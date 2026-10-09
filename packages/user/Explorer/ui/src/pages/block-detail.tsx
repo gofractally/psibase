@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
-import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import {
@@ -12,7 +11,7 @@ import {
 } from "@/lib/format";
 import { fetchBlock } from "@/lib/queries";
 import { FIRST_VISIBLE_BLOCK } from "@/lib/types";
-import { flattenTransactions } from "@/store/live-chain";
+import { countActions, flattenTransactions } from "@/store/live-chain";
 import { useHead } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
@@ -20,6 +19,7 @@ import { DocLabel } from "@/components/doc-link";
 import { Hash } from "@/components/hash";
 import { JsonView } from "@/components/json-view";
 import { KeyValue, PageHeader, Panel } from "@/components/page-header";
+import { PrivateMarker } from "@/components/private-marker";
 import { TimeAgo } from "@/components/time-ago";
 import { TransactionsTable } from "@/components/transactions-table";
 import { DOC_PATHS, consensusDocPath } from "@/lib/docs";
@@ -27,13 +27,11 @@ import { DOC_PATHS, consensusDocPath } from "@/lib/docs";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { Switch } from "@shared/shadcn/ui/switch";
 
 export const BlockDetailPage = () => {
     const { blockNum: raw } = useParams();
     const blockNum = Number(raw);
     const head = useHead();
-    const [showSystem, setShowSystem] = useState(false);
 
     const valid = Number.isInteger(blockNum) && blockNum >= 0;
     const isGenesis = valid && blockNum < FIRST_VISIBLE_BLOCK;
@@ -139,15 +137,19 @@ export const BlockDetailPage = () => {
     }
 
     const txs = flattenTransactions(block);
-    const userTxs = txs.filter((t) => !t.isSystem);
-    const shown = showSystem ? txs : userTxs;
-    const actionCount = userTxs.reduce((a, t) => a + t.transaction.actions.length, 0);
-    const payloadBytes = txs.reduce(
+    const visibleTxs = txs.filter((t) => t.transaction !== null);
+    const privateCount = txs.length - visibleTxs.length;
+    const actionCount = countActions(block);
+    const payloadBytes = visibleTxs.reduce(
         (a, t) =>
             a +
-            t.transaction.actions.reduce((b, act) => b + hexByteLength(act.rawData), 0),
+            (t.transaction?.actions ?? []).reduce(
+                (b, act) => b + hexByteLength(act.rawData),
+                0,
+            ),
         0,
     );
+    const received = [...block.actionsReceived].sort((a, b) => b.count - a.count);
     const isHead = head?.blockNum === block.header.blockNum;
     const lag = block.header.blockNum - block.header.commitNum;
     const nc = block.header.newConsensus;
@@ -208,14 +210,38 @@ export const BlockDetailPage = () => {
                     </KeyValue>
                     <KeyValue label="Transactions">
                         <span className="tabular-nums">
-                            {userTxs.length} user
+                            {txs.length} transactions
                             <span className="text-muted-foreground">
-                                {" "}· {txs.length - userTxs.length} system · {actionCount} actions
+                                {" "}· {actionCount} actions · {visibleTxs.length} visible to you
                             </span>
                         </span>
                     </KeyValue>
+                    <KeyValue label="Actions received">
+                        <span className="flex flex-wrap gap-x-3 gap-y-1">
+                            {received.map((r) => (
+                                <span key={r.service} className="inline-flex items-center gap-1">
+                                    <AccountLink name={r.service} />
+                                    <span className="text-muted-foreground font-mono text-[10px]">
+                                        ×{r.count}
+                                    </span>
+                                </span>
+                            ))}
+                        </span>
+                    </KeyValue>
                     <KeyValue label="Action payload">
-                        <span className="tabular-nums">{formatBytes(payloadBytes)}</span>
+                        {visibleTxs.length === 0 ? (
+                            <PrivateMarker />
+                        ) : (
+                            <span className="tabular-nums">
+                                {formatBytes(payloadBytes)}
+                                {privateCount > 0 && (
+                                    <span className="text-muted-foreground text-xs">
+                                        {" "}· excludes {privateCount} private{" "}
+                                        {privateCount === 1 ? "transaction" : "transactions"}
+                                    </span>
+                                )}
+                            </span>
+                        )}
                     </KeyValue>
                     <KeyValue
                         label={
@@ -288,19 +314,18 @@ export const BlockDetailPage = () => {
             )}
 
             <Panel
-                title={`Transactions (${shown.length})`}
-                actions={
-                    <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                        <Switch checked={showSystem} onCheckedChange={setShowSystem} className="scale-90" />
-                        Show system
-                    </label>
+                title={`Transactions (${txs.length})`}
+                description={
+                    privateCount > 0
+                        ? "Contents are shown only for transactions you're a party to"
+                        : undefined
                 }
             >
                 <TransactionsTable
-                    transactions={shown}
+                    transactions={txs}
                     showBlock={false}
                     animateNew={false}
-                    emptyMessage="This block carries only the system block-start transaction"
+                    emptyMessage="This block carries no transactions"
                 />
             </Panel>
 

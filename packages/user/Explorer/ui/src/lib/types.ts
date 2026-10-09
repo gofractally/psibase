@@ -13,23 +13,23 @@ export interface Action {
     data?: unknown;
 }
 
-export interface Tapos {
-    expiration: string;
-    refBlockSuffix: number;
-    flags: number;
-    refBlockIndex: number;
-}
-
 export interface Transaction {
-    tapos: Tapos;
     actions: Action[];
-    claims: Claim[];
 }
 
 export interface TransactionRecord {
     id: string;
-    transaction: Transaction;
-    proofs?: string[];
+    /** Number of top-level actions. Public, even when `transaction` is redacted. */
+    numActions: number;
+    /** `null` when the viewer is not a party to the transaction. */
+    transaction: Transaction | null;
+    proofs?: string[] | null;
+}
+
+/** Top-level actions received by a service within one block. */
+export interface ServiceActionCount {
+    service: string;
+    count: number;
 }
 
 export interface Producer {
@@ -80,6 +80,7 @@ export interface BlockRecord {
     id: string;
     header: BlockHeader;
     transactions: TransactionRecord[];
+    actionsReceived: ServiceActionCount[];
 }
 
 export interface PageInfo {
@@ -111,8 +112,9 @@ export interface TransactionWithContext {
     blockTime: string;
     producer: string;
     index: number;
-    transaction: Transaction;
-    isSystem: boolean;
+    numActions: number;
+    /** `null` when the viewer is not a party to the transaction. */
+    transaction: Transaction | null;
 }
 
 /** Genesis is block #2; it cannot currently be displayed, so the UI starts at #3. */

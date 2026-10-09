@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Lock } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -7,7 +7,6 @@ import {
     formatBytes,
     formatNumber,
     formatTime,
-    formatUtc,
     hexByteLength,
     hexToPrintable,
     isHash,
@@ -21,6 +20,10 @@ import { DocLabel } from "@/components/doc-link";
 import { CopyIcon, Hash } from "@/components/hash";
 import { JsonView } from "@/components/json-view";
 import { KeyValue, PageHeader, Panel } from "@/components/page-header";
+import {
+    PRIVATE_TRANSACTION_HINT,
+    PrivateMarker,
+} from "@/components/private-marker";
 import { TimeAgo } from "@/components/time-ago";
 import { DOC_PATHS } from "@/lib/docs";
 
@@ -71,10 +74,9 @@ export const TransactionDetailPage = () => {
         );
     }
 
-    const { transaction: trx } = data.transaction;
-    const senders = [...new Set(trx.actions.map((a) => a.sender).filter(Boolean))];
-    const isSystem = trx.actions.length > 0 && trx.actions.every((a) => a.sender === "");
-    const payload = trx.actions.reduce((a, act) => a + hexByteLength(act.rawData), 0);
+    const { transaction: trx, numActions, proofs } = data.transaction;
+    const senders = [...new Set((trx?.actions ?? []).map((a) => a.sender).filter(Boolean))];
+    const payload = (trx?.actions ?? []).reduce((a, act) => a + hexByteLength(act.rawData), 0);
 
     return (
         <div className="flex flex-col gap-4">
@@ -82,9 +84,9 @@ export const TransactionDetailPage = () => {
                 title={
                     <span className="flex items-center gap-3">
                         Transaction
-                        {isSystem && (
-                            <Badge variant="outline" className="text-muted-foreground">
-                                System
+                        {!trx && (
+                            <Badge variant="outline" className="text-muted-foreground gap-1">
+                                <Lock className="size-3" /> Private
                             </Badge>
                         )}
                     </span>
@@ -100,109 +102,76 @@ export const TransactionDetailPage = () => {
                 }
             />
 
-            <div className="grid gap-4 xl:grid-cols-3">
-                <Panel title="Summary" className="xl:col-span-2">
-                    <KeyValue label="Block">
-                        <span className="flex flex-wrap items-center gap-2">
-                            <Link to={`/blocks/${data.blockNum}`} className="text-primary font-mono hover:underline">
-                                #{formatNumber(data.blockNum)}
-                            </Link>
-                            <Hash value={data.blockId} head={8} tail={8} />
-                            <span className="text-muted-foreground text-xs">
-                                position {data.index}
-                            </span>
+            <Panel title="Summary">
+                <KeyValue label="Block">
+                    <span className="flex flex-wrap items-center gap-2">
+                        <Link to={`/blocks/${data.blockNum}`} className="text-primary font-mono hover:underline">
+                            #{formatNumber(data.blockNum)}
+                        </Link>
+                        <Hash value={data.blockId} head={8} tail={8} />
+                        <span className="text-muted-foreground text-xs">
+                            position {data.index}
                         </span>
-                    </KeyValue>
-                    <KeyValue label="Timestamp">
-                        <span className="flex flex-wrap items-center gap-2">
-                            <span>{formatTime(data.blockTime)}</span>
-                            <span className="text-muted-foreground text-xs">
-                                (<TimeAgo time={data.blockTime} tooltip={false} />)
-                            </span>
+                    </span>
+                </KeyValue>
+                <KeyValue label="Timestamp">
+                    <span className="flex flex-wrap items-center gap-2">
+                        <span>{formatTime(data.blockTime)}</span>
+                        <span className="text-muted-foreground text-xs">
+                            (<TimeAgo time={data.blockTime} tooltip={false} />)
                         </span>
-                    </KeyValue>
-                    <KeyValue label="Provider">
-                        <AccountLink name={data.producer} />
-                    </KeyValue>
-                    <KeyValue label="Sender">
-                        {senders.length === 0 ? (
-                            <AccountLink name="" />
-                        ) : (
-                            <div className="flex flex-wrap gap-2">
-                                {senders.map((s) => (
-                                    <AccountLink key={s} name={s} />
-                                ))}
-                            </div>
-                        )}
-                    </KeyValue>
-                    <KeyValue label="Actions">
-                        <span className="tabular-nums">
-                            {trx.actions.length}
+                    </span>
+                </KeyValue>
+                <KeyValue label="Provider">
+                    <AccountLink name={data.producer} />
+                </KeyValue>
+                <KeyValue label="Sender">
+                    {!trx ? (
+                        <PrivateMarker />
+                    ) : senders.length === 0 ? (
+                        <AccountLink name="" />
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {senders.map((s) => (
+                                <AccountLink key={s} name={s} />
+                            ))}
+                        </div>
+                    )}
+                </KeyValue>
+                <KeyValue label="Actions">
+                    <span className="tabular-nums">
+                        {numActions}
+                        {trx && (
                             <span className="text-muted-foreground"> · {formatBytes(payload)} payload</span>
-                        </span>
-                    </KeyValue>
-                    <KeyValue
-                        label={
-                            <DocLabel path={DOC_PATHS.smartAuthorization} topic="claims and proofs">
-                                Authorization
-                            </DocLabel>
-                        }
-                    >
-                        {trx.claims.length === 0 ? (
-                            <span className="text-muted-foreground text-xs">
-                                No claims (unsigned)
-                            </span>
-                        ) : (
-                            <div className="flex flex-col gap-1.5">
-                                {trx.claims.map((c, i) => (
-                                    <div key={i} className="flex flex-wrap items-center gap-2 text-xs">
-                                        <AccountLink name={c.service} />
-                                        <span className="text-muted-foreground font-mono break-all">
-                                            {c.rawData.length > 80 ? `${c.rawData.slice(0, 80)}…` : c.rawData}
-                                        </span>
-                                        <CopyIcon value={c.rawData} />
-                                    </div>
-                                ))}
-                                <span className="text-muted-foreground text-xs">
-                                    {data.transaction.proofs?.length ?? 0} proof(s)
-                                </span>
-                            </div>
                         )}
-                    </KeyValue>
-                </Panel>
-
-                <Panel
-                    title={
-                        <DocLabel path={DOC_PATHS.tapos} topic="TAPoS">
-                            TAPoS
+                    </span>
+                </KeyValue>
+                <KeyValue
+                    label={
+                        <DocLabel path={DOC_PATHS.smartAuthorization} topic="proofs">
+                            Proofs
                         </DocLabel>
                     }
                 >
-                    <KeyValue label="Expiration" className="sm:grid-cols-1">
-                        <span className="font-mono text-xs">{formatUtc(trx.tapos.expiration)}</span>
-                    </KeyValue>
-                    <KeyValue label="Ref block index" className="sm:grid-cols-1">
-                        <span className="font-mono text-xs">{trx.tapos.refBlockIndex}</span>
-                    </KeyValue>
-                    <KeyValue label="Ref block suffix" className="sm:grid-cols-1">
-                        <span className="font-mono text-xs">
-                            {trx.tapos.refBlockSuffix.toString(16).toUpperCase().padStart(8, "0")}
-                        </span>
-                    </KeyValue>
-                    <KeyValue label="Flags" className="sm:grid-cols-1">
-                        <span className="font-mono text-xs">
-                            0x{trx.tapos.flags.toString(16).padStart(4, "0")}
-                            {trx.tapos.flags & 1 ? " · do not broadcast" : ""}
-                        </span>
-                    </KeyValue>
-                </Panel>
-            </div>
-
-            <Panel title={`Actions (${trx.actions.length})`} bodyClassName="flex flex-col divide-y">
-                {trx.actions.map((a, i) => (
-                    <ActionCard key={i} index={i} action={a} />
-                ))}
+                    {proofs ? (
+                        <span className="tabular-nums">{proofs.length}</span>
+                    ) : (
+                        <PrivateMarker />
+                    )}
+                </KeyValue>
             </Panel>
+
+            {trx ? (
+                <Panel title={`Actions (${trx.actions.length})`} bodyClassName="flex flex-col divide-y">
+                    {trx.actions.map((a, i) => (
+                        <ActionCard key={i} index={i} action={a} />
+                    ))}
+                </Panel>
+            ) : (
+                <Notice title={`${numActions} private ${numActions === 1 ? "action" : "actions"}`}>
+                    {PRIVATE_TRANSACTION_HINT}
+                </Notice>
+            )}
 
             <JsonView value={data} title="Raw transaction JSON" />
         </div>

@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { GlobalSearch } from "@/components/global-search";
 import { LiveIndicator } from "@/components/live-indicator";
 
+import { useViewerSync } from "@/hooks/use-viewer-sync";
 import { shortHash } from "@/lib/format";
 
 import { cn } from "@shared/lib/utils";
@@ -68,6 +69,7 @@ const useCrumbs = () => {
 
 export const Layout = () => {
     const crumbs = useCrumbs();
+    useViewerSync();
     return (
         <SidebarProvider>
             <AppSidebar variant="inset" />

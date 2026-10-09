@@ -69,7 +69,7 @@ export const GlobalSearch = ({ className }: { className?: string }) => {
     });
 
     const producers = useLiveChain((s) => s.stats.producers);
-    const recentTxs = useLiveChain((s) => s.recentUserTransactions);
+    const recentTxs = useLiveChain((s) => s.recentTransactions);
     const recentBlocks = useLiveChain((s) => s.blocks);
 
     const term = value.trim();

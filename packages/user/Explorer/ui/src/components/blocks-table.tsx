@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import type { BlockRecord } from "@/lib/types";
 import { formatClock, formatNumber } from "@/lib/format";
-import { isSystemTransaction } from "@/store/live-chain";
+import { countActions } from "@/store/live-chain";
 
 import { AccountLink } from "@/components/account-link";
 import { EmptyState } from "@/components/empty-state";
@@ -89,13 +89,8 @@ export const BlocksTable = ({
                 </thead>
                 <tbody>
                     {blocks.map((b) => {
-                        const userTxs = b.transactions.filter(
-                            (t) => !isSystemTransaction(t),
-                        );
-                        const actions = userTxs.reduce(
-                            (a, t) => a + t.transaction.actions.length,
-                            0,
-                        );
+                        const txs = b.transactions.length;
+                        const actions = countActions(b);
                         const lag = b.header.blockNum - b.header.commitNum;
                         const isNew =
                             animateNew &&
@@ -136,23 +131,13 @@ export const BlocksTable = ({
                                         tail={6}
                                     />
                                 </Td>
-                                <Td className="text-right tabular-nums">
-                                    <span
-                                        className={cn(
-                                            userTxs.length === 0 &&
-                                                "text-muted-foreground/60",
-                                        )}
-                                    >
-                                        {userTxs.length}
-                                    </span>
-                                    {b.transactions.length > userTxs.length && (
-                                        <span
-                                            className="text-muted-foreground/50 ml-1 text-[10px]"
-                                            title="system transactions"
-                                        >
-                                            +{b.transactions.length - userTxs.length}
-                                        </span>
+                                <Td
+                                    className={cn(
+                                        "text-right tabular-nums",
+                                        txs === 0 && "text-muted-foreground/60",
                                     )}
+                                >
+                                    {txs}
                                 </Td>
                                 <Td
                                     className={cn(

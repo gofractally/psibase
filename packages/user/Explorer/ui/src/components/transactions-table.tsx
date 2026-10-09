@@ -8,10 +8,10 @@ import { AccountLink } from "@/components/account-link";
 import { EmptyState } from "@/components/empty-state";
 import { ActionChips } from "@/components/action-chips";
 import { Hash } from "@/components/hash";
+import { PrivateMarker } from "@/components/private-marker";
 import { TimeAgo } from "@/components/time-ago";
 
 import { cn } from "@shared/lib/utils";
-import { Badge } from "@shared/shadcn/ui/badge";
 
 interface Props {
     transactions: TransactionWithContext[];
@@ -52,7 +52,9 @@ const Td = ({
 );
 
 export const uniqueSenders = (t: TransactionWithContext) => [
-    ...new Set(t.transaction.actions.map((a) => a.sender).filter(Boolean)),
+    ...new Set(
+        (t.transaction?.actions ?? []).map((a) => a.sender).filter(Boolean),
+    ),
 ];
 
 export const TransactionsTable = ({
@@ -84,12 +86,7 @@ export const TransactionsTable = ({
                         <Th>Age</Th>
                         <Th>Sender</Th>
                         <Th>Actions</Th>
-                        {!compact && (
-                            <>
-                                <Th className="text-right">#</Th>
-                                <Th>Auth</Th>
-                            </>
-                        )}
+                        {!compact && <Th className="text-right">#</Th>}
                     </tr>
                 </thead>
                 <tbody>
@@ -114,14 +111,6 @@ export const TransactionsTable = ({
                                         head={8}
                                         tail={6}
                                     />
-                                    {t.isSystem && (
-                                        <Badge
-                                            variant="outline"
-                                            className="text-muted-foreground ml-2 h-4 px-1 text-[9px] uppercase"
-                                        >
-                                            sys
-                                        </Badge>
-                                    )}
                                 </Td>
                                 {showBlock && (
                                     <Td>
@@ -137,7 +126,9 @@ export const TransactionsTable = ({
                                     <TimeAgo time={t.blockTime} />
                                 </Td>
                                 <Td>
-                                    {senders.length === 0 ? (
+                                    {!t.transaction ? (
+                                        <PrivateMarker />
+                                    ) : senders.length === 0 ? (
                                         <AccountLink name="" />
                                     ) : (
                                         <span className="inline-flex items-center gap-1.5">
@@ -151,24 +142,21 @@ export const TransactionsTable = ({
                                     )}
                                 </Td>
                                 <Td className="max-w-[420px] whitespace-normal">
-                                    <ActionChips
-                                        actions={t.transaction.actions}
-                                        max={compact ? 2 : 3}
-                                    />
+                                    {t.transaction ? (
+                                        <ActionChips
+                                            actions={t.transaction.actions}
+                                            max={compact ? 2 : 3}
+                                        />
+                                    ) : (
+                                        <PrivateMarker
+                                            label={`${formatNumber(t.numActions)} ${t.numActions === 1 ? "action" : "actions"}`}
+                                        />
+                                    )}
                                 </Td>
                                 {!compact && (
-                                    <>
-                                        <Td className="text-right tabular-nums">
-                                            {t.transaction.actions.length}
-                                        </Td>
-                                        <Td className="text-muted-foreground text-xs">
-                                            {t.transaction.claims.length === 0
-                                                ? "—"
-                                                : t.transaction.claims
-                                                      .map((c) => c.service)
-                                                      .join(", ")}
-                                        </Td>
-                                    </>
+                                    <Td className="text-right tabular-nums">
+                                        {t.numActions}
+                                    </Td>
                                 )}
                             </tr>
                         );

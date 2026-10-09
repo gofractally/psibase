@@ -100,7 +100,7 @@ export const ServicesPage = () => {
                     label="Active services"
                     accent="var(--chart-1)"
                     value={formatNumber(stats.serviceActivity.length)}
-                    sub="received user actions in window"
+                    sub="received actions in window"
                 />
                 <StatCard
                     label="Actions"

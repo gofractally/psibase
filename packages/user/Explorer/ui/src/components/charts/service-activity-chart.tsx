@@ -21,7 +21,7 @@ export const ServiceActivityChart = ({ data, max = 8, height = 200 }: Props) => 
     if (total === 0) {
         return (
             <EmptyState style={{ minHeight: height }}>
-                No user actions in the current window
+                No actions in the current window
             </EmptyState>
         );
     }

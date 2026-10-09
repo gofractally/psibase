@@ -12,7 +12,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatNumber } from "@/lib/format";
 import { fetchBlocks } from "@/lib/queries";
 import { type BlockRecord, FIRST_VISIBLE_BLOCK } from "@/lib/types";
-import { isSystemTransaction } from "@/store/live-chain";
 import { useLiveChain } from "@/store/use-live-chain";
 
 import { BlocksTable } from "@/components/blocks-table";
@@ -39,7 +38,7 @@ export const BlocksPage = () => {
 
     const [paused, setPaused] = useState(false);
     const [frozen, setFrozen] = useState<BlockRecord[] | null>(null);
-    const [onlyWithTxs, setOnlyWithTxs] = useState(false);
+    const [onlyBusy, setOnlyBusy] = useState(false);
     const [producerFilter, setProducerFilter] = useState<string>("");
     const [jump, setJump] = useState("");
 
@@ -69,18 +68,15 @@ export const BlocksPage = () => {
         [liveBlocks],
     );
 
-    const rows = useMemo(
-        () =>
-            source
-                .filter(
-                    (b) =>
-                        !onlyWithTxs ||
-                        b.transactions.some((t) => !isSystemTransaction(t)),
-                )
-                .filter((b) => !producerFilter || b.header.producer === producerFilter)
-                .slice(0, PAGE_SIZE),
-        [source, onlyWithTxs, producerFilter],
-    );
+    // Every block carries system transactions, so "busy" means more
+    // transactions than the quietest block in view.
+    const rows = useMemo(() => {
+        const baseline = Math.min(...source.map((b) => b.transactions.length));
+        return source
+            .filter((b) => !onlyBusy || b.transactions.length > baseline)
+            .filter((b) => !producerFilter || b.header.producer === producerFilter)
+            .slice(0, PAGE_SIZE);
+    }, [source, onlyBusy, producerFilter]);
 
     const oldest = rows.length ? rows[rows.length - 1].header.blockNum : null;
     const newest = rows.length ? rows[0].header.blockNum : null;
@@ -158,11 +154,11 @@ export const BlocksPage = () => {
                     <div className="flex flex-wrap items-center gap-2">
                         <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
                             <Switch
-                                checked={onlyWithTxs}
-                                onCheckedChange={setOnlyWithTxs}
+                                checked={onlyBusy}
+                                onCheckedChange={setOnlyBusy}
                                 className="scale-90"
                             />
-                            With txs
+                            Busy only
                         </label>
                         {producers.length > 1 && (
                             <select
@@ -246,8 +242,8 @@ export const BlocksPage = () => {
                         blocks={rows}
                         animateNew={live && !paused}
                         emptyMessage={
-                            onlyWithTxs
-                                ? "No blocks with user transactions in this range"
+                            onlyBusy
+                                ? "No blocks busier than the quietest block in this range"
                                 : "No blocks"
                         }
                     />

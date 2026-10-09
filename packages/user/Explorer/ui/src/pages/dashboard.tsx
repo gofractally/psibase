@@ -10,22 +10,15 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import {
-    formatDuration,
-    formatNumber,
-    formatSeconds,
-    pct,
-} from "@/lib/format";
+import { formatDuration, formatNumber, formatSeconds } from "@/lib/format";
 import { fetchNetworkName, fetchProducersInfo } from "@/lib/queries";
 import { useLiveChain } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
 import { BlockStrip } from "@/components/block-strip";
 import { BlocksTable } from "@/components/blocks-table";
-import { EmptyState } from "@/components/empty-state";
 import { BlockActivityChart } from "@/components/charts/block-activity-chart";
 import { ServiceActivityChart } from "@/components/charts/service-activity-chart";
-import { MethodChip } from "@/components/action-chips";
 import { DocLabel } from "@/components/doc-link";
 import { Panel } from "@/components/page-header";
 import { ProducerRing } from "@/components/producer-ring";
@@ -38,7 +31,7 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const DashboardPage = () => {
     const state = useLiveChain();
-    const { blocks, head, stats, recentUserTransactions, status } = state;
+    const { blocks, head, stats, recentTransactions, status } = state;
 
     const { data: producersInfo } = useQuery({
         queryKey: ["producers", "info"],
@@ -53,12 +46,12 @@ export const DashboardPage = () => {
 
     const producerNames = producersInfo?.producers.map((p) => p.name) ?? [];
     const latestBlocks = blocks.slice(-10).reverse();
-    const latestTxs = recentUserTransactions.slice(0, 10);
+    const latestTxs = recentTransactions.slice(0, 10);
     const intervals = stats.series
         .map((p) => p.interval)
         .filter((v): v is number => v !== null)
         .slice(-60);
-    const txSpark = stats.series.slice(-60).map((p) => p.userTxs);
+    const txSpark = stats.series.slice(-60).map((p) => p.txs);
     const activeProducers = stats.producers.length;
 
     return (
@@ -126,7 +119,7 @@ export const DashboardPage = () => {
                         icon={ArrowLeftRight}
                         accent="var(--chart-1)"
                         value={stats.txPerMinute.toFixed(1)}
-                        sub={`${stats.userTps.toFixed(2)} tx/s · ${formatNumber(stats.userTxCount)} user tx in window`}
+                        sub={`${stats.tps.toFixed(2)} tx/s · ${formatNumber(stats.txCount)} tx in window`}
                         spark={txSpark}
                     />
                     <StatCard
@@ -250,7 +243,7 @@ export const DashboardPage = () => {
                 </Panel>
                 <Panel
                     title="Latest transactions"
-                    description="System block-start transactions hidden"
+                    description="Contents are shown only for transactions you're a party to"
                     actions={
                         <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
                             <Link to="/transactions">View all</Link>
@@ -260,62 +253,18 @@ export const DashboardPage = () => {
                     <TransactionsTable
                         transactions={latestTxs}
                         compact
-                        emptyMessage="No user transactions in the recent window yet"
+                        emptyMessage="No transactions in the recent window yet"
                     />
                 </Panel>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-3">
-                <Panel title="Activity by service" description="User actions in window" bodyClassName="p-4">
-                    <ServiceActivityChart data={stats.serviceActivity} height={180} />
-                </Panel>
-                <Panel title="Top methods" description="Most-called service methods" bodyClassName="p-2">
-                    {stats.methodActivity.length === 0 ? (
-                        <EmptyNote />
-                    ) : (
-                        <ul className="flex flex-col">
-                            {stats.methodActivity.slice(0, 8).map((m) => (
-                                <li
-                                    key={m.key}
-                                    className="hover:bg-accent/40 flex items-center justify-between gap-2 rounded-md px-2 py-1.5"
-                                >
-                                    <MethodChip service={m.service} method={m.method} />
-                                    <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
-                                        {formatNumber(m.count)}
-                                        <span className="ml-1 opacity-60">
-                                            {pct(m.count, stats.actionCount, 0)}
-                                        </span>
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </Panel>
-                <Panel title="Most active accounts" description="By actions sent" bodyClassName="p-2">
-                    {stats.senderActivity.length === 0 ? (
-                        <EmptyNote />
-                    ) : (
-                        <ul className="flex flex-col">
-                            {stats.senderActivity.slice(0, 8).map((s, i) => (
-                                <li
-                                    key={s.sender}
-                                    className="hover:bg-accent/40 flex items-center justify-between gap-2 rounded-md px-2 py-1.5"
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <span className="text-muted-foreground w-4 text-right font-mono text-[10px]">
-                                            {i + 1}
-                                        </span>
-                                        <AccountLink name={s.sender} />
-                                    </span>
-                                    <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
-                                        {formatNumber(s.count)}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </Panel>
-            </div>
+            <Panel
+                title="Activity by service"
+                description="Actions received in window, including system transactions"
+                bodyClassName="p-4"
+            >
+                <ServiceActivityChart data={stats.serviceActivity} height={200} />
+            </Panel>
 
             <div className="text-muted-foreground flex items-center gap-2 text-[11px]">
                 <Gauge className="size-3.5" />
@@ -324,10 +273,6 @@ export const DashboardPage = () => {
         </div>
     );
 };
-
-const EmptyNote = () => (
-    <EmptyState>No user activity in the current window</EmptyState>
-);
 
 const hue = (label: string) => {
     let hash = 0;

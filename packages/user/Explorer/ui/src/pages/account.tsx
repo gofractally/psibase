@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, KeyRound, Package, Radio, Server, Store } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -27,6 +27,7 @@ import { MethodChip } from "@/components/action-chips";
 import { DocLabel } from "@/components/doc-link";
 import { CopyIcon, Hash } from "@/components/hash";
 import { KeyValue, PageHeader, Panel } from "@/components/page-header";
+import { PrivateMarker } from "@/components/private-marker";
 import { StatCard } from "@/components/stat-card";
 import { TimeAgo } from "@/components/time-ago";
 import { TransactionsTable } from "@/components/transactions-table";
@@ -34,15 +35,15 @@ import { DOC_PATHS } from "@/lib/docs";
 
 import { Avatar } from "@shared/components/avatar";
 import { cn } from "@shared/lib/utils";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { Switch } from "@shared/shadcn/ui/switch";
 
 export const AccountPage = () => {
     const { name = "" } = useParams();
-    const [showSystem, setShowSystem] = useState(false);
+    const { data: currentUser } = useCurrentUser();
 
     const account = useQuery({
         queryKey: ["account", name],
@@ -98,41 +99,50 @@ export const AccountPage = () => {
     const profile = useProfile(name || null);
 
     const all = useLiveChain((s) => s.recentTransactions);
+    const blocks = useLiveChain((s) => s.blocks);
     const stats = useLiveChain((s) => s.stats);
 
-    const activity = useMemo(() => {
-        const source = all.filter((t) => showSystem || !t.isSystem);
-        return source.filter((t) =>
-            t.transaction.actions.some((a) => a.sender === name || a.service === name),
-        );
-    }, [all, name, showSystem]);
+    // Transactions are only visible to the accounts involved, so anything
+    // beyond public per-service counts is only complete for the account
+    // itself or its delegated owner.
+    const viewerControls =
+        !!currentUser && (currentUser === name || authDelg.data?.owner === currentUser);
+
+    // Only transactions the viewer is a party to; others are redacted
+    const activity = useMemo(
+        () =>
+            all.filter((t) =>
+                (t.transaction?.actions ?? []).some(
+                    (a) => a.sender === name || a.service === name,
+                ),
+            ),
+        [all, name],
+    );
 
     const sentCount = useMemo(
         () =>
-            all.reduce(
-                (n, t) => n + t.transaction.actions.filter((a) => a.sender === name).length,
+            activity.reduce(
+                (n, t) => n + (t.transaction?.actions ?? []).filter((a) => a.sender === name).length,
                 0,
             ),
-        [all, name],
+        [activity, name],
     );
-    const receivedCount = useMemo(
+    const receivedPerBlock = useMemo(
         () =>
-            all.reduce(
-                (n, t) =>
-                    n +
-                    t.transaction.actions.filter((a) => a.service === name && a.sender !== "").length,
-                0,
+            blocks.map(
+                (b) => b.actionsReceived.find((r) => r.service === name)?.count ?? 0,
             ),
-        [all, name],
+        [blocks, name],
     );
+    const receivedCount = receivedPerBlock.reduce((a, b) => a + b, 0);
     const receivedMethods = useMemo(() => {
         const m = new Map<string, number>();
-        for (const t of all)
-            for (const a of t.transaction.actions)
+        for (const t of activity)
+            for (const a of t.transaction?.actions ?? [])
                 if (a.service === name && a.sender !== "")
                     m.set(a.method, (m.get(a.method) ?? 0) + 1);
         return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
-    }, [all, name]);
+    }, [activity, name]);
 
     const pkg = packages.data?.find((p) => p.accounts.includes(name) || p.services.includes(name));
     const isProducer = producers.data?.producers.some((p) => p.name === name) ?? false;
@@ -226,22 +236,43 @@ export const AccountPage = () => {
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <StatCard
-                    label="Actions sent"
-                    accent="var(--chart-1)"
-                    value={formatNumber(sentCount)}
-                    sub={`in last ${formatNumber(stats.windowBlocks)} blocks`}
-                />
-                <StatCard
                     label="Actions received"
                     accent="var(--chart-2)"
                     value={formatNumber(receivedCount)}
-                    sub={isService ? "calls into this service" : "not a service"}
+                    sub={`in last ${formatNumber(stats.windowBlocks)} blocks`}
+                    spark={receivedPerBlock.slice(-60)}
+                />
+                <StatCard
+                    label="Actions sent"
+                    accent="var(--chart-1)"
+                    value={
+                        viewerControls ? (
+                            formatNumber(sentCount)
+                        ) : (
+                            <PrivateMarker className="text-base" />
+                        )
+                    }
+                    sub={
+                        viewerControls
+                            ? `in last ${formatNumber(stats.windowBlocks)} blocks`
+                            : "only visible to this account"
+                    }
                 />
                 <StatCard
                     label="Transactions"
                     accent="var(--chart-4)"
-                    value={formatNumber(activity.length)}
-                    sub="involving this account (window)"
+                    value={
+                        viewerControls ? (
+                            formatNumber(activity.length)
+                        ) : (
+                            <PrivateMarker className="text-base" />
+                        )
+                    }
+                    sub={
+                        viewerControls
+                            ? "involving this account (window)"
+                            : "only visible to this account"
+                    }
                 />
                 {isProducer || producerStats ? (
                     <StatCard
@@ -452,7 +483,7 @@ export const AccountPage = () => {
                                     </span>
                                 )}
                             </KeyValue>
-                            {receivedMethods.length > 0 && (
+                            {viewerControls && receivedMethods.length > 0 && (
                                 <KeyValue label="Methods called">
                                     <span className="flex flex-wrap gap-1">
                                         {receivedMethods.map(([m, c]) => (
@@ -489,18 +520,20 @@ export const AccountPage = () => {
             </div>
 
             <Panel
-                title={`Recent activity (${activity.length})`}
-                description="Transactions in the live window where this account is a sender or the called service"
-                actions={
-                    <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                        <Switch checked={showSystem} onCheckedChange={setShowSystem} className="scale-90" />
-                        System
-                    </label>
+                title={`Recent activity${activity.length ? ` (${activity.length})` : ""}`}
+                description={
+                    viewerControls
+                        ? "Transactions in the live window where this account is a sender or the called service"
+                        : "Transactions involving this account that you are also a party to"
                 }
             >
                 <TransactionsTable
                     transactions={activity.slice(0, 100)}
-                    emptyMessage="No recent transactions involve this account"
+                    emptyMessage={
+                        viewerControls
+                            ? "No recent transactions involve this account"
+                            : "Transactions involving this account are only visible to the accounts involved"
+                    }
                 />
             </Panel>
         </div>

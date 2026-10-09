@@ -16,7 +16,12 @@ import { gqlString, graphql } from "./graphql";
 // Explorer service (block log)
 // ---------------------------------------------------------------------------
 
-/** Fields fetched for list/feed views. Deliberately omits action payloads. */
+/**
+ * Fields fetched for list/feed views. Deliberately omits action payloads.
+ *
+ * `transaction` is redacted (null) unless the logged-in user is a party to it;
+ * `numActions` and `actionsReceived` are public.
+ */
 const BLOCK_SUMMARY_FIELDS = `
     id
     header {
@@ -27,12 +32,12 @@ const BLOCK_SUMMARY_FIELDS = `
         term
         commitNum
     }
+    actionsReceived { service count }
     transactions {
         id
+        numActions
         transaction {
-            tapos { expiration refBlockSuffix flags refBlockIndex }
             actions { sender service method }
-            claims { service }
         }
     }
 `;
@@ -67,12 +72,12 @@ const BLOCK_FULL_FIELDS = `
             }
         }
     }
+    actionsReceived { service count }
     transactions {
         id
+        numActions
         transaction {
-            tapos { expiration refBlockSuffix flags refBlockIndex }
             actions { sender service method rawData data }
-            claims { service rawData }
         }
         proofs
     }
@@ -172,10 +177,9 @@ export const findTransaction = async (
             blockNum blockId blockTime producer index
             transaction {
                 id
+                numActions
                 transaction {
-                    tapos { expiration refBlockSuffix flags refBlockIndex }
                     actions { sender service method rawData data }
-                    claims { service rawData }
                 }
                 proofs
             }

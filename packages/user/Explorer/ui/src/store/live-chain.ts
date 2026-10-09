@@ -14,7 +14,6 @@ export interface BlockPoint {
     blockNum: number;
     time: number;
     txs: number;
-    userTxs: number;
     actions: number;
     interval: number | null;
     producer: string;
@@ -35,16 +34,12 @@ export interface ChainStats {
     medianInterval: number;
     maxInterval: number;
     txCount: number;
-    userTxCount: number;
     actionCount: number;
-    userTps: number;
+    tps: number;
     txPerMinute: number;
-    systemTxPerMinute: number;
     actionsPerMinute: number;
     producers: ProducerStats[];
     serviceActivity: { service: string; count: number }[];
-    methodActivity: { key: string; service: string; method: string; count: number }[];
-    senderActivity: { sender: string; count: number }[];
     series: BlockPoint[];
     commitLag: number;
     term: number;
@@ -62,7 +57,6 @@ export interface LiveChainState {
     version: number;
     stats: ChainStats;
     recentTransactions: TransactionWithContext[];
-    recentUserTransactions: TransactionWithContext[];
 }
 
 const WINDOW = 720; // blocks kept in memory (~12 min at 1 block/s)
@@ -72,23 +66,22 @@ const HIDDEN_POLL_MS = 5000;
 const STALL_MS = 6000;
 const TX_HISTORY = 400;
 
-export const isSystemTransaction = (trx: TransactionRecord) =>
-    trx.transaction.actions.length > 0 &&
-    trx.transaction.actions.every((a) => a.sender === "");
-
 export const flattenTransactions = (
     block: BlockRecord,
 ): TransactionWithContext[] =>
-    block.transactions.map((trx, index) => ({
+    block.transactions.map((trx: TransactionRecord, index) => ({
         id: trx.id,
         blockNum: block.header.blockNum,
         blockId: block.id,
         blockTime: block.header.time,
         producer: block.header.producer,
         index,
+        numActions: trx.numActions,
         transaction: trx.transaction,
-        isSystem: isSystemTransaction(trx),
     }));
+
+export const countActions = (block: BlockRecord) =>
+    block.transactions.reduce((n, trx) => n + trx.numActions, 0);
 
 const median = (values: number[]) => {
     if (values.length === 0) return 0;
@@ -106,16 +99,12 @@ const emptyStats = (): ChainStats => ({
     medianInterval: 0,
     maxInterval: 0,
     txCount: 0,
-    userTxCount: 0,
     actionCount: 0,
-    userTps: 0,
+    tps: 0,
     txPerMinute: 0,
-    systemTxPerMinute: 0,
     actionsPerMinute: 0,
     producers: [],
     serviceActivity: [],
-    methodActivity: [],
-    senderActivity: [],
     series: [],
     commitLag: 0,
     term: 0,
@@ -129,11 +118,8 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
     const intervals: number[] = [];
     const producerMap = new Map<string, ProducerStats>();
     const serviceMap = new Map<string, number>();
-    const methodMap = new Map<string, number>();
-    const senderMap = new Map<string, number>();
 
     let txCount = 0;
-    let userTxCount = 0;
     let actionCount = 0;
     let prevTime: number | null = null;
     let busiest: BlockPoint | null = null;
@@ -145,43 +131,23 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
         if (interval !== null) intervals.push(interval);
         prevTime = time;
 
-        let userTxs = 0;
-        let actions = 0;
-        for (const trx of block.transactions) {
-            const system = isSystemTransaction(trx);
-            if (!system) userTxs++;
-            for (const action of trx.transaction.actions) {
-                if (system) continue;
-                actions++;
-                serviceMap.set(
-                    action.service,
-                    (serviceMap.get(action.service) ?? 0) + 1,
-                );
-                const key = `${action.service}::${action.method}`;
-                methodMap.set(key, (methodMap.get(key) ?? 0) + 1);
-                if (action.sender) {
-                    senderMap.set(
-                        action.sender,
-                        (senderMap.get(action.sender) ?? 0) + 1,
-                    );
-                }
-            }
+        for (const { service, count } of block.actionsReceived) {
+            serviceMap.set(service, (serviceMap.get(service) ?? 0) + count);
         }
+        const actions = countActions(block);
         txCount += block.transactions.length;
-        userTxCount += userTxs;
         actionCount += actions;
 
         const point: BlockPoint = {
             blockNum: block.header.blockNum,
             time,
             txs: block.transactions.length,
-            userTxs,
             actions,
             interval,
             producer: block.header.producer,
         };
         series.push(point);
-        if (!busiest || point.userTxs > busiest.userTxs) busiest = point;
+        if (!busiest || point.txs > busiest.txs) busiest = point;
 
         const p = producerMap.get(block.header.producer) ?? {
             name: block.header.producer,
@@ -206,13 +172,11 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
 
     // Throughput over the trailing 60 seconds
     const cutoff = last - 60_000;
-    let recentUserTx = 0;
     let recentTx = 0;
     let recentActions = 0;
     let recentSpan = 0;
     for (let i = series.length - 1; i >= 0; i--) {
         if (series[i].time < cutoff) break;
-        recentUserTx += series[i].userTxs;
         recentTx += series[i].txs;
         recentActions += series[i].actions;
         recentSpan = last - series[i].time;
@@ -232,24 +196,13 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
         medianInterval: median(intervals),
         maxInterval: intervals.length ? Math.max(...intervals) : 0,
         txCount,
-        userTxCount,
         actionCount,
-        userTps: recentUserTx / spanSec,
-        txPerMinute: (recentUserTx / spanSec) * 60,
-        systemTxPerMinute: ((recentTx - recentUserTx) / spanSec) * 60,
+        tps: recentTx / spanSec,
+        txPerMinute: (recentTx / spanSec) * 60,
         actionsPerMinute: (recentActions / spanSec) * 60,
         producers,
         serviceActivity: [...serviceMap.entries()]
             .map(([service, count]) => ({ service, count }))
-            .sort((a, b) => b.count - a.count),
-        methodActivity: [...methodMap.entries()]
-            .map(([key, count]) => {
-                const [service, method] = key.split("::");
-                return { key, service, method, count };
-            })
-            .sort((a, b) => b.count - a.count),
-        senderActivity: [...senderMap.entries()]
-            .map(([sender, count]) => ({ sender, count }))
             .sort((a, b) => b.count - a.count),
         series,
         commitLag: head.blockNum - head.commitNum,
@@ -260,25 +213,28 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
 
 type Listener = () => void;
 
+const initialState = (): LiveChainState => ({
+    blocks: [],
+    head: null,
+    status: "connecting",
+    error: null,
+    lastBlockAt: 0,
+    lastPollAt: 0,
+    seeded: false,
+    version: 0,
+    stats: emptyStats(),
+    recentTransactions: [],
+});
+
 class LiveChainStore {
-    private state: LiveChainState = {
-        blocks: [],
-        head: null,
-        status: "connecting",
-        error: null,
-        lastBlockAt: 0,
-        lastPollAt: 0,
-        seeded: false,
-        version: 0,
-        stats: emptyStats(),
-        recentTransactions: [],
-        recentUserTransactions: [],
-    };
+    private state: LiveChainState = initialState();
     private listeners = new Set<Listener>();
     private timer: ReturnType<typeof setTimeout> | null = null;
     private running = false;
     private inFlight = false;
     private controller: AbortController | null = null;
+    private viewer: string | null | undefined = undefined;
+    private generation = 0;
 
     getState = () => this.state;
 
@@ -288,6 +244,16 @@ class LiveChainStore {
         return () => {
             this.listeners.delete(listener);
         };
+    };
+
+    /**
+     * Which transactions are redacted depends on who is logged in, so the
+     * window must be refetched when the logged-in user changes.
+     */
+    setViewer = (viewer: string | null) => {
+        const previous = this.viewer;
+        this.viewer = viewer;
+        if (previous !== undefined && previous !== viewer) this.reset();
     };
 
     start() {
@@ -303,6 +269,17 @@ class LiveChainStore {
         if (this.timer) clearTimeout(this.timer);
         this.timer = null;
         this.controller?.abort();
+    }
+
+    private reset() {
+        this.generation++;
+        this.controller?.abort();
+        this.controller = null;
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = null;
+        this.inFlight = false;
+        this.emit({ ...initialState(), version: this.state.version });
+        if (this.running) void this.tick();
     }
 
     private onVisibility = () => {
@@ -328,71 +305,75 @@ class LiveChainStore {
     private async tick() {
         if (this.inFlight) return;
         this.inFlight = true;
-        this.controller = new AbortController();
+        const generation = this.generation;
+        const controller = new AbortController();
+        this.controller = controller;
         try {
-            const { blocks, seeded } = this.state;
-            const lastNum = blocks.length
-                ? blocks[blocks.length - 1].header.blockNum
-                : null;
-            const connection = await fetchBlocks(
-                seeded && lastNum !== null
-                    ? { gt: lastNum, first: WINDOW }
-                    : { last: SEED },
-                this.controller.signal,
-            );
-            const incoming = connection.edges
-                .map((e) => e.node)
-                .filter(
-                    (b) => lastNum === null || b.header.blockNum > lastNum,
-                );
-            const now = Date.now();
-
-            if (incoming.length > 0) {
-                const merged = [...blocks, ...incoming].slice(-WINDOW);
-                const newTxs = incoming.flatMap(flattenTransactions).reverse();
-                const recentTransactions = [
-                    ...newTxs,
-                    ...this.state.recentTransactions,
-                ].slice(0, TX_HISTORY);
-                const recentUserTransactions = [
-                    ...newTxs.filter((t) => !t.isSystem),
-                    ...this.state.recentUserTransactions,
-                ].slice(0, TX_HISTORY);
-                this.emit({
-                    blocks: merged,
-                    head: merged[merged.length - 1].header,
-                    status: "live",
-                    error: null,
-                    lastBlockAt: now,
-                    lastPollAt: now,
-                    seeded: true,
-                    stats: computeStats(merged),
-                    recentTransactions,
-                    recentUserTransactions,
-                });
-            } else {
-                const stalled =
-                    this.state.lastBlockAt > 0 &&
-                    now - this.state.lastBlockAt > STALL_MS;
-                this.emit({
-                    status: stalled ? "stalled" : seeded ? "live" : "connecting",
-                    error: null,
-                    lastPollAt: now,
-                    seeded: true,
-                });
-            }
+            await this.poll(controller.signal, generation);
         } catch (err) {
-            if (!(err instanceof DOMException && err.name === "AbortError")) {
+            if (
+                generation === this.generation &&
+                !(err instanceof DOMException && err.name === "AbortError")
+            ) {
                 this.emit({
                     status: "error",
                     error: err instanceof Error ? err.message : String(err),
                     lastPollAt: Date.now(),
                 });
             }
-        } finally {
-            this.inFlight = false;
-            this.controller = null;
-            this.schedule();
+        }
+        // A reset while this poll was in flight already started a new one
+        if (generation !== this.generation) return;
+        this.inFlight = false;
+        this.controller = null;
+        this.schedule();
+    }
+
+    private async poll(signal: AbortSignal, generation: number) {
+        const { blocks, seeded } = this.state;
+        const lastNum = blocks.length
+            ? blocks[blocks.length - 1].header.blockNum
+            : null;
+        const connection = await fetchBlocks(
+            seeded && lastNum !== null
+                ? { gt: lastNum, first: WINDOW }
+                : { last: SEED },
+            signal,
+        );
+        if (generation !== this.generation) return;
+        const incoming = connection.edges
+            .map((e) => e.node)
+            .filter((b) => lastNum === null || b.header.blockNum > lastNum);
+        const now = Date.now();
+
+        if (incoming.length > 0) {
+            const merged = [...blocks, ...incoming].slice(-WINDOW);
+            const newTxs = incoming.flatMap(flattenTransactions).reverse();
+            const recentTransactions = [
+                ...newTxs,
+                ...this.state.recentTransactions,
+            ].slice(0, TX_HISTORY);
+            this.emit({
+                blocks: merged,
+                head: merged[merged.length - 1].header,
+                status: "live",
+                error: null,
+                lastBlockAt: now,
+                lastPollAt: now,
+                seeded: true,
+                stats: computeStats(merged),
+                recentTransactions,
+            });
+        } else {
+            const stalled =
+                this.state.lastBlockAt > 0 &&
+                now - this.state.lastBlockAt > STALL_MS;
+            this.emit({
+                status: stalled ? "stalled" : seeded ? "live" : "connecting",
+                error: null,
+                lastPollAt: now,
+                seeded: true,
+            });
         }
     }
 }

@@ -184,7 +184,10 @@ export const useUserActivity = (
         let actionsSent = 0;
         let actionsReceived = 0;
 
+        // The explorer only returns contents for transactions the user is a
+        // party to, which covers everything they sent or that targeted them.
         for (const t of all) {
+            if (!t.transaction) continue;
             let isSender = false;
             let isTarget = false;
             for (const a of t.transaction.actions) {
@@ -216,7 +219,7 @@ export const useUserActivity = (
         const perBlockSent = new Map<number, number>();
         const perBlockReceived = new Map<number, number>();
         for (const t of sent) {
-            const n = t.transaction.actions.filter(
+            const n = (t.transaction?.actions ?? []).filter(
                 (a) => a.sender === user,
             ).length;
             perBlockSent.set(
@@ -225,7 +228,7 @@ export const useUserActivity = (
             );
         }
         for (const t of received) {
-            const n = t.transaction.actions.filter(
+            const n = (t.transaction?.actions ?? []).filter(
                 (a) => a.service === user && a.sender !== user,
             ).length;
             perBlockReceived.set(

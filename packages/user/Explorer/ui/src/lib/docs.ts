@@ -5,7 +5,6 @@ export const DOC_PATHS = {
     bft: "/specifications/blockchain/peer-consensus/bft.html",
     jointConsensus:
         "/specifications/blockchain/peer-consensus/joint-consensus.html",
-    tapos: "/specifications/blockchain/tapos.html",
     smartAuthorization: "/specifications/blockchain/smart-authorization.html",
     services: "/specifications/app-architecture/services.html",
     packages: "/specifications/data-formats/package.html",

@@ -14,18 +14,19 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Switch } from "@shared/shadcn/ui/switch";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+
 export const TransactionsPage = () => {
     const stats = useLiveChain((s) => s.stats);
     const all = useLiveChain((s) => s.recentTransactions);
-    const user = useLiveChain((s) => s.recentUserTransactions);
+    const { data: currentUser } = useCurrentUser();
 
-    const [showSystem, setShowSystem] = useState(false);
-    const [service, setService] = useState("");
+    const [mineOnly, setMineOnly] = useState(false);
     const [account, setAccount] = useState("");
     const [paused, setPaused] = useState(false);
     const [frozen, setFrozen] = useState<TransactionWithContext[] | null>(null);
 
-    const source = showSystem ? all : user;
+    const source = all;
 
     useEffect(() => {
         if (paused && !frozen) setFrozen([...source]);
@@ -36,25 +37,20 @@ export const TransactionsPage = () => {
         const base = frozen ?? source;
         const acct = account.trim().toLowerCase();
         return base
-            .filter(
-                (t) =>
-                    !service ||
-                    t.transaction.actions.some((a) => a.service === service),
-            )
+            .filter((t) => !(mineOnly && currentUser) || t.transaction !== null)
             .filter(
                 (t) =>
                     !acct ||
-                    t.transaction.actions.some(
+                    (t.transaction?.actions ?? []).some(
                         (a) =>
                             a.sender.toLowerCase().includes(acct) ||
                             a.service.toLowerCase().includes(acct),
                     ),
             )
             .slice(0, 200);
-    }, [frozen, source, service, account]);
+    }, [frozen, source, account, mineOnly, currentUser]);
 
-    const services = stats.serviceActivity.map((s) => s.service);
-    const uniqueSenders = stats.senderActivity.length;
+    const visibleCount = source.filter((t) => t.transaction !== null).length;
 
     return (
         <div className="flex flex-col gap-4">
@@ -68,7 +64,7 @@ export const TransactionsPage = () => {
                     label="Tx / min"
                     accent="var(--chart-1)"
                     value={stats.txPerMinute.toFixed(1)}
-                    sub={`${stats.userTps.toFixed(2)} tx/s trailing 60s`}
+                    sub={`${stats.tps.toFixed(2)} tx/s trailing 60s`}
                 />
                 <StatCard
                     label="Actions / min"
@@ -77,19 +73,23 @@ export const TransactionsPage = () => {
                     sub={`${formatNumber(stats.actionCount)} in window`}
                 />
                 <StatCard
-                    label="User transactions"
+                    label="Transactions"
                     accent="var(--chart-2)"
-                    value={formatNumber(stats.userTxCount)}
+                    value={formatNumber(stats.txCount)}
                     sub={`in last ${formatNumber(stats.windowBlocks)} blocks`}
                 />
                 <StatCard
-                    label="Active accounts"
+                    label="Busiest block"
                     accent="var(--chart-5)"
-                    value={formatNumber(uniqueSenders)}
+                    value={
+                        stats.busiestBlock
+                            ? `#${formatNumber(stats.busiestBlock.blockNum)}`
+                            : "—"
+                    }
                     sub={
-                        stats.busiestBlock && stats.busiestBlock.userTxs > 0
-                            ? `busiest block #${formatNumber(stats.busiestBlock.blockNum)} (${stats.busiestBlock.userTxs} tx)`
-                            : "no user activity yet"
+                        stats.busiestBlock
+                            ? `${stats.busiestBlock.txs} tx · ${stats.busiestBlock.actions} actions`
+                            : "no blocks yet"
                     }
                 />
             </div>
@@ -101,31 +101,22 @@ export const TransactionsPage = () => {
                         {paused ? "Paused" : "Streaming"}
                     </span>
                 }
-                description={`${rows.length} shown · ${formatNumber(source.length)} buffered`}
+                description={`${rows.length} shown · ${formatNumber(source.length)} buffered · ${formatNumber(visibleCount)} visible to you`}
                 actions={
                     <div className="flex flex-wrap items-center gap-2">
                         <Input
                             value={account}
                             onChange={(e) => setAccount(e.target.value)}
                             placeholder="Filter by account"
+                            title="Only matches transactions whose contents are visible to you"
                             className="h-8 w-40 font-mono text-xs"
                         />
-                        <select
-                            value={service}
-                            onChange={(e) => setService(e.target.value)}
-                            className="bg-background h-8 rounded-md border px-2 font-mono text-xs"
-                        >
-                            <option value="">All services</option>
-                            {services.map((s) => (
-                                <option key={s} value={s}>
-                                    {s}
-                                </option>
-                            ))}
-                        </select>
-                        <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                            <Switch checked={showSystem} onCheckedChange={setShowSystem} className="scale-90" />
-                            System
-                        </label>
+                        {currentUser && (
+                            <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                                <Switch checked={mineOnly} onCheckedChange={setMineOnly} className="scale-90" />
+                                Mine only
+                            </label>
+                        )}
                         <Button
                             size="sm"
                             variant={paused ? "default" : "outline"}
@@ -149,16 +140,18 @@ export const TransactionsPage = () => {
                     transactions={rows}
                     animateNew={!paused}
                     emptyMessage={
-                        showSystem
-                            ? "No transactions match the current filters"
-                            : "No user transactions in the recent window. Toggle “System” to see block-start transactions."
+                        account || mineOnly
+                            ? "No visible transactions match the current filters"
+                            : "No transactions in the recent window yet"
                     }
                 />
             </Panel>
 
             <p className="text-muted-foreground text-[11px]">
                 The feed keeps the most recent {formatNumber(400)} transactions in memory.
-                Use search (⌘K) with a transaction ID to look up older transactions.
+                Transaction contents are only shown to the accounts involved; everyone else sees
+                the ID and action count. Use search (⌘K) with a transaction ID to look up older
+                transactions.
             </p>
         </div>
     );
