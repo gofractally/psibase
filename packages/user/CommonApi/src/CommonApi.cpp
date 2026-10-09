@@ -190,10 +190,17 @@ namespace SystemService
          }
          if (request.target == "/common/set-host-cookie")
          {
-            auto data = extractData<CookieData>(request);
-
             auto headers = allowCorsFrom(request, "supervisor"_a);
+            if (headers.empty())
+            {
+               return HttpReply{.status      = HttpStatus::forbidden,
+                                .contentType = "text/plain",
+                                .body        = {},
+                                .headers     = {}};
+            }
             headers.push_back(allowCredentials());
+
+            auto data = extractData<CookieData>(request);
 
             // cookie-name and cookie-value per RFC 6265; maxAge must be non-negative.
             if (!isValidCookieName(data.name) || !isValidCookieValue(data.value) || data.maxAge < 0)
