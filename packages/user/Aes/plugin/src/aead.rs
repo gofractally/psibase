@@ -1,13 +1,14 @@
 use aes_gcm::aead::generic_array::typenum::Unsigned;
 use aes_gcm::aead::{Aead, AeadCore, KeyInit, Nonce, OsRng, Payload};
 
+const INVALID_KEY_LENGTH_FOR_CIPHER: &str = "invalid key length for cipher";
+
 /// Encrypts with AES-GCM. Output is `nonce || ciphertext || tag`.
 pub(crate) fn encrypt<C>(key: &[u8], data: &[u8], associated_data: &[u8]) -> Vec<u8>
 where
     C: AeadCore + Aead + KeyInit,
 {
-    let cipher = C::new_from_slice(key)
-        .expect("AES-GCM key length matches the selected cipher");
+    let cipher = C::new_from_slice(key).expect(INVALID_KEY_LENGTH_FOR_CIPHER);
     let nonce = C::generate_nonce(&mut OsRng);
     let ciphertext = cipher
         .encrypt(
@@ -40,8 +41,7 @@ where
     }
 
     let nonce: &Nonce<C> = (&encrypted_data[..nonce_len]).into();
-    let cipher = C::new_from_slice(key)
-        .expect("AES-GCM key length matches the selected cipher");
+    let cipher = C::new_from_slice(key).expect(INVALID_KEY_LENGTH_FOR_CIPHER);
     cipher
         .decrypt(
             nonce,

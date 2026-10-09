@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { bytesToBase64Url } from "@psibase/common-lib";
-
 import { HttpResponse } from "./host-interface";
 import { HostDb, sha256Hex } from "./hostdb";
 
@@ -10,6 +8,10 @@ const PLAINTEXT_KEY = "non-trx:accounts:contacts:alice";
 
 function hexKey(n: number): string {
     return n.toString(16).padStart(64, "0");
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+    return bytes.toBase64({ alphabet: "base64url", omitPadding: true });
 }
 
 function makeValue(size: number): Uint8Array {

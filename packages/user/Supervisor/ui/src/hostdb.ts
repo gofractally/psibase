@@ -1,4 +1,4 @@
-import { bytesToBase64Url, siblingUrl } from "@psibase/common-lib";
+import { siblingUrl } from "@psibase/common-lib";
 
 import { HttpRequest, HttpResponse } from "./host-interface";
 import { RecoverableErrorPayload } from "./plugin/errors";
@@ -144,7 +144,7 @@ export class HostDb {
         this.enqueue({
             duration: name,
             key,
-            value: bytesToBase64Url(value),
+            value: value.toBase64({ alphabet: "base64url", omitPadding: true }),
         });
     }
 

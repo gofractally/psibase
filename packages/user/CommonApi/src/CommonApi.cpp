@@ -4,7 +4,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/to_json.hpp>
-#include <services/system/HttpServer.hpp>
+#include <services/local/XHttp.hpp>
 #include <services/system/Transact.hpp>
 
 #include <algorithm>
@@ -13,6 +13,7 @@
 static constexpr bool enable_print = false;
 
 using namespace psibase;
+using namespace LocalService;
 
 namespace SystemService
 {
@@ -45,7 +46,7 @@ namespace SystemService
 
       bool isTokenChar(char ch)
       {
-         return isAllowedChar(ch, "()<>@,;:\\\"/[]?={} \t");
+         return isAllowedChar(ch, "()<>@,;:\\\"/[]?={}");
       }
 
       bool isCookieOctet(char ch)
@@ -107,7 +108,7 @@ namespace SystemService
 
       std::vector<HttpHeader> allowCorsFrom(const HttpRequest& req, AccountNumber subdomain)
       {
-         bool hostIsSubdomain = to<HttpServer>().rootHost(req.host) != req.host;
+         bool hostIsSubdomain = to<XHttp>().rootHost(req.host) != req.host;
          return allowCors(req, subdomain, hostIsSubdomain);
       }
    }  // namespace
@@ -128,7 +129,7 @@ namespace SystemService
       {
          if (request.target == "/common/thisservice")
          {
-            auto        rootHost = to<HttpServer>().rootHost(request.host);
+            auto        rootHost = to<XHttp>().rootHost(request.host);
             std::string serviceName;
             if (request.host.size() > rootHost.size() + 1 && request.host.ends_with(rootHost) &&
                 request.host[request.host.size() - rootHost.size() - 1] == '.')
@@ -140,7 +141,7 @@ namespace SystemService
             return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
-            return to_json(to<HttpServer>().rootHost(request.host));
+            return to_json(to<XHttp>().rootHost(request.host));
          if (request.target == "/common/tapos/head")
          {
             auto [index, suffix] = to<Transact>().headTapos();
@@ -190,10 +191,17 @@ namespace SystemService
          }
          if (request.target == "/common/set-host-cookie")
          {
-            auto data = extractData<CookieData>(request);
-
             auto headers = allowCorsFrom(request, "supervisor"_a);
+            if (headers.empty())
+            {
+               return HttpReply{.status      = HttpStatus::forbidden,
+                                .contentType = "text/plain",
+                                .body        = {},
+                                .headers     = {}};
+            }
             headers.push_back(allowCredentials());
+
+            auto data = extractData<CookieData>(request);
 
             // cookie-name and cookie-value per RFC 6265; maxAge must be non-negative.
             if (!isValidCookieName(data.name) || !isValidCookieValue(data.value) || data.maxAge < 0)

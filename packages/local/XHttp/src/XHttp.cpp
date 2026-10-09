@@ -699,8 +699,10 @@ extern "C" [[clang::export_name("serve")]] void serve()
       // Handle registered servers
       if (server)
       {
-         owned.put({.socket = sock, .owner = server->server});
-         reply = psibase::Actor<ServerInterface>(XHttp::service, server->server)
+         auto service =
+             (req.target.starts_with(XHttp::commonPrefix) ? XHttp::commonService : server->server);
+         owned.put({.socket = sock, .owner = service});
+         reply = psibase::Actor<ServerInterface>(XHttp::service, service)
                      .serveSys(req, std::optional{sock}, std::nullopt);
          if (!owned.get(sock))
             return;
