@@ -774,18 +774,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "credentials"
-version = "0.29.0"
-dependencies = [
- "psibase",
- "psibase-system-workspace-hack",
- "psibase_macros",
- "psibase_service",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "critical-section"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1586,7 +1574,6 @@ name = "guilds"
 version = "0.29.0"
 dependencies = [
  "async-graphql",
- "credentials",
  "guilds-pkg",
  "pem",
  "psibase",
@@ -2827,22 +2814,6 @@ name = "psibase-rust-workspace-hack"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "824a4a32ab0318fedcd1c101a8d644d157741c9de1cf716a94368e6447a67946"
-
-[[package]]
-name = "psibase-system-workspace-hack"
-version = "0.1.0"
-dependencies = [
- "getrandom 0.3.3",
- "indexmap",
- "libc",
- "memchr",
- "proc-macro2",
- "quote",
- "serde",
- "serde_core",
- "serde_json",
- "syn 2.0.106",
-]
 
 [[package]]
 name = "psibase-user-workspace-hack"

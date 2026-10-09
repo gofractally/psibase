@@ -136,8 +136,8 @@ impl GuildInvite {
             async_graphql::Error::new(format!("guild invite {id} not found"))
         })?;
 
-        credentials::credential_expiry_at(Credentials::SERVICE, invite.credential_id()).ok_or_else(
-            || async_graphql::Error::new(format!("guild invite {id} has no expiry")),
-        )
+        Credentials::call()
+            .get_expiry_date(invite.credential_id())
+            .ok_or_else(|| async_graphql::Error::new(format!("guild invite {id} has no expiry")))
     }
 }

@@ -12,7 +12,6 @@ data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = []
 
 [dependencies]
-credentials = { path = "../../../system/Credentials/service" }
 psibase.workspace = true
 psibase_macros.workspace = true
 psibase_service.workspace = true
