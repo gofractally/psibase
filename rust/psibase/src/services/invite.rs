@@ -30,6 +30,12 @@ pub struct InviteRecord {
     secret: String,
 }
 
+impl InviteRecord {
+    pub fn credential_id(&self) -> u32 {
+        self.cid
+    }
+}
+
 #[derive(Clone, Pack, Unpack)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct InvPayload {

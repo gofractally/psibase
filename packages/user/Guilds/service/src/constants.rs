@@ -1,3 +1,7 @@
+use psibase::{account, AccountNumber};
+
+pub const GUILDS_QUERY_SERVICE: AccountNumber = account!("guilds+1");
+
 pub const ONE_DAY: u32 = 86400;
 pub const ONE_WEEK: u32 = ONE_DAY * 7;
 const ONE_YEAR: u32 = ONE_WEEK * 52;

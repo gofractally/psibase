@@ -1,6 +1,19 @@
 mod tables;
 
+use psibase::Table;
+
 pub const CRED_SYS: psibase::AccountNumber = psibase::account!("cred-sys");
+
+/// Reads credential expiry from the owning service's table without aborting.
+pub fn credential_expiry_at(
+    service: psibase::AccountNumber,
+    id: u32,
+) -> Option<psibase::TimePointSec> {
+    tables::tables::CredentialTable::with_service(service)
+        .get_index_pk()
+        .get(&id)
+        .and_then(|credential| credential.expiry_date)
+}
 
 #[psibase::service(name = "credential", tables = "tables::tables")]
 pub mod service {
@@ -180,11 +193,7 @@ pub mod service {
     /// Gets the `expiry_date` of the specified credential
     #[action]
     fn get_expiry_date(id: u32) -> Option<TimePointSec> {
-        CredentialTable::read()
-            .get_index_pk()
-            .get(&id)
-            .expect("Credential DNE")
-            .expiry_date
+        crate::credential_expiry_at(Wrapper::SERVICE, id)
     }
 
     /// Gets the `id` of the active credential

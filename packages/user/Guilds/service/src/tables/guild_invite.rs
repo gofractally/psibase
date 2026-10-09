@@ -10,7 +10,8 @@ use crate::{
     tables::tables::{Guild, GuildApplication, GuildInvite, GuildInviteTable, GuildMember},
 };
 use psibase::services::{
-    invite::Wrapper as Invite, tokens::Wrapper as Tokens, transact::Wrapper as TransactSvc,
+    credentials::Wrapper as Credentials, invite::Wrapper as Invite, tokens::Wrapper as Tokens,
+    transact::Wrapper as TransactSvc,
 };
 
 impl GuildInvite {
@@ -120,6 +121,7 @@ impl GuildInvite {
             .put(&self)
             .expect("failed to save");
     }
+
 }
 
 #[ComplexObject]
@@ -128,7 +130,14 @@ impl GuildInvite {
         Guild::get_assert(self.guild)
     }
 
-    pub async fn expiry(&self) -> TimePointSec {
-        Invite::call().getExpDate(self.id)
+    pub async fn expiry(&self) -> Result<TimePointSec, async_graphql::Error> {
+        let id = self.id;
+        let invite = Invite::call().getInvite(id).ok_or_else(|| {
+            async_graphql::Error::new(format!("guild invite {id} not found"))
+        })?;
+
+        credentials::credential_expiry_at(Credentials::SERVICE, invite.credential_id()).ok_or_else(
+            || async_graphql::Error::new(format!("guild invite {id} has no expiry")),
+        )
     }
 }
