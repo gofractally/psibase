@@ -123,7 +123,7 @@ SCENARIO("Buying a symbol")
             auto getNft     = alice.to<Nft>().getNft(ownerNftId);
             CHECK(getNft.succeeded());
 
-            auto nft = getNft.returnVal();
+            auto nft = getNft.returnVal().value();
             CHECK(nft.owner == alice.id);
 
             AND_THEN("The new symbolId is not 0")

@@ -199,6 +199,7 @@ pub mod tables {
         pub fn administration_nft_owner(&self) -> AccountNumber {
             psibase::services::nft::Wrapper::call()
                 .getNft(self.admin_nft)
+                .expect("NFT was burned")
                 .owner
         }
 
