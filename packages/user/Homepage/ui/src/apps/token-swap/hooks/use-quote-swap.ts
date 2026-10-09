@@ -1,5 +1,5 @@
 import { usePluginFunctionQuery } from "@shared/lib/plugins";
-import { tokenSwap } from "@shared/lib/plugins";
+import { homepage } from "@shared/lib/plugins";
 
 export const useQuoteSwap = (
     enabled: boolean,
@@ -10,7 +10,7 @@ export const useQuoteSwap = (
 ) => {
     const isAmountValid = !amount?.endsWith(".");
     return usePluginFunctionQuery(
-        tokenSwap.swap.quote,
+        homepage.dex.swap.quote,
         [
             undefined,
             { amount: amount!, tokenId: fromToken! },

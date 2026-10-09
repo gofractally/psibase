@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import QueryKey from "@/lib/query-keys";
 
 import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
-import { producers } from "@shared/lib/plugins";
+import { config } from "@shared/lib/plugins";
 
 interface CandidateInfo {
     account: string;
@@ -46,7 +46,7 @@ export const useCandidates = () => {
             `;
 
             const res = await callGraphqlViaPlugin<CandidatesResponse>(
-                producers.authorized.graphql,
+                config.producers.graphql,
                 query,
             );
 

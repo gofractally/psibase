@@ -50,8 +50,8 @@ const transformRawMessagesToMessages = (
 const getIncomingMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getMsgs",
             params: [undefined, account],
         }),
@@ -83,8 +83,8 @@ export function useIncomingMessages() {
 const getSentMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getMsgs",
             params: [account],
         }),
@@ -174,8 +174,8 @@ export const useSendMessage = () => {
         mutationFn: async (vars) => {
             const { to, subject, message } = zSendMessageSchema.parse(vars);
             await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
+                service: "homepage",
+                intf: "chainmail",
                 method: "send",
                 params: [to, subject, message],
             });
