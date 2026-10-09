@@ -246,7 +246,7 @@ export function App() {
                 },
             });
             try {
-                await realtime.connect(supervisor);
+                await realtime.connect();
             } catch (e) {
                 state.netStatus = `WS FAIL: ${e instanceof Error ? e.message : String(e)}`;
             }

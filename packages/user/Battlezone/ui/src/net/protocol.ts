@@ -1,5 +1,4 @@
 export const BATTLEZONE_SUBPROTOCOL_V1 = "psibase.battlezone.v1";
-export const WS_TICKET_PREFIX = "psibase.ws-ticket.";
 
 export type PresenceStatus = "online" | "offline";
 

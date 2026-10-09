@@ -8,7 +8,7 @@ const TICKET_LIFETIME_US: i64 = 60_000_000;
 const CLOCK_MONOTONIC: u32 = 1;
 
 mod transact {
-    #[psibase::service(name = "r-transact", dispatch = false)]
+    #[psibase::service(name = "transact+1", dispatch = false)]
     #[allow(non_snake_case)]
     mod service {
         use psibase::{AccountNumber, HttpRequest};

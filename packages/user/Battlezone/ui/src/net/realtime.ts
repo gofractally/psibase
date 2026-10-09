@@ -1,10 +1,9 @@
-import { siblingUrl, Supervisor } from "@psibase/common-lib";
+import { openServiceWebSocket, Supervisor } from "@psibase/common-lib";
 
 import {
     BATTLEZONE_SUBPROTOCOL_V1,
     type ClientFrame,
     type ServerFrame,
-    WS_TICKET_PREFIX,
 } from "./protocol";
 
 export type RealtimeHandlers = {
@@ -22,27 +21,12 @@ export class BattlezoneRealtime {
         this.handlers = handlers;
     }
 
-    async connect(supervisor: Supervisor): Promise<void> {
+    async connect(): Promise<void> {
         this.close();
 
-        const ticket = (await supervisor.functionCall({
-            service: "host",
-            plugin: "http",
-            intf: "api",
-            method: "get-ws-ticket",
-            params: ["x-bzone"],
-        })) as string;
-
-        if (!ticket) {
-            throw new Error("Failed to mint websocket ticket");
-        }
-
-        const url = siblingUrl(null, "x-bzone", "/ws").replace(/^http/, "ws");
-        const protocols = [
+        const ws = await openServiceWebSocket("x-bzone", "/ws", [
             BATTLEZONE_SUBPROTOCOL_V1,
-            `${WS_TICKET_PREFIX}${ticket}`,
-        ];
-        const ws = new WebSocket(url, protocols);
+        ]);
         this.ws = ws;
 
         ws.onopen = () => {

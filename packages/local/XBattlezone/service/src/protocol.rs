@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const BATTLEZONE_SUBPROTOCOL_V1: &str = "psibase.battlezone.v1";
-pub const WS_TICKET_SUBPROTOCOL_PREFIX: &str = "psibase.ws-ticket.";
 pub const WEBSOCKET_TEXT: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

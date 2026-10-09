@@ -41,7 +41,6 @@ services = ["x-wsauth"]
 
 [package.metadata.psibase.dependencies]
 XHttp = "0.29.0"
-Transact = "0.29.0"
 
 [lib]
 crate-type = ["rlib"]

@@ -23,17 +23,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "TicketTable", index = 1, db = "Subjective")]
-    #[derive(Debug, Clone, PartialEq, Eq, Pack, Unpack, Serialize, Deserialize, ToSchema)]
-    pub struct TicketRow {
-        #[primary_key]
-        pub ticket: String,
-        pub user: AccountNumber,
-        pub app: AccountNumber,
-        pub expires_at: i64,
-    }
-
-    #[table(name = "MatchTable", index = 2, db = "Subjective")]
+    #[table(name = "MatchTable", index = 1, db = "Subjective")]
     #[derive(Debug, Clone, PartialEq, Eq, Pack, Unpack, Serialize, Deserialize, ToSchema)]
     pub struct MatchRow {
         #[primary_key]
@@ -45,16 +35,8 @@ pub mod tables {
         pub roster_json: String,
     }
 
-    #[table(name = "TicketSeqTable", index = 3, db = "Subjective")]
-    #[derive(Debug, Clone, PartialEq, Eq, Pack, Unpack, Serialize, Deserialize, ToSchema)]
-    pub struct TicketSeqRow {
-        #[primary_key]
-        pub id: u8,
-        pub next: u64,
-    }
-
     /// Accounts that have pressed Enter in the waiting room.
-    #[table(name = "ReadyTable", index = 4, db = "Subjective")]
+    #[table(name = "ReadyTable", index = 2, db = "Subjective")]
     #[derive(Debug, Clone, PartialEq, Eq, Pack, Unpack, Serialize, Deserialize, ToSchema)]
     pub struct ReadyRow {
         #[primary_key]
@@ -62,7 +44,7 @@ pub mod tables {
     }
 
     /// Pending match settings owned by the first player who readied.
-    #[table(name = "LobbyTable", index = 5, db = "Subjective")]
+    #[table(name = "LobbyTable", index = 3, db = "Subjective")]
     #[derive(Debug, Clone, PartialEq, Eq, Pack, Unpack, Serialize, Deserialize, ToSchema)]
     pub struct LobbyRow {
         #[primary_key]
@@ -76,14 +58,11 @@ pub mod tables {
 
 use tables::{
     LobbyRow, LobbyTable, MatchRow, MatchTable, ReadyRow, ReadyTable, SocketRow, SocketTable,
-    TicketRow, TicketSeqRow, TicketSeqTable, TicketTable,
 };
 
 pub const BATTLEZONE_APP: AccountNumber = account!("battlezone");
-pub const TICKET_TTL_US: i64 = 60_000_000; // 60s
 const MATCH_ID: u8 = 0;
 const LOBBY_ID: u8 = 0;
-const SEQ_ID: u8 = 0;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -171,41 +150,6 @@ pub fn all_sockets_except(except: i32) -> Vec<i32> {
         .map(|r| r.socket)
         .filter(|s| *s != except)
         .collect()
-}
-
-pub fn mint_ticket(user: AccountNumber, app: AccountNumber, now: i64) -> String {
-    let seq_table = TicketSeqTable::read_write();
-    let mut seq = seq_table
-        .get_index_pk()
-        .get(&SEQ_ID)
-        .unwrap_or(TicketSeqRow {
-            id: SEQ_ID,
-            next: 1,
-        });
-    let n = seq.next;
-    seq.next = seq.next.saturating_add(1);
-    seq_table.put(&seq).unwrap();
-
-    let ticket = format!("{:x}-{:x}-{:x}", user.value, now as u64, n);
-    TicketTable::read_write()
-        .put(&TicketRow {
-            ticket: ticket.clone(),
-            user,
-            app,
-            expires_at: now + TICKET_TTL_US,
-        })
-        .unwrap();
-    ticket
-}
-
-pub fn consume_ticket(ticket: &str, now: i64) -> Option<(AccountNumber, AccountNumber)> {
-    let table = TicketTable::read_write();
-    let row = table.get_index_pk().get(&ticket.to_string())?;
-    table.erase(&ticket.to_string());
-    if row.expires_at < now {
-        return None;
-    }
-    Some((row.user, row.app))
 }
 
 fn roster_from_json(json: &str) -> Vec<RosterSlot> {
@@ -543,18 +487,6 @@ pub fn end_match_if_participant(account: AccountNumber) -> bool {
 pub fn get_socket_tx(socket: i32) -> Option<SocketRow> {
     ::psibase::subjective_tx! {
         get_socket(socket)
-    }
-}
-
-pub fn mint_ticket_tx(user: AccountNumber, app: AccountNumber, now: i64) -> String {
-    ::psibase::subjective_tx! {
-        mint_ticket(user, app, now)
-    }
-}
-
-pub fn consume_ticket_tx(ticket: &str, now: i64) -> Option<(AccountNumber, AccountNumber)> {
-    ::psibase::subjective_tx! {
-        consume_ticket(ticket, now)
     }
 }
 

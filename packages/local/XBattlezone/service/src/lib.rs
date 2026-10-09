@@ -1,28 +1,21 @@
 mod http;
 mod protocol;
-mod r_transact;
 mod state;
 
 use http::{
-    assert_x_http_sender, authenticated_user, fanout_frames, json_reply, options_reply,
-    plain_reply, send_frame, send_protocol_error, ticket_from_subprotocol, websocket_handshake,
-    with_ticket_cors,
+    assert_x_http_sender, fanout_frames, plain_reply, send_frame, send_protocol_error,
+    websocket_handshake,
 };
 use protocol::{parse_client_frame, ClientFrame, PresenceStatus, ServerFrame, WEBSOCKET_TEXT};
 use psibase::services::transact::Wrapper as Transact;
 use psibase::services::x_http::Wrapper as XHttp;
+use psibase::services::x_ws_auth::{self, Wrapper as XWsAuth};
 use psibase::{AccountNumber, HttpReply, HttpRequest, MethodNumber, ServiceWrapper};
 use state::{
     all_sockets_except_tx, cleanup_tx, clear_lobby_tx, clear_match_if_host_tx, connect_tx,
-    consume_ticket_tx, get_socket_tx, input_route_tx, is_host_socket_tx, lobby_frame_tx,
-    mint_ticket_tx, peer_sockets_for_presence_tx, presence_delta, set_ready_tx, set_unready_tx,
-    BATTLEZONE_APP,
+    get_socket_tx, input_route_tx, is_host_socket_tx, lobby_frame_tx, peer_sockets_for_presence_tx,
+    presence_delta, set_ready_tx, set_unready_tx, BATTLEZONE_APP,
 };
-
-#[derive(serde::Deserialize)]
-struct WsTicketBody {
-    app: String,
-}
 
 #[psibase::service(name = "x-bzone", tables = "state::tables")]
 #[allow(non_snake_case)]
@@ -35,15 +28,8 @@ mod service {
 
         let path = request.path();
         match path.as_ref() {
-            "/ws-ticket" => {
-                if request.method == "OPTIONS" {
-                    Some(options_reply())
-                } else {
-                    Some(with_ticket_cors(handle_ws_ticket(&request)))
-                }
-            }
             "/ws" => handle_ws(&request, socket),
-            _ => Some(plain_reply(404, "x-bzone endpoints are /ws-ticket and /ws")),
+            _ => Some(plain_reply(404, "x-bzone endpoint is /ws")),
         }
     }
 
@@ -95,32 +81,11 @@ mod service {
     }
 }
 
-fn handle_ws_ticket(request: &HttpRequest) -> HttpReply {
-    if request.method != "POST" {
-        return plain_reply(405, "POST required");
-    }
-    let Some(user) = authenticated_user(request) else {
-        return plain_reply(401, "authentication required");
-    };
-    let Ok(body) = serde_json::from_slice::<WsTicketBody>(&request.body) else {
-        return plain_reply(400, "expected JSON {\"app\":\"battlezone\"}");
-    };
-    let Ok(app) = AccountNumber::from_exact(&body.app) else {
-        return plain_reply(400, "invalid app");
-    };
-    if app != BATTLEZONE_APP {
-        return plain_reply(403, "app must be battlezone");
-    }
-    let now = Transact::call().currentBlock().time.microseconds;
-    let ticket = mint_ticket_tx(user, app, now);
-    json_reply(200, &serde_json::json!({ "ticket": ticket }).to_string())
-}
-
 fn handle_ws(request: &HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
     let Some(socket) = socket else {
         return Some(plain_reply(503, "x-bzone requires a websocket socket"));
     };
-    let Some(ticket) = ticket_from_subprotocol(request) else {
+    let Some(ticket) = x_ws_auth::get_ticket(request) else {
         return Some(plain_reply(
             401,
             "x-bzone /ws requires subprotocols psibase.battlezone.v1 and psibase.ws-ticket.*",
@@ -131,8 +96,8 @@ fn handle_ws(request: &HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
     };
 
     let now = Transact::call().currentBlock().time.microseconds;
-    let user = match consume_ticket_tx(&ticket, now) {
-        Some((user, app)) if app == BATTLEZONE_APP => user,
+    let user = match XWsAuth::call().consume(ticket) {
+        Some(info) if info.app == BATTLEZONE_APP => info.user,
         _ => return Some(plain_reply(401, "invalid or expired ws ticket")),
     };
 

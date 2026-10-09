@@ -42,6 +42,7 @@ services = ["x-bzone"]
 
 [package.metadata.psibase.dependencies]
 XHttp = "0.29.0"
+XWsAuth = "0.29.0"
 
 [lib]
 crate-type = ["rlib"]

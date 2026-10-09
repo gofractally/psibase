@@ -1299,6 +1299,11 @@ cargo_psibase_package(
     PATH packages/local/XWsAuth
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/XBattlezone.psi
+    PATH packages/local/XBattlezone
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/DevDefault.psi
     NAME DevDefault
@@ -1380,7 +1385,7 @@ write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Battlezone Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact XWsAuth)
+    XAdmin XBasic XBattlezone XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact XWsAuth)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1459,6 +1464,7 @@ install(
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
           ${SERVICE_DIR}/XBasic.psi
+          ${SERVICE_DIR}/XBattlezone.psi
           ${SERVICE_DIR}/XCommonApi.psi
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
