@@ -5,7 +5,7 @@ use crate::tables::tables::{NetworkVariables, ServerSpecs};
 use crate::Wrapper;
 
 /// Runs a GraphQL query against `service` and deserializes `data[field]` into `T`.
-fn query<T: DeserializeOwned>(
+pub(super) fn query<T: DeserializeOwned>(
     chain: &psibase::Chain,
     service: AccountNumber,
     field: &str,

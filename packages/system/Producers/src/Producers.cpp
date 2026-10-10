@@ -183,6 +183,11 @@ namespace SystemService
       Tables().open<CandidateInfoTable>().erase(sender);
    }
 
+   std::optional<CandidateInfo> Producers::getCandidate(psibase::AccountNumber account)
+   {
+      return Tables{getReceiver(), KvMode::read}.open<CandidateInfoTable>().get(account);
+   }
+
    std::vector<psibase::AccountNumber> Producers::getProducers()
    {
       return ::getProducers()                          //

@@ -222,6 +222,24 @@ pub mod tables {
         /// Fee on refunds, parts per million
         pub fee_ppm: u32,
     }
+
+    /// A producer that accepts payment for resources through a node-local app.
+    #[table(name = "ResourceProviderTable", index = 8)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
+    #[serde(rename_all = "camelCase")]
+    #[graphql(complex)]
+    pub struct ResourceProvider {
+        /// Producer account that provides resources
+        #[primary_key]
+        #[graphql(name = "producer")]
+        pub provider: AccountNumber,
+
+        /// Node-local app account (must start with `x-`) that accepts payments
+        pub app: String,
+
+        /// Currencies the provider accepts for resource payment (free-form)
+        pub accepted: Vec<String>,
+    }
 }
 
 mod billing_config;
@@ -229,6 +247,7 @@ pub(crate) mod capacity_limit_pricing;
 mod network_specs;
 mod network_variables;
 mod rate_limit_pricing;
+mod resource_provider;
 mod server_specs;
 mod user_settings;
 

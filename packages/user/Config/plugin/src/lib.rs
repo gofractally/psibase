@@ -194,6 +194,14 @@ impl VirtualServer for ConfigPlugin {
             min_billable_unit_bits: params.min_billable_unit_bits,
         })
     }
+
+    fn reg_res_provider(app: String, accepted: Vec<String>) -> Result<(), Error> {
+        virtual_server::plugin::admin::reg_res_provider(&app, &accepted)
+    }
+
+    fn unreg_res_provider() -> Result<(), Error> {
+        virtual_server::plugin::admin::unreg_res_provider()
+    }
 }
 
 bindings::export!(ConfigPlugin with_types_in bindings);

@@ -7,12 +7,12 @@ use std::str::FromStr;
 
 use errors::ErrorType;
 
-use bindings::exports::virtual_server::plugin as Exports;
 use Exports::types::{CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs};
 use Exports::{
     admin::Guest as Admin, authorized::Guest as Authorized, billing::Guest as Billing,
     transact::Guest as TransactInterface,
 };
+use bindings::exports::virtual_server::plugin as Exports;
 
 use bindings::accounts::query as AccountsQuery;
 use bindings::tokens::plugin as TokensPlugin;
@@ -20,9 +20,9 @@ use psibase::AccountNumber;
 use psibase_plugin::*;
 
 use psibase::services::tokens::{Precision, Quantity};
-use virtual_server::tables::tables::{self as ServiceTables};
-use virtual_server::Wrapper as VirtualServer;
 use virtual_server::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
+use virtual_server::Wrapper as VirtualServer;
+use virtual_server::tables::tables::{self as ServiceTables};
 
 struct VirtualServerPlugin;
 
@@ -33,6 +33,16 @@ fn assert_caller(allowed: &[&str], context: &str) {
         "{} can only be called by {:?}",
         context,
         allowed
+    );
+}
+
+fn assert_caller_config_or_self(context: &str) {
+    let sender = host::client::get_sender();
+    let receiver = host::client::get_receiver();
+    assert!(
+        sender == "config" || sender == receiver,
+        "{} can only be called by config or self",
+        context
     );
 }
 
@@ -110,6 +120,18 @@ impl Admin for VirtualServerPlugin {
         add_to_tx.net_blocks_avg(params.num_blocks_to_average);
         add_to_tx.net_min_unit(params.min_billable_unit_bits);
 
+        Ok(())
+    }
+
+    fn reg_res_provider(app: String, accepted: Vec<String>) -> Result<(), Error> {
+        assert_caller_config_or_self("reg_res_provider");
+        VirtualServer::add_to_tx().reg_res_provider(app, accepted);
+        Ok(())
+    }
+
+    fn unreg_res_provider() -> Result<(), Error> {
+        assert_caller_config_or_self("unreg_res_provider");
+        VirtualServer::add_to_tx().unreg_res_provider();
         Ok(())
     }
 }
@@ -217,6 +239,10 @@ impl TransactInterface for VirtualServerPlugin {
 
         let user = AccountsQuery::api::get_current_user();
         if !query::billing_enabled()? || user.is_none() || user.unwrap() != account {
+            return Ok(());
+        }
+
+        if query::is_private_network()? {
             return Ok(());
         }
 

@@ -283,6 +283,22 @@ mod service {
         unimplemented!()
     }
 
+    /// Register or update the sender as a resource provider.
+    ///
+    /// The sender must be an active producer with a non-empty candidate endpoint.
+    /// `app` must be a valid account name starting with `x-`.
+    /// `accepted` must be non-empty (currency codes are free-form).
+    #[action]
+    fn reg_res_provider(app: String, accepted: Vec<String>) {
+        unimplemented!()
+    }
+
+    /// Remove the sender's resource provider registration, if any.
+    #[action]
+    fn unreg_res_provider() {
+        unimplemented!()
+    }
+
     /// Allows the sender to specify one of their sub-accounts as the billable account for
     /// the current transaction.
     ///

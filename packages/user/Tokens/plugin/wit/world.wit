@@ -153,6 +153,9 @@ interface helpers {
     /// Fetches network token, returns TID
     fetch-network-token: func() -> result<option<u32>, error>;
 
+    /// Returns `true` if the token is transferable (not marked untransferable).
+    is-token-transferable: func(token-id: u32) -> result<bool, error>;
+
     /// Uses the precision of the specified token to convert from a token
     ///   decimal (string) to its u64 representation.
     ///   The string precision must not exceed the token's actual precision:

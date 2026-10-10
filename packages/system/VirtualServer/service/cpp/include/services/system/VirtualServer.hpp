@@ -4,6 +4,8 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 #include <services/user/tokenTypes.hpp>
+#include <string>
+#include <vector>
 
 namespace SystemService
 {
@@ -238,6 +240,16 @@ namespace SystemService
       /// The sender must have already credited the system tokens to this service.
       void buy_res(UserService::Quantity amount);
 
+      /// Register or update the sender as a resource provider.
+      ///
+      /// The sender must be an active producer with a non-empty candidate endpoint.
+      /// `app` must be a valid account name starting with `x-`.
+      /// `accepted` must be non-empty (currency codes are free-form).
+      void reg_res_provider(std::string app, std::vector<std::string> accepted);
+
+      /// Remove the sender's resource provider registration, if any.
+      void unreg_res_provider();
+
       /// Allows the sender to specify one of their sub-accounts as the billable account for
       /// the current transaction.
       ///
@@ -423,6 +435,8 @@ namespace SystemService
                 method(buy_res_sub, amount, sub_account),
                 method(del_res_sub, sub_account),
                 method(buy_res, amount),
+                method(reg_res_provider, app, accepted),
+                method(unreg_res_provider),
                 method(bill_to_sub, sub_account),
                 method(conf_buffer, config),
                 method(std_buffer_cost),

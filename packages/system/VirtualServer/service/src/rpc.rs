@@ -3,19 +3,20 @@ use crate::{
     resource_type::ResourceType,
     tables::tables::{
         BillingConfig, BillingConfigTable, CapacityPricing, InitRow, NetworkSpecs,
-        NetworkSpecsTable, NetworkVariables, RateLimitPricing, ServerSpecs as InternalServerSpecs,
-        UserSettings,
+        NetworkSpecsTable, NetworkVariables, RateLimitPricing, ResourceProvider,
+        ResourceProviderTable, ServerSpecs as InternalServerSpecs, UserSettings,
     },
 };
 
-use async_graphql::*;
+use async_graphql::{connection::Connection, *};
 use psibase::{
     is_auth,
     services::{
         tokens::{Decimal, Quantity, Wrapper as Tokens},
         transact::ServiceMethod,
     },
-    AccountNumber, EventConnection, EventQuery, MethodNumber, ServiceWrapper, Table,
+    AccountNumber, EventConnection, EventQuery, MethodNumber, RawKey, ServiceWrapper, Table,
+    TableQuery,
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
@@ -388,5 +389,26 @@ impl Query {
             .before(before)
             .after(after)
             .query()
+    }
+
+    /// Registered resource providers and their payment portals.
+    ///
+    /// Returns all registered providers. Dynamic fields `endpoint` and
+    /// `activeInfraProvider` are resolved from the current producer state;
+    /// filtering for UI purposes is left to the client.
+    async fn resource_providers(
+        &self,
+        first: Option<i32>,
+        last: Option<i32>,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<RawKey, ResourceProvider>> {
+        TableQuery::new(ResourceProviderTable::read().get_index_pk())
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
     }
 }
