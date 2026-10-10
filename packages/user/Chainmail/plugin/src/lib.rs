@@ -9,12 +9,12 @@ mod queries;
 mod serde_structs;
 
 use crate::trust::*;
-use bindings::host::accounts as HostAccounts;
 use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
     queries::{Guest as Query, Message},
 };
 use bindings::host::http::api as CommonServer;
+use bindings::host::accounts as HostAccounts;
 use bindings::transact::plugin::api as Transact;
 use chrono::DateTime;
 use errors::ErrorType;

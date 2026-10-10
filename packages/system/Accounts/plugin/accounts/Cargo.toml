@@ -4,7 +4,6 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-url = "2.5.2"
 wit-bindgen-rt.workspace = true
 psibase.workspace = true
 serde.workspace = true
@@ -24,15 +23,9 @@ world = "impl"
 "host:client" = { path = "../../../../user/Host/plugin/client/wit/world.wit" }
 "host:http" = { path = "../../../../user/Host/plugin/http/wit/world.wit" }
 "host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
-"host:prompt" = { path = "../../../../user/Host/plugin/prompt/wit/world.wit" }
 "transact:plugin" = { path = "../../../Transact/plugin/transact/wit/world.wit" }
 "permissions:plugin" = { path = "../../../../user/Permissions/plugin/wit/world.wit" }
-"accounts:query" = { path = "../query/wit/world.wit" }
 "host:accounts" = { path = "../../../../user/Host/plugin/accounts/wit/world.wit" }
-"invite:plugin" = { path = "../../../../user/Invite/plugin/wit/redemption.wit" }
-"auth-sig:plugin" = { path = "../../../AuthSig/plugin/wit/world.wit" }
-"name-market:plugin" = { path = "../../../../user/NameMarket/plugin/wit/world.wit" }
-"host:crypto" = { path = "../../../../user/Host/plugin/crypto/wit/world.wit" }
 
 [package.metadata.component.bindings]
 derives = ["serde::Deserialize"]

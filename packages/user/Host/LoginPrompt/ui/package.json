@@ -1,10 +1,10 @@
 {
-    "name": "@psibase/accounts-ui",
+    "name": "@psibase/host-login-prompt-ui",
     "private": true,
     "version": "0.0.0",
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../if-build-needed.mjs 'tsc -b --noEmit && yarn lint && vite build'",
+        "build": "node ../../../../if-build-needed.mjs 'tsc -b --noEmit && yarn lint && vite build'",
         "lint": "eslint .",
         "preview": "vite preview"
     },

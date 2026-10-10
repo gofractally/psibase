@@ -3,20 +3,13 @@ import type { QueryOptions } from "@shared/hooks/types";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@shared/lib/supervisor";
-
+import { callLoginPrompt } from "../lib/login-prompt";
 import QueryKey from "../lib/query-keys";
 
 export const queryCanCreateAccount = queryOptions({
     queryKey: QueryKey.canCreateAccount(),
     queryFn: async () => {
-        const res = await supervisor.functionCall({
-            service: "accounts",
-            plugin: "plugin",
-            intf: "prompt",
-            method: "canCreateAccount",
-            params: [],
-        });
+        const res = await callLoginPrompt("api", "canCreateAccount", []);
         return z.boolean().parse(res);
     },
 });

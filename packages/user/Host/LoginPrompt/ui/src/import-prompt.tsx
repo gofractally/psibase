@@ -9,7 +9,7 @@ import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
-import { useImportExisting } from "@shared/hooks/use-import-existing";
+import { useImportExisting } from "./hooks/use-import-existing";
 import { b64ToPem, validateB64 } from "@shared/lib/b64-key-utils";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
@@ -51,7 +51,7 @@ export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
         useCanCreateAccount();
 
     // mutations
-    const importExistingMutation = useImportExisting(); // this will take a private key and it will validate it belongs to the account
+    const importExistingMutation = useImportExisting();
     const connectAccountMutation = useConnectAccount();
 
     const handleImportAndLogin = async (account: string, b64: string) => {

@@ -24,7 +24,7 @@ TEST_CASE("schema")
 
 TEST_CASE("Steal resources")
 {
-   DefaultTestChain t{{"TestDefault", "TokenUsers"}};
+   DefaultTestChain t{{"TestDefault", "TokenUsers", "Invite"}};
    t.addService<CredResThief>("CredResThief.wasm");
 
    auto alice  = AccountNumber{"alice"};

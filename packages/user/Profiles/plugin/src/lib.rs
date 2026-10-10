@@ -2,11 +2,11 @@
 mod bindings;
 
 use bindings::{
-    host::accounts::api::get_current_user,
     accounts::query::api::get_account,
     exports::profiles::plugin::{
         api::Guest as Api, contacts::Contact, contacts::Guest as Contacts,
     },
+    host::accounts::api::get_current_user,
     host::{self, types::types::Error},
     permissions,
     profiles::plugin::types::{Avatar, Profile as PluginProfile},
@@ -122,10 +122,7 @@ impl Api for ProfilesPlugin {
         }
         .packed();
 
-        add_action_to_transaction(
-            profiles::action_structs::uploadAvatar::ACTION_NAME,
-            &packed,
-        )
+        add_action_to_transaction(profiles::action_structs::uploadAvatar::ACTION_NAME, &packed)
     }
 
     fn remove_avatar() -> Result<(), Error> {

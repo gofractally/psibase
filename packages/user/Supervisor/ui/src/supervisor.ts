@@ -136,7 +136,7 @@ export class Supervisor implements AppInterface {
                 return;
             }
 
-            // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
+            // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., host:accounts, host:auth
             this.loader.trackPlugins([...systemPlugins]);
             await this.loader.processPlugins();
             await this.loader.awaitReady();

@@ -3,20 +3,13 @@ import type { QueryOptions } from "@shared/hooks/types";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@shared/lib/supervisor";
-
+import { callLoginPrompt } from "../lib/login-prompt";
 import QueryKey from "../lib/query-keys";
 
 export const queryGetAllAccounts = queryOptions({
     queryKey: QueryKey.getAllAccounts(),
     queryFn: async () => {
-        const res = await supervisor.functionCall({
-            service: "accounts",
-            plugin: "plugin",
-            intf: "admin",
-            method: "getAllAccounts",
-            params: [],
-        });
+        const res = await callLoginPrompt("admin", "getAllAccounts", []);
         return z.string().array().parse(res);
     },
 });

@@ -1,12 +1,12 @@
 [
     {
-        "sender": "accounts",
+        "sender": "host",
         "service": "sites",
         "method": "enablespa",
         "data": { "enable": true }
     },
     {
-        "sender": "accounts",
+        "sender": "host",
         "service": "sites",
         "method": "setcsp",
         "data": {

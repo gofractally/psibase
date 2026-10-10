@@ -6,52 +6,15 @@ use crate::plugin::AccountsPlugin;
 
 use crate::bindings::exports::accounts::plugin::admin::{Error, Guest as Admin};
 use crate::bindings::host::accounts::admin as HostAccountsAdmin;
-use crate::bindings::host::client::api as Client;
 use crate::bindings::transact::plugin::api as Transact;
-use crate::helpers::assert_valid_account;
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as Accounts;
 use std::collections::HashSet;
 
-fn prune_invalid_accounts(accounts: Vec<String>) {
-    let app = Client::get_receiver();
-    for account in accounts {
-        HostAccountsAdmin::disconnect(&account, &app);
-    }
-}
+const HOST_APP: &str = "host";
 
 impl Admin for AccountsPlugin {
-    fn get_connected_apps(user: String) -> Vec<String> {
-        assert_authorized_with_whitelist(FunctionName::get_connected_apps, vec!["homepage".into()])
-            .unwrap();
-        HostAccountsAdmin::get_connected_apps(&user)
-    }
-
-    fn import_account(account: String) {
-        assert_authorized_with_whitelist(FunctionName::import_account, vec!["x-admin".into()])
-            .unwrap();
-        assert_valid_account(&account);
-        HostAccountsAdmin::connect(&account, &Client::get_receiver());
-    }
-
-    fn remove_account(account: String) {
-        assert_authorized(FunctionName::remove_account).unwrap();
-
-        let connected_apps = HostAccountsAdmin::get_connected_apps(&account);
-        for app in connected_apps {
-            HostAccountsAdmin::disconnect(&account, &app);
-        }
-
-        HostAccountsAdmin::disconnect(&account, &Client::get_receiver());
-    }
-
-    fn get_all_accounts() -> Vec<String> {
-        assert_authorized_with_whitelist(FunctionName::get_all_accounts, vec!["supervisor".into()])
-            .unwrap();
-        HostAccountsAdmin::get_connected_accounts(&Client::get_receiver())
-    }
-
     fn get_auth_services() -> Result<Vec<String>, Error> {
         assert_authorized_with_whitelist(
             FunctionName::get_auth_services,
@@ -59,13 +22,13 @@ impl Admin for AccountsPlugin {
         )
         .unwrap();
 
-        let connected_accounts = Self::get_all_accounts();
+        let connected_accounts = HostAccountsAdmin::get_connected_accounts(HOST_APP);
         if connected_accounts.is_empty() {
             return Ok(Vec::new());
         }
         let accounts = connected_accounts
             .iter()
-            .map(|a| format!("\"{}\"", a))
+            .map(|a| format!("\"{a}\""))
             .collect::<Vec<String>>()
             .join(",");
         let graphql_query = format!(
@@ -100,29 +63,22 @@ impl Admin for AccountsPlugin {
         let response_root = serde_json::from_str::<ResponseRoot>(&auth_services_res)
             .map_err(|e| DeserializationError(e.to_string()))?;
 
-        let valid_account_nums: HashSet<String> = response_root
-            .data
-            .getAccounts
-            .iter()
-            .filter_map(|opt_acc| opt_acc.as_ref().map(|accnt| accnt.accountNum.clone()))
-            .collect();
-
-        let invalid_accounts: Vec<String> = connected_accounts
-            .iter()
-            .filter(|account| !valid_account_nums.contains(*account))
-            .cloned()
-            .collect();
-
-        if !invalid_accounts.is_empty() {
-            prune_invalid_accounts(invalid_accounts);
+        let rows = response_root.data.getAccounts;
+        let mut valid_account_nums = HashSet::with_capacity(rows.len());
+        let mut auth_services = Vec::with_capacity(rows.len());
+        for opt_accnt in rows {
+            if let Some(accnt) = opt_accnt {
+                valid_account_nums.insert(accnt.accountNum);
+                auth_services.push(accnt.authService);
+            }
         }
 
-        let auth_services: Vec<String> = response_root
-            .data
-            .getAccounts
-            .into_iter()
-            .filter_map(|opt_accnt| opt_accnt.map(|accnt| accnt.authService))
-            .collect();
+        for account in &connected_accounts {
+            if !valid_account_nums.contains(account) {
+                HostAccountsAdmin::disconnect(account, HOST_APP);
+            }
+        }
+
         Ok(auth_services)
     }
 

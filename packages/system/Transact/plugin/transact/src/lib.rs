@@ -218,10 +218,10 @@ impl Api for TransactPlugin {
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
-        // Whitelisting accounts so that the accounts user prompts can stage transactions even when accounts is not the act
+        // Whitelisting host so that the host login prompts can stage transactions even when host is not the active app
         assert_authorized_with_whitelist(
             FunctionName::set_propose_latch,
-            vec![Client::get_active_app(), String::from("accounts")],
+            vec![Client::get_active_app(), String::from("host")],
         )?;
 
         let Some(acct) = account else {
