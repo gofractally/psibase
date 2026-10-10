@@ -2,8 +2,8 @@
 mod bindings;
 use bindings::*;
 
-use accounts::query::api::get_current_user;
 use auth_delegate::plugin::api::new_account;
+use bindings::host::accounts::api::get_current_user;
 use exports::workshop::plugin::{
     app::{File, Guest as App},
     development::Guest as Development,
@@ -12,8 +12,8 @@ use exports::workshop::plugin::{
 };
 use host::types::types::Error;
 use psibase::MethodNumber;
-use transact::plugin::api::set_propose_latch;
 use std::str::FromStr;
+use transact::plugin::api::set_propose_latch;
 
 use crate::trust::*;
 

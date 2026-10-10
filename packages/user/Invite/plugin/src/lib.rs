@@ -168,7 +168,7 @@ fn use_active_invite() {
 
 impl Redemption for InvitePlugin {
     fn get_active_invite() -> Option<bool> {
-        assert!(host::client::get_sender() == psibase::services::accounts::SERVICE.to_string());
+        assert!(host::client::get_sender() == "host");
 
         let token = InviteTokensTable::active_invite_id();
         if token.is_none() {
@@ -179,7 +179,7 @@ impl Redemption for InvitePlugin {
     }
 
     fn create_new_account(account: String) -> String {
-        assert!(host::client::get_sender() == psibase::services::accounts::SERVICE.to_string());
+        assert!(host::client::get_sender() == "host");
 
         assert!(
             InviteTokensTable::active_can_create_account(),
@@ -201,7 +201,7 @@ impl Redemption for InvitePlugin {
     }
 
     fn accept() {
-        assert!(host::client::get_sender() == psibase::services::accounts::SERVICE.to_string());
+        assert!(host::client::get_sender() == "host");
 
         use_active_invite();
 

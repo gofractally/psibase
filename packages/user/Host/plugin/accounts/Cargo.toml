@@ -1,0 +1,27 @@
+[package]
+name = "host-accounts"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt.workspace = true
+psibase.workspace = true
+psibase-plugin-workspace-hack.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "host:accounts"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:client" = { path = "../client/wit/world.wit" }
+"host:db" = { path = "../db/wit/world.wit" }
+"host:auth" = { path = "../auth/wit/world.wit" }
+"host:prompt" = { path = "../prompt/wit/world.wit" }
+"host:types" = { path = "../types/wit/world.wit" }
+"accounts:query" = { path = "../../../../system/Accounts/plugin/query/wit/world.wit" }
+"auth-sig:plugin" = { path = "../../../../system/AuthSig/plugin/wit/world.wit" }

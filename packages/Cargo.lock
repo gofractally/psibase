@@ -20,7 +20,6 @@ dependencies = [
  "psibase-plugin-workspace-hack",
  "serde",
  "serde_json",
- "url",
  "wit-bindgen-rt",
 ]
 
@@ -1364,6 +1363,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "host-accounts"
+version = "0.29.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "host-auth"
 version = "0.29.0"
 dependencies = [
@@ -1933,6 +1941,15 @@ name = "log"
 version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
+
+[[package]]
+name = "login-prompt"
+version = "0.29.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
 
 [[package]]
 name = "lru-slab"
