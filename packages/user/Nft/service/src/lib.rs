@@ -72,8 +72,8 @@ pub mod tables {
 
     impl Nft {
         #[secondary_key(1)]
-        fn by_owner(&self) -> (AccountNumber, NID) {
-            (self.owner, self.id)
+        fn by_owner(&self) -> (AccountNumber, AccountNumber, NID) {
+            (self.owner, self.issuer, self.id)
         }
 
         #[secondary_key(2)]
