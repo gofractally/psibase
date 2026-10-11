@@ -62,13 +62,16 @@ export const CreatePrompt = () => {
     const { data: networkName } = useBranding();
     const { data: systemToken, isPending: isPendingSystemToken } =
         useSystemToken();
+    const premiumBlocked = systemToken?.untransferable === true;
+    const canBuyEnabled = !isPendingSystemToken && !premiumBlocked;
 
     const { data: canBuyAccount, isPending: isPendingCanBuyAccount } =
-        useCanBuyAccount();
+        useCanBuyAccount({ enabled: canBuyEnabled });
+    const offerPremium = canBuyEnabled && canBuyAccount === true;
 
     const { data: tokenBalances, isPending: isPendingBalances } =
         useUserTokenBalances(currentUser, {
-            enabled: Boolean(currentUser && canBuyAccount),
+            enabled: Boolean(currentUser && offerPremium),
         });
 
     const availableBalance = useMemo(
@@ -80,8 +83,8 @@ export const CreatePrompt = () => {
     );
 
     const { data: markets, isPending: isPendingMarkets } = useAccountMarkets({
-        enabled: Boolean(canBuyAccount),
-        refetchInterval: canBuyAccount
+        enabled: offerPremium,
+        refetchInterval: offerPremium
             ? ACCOUNT_MARKETS_REFETCH_INTERVAL_MS
             : false,
     });
@@ -101,7 +104,7 @@ export const CreatePrompt = () => {
 
     const resolveLivePrice = useCallback(
         (rawAccountName: string): Quantity | null => {
-            if (!canBuyAccount || !systemToken) {
+            if (!offerPremium || !systemToken) {
                 return null;
             }
             const parsed = zAccount.safeParse(rawAccountName.trim());
@@ -123,13 +126,13 @@ export const CreatePrompt = () => {
                 systemToken.symbol,
             );
         },
-        [canBuyAccount, systemToken],
+        [offerPremium, systemToken],
     );
 
     const isLoading =
         isPendingSystemToken ||
-        isPendingCanBuyAccount ||
-        (canBuyAccount && isPendingMarkets);
+        (canBuyEnabled && isPendingCanBuyAccount) ||
+        (offerPremium && isPendingMarkets);
 
     const createAccountMutation = useCreateAccount();
     const purchaseAccountMutation = usePurchaseAccount({
@@ -141,7 +144,7 @@ export const CreatePrompt = () => {
     });
     const connectAccountMutation = useConnectAccount();
 
-    const accountValidator = canBuyAccount ? zAccount : zAccountFree;
+    const accountValidator = offerPremium ? zAccount : zAccountFree;
 
     const createForm = useAppForm({
         defaultValues: {
@@ -165,7 +168,7 @@ export const CreatePrompt = () => {
                     fields: {
                         account: taken
                             ? "This account name is not available"
-                            : canBuyAccount &&
+                            : offerPremium &&
                                 zAccount.safeParse(value.account.trim())
                                     .success &&
                                 value.account.trim().length <
@@ -273,7 +276,7 @@ export const CreatePrompt = () => {
     }: {
         value: string;
     }) => {
-        if (!canBuyAccount) {
+        if (!offerPremium) {
             return;
         }
         try {
@@ -306,7 +309,7 @@ export const CreatePrompt = () => {
             isAccountTakenRef.current = taken;
             if (taken) return "Account name is already taken";
 
-            if (canBuyAccount && value.length < MIN_FREE_ACCOUNT_NAME_LENGTH) {
+            if (offerPremium && value.length < MIN_FREE_ACCOUNT_NAME_LENGTH) {
                 if (!pricesRef.current.has(value.length)) {
                     return `${value.length} character account names are not available`;
                 }
@@ -362,7 +365,7 @@ export const CreatePrompt = () => {
                                     Create a {networkName} account
                                 </CardTitle>
                                 <CardDescription>
-                                    {canBuyAccount
+                                    {offerPremium
                                         ? `Account names can be up to ${MAX_ACCOUNT_NAME_LENGTH} characters long, must start with a letter, and can only contain letters, numbers, and underscores.`
                                         : `Account names can be ${MIN_FREE_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH} characters long, must start with a letter, and can only contain letters, numbers, and underscores.`}
                                 </CardDescription>

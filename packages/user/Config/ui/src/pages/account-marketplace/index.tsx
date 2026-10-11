@@ -163,6 +163,24 @@ export const NameMarketConfig = () => {
         form.reset(defaultValues);
     }, [defaultValues, form, isLoading, isSaving, isDirty]);
 
+    if (!systemTokenLoading && systemToken?.untransferable) {
+        return (
+            <PageContainer className="space-y-6">
+                <Card className="gap-4 py-4 shadow-sm">
+                    <CardHeader className="gap-1.5 px-4">
+                        <CardTitle className="text-lg font-medium">
+                            Account Marketplace
+                        </CardTitle>
+                        <CardDescription>
+                            Premium account names are not available on this
+                            network. Accounts are created with free names.
+                        </CardDescription>
+                    </CardHeader>
+                </Card>
+            </PageContainer>
+        );
+    }
+
     return (
         <PageContainer className="space-y-6">
             <Card className="gap-4 py-4 shadow-sm">
