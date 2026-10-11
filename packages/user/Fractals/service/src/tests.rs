@@ -114,7 +114,7 @@ mod chain {
     use crate::helpers::donation_sub_account;
     use crate::Wrapper;
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::services::tokens::{BalanceFlags, Quantity, Wrapper as Tokens};
+    use psibase::services::tokens::{BalanceFlags, Decimal, Quantity, Wrapper as Tokens};
     use psibase::*;
 
     const ALICE: AccountNumber = account!("alice");
@@ -171,6 +171,21 @@ mod chain {
             .dist_token(FRACTAL)
             .get()
             .unwrap();
+    }
+
+    fn total_earned(chain: &Chain, member: AccountNumber) -> u64 {
+        let reply: serde_json::Value = chain
+            .graphql(
+                Wrapper::SERVICE,
+                &format!(
+                    r#"query {{ member(fractal: "{FRACTAL}", member: "{member}") {{ totalEarned }} }}"#
+                ),
+            )
+            .unwrap();
+        let earned = reply["data"]["member"]["totalEarned"]
+            .as_str()
+            .unwrap_or_else(|| panic!("missing totalEarned: {reply}"));
+        earned.parse::<Decimal>().unwrap().quantity.value
     }
 
     fn drain_stream(chain: &Chain) {
@@ -271,13 +286,21 @@ mod chain {
 
         pass_time(&chain, DEFAULT_MEMBER_DISTRIBUTION_INTERVAL as i64);
         let before = Tokens::push(&chain).getBalance(tid, ALICE).get()?.value;
+        let earned_before = total_earned(&chain, ALICE);
+        assert!(earned_before > 0, "setup claim should already be recorded",);
         Wrapper::push_from(&chain, ALICE)
             .claim_rew(FRACTAL, ALICE)
             .get()?;
         let after = Tokens::push(&chain).getBalance(tid, ALICE).get()?.value;
+        let earned_after = total_earned(&chain, ALICE);
         assert!(
             after > before,
             "income should increase a later member claim ({before} -> {after})",
+        );
+        assert_eq!(
+            earned_after - earned_before,
+            after - before,
+            "total earned should grow by the net amount credited",
         );
 
         Ok(())

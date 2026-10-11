@@ -8,6 +8,7 @@ import { zDateTime } from "@shared/lib/schemas/date-time";
 export const zMemberListInstance = z.object({
     account: zAccount,
     createdAt: zDateTime,
+    totalEarned: z.string(),
 });
 
 export type MembershipListInstance = z.infer<typeof zMemberListInstance>;
@@ -21,6 +22,7 @@ export const getMembers = async (fractalAccount: Account) => {
             nodes {     
                 account
                 createdAt
+                totalEarned
         }} 
     }`,
     );
