@@ -268,10 +268,16 @@ mod tests {
 
         test.claim(CHARLIE, stream2);
 
+        let expected_vested = 2735;
         assert_eq!(
             test.get_balance(BOB).value,
+            expected_vested,
+            "regular claims should vest the half-life amount"
+        );
+        assert_eq!(
             test.get_balance(CHARLIE).value,
-            "Balances should match after claims"
+            expected_vested,
+            "one claim at the same time should vest the same amount"
         );
     }
 
@@ -332,6 +338,29 @@ mod tests {
             (69_999..=70_001).contains(&total_claimed.value),
             "Claimed amount {} not in expected range 69_999..=70_001",
             total_claimed.value
+        );
+    }
+
+    /// A deposit must not vest principal that is still inside the half-life.
+    #[psibase::test_case(packages("TokenStream"))]
+    fn deposit_after_partial_claim_keeps_unvested_locked(chain: psibase::Chain) {
+        let test = TestHelper::new(chain);
+        let stream = test.create_stream(ALICE, 1000);
+
+        test.pass_time(TestHelper::HALF_LIFE as i64);
+        let claimed = TokenStream::push_from(&test.chain, ALICE)
+            .claim(stream)
+            .get()
+            .unwrap();
+        assert_eq!(claimed, 500.into(), "one half-life vests half of 1000");
+
+        test.deposit(ALICE, stream, 1);
+        let stored = test.stream(stream).claimable_at_last_deposit;
+        assert_eq!(
+            stored,
+            0.into(),
+            "deposit stored {} as already claimable; the unvested remainder must stay locked",
+            stored.value
         );
     }
 }
