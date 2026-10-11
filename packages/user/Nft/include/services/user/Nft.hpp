@@ -26,6 +26,7 @@ namespace UserService
       void credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
       void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
       void debit(NID nftId, psio::view<const psibase::Memo> memo);
+      void try_debit(NID nftId, psio::view<const psibase::Memo> memo);
       void setUserConf(std::uint8_t flag, bool enable);
 
       // Read-only:
@@ -57,6 +58,7 @@ namespace UserService
       method(credit, nftId, receiver, memo),
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
+      method(try_debit, nftId, memo),
       method(setUserConf, flag, enable),
 
       method(getNft, nftId),

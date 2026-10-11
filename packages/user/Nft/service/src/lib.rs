@@ -444,6 +444,15 @@ pub mod service {
     }
 
     #[action]
+    pub fn try_debit(nftId: NID, memo: Memo) {
+        if CreditRecord::get(nftId).is_some() {
+            debit(nftId, memo);
+        } else {
+            Nft::get_assert(nftId).check_is_owner(get_sender());
+        }
+    }
+
+    #[action]
     pub fn setUserConf(index: u8, enable: bool) {
         NftHolder::get_or_default(get_sender()).set_flag(index.into(), enable);
     }
