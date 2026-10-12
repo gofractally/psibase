@@ -6,7 +6,7 @@ use exports::credentials::plugin::api::Guest as Api;
 use host::crypto::keyvault as HostCrypto;
 use host::types::types::Pem;
 use transact::plugin::api as Transact;
-use transact::plugin::types::Claim;
+use transact::types::types::Claim;
 
 struct Credentials;
 

@@ -1,4 +1,5 @@
 use crate::bindings::accounts::plugin::api as AccountsPlugin;
+use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::host::login_prompt::api::{Credential, Guest as Api};
 use crate::bindings::host::{
@@ -82,9 +83,13 @@ impl Api for LoginPrompt {
         assert!(HostAccountsAdmin::get_connected_accounts(HOST_APP).contains(&account));
 
         let app = Client::get_active_app();
+        let auth_service = AccountsQuery::get_account(&account)
+            .expect("Get account failed")
+            .expect("Account not found")
+            .auth_service;
         HostAccountsAdmin::add_connected_app(&account, &app);
 
-        if HostAccountsAdmin::login(&account, &app).is_err() {
+        if HostAccountsAdmin::login(&account, &app, &auth_service).is_err() {
             HostAccountsAdmin::remove_connected_app(&account, &app);
         }
 

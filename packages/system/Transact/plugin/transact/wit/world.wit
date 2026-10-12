@@ -1,35 +1,5 @@
 package transact:plugin;
 
-interface types {
-    /// A list of `claim` objects is added to every submitted transaction.
-    /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
-    record claim {
-        /// The name of the service used to verify the claim is valid
-        verify-service: string,
-        /// The raw claim data (typically the DER-encoded public key
-        /// whose matching private key produces the proof)
-        raw-data: list<u8>,
-    }
-
-    /// The verify-service specified in the claim is the service that knows how to verify that
-    /// a proof actually proves the claim.
-    record proof {
-        signature: list<u8>,
-    }
-
-    /// Action data from a transaction
-    record action {
-        /// The sender of this action
-        sender: string,
-        /// The service that will execute this action
-        service: string,
-        /// The name of the action to execute
-        method: string,
-        /// The data passed to the action, packed in fracpack format
-        raw-data: list<u8>,
-    }
-}
-
 interface hooks {
     /// Allows the caller plugin to manage the sender of any subsequent actions added to this
     /// transaction.
@@ -42,7 +12,7 @@ interface hooks {
 
 interface api {
     use host:types/types.{error};
-    use types.{action, claim};
+    use transact:types/types.{action, claim};
 
     /// Adds the specified service action to the current transaction.
     ///
@@ -93,26 +63,6 @@ interface api {
     propose: func(actions: list<action>, auto-exec: bool) -> result<_, error>;
 }
 
-interface auth {
-    use host:types/types.{error};
-
-    /// Gets a bearer token for user to make authenticated queries
-    get-query-token: func(app: string, user: string) -> result<string, error>;
-}
-
-/// Interface that makes authorized queries to this app's http server.
-interface authorized {
-    use host:types/types.{error};
-
-    /// Executes a GraphQL query against this app's http server.
-    ///
-    /// Arguments
-    /// * `query` - GraphQL query to execute
-    ///
-    /// Returns the result of the query as a string.
-    graphql: func(query: string) -> result<string, error>;
-}
-
 interface network {
     use host:types/types.{error};
 
@@ -139,7 +89,7 @@ world imports {
 world hook-user-auth {
     export transact-hook-user-auth: interface {
         use host:types/types.{error};
-        use types.{claim, proof, action};
+        use transact:types/types.{claim, proof, action};
 
         /// Gets the claim needed to satisfy the authorization of the logged-in user
         on-user-auth-claim: func(account-name: string) -> result<option<claim>, error>;

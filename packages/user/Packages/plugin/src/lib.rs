@@ -731,9 +731,9 @@ impl PrivateApi for PackagesPlugin {
     }
 }
 
-impl From<Action> for transact::plugin::types::Action {
+impl From<Action> for transact::types::types::Action {
     fn from(action: Action) -> Self {
-        transact::plugin::types::Action {
+        transact::types::types::Action {
             sender: action.sender.to_string(),
             service: action.service.to_string(),
             method: action.method.to_string(),

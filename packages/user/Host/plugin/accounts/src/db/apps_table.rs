@@ -63,11 +63,11 @@ impl AppsTable {
             .map(|a| String::from_utf8(a).unwrap())
     }
 
-    pub(crate) fn login(&self, user: &str) -> Result<(), Error> {
+    pub(crate) fn login(&self, user: &str, auth_service: &str) -> Result<(), Error> {
         logged_in_user_table().set(&self.app, user.as_bytes());
         self.connect(user);
 
-        let result = HostAuth::set_logged_in_user(user, &self.app);
+        let result = HostAuth::set_logged_in_user(user, &self.app, auth_service);
         if result.is_err() {
             self.logout();
         }

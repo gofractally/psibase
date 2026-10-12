@@ -28,6 +28,8 @@ world = "impl"
 "host:client" = { path = "../../Host/plugin/client/wit/world.wit" }
 "host:http" = { path = "../../Host/plugin/http/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
+"transact:types" = { path = "../../../system/Transact/plugin/types/wit/world.wit" }
+
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 "tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }
 "nft:plugin" = { path = "../../Nft/plugin/wit/world.wit" }

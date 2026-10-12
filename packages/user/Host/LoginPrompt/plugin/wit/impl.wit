@@ -11,6 +11,7 @@ world impl {
     include name-market:plugin/imports;
 
     import accounts:plugin/api;
+    include accounts:query/imports;
     import invite:plugin/redemption;
 
     export api;
