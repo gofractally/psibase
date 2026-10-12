@@ -7,6 +7,7 @@ import { useBranding } from "@shared/hooks/use-branding";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
+import { type PluginCall } from "@shared/lib/plugins/lib/call-plugin-function";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,14 +21,23 @@ import {
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 
-export const ShowContactsButton = ({ returnPath }: { returnPath?: string }) => {
+export const ShowContactsButton = ({
+    returnPath,
+    canReadContacts,
+    getContacts,
+}: {
+    returnPath?: string;
+    canReadContacts?: PluginCall<[], boolean>;
+    getContacts?: PluginCall<[], unknown[]>;
+}) => {
     const { data: currentUser } = useCurrentUser();
     const { data: hasProfilesReadPermission } = useHasProfilesReadPermission({
         enabled: !!currentUser,
+        call: canReadContacts,
     });
     const { refetch: prompt } = useContacts(
         currentUser,
-        { enabled: false },
+        { enabled: false, call: getContacts },
         { enabled: true, returnPath: returnPath ?? "/" },
     );
 

@@ -8,7 +8,7 @@ import z from "zod";
 export const importToken = async (token: string): Promise<number> => {
     return z.number().int().parse(await supervisor.functionCall({
         service: "fractal-cr",
-        intf: "invite",
+        intf: "embedded",
         method: "importInviteToken",
         params: [token],
     }));

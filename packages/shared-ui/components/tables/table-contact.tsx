@@ -2,9 +2,18 @@ import { Avatar } from "@shared/components/avatar";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
+import { type PluginCall } from "@shared/lib/plugins/lib/call-plugin-function";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-export const TableContact = ({ account }: { account: string }) => {
+export const TableContact = ({
+    account,
+    canReadContacts,
+    getContacts,
+}: {
+    account: string;
+    canReadContacts?: PluginCall<[], boolean>;
+    getContacts?: PluginCall<[], unknown[]>;
+}) => {
     const {
         data: currentUser,
         isPending: isPendingCurrentUser,
@@ -17,6 +26,7 @@ export const TableContact = ({ account }: { account: string }) => {
         isError: isErrorHasProfilesReadPermission,
     } = useHasProfilesReadPermission({
         enabled: !!currentUser,
+        call: canReadContacts,
     });
 
     const {
@@ -25,6 +35,7 @@ export const TableContact = ({ account }: { account: string }) => {
         isError: isErrorContacts,
     } = useContacts(currentUser, {
         enabled: !!hasProfilesReadPermission,
+        call: getContacts,
     });
 
     const nickname = contacts?.find(

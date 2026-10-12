@@ -5,6 +5,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { hostingAppCall, hostingAppService } from "../lib/plugins/host-app";
+import { type PluginCall } from "../lib/plugins/lib/call-plugin-function";
 import { queryClient } from "../lib/query-client";
 import QueryKey from "../lib/query-keys";
 import { type Account, zAccount } from "../lib/schemas/account";
@@ -37,11 +38,13 @@ export const contactsQueryKey = (
 export const queryContacts = (
     username: Account | null | undefined,
     autoRedirectConfig: AutoRedirectConfig,
+    call?: PluginCall<[], unknown[]>,
 ) =>
     queryOptions({
         queryKey: contactsQueryKey(username),
         queryFn: async () => {
-            const getCall = hostingAppCall<[], unknown[]>("contacts", "get");
+            const getCall =
+                call ?? hostingAppCall<[], unknown[]>("contacts", "get");
             const res = await supervisor.functionCall(
                 {
                     service: getCall.service,
@@ -62,15 +65,17 @@ export const useContacts = (
         Error,
         LocalContact[],
         ContactsQueryKey
-    >,
+    > & {
+        call?: PluginCall<[], unknown[]>;
+    },
     autoRedirectConfig: AutoRedirectConfig = {
         enabled: true,
         returnPath: "/",
     },
 ) => {
-    const queryOptions = options ?? {};
+    const { call, ...queryOptions } = options ?? {};
     return useQuery({
-        ...queryContacts(username, autoRedirectConfig),
+        ...queryContacts(username, autoRedirectConfig, call),
         ...queryOptions,
         enabled: !!username && queryOptions.enabled,
     });

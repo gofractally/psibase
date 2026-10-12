@@ -18,6 +18,5 @@ world impl {
     export user-guild;
     export user-fractal;
     export user-eval;
-    export invite;
-    export contacts;
+    export embedded;
 }
