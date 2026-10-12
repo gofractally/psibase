@@ -1,7 +1,7 @@
 use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::sites;
-use psibase::services::tokens::{Precision, Quantity};
+use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
 
 use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
 use crate::constants::{
@@ -17,7 +17,7 @@ use psibase::services::fractals::FractalRole::{
     self, Executive, Judiciary, Legislature, Recruitment,
 };
 
-use crate::helpers::create_managed_account;
+use crate::helpers::{create_managed_account, donation_sub_account, link_fractal_core_plugin_deps};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
     RoleTable,
@@ -27,12 +27,15 @@ use psibase::{
 };
 
 use psibase::services::fractals::{self, occu_wrapper};
-use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::{get_sender, RawKey, TableQuery, TimePointSec};
 
 impl Fractal {
     fn new(account: AccountNumber, name: String, mission: String) -> Self {
+        assert!(
+            !account.is_subaccount(),
+            "fractal account cannot be a subaccount"
+        );
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         let max_supply: Quantity = TOKEN_SUPPLY.into();
@@ -73,15 +76,7 @@ impl Fractal {
         Self::get_assert(sender)
     }
 
-    pub fn add(
-        fractal: AccountNumber,
-        legislature: AccountNumber,
-        judiciary: AccountNumber,
-        executive: AccountNumber,
-        recruitment: AccountNumber,
-        name: String,
-        mission: String,
-    ) -> Self {
+    pub fn add(fractal: AccountNumber, name: String, mission: String) -> Self {
         assert!(Self::get(fractal).is_none(), "fractal already exists");
         let new_instance = Self::new(fractal, name, mission);
 
@@ -92,19 +87,19 @@ impl Fractal {
 
         let defacto_service = account!("fractals+2");
 
-        let create_role = |role_account: AccountNumber, role: FractalRole| {
-            Role::add(fractal, role_account, role, defacto_service)
-        };
-
-        create_role(legislature, Legislature);
-        create_role(judiciary, Judiciary);
-        create_role(executive, Executive);
-        create_role(recruitment, Recruitment);
-
         Occupation::set_ordered_occupations(fractal, vec![defacto_service]);
 
+        // Create the fractal account first so role subaccounts can be
+        // preapproved by the parent. Roles must exist before the AuthDyn
+        // switch because has_policy/auth_policy reads them.
         create_managed_account(fractal, || {
+            Role::add(fractal, Legislature.into(), defacto_service);
+            Role::add(fractal, Judiciary.into(), defacto_service);
+            Role::add(fractal, Executive.into(), defacto_service);
+            Role::add(fractal, Recruitment.into(), defacto_service);
+
             sites::Wrapper::call_as(fractal).setProxy(account!("fractal-cr"));
+            link_fractal_core_plugin_deps(fractal);
         });
 
         FractalMember::add(fractal, get_sender(), None);
@@ -123,7 +118,7 @@ impl Fractal {
     }
 
     fn role_account(&self, role: FractalRole) -> AccountNumber {
-        Role::get_assert(self.account, role).account
+        Role::get_assert(self.account, role.into()).account()
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
@@ -132,6 +127,14 @@ impl Fractal {
 
     pub fn get_assert(fractal: AccountNumber) -> Self {
         Self::get(fractal).expect(&format!("fractal {} does not exist", fractal.to_string()))
+    }
+
+    pub fn get_by_token(token_id: TID) -> Option<Self> {
+        FractalTable::read().get_index_by_token().get(&token_id)
+    }
+
+    pub fn get_by_token_assert(token_id: TID) -> Self {
+        Self::get_by_token(token_id).expect("no fractal for token")
     }
 
     pub fn init_token(&self) {
@@ -152,22 +155,41 @@ impl Fractal {
         RewardStream::get(self.account, self.account).expect("fractal does not have reward stream")
     }
 
+    pub fn hold_donation(&self, amount: Quantity) {
+        Tokens::call().toSub(self.token_id, donation_sub_account(self.account), amount);
+    }
+
+    fn take_donations(&self) -> Quantity {
+        let key = donation_sub_account(self.account);
+        let amount = Tokens::call()
+            .getSubBal(self.token_id, key.clone())
+            .unwrap_or(0.into());
+        if amount.value == 0 {
+            return 0.into();
+        }
+        Tokens::call().fromSub(self.token_id, key, amount);
+        amount
+    }
+
     pub fn distribute_tokens(&self) {
         let mut stream = self.reward_stream();
-        let (_, withdrawn) = stream.claim();
-        if withdrawn.value == 0 {
-            return;
-        }
+        let (_, withdrawn) = stream.withdraw();
+        let amount = withdrawn + self.take_donations();
+        assert!(amount.value > 0, "nothing to distribute");
+        self.distribute_amount(amount);
+    }
 
-        let mut dust = withdrawn.value;
-        allocations(self.member_reward_shares(), withdrawn.value).for_each(|(member, amount)| {
-            dust -= amount;
+    fn distribute_amount(&self, amount: Quantity) {
+        let mut dust = amount.value;
+        allocations(self.member_reward_shares(), amount.value).for_each(|(member, share)| {
+            dust -= share;
             RewardStream::get_assert(self.account, member)
-                .deposit(amount.into(), "Fractal reward".into());
+                .deposit(share.into(), "Fractal reward".into());
         });
 
         if dust > 0 {
-            stream.deposit(dust.into(), "Dust recycle".into());
+            self.reward_stream()
+                .deposit(dust.into(), "Dust recycle".into());
         }
     }
 
@@ -241,19 +263,19 @@ impl Fractal {
     }
 
     async fn legislature(&self) -> Role {
-        Role::get_assert(self.account, Legislature)
+        Role::get_assert(self.account, Legislature.into())
     }
 
     async fn judiciary(&self) -> Role {
-        Role::get_assert(self.account, Judiciary)
+        Role::get_assert(self.account, Judiciary.into())
     }
 
     async fn executive(&self) -> Role {
-        Role::get_assert(self.account, Executive)
+        Role::get_assert(self.account, Executive.into())
     }
 
     async fn recruitment(&self) -> Role {
-        Role::get_assert(self.account, Recruitment)
+        Role::get_assert(self.account, Recruitment.into())
     }
 
     async fn stream(&self) -> Option<RewardStream> {

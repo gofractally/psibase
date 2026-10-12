@@ -10,7 +10,7 @@ export const BrandedGlowingCard = ({
     children: React.ReactNode;
 }) => {
     return (
-        <GlowingCard className="w-xl mx-4">
+        <GlowingCard className="mx-auto w-full min-w-0 max-w-xl">
             <CardHeader className="-ml-2 -mt-2">
                 <NetworkLogo
                     onClick={() => {

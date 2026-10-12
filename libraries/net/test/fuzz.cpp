@@ -219,12 +219,12 @@ namespace
          writer->set_top_root(initialState);
          reset_mock_time(initialClock);
       }
-      TempDatabase                    db;
-      std::unique_ptr<SystemContext>  systemContext;
-      ConstRevisionPtr                initialHead;
-      std::shared_ptr<triedent::root> initialState;
-      mock_clock::time_point          initialClock;
-      static StaticDatabaseImpl&      instance(const psibase::ConsensusData* init = nullptr)
+      TempDatabase                   db;
+      std::unique_ptr<SystemContext> systemContext;
+      ConstRevisionPtr               initialHead;
+      triedent::shared_root          initialState;
+      mock_clock::time_point         initialClock;
+      static StaticDatabaseImpl&     instance(const psibase::ConsensusData* init = nullptr)
       {
          static StaticDatabaseImpl result(init);
          return result;

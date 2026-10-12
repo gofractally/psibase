@@ -416,11 +416,12 @@ namespace psibase
                                          impl->altExecContexts.size() - 1
                                    : impl->executionContexts.size();
       auto& memory = blockContext.systemContext.executionMemories[memidx];
-      ExecutionContext            execContext{*this, impl->wasmConfig.vmOptions, memory, service};
-      std::lock_guard<std::mutex> guard{impl->mutex};
+      ExecutionContext             execContext{*this, impl->wasmConfig.vmOptions, memory, service};
+      std::unique_lock<std::mutex> guard{impl->mutex};
       if (impl->timedOut)
          throw TimeoutException{};
       auto& result = executionContexts.insert({service, std::move(execContext)}).first->second;
+      guard.unlock();
       impl->watchdog.resume();
       return result;
    }

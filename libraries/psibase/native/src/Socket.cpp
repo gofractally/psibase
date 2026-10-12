@@ -544,9 +544,11 @@ CloseLock::~CloseLock()
       auto* socket = static_cast<AutoCloseSocket*>(base.get());
       assert(socket->closeLocks != 0);
       --socket->closeLocks;
-      l.unlock();
       if (tryClose(*socket, *self))
+      {
+         l.unlock();
          socket->onClose(std::nullopt);
+      }
    }
 }
 

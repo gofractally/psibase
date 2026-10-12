@@ -124,9 +124,15 @@ impl Bucket {
     }
 
     fn validate_value_size(&self, value: &[u8]) {
-        // 100kb
-        const MAX_SIZE: usize = 100 * 1024;
-        assert!(value.len() <= MAX_SIZE, "value must be less <= 100KB");
+        let max = match self.db.duration {
+            StorageDuration::Ephemeral => 1024 * 1024, // 1MB; never written to the host
+            _ => 100 * 1024,                           // 100KB
+        };
+        assert!(
+            value.len() <= max,
+            "value exceeds size limit ({} bytes) for {:?}",
+            max, self.db.duration
+        );
     }
 
     fn validate_identifier(identifier: &str) {

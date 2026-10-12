@@ -23,7 +23,7 @@ use bindings::guilds::plugin as GuildsPlugin;
 use trust::{assert_authorized, FunctionName};
 
 use crate::bindings::host::{
-    client::api::get_receiver,
+    client::api::{get_receiver, get_sender},
     db::store::{Bucket, Database, DbMode::Transactional, StorageDuration::Persistent},
 };
 
@@ -49,6 +49,7 @@ define_trust! {
             - Attesting a finalized ranking proposal
             - Exiling a member from the fractal
             - Initialising the fractal token
+            - Donating tokens to the fractal
             - Setting the fractal token distribution interval
             - Creating a new guild
             - Mapping a governance role to a guild
@@ -65,8 +66,12 @@ define_trust! {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
         Medium => [apply_guild, claim_rewards, join_fractal, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
-        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
+        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, init_token, donate, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
     }
+}
+
+fn assert_caller_self() {
+    assert_eq!(get_sender(), get_receiver());
 }
 
 struct FractalCorePlugin;
@@ -259,6 +264,11 @@ impl UserFractal for FractalCorePlugin {
         assert_authorized(FunctionName::join_fractal)?;
         GuildsPlugin::user_guild::join_fractal()
     }
+
+    fn donate(token_id: u32, amount: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::donate)?;
+        FractalsPlugin::user_fractal::donate(token_id, &amount)
+    }
 }
 
 impl UserGuild for FractalCorePlugin {
@@ -331,16 +341,19 @@ impl UserGuild for FractalCorePlugin {
 
 impl Invite for FractalCorePlugin {
     fn import_invite_token(token: String) -> Result<u32, Error> {
+        assert_caller_self();
         bindings::invite::plugin::invitee::import_invite_token(&token)
     }
 }
 
 impl Contacts for FractalCorePlugin {
     fn get() -> Result<Vec<Contact>, Error> {
+        assert_caller_self();
         bindings::profiles::plugin::contacts::get()
     }
 
     fn has_read_permission() -> bool {
+        assert_caller_self();
         bindings::profiles::plugin::api::has_read_permission()
     }
 }

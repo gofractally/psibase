@@ -51,7 +51,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
    if (!upper.empty() && upper < lower)
       return -1;
 
-   auto r1   = std::shared_ptr<root>{};
+   auto r1   = shared_root{};
    char v0[] = {'\0'};
    char v1[] = {'\1'};
    for (const auto& [row, type] : contents)

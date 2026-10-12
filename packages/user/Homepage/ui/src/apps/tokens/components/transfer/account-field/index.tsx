@@ -7,7 +7,6 @@ import { withFieldGroup } from "@shared/components/form/app-form";
 import { FieldErrors } from "@shared/components/form/internal/field-errors";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { homepage } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
@@ -95,10 +94,7 @@ export const FieldAccount = withFieldGroup({
 
         const { data } = useCurrentUser();
         const currentUser = data;
-        const { data: contacts } = useContacts(
-            homepage.contacts.get,
-            currentUser,
-        );
+        const { data: contacts } = useContacts(currentUser);
         const contactsExcludingCurrentUser = contacts?.filter(
             (c) => c.account !== currentUser,
         );

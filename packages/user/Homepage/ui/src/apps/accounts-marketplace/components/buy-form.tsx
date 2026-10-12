@@ -6,15 +6,15 @@ import z from "zod";
 
 import { useBuyName } from "@/apps/accounts-marketplace/hooks/use-buy-name";
 import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/accounts-marketplace/route";
-import {
-    getSystemTokenBalance,
-    useUserTokenBalances,
-} from "@/hooks/use-user-token-balances";
 
 import { AvailableBalanceLabel } from "@shared/components/accounts-marketplace/available-balance-label";
 import { BuyNameConfirmationDialog } from "@shared/components/accounts-marketplace/buy-name-confirmation-dialog";
 import { useAppForm } from "@shared/components/form/app-form";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import {
+    getSystemTokenBalance,
+    useUserTokenBalances,
+} from "@shared/hooks/use-user-token-balances";
 import { getAccount } from "@shared/lib/get-account";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";

@@ -35,14 +35,14 @@ const zUserTokenBalanceSchema = z.object({
 export type UserTokenBalanceNode = z.infer<typeof zUserTokenBalanceNodeSchema>;
 
 export const fetchUserTokenBalances = async (
-    graphql: GraphqlPluginCall,
+    graphqlCall: GraphqlPluginCall,
     username: string,
 ) => {
     const parsedUsername = zAccount.parse(username);
     const query = `{${userTokenBalancesQuery(parsedUsername)}}`;
     const data = await graphqlAuth<
         z.infer<typeof zUserTokenBalanceSchema>
-    >(graphql, query);
+    >(graphqlCall, query);
     const parsed = zUserTokenBalanceSchema.parse(data);
     return parsed.userBalances.nodes;
 };

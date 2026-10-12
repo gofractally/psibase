@@ -1,9 +1,18 @@
+use crate::{self as psibase, AccountNumber, Pack, ToSchema, Unpack};
+use serde::{Deserialize, Serialize};
+
 /// Identify a service and method
 ///
 /// An empty `service` or `method` indicates a wildcard.
 pub use crate::ServiceMethod;
 
 type CallbackType = u32;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+struct AuthTarget {
+    sender: AccountNumber,
+    action: Option<ServiceMethod>,
+}
 
 /// Authenticate actions
 ///
@@ -52,11 +61,8 @@ pub mod auth_interface {
 
     /// Transaction's first authorizer.
     ///
-    /// Auth services should be aware that if this flag
-    /// is set, then only the first proof has been verified.
-    /// If they rely on other proofs when this flag is set,
-    /// they'll open up the accounts they're trying to
-    /// protect to resource billing attacks.
+    /// This flag is set when checking the authorization of the
+    /// sender of the first action of a transaction.
     pub const FIRST_AUTH_FLAG: u32 = 0x4000_0000;
 
     /// Authenticate a top-level action or a `runAs` action
@@ -152,8 +158,8 @@ pub mod auth_interface {
 #[crate::service(name = "transact", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use super::CallbackType;
-    use crate::{Action, Checksum256, Hex, Transaction};
+    use super::{AuthTarget, CallbackType};
+    use crate::{AccountNumber, Action, Checksum256, Hex, Transaction};
     use fracpack::Nested;
 
     /// Only called once, immediately after the boot transaction.
@@ -265,6 +271,13 @@ mod service {
         action: crate::Action,
         allowedActions: Vec<crate::services::transact::ServiceMethod>,
     ) -> Hex<Vec<u8>> {
+        unimplemented!()
+    }
+
+    /// Returns true if all the actions can be authorized by authorizers.
+    /// This does not include any of the special rules of `runAs`.
+    #[action]
+    fn isAuth(actions: Vec<AuthTarget>, authorizers: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 

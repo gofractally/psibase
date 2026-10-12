@@ -4,6 +4,9 @@ import { useMemo } from "react";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { useBranding } from "@shared/hooks/use-branding";
+import { useContacts } from "@shared/hooks/use-contacts";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -17,20 +20,24 @@ import {
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 
-export const ShowContactsButton = ({
-    hasReadPermission,
-    onRequestPermission,
-}: {
-    hasReadPermission: boolean | undefined;
-    onRequestPermission: () => void;
-}) => {
+export const ShowContactsButton = ({ returnPath }: { returnPath?: string }) => {
+    const { data: currentUser } = useCurrentUser();
+    const { data: hasProfilesReadPermission } = useHasProfilesReadPermission({
+        enabled: !!currentUser,
+    });
+    const { refetch: prompt } = useContacts(
+        currentUser,
+        { enabled: false },
+        { enabled: true, returnPath: returnPath ?? "/" },
+    );
+
     const { data: networkName } = useBranding();
     const contactsUrl = useMemo(
         () => siblingUrl(null, networkName, "contacts"),
         [networkName],
     );
 
-    if (hasReadPermission === false) {
+    if (hasProfilesReadPermission === false) {
         return (
             <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -59,7 +66,7 @@ export const ShowContactsButton = ({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={onRequestPermission}>
+                        <AlertDialogAction onClick={() => void prompt()}>
                             Continue
                         </AlertDialogAction>
                     </AlertDialogFooter>

@@ -125,7 +125,7 @@ class TestShutdown(unittest.TestCase):
         (a, b) = cluster.disconnected(*testutil.generate_names(2), env=ENV)
         a.boot(packages=['Minimal', 'Explorer'])
         b.connect(a)
-        b.wait(new_block())
+        b.wait(new_block(), timeout=20)
         self.do_shutdown(a)
 
     @testutil.psinode_test
@@ -133,7 +133,7 @@ class TestShutdown(unittest.TestCase):
         (a, b) = cluster.disconnected(*testutil.generate_names(2), env=ENV)
         a.boot(packages=['Minimal', 'Explorer'])
         a.connect(b)
-        b.wait(new_block())
+        b.wait(new_block(), timeout=20)
         self.do_shutdown(a)
 
     def do_shutdown(self, node):

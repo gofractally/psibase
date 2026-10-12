@@ -2,8 +2,8 @@
 mod bindings;
 use bindings::*;
 
-use accounts::query::api::get_current_user;
 use auth_delegate::plugin::api::new_account;
+use bindings::host::accounts::api::get_current_user;
 use exports::workshop::plugin::{
     app::{File, Guest as App},
     development::Guest as Development,
@@ -12,8 +12,8 @@ use exports::workshop::plugin::{
 };
 use host::types::types::Error;
 use psibase::MethodNumber;
-use transact::plugin::intf::set_propose_latch;
 use std::str::FromStr;
+use transact::plugin::api::set_propose_latch;
 
 use crate::trust::*;
 
@@ -30,11 +30,10 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [get_msgs],
         Low => [],
         Medium => [create_app, set_cache_mode],
         High => [set_app_metadata, publish_app, unpublish_app, upload, upload_tree, enable_spa, set_csp, delete_csp, remove, set_service_code],
-        Max => [send, archive, save],
+        Max => [send, archive, save, get_msgs],
     }
 }
 
