@@ -1,0 +1,18 @@
+package host:login-prompt;
+
+world impl {
+    include host:client/imports;
+    include host:accounts/imports;
+    import host:accounts/admin;
+    include host:crypto/imports;
+    include transact:plugin/imports;
+    include permissions:plugin/imports;
+    include auth-sig:plugin/imports;
+    include name-market:plugin/imports;
+
+    import accounts:plugin/api;
+    import invite:plugin/redemption;
+
+    export api;
+    export admin;
+}
