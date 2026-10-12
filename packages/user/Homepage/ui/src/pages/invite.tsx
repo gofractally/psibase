@@ -171,7 +171,8 @@ export const Invite = () => {
                             onClick={async () => {
                                 await supervisor.functionCall(
                                     {
-                                        service: "accounts",
+                                        service: "host",
+                                        plugin: "accounts",
                                         intf: "activeApp",
                                         method: "connectAccount",
                                         params: [],

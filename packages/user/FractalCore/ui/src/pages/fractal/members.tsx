@@ -4,11 +4,12 @@ import { Users } from "lucide-react";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembers } from "@/hooks/fractals/use-members";
 import { paths } from "@/lib/paths";
+import { embeddedContactCalls } from "@/lib/plugin";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
-import { ShowContactsButton } from "@/components/show-contacts-button";
-import { TableContact } from "@/components/table-contact";
+import { ShowContactsButton } from "@shared/components/show-contacts-button";
+import { TableContact } from "@shared/components/tables/table-contact";
 import { COUNCIL_SEATS } from "@shared/domains/fractal/lib/constants";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {
@@ -50,6 +51,7 @@ export const Members = () => {
                     <CardAction>
                         <ShowContactsButton
                             returnPath={paths.fractal.members()}
+                            {...embeddedContactCalls}
                         />
                     </CardAction>
                 </CardHeader>
@@ -68,7 +70,10 @@ export const Members = () => {
                             {sortedMembers?.map((member, index) => (
                                 <TableRow key={member.account}>
                                     <TableCell className="font-medium">
-                                        <TableContact account={member.account} />
+                                        <TableContact
+                                            account={member.account}
+                                            {...embeddedContactCalls}
+                                        />
                                     </TableCell>
                                     <TableCell className="flex items-center gap-2">
                                         {index < COUNCIL_SEATS && (
@@ -82,9 +87,7 @@ export const Members = () => {
                                                 </TooltipContent>
                                             </Tooltip>
                                         )}
-                                        <Badge variant="default">
-                                            Member
-                                        </Badge>
+                                        <Badge variant="default">Member</Badge>
                                     </TableCell>
                                     <TableCell className="text-end">
                                         {dayjs(member.createdAt).format(

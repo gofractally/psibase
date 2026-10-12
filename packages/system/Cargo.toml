@@ -25,7 +25,8 @@ exclude = [
     "HttpServer/plugin/",
     "Producers/plugin/",
     "SetCode/plugin/",
-    "Transact/plugin/",
+    "Transact/plugin/transact/",
+    "Transact/plugin/admin/",
 ]
 
 [workspace.package]

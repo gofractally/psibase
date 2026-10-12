@@ -30,9 +30,16 @@ use exports::config::plugin::packaging::{
 };
 use exports::config::plugin::producers::ClaimType;
 
-use transact::plugin::intf::set_propose_latch;
+use transact::plugin::api::set_propose_latch;
 
 const VIRTUAL_SERVER: &'static str = "vserver";
+
+fn assert_caller_self() {
+    assert_eq!(
+        host::client::api::get_sender(),
+        host::client::api::get_receiver()
+    );
+}
 
 struct ConfigPlugin;
 
@@ -76,15 +83,18 @@ impl Producers for ConfigPlugin {
     }
 
     fn register_candidate(endpoint: String, claim: ClaimType) -> Result<(), Error> {
+        assert_caller_self();
         producers::plugin::api::register_candidate(&endpoint, &claim)
     }
 
     fn unregister_candidate() -> Result<(), Error> {
+        assert_caller_self();
         producers::plugin::api::unregister_candidate();
         Ok(())
     }
 
     fn graphql(query: String) -> Result<String, Error> {
+        assert_caller_self();
         producers::plugin::authorized::graphql(&query)
     }
 }
@@ -118,10 +128,12 @@ impl Packaging for ConfigPlugin {
     }
 
     fn get_sources(owner: String) -> Result<Vec<PackageSource>, Error> {
+        assert_caller_self();
         packages::plugin::queries::get_sources(&owner)
     }
 
     fn get_installed_packages() -> Result<Vec<Meta>, Error> {
+        assert_caller_self();
         packages::plugin::queries::get_installed_packages()
     }
 
@@ -131,6 +143,7 @@ impl Packaging for ConfigPlugin {
         request_pref: PackagePreference,
         non_request_pref: PackagePreference,
     ) -> Result<Vec<PackageOpInfo>, Error> {
+        assert_caller_self();
         packages::plugin::private_api::resolve_packages(
             &index,
             &request,
@@ -140,8 +153,8 @@ impl Packaging for ConfigPlugin {
     }
 
     fn install_packages(owner: String, ops: Vec<PackageOpFull>) -> Result<(), Error> {
-        let (data, install) =
-            packages::plugin::private_api::build_transactions(&owner, &ops, 4)?;
+        assert_caller_self();
+        let (data, install) = packages::plugin::private_api::build_transactions(&owner, &ops, 4)?;
         for tx in data {
             packages::plugin::private_api::push_data(&tx);
         }
@@ -164,10 +177,12 @@ impl NameMarket for ConfigPlugin {
     }
 
     fn get_markets_overview() -> Result<name_market::plugin::types::MarketsOverview, Error> {
+        assert_caller_self();
         name_market::plugin::api::get_markets_overview()
     }
 
     fn graphql(query: String) -> Result<String, Error> {
+        assert_caller_self();
         name_market::plugin::authorized::graphql(&query)
     }
 }
@@ -260,50 +275,60 @@ impl VirtualServer for ConfigPlugin {
     }
 
     fn get_billing_config() -> Result<virtual_server::plugin::types::BillingConfig, Error> {
+        assert_caller_self();
         virtual_server::plugin::authorized::get_billing_config()
     }
 
     fn graphql(query: String) -> Result<String, Error> {
+        assert_caller_self();
         virtual_server::plugin::authorized::graphql(&query)
     }
 }
 
 impl Tokens for ConfigPlugin {
     fn get_system_token() -> Result<Option<tokens::plugin::types::SystemTokenInfo>, Error> {
+        assert_caller_self();
         tokens::plugin::helpers::get_system_token()
     }
 }
 
 impl Staged for ConfigPlugin {
     fn accept(id: u32) -> Result<(), Error> {
+        assert_caller_self();
         staged_tx::plugin::respondent::accept(id)
     }
 
     fn reject(id: u32) -> Result<(), Error> {
+        assert_caller_self();
         staged_tx::plugin::respondent::reject(id)
     }
 
     fn execute(id: u32) -> Result<(), Error> {
+        assert_caller_self();
         staged_tx::plugin::respondent::execute(id)
     }
 
     fn remove(id: u32) -> Result<(), Error> {
+        assert_caller_self();
         staged_tx::plugin::proposer::remove(id)
     }
 
     fn graphql(query: String) -> Result<String, Error> {
+        assert_caller_self();
         staged_tx::plugin::authorized::graphql(&query)
     }
 }
 
 impl Sites for ConfigPlugin {
     fn graphql(query: String) -> Result<String, Error> {
+        assert_caller_self();
         sites::plugin::authorized::graphql(&query)
     }
 }
 
 impl Transact for ConfigPlugin {
     fn graphql(query: String) -> Result<String, Error> {
+        assert_caller_self();
         transact::plugin::authorized::graphql(&query)
     }
 }

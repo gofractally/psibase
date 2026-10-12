@@ -3022,6 +3022,7 @@ dependencies = [
  "psibase-user-workspace-hack",
  "psibase_service",
  "serde",
+ "serde-aux",
  "serde_json",
 ]
 
@@ -3674,6 +3675,26 @@ name = "simd-adler32"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
+
+[[package]]
+name = "single-prod"
+version = "0.29.0"
+dependencies = [
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "single-prod-pkg",
+]
+
+[[package]]
+name = "single-prod-pkg"
+version = "0.29.0"
+dependencies = [
+ "psibase-user-workspace-hack",
+ "single-prod",
+]
 
 [[package]]
 name = "slab"

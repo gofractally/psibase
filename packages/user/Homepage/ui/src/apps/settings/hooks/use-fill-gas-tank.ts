@@ -12,7 +12,7 @@ export const useFillGasTank = () => {
             await supervisor.functionCall({
                 service: "homepage",
                 plugin: "plugin",
-                intf: "vserver",
+                intf: "virtual-server",
                 method: "fillGasTank",
                 params: [],
             });
@@ -36,7 +36,7 @@ export const useResizeAndFillGasTank = () => {
             await supervisor.functionCall({
                 service: "homepage",
                 plugin: "plugin",
-                intf: "vserver",
+                intf: "virtual-server",
                 method: "resizeAndFillGasTank",
                 params: [newCapacity],
             });

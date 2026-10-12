@@ -4,7 +4,7 @@ world impl {
     include host:client/imports;
     include host:crypto/imports;
     include host:types/imports;
-    import transact:plugin/intf;
+    import transact:plugin/api;
     import auth-sig:plugin/keyvault;
     import auth-sig:plugin/actions;
     import accounts:plugin/api;
@@ -22,7 +22,7 @@ world impl {
     export contacts;
     export chainmail;
     export invite;
-    export vserver;
+    export virtual-server;
     export swap;
     export liquidity;
     export token-swap;

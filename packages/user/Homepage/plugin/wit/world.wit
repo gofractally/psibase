@@ -62,7 +62,7 @@ interface invite {
     graphql: func(query: string) -> result<string, error>;
 }
 
-interface vserver {
+interface virtual-server {
     use host:types/types.{error};
     use virtual-server:plugin/types.{billing-config};
 
@@ -96,7 +96,4 @@ interface token-swap {
     use host:types/types.{error};
 
     graphql: func(query: string) -> result<string, error>;
-}
-
-world imports {
 }

@@ -8,7 +8,6 @@ import { Avatar } from "@shared/components/avatar";
 import { withForm } from "@shared/components/form/app-form";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { homepage } from "@shared/lib/plugins";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
@@ -50,10 +49,7 @@ export const TransferModal = withForm({
     }) {
         const { data: currentUser } = useCurrentUser();
         const { data: profile } = useProfile(currentUser, true);
-        const { data: contacts } = useContacts(
-            homepage.contacts.get,
-            currentUser,
-        );
+        const { data: contacts } = useContacts(currentUser);
 
         const [to, amount, isSubmitting] = useStore(form.store, (state) => [
             state.values.to.account,

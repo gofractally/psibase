@@ -1,5 +1,14 @@
 import type { SystemTokenInfo as PluginSystemTokenInfo } from "@shared/lib/plugins/tokens";
 
+import { useQuery } from "@tanstack/react-query";
+
+import { hostingAppCall } from "@shared/lib/plugins/host-app";
+import {
+    type PluginCall,
+    callPluginFunction,
+} from "@shared/lib/plugins/lib/call-plugin-function";
+import QueryKey from "@shared/lib/query-keys";
+
 export interface SystemTokenInfo {
     id: string;
     /** Display label: token symbol, or "ID: {id}" when no symbol is set */
@@ -21,3 +30,15 @@ export function toSystemTokenInfo(
         precision: token.precision,
     };
 }
+
+export const useSystemToken = (
+    call: PluginCall<[], PluginSystemTokenInfo | undefined> = hostingAppCall(
+        "tokens",
+        "getSystemToken",
+    ),
+) =>
+    useQuery<SystemTokenInfo | null>({
+        queryKey: QueryKey.systemToken(),
+        queryFn: async () =>
+            toSystemTokenInfo(await callPluginFunction(call, [])),
+    });

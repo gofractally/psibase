@@ -3,11 +3,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useGuilds } from "@/hooks/fractals/use-guilds";
+import { embeddedContactCalls } from "@/lib/plugin";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
-import { TableContact } from "@/components/table-contact";
+import { TableContact } from "@shared/components/tables/table-contact";
 import { FractalGuildIdentifier } from "@shared/domains/fractal/components/fractal-guild-header-identifier";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
@@ -90,9 +91,12 @@ export const Guilds = () => {
                                             </TableCell>
                                             <TableCell className="justify-items-end">
                                                 {guild.rep?.member ? (
-                                                    <TableContact account={
+                                                    <TableContact
+                                                        account={
                                                             guild.rep.member
-                                                        } />
+                                                        }
+                                                        {...embeddedContactCalls}
+                                                    />
                                                 ) : (
                                                     "Council"
                                                 )}

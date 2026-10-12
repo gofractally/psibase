@@ -8,11 +8,12 @@ import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { paths } from "@/lib/paths";
+import { embeddedContactCalls } from "@/lib/plugin";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
-import { ShowContactsButton } from "@/components/show-contacts-button";
-import { TableContact } from "@/components/table-contact";
+import { ShowContactsButton } from "@shared/components/show-contacts-button";
+import { TableContact } from "@shared/components/tables/table-contact";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     CardAction,
@@ -57,10 +58,11 @@ export const GuildApplicants = () => {
                         <CardTitle>Guild applicants</CardTitle>
                         <CardAction>
                             <ShowContactsButton
-                            returnPath={paths.guild.membership.applicants(
+                                returnPath={paths.guild.membership.applicants(
                                     guildAccount!,
                                 )}
-                        />
+                                {...embeddedContactCalls}
+                            />
                         </CardAction>
                     </CardHeader>
                     <CardContent className="@container">
@@ -85,7 +87,10 @@ export const GuildApplicants = () => {
                                         }
                                     >
                                         <TableCell className="font-medium">
-                                            <TableContact account={application.applicant} />
+                                            <TableContact
+                                                account={application.applicant}
+                                                {...embeddedContactCalls}
+                                            />
                                         </TableCell>
                                         <TableCell className="text-end">
                                             {dayjs(

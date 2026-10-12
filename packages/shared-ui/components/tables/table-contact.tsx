@@ -1,18 +1,52 @@
 import { Avatar } from "@shared/components/avatar";
+import { useContacts } from "@shared/hooks/use-contacts";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
+import { type PluginCall } from "@shared/lib/plugins/lib/call-plugin-function";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const TableContact = ({
     account,
-    nickname,
-    isLoading = false,
-    isError = false,
+    canReadContacts,
+    getContacts,
 }: {
     account: string;
-    nickname?: string | null;
-    isLoading?: boolean;
-    isError?: boolean;
+    canReadContacts?: PluginCall<[], boolean>;
+    getContacts?: PluginCall<[], unknown[]>;
 }) => {
-    if (isLoading) {
+    const {
+        data: currentUser,
+        isPending: isPendingCurrentUser,
+        isError: isErrorCurrentUser,
+    } = useCurrentUser();
+
+    const {
+        data: hasProfilesReadPermission,
+        isPending: isPendingHasProfilesReadPermission,
+        isError: isErrorHasProfilesReadPermission,
+    } = useHasProfilesReadPermission({
+        enabled: !!currentUser,
+        call: canReadContacts,
+    });
+
+    const {
+        data: contacts,
+        isLoading: isLoadingContacts,
+        isError: isErrorContacts,
+    } = useContacts(currentUser, {
+        enabled: !!hasProfilesReadPermission,
+        call: getContacts,
+    });
+
+    const nickname = contacts?.find(
+        (contact) => contact.account === account,
+    )?.nickname;
+
+    if (
+        isPendingCurrentUser ||
+        isPendingHasProfilesReadPermission ||
+        isLoadingContacts
+    ) {
         return (
             <div className="@lg:h-auto flex h-10 items-center gap-2">
                 <Skeleton className="@lg:h-5 @lg:w-5 h-8 w-8 shrink-0 rounded-full" />
@@ -21,7 +55,11 @@ export const TableContact = ({
         );
     }
 
-    if (isError) {
+    if (
+        isErrorCurrentUser ||
+        isErrorHasProfilesReadPermission ||
+        isErrorContacts
+    ) {
         return <div>{account}</div>;
     }
 

@@ -1,6 +1,6 @@
 package host:http;
 
-/// HTTP to an app's own server, with the current session attached when present.
+/// Common calls related to interactions with the server
 interface api {
     use host:types/types.{error, post-request, body-types};
 
@@ -23,6 +23,9 @@ interface api {
     /// Parameters
     /// * `endpoint` - The subpath being requested (e.g. `/common/tapos/head` or `/api/some-request`)
     get-json: func(endpoint: string) -> result<string, error>;
+
+    // Todo: Probably will need to implement most/all js library functionality:
+    // https://docs.psibase.io/development/front-ends/reference/js-libraries.html
 }
 
 world imports {

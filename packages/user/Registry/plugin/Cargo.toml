@@ -26,7 +26,7 @@ package = "registry:plugin"
 "host:client" = { path = "../../Host/plugin/client/wit/world.wit" }
 "host:http" = { path = "../../Host/plugin/http/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
-"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 
 [package.metadata.component.target]

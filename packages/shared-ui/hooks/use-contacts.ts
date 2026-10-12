@@ -4,11 +4,12 @@ import type { AutoRedirectConfig } from "@psibase/common-lib";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { hostingAppCall, hostingAppService } from "../lib/plugins/host-app";
+import { type PluginCall } from "../lib/plugins/lib/call-plugin-function";
 import { queryClient } from "../lib/query-client";
 import QueryKey from "../lib/query-keys";
 import { type Account, zAccount } from "../lib/schemas/account";
 import { supervisor } from "../lib/supervisor";
-import { type PluginCall } from "../lib/plugins/lib/call-plugin-function";
 
 export const zLocalContact = z.object({
     account: zAccount,
@@ -24,24 +25,26 @@ export const zProcessedContact = zLocalContact.extend({
 export type LocalContact = z.infer<typeof zLocalContact>;
 export type ProcessedContact = z.infer<typeof zProcessedContact>;
 
-export type ContactsGetCall = PluginCall<[], unknown>;
-
 export type ContactsQueryKey = readonly [
     ...ReturnType<typeof QueryKey.contacts>,
     Account,
 ];
 
+export const contactsQueryKey = (
+    username: Account | null | undefined,
+): ContactsQueryKey =>
+    [...QueryKey.contacts(username), hostingAppService()] as ContactsQueryKey;
+
 export const queryContacts = (
-    getCall: ContactsGetCall,
     username: Account | null | undefined,
     autoRedirectConfig: AutoRedirectConfig,
+    call?: PluginCall<[], unknown[]>,
 ) =>
     queryOptions({
-        queryKey: [
-            ...QueryKey.contacts(username),
-            getCall.service,
-        ] as ContactsQueryKey,
+        queryKey: contactsQueryKey(username),
         queryFn: async () => {
+            const getCall =
+                call ?? hostingAppCall<[], unknown[]>("contacts", "get");
             const res = await supervisor.functionCall(
                 {
                     service: getCall.service,
@@ -56,65 +59,52 @@ export const queryContacts = (
     });
 
 export const useContacts = (
-    getCall: ContactsGetCall,
     username?: Account | null | undefined,
     options?: QueryOptions<
         LocalContact[],
         Error,
         LocalContact[],
         ContactsQueryKey
-    >,
+    > & {
+        call?: PluginCall<[], unknown[]>;
+    },
     autoRedirectConfig: AutoRedirectConfig = {
         enabled: true,
         returnPath: "/",
     },
 ) => {
-    const queryOptions = options ?? {};
+    const { call, ...queryOptions } = options ?? {};
     return useQuery({
-        ...queryContacts(getCall, username, autoRedirectConfig),
+        ...queryContacts(username, autoRedirectConfig, call),
         ...queryOptions,
         enabled: !!username && queryOptions.enabled,
     });
 };
 
-export const upsertUserToCache = (
-    username: Account,
-    contact: LocalContact,
-    service: Account,
-) => {
-    queryClient.setQueryData(
-        [...QueryKey.contacts(username), service],
-        (data: unknown) => {
-            if (data) {
-                const parsed = zLocalContact.array().parse(data);
-                const isExisting = parsed.some(
-                    (c) => c.account === contact.account,
-                );
+export const upsertUserToCache = (username: Account, contact: LocalContact) => {
+    queryClient.setQueryData(contactsQueryKey(username), (data: unknown) => {
+        if (data) {
+            const parsed = zLocalContact.array().parse(data);
+            const isExisting = parsed.some(
+                (c) => c.account === contact.account,
+            );
 
-                return isExisting
-                    ? parsed.map((c) =>
-                          c.account === contact.account ? contact : c,
-                      )
-                    : [...parsed, contact];
-            }
-            return [contact];
-        },
-    );
+            return isExisting
+                ? parsed.map((c) =>
+                      c.account === contact.account ? contact : c,
+                  )
+                : [...parsed, contact];
+        }
+        return [contact];
+    });
 };
 
-export const removeUserFromCache = (
-    username: Account,
-    account: Account,
-    service: Account,
-) => {
-    queryClient.setQueryData(
-        [...QueryKey.contacts(username), service],
-        (data: unknown) => {
-            if (data) {
-                const parsed = zLocalContact.array().parse(data);
-                return parsed.filter((c) => c.account !== account);
-            }
-            return [];
-        },
-    );
+export const removeUserFromCache = (username: Account, account: Account) => {
+    queryClient.setQueryData(contactsQueryKey(username), (data: unknown) => {
+        if (data) {
+            const parsed = zLocalContact.array().parse(data);
+            return parsed.filter((c) => c.account !== account);
+        }
+        return [];
+    });
 };

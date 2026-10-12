@@ -7,19 +7,17 @@ use errors::ErrorType;
 
 use serde::{Deserialize, Serialize};
 
-use host::http::api as Server;
 use host::client::api as Client;
+use host::http::api as Server;
 use host::types::types as HostTypes;
 
-use accounts::query::api as Accounts;
-use setcode::plugin::api as SetCode;
-use sites::plugin::api as Sites;
-use transact::plugin::admin as TransactAdmin;
-
-use crate::bindings::transact::plugin::intf::add_action_to_transaction;
+use crate::bindings::transact::plugin::api::{add_action_to_transaction, propose};
 use crate::packages::plugin::types;
+use bindings::host::accounts::api as HostAccounts;
 use exports::packages::plugin::private_api::Guest as PrivateApi;
 use exports::packages::plugin::queries::Guest as Queries;
+use setcode::plugin::api as SetCode;
+use sites::plugin::api as Sites;
 
 use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
@@ -492,7 +490,7 @@ impl PrivateApi for PackagesPlugin {
         // exist have the right owner.
         get_accounts_to_create(&get_package_accounts(&packages)?, sender)?;
 
-        let user = Accounts::get_current_user().ok_or(ErrorType::NoLoggedInUser)?;
+        let user = HostAccounts::get_current_user().ok_or(ErrorType::NoLoggedInUser)?;
         let uploader = StagedUpload::new(id, user.parse().unwrap());
 
         let mut upload_builder = TransactionBuilder::new(
@@ -582,7 +580,7 @@ impl PrivateApi for PackagesPlugin {
         assert_caller_config_or_self("propose_install");
 
         let tx = <Vec<Action>>::unpacked(&tx).unwrap();
-        TransactAdmin::propose(&tx.into_iter().map(|a| a.into()).collect::<Vec<_>>(), true)
+        propose(&tx.into_iter().map(|a| a.into()).collect::<Vec<_>>(), true)
     }
 
     fn set_account_sources(accounts: Vec<String>) -> Result<(), HostTypes::Error> {

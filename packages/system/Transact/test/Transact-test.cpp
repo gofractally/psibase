@@ -563,3 +563,42 @@ TEST_CASE("Test runAs")
                   .failed("caller is not authorized"));
    }
 }
+
+TEST_CASE("Test isAuth")
+{
+   auto t     = DefaultTestChain{};
+   auto alice = t.addAccount("alice");
+   auto bob   = t.addAccount("bob");
+   auto carol = AccountNumber{"carol678"};
+   auto dave  = AccountNumber{"dave5678"};
+   t.addService<AuthTest>("AuthTest.wasm");
+   auto nop  = ServiceMethod{Nop::service, MethodNumber{"nop"}};
+   auto nop2 = ServiceMethod{Nop::service, MethodNumber{"nop2"}};
+   SECTION("simple method")
+   {
+      REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{bob}, 1).succeeded());
+      REQUIRE(t.to<AuthTest>().setAuth(carol, std::vector{alice}, 1, nop).succeeded());
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop}}, std::vector{alice})
+                .returnVal() == true);
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop}}, std::vector{bob})
+                .returnVal() == false);
+   }
+   SECTION("multiple")
+   {
+      REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{bob}, 1).succeeded());
+      REQUIRE(t.to<AuthTest>().setAuth(carol, std::vector{alice}, 1, nop).succeeded());
+      REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob}, 1).succeeded());
+      REQUIRE(t.to<AuthTest>().setAuth(dave, std::vector{alice}, 1, nop2).succeeded());
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop}, {dave, nop2}}, std::vector{alice})
+                .returnVal() == true);
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop}, {dave, nop}}, std::vector{alice})
+                .returnVal() == false);
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop2}, {dave, nop2}}, std::vector{alice})
+                .returnVal() == false);
+   }
+}

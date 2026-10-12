@@ -41,7 +41,7 @@ export const useUserResources = (
             `;
 
             const data = await graphqlAuth<UserResourcesResponse>(
-                homepage.vserver.graphql,
+                homepage.virtualServer.graphql,
                 query,
             );
 

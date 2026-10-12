@@ -6,10 +6,11 @@ import dayjs from "dayjs";
 import { useScores } from "@/hooks/fractals/use-scores";
 import { useGuild } from "@/hooks/use-guild";
 import { paths } from "@/lib/paths";
+import { embeddedContactCalls } from "@/lib/plugin";
 
 import { GlowingCard } from "@shared/components/glowing-card";
-import { ShowContactsButton } from "@/components/show-contacts-button";
-import { TableContact } from "@/components/table-contact";
+import { ShowContactsButton } from "@shared/components/show-contacts-button";
+import { TableContact } from "@shared/components/tables/table-contact";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {
     CardAction,
@@ -52,10 +53,11 @@ export const GuildMembers = () => {
                 <CardTitle>Guild members</CardTitle>
                 <CardAction>
                     <ShowContactsButton
-                            returnPath={paths.guild.membership.members(
+                        returnPath={paths.guild.membership.members(
                             guild?.account ?? "",
                         )}
-                        />
+                        {...embeddedContactCalls}
+                    />
                 </CardAction>
             </CardHeader>
             <CardContent className="@container">
@@ -79,7 +81,10 @@ export const GuildMembers = () => {
                                 <TableRow key={member.member}>
                                     <TableCell className="font-medium">
                                         <div className="flex flex-row gap-2">
-                                            <TableContact account={member.member} />
+                                            <TableContact
+                                                account={member.member}
+                                                {...embeddedContactCalls}
+                                            />
                                             {roleLabel != null && (
                                                 <Badge variant="default">
                                                     {roleLabel}
