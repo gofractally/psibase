@@ -1419,7 +1419,6 @@ dependencies = [
  "psibase-plugin-workspace-hack",
  "serde",
  "serde_json",
- "url",
  "wit-bindgen-rt",
 ]
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { guilds } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -34,7 +34,7 @@ export const getEvaluationResults = async (evaluationId: number) => {
         }
     }`;
 
-    const results = await callGraphqlViaPlugin(
+    const results = await graphqlAuth(
         guilds.authorized.graphql,
         gql,
     );

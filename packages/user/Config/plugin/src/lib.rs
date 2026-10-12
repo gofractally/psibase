@@ -25,7 +25,9 @@ use virtual_server::plugin::types::{
     NetworkVariables as DestNetworkVariables, ServerSpecs as DestServerSpecs,
 };
 
-use exports::config::plugin::packaging::{Meta, PackageInfo, PackagePreference, PackageSource};
+use exports::config::plugin::packaging::{
+    Meta, PackageInfo, PackageOpFull, PackageOpInfo, PackagePreference, PackageSource,
+};
 use exports::config::plugin::producers::ClaimType;
 
 use transact::plugin::api::set_propose_latch;
@@ -135,22 +137,23 @@ impl Packaging for ConfigPlugin {
         packages::plugin::queries::get_installed_packages()
     }
 
-    fn get_available_packages(owner: String) -> Result<Vec<PackageInfo>, Error> {
-        assert_caller_self();
-        packages::plugin::queries::get_available_packages(&owner)
-    }
-
-    fn install_packages(
-        owner: String,
-        pkgs: Vec<String>,
+    fn resolve_packages(
+        index: Vec<PackageInfo>,
+        request: Vec<String>,
         request_pref: PackagePreference,
         non_request_pref: PackagePreference,
-    ) -> Result<(), Error> {
+    ) -> Result<Vec<PackageOpInfo>, Error> {
         assert_caller_self();
-        let index = packages::plugin::queries::get_available_packages(&owner)?;
-        let resolved =
-            packages::plugin::private_api::resolve(&index, &pkgs, request_pref, non_request_pref)?;
-        let ops = packages::plugin::private_api::load_package_ops(&resolved)?;
+        packages::plugin::private_api::resolve_packages(
+            &index,
+            &request,
+            request_pref,
+            non_request_pref,
+        )
+    }
+
+    fn install_packages(owner: String, ops: Vec<PackageOpFull>) -> Result<(), Error> {
+        assert_caller_self();
         let (data, install) = packages::plugin::private_api::build_transactions(&owner, &ops, 4)?;
         for tx in data {
             packages::plugin::private_api::push_data(&tx);
