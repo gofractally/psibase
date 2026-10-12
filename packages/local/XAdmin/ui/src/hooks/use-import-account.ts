@@ -27,9 +27,9 @@ export const useImportAccount = () =>
             const validatedCredential = zCredentialSchema.parse(credential);
 
             await supervisor.functionCall({
-                service: "accounts",
-                plugin: "plugin",
-                intf: "prompt",
+                service: "host",
+                plugin: "login-prompt",
+                intf: "api",
                 method: "importExisting",
                 params: [[validatedCredential]],
             });

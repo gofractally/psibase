@@ -123,16 +123,16 @@ impl Helpers for TokensPlugin {
 
     #[psibase_plugin::authorized(None)]
     fn get_system_token() -> Result<Option<Exports::types::SystemTokenInfo>, Error> {
-        Ok(
-            query::get_system_token::get_system_token()?.map(|token| Exports::types::SystemTokenInfo {
+        Ok(query::get_system_token::get_system_token()?.map(|token| {
+            Exports::types::SystemTokenInfo {
                 id: token.id,
                 symbol: token.symbol,
                 precision: token.precision,
-            }),
-        )
+            }
+        }))
     }
 
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "accounts", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "host", "config"])]
     fn get_user_balances(user: String) -> Result<Vec<Exports::types::UserBalance>, Error> {
         Ok(query::get_user_balances::get_user_balances(&user)?
             .into_iter()
@@ -176,7 +176,7 @@ impl TokensPlugin {
 }
 
 impl User for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "vserver", "invite", "token-swap", "namemarket", "fractals", "accounts", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "vserver", "invite", "token-swap", "namemarket", "fractals", "host", "config"])]
     fn credit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();
@@ -258,7 +258,7 @@ impl Admin for TokensPlugin {
 }
 
 impl Authorized for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "accounts", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "host", "config"])]
     fn graphql(query: String) -> Result<String, Error> {
         host::server::post_graphql_get_json(&query)
     }

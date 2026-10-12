@@ -54,10 +54,10 @@ pub fn get_user_balances(user: &str) -> Result<Vec<UserBalance>, ErrorType> {
         }}"#
     );
 
-    let response_str = server::post_graphql_get_json(&query)
-        .map_err(|e| ErrorType::QueryError(e.message))?;
-    let response: Response = serde_json::from_str(&response_str)
-        .map_err(|e| ErrorType::QueryError(e.to_string()))?;
+    let response_str =
+        server::post_graphql_get_json(&query).map_err(|e| ErrorType::QueryError(e.message))?;
+    let response: Response =
+        serde_json::from_str(&response_str).map_err(|e| ErrorType::QueryError(e.to_string()))?;
 
     Ok(response
         .data
