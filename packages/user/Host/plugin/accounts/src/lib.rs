@@ -8,9 +8,10 @@ mod import;
 use db::{apps_table::AppsTable, user_table::UserTable};
 /// App id for Host plugins and UI (no on-chain service).
 pub(crate) const HOST_APP: &str = "host";
-use errors::ErrorType::NotConnected;
+use errors::ErrorType::{AccountNotFound, NotConnected};
 use helpers::*;
 
+use bindings::accounts::query::api as AccountsQuery;
 use bindings::exports::host::accounts::active_app::Guest as ActiveApp;
 use bindings::exports::host::accounts::admin::{Credential, Guest as Admin};
 use bindings::exports::host::accounts::api::Guest as API;
@@ -40,7 +41,11 @@ impl ActiveApp for HostAccounts {
             return Err(NotConnected(user).into());
         }
 
-        AppsTable::new(&app).login(&user)
+        let Some(details) = AccountsQuery::get_account(&user)? else {
+            return Err(AccountNotFound(user).into());
+        };
+
+        AppsTable::new(&app).login(&user, &details.auth_service)
     }
 
     fn logout() -> Result<(), Error> {
@@ -82,9 +87,9 @@ impl Admin for HostAccounts {
         import::import_existing(credentials)
     }
 
-    fn login(user: String, app: String) -> Result<(), Error> {
+    fn login(user: String, app: String, auth_service: String) -> Result<(), Error> {
         check_caller(&[HOST_APP], "login@host:accounts/admin");
-        AppsTable::new(&app).login(&user)
+        AppsTable::new(&app).login(&user, &auth_service)
     }
 
     fn logout(app: String) {
@@ -98,10 +103,7 @@ impl Admin for HostAccounts {
     }
 
     fn disconnect(account: String, app: String) {
-        check_caller(
-            &["accounts", HOST_APP],
-            "disconnect@host:accounts/admin",
-        );
+        check_caller(&["accounts", HOST_APP], "disconnect@host:accounts/admin");
         AppsTable::new(&app).disconnect(&account);
     }
 

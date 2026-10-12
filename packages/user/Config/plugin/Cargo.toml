@@ -26,6 +26,8 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
+"transact:types" = { path = "../../../system/Transact/plugin/types/wit/world.wit" }
+
 "producers:plugin" = { path = "../../../system/Producers/plugin/wit/world.wit" }
 "branding:plugin" = { path = "../../Branding/plugin/wit/world.wit" }
 "packages:plugin" = { path = "../../Packages/plugin/wit/world.wit" }

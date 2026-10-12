@@ -58,8 +58,9 @@ interface admin {
     /// Any credentials that fails validation will not be imported.
     import-existing: func(credentials: list<credential>) -> result<_, list<tuple<string, error>>>;
 
-    /// Logs the user into the specified app and connects them to it
-    login: func(user: string, app: string) -> result<_, error>;
+    /// Logs the user into the specified app and connects them to it.
+    /// `auth-service` signs the login tx on a cache miss.
+    login: func(user: string, app: string, auth-service: string) -> result<_, error>;
 
     /// Logs out the user logged into the specified app
     logout: func(app: string);

@@ -12,6 +12,7 @@ world impl {
     include tokens:plugin/imports;
 
     import accounts:plugin/api;
+    include accounts:query/imports;
     import invite:plugin/redemption;
 
     export api;
