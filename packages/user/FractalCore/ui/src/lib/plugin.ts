@@ -33,28 +33,26 @@ class AdminFractal extends PluginInterface {
     protected override readonly _intf = "adminFractal" as const;
 
     get setRoleOccupation() {
-        return this._call<[roleId: number, occupation: string]>("setRoleOccupation")
+        return this._call<[roleId: number, occupation: string]>(
+            "setRoleOccupation",
+        );
     }
 
     get setPaidOccupations() {
         return this._call<[occupations: string[]]>("setPaidOccupations");
     }
 
-
-
     get migrateGuilds() {
-        return this._call<[guild: string]>("migrateGuilds")
+        return this._call<[guild: string]>("migrateGuilds");
     }
 
-
     get setRoleMapping() {
-        return this._call<[roleId: number, guild: string]>("setRoleMapping")
+        return this._call<[roleId: number, guild: string]>("setRoleMapping");
     }
 
     get exileMember() {
         return this._call<[member: Account]>("exileMember");
     }
-
 
     get initToken() {
         return this._call<[]>("initToken");
@@ -161,7 +159,6 @@ class AdminGuild extends PluginInterface {
     get removeGuildRep() {
         return this._call<[guildAccount: Account]>("removeGuildRep");
     }
-
 }
 
 class UserGuild extends PluginInterface {
@@ -172,7 +169,9 @@ class UserGuild extends PluginInterface {
     }
 
     get createGuildInvite() {
-        return this._call<[guildAccount: Account, numSeats: number, preAttest: boolean]>("inviteMember");
+        return this._call<
+            [guildAccount: Account, numSeats: number, preAttest: boolean]
+        >("inviteMember");
     }
 
     get attestMembershipApp() {
@@ -193,7 +192,9 @@ class UserGuild extends PluginInterface {
     }
 
     get draftApplication() {
-        return this._call<[guildAccount: Account, description: string]>("draftApplication");
+        return this._call<[guildAccount: Account, description: string]>(
+            "draftApplication",
+        );
     }
 
     get pushApplication() {

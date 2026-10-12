@@ -6,7 +6,11 @@ use crate::bindings::host::{
     accounts::api as HostAccountsApi, types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
-use crate::bindings::name_market::plugin::api as NameMarket;
+use crate::bindings::name_market::plugin::{api as NameMarket, types::MarketsOverview};
+use crate::bindings::tokens::plugin::{
+    helpers as TokensHelpers,
+    types::{SystemTokenInfo, UserBalance},
+};
 use crate::bindings::transact::plugin::api as Transact;
 use crate::errors::ErrorType;
 use crate::plugin::LoginPrompt;
@@ -91,5 +95,25 @@ impl Api for LoginPrompt {
         if Invites::get_active_invite().is_some() {
             Invites::accept();
         }
+    }
+
+    fn get_system_token() -> Result<Option<SystemTokenInfo>, Error> {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        TokensHelpers::get_system_token()
+    }
+
+    fn get_user_balances(user: String) -> Result<Vec<UserBalance>, Error> {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        TokensHelpers::get_user_balances(&user)
+    }
+
+    fn can_buy_account() -> bool {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        NameMarket::can_create_account()
+    }
+
+    fn get_markets_overview() -> Result<MarketsOverview, Error> {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        NameMarket::get_markets_overview()
     }
 }

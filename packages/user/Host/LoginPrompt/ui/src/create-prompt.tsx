@@ -45,6 +45,7 @@ import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { Loader } from "./components/create-prompt/loader";
 import { useConnectAccount } from "./hooks/use-connect-account";
+import { loginPromptCall } from "./lib/login-prompt";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { usePurchaseAccount } from "./hooks/use-purchase-account";
 
@@ -61,14 +62,15 @@ export const CreatePrompt = () => {
 
     const { data: networkName } = useBranding();
     const { data: systemToken, isPending: isPendingSystemToken } =
-        useSystemToken();
+        useSystemToken(loginPromptCall("api", "getSystemToken"));
 
     const { data: canBuyAccount, isPending: isPendingCanBuyAccount } =
-        useCanBuyAccount();
+        useCanBuyAccount({ call: loginPromptCall("api", "canBuyAccount") });
 
     const { data: tokenBalances, isPending: isPendingBalances } =
         useUserTokenBalances(currentUser, {
             enabled: Boolean(currentUser && canBuyAccount),
+            call: loginPromptCall("api", "getUserBalances"),
         });
 
     const availableBalance = useMemo(
@@ -84,6 +86,7 @@ export const CreatePrompt = () => {
         refetchInterval: canBuyAccount
             ? ACCOUNT_MARKETS_REFETCH_INTERVAL_MS
             : false,
+        call: loginPromptCall("api", "getMarketsOverview"),
     });
 
     const prices = useMemo(
