@@ -47,10 +47,11 @@ pub mod tables {
         }
 
         pub fn get_next_id(&mut self) -> NID {
-            let next_id = self
-                .next_id
-                .checked_add(1)
-                .expect("overflow in id generation");
+            let next_id = Nft::next_free_id(
+                self.next_id
+                    .checked_add(1)
+                    .expect("overflow in id generation"),
+            );
             self.next_id = next_id;
             self.save();
             next_id
@@ -81,16 +82,31 @@ pub mod tables {
             (self.issuer, self.id)
         }
 
-        pub fn new(owner_and_issuer: AccountNumber) -> Self {
-            Self {
-                id: ConfigRow::get_assert().get_next_id(),
-                issuer: owner_and_issuer,
-                owner: owner_and_issuer,
-            }
-        }
-
         pub fn get(nft_id: NID) -> Option<Self> {
             NftTable::read().get_index_pk().get(&nft_id)
+        }
+
+        /// First id at or after `start` that is neither minted nor burned.
+        pub fn next_free_id(mut id: NID) -> NID {
+            while Self::get(id).is_some() || Burned::contains(id) {
+                id = id.checked_add(1).expect("overflow in id generation");
+            }
+            id
+        }
+
+        /// Id `mint(None)` would assign, without moving the counter.
+        pub fn peek_next_id() -> NID {
+            Self::next_free_id(
+                ConfigRow::get_assert()
+                    .next_id
+                    .checked_add(1)
+                    .expect("overflow in id generation"),
+            )
+        }
+
+        /// True when `mint(Some(id))` can create this id. Id 0 is never available.
+        pub fn id_available(id: NID) -> bool {
+            id != 0 && Self::get(id).is_none() && !Burned::contains(id)
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
@@ -98,29 +114,45 @@ pub mod tables {
         }
 
         pub fn get_assert(nft_id: NID) -> Self {
-            Self::get(nft_id).unwrap_or_else(|| {
-                if nft_id <= ConfigRow::get_assert().next_id {
-                    abort_message("NFT was burned")
-                } else {
-                    abort_message("NFT does not exist")
-                }
-            })
+            if let Some(nft) = Self::get(nft_id) {
+                return nft;
+            }
+            if Burned::contains(nft_id) {
+                abort_message("NFT was burned");
+            }
+            abort_message("NFT does not exist");
         }
 
-        pub fn add() -> Self {
-            let sender = get_sender();
-            let new_instance = Self::new(sender);
-            new_instance.save();
+        pub fn new(sender: AccountNumber, id: NID) -> Self {
+            Self {
+                id,
+                issuer: sender,
+                owner: sender,
+            }
+        }
 
+        pub fn add(id: Option<NID>) -> Self {
+            let sender = get_sender();
+            let id = match id {
+                Some(id) => {
+                    assert!(id != 0, "NFT ID invalid");
+                    if Self::get(id).is_some() || Burned::contains(id) {
+                        abort_message("NFT ID already taken");
+                    }
+                    id
+                }
+                None => ConfigRow::get_assert().get_next_id(),
+            };
+            let nft = Self::new(sender, id);
+            nft.save();
             super::Wrapper::emit().history().ownerChange(
-                new_instance.id,
+                nft.id,
                 MINTED,
                 sender,
                 super::Wrapper::SERVICE,
                 "Minted".into(),
             );
-
-            new_instance
+            nft
         }
 
         pub fn burn(&self) {
@@ -135,6 +167,7 @@ pub mod tables {
                 super::Wrapper::SERVICE,
                 "Burned".into(),
             );
+            Burned::add(self.id);
             self.erase();
         }
 
@@ -319,6 +352,27 @@ pub mod tables {
         }
     }
 
+    #[table(name = "BurnedTable", index = 5)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct Burned {
+        #[primary_key]
+        pub id: NID,
+    }
+
+    impl Burned {
+        pub fn get(id: NID) -> Option<Self> {
+            BurnedTable::read().get_index_pk().get(&id)
+        }
+
+        pub fn contains(id: NID) -> bool {
+            Self::get(id).is_some()
+        }
+
+        fn add(id: NID) {
+            BurnedTable::read_write().put(&Self { id }).unwrap();
+        }
+    }
+
     impl NftHolder {
         pub fn get_or_default(account: AccountNumber) -> Self {
             NftHolderTable::read()
@@ -386,8 +440,8 @@ pub mod service {
     }
 
     #[action]
-    pub fn mint() -> NID {
-        Nft::add().id
+    pub fn mint(nftId: Option<NID>) -> NID {
+        Nft::add(nftId).id
     }
 
     #[action]

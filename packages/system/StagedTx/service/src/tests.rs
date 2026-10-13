@@ -75,7 +75,7 @@ mod tests {
                     sender: bob,
                     service: Nft::SERVICE,
                     method: MethodNumber::from("mint"),
-                    rawData: Nft::action_structs::mint {}.packed().into(),
+                    rawData: Nft::action_structs::mint { nftId: None }.packed().into(),
                 }],
                 true,
             )
@@ -106,7 +106,7 @@ mod tests {
                 .propose(
                     accounts
                         .iter()
-                        .map(|account| Nft::Wrapper::pack_from(*account).mint())
+                        .map(|account| Nft::Wrapper::pack_from(*account).mint(None))
                         .collect(),
                     true,
                 )

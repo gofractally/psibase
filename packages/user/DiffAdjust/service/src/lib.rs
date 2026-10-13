@@ -88,7 +88,7 @@ pub mod tables {
             Self::check_window_seconds(window_seconds);
             Self::check_decrease_ppm(decrease_ppm);
 
-            let nft_id = Nft::call().mint();
+            let nft_id = Nft::call().mint(None);
             let sender = get_sender();
             Nft::call().credit(nft_id, sender, "RateLimit administration NFT".into());
 

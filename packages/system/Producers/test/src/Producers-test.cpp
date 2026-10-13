@@ -155,7 +155,7 @@ SCENARIO("Producers")
          return Action{.sender  = acc,
                        .service = Nft::service,
                        .method  = "mint"_m,
-                       .rawData = psio::to_frac(std::tuple())
+                       .rawData = psio::to_frac(std::tuple(std::optional<NID>{}))
 
          };
       };
