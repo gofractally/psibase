@@ -189,8 +189,9 @@ struct LookupHeader
 };
 struct LookupBlock
 {
+   LookupHeader                   header;
    std::vector<CountsTransaction> transactions;
-   PSIO_REFLECT(LookupBlock, transactions)
+   PSIO_REFLECT(LookupBlock, header, transactions)
 };
 struct LookupLocation
 {
@@ -203,10 +204,9 @@ struct LookupLocation
 struct LookupData
 {
    std::optional<LookupHeader>   head;
-   std::optional<LookupHeader>   blockHeader;
    std::optional<LookupBlock>    block;
    std::optional<LookupLocation> transaction;
-   PSIO_REFLECT(LookupData, head, blockHeader, block, transaction)
+   PSIO_REFLECT(LookupData, head, block, transaction)
 };
 struct LookupRoot
 {
@@ -238,8 +238,8 @@ TEST_CASE("block and transaction lookups")
    auto lookup = [&](const std::optional<std::string>& token)
    {
       std::string query = std::format(
-          "query {{ head {{ blockNum }} blockHeader(blockNum: {0}) {{ blockNum }} block(blockNum: "
-          "{0}) {{ transactions {{ id numActions }} }} transaction(id: \"{1}\") {{ blockNum index "
+          "query {{ head {{ blockNum }} block(blockNum: {0}) {{ header {{ blockNum }} transactions "
+          "{{ id numActions }} }} transaction(id: \"{1}\") {{ blockNum index "
           "producer transaction {{ id numActions transaction {{ actions {{ service sender method "
           "}} }} }} }} }}",
           blockNum, aliceTxId);
@@ -252,9 +252,8 @@ TEST_CASE("block and transaction lookups")
       auto reply = lookup(std::nullopt);
       REQUIRE(reply.data.head.has_value());
       CHECK(reply.data.head->blockNum == blockNum);
-      REQUIRE(reply.data.blockHeader.has_value());
-      CHECK(reply.data.blockHeader->blockNum == blockNum);
       REQUIRE(reply.data.block.has_value());
+      CHECK(reply.data.block->header.blockNum == blockNum);
       CHECK(reply.data.block->transactions.size() == 3);
       REQUIRE(reply.data.transaction.has_value());
       CHECK(reply.data.transaction->blockNum == blockNum);
@@ -273,11 +272,11 @@ TEST_CASE("block and transaction lookups")
    }
    {
       std::string query =
-          std::format("query {{ blockHeader(blockNum: {}) {{ blockNum }} transaction(id: \"{}\") "
-                      "{{ index }} }}",
+          std::format("query {{ block(blockNum: {}) {{ header {{ blockNum }} }} transaction(id: "
+                      "\"{}\") {{ index }} }}",
                       blockNum + 1000, std::string(64, '0'));
       auto reply = t.post<LookupRoot>(Explorer::service, "/graphql", GraphQLBody{query});
-      CHECK(!reply.data.blockHeader.has_value());
+      CHECK(!reply.data.block.has_value());
       CHECK(!reply.data.transaction.has_value());
    }
 }

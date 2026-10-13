@@ -151,10 +151,10 @@ export const fetchBlockHeader = async (
     blockNum: number,
 ): Promise<BlockHeader | null> => {
     if (blockNum < FIRST_VISIBLE_BLOCK) return null;
-    const data = await graphql<{ blockHeader: BlockHeader | null }>(
-        `{ blockHeader(blockNum: ${blockNum}) { previous blockNum time producer term commitNum } }`,
+    const data = await graphql<{ block: { header: BlockHeader } | null }>(
+        `{ block(blockNum: ${blockNum}) { header { previous blockNum time producer term commitNum } } }`,
     );
-    return data.blockHeader;
+    return data.block?.header ?? null;
 };
 
 export const fetchHead = async (

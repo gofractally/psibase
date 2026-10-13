@@ -148,7 +148,7 @@ struct SignedTransactionQuery
    const TransactionAuthChecker*       censor;
    Checksum256 id() const { return sha256(value.transaction().data(), value.transaction().size()); }
    // Available even when the transaction is censored
-   std::uint32_t numActions() const { return (*value.transaction()).actions().size(); }
+   std::uint32_t numActions() const { return value.transaction()->actions().size(); }
    std::optional<TransactionQuery> transaction() const
    {
       if ((*censor)(value))
@@ -214,7 +214,7 @@ struct BlockQuery
       std::map<AccountNumber, std::uint32_t> counts;
       for (auto transaction : block->transactions())
       {
-         for (auto action : (*transaction.transaction()).actions())
+         for (auto action : transaction.transaction()->actions())
          {
             ++counts[action.service()];
          }
@@ -290,15 +290,6 @@ struct Query
       return BlockQuery{std::move(block), &transactionCensor};
    }
 
-   std::optional<BlockHeader> blockHeader(std::uint32_t blockNum) const
-   {
-      auto block = blockLog().getView(blockNum);
-      if (!block)
-         return std::nullopt;
-      BlockHeader header = block->header();
-      return header;
-   }
-
    std::optional<BlockHeader> head() const
    {
       auto index = blockLog();
@@ -346,7 +337,6 @@ PSIO_REFLECT(  //
     Query,
     method(blocks),
     method(block, blockNum),
-    method(blockHeader, blockNum),
     method(head),
     method(transaction, id, maxBlocks))
 
