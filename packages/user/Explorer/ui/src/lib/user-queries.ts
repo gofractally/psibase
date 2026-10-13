@@ -9,7 +9,7 @@
  */
 import { gqlString, graphql } from "@/lib/graphql";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { tokens, vserver } from "@shared/lib/plugins";
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ export interface UserResources {
 export const fetchUserResources = async (
     user: string,
 ): Promise<UserResources | null> => {
-    const data = await callGraphqlViaPlugin<{
+    const data = await graphqlAuth<{
         userResources: {
             balance: string | number;
             bufferCapacity: string | number;
@@ -202,7 +202,7 @@ export const fetchConsumedHistory = async (
     user: string,
     last = 200,
 ): Promise<ConsumptionEvent[]> => {
-    const data = await callGraphqlViaPlugin<{
+    const data = await graphqlAuth<{
         consumedHistory: {
             edges: {
                 node: {
@@ -258,7 +258,7 @@ export const fetchTokenTransfers = async (
     tokenId: number | string,
     last = 25,
 ): Promise<TokenTransfer[]> => {
-    const data = await callGraphqlViaPlugin<{
+    const data = await graphqlAuth<{
         balChanges: {
             edges: {
                 node: {
@@ -308,7 +308,7 @@ export interface PendingTransfer {
 export const fetchPendingTransfers = async (
     user: string,
 ): Promise<PendingTransfer[]> => {
-    const data = await callGraphqlViaPlugin<{
+    const data = await graphqlAuth<{
         userPending: {
             nodes: {
                 sharedBal: {
