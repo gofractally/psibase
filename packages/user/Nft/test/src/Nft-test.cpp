@@ -67,7 +67,7 @@ SCENARIO("Minting & burning nfts")
             // ID may not match if the boot packages mint NFTs during initialization
             NftRecord expected{.id = 1, .issuer = alice.id, .owner = alice.id};
 
-            auto nft = a.getNft(mint.returnVal()).returnVal();
+            auto nft = a.getNft(mint.returnVal()).returnVal().value();
 
             // Todo - Use simple comparison if/when eventHead is removed from the record.
             //CHECK(nft == expected);
@@ -80,7 +80,7 @@ SCENARIO("Minting & burning nfts")
       {
          auto mint  = a.mint(std::nullopt);
          auto mint2 = a.mint(std::nullopt);
-         auto nft1  = a.getNft(mint.returnVal()).returnVal();
+         auto nft1  = a.getNft(mint.returnVal()).returnVal().value();
 
          THEN("Alice can burn the NFT")
          {  //
@@ -88,7 +88,7 @@ SCENARIO("Minting & burning nfts")
 
             AND_THEN("The NFT no longer exists")
             {  //
-               CHECK(a.getNft(nft1.id).failed(nftBurned));
+               CHECK(!a.getNft(nft1.id).returnVal().has_value());
             }
          }
          THEN("Alice cannot burn a nonexistent NFT")
@@ -105,7 +105,7 @@ SCENARIO("Minting & burning nfts")
 
             THEN("The NFT is identical in every way, except the ID is incremented")
             {
-               auto      nft3     = a.getNft(mint3.returnVal()).returnVal();
+               auto      nft3     = a.getNft(mint3.returnVal()).returnVal().value();
                NftRecord expected = nft1;
                expected.id += 2;
                CHECK(nft3.id == expected.id);
@@ -150,7 +150,7 @@ SCENARIO("Transferring NFTs")
       AND_GIVEN("Alice has minted an NFT")
       {
          auto mint = a.mint(std::nullopt);
-         auto nft  = a.getNft(mint.returnVal()).returnVal();
+         auto nft  = a.getNft(mint.returnVal()).returnVal().value();
 
          THEN("No one can debit or uncredit the NFT")
          {
@@ -178,7 +178,7 @@ SCENARIO("Transferring NFTs")
 
             THEN("Bob immediately owns the NFT")
             {
-               auto newNft = b.getNft(nft.id).returnVal();
+               auto newNft = b.getNft(nft.id).returnVal().value();
                CHECK(newNft.owner == bob.id);
             }
             THEN("Alice has no chance to uncredit the NFT")
@@ -196,7 +196,7 @@ SCENARIO("Transferring NFTs")
 
                THEN("The NFT is not yet owned by Bob")
                {
-                  CHECK(bob.id != b.getNft(nft.id).returnVal().owner);
+                  CHECK(bob.id != b.getNft(nft.id).returnVal().value().owner);
                }
                THEN("Alice and Charlie may not debit the NFT")
                {
@@ -229,7 +229,7 @@ SCENARIO("Transferring NFTs")
 
                   THEN("Bob owns the NFT")
                   {
-                     CHECK(bob.id == b.getNft(nft.id).returnVal().owner);
+                     CHECK(bob.id == b.getNft(nft.id).returnVal().value().owner);
                   }
                   THEN("Alice and Charlie may not uncredit or debit the NFT")
                   {
@@ -293,7 +293,7 @@ SCENARIO("mint with an explicit id")
          REQUIRE(minted.succeeded());
          CHECK(minted.returnVal() == chosen);
 
-         auto nft = a.getNft(chosen).returnVal();
+         auto nft = a.getNft(chosen).returnVal().value();
          CHECK(nft.owner == alice.id);
          CHECK(nft.issuer == alice.id);
 
@@ -325,7 +325,7 @@ SCENARIO("mint with an explicit id")
       THEN("A burned sequential id cannot be reused")
       {
          REQUIRE(a.burn(sequential).succeeded());
-         CHECK(a.getNft(sequential).failed(nftBurned));
+         CHECK(!a.getNft(sequential).returnVal().has_value());
          CHECK(a.exists(sequential).returnVal() == false);
          CHECK(a.mint(sequential).failed(nftIdTaken));
          CHECK_FALSE(availableQuery(t, sequential).idAvailable);
@@ -335,7 +335,7 @@ SCENARIO("mint with an explicit id")
          NID chosen = next + 10;
          REQUIRE(a.mint(chosen).succeeded());
          REQUIRE(a.burn(chosen).succeeded());
-         CHECK(a.getNft(chosen).failed(nftBurned));
+         CHECK(!a.getNft(chosen).returnVal().has_value());
          CHECK(a.exists(chosen).returnVal() == false);
          CHECK(a.mint(chosen).failed(nftIdTaken));
 

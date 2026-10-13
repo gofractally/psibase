@@ -73,13 +73,13 @@ pub mod tables {
 
     impl Nft {
         #[secondary_key(1)]
-        fn by_owner(&self) -> (AccountNumber, NID) {
-            (self.owner, self.id)
+        fn by_owner(&self) -> (AccountNumber, AccountNumber, NID) {
+            (self.owner, self.issuer, self.id)
         }
 
         #[secondary_key(2)]
-        fn by_issuer(&self) -> (AccountNumber, NID) {
-            (self.issuer, self.id)
+        fn by_issuer(&self) -> (AccountNumber, AccountNumber, NID) {
+            (self.issuer, self.owner, self.id)
         }
 
         pub fn get(nft_id: NID) -> Option<Self> {
@@ -508,8 +508,8 @@ pub mod service {
     }
 
     #[action]
-    pub fn getNft(nftId: NID) -> Nft {
-        Nft::get_assert(nftId)
+    pub fn getNft(nftId: NID) -> Option<Nft> {
+        Nft::get(nftId)
     }
 
     #[action]
