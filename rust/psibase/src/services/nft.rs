@@ -33,9 +33,9 @@ pub struct NftHolderRecord {
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "CreditRecordInput")]
 pub struct CreditRecord {
-    nftId: NID,
-    creditor: AccountNumber,
-    debitor: AccountNumber,
+    pub nftId: NID,
+    pub creditor: AccountNumber,
+    pub debitor: AccountNumber,
 }
 
 crate::define_flags!(NftHolderFlags, u8, {

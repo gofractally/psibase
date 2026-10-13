@@ -207,11 +207,10 @@ mod service {
             rows.sort_by_key(|row| row.account.value);
 
             if let Some(cursor) = after.as_deref() {
-                let Some(pos) = rows.iter().position(|row| row.account.to_string() == cursor)
-                else {
+                let Ok(cursor_account) = AccountNumber::from_exact(cursor) else {
                     return Ok(Connection::new(false, false));
                 };
-                rows.drain(..=pos);
+                rows.retain(|row| row.account.value > cursor_account.value);
             }
 
             let limit = first.unwrap_or(i32::MAX).max(0) as usize;

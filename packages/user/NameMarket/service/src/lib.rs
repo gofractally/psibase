@@ -196,6 +196,11 @@ pub mod service {
         let sender = get_sender();
         let nft_id = purchased_account.nft_id;
 
+        assert!(
+            Nfts::Wrapper::call().getCredRecord(nft_id).creditor == sender,
+            "only the creditor may claim",
+        );
+
         Nfts::Wrapper::call().debit(nft_id, "".into());
         Nfts::Wrapper::call().burn(nft_id);
 

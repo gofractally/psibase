@@ -98,8 +98,7 @@ interface api {
 
     /// Claim an account name.
     /// * `account`: the account to claim the name for
-    /// * `nft-id`: redemption NFT id when it is already known. Omit it to read the committed id.
-    claim: func(account: string, nft-id: option<u32>) -> result<_, error>;
+    claim: func(account: string) -> result<_, error>;
 }
 
 /// Interface that makes authorized queries to this app's http server.

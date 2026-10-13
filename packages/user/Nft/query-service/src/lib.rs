@@ -202,7 +202,7 @@ mod service {
             .await
         }
 
-        /// Id that `mint` with an empty id would assign.
+        /// Id that `mint` would assign when its id argument is omitted.
         async fn nextId(&self) -> u32 {
             Nft::peek_next_id()
         }

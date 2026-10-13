@@ -229,23 +229,13 @@ impl Api for NameMarketPlugin {
     #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn claim_and_buy(account: String, max_cost: String) -> Result<(), Error> {
         let nft_id = schedule_buy(&account, &max_cost)?;
-        Self::claim(account, Some(nft_id))
+        schedule_claim(&account, nft_id)
     }
 
     #[psibase_plugin::authorized(Medium, whitelist = ["host", "homepage"])]
-    fn claim(account: String, nft_id: Option<u32>) -> Result<(), Error> {
-        let acct = AccountNumber::from_exact(&account)
-            .map_err(|_| ErrorType::InvalidAccountName(account.clone()))?;
-        let nft_id = match nft_id {
-            Some(id) => id,
-            None => fetch_purchased_nft_id(&account)?,
-        };
-
-        bindings::nft::plugin::user::try_debit(nft_id, "")?;
-        bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
-        name_market::Wrapper::add_to_tx().claim(acct);
-
-        Ok(())
+    fn claim(account: String) -> Result<(), Error> {
+        let nft_id = fetch_purchased_nft_id(&account)?;
+        schedule_claim(&account, nft_id)
     }
 }
 
@@ -353,6 +343,14 @@ fn schedule_buy(account: &str, max_cost: &String) -> Result<u32, Error> {
     name_market::Wrapper::add_to_tx().buy(acct_name, Some(nft_id));
     bindings::nft::plugin::user::try_debit(nft_id, "")?;
     Ok(nft_id)
+}
+
+fn schedule_claim(account: &str, nft_id: u32) -> Result<(), Error> {
+    let acct = AccountNumber::from_exact(account)
+        .map_err(|_| ErrorType::InvalidAccountName(account.to_string()))?;
+    bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
+    name_market::Wrapper::add_to_tx().claim(acct);
+    Ok(())
 }
 
 fn fetch_purchased_nft_id(account: &str) -> Result<u32, Error> {
