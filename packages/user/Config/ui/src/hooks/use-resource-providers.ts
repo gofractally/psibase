@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import QueryKey from "@/lib/query-keys";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { vserver } from "@shared/lib/plugins";
 
 export interface ResourceProvider {
@@ -24,7 +24,7 @@ export const useResourceProviders = () => {
     return useQuery({
         queryKey: QueryKey.resourceProviders(),
         queryFn: async () => {
-            const res = await callGraphqlViaPlugin<ResourceProvidersResponse>(
+            const res = await graphqlAuth<ResourceProvidersResponse>(
                 vserver.authorized.graphql,
                 `query {
                     resourceProviders {
