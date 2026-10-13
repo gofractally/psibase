@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import { useSystemToken } from "@shared/hooks/use-system-token";
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { tokens } from "@shared/lib/plugins";
 import QueryKey from "@shared/lib/query-keys";
 
@@ -30,7 +30,7 @@ export const useIsPrivateNetwork = () => {
         queryKey: [...QueryKey.systemToken(), "transferable", systemToken?.id],
         enabled: !!systemToken?.id,
         queryFn: async (): Promise<boolean> => {
-            const res = await callGraphqlViaPlugin<TokenSettingsResponse>(
+            const res = await graphqlAuth<TokenSettingsResponse>(
                 tokens.authorized.graphql,
                 `query {
                     token(tokenId: "${systemToken!.id}") {
