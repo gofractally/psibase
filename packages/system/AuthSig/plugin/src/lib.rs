@@ -111,7 +111,7 @@ impl KeyVault for AuthSig {
         assert_authorized_with_whitelist(
             FunctionName::import_key,
             vec![
-                "accounts".into(),
+                "host".into(),
                 "x-admin".into(),
                 "invite".into(),
                 "namemarket".into(),
@@ -126,7 +126,7 @@ impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(
             FunctionName::set_key,
-            vec!["accounts".into(), "namemarket".into(), "homepage".into()],
+            vec!["host".into(), "namemarket".into(), "homepage".into()],
         )?;
 
         Transact::add_action_to_transaction(
@@ -141,7 +141,7 @@ impl Actions for AuthSig {
     }
 
     fn create_account(new_account_name: String) -> Result<String, HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::create_account, vec!["accounts".into()])?;
+        assert_authorized_with_whitelist(FunctionName::create_account, vec!["host".into()])?;
 
         let name = psibase::AccountNumber::from_exact(&new_account_name)
             .map_err(|_| ErrorType::InvalidAccountName(&new_account_name))?;

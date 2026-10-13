@@ -1,5 +1,5 @@
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
-import { nameMarket } from "@shared/lib/plugins";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { homepage } from "@shared/lib/plugins";
 
 import {
     zNameEvent,
@@ -19,7 +19,7 @@ export type FetchNameEventsPageParams =
     | { last: number; before?: string };
 
 async function nameMarketAuthorizedGraphql<T>(query: string): Promise<T> {
-    return callGraphqlViaPlugin(nameMarket.authorized.graphql, query);
+    return graphqlAuth(homepage.accountsMarketplace.graphql, query);
 }
 
 function mapNameEventEdges(edges: Array<{ cursor?: string; node?: unknown }>) {
