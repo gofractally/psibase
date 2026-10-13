@@ -346,6 +346,51 @@ SCENARIO("mint with an explicit id")
    }
 }
 
+SCENARIO("try_debit")
+{
+   GIVEN("Alice has minted an NFT")
+   {
+      DefaultTestChain t;
+
+      auto alice = t.from(t.addAccount("alice"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
+      auto a     = alice.to<Nft>();
+      auto b     = bob.to<Nft>();
+
+      auto mint = a.mint(std::nullopt);
+      auto nft  = a.getNft(mint.returnVal()).returnVal().value();
+
+      THEN("Alice may try_debit an NFT she already owns")
+      {
+         CHECK(a.try_debit(nft.id, "memo").succeeded());
+         CHECK(a.getNft(nft.id).returnVal().value().owner == alice.id);
+      }
+      THEN("Bob may not try_debit Alice's NFT")
+      {
+         CHECK(b.try_debit(nft.id, "memo").failed(missingRequiredAuth));
+      }
+      THEN("try_debit of a nonexistent NFT fails")
+      {
+         CHECK(a.try_debit(99, "memo").failed(nftDNE));
+      }
+      WHEN("Alice credits the NFT to Bob")
+      {
+         a.credit(nft.id, bob, "memo");
+
+         THEN("Bob's try_debit takes ownership")
+         {
+            CHECK(b.try_debit(nft.id, "memo").succeeded());
+            CHECK(b.getNft(nft.id).returnVal().value().owner == bob.id);
+            CHECK(b.try_debit(nft.id, "memo").succeeded());
+         }
+         THEN("Alice may not try_debit it")
+         {
+            CHECK(a.try_debit(nft.id, "memo").failed(missingRequiredAuth));
+         }
+      }
+   }
+}
+
 TEST_CASE("nft schema")
 {
    CHECK_SCHEMA(Nft);

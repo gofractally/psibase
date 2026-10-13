@@ -79,12 +79,22 @@ mod service {
     }
 
     #[action]
+    fn try_debit(nftId: crate::services::nft::NID, memo: Memo) {
+        unimplemented!()
+    }
+
+    #[action]
     fn setUserConf(index: u8, enable: bool) {
         unimplemented!()
     }
 
     #[action]
     fn getNft(nftId: crate::services::nft::NID) -> Option<super::Nft> {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getHeldIds(issuer: AccountNumber, owner: AccountNumber) -> Vec<crate::services::nft::NID> {
         unimplemented!()
     }
 

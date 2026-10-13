@@ -8,6 +8,11 @@ interface issuer {
     ///
     /// Returns the id of NFT.
     mint: func() -> result<u32, error>;
+
+    /// Pick an id for a later `mint`, without scheduling the mint.
+    ///
+    /// Returns a random free id, or the next sequential id when that guess is taken.
+    guess-id: func() -> result<u32, error>;
 }
 
 
@@ -38,6 +43,9 @@ interface user {
     /// * `nft_id` - Unique NFT identifier
     /// * `memo`     - Memo describing the debit
     debit: func(nft-id: u32, memo: string) -> result<_, error>;
+
+    /// Debit a pending credit, or succeed when the caller already owns the NFT.
+    try-debit: func(nft-id: u32, memo: string) -> result<_, error>;
 
     /// Burn NFT from the caller's posession.
     ///

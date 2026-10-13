@@ -33,8 +33,9 @@ define_trust! {
         ",
     }
     functions {
+        None => [guess_id],
         Medium => [mint],
-        High => [uncredit, debit, enable_user_auto_debit, credit, burn, graphql],
+        High => [uncredit, debit, try_debit, enable_user_auto_debit, credit, burn, graphql],
     }
 }
 
@@ -62,6 +63,16 @@ fn plugin_error(message: impl Into<String>) -> Error {
     }
 }
 
+fn choose_id() -> Result<u32, Error> {
+    let guess: u32 = rand::rng().random();
+    let choice = mint_choice(guess)?;
+    Ok(if choice.available {
+        guess
+    } else {
+        choice.next_id
+    })
+}
+
 fn mint_choice(guess: u32) -> Result<MintChoiceData, Error> {
     let query = format!("query {{ idAvailable(id: {guess}) nextId }}");
     let body = post_graphql_get_json(&query)?;
@@ -76,22 +87,24 @@ impl Issuer for NftPlugin {
     fn mint() -> Result<u32, Error> {
         trust::assert_authorized(trust::FunctionName::mint)?;
 
-        let guess: u32 = rand::rng().random();
-        let choice = mint_choice(guess)?;
-        let id = if choice.available {
-            guess
-        } else {
-            choice.next_id
-        };
+        let id = choose_id()?;
         let packed_args = Nft::action_structs::mint { nftId: Some(id) }.packed();
         add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)?;
         Ok(id)
+    }
+
+    fn guess_id() -> Result<u32, Error> {
+        trust::assert_authorized(trust::FunctionName::guess_id)?;
+        choose_id()
     }
 }
 
 impl User for NftPlugin {
     fn credit(nft_id: u32, receiver: String, memo: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::credit)?;
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::credit,
+            vec!["namemarket".into()],
+        )?;
 
         let packed_args = Nft::action_structs::credit {
             memo: memo.try_into().unwrap(),
@@ -125,6 +138,21 @@ impl User for NftPlugin {
         .packed();
 
         add_action_to_transaction(Nft::action_structs::debit::ACTION_NAME, &packed_args)
+    }
+
+    fn try_debit(nft_id: u32, memo: String) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::try_debit,
+            vec!["namemarket".into()],
+        )?;
+
+        let packed_args = Nft::action_structs::try_debit {
+            memo: memo.try_into().unwrap(),
+            nftId: nft_id,
+        }
+        .packed();
+
+        add_action_to_transaction(Nft::action_structs::try_debit::ACTION_NAME, &packed_args)
     }
 
     fn burn(nft_id: u32) -> Result<(), Error> {

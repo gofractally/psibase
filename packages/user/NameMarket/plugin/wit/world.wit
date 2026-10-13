@@ -87,11 +87,13 @@ interface api {
     /// Purchase an account name
     /// * `account`: the account to purchase the name for
     /// * `max-cost`: maximum payment in network token (Quantity string)
-    buy: func(account: string, max-cost: string) -> result<_, error>;
+    /// * `nft-id`: redemption NFT id to mint, or none to assign the next free id
+    buy: func(account: string, max-cost: string, nft-id: option<u32>) -> result<_, error>;
 
-    /// Claim an account name
+    /// Claim an account name.
     /// * `account`: the account to claim the name for
-    claim: func(account: string) -> result<_, error>;
+    /// * `nft-id`: redemption NFT id when it is already known. Omit it to read the committed id.
+    claim: func(account: string, nft-id: option<u32>) -> result<_, error>;
 }
 
 /// Interface that makes authorized queries to this app's http server.

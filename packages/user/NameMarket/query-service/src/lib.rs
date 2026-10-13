@@ -3,12 +3,16 @@
 mod service {
     use std::sync::OnceLock;
 
-    use async_graphql::{connection::Connection, *};
+    use async_graphql::{
+        connection::{Connection, Edge},
+        *,
+    };
     use name_market::tables::{
         Auction as AuctionRow, AuctionsTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use name_market::Wrapper as NameMarketService;
     use psibase::services::diff_adjust::{RateLimit, Wrapper as DiffAdjust};
+    use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
@@ -187,26 +191,46 @@ mod service {
                 .collect()
         }
 
-        /// Bought-but-unclaimed account records for the authenticated user
+        /// Unclaimed accounts whose redemption NFT is owned by the authenticated user.
         async fn unclaimed_names(
             &self,
             first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, PurchasedAccount>> {
+        ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
             let user = self.require_authenticated()?;
+            let by_nft = PurchasedAccountsTable::read().get_index_by_nft();
+            let mut rows: Vec<_> = Nfts::call()
+                .getHeldIds(NameMarketService::SERVICE, user)
+                .into_iter()
+                .filter_map(|nft_id| by_nft.get(&nft_id))
+                .collect();
+            rows.sort_by_key(|row| row.account.value);
 
-            TableQuery::subindex::<AccountNumber>(
-                PurchasedAccountsTable::read().get_index_by_owner(),
-                &user,
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
+            if let Some(cursor) = after.as_deref() {
+                let Some(pos) = rows.iter().position(|row| row.account.to_string() == cursor)
+                else {
+                    return Ok(Connection::new(false, false));
+                };
+                rows.drain(..=pos);
+            }
+
+            let limit = first.unwrap_or(i32::MAX).max(0) as usize;
+            let has_next = rows.len() > limit;
+            rows.truncate(limit);
+
+            let mut conn = Connection::new(after.is_some(), has_next);
+            conn.edges = rows
+                .into_iter()
+                .map(|row| Edge::new(row.account.to_string(), row))
+                .collect();
+            Ok(conn)
+        }
+
+        /// Purchased account row, if `account` is still unclaimed.
+        async fn purchased_account(&self, account: AccountNumber) -> Option<PurchasedAccount> {
+            PurchasedAccountsTable::read()
+                .get_index_pk()
+                .get(&account)
         }
 
         /// Events: account **name** history for `owner`

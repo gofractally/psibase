@@ -221,7 +221,7 @@ impl Api for NameMarketPlugin {
     }
 
     #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
-    fn buy(account: String, max_cost: String) -> Result<(), Error> {
+    fn buy(account: String, max_cost: String, nft_id: Option<u32>) -> Result<(), Error> {
         let acct_name = AccountNumber::from_exact(&account)
             .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
 
@@ -244,17 +244,23 @@ impl Api for NameMarketPlugin {
             "account purchase",
         )?;
 
-        name_market::Wrapper::add_to_tx().buy(acct_name);
+        name_market::Wrapper::add_to_tx().buy(acct_name, nft_id);
 
         Ok(())
     }
 
     #[psibase_plugin::authorized(Medium, whitelist = ["host", "homepage"])]
-    fn claim(account: String) -> Result<(), Error> {
-        let account = AccountNumber::from_exact(&account)
-            .map_err(|_| ErrorType::InvalidAccountName(account))?;
+    fn claim(account: String, nft_id: Option<u32>) -> Result<(), Error> {
+        let acct = AccountNumber::from_exact(&account)
+            .map_err(|_| ErrorType::InvalidAccountName(account.clone()))?;
+        let nft_id = match nft_id {
+            Some(id) => id,
+            None => fetch_purchased_nft_id(&account)?,
+        };
 
-        name_market::Wrapper::add_to_tx().claim(account);
+        bindings::nft::plugin::user::try_debit(nft_id, "")?;
+        bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
+        name_market::Wrapper::add_to_tx().claim(acct);
 
         Ok(())
     }
@@ -320,6 +326,36 @@ struct MarketParamsData {
 #[serde(rename_all = "camelCase")]
 struct MarketParamsResponse {
     data: MarketParamsData,
+}
+
+#[derive(serde::Deserialize)]
+struct PurchasedAccountResponse {
+    data: PurchasedAccountData,
+}
+
+#[derive(serde::Deserialize)]
+struct PurchasedAccountData {
+    #[serde(rename = "purchasedAccount")]
+    purchased_account: Option<PurchasedAccountFields>,
+}
+
+#[derive(serde::Deserialize)]
+struct PurchasedAccountFields {
+    #[serde(rename = "nftId")]
+    nft_id: u32,
+}
+
+fn fetch_purchased_nft_id(account: &str) -> Result<u32, Error> {
+    let query = format!("query {{ purchasedAccount(account: \"{account}\") {{ nftId }} }}");
+    let body = CommonServer::post_graphql_get_json(&query)?;
+    let response = serde_json::from_str::<PurchasedAccountResponse>(&body).map_err(|err| {
+        Error::from(ErrorType::QueryResponseParseError(err.to_string()))
+    })?;
+    response
+        .data
+        .purchased_account
+        .map(|row| row.nft_id)
+        .ok_or_else(|| Error::from(ErrorType::PurchasedAccountNotFound(account.to_string())))
 }
 
 fn fetch_market_params() -> Result<Vec<MarketParamsRow>, Error> {

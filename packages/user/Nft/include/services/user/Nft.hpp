@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 #include <psibase/Memo.hpp>
 #include <psibase/psibase.hpp>
 
@@ -32,10 +33,12 @@ namespace UserService
       void credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
       void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
       void debit(NID nftId, psio::view<const psibase::Memo> memo);
+      void try_debit(NID nftId, psio::view<const psibase::Memo> memo);
       void setUserConf(std::uint8_t flag, bool enable);
 
       // Read-only:
       std::optional<NftRecord> getNft(NID nftId);
+      std::vector<NID>         getHeldIds(psibase::AccountNumber issuer, psibase::AccountNumber owner);
       NftHolderRecord          getNftHolder(psibase::AccountNumber account);
       CreditRecord             getCredRecord(NID nftId);
       bool                     exists(NID nftId);
@@ -63,9 +66,11 @@ namespace UserService
       method(credit, nftId, receiver, memo),
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
+      method(try_debit, nftId, memo),
       method(setUserConf, flag, enable),
 
       method(getNft, nftId),
+      method(getHeldIds, issuer, owner),
       method(getNftHolder, account),
       method(getCredRecord, nftId),
       method(exists, nftId),

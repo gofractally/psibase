@@ -135,7 +135,7 @@ mod tests {
         credit_namemarket(&chain, alice, sys, 1000_0000u64.into())?;
 
         NameMarket::push_from(&chain, alice)
-            .buy(account!("test"))
+            .buy(account!("test"), None)
             .get()?;
 
         NameMarket::push(&chain).disable(4).get()?;
@@ -159,7 +159,7 @@ mod tests {
         );
 
         let err = NameMarket::push_from(&chain, alice)
-            .buy(account!("abcd"))
+            .buy(account!("abcd"), None)
             .trace
             .error
             .expect("buy should fail when market disabled");
@@ -172,6 +172,22 @@ mod tests {
         let _der = pem::parse(pub_pem.trim())
             .map_err(|e| anyhow::anyhow!(e))?
             .into_contents();
+
+        let raw: serde_json::Value = chain.graphql(
+            NameMarket::SERVICE,
+            "query { purchasedAccount(account: \"test\") { nftId } }",
+        )?;
+        let nft_id = raw
+            .pointer("/data/purchasedAccount/nftId")
+            .and_then(|v| v.as_u64())
+            .expect("purchasedAccount.nftId") as u32;
+
+        Nfts::push_from(&chain, alice)
+            .try_debit(nft_id, "".into())
+            .get()?;
+        Nfts::push_from(&chain, alice)
+            .credit(nft_id, NameMarket::SERVICE, "".into())
+            .get()?;
 
         NameMarket::push_from(&chain, alice)
             .claim(account!("test"))
@@ -311,7 +327,7 @@ mod tests {
         credit_namemarket(&chain, alice, sys, 1000_0000u64.into())?;
 
         NameMarket::push_from(&chain, alice)
-            .buy(account!("abcdefg"))
+            .buy(account!("abcdefg"), None)
             .get()?;
 
         // --- marketParams ---

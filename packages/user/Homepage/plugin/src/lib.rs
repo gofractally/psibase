@@ -26,7 +26,7 @@ struct HomepagePlugin;
 impl NameMarketApi for HomepagePlugin {
     fn claim_and_set_key(account: String) -> Result<String, Error> {
         assert_caller_self();
-        name_market::plugin::api::claim(&account)?;
+        name_market::plugin::api::claim(&account, None)?;
 
         let keypair = host::crypto::keyvault::generate_unmanaged_keypair()?;
 
@@ -42,7 +42,7 @@ impl NameMarketApi for HomepagePlugin {
 
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
         assert_caller_self();
-        name_market::plugin::api::buy(&account, &max_cost)
+        name_market::plugin::api::buy(&account, &max_cost, None)
     }
 
     fn can_create_account() -> bool {

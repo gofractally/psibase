@@ -5,6 +5,7 @@ world impl {
     include host:http/imports;
     include host:crypto/imports;
     include tokens:plugin/imports;
+    include nft:plugin/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
 

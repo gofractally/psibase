@@ -408,6 +408,7 @@ pub mod service {
     use crate::tables::*;
     use psibase::{
         get_sender, services::events, AccountNumber, EventDb, Memo, MethodNumber, ServiceWrapper,
+        Table, TableIndex, ToKey,
     };
 
     pub type NID = u32;
@@ -497,6 +498,16 @@ pub mod service {
         credit_record.debit(memo);
     }
 
+    /// Debit a pending credit when one exists. Otherwise require the sender to already own the NFT.
+    #[action]
+    pub fn try_debit(nftId: NID, memo: Memo) {
+        if CreditRecord::get(nftId).is_some() {
+            debit(nftId, memo);
+        } else {
+            Nft::get_assert(nftId).check_is_owner(get_sender());
+        }
+    }
+
     #[action]
     pub fn setUserConf(index: u8, enable: bool) {
         NftHolder::get_or_default(get_sender()).set_flag(index.into(), enable);
@@ -510,6 +521,24 @@ pub mod service {
     #[action]
     pub fn getNft(nftId: NID) -> Option<Nft> {
         Nft::get(nftId)
+    }
+
+    /// Ids `issuer` created that `owner` currently holds.
+    ///
+    /// The sender must share `issuer`'s base account, so a service and its
+    /// subaccounts can read each other's issuances.
+    #[action]
+    pub fn getHeldIds(issuer: AccountNumber, owner: AccountNumber) -> Vec<NID> {
+        assert_eq!(
+            get_sender().base(),
+            issuer.base(),
+            "Missing required authority",
+        );
+        let index = NftTable::read().get_index_by_issuer();
+        let mut prefix = index.prefix;
+        (issuer, owner).append_key(&mut prefix);
+        let held = TableIndex::<NID, Nft>::new(&index.db, prefix, true);
+        held.iter().map(|nft| nft.id).collect()
     }
 
     #[action]
