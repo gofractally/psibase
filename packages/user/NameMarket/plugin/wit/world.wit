@@ -84,11 +84,17 @@ interface api {
     /// Returns configured name markets and current ask prices.
     get-markets-overview: func() -> result<markets-overview, error>;
 
-    /// Purchase an account name
+    /// Purchase an account name.
+    ///
+    /// Guesses a redemption NFT id, buys the name with that id, and debits the NFT to the buyer.
     /// * `account`: the account to purchase the name for
     /// * `max-cost`: maximum payment in network token (Quantity string)
-    /// * `nft-id`: redemption NFT id to mint, or none to assign the next free id
-    buy: func(account: string, max-cost: string, nft-id: option<u32>) -> result<_, error>;
+    buy: func(account: string, max-cost: string) -> result<_, error>;
+
+    /// Buy an account name and claim it in this transaction.
+    /// * `account`: the account to purchase and claim
+    /// * `max-cost`: maximum payment in network token (Quantity string)
+    claim-and-buy: func(account: string, max-cost: string) -> result<_, error>;
 
     /// Claim an account name.
     /// * `account`: the account to claim the name for

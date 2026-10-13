@@ -7,7 +7,6 @@ use crate::bindings::host::{
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::{api as NameMarket, types::MarketsOverview};
-use crate::bindings::nft::plugin::issuer as NftIssuer;
 use crate::bindings::tokens::plugin::{
     helpers as TokensHelpers,
     types::{SystemTokenInfo, UserBalance},
@@ -65,9 +64,7 @@ impl Api for LoginPrompt {
             return Err(ErrorType::CannotCreateAccount().into());
         }
 
-        let nft_id = NftIssuer::guess_id()?;
-        NameMarket::buy(&account_name, &max_cost, Some(nft_id))?;
-        NameMarket::claim(&account_name, Some(nft_id))?;
+        NameMarket::claim_and_buy(&account_name, &max_cost)?;
 
         let keypair = HostCrypto::generate_unmanaged_keypair()?;
 

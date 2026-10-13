@@ -42,7 +42,7 @@ impl NameMarketApi for HomepagePlugin {
 
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
         assert_caller_self();
-        name_market::plugin::api::buy(&account, &max_cost, None)
+        name_market::plugin::api::buy(&account, &max_cost)
     }
 
     fn can_create_account() -> bool {

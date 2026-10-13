@@ -9,7 +9,6 @@ world impl {
     include permissions:plugin/imports;
     include auth-sig:plugin/imports;
     include name-market:plugin/imports;
-    include nft:plugin/imports;
     include tokens:plugin/imports;
 
     import accounts:plugin/api;
