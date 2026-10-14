@@ -9,12 +9,12 @@ mod queries;
 mod serde_structs;
 
 use crate::trust::*;
-use bindings::accounts::query as AccountPlugin;
 use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
     queries::{Guest as Query, Message},
 };
 use bindings::host::http::api as CommonServer;
+use bindings::host::accounts as HostAccounts;
 use bindings::transact::plugin::api as Transact;
 use chrono::DateTime;
 use errors::ErrorType;
@@ -134,7 +134,7 @@ impl Query for ChainmailPlugin {
         assert_authorized(FunctionName::get_saved_msgs)?;
         let rcvr = match receiver {
             Some(r) => r,
-            None => AccountPlugin::api::get_current_user().expect("No receiver specified"),
+            None => HostAccounts::api::get_current_user().expect("No receiver specified"),
         };
         // lib: construct gql query from types; generate schema
         // - generate obj based on gql schema with query methods on it

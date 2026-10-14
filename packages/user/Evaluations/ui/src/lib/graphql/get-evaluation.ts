@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { evaluation as evaluationPlugin } from "@shared/lib/plugins";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 import { zUnix } from "@shared/lib/schemas/unix";
@@ -21,7 +21,7 @@ export const zEvaluation = z.object({
 export type Evaluation = z.infer<typeof zEvaluation>;
 
 export const getEvaluation = async (owner: Account, id: number) => {
-    const evaluation = await callGraphqlViaPlugin(
+    const evaluation = await graphqlAuth(
         evaluationPlugin.authorized.graphql,
         `
     {
