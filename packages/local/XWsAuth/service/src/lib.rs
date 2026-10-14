@@ -104,8 +104,9 @@ mod service {
         };
         let ticket = random_ticket();
         let now = monotonic_us();
-        // Cleanup is best-effort. A failed commit is not retried; the next mint tries again.
-        erase_expired_once(now);
+        let _ = psibase::try_subjective_tx! {
+            erase_expired(now);
+        };
         let expiration = now + TICKET_LIFETIME_US;
         psibase::subjective_tx! {
             WsTicketTable::new()
@@ -136,7 +137,7 @@ mod service {
             let table = WsTicketTable::new();
             match table.get_index_pk().get(&ticket) {
                 Some(row) if row.service == sender => {
-                    table.erase(&ticket);
+                    table.remove(&row);
                     if row.expiration <= now {
                         None
                     } else {
@@ -187,15 +188,6 @@ fn monotonic_us() -> i64 {
     (nanos / 1000) as i64
 }
 
-fn erase_expired_once(now: i64) {
-    psibase::checkout_subjective();
-    let guard = psibase::scopeguard::guard((), |_| psibase::abort_subjective());
-    erase_expired(now);
-    if psibase::commit_subjective() {
-        psibase::scopeguard::ScopeGuard::into_inner(guard);
-    }
-}
-
 fn erase_expired(now: i64) {
     let table = WsTicketTable::new();
     let index = table.get_index_by_expiration();
@@ -203,6 +195,6 @@ fn erase_expired(now: i64) {
         if row.expiration > now {
             break;
         }
-        table.erase(&row.ticket);
+        table.remove(&row);
     }
 }
