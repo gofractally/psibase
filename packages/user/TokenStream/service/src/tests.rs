@@ -341,7 +341,7 @@ mod tests {
         );
     }
 
-    /// A deposit must not vest principal that is still inside the half-life.
+    /// A deposit must not vest principal that is still unvested.
     #[psibase::test_case(packages("TokenStream"))]
     fn deposit_after_partial_claim_keeps_unvested_locked(chain: psibase::Chain) {
         let test = TestHelper::new(chain);
