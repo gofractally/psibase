@@ -143,7 +143,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XPeers XProxy XSocketListService WSEcho XDelay ServerId)
+        XPackages XPeers XPortal XProxy XSocketListService WSEcho XDelay ServerId)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1249,6 +1249,21 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XPortal.psi
+    NAME XPortal
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Anonymous account requests for this node"
+    LOCAL
+    SERVICE x-portal
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XPortal.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPortal-schema.json
+        FLAGS isPrivileged
+        SERVER x-portal
+    DEPENDS wasm
+    PACKAGE_DEPENDS XKeys XTimer XHttp XAdmin
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XProxy.psi
     NAME XProxy
     VERSION ${PSIBASE_VERSION}.0
@@ -1394,7 +1409,7 @@ write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthScope AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XPortal XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1481,6 +1496,7 @@ install(
           ${SERVICE_DIR}/XKeys.psi
           ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XPeers.psi
+          ${SERVICE_DIR}/XPortal.psi
           ${SERVICE_DIR}/XProxy.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSites.psi
