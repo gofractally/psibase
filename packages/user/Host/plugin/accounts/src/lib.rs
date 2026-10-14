@@ -94,10 +94,7 @@ impl ActiveApp for HostAccounts {
 
 impl Admin for HostAccounts {
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
-        check_caller(
-            &[HOST_APP, "homepage"],
-            "import-existing@host:accounts/admin",
-        );
+        check_caller(&[HOST_APP], "import-existing@host:accounts/admin");
         import::import_existing(credentials)
     }
 

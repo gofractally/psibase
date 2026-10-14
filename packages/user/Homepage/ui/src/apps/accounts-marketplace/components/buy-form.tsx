@@ -5,7 +5,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import z from "zod";
 
 import { useBuyName } from "@/apps/accounts-marketplace/hooks/use-buy-name";
-import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/accounts-marketplace/route";
+import { ACCOUNT_MARKETPLACE_CLAIM_PATH } from "@/apps/accounts-marketplace/route";
 
 import { AvailableBalanceLabel } from "@shared/components/accounts-marketplace/available-balance-label";
 import { BuyNameConfirmationDialog } from "@shared/components/accounts-marketplace/buy-name-confirmation-dialog";
@@ -323,7 +323,7 @@ export function BuyForm({
                     price={confirmPrice}
                     isLoading={isBuying}
                     purchaseComplete={purchaseComplete}
-                    claimPageHref={`/${ACCOUNT_MARKETPLACE_PATH}/claim`}
+                    claimPageHref={ACCOUNT_MARKETPLACE_CLAIM_PATH}
                     onConfirm={() => void handleBuy()}
                 />
             ) : null}

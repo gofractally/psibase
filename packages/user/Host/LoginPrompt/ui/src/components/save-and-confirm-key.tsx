@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { ConfirmKeyStep } from "@shared/components/account-key/confirm-key-step";
-import { SaveKeyStep } from "@shared/components/account-key/save-key-step";
+import { ConfirmKeyStep } from "./account-key/confirm-key-step";
+import { SaveKeyStep } from "./account-key/save-key-step";
 
 export type KeyStep = "save" | "confirm";
 
