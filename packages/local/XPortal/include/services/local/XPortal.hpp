@@ -114,6 +114,9 @@ namespace LocalService
    ///
    /// `GET /status` is anonymous. `GET` and `PUT /admin/config` require an
    /// x-admin administrator. `PUT` changes only `requests_enabled`.
+   /// `POST /admin/agents/creator/keygen` returns `AgentKey("creator")`,
+   /// creating it in `x-keys` when absent. It returns 409 when `ac-creator`
+   /// already exists.
    struct XPortal : psibase::Service
    {
       static constexpr auto service        = psibase::AccountNumber{"x-portal"};
