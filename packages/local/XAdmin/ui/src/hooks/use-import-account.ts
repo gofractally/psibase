@@ -28,8 +28,8 @@ export const useImportAccount = () =>
 
             await supervisor.functionCall({
                 service: "host",
-                plugin: "login-prompt",
-                intf: "api",
+                plugin: "accounts",
+                intf: "admin",
                 method: "importExisting",
                 params: [[validatedCredential]],
             });
