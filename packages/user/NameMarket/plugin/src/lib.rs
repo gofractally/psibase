@@ -222,32 +222,17 @@ impl Api for NameMarketPlugin {
 
     #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
-        let nft_id = schedule_buy(&account, &max_cost)?;
-        if is_send_to_wallet_enabled() {
-            bindings::nft::plugin::user::try_debit(nft_id, "")?;
-        }
-        Ok(())
-    }
-
-    #[psibase_plugin::authorized(None)]
-    fn is_send_to_wallet() -> bool {
-        is_send_to_wallet_enabled()
-    }
-
-    #[psibase_plugin::authorized(None)]
-    fn set_send_to_wallet(enable: bool) -> Result<(), Error> {
-        let user = current_user()?;
-        bindings::clientdata::plugin::keyvalue::set(
-            &send_to_wallet_key(&user),
-            &[u8::from(enable)],
-        );
+        schedule_buy(&account, &max_cost)?;
         Ok(())
     }
 
     #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn buy_and_claim(account: String, max_cost: String) -> Result<(), Error> {
-        schedule_buy(&account, &max_cost)?;
-        // Buy in this transaction leaves the credit `take` accepts.
+        let nft_id = schedule_buy(&account, &max_cost)?;
+        // Auto-debit consumes the purchase credit inside buy, so return the NFT for take.
+        if buyer_auto_debit()? {
+            bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
+        }
         add_claim(&account)
     }
 
@@ -338,6 +323,17 @@ struct PurchasedAccountFields {
 }
 
 #[derive(serde::Deserialize)]
+struct AutoDebitResponse {
+    data: AutoDebitData,
+}
+
+#[derive(serde::Deserialize)]
+struct AutoDebitData {
+    #[serde(rename = "autoDebit")]
+    auto_debit: bool,
+}
+
+#[derive(serde::Deserialize)]
 struct NftCreditResponse {
     data: NftCreditData,
 }
@@ -379,18 +375,6 @@ fn current_user() -> Result<String, Error> {
     bindings::host::accounts::api::get_current_user().ok_or_else(|| ErrorType::NotLoggedIn.into())
 }
 
-fn send_to_wallet_key(user: &str) -> String {
-    format!("send-to-wallet:{user}")
-}
-
-fn is_send_to_wallet_enabled() -> bool {
-    let Ok(user) = current_user() else {
-        return false;
-    };
-    bindings::clientdata::plugin::keyvalue::get(&send_to_wallet_key(&user))
-        .is_some_and(|value| value.first() == Some(&1))
-}
-
 /// Credits the redemption NFT to namemarket when `take` would not already succeed.
 fn schedule_claim(account: &str, nft_id: u32) -> Result<(), Error> {
     if !can_take(account, nft_id)? {
@@ -404,6 +388,15 @@ fn add_claim(account: &str) -> Result<(), Error> {
         .map_err(|_| ErrorType::InvalidAccountName(account.to_string()))?;
     name_market::Wrapper::add_to_tx().claim(acct);
     Ok(())
+}
+
+fn buyer_auto_debit() -> Result<bool, Error> {
+    let user = current_user()?;
+    let query = format!("query {{ autoDebit(account: \"{user}\") }}");
+    let body = CommonServer::post_graphql_get_json(&query)?;
+    let response = serde_json::from_str::<AutoDebitResponse>(&body)
+        .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+    Ok(response.data.auto_debit)
 }
 
 fn can_take(account: &str, nft_id: u32) -> Result<bool, Error> {

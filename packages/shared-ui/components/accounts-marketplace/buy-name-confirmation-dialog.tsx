@@ -16,7 +16,6 @@ import {
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
-import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
 import {
     Empty,
@@ -27,7 +26,6 @@ import {
     EmptyTitle,
 } from "@shared/shadcn/ui/empty";
 import { Item, ItemContent } from "@shared/shadcn/ui/item";
-import { Label } from "@shared/shadcn/ui/label";
 export type BuyNameConfirmationMode = "buy-and-claim" | "buy-only";
 
 const DESCRIPTION_BY_MODE: Record<
@@ -57,7 +55,6 @@ export const BuyNameConfirmationDialog = ({
     previousPrice,
     isLoading,
     onConfirm,
-    sendToWallet,
     purchaseComplete = false,
     claimPageHref,
 }: {
@@ -70,12 +67,6 @@ export const BuyNameConfirmationDialog = ({
     previousPrice?: Quantity | null;
     isLoading: boolean;
     onConfirm: () => void;
-    /** Buy-only. Local preference; omitted when the UI should not offer it. */
-    sendToWallet?: {
-        checked: boolean;
-        disabled?: boolean;
-        onCheckedChange: (checked: boolean) => void;
-    };
     /** When true (buy-only), show success state instead of the confirmation form. */
     purchaseComplete?: boolean;
     /** Route to the claim page; required when `purchaseComplete` is true in buy-only mode. */
@@ -171,27 +162,6 @@ export const BuyNameConfirmationDialog = ({
                             </div>
                         </ItemContent>
                     </Item>
-                    {mode === "buy-only" && sendToWallet ? (
-                        <Label className="flex items-start gap-3 rounded-lg border p-3">
-                            <Checkbox
-                                checked={sendToWallet.checked}
-                                disabled={sendToWallet.disabled || isLoading}
-                                onCheckedChange={(checked) =>
-                                    sendToWallet.onCheckedChange(
-                                        checked === true,
-                                    )
-                                }
-                            />
-                            <span className="grid gap-1 font-normal">
-                                <span className="text-sm leading-none font-medium">
-                                    Send to wallet
-                                </span>
-                                <span className="text-muted-foreground text-sm">
-                                    Deliver the redemption NFT to your wallet.
-                                </span>
-                            </span>
-                        </Label>
-                    ) : null}
                     <AlertDialogDescription>
                         Do you want to continue?
                     </AlertDialogDescription>

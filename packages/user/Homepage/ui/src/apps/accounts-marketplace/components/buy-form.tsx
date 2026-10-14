@@ -5,7 +5,6 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import z from "zod";
 
 import { useBuyName } from "@/apps/accounts-marketplace/hooks/use-buy-name";
-import { useSendToWallet } from "@/apps/accounts-marketplace/hooks/use-send-to-wallet";
 import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/accounts-marketplace/route";
 
 import { AvailableBalanceLabel } from "@shared/components/accounts-marketplace/available-balance-label";
@@ -38,8 +37,6 @@ export function BuyForm({
     prices: Map<number, string>;
 }) {
     const { data: currentUser } = useCurrentUser();
-    const { query: sendToWallet, mutation: setSendToWallet } =
-        useSendToWallet(currentUser);
     const { data: tokenBalances, isPending: isPendingBalances } =
         useUserTokenBalances(currentUser);
 
@@ -324,17 +321,7 @@ export function BuyForm({
                     mode="buy-only"
                     account={purchasedAccountName ?? accountName}
                     price={confirmPrice}
-                    isLoading={isBuying || setSendToWallet.isPending}
-                    sendToWallet={
-                        sendToWallet.isSuccess
-                            ? {
-                                  checked: sendToWallet.data ?? false,
-                                  disabled: setSendToWallet.isPending,
-                                  onCheckedChange: (checked) =>
-                                      setSendToWallet.mutate(checked),
-                              }
-                            : undefined
-                    }
+                    isLoading={isBuying}
                     purchaseComplete={purchaseComplete}
                     claimPageHref={`/${ACCOUNT_MARKETPLACE_PATH}/claim`}
                     onConfirm={() => void handleBuy()}

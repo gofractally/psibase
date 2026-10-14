@@ -17,14 +17,6 @@ class Api extends PluginInterface {
     get getMarketsOverview() {
         return this._call<[], MarketsOverview>("getMarketsOverview");
     }
-
-    get isSendToWallet() {
-        return this._call<[], boolean>("isSendToWallet");
-    }
-
-    get setSendToWallet() {
-        return this._call<[enable: boolean], void>("setSendToWallet");
-    }
 }
 
 export class Plugin {

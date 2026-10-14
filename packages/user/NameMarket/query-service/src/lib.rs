@@ -13,7 +13,7 @@ mod service {
     use name_market::Wrapper as NameMarketService;
     use nft::tables::{CreditRecord, CreditTable};
     use psibase::services::diff_adjust::{RateLimit, Wrapper as DiffAdjust};
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nfts};
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
@@ -289,6 +289,11 @@ mod service {
                 creditor: credit.creditor,
                 debitor: credit.debitor,
             })
+        }
+
+        /// NFT auto-debit flag for `account`. A missing holder row is false.
+        async fn auto_debit(&self, account: AccountNumber) -> bool {
+            Nfts::call().getUserConf(account, NftHolderFlags::AUTO_DEBIT.index())
         }
 
         /// Purchased account row, if `account` is still unclaimed.
