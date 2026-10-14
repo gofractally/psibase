@@ -52,6 +52,23 @@ mod service {
             }
             Ok(())
         }
+
+        fn check_either_auth(
+            &self,
+            issuer: AccountNumber,
+            user: AccountNumber,
+        ) -> async_graphql::Result<()> {
+            if issuer == user {
+                return self.check_user_auth(issuer);
+            }
+            if self.user == Some(issuer) || self.user == Some(user) {
+                return Ok(());
+            }
+            Err(async_graphql::Error::new(format!(
+                "permission denied: either '{}' or '{}' must authorize",
+                issuer, user
+            )))
+        }
     }
 
     #[Object]
@@ -94,7 +111,7 @@ mod service {
 
         /// NFTs filtered by issuer, holder, or both.
         ///
-        /// With neither argument, lists every NFT.
+        /// Requires `issuer`, `user`, or both.
         async fn nfts(
             &self,
             issuer: Option<AccountNumber>,
@@ -106,16 +123,11 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, Nft>> {
             let table = NftTable::with_service(psibase::services::nft::SERVICE);
             match (issuer, user) {
-                (None, None) => {
-                    TableQuery::subindex::<NID>(table.get_index_pk(), &())
-                        .first(first)
-                        .last(last)
-                        .before(before)
-                        .after(after)
-                        .query()
-                        .await
-                }
+                (None, None) => Err(async_graphql::Error::new(
+                    "Either 'issuer' or 'user' (or both) must be specified",
+                )),
                 (Some(issuer), None) => {
+                    self.check_user_auth(issuer)?;
                     TableQuery::subindex::<(AccountNumber, NID)>(
                         table.get_index_by_issuer(),
                         &(issuer),
@@ -128,6 +140,7 @@ mod service {
                     .await
                 }
                 (None, Some(user)) => {
+                    self.check_user_auth(user)?;
                     TableQuery::subindex::<(AccountNumber, NID)>(
                         table.get_index_by_owner(),
                         &(user),
@@ -140,6 +153,7 @@ mod service {
                     .await
                 }
                 (Some(issuer), Some(user)) => {
+                    self.check_either_auth(issuer, user)?;
                     TableQuery::subindex::<NID>(table.get_index_by_issuer(), &(issuer, user))
                         .first(first)
                         .last(last)
