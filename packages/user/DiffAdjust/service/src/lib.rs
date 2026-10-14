@@ -305,11 +305,8 @@ pub mod tables {
 
     #[ComplexObject]
     impl RateLimit {
-        pub async fn admin(&self) -> AccountNumber {
-            Nft::call()
-                .getNft(self.nft_id)
-                .expect("NFT was burned")
-                .owner
+        pub async fn admin(&self) -> Option<AccountNumber> {
+            Nft::call().getNft(self.nft_id).map(|nft| nft.owner)
         }
     }
 }

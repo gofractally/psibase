@@ -45,7 +45,7 @@ namespace
                            "GjyjVxTbjHHHyq96f3lqGlbApIe9u1CUDng/qlj0jGbuz5sOeeIY/DWJ\n"
                            "-----END PRIVATE KEY-----\n")};
 
-   //{"data": {"userNfts":{"edges":[{"node":{"id":2,"issuer":"alice","owner":"alice"}}]}}}
+   //{"data": {"nfts":{"edges":[{"node":{"id":2,"issuer":"alice","owner":"alice"}}]}}}
    struct Node
    {
       uint32_t      id;
@@ -68,9 +68,9 @@ namespace
 
    struct Data
    {
-      UserNfts userNfts;
+      UserNfts nfts;
    };
-   PSIO_REFLECT(Data, userNfts);
+   PSIO_REFLECT(Data, nfts);
 
    struct QueryRoot
    {
@@ -114,7 +114,7 @@ SCENARIO("AuthSig")
 
       auto getNfts = [](DefaultTestChain& t, AccountNumber acc) -> std::vector<uint32_t>
       {
-         std::string query_str = "query UserNfts { userNfts( user: \"" + acc.str() +
+         std::string query_str = "query Nfts { nfts( user: \"" + acc.str() +
                                  "\" ) { edges { node { id issuer owner } } } "
                                  "}";
          std::string_view query_sv = query_str;
@@ -128,7 +128,7 @@ SCENARIO("AuthSig")
          std::cout << "Response: " << body << "\n";
          auto response_root = psio::convert_from_json<QueryRoot>(body);
 
-         return response_root.data.userNfts.edges |
+         return response_root.data.nfts.edges |
                 std::views::transform([](auto edge) { return edge.node.id; }) |
                 std::ranges::to<std::vector>();
       };

@@ -252,8 +252,8 @@ pub mod tables {
 
     #[ComplexObject]
     impl Token {
-        pub async fn owner(&self) -> AccountNumber {
-            self.nft_holder()
+        pub async fn owner(&self) -> Option<AccountNumber> {
+            Nfts::call().getNft(self.nft_id).map(|nft| nft.owner)
         }
 
         pub async fn current_supply(&self) -> Decimal {

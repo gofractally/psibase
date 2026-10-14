@@ -92,23 +92,63 @@ mod service {
                 .query()
         }
 
-        async fn allNfts(
+        /// NFTs filtered by issuer, holder, or both.
+        ///
+        /// With neither argument, lists every NFT.
+        async fn nfts(
             &self,
+            issuer: Option<AccountNumber>,
+            user: Option<AccountNumber>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Nft>> {
-            TableQuery::subindex::<NID>(
-                NftTable::with_service(psibase::services::nft::SERVICE).get_index_pk(),
-                &(),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
+            let table = NftTable::with_service(psibase::services::nft::SERVICE);
+            match (issuer, user) {
+                (None, None) => {
+                    TableQuery::subindex::<NID>(table.get_index_pk(), &())
+                        .first(first)
+                        .last(last)
+                        .before(before)
+                        .after(after)
+                        .query()
+                        .await
+                }
+                (Some(issuer), None) => {
+                    TableQuery::subindex::<(AccountNumber, NID)>(
+                        table.get_index_by_issuer(),
+                        &(issuer),
+                    )
+                    .first(first)
+                    .last(last)
+                    .before(before)
+                    .after(after)
+                    .query()
+                    .await
+                }
+                (None, Some(user)) => {
+                    TableQuery::subindex::<(AccountNumber, NID)>(
+                        table.get_index_by_owner(),
+                        &(user),
+                    )
+                    .first(first)
+                    .last(last)
+                    .before(before)
+                    .after(after)
+                    .query()
+                    .await
+                }
+                (Some(issuer), Some(user)) => {
+                    TableQuery::subindex::<NID>(table.get_index_by_issuer(), &(issuer, user))
+                        .first(first)
+                        .last(last)
+                        .before(before)
+                        .after(after)
+                        .query()
+                        .await
+                }
+            }
         }
 
         /// Current NFT holder settings for `user` (no history).
@@ -120,26 +160,6 @@ mod service {
                     account: user,
                     config: 0,
                 })
-        }
-
-        async fn issuerNfts(
-            &self,
-            user: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, Nft>> {
-            TableQuery::subindex::<(AccountNumber, NID)>(
-                NftTable::with_service(psibase::services::nft::SERVICE).get_index_by_issuer(),
-                &(user),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
         }
 
         /// Pending NFT credits/debits for `user`.
@@ -180,26 +200,6 @@ mod service {
                 .query()
                 .await
             }
-        }
-
-        async fn userNfts(
-            &self,
-            user: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, Nft>> {
-            TableQuery::subindex::<(AccountNumber, NID)>(
-                NftTable::with_service(psibase::services::nft::SERVICE).get_index_by_owner(),
-                &(user),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
         }
 
         /// Id that `mint` would assign when its id argument is omitted.
