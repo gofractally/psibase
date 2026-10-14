@@ -19,6 +19,7 @@ namespace SystemService
             return false;
          return std::ranges::contains(row.allowed, AllowedAction{action.service, action.method});
       }
+
    }  // namespace
 
    bool AuthScope::checkAuthSys(uint32_t                    flags,
@@ -86,6 +87,26 @@ namespace SystemService
    std::optional<AuthScopeRow> AuthScope::get(AccountNumber account)
    {
       return open<AuthScopeTable>(KvMode::read).getIndex<0>().get(account);
+   }
+
+   void AuthScope::setKey(AccountNumber account, AuthSig::SubjectPublicKeyInfo key)
+   {
+      auto table = open<AuthScopeTable>();
+      auto row   = table.getIndex<0>().get(account);
+      check(row.has_value(), "account does not have a public key");
+      check(getSender() == row->owner, "sender is not the owner");
+      row->pubkey = std::move(key);
+      table.put(*row);
+   }
+
+   void AuthScope::setAllowed(AccountNumber account, std::vector<AllowedAction> allowed)
+   {
+      auto table = open<AuthScopeTable>();
+      auto row   = table.getIndex<0>().get(account);
+      check(row.has_value(), "account does not have a public key");
+      check(getSender() == row->owner, "sender is not the owner");
+      row->allowed = std::move(allowed);
+      table.put(*row);
    }
 }  // namespace SystemService
 
