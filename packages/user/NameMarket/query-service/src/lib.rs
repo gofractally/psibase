@@ -282,9 +282,7 @@ mod service {
 
         /// Parties on the NFT credit record, if one exists.
         async fn nft_credit(&self, nft_id: u32) -> Option<NftCredit> {
-            let credit = CreditTable::with_service(psibase::services::nft::SERVICE)
-                .get_index_pk()
-                .get(&nft_id)?;
+            let credit = Nfts::call().getCredRecord(nft_id)?;
             Some(NftCredit {
                 creditor: credit.creditor,
                 debitor: credit.debitor,

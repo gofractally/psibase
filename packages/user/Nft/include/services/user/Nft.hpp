@@ -40,7 +40,7 @@ namespace UserService
       std::optional<NftRecord> getNft(NID nftId);
       std::vector<NID>         getHeldIds(psibase::AccountNumber issuer, psibase::AccountNumber owner);
       NftHolderRecord          getNftHolder(psibase::AccountNumber account);
-      CreditRecord             getCredRecord(NID nftId);
+      std::optional<CreditRecord> getCredRecord(NID nftId);
       bool                     exists(NID nftId);
       bool                     getUserConf(psibase::AccountNumber account, std::uint8_t flag);
 

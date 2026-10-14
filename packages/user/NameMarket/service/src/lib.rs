@@ -210,7 +210,9 @@ pub mod service {
 
     fn take(nft_id: u32, other_party: AccountNumber) {
         let service = get_service();
-        let credit = Nfts::Wrapper::call().getCredRecord(nft_id);
+        let Some(credit) = Nfts::Wrapper::call().getCredRecord(nft_id) else {
+            abort_message("Nothing to uncredit. Must first credit.");
+        };
         if credit.creditor == service && credit.debitor == other_party {
             Nfts::Wrapper::call().uncredit(nft_id, "".into());
         } else if credit.creditor == other_party && credit.debitor == service {
