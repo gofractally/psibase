@@ -101,7 +101,7 @@ int main(int argc, char** argv)
    auto s    = db.start_write_session();
    auto root = s->get_top_root();
 
-   using root_t = std::shared_ptr<triedent::root>;
+   using root_t = triedent::shared_root;
    std::mutex          revisions_mutex;
    std::vector<root_t> revisions(16);
 

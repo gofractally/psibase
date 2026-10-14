@@ -10,8 +10,8 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
-import { invite as invitePlugin } from "@shared/lib/plugins";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { homepage } from "@shared/lib/plugins";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -35,14 +35,14 @@ const inviteDetailsResponse = z.object({
 
 const fetchInvite = async (token: string) => {
     const inviteId = await supervisor.functionCall({
-        service: "invite",
-        intf: "invitee",
+        service: "homepage",
+        intf: "invite",
         method: "importInviteToken",
         params: [token],
     });
 
-    const response = await callGraphqlViaPlugin(
-        invitePlugin.authorized.graphql,
+    const response = await graphqlAuth(
+        homepage.invite.graphql,
         `
             query InviteById {
                 inviteById(inviteId: ${inviteId}) {
@@ -171,7 +171,8 @@ export const Invite = () => {
                             onClick={async () => {
                                 await supervisor.functionCall(
                                     {
-                                        service: "accounts",
+                                        service: "host",
+                                        plugin: "accounts",
                                         intf: "activeApp",
                                         method: "connectAccount",
                                         params: [],

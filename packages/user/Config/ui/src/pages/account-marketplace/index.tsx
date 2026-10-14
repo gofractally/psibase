@@ -62,7 +62,7 @@ const isMarketRowDirty = (
         const meta = fieldMeta[`markets[${index}].${field}`];
         return meta != null && meta.isDefaultValue === false;
     });
-}
+};
 
 export const NameMarketConfig = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
@@ -262,7 +262,7 @@ export const NameMarketConfig = () => {
                                         className={cn(
                                             "gap-0 py-0 shadow-sm",
                                             !market.configured &&
-                                            "border-dashed",
+                                                "border-dashed",
                                         )}
                                     >
                                         <form.Subscribe
@@ -282,7 +282,7 @@ export const NameMarketConfig = () => {
                                                         className={cn(
                                                             "flex items-center gap-4 px-4 py-3",
                                                             enabled &&
-                                                            "[.border-b]:pb-3 border-b",
+                                                                "[.border-b]:pb-3 border-b",
                                                         )}
                                                     >
                                                         <div className="flex flex-1 flex-wrap items-center justify-between gap-2">
@@ -294,8 +294,8 @@ export const NameMarketConfig = () => {
                                                                     }
                                                                 </CardTitle>
                                                                 {market.configured &&
-                                                                    enabled &&
-                                                                    systemToken ? (
+                                                                enabled &&
+                                                                systemToken ? (
                                                                     <LivePrice
                                                                         price={livePriceByLength.get(
                                                                             market.length,
@@ -311,7 +311,7 @@ export const NameMarketConfig = () => {
                                                                 className={cn(
                                                                     "flex items-center gap-1.5",
                                                                     !isRowDirty &&
-                                                                    "invisible",
+                                                                        "invisible",
                                                                 )}
                                                                 aria-hidden={
                                                                     !isRowDirty

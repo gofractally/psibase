@@ -86,7 +86,7 @@ namespace psio
    {
       explicit constexpr frac_proxy_view(char_ptr<Ch> ptr) : view_base<Ch>{ptr} {}
       template <uint32_t idx, auto MemberPtr>
-      auto get()
+      auto get() const
       {
          using class_type  = decltype(psio::class_of_member(MemberPtr));
          using member_type = decltype(psio::result_of_member(MemberPtr));
@@ -145,7 +145,7 @@ namespace psio
    {
       explicit constexpr frac_wrap_view(char_ptr<Ch> ptr) : view_base<Ch>{ptr} {}
       template <uint32_t idx, auto MemberPtr>
-      auto get()
+      auto get() const
       {
          using member_type = decltype(psio::result_of_member(MemberPtr));
          using result_type =
@@ -694,7 +694,7 @@ namespace psio
              &result, has_unknown, known_end, psio::get_view_data(*this), pos, 0xFFFFFFFFu);
          return result;
       }
-      operator std::remove_cv_t<T>() const { return unpack(); }
+                  operator std::remove_cv_t<T>() const { return unpack(); }
       const view& operator=(const T& value) const
          requires(!std::is_const_v<T> && !is_packable<std::remove_cv_t<T>>::is_variable_size)
       {

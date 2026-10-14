@@ -8,6 +8,7 @@ import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { paths } from "@/lib/paths";
+import { embeddedContactCalls } from "@/lib/plugin";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
@@ -60,6 +61,7 @@ export const GuildApplicants = () => {
                                 returnPath={paths.guild.membership.applicants(
                                     guildAccount!,
                                 )}
+                                {...embeddedContactCalls}
                             />
                         </CardAction>
                     </CardHeader>
@@ -87,6 +89,7 @@ export const GuildApplicants = () => {
                                         <TableCell className="font-medium">
                                             <TableContact
                                                 account={application.applicant}
+                                                {...embeddedContactCalls}
                                             />
                                         </TableCell>
                                         <TableCell className="text-end">

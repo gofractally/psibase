@@ -140,6 +140,13 @@ namespace SystemService
    };
    PSIO_REFLECT(VerifyInterface, method(verifySys, transactionHash, claim, proof))
 
+   struct AuthTarget
+   {
+      psibase::AccountNumber                sender;
+      std::optional<psibase::ServiceMethod> action;
+      PSIO_REFLECT(AuthTarget, sender, action)
+   };
+
    struct TransactStatus
    {
       bool enforceAuth = true;
@@ -319,6 +326,10 @@ namespace SystemService
       ///   `allowedActions` from that same earlier call.
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
+      /// Returns true if all the actions can be authorized by authorizers.
+      /// This does not include any of the special rules of `runAs`.
+      bool isAuth(std::vector<AuthTarget> actions, std::vector<psibase::AccountNumber> authorizers);
+
       /// Checks authorization for the sender of the first action
       bool checkFirstAuth(psibase::Checksum256                   id,
                           psio::view<const psibase::Transaction> transaction);
@@ -388,6 +399,7 @@ namespace SystemService
                 method(removeCallback, type, objective, action),
                 method(regEvIdx, service),
                 method(runAs, action, allowedActions),
+                method(isAuth, actions, authorizers),
                 method(checkFirstAuth, id, transaction),
                 method(resMonitoring, enable),
                 method(isResMonitoring),

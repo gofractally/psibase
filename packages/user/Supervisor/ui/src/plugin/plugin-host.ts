@@ -72,42 +72,26 @@ export class PluginHost implements HostInterface {
         };
     }
 
+    // Classifies the response body from the response's Content-Type header.
     private getBodyTagFromContentType(
         contentType: string,
-        binary: boolean,
-    ): string {
+    ): "json" | "text" | "bytes" {
         const ct = contentType.toLowerCase();
         if (ct.includes("application/json")) {
             return "json";
+        } else if (ct.startsWith("text/")) {
+            return "text";
         } else if (
             ct.includes("application/octet-stream") ||
             ct.includes("application/zip") ||
             ct.includes("application/wasm")
         ) {
             return "bytes";
-        } else if (ct.includes("text/plain") || ct.startsWith("text/")) {
-            return "text";
-        } else if (binary) {
-            return "bytes";
         } else {
             throw this.recoverableError(
                 `Unsupported content type in response: ${contentType}`,
             );
         }
-    }
-
-    private wantsBinaryResponse(req: HttpRequest): boolean {
-        const headers = convert(req.headers);
-        const accept = (
-            headers["Accept"] ||
-            headers["accept"] ||
-            ""
-        ).toLowerCase();
-        return (
-            accept.includes("application/octet-stream") ||
-            accept.includes("application/zip") ||
-            accept === "*/*"
-        );
     }
 
     private getStorage(duration: number): Storage {
@@ -155,12 +139,10 @@ export class PluginHost implements HostInterface {
             );
             xhr.withCredentials = withCredentials;
 
-            // Sync XHR cannot use responseType=arraybuffer; force a binary-safe
-            // text encoding and decode to bytes after send.
-            const binary = this.wantsBinaryResponse(req);
-            if (binary) {
-                xhr.overrideMimeType("text/plain; charset=x-user-defined");
-            }
+            // Sync XHR cannot use responseType=arraybuffer. Always read the
+            // response as a binary-safe string so every byte survives, then
+            // interpret it based on the response Content-Type below.
+            xhr.overrideMimeType("text/plain; charset=x-user-defined");
 
             const requestHeaders = new Headers(convert(req.headers));
             for (const [name, value] of requestHeaders.entries()) {
@@ -173,23 +155,23 @@ export class PluginHost implements HostInterface {
                     ? (req.body.val as string)
                     : null,
             );
+            const raw = xhr.responseText;
+            const bytes =
+                raw == null || raw === ""
+                    ? undefined
+                    : this.binaryStringToBytes(raw);
+            const decodeText = (b: Uint8Array) => new TextDecoder().decode(b);
+
             if (xhr.status >= 400) {
-                if (xhr.response) {
-                    console.error(xhr.response);
+                if (bytes) {
+                    console.error(decodeText(bytes));
                 }
             }
             if (xhr.status === 500) {
                 throw this.recoverableError(
-                    `Http request error: ${xhr.response}`,
+                    `Http request error: ${bytes ? decodeText(bytes) : "No response body"}`,
                 );
             }
-            const raw = xhr.responseText;
-            const body =
-                raw == null || raw === ""
-                    ? undefined
-                    : binary
-                      ? this.binaryStringToBytes(raw)
-                      : raw;
             const headers: Array<[string, string]> = [];
             xhr.getAllResponseHeaders()
                 .trim()
@@ -201,18 +183,24 @@ export class PluginHost implements HostInterface {
                     const value = parts.join(": ");
                     headers.push([key, value]);
                 });
+            if (!bytes) {
+                return {
+                    status: xhr.status,
+                    headers: convertBack(headers),
+                    body: null,
+                };
+            }
+
             const contentType = xhr.getResponseHeader("content-type") || "";
-            const tag = this.getBodyTagFromContentType(contentType, binary);
+            const tag = this.getBodyTagFromContentType(contentType);
 
             return {
                 status: xhr.status,
                 headers: convertBack(headers),
-                body: body
-                    ? {
-                          tag,
-                          val: body,
-                      }
-                    : null,
+                body: {
+                    tag,
+                    val: tag === "bytes" ? bytes : decodeText(bytes),
+                },
             };
         } catch (err: any) {
             if (

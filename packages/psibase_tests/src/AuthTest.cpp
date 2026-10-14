@@ -25,6 +25,18 @@ namespace
       }
       return false;
    }
+
+   AuthRow getAuthRow(AccountNumber account, std::optional<ServiceMethod> action)
+   {
+      if (action)
+      {
+         if (auto result = AuthTest{}.open<AuthMethodTable>().get(std::tuple(account, *action)))
+         {
+            return std::move(result->auth);
+         }
+      }
+      return AuthTest{}.open<AuthTable>().get(account).value();
+   }
 }  // namespace
 
 void AuthTest::newAccount(AccountNumber              account,
@@ -41,29 +53,39 @@ void AuthTest::canAuthUserSys(AccountNumber account)
    check(open<AuthTable>().get(account).has_value(), "Auth missing");
 }
 
-void AuthTest::setAuth(AccountNumber              account,
-                       std::vector<AccountNumber> deps,
-                       std::uint32_t              threshold)
+void AuthTest::setAuth(AccountNumber                account,
+                       std::vector<AccountNumber>   deps,
+                       std::uint32_t                threshold,
+                       std::optional<ServiceMethod> action)
 {
    check(getSender() == getReceiver(), "Wrong sender");
    check(threshold <= deps.size(), "Threshold too big");
-   open<AuthTable>().put({account, std::move(deps), threshold});
+   auto row = AuthRow{account, std::move(deps), threshold};
+   if (action)
+      open<AuthMethodTable>().put({row, *action});
+   else
+      open<AuthTable>().put(row);
 }
 
-auto AuthTest::getDlgsSys(psibase::AccountNumber account) -> std::vector<psibase::AccountNumber>
+auto AuthTest::getDlgsSys(psibase::AccountNumber account, std::optional<ServiceMethod> action)
+    -> std::vector<psibase::AccountNumber>
 {
-   return open<AuthTable>().get(account).value().deps;
+   return getAuthRow(account, action).deps;
 }
 
-bool AuthTest::isAuthSys(AccountNumber account, std::vector<AccountNumber> approved)
+bool AuthTest::isAuthSys(AccountNumber                account,
+                         std::vector<AccountNumber>   approved,
+                         std::optional<ServiceMethod> action)
 {
-   auto row = open<AuthTable>().get(account).value();
+   auto row = getAuthRow(account, action);
    return checkThreshold(row.threshold, row.deps, approved);
 }
 
-bool AuthTest::isRejectSys(AccountNumber account, std::vector<AccountNumber> rejected)
+bool AuthTest::isRejectSys(AccountNumber                account,
+                           std::vector<AccountNumber>   rejected,
+                           std::optional<ServiceMethod> action)
 {
-   auto row = open<AuthTable>().get(account).value();
+   auto row = getAuthRow(account, action);
    return checkThreshold(row.deps.size() - row.threshold + 1, row.deps, rejected);
 }
 

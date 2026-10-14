@@ -8,6 +8,7 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
 
+    export types;
     export market-admin;
     export api;
     export authorized;

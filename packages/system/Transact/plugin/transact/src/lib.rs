@@ -88,7 +88,7 @@ fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::E
             return Ok(s);
         }
     }
-    if let Some(sender) = accounts::query::api::get_current_user() {
+    if let Some(sender) = bindings::host::accounts::api::get_current_user() {
         return Ok(sender);
     }
 
@@ -133,7 +133,7 @@ fn pack_staged_propose(actions: Vec<ImportAction>, auto_exec: bool) -> (String, 
 }
 
 fn flush_propose_latch() -> Result<(), HostTypes::Error> {
-    OpenTx::flush_latch(accounts::query::api::get_current_user().as_deref())
+    OpenTx::flush_latch(bindings::host::accounts::api::get_current_user().as_deref())
         .map_err(|_| NotLoggedIn("flush_propose_latch").into())
 }
 
@@ -218,10 +218,10 @@ impl Api for TransactPlugin {
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
-        // Whitelisting accounts so that the accounts user prompts can stage transactions even when accounts is not the act
+        // Whitelisting host so that the host login prompts can stage transactions even when host is not the active app
         assert_authorized_with_whitelist(
             FunctionName::set_propose_latch,
-            vec![Client::get_active_app(), String::from("accounts")],
+            vec![Client::get_active_app(), String::from("host")],
         )?;
 
         let Some(acct) = account else {
