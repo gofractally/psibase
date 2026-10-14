@@ -4,10 +4,12 @@
 #include <limits>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/trace.hpp>
 #include <psio/json/any.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XKeys.hpp>
+#include <services/local/XTimer.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthScope.hpp>
 #include <services/system/RTransact.hpp>
@@ -25,14 +27,23 @@ namespace
    constexpr uint64_t seedUsdMicros    = 2'500'000;
    constexpr uint64_t freeTierUsdCents = 250;
 
-   struct HostProducer
+   struct ListenSpec
+   {
+      std::string                  protocol;
+      std::optional<std::string>   path;
+      std::optional<std::string>   address;
+      std::optional<std::uint16_t> port;
+      PSIO_REFLECT(ListenSpec, protocol, path, address, port)
+   };
+   struct HostSettings
    {
       std::optional<AccountNumber> producer;
-      PSIO_REFLECT(HostProducer, producer)
+      std::vector<ListenSpec>      listen;
+      PSIO_REFLECT(HostSettings, producer, listen)
    };
    struct HostFile
    {
-      HostProducer host;
+      HostSettings host;
       PSIO_REFLECT(HostFile, host)
    };
 
@@ -41,20 +52,30 @@ namespace
       return allowCors(req, {XPortal::service, XAdmin::service});
    }
 
-   HttpReply jsonBody(const HttpRequest& req, const auto& value)
+   HttpReply jsonBody(std::vector<HttpHeader> headers, const auto& value)
    {
-      HttpReply           reply{.contentType = "application/json", .headers = cors(req)};
+      HttpReply           reply{.contentType = "application/json", .headers = std::move(headers)};
       psio::vector_stream stream{reply.body};
       to_json(value, stream);
       return reply;
    }
 
-   HttpReply textError(const HttpRequest& req, HttpStatus status, std::string_view message)
+   HttpReply jsonBody(const HttpRequest& req, const auto& value)
+   {
+      return jsonBody(cors(req), value);
+   }
+
+   HttpReply textError(std::vector<HttpHeader> headers, HttpStatus status, std::string_view message)
    {
       return HttpReply{.status      = status,
                        .contentType = "text/html",
                        .body        = std::vector<char>(message.begin(), message.end()),
-                       .headers     = cors(req)};
+                       .headers     = std::move(headers)};
+   }
+
+   HttpReply textError(const HttpRequest& req, HttpStatus status, std::string_view message)
+   {
+      return textError(cors(req), status, message);
    }
 
    PortalConfig readConfig()
@@ -168,7 +189,7 @@ namespace
       return balance.value >= grant->value && buffer.value > 0;
    }
 
-   std::optional<AccountNumber> configuredProducer()
+   std::optional<HostSettings> hostSettings()
    {
       std::optional<HostConfigRow> row;
       PSIBASE_SUBJECTIVE_TX
@@ -177,10 +198,140 @@ namespace
       }
       if (!row)
          return std::nullopt;
-      auto producer = psio::convert_from_json<HostFile>(row->config).host.producer;
-      if (!producer || *producer == AccountNumber{})
+      return psio::convert_from_json<HostFile>(row->config).host;
+   }
+
+   std::optional<AccountNumber> configuredProducer()
+   {
+      auto settings = hostSettings();
+      if (!settings || !settings->producer || *settings->producer == AccountNumber{})
          return std::nullopt;
-      return producer;
+      return settings->producer;
+   }
+
+   // Prefers the node's unix socket. A wildcard TCP address connects over loopback.
+   SocketEndpoint nodeEndpoint()
+   {
+      auto settings = hostSettings();
+      check(settings.has_value(), "node host config is not set");
+      const auto& listen = settings->listen;
+      if (auto local = std::ranges::find(listen, "local", &ListenSpec::protocol);
+          local != listen.end())
+         return LocalEndpoint{local->path.value()};
+
+      auto http = std::ranges::find(listen, "http", &ListenSpec::protocol);
+      check(http != listen.end(), "node has no unix socket or http listener");
+      auto address = parseIPAddress(http->address.value());
+      check(address.has_value(), "invalid listen address " + *http->address);
+      auto port = http->port.value();
+      if (auto* v4 = std::get_if<IPV4Address>(&*address))
+      {
+         if (*v4 == IPV4Address{})
+            *v4 = IPV4Address{{127, 0, 0, 1}};
+         return IPV4Endpoint{*v4, port};
+      }
+      auto& v6 = std::get<IPV6Address>(*address);
+      if (v6 == IPV6Address{})
+         v6.bytes.back() = 1;
+      return IPV6Endpoint{v6, port};
+   }
+
+   using PushResult = std::variant<TransactionTrace, std::string>;
+
+   // Signs `actions` with x-portal's x-keys keys and sends them to this node's
+   // `transact`. The final result goes to `replyTo` when set.
+   //
+   // `signTx` aborts the caller when the signing account's auth rejects the
+   // actions, so callers commit any attempt bookkeeping before calling this.
+   void pushAgentTx(std::vector<Action> actions, std::optional<PushReplyTo> replyTo)
+   {
+      auto trx = to<XKeys>().signTx(std::move(actions));
+      // An empty host resolves to the node's first configured host.
+      auto root = to<XHttp>().rootHost(std::string{});
+      check(!root.empty(), "node has no configured host");
+      auto body = psio::to_frac(trx);
+      // x-http does not add Content-Length to outgoing requests
+      HttpRequest request{.host        = "transact." + root,
+                          .method      = "POST",
+                          .target      = "/push_transaction?wait_for=final",
+                          .contentType = "application/octet-stream",
+                          .headers     = {{"Accept", "application/octet-stream"},
+                                          {"Content-Length", std::to_string(body.size())}},
+                          .body        = std::move(body)};
+      auto socket = to<XHttp>().sendRequest(std::move(request), std::nullopt, nodeEndpoint());
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (replyTo)
+            to<XHttp>().autoClose(replyTo->socket, false);
+         to<XHttp>().setCallback(socket, MethodNumber{"onPushReply"}, MethodNumber{"onPushError"});
+         XPortal{}.open<PendingPushTable>().put({socket, std::move(replyTo)});
+      }
+   }
+
+   PushResult pushResult(const HttpReply& reply)
+   {
+      if (reply.status != HttpStatus::ok)
+         return std::string(reply.body.begin(), reply.body.end());
+      auto trace = psio::from_frac<TransactionTrace>(reply.body);
+      if (trace.error)
+         return *trace.error;
+      return trace;
+   }
+
+   void finishPush(std::int32_t socket, PushResult result)
+   {
+      std::optional<PendingPush> pending;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XPortal{}.open<PendingPushTable>();
+         pending    = table.get(socket);
+         check(pending.has_value(), "no pending push on socket " + std::to_string(socket));
+         table.remove(*pending);
+      }
+      auto* error = std::get_if<std::string>(&result);
+      if (!pending->replyTo)
+      {
+         if (error)
+            to<XHttp>().log(LogMessage::Severity::warning, "x-portal agent push failed: " + *error);
+         return;
+      }
+      auto& [replySocket, headers] = *pending->replyTo;
+      auto reply = error ? textError(std::move(headers), HttpStatus::internalServerError, *error)
+                         : jsonBody(std::move(headers), std::get<TransactionTrace>(result));
+      to<XHttp>().autoClose(replySocket, true);
+      to<XHttp>().sendReply(replySocket, reply);
+   }
+
+   // Enables auto-debit for ac-creator and debits the producer's pending credit
+   std::vector<Action> creatorSetupActions()
+   {
+      transactor<Tokens>  tokens{XPortal::creatorAccount, Tokens::service};
+      std::vector<Action> actions{tokens.setUserConf(Tokens::autoDebit, true)};
+      auto                sys      = to<Tokens>().getSysToken();
+      auto                producer = configuredProducer();
+      if (sys && producer)
+      {
+         auto pending = to<Tokens>().getSharedBal(sys->id, *producer, XPortal::creatorAccount);
+         if (pending.value != 0)
+            actions.push_back(tokens.debit(sys->id, *producer, pending, "x-portal setup"));
+      }
+      return actions;
+   }
+
+   // Claims the one-time setup and schedules its push, unless already claimed
+   void startCreatorSetupOnce()
+   {
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XPortal{}.open<AgentSetupTable>();
+         auto name  = std::string{XPortal::creatorAgent};
+         if (!table.get(name))
+         {
+            table.put({name});
+            auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now());
+            to<XTimer>().runAt(now, MethodNumber{"creatorSetup"});
+         }
+      }
    }
 
    AdminConfig adminView(const HttpRequest& req, const PortalConfig& config)
@@ -204,7 +355,10 @@ namespace
       auto   config  = loadedConfig();
       auto   billing = to<VirtualServer>().is_billing_enabled();
       Status status{.requests_enabled = config.requests_enabled, .billing_enabled = billing};
-      status.conditions.push_back({.id = "creator_ready", .ok = creatorReady()});
+      auto   ready = creatorReady();
+      if (ready)
+         startCreatorSetupOnce();
+      status.conditions.push_back({.id = "creator_ready", .ok = ready});
       if (billing)
          status.conditions.push_back({.id = "creator_funded", .ok = creatorFunded(config)});
       status.ready =
@@ -291,6 +445,20 @@ namespace
       }
       return jsonBody(req, created);
    }
+
+   // Replies later, from the push callbacks
+   std::optional<HttpReply> serveCreatorTest(const HttpRequest&          req,
+                                             std::optional<std::int32_t> socket)
+   {
+      if (req.method == "OPTIONS")
+         return HttpReply{.headers = cors(req)};
+      if (auto reply = to<XAdmin>().checkAuth(req, socket))
+         return reply;
+      if (req.method != "POST")
+         return HttpReply::methodNotAllowed(req);
+      pushAgentTx(creatorSetupActions(), PushReplyTo{socket.value(), cors(req)});
+      return std::nullopt;
+   }
 }  // namespace
 
 std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
@@ -305,7 +473,27 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
       return serveAdminConfig(request, socket);
    if (target == "/admin/agents/creator/keygen")
       return serveCreatorKeygen(request, socket);
+   if (target == "/admin/agents/creator/test")
+      return serveCreatorTest(request, socket);
    return std::nullopt;
+}
+
+void XPortal::creatorSetup(std::uint64_t /*timer*/)
+{
+   check(getSender() == XTimer::service, "Wrong sender");
+   pushAgentTx(creatorSetupActions(), std::nullopt);
+}
+
+void XPortal::onPushReply(std::int32_t socket, HttpReply reply)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   finishPush(socket, pushResult(reply));
+}
+
+void XPortal::onPushError(std::int32_t socket)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   finishPush(socket, std::string{"transact sent no reply"});
 }
 
 PSIBASE_DISPATCH(XPortal)
