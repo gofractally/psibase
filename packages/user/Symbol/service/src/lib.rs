@@ -218,8 +218,8 @@ pub mod tables {
 
     #[ComplexObject]
     impl Symbol {
-        pub async fn owner_nft(&self) -> NftRecord {
-            Nft::call().getNft(self.ownerNft).expect("NFT was burned")
+        pub async fn owner_nft(&self) -> Option<NftRecord> {
+            Nft::call().getNft(self.ownerNft)
         }
 
         pub async fn mapping(&self) -> Option<Mapping> {
