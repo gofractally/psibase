@@ -480,6 +480,11 @@ cargo_psibase_package(
     TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthRecover.psi
+    PATH packages/system/AuthRecover
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
+)
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
