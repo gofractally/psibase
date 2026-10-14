@@ -81,6 +81,18 @@ namespace SystemService
 
       /// Returns the stored row, if any.
       std::optional<AuthScopeRow> get(psibase::AccountNumber account);
+
+      /// Replaces `account`'s authorized public key. The sender must be the row's `owner`.
+      ///
+      /// Aborts if `account` has no row or the sender is not the row's `owner`.
+      void setKey(psibase::AccountNumber        account,
+                  AuthSig::SubjectPublicKeyInfo key);
+
+      /// Replaces `account`'s action whitelist. The sender must be the row's `owner`.
+      ///
+      /// Aborts if `account` has no row or the sender is not the row's `owner`.
+      void setAllowed(psibase::AccountNumber     account,
+                      std::vector<AllowedAction> allowed);
    };
    PSIO_REFLECT(AuthScope,  //
                 method(checkAuthSys, flags, sender, action, claims),
@@ -89,7 +101,9 @@ namespace SystemService
                 method(isAuthSys, sender, authorizers, method),
                 method(isRejectSys, sender, rejecters, method),
                 method(newAccount, name, key, owner, allowed),
-                method(get, account)
+                method(get, account),
+                method(setKey, account, key),
+                method(setAllowed, account, allowed)
                 //
    )
    PSIBASE_REFLECT_TABLES(AuthScope, AuthScope::Tables)

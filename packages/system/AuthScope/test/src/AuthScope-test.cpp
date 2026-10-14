@@ -149,3 +149,44 @@ TEST_CASE("auth-scope newAccount and whitelist")
              .runAs(std::move(runAsNop), std::vector<ServiceMethod>{})
              .failed("isAuthSys is not supported"));
 }
+
+TEST_CASE("auth-scope setKey and setAllowed")
+{
+   DefaultTestChain t;
+   t.addService<AuthScope>("AuthScope.wasm");
+
+   auto                       owner = t.from(t.addAccount("alice"_a));
+   auto                       other = t.from(t.addAccount("bob"_a));
+   auto                       agent = "agentacct"_a;
+   auto                       nop   = ServiceMethod{UserService::Nop::service, "nop"_m};
+   std::vector<AllowedAction> allowed{{UserService::Nop::service, "nop"_m}};
+
+   REQUIRE(owner.to<AuthScope>().newAccount(agent, agentPub, owner, allowed).succeeded());
+
+   CHECK(other.to<AuthScope>()
+             .setKey(agent, otherPub)
+             .failed("sender is not the owner"));
+   CHECK(other.to<AuthScope>()
+             .setAllowed(agent, allowed)
+             .failed("sender is not the owner"));
+   CHECK(owner.to<AuthScope>()
+             .setKey("noonehas"_a, otherPub)
+             .failed("account does not have a public key"));
+
+   REQUIRE(owner.to<AuthScope>().setKey(agent, otherPub).succeeded());
+   auto row = owner.to<AuthScope>().get(agent).returnVal();
+   REQUIRE(row.has_value());
+   CHECK(row->pubkey == otherPub);
+
+   auto otherClaim = claimFor(otherPub);
+   CHECK(owner.to<AuthScope>().checkAuthSys(0, agent, nop, std::vector{otherClaim}).returnVal());
+   CHECK(owner.to<AuthScope>().checkAuthSys(0, agent, nop, std::vector{claimFor(agentPub)}).returnVal() ==
+         false);
+
+   std::vector<AllowedAction> updated{{UserService::Nop::service, "withId"_m}};
+   REQUIRE(owner.to<AuthScope>().setAllowed(agent, updated).succeeded());
+   row = owner.to<AuthScope>().get(agent).returnVal();
+   REQUIRE(row.has_value());
+   CHECK(row->allowed == updated);
+   CHECK(owner.to<AuthScope>().checkAuthSys(0, agent, nop, std::vector{otherClaim}).returnVal() == false);
+}

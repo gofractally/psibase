@@ -4,6 +4,7 @@ pub mod accounts;
 pub mod auth_any;
 pub mod auth_delegate;
 pub mod auth_dyn;
+pub mod auth_scope;
 pub mod auth_sig;
 pub mod brotli_svc;
 pub mod chainmail;
