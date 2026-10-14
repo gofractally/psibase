@@ -32,7 +32,7 @@ namespace UserService
       // Read-only:
       std::optional<NftRecord> getNft(NID nftId);
       NftHolderRecord          getNftHolder(psibase::AccountNumber account);
-      CreditRecord             getCredRecord(NID nftId);
+      std::optional<CreditRecord> getCredRecord(NID nftId);
       bool                     exists(NID nftId);
       bool                     getUserConf(psibase::AccountNumber account, std::uint8_t flag);
 

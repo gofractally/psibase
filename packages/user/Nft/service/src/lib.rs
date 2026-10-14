@@ -194,10 +194,6 @@ pub mod tables {
             CreditTable::read().get_index_pk().get(&nft_id)
         }
 
-        pub fn get_assert(nft_id: NID) -> Self {
-            Self::get(nft_id).expect("Nothing to uncredit. Must first credit.")
-        }
-
         pub fn add(
             nft_id: NID,
             creditor: AccountNumber,
@@ -417,8 +413,8 @@ pub mod service {
     }
 
     #[action]
-    fn getCredRecord(nftId: NID) -> CreditRecord {
-        CreditRecord::get_assert(nftId)
+    fn getCredRecord(nftId: NID) -> Option<CreditRecord> {
+        CreditRecord::get(nftId)
     }
 
     #[action]
