@@ -30,6 +30,27 @@ fn to_claim(key: &AnyPublicKey) -> Claim {
     }
 }
 
+fn create_producer_account<F>(
+    builder: &mut TransactionBuilder<SignedTransaction, F>,
+    tx_signing_key: &Option<AnyPublicKey>,
+    initial_producer: AccountNumber,
+) -> Result<(), anyhow::Error>
+where
+    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+{
+    if let Some(key) = tx_signing_key {
+        builder.push(accounts::Wrapper::pack_from(accounts::SERVICE).newAccount(
+            initial_producer,
+            auth_sig::SERVICE,
+            accounts::NewAccountMode::REQUIRE_NEW,
+        ))?;
+        builder.push(set_key_action(initial_producer, key))?;
+    } else {
+        builder.push(new_account_action(accounts::SERVICE, initial_producer))?;
+    }
+    Ok(())
+}
+
 fn without_tapos(actions: Vec<Action>, expiration: TimePointSec) -> Transaction {
     Transaction {
         tapos: Tapos {
@@ -142,6 +163,9 @@ pub fn get_initial_actions<
     // If a package sets an auth service for an account, we should not override it
     let mut accounts_with_auth = HashSet::new();
     let mut installed_packages = PackageList::new();
+    // SingleProd's postinstall names this account the fee receiver and credits it.
+    // Create it once accounts::init has run, before those later postinstalls.
+    let mut producer_created = false;
 
     for s in &mut service_packages[..] {
         let mut actions = Vec::new();
@@ -179,6 +203,9 @@ pub fn get_initial_actions<
         s.link(&installed_packages, &mut actions)?;
 
         s.postinstall(schemas, &mut actions)?;
+        let initializes_accounts = actions
+            .iter()
+            .any(|act| act.service == accounts::SERVICE && act.method == method!("init"));
         for act in &actions {
             if act.service == accounts::SERVICE && act.method == method!("setAuthServ") {
                 accounts_with_auth.insert(act.sender);
@@ -187,21 +214,16 @@ pub fn get_initial_actions<
         for act in actions {
             builder.push(act)?;
         }
+        if initializes_accounts && !producer_created {
+            create_producer_account(builder, tx_signing_key, initial_producer)?;
+            producer_created = true;
+        }
     }
 
     builder.set_label("Creating system accounts".to_string());
 
-    // Create producer account
-    if let Some(key) = tx_signing_key {
-        // Set transaction signing key for producer
-        builder.push(accounts::Wrapper::pack_from(accounts::SERVICE).newAccount(
-            initial_producer,
-            auth_sig::SERVICE,
-            accounts::NewAccountMode::REQUIRE_NEW,
-        ))?;
-        builder.push(set_key_action(initial_producer, &key))?;
-    } else {
-        builder.push(new_account_action(accounts::SERVICE, initial_producer))?;
+    if !producer_created {
+        create_producer_account(builder, tx_signing_key, initial_producer)?;
     }
 
     builder.push(accounts::Wrapper::pack().newAccount(
