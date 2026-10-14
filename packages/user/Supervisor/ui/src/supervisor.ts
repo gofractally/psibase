@@ -53,11 +53,14 @@ const systemPlugins: Array<QualifiedPluginId> = [
 
 // The homepage is served from the network name's subdomain, but its plugins are
 //   registered (e.g. in dyn-ld) under the "homepage" service.
-const toHomepageAlias = <T extends { service: string }>(
+const toHomepageAlias = async <T extends { service: string }>(
     id: T,
-    network: string,
-): T =>
-    network && id.service === network ? { ...id, service: "homepage" } : id;
+): Promise<T> => {
+    const network = await networkNamePromise;
+    return network && id.service === network
+        ? { ...id, service: "homepage" }
+        : id;
+};
 
 // Control-flow signal thrown to unwind out of a plugin call.
 //
@@ -409,8 +412,8 @@ export class Supervisor implements AppInterface {
     // This is an entrypoint that returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
-            const network = await networkNamePromise;
-            plugin = toHomepageAlias(plugin, network);
+            await networkNamePromise;
+            plugin = await toHomepageAlias(plugin);
             this.setParentOrigination(callerOrigin);
             await this.preload([plugin]);
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
@@ -433,11 +436,9 @@ export class Supervisor implements AppInterface {
     ) {
         let result: unknown = null;
         try {
-            const network = await networkNamePromise;
+            await networkNamePromise;
             this.setParentOrigination(callerOrigin);
-            await this.preload(
-                plugins.map((plugin) => toHomepageAlias(plugin, network)),
-            );
+            await this.preload(await Promise.all(plugins.map(toHomepageAlias)));
         } catch (e) {
             result = e;
         } finally {
@@ -454,8 +455,8 @@ export class Supervisor implements AppInterface {
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {
-            const network = await networkNamePromise;
-            args = toHomepageAlias(args, network);
+            await networkNamePromise;
+            args = await toHomepageAlias(args);
             this.setParentOrigination(callerOrigin);
 
             // This is the time-intensive step. It includes: downloading, parsing, and transpiling the
