@@ -6,8 +6,7 @@ use psibase::{
 
 const TICKET_LIFETIME_US: i64 = 60_000_000;
 const CLOCK_MONOTONIC: u32 = 1;
-/// Drop at most this many of the oldest expired tickets per mint.
-const MAX_EXPIRED_ERASE: usize = 32;
+const MAX_EXPIRED_TICKET_ERASE_PER_MINT: usize = 32;
 
 mod transact {
     #[psibase::service(name = "r-transact", dispatch = false)]
@@ -200,7 +199,7 @@ fn erase_expired_once(now: i64) {
 fn erase_expired(now: i64) {
     let table = WsTicketTable::new();
     let index = table.get_index_by_expiration();
-    for row in index.iter().take(MAX_EXPIRED_ERASE) {
+    for row in index.iter().take(MAX_EXPIRED_TICKET_ERASE_PER_MINT) {
         if row.expiration > now {
             break;
         }
