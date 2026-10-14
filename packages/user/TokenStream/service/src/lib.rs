@@ -88,6 +88,7 @@ pub mod tables {
             assert_eq!(
                 psibase::services::nft::Wrapper::call()
                     .getNft(self.nft_id)
+                    .expect("NFT was burned")
                     .owner,
                 account,
                 "{} must be holder of NFT ID: {}",
