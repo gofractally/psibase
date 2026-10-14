@@ -7,6 +7,8 @@
 #include <psio/json/any.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
+#include <services/local/XKeys.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/AuthScope.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/VirtualServer.hpp>
@@ -63,6 +65,16 @@ namespace
          stored = XPortal{}.open<PortalConfigTable>().get({});
       }
       return stored.value_or(PortalConfig{});
+   }
+
+   std::optional<AgentKey> readCreatorAgentKey()
+   {
+      std::optional<AgentKey> stored;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         stored = XPortal{}.open<AgentKeyTable>().get(std::string{XPortal::creatorAgent});
+      }
+      return stored;
    }
 
    void writeConfig(const PortalConfig& config)
@@ -130,11 +142,7 @@ namespace
 
    bool creatorReady()
    {
-      std::optional<AgentKey> key;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         key = XPortal{}.open<AgentKeyTable>().get(std::string{XPortal::creatorAgent});
-      }
+      auto key = readCreatorAgentKey();
       if (!key)
          return false;
       auto row = to<AuthScope>().get(XPortal::creatorAccount);
@@ -260,6 +268,29 @@ namespace
       writeConfig(config);
       return HttpReply{.headers = cors(req)};
    }
+
+   HttpReply serveCreatorKeygen(const HttpRequest& req, std::optional<std::int32_t> socket)
+   {
+      if (req.method == "OPTIONS")
+         return HttpReply{.headers = cors(req)};
+      if (auto reply = to<XAdmin>().checkAuth(req, socket))
+         return *reply;
+      if (req.method != "POST")
+         return HttpReply::methodNotAllowed(req);
+      if (to<Accounts>().exists(XPortal::creatorAccount))
+         return textError(req, HttpStatus::conflict, "account already exists\n");
+
+      if (auto stored = readCreatorAgentKey())
+         return jsonBody(req, *stored);
+
+      AgentKey created{.name   = std::string{XPortal::creatorAgent},
+                       .pubkey = to<XKeys>().newKey()};
+      PSIBASE_SUBJECTIVE_TX
+      {
+         XPortal{}.open<AgentKeyTable>().put(created);
+      }
+      return jsonBody(req, created);
+   }
 }  // namespace
 
 std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
@@ -272,6 +303,8 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
       return serveStatus(request);
    if (target == "/admin/config")
       return serveAdminConfig(request, socket);
+   if (target == "/admin/agents/creator/keygen")
+      return serveCreatorKeygen(request, socket);
    return std::nullopt;
 }
 

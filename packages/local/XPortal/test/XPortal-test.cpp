@@ -1,15 +1,20 @@
 #include <services/local/XPortal.hpp>
 
 #include <format>
+#include <limits>
+#include <tuple>
 
 #include <catch2/catch_test_macros.hpp>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/fileUtil.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
+#include <services/local/XKeys.hpp>
 #include <services/system/AuthScope.hpp>
+#include <services/system/AuthSig.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
+#include <services/system/VirtualServer.hpp>
 #include <services/user/Tokens.hpp>
 
 using namespace psibase;
@@ -86,6 +91,8 @@ namespace
          builder.auth_bearer(token);
       if (method == "GET")
          return builder.get(XPortal::service, target);
+      if (method == "POST")
+         return builder.post(XPortal::service, target, EmptyBody{});
       return builder.request(XPortal::service, method, target);
    }
 
@@ -95,6 +102,105 @@ namespace
       REQUIRE(row.has_value());
       row->config = std::format(R"({{"host":{{"hosts":["psibase.io"],"producer":"{}"}}}})", name);
       t.kvPut(HostConfigRow::db, row->key(), *row);
+   }
+
+   std::vector<AllowedAction> creatorAllowed()
+   {
+      return {
+          {AccountNumber{"auth-sig"}, MethodNumber{"newAccount"}},
+          {Tokens::service, MethodNumber{"credit"}},
+          {Tokens::service, MethodNumber{"debit"}},
+          {Tokens::service, MethodNumber{"setUserConf"}},
+          {VirtualServer::service, MethodNumber{"buy_res_for"}},
+      };
+   }
+
+   HttpRequest keygenRequest(std::string_view token = {})
+   {
+      return forwarded("POST", "/admin/agents/creator/keygen", token);
+   }
+
+   struct BilledToken
+   {
+      TID      id        = 0;
+      uint8_t  precision = 0;
+      uint64_t cost      = 0;
+   };
+
+   // `extraDrips` credits additional faucet drips before billing is enabled.
+   // One drip is not enough to fund ac-creator at 100x the free grant.
+   BilledToken enableBilling(DefaultTestChain& t, AccountNumber payer, int extraDrips = 0)
+   {
+      REQUIRE(t.to<VirtualServer>().init_billing(Tokens::service).succeeded());
+      auto sysToken = t.from(payer).to<Tokens>().getSysToken().returnVal();
+      REQUIRE(sysToken.has_value());
+      auto cost = t.to<VirtualServer>().std_buffer_cost().returnVal().value;
+      REQUIRE(cost != 0);
+      auto faucet = AccountNumber{"faucet-tok"};
+      REQUIRE(t.from(payer).to<Tokens>().debit(sysToken->id, faucet, 100'000'0000, "").succeeded());
+      if (extraDrips != 0)
+      {
+         std::vector<Action> drips;
+         for (int i = 0; i < extraDrips; ++i)
+         {
+            drips.push_back(Action{
+                .sender  = faucet,
+                .service = faucet,
+                .method  = MethodNumber{"dispense"},
+                .rawData = psio::convert_to_frac(std::tuple{payer}),
+            });
+         }
+         expect(t.pushTransaction(t.makeTransaction(std::move(drips))));
+         REQUIRE(t.from(payer)
+                     .to<Tokens>()
+                     .debit(sysToken->id, faucet, uint64_t(extraDrips) * 100'000'0000, "")
+                     .succeeded());
+      }
+      Quantity resource{cost};
+      REQUIRE(
+          t.from(payer).to<Tokens>().credit(sysToken->id, VirtualServer::service, resource, "").succeeded());
+      REQUIRE(t.from(payer)
+                  .to<VirtualServer>()
+                  .buy_res_for(resource, VirtualServer::service, "")
+                  .succeeded());
+      REQUIRE(
+          t.from(payer).to<Tokens>().credit(sysToken->id, VirtualServer::service, resource, "").succeeded());
+      REQUIRE(t.from(payer).to<VirtualServer>().buy_res(resource).succeeded());
+      REQUIRE(t.to<VirtualServer>().enable_billing().succeeded());
+      return {.id = sysToken->id, .precision = sysToken->precision.value, .cost = cost};
+   }
+
+   void requireStoredKey(const SubjectPublicKeyInfo& pub)
+   {
+      auto table = XKeys{}.open<KeyTable>();
+      auto id    = sha256(pub.data.data(), pub.data.size());
+      auto row   = table.get({XPortal::service, id});
+      REQUIRE(row.has_value());
+      CHECK(row->owner == XPortal::service);
+      CHECK(getSubjectPublicKeyInfo(row->key) == pub);
+   }
+
+   void createCreator(DefaultTestChain&              t,
+                      AccountNumber                  producer,
+                      const SubjectPublicKeyInfo&    pub,
+                      const std::optional<Quantity>& buffer = {},
+                      const std::optional<Quantity>& grant  = {})
+   {
+      transactor<AuthScope>     scope{producer, AuthScope::service};
+      transactor<Tokens>        tokens{producer, Tokens::service};
+      transactor<VirtualServer> vserver{producer, VirtualServer::service};
+      std::vector<Action>       actions{
+          scope.newAccount(XPortal::creatorAccount, pub, producer, creatorAllowed())};
+      REQUIRE(buffer.has_value() == grant.has_value());
+      if (buffer)
+      {
+         auto sys = t.from(producer).to<Tokens>().getSysToken().returnVal();
+         REQUIRE(sys.has_value());
+         actions.push_back(tokens.credit(sys->id, VirtualServer::service, *buffer, ""));
+         actions.push_back(vserver.buy_res_for(*buffer, XPortal::creatorAccount, ""));
+         actions.push_back(tokens.credit(sys->id, XPortal::creatorAccount, *grant, ""));
+      }
+      expect(t.pushTransaction(t.makeTransaction(std::move(actions))));
    }
 }  // namespace
 
@@ -181,24 +287,12 @@ TEST_CASE("status, requests switch, and seeded pricing")
    XPortal{}.open<AgentKeyTable>().put(
        AgentKey{.name = std::string{XPortal::creatorAgent}, .pubkey = agentPub});
 
-   REQUIRE(t.to<VirtualServer>().init_billing(Tokens::service).succeeded());
-   auto sysToken = t.from(alice).to<Tokens>().getSysToken().returnVal();
-   auto sys      = sysToken->id;
-   auto scale    = uint64_t{1};
-   for (uint8_t i = 0; i < sysToken->precision.value; ++i)
+   auto billed = enableBilling(t, alice);
+   auto sys    = billed.id;
+   auto scale  = uint64_t{1};
+   for (uint8_t i = 0; i < billed.precision; ++i)
       scale *= 10;
-   auto cost = t.to<VirtualServer>().std_buffer_cost().returnVal().value;
-   REQUIRE(cost != 0);
-   REQUIRE(t.from(alice)
-               .to<Tokens>()
-               .debit(sys, AccountNumber{"faucet-tok"}, 100'000'0000, "")
-               .succeeded());
-   REQUIRE(t.from(alice).to<Tokens>().credit(sys, VirtualServer::service, cost, "").succeeded());
-   REQUIRE(
-       t.from(alice).to<VirtualServer>().buy_res_for(cost, VirtualServer::service, "").succeeded());
-   REQUIRE(t.from(alice).to<Tokens>().credit(sys, VirtualServer::service, cost, "").succeeded());
-   REQUIRE(t.from(alice).to<VirtualServer>().buy_res(cost).succeeded());
-   REQUIRE(t.to<VirtualServer>().enable_billing().succeeded());
+   auto cost = billed.cost;
 
    config = t.get<AdminConfig>(XPortal::service, "/admin/config");
    REQUIRE(config.price_per_token_usd_micros.has_value());
@@ -235,4 +329,65 @@ TEST_CASE("status, requests switch, and seeded pricing")
    status = t.get<Status>(XPortal::service, "/status");
    CHECK(status.conditions[1].ok);
    CHECK(status.ready);
+}
+
+TEST_CASE("producer funds ac-creator when billing is enabled")
+{
+   DefaultTestChain t{{"TestDefault", "TokenUsers", "AuthScope"}};
+   installPortal(t);
+   auto alice = AccountNumber{"alice"};
+   setProducer(t, "alice");
+   XAdmin{}.open<AdminAccountTable>().put(AdminAccountRow{alice});
+   auto token = t.login(alice, XPortal::service);
+   auto first = t.http(keygenRequest(token));
+   CHECK(first.status == HttpStatus::ok);
+   auto body = std::string(first.body.begin(), first.body.end());
+   CHECK(body.find("PRIVATE KEY") == std::string::npos);
+   body.push_back('\0');
+   psio::json_token_stream stream(body.data());
+   auto                    key = psio::from_json<AgentKey>(stream);
+   CHECK(key.name == XPortal::creatorAgent);
+   requireStoredKey(key.pubkey);
+
+   auto billed = enableBilling(t, alice, 5);
+   auto sys    = billed.id;
+   auto cost   = billed.cost;
+
+   auto config = t.get<AdminConfig>(XPortal::service, "/admin/config");
+   REQUIRE(config.free_tier.tokens.has_value());
+   auto grant = config.free_tier.tokens->value;
+   REQUIRE(grant > 0);
+   REQUIRE(grant <= std::numeric_limits<uint64_t>::max() / 100);
+   REQUIRE(cost <= std::numeric_limits<uint64_t>::max() / 100);
+   Quantity funded{grant * 100};
+   Quantity buffer{cost * 100};
+   auto     balance = t.from(alice).to<Tokens>().getBalance(sys, alice).returnVal();
+   REQUIRE(balance.value >= funded.value + buffer.value);
+
+   createCreator(t, alice, key.pubkey, buffer, funded);
+
+   auto row = t.from(alice).to<AuthScope>().get(XPortal::creatorAccount).returnVal();
+   REQUIRE(row.has_value());
+   CHECK(row->owner == alice);
+   CHECK(row->pubkey == key.pubkey);
+   CHECK(row->allowed == creatorAllowed());
+
+   auto status = t.get<Status>(XPortal::service, "/status");
+   CHECK(status.billing_enabled);
+   REQUIRE(status.conditions.size() == 2);
+   CHECK(status.conditions[0].id == "creator_ready");
+   CHECK(status.conditions[0].ok);
+   CHECK(status.conditions[1].id == "creator_funded");
+   CHECK(status.conditions[1].ok == false);
+   CHECK(t.from(alice).to<Tokens>().getBalance(sys, XPortal::creatorAccount).returnVal().value == 0);
+   CHECK(t.from(alice).to<Tokens>().getSharedBal(sys, alice, XPortal::creatorAccount).returnVal().value ==
+         funded.value);
+   auto sub =
+       t.from(VirtualServer::service).to<Tokens>().getSubBal(sys, XPortal::creatorAccount.str()).returnVal();
+   REQUIRE(sub.has_value());
+   CHECK(sub->value == buffer.value);
+
+   auto conflict = t.http(keygenRequest(token));
+   CHECK(conflict.status == HttpStatus::conflict);
+   requireStoredKey(key.pubkey);
 }
