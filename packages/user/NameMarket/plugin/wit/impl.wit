@@ -4,6 +4,8 @@ world impl {
     include host:client/imports;
     include host:http/imports;
     include host:crypto/imports;
+    include host:accounts/imports;
+    include clientdata:plugin/imports;
     include tokens:plugin/imports;
     include nft:plugin/imports;
     include transact:plugin/imports;

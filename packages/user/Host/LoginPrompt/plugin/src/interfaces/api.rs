@@ -64,7 +64,7 @@ impl Api for LoginPrompt {
             return Err(ErrorType::CannotCreateAccount().into());
         }
 
-        NameMarket::claim_and_buy(&account_name, &max_cost)?;
+        NameMarket::buy_and_claim(&account_name, &max_cost)?;
 
         let keypair = HostCrypto::generate_unmanaged_keypair()?;
 

@@ -11,6 +11,7 @@ mod service {
         Auction as AuctionRow, AuctionsTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use name_market::Wrapper as NameMarketService;
+    use nft::tables::{CreditRecord, CreditTable};
     use psibase::services::diff_adjust::{RateLimit, Wrapper as DiffAdjust};
     use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as TokensWrapper};
@@ -133,6 +134,56 @@ mod service {
         )))
     }
 
+    fn page_purchased_accounts(
+        mut rows: Vec<PurchasedAccount>,
+        first: Option<i32>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
+        rows.sort_by_key(|row| row.account.value);
+
+        if let Some(cursor) = after.as_deref() {
+            let Ok(cursor_account) = AccountNumber::from_exact(cursor) else {
+                return Ok(Connection::new(false, false));
+            };
+            rows.retain(|row| row.account.value > cursor_account.value);
+        }
+
+        let limit = first.unwrap_or(i32::MAX).max(0) as usize;
+        let has_next = rows.len() > limit;
+        rows.truncate(limit);
+
+        let mut conn = Connection::new(after.is_some(), has_next);
+        conn.edges = rows
+            .into_iter()
+            .map(|row| Edge::new(row.account.to_string(), row))
+            .collect();
+        Ok(conn)
+    }
+
+    #[derive(SimpleObject)]
+    struct NftCredit {
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+    }
+
+    fn credits_for(user: AccountNumber, as_creditor: bool) -> Vec<CreditRecord> {
+        let table = CreditTable::with_service(psibase::services::nft::SERVICE);
+        let range = (user, 0u32)..=(user, u32::MAX);
+        if as_creditor {
+            table.get_index_by_creditor().range(range).collect()
+        } else {
+            table.get_index_by_debitor().range(range).collect()
+        }
+    }
+
+    fn purchased_from_credits(credits: Vec<CreditRecord>) -> Vec<PurchasedAccount> {
+        let by_nft = PurchasedAccountsTable::read().get_index_by_nft();
+        credits
+            .into_iter()
+            .filter_map(|credit| by_nft.get(&credit.nftId))
+            .collect()
+    }
+
     fn serve_sys() -> services::transact::ServiceMethod {
         services::transact::ServiceMethod {
             service: crate::Wrapper::SERVICE,
@@ -199,30 +250,45 @@ mod service {
         ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
             let user = self.require_authenticated()?;
             let by_nft = PurchasedAccountsTable::read().get_index_by_nft();
-            let mut rows: Vec<_> = Nfts::call()
+            let rows = Nfts::call()
                 .getHeldIds(NameMarketService::SERVICE, user)
                 .into_iter()
                 .filter_map(|nft_id| by_nft.get(&nft_id))
                 .collect();
-            rows.sort_by_key(|row| row.account.value);
+            page_purchased_accounts(rows, first, after)
+        }
 
-            if let Some(cursor) = after.as_deref() {
-                let Ok(cursor_account) = AccountNumber::from_exact(cursor) else {
-                    return Ok(Connection::new(false, false));
-                };
-                rows.retain(|row| row.account.value > cursor_account.value);
-            }
+        /// Unclaimed accounts whose redemption NFT the user has credited.
+        async fn credited_names(
+            &self,
+            first: Option<i32>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
+            let user = self.require_authenticated()?;
+            let rows = purchased_from_credits(credits_for(user, true));
+            page_purchased_accounts(rows, first, after)
+        }
 
-            let limit = first.unwrap_or(i32::MAX).max(0) as usize;
-            let has_next = rows.len() > limit;
-            rows.truncate(limit);
+        /// Unclaimed accounts whose redemption NFT is credited to the user.
+        async fn debited_names(
+            &self,
+            first: Option<i32>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
+            let user = self.require_authenticated()?;
+            let rows = purchased_from_credits(credits_for(user, false));
+            page_purchased_accounts(rows, first, after)
+        }
 
-            let mut conn = Connection::new(after.is_some(), has_next);
-            conn.edges = rows
-                .into_iter()
-                .map(|row| Edge::new(row.account.to_string(), row))
-                .collect();
-            Ok(conn)
+        /// Parties on the NFT credit record, if one exists.
+        async fn nft_credit(&self, nft_id: u32) -> Option<NftCredit> {
+            let credit = CreditTable::with_service(psibase::services::nft::SERVICE)
+                .get_index_pk()
+                .get(&nft_id)?;
+            Some(NftCredit {
+                creditor: credit.creditor,
+                debitor: credit.debitor,
+            })
         }
 
         /// Purchased account row, if `account` is still unclaimed.

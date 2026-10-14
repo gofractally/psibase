@@ -11,7 +11,9 @@ interface issuer {
 
     /// Pick an id for a later `mint`, without scheduling the mint.
     ///
-    /// Returns a random free id, or the next sequential id when that guess is taken.
+    /// Submits a random guess to `chooseId`. A free guess is used. A taken
+    /// guess above the sequential cursor walks forward; one at or below it
+    /// resumes at the cursor.
     guess-id: func() -> result<u32, error>;
 }
 

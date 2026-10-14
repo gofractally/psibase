@@ -183,7 +183,7 @@ pub mod service {
 
     /// Claim a purchased account.
     ///
-    /// Debits the redemption NFT, burns it, and transfers the account.
+    /// Takes the redemption credit, burns the NFT, and transfers the account.
     #[action]
     fn claim(account: AccountNumber) {
         let purchased_accounts_table = PurchasedAccountsTable::new();
@@ -196,12 +196,7 @@ pub mod service {
         let sender = get_sender();
         let nft_id = purchased_account.nft_id;
 
-        assert!(
-            Nfts::Wrapper::call().getCredRecord(nft_id).creditor == sender,
-            "only the creditor may claim",
-        );
-
-        Nfts::Wrapper::call().debit(nft_id, "".into());
+        take(nft_id, sender);
         Nfts::Wrapper::call().burn(nft_id);
 
         AuthDelegate::Wrapper::call_as(account).setOwner(sender);
@@ -211,6 +206,21 @@ pub mod service {
         crate::Wrapper::emit()
             .history()
             .nameMktEvent(sender, account, CLAIMED);
+    }
+
+    fn take(nft_id: u32, other_party: AccountNumber) {
+        let service = get_service();
+        let credit = Nfts::Wrapper::call().getCredRecord(nft_id);
+        if credit.creditor == service && credit.debitor == other_party {
+            Nfts::Wrapper::call().uncredit(nft_id, "".into());
+        } else if credit.creditor == other_party && credit.debitor == service {
+            Nfts::Wrapper::call().debit(nft_id, "".into());
+        } else {
+            abort_message(&format!(
+                "credit record not found with account {}",
+                other_party
+            ));
+        }
     }
 
     /// Create a new name-length market.

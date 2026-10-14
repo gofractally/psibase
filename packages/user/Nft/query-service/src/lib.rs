@@ -212,6 +212,14 @@ mod service {
             Nft::id_available(id)
         }
 
+        /// Id `mint(Some)` should use for `id`.
+        ///
+        /// Returns `id` when it is free. A taken id above `nextId` walks
+        /// forward. A taken id at or below `nextId` resumes there.
+        async fn chooseId(&self, id: u32) -> u32 {
+            Nft::choose_id(id)
+        }
+
         async fn nftDetails(&self, nftId: NID) -> async_graphql::Result<Option<NftDetail>> {
             use psibase::services::accounts::Wrapper as Accounts;
 

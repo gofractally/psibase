@@ -86,15 +86,25 @@ interface api {
 
     /// Purchase an account name.
     ///
-    /// Guesses a redemption NFT id, buys the name with that id, and debits the NFT to the buyer.
+    /// Guesses a redemption NFT id and buys the name with that id.
+    /// Delivers that NFT with try-debit when this app's send-to-wallet preference is on.
     /// * `account`: the account to purchase the name for
     /// * `max-cost`: maximum payment in network token (Quantity string)
     buy: func(account: string, max-cost: string) -> result<_, error>;
 
+    /// Whether buys should deliver the redemption NFT to the logged-in user's wallet.
+    ///
+    /// Stored in this app's clientdata table. Missing means false.
+    /// This does not read or change the NFT service auto-debit setting.
+    is-send-to-wallet: func() -> bool;
+
+    /// Stores the send-to-wallet preference for the logged-in user.
+    set-send-to-wallet: func(enable: bool) -> result<_, error>;
+
     /// Buy an account name and claim it in this transaction.
     /// * `account`: the account to purchase and claim
     /// * `max-cost`: maximum payment in network token (Quantity string)
-    claim-and-buy: func(account: string, max-cost: string) -> result<_, error>;
+    buy-and-claim: func(account: string, max-cost: string) -> result<_, error>;
 
     /// Claim an account name.
     /// * `account`: the account to claim the name for

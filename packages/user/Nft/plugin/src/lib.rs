@@ -40,16 +40,14 @@ define_trust! {
 }
 
 #[derive(Deserialize)]
-struct MintChoiceResponse {
-    data: MintChoiceData,
+struct ChooseIdResponse {
+    data: ChooseIdData,
 }
 
 #[derive(Deserialize)]
-struct MintChoiceData {
-    #[serde(rename = "idAvailable")]
-    available: bool,
-    #[serde(rename = "nextId")]
-    next_id: u32,
+struct ChooseIdData {
+    #[serde(rename = "chooseId")]
+    id: u32,
 }
 
 fn plugin_error(message: impl Into<String>) -> Error {
@@ -65,19 +63,10 @@ fn plugin_error(message: impl Into<String>) -> Error {
 
 fn choose_id() -> Result<u32, Error> {
     let guess: u32 = rand::rng().random();
-    let choice = mint_choice(guess)?;
-    Ok(if choice.available {
-        guess
-    } else {
-        choice.next_id
-    })
-}
-
-fn mint_choice(guess: u32) -> Result<MintChoiceData, Error> {
-    let query = format!("query {{ idAvailable(id: {guess}) nextId }}");
+    let query = format!("query {{ chooseId(id: {guess}) }}");
     let body = post_graphql_get_json(&query)?;
-    serde_json::from_str::<MintChoiceResponse>(&body)
-        .map(|response| response.data)
+    serde_json::from_str::<ChooseIdResponse>(&body)
+        .map(|response| response.data.id)
         .map_err(|err| plugin_error(err.to_string()))
 }
 

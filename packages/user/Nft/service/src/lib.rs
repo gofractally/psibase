@@ -109,6 +109,20 @@ pub mod tables {
             id != 0 && Self::get(id).is_none() && !Burned::contains(id)
         }
 
+        /// Id `mint(Some)` should use for `guess`.
+        ///
+        /// A free guess is returned as-is. A taken guess above the sequential
+        /// cursor walks forward from that guess. A taken guess at or below
+        /// the cursor resumes at the cursor, so the packed prefix is not scanned.
+        pub fn choose_id(guess: NID) -> NID {
+            if Self::id_available(guess) {
+                return guess;
+            }
+            let next_id = Self::peek_next_id();
+            let start = if guess > next_id { guess } else { next_id };
+            Self::next_free_id(start)
+        }
+
         pub fn check_is_owner(&self, account: AccountNumber) {
             assert_eq!(self.owner, account, "Missing required authority");
         }

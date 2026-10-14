@@ -173,24 +173,40 @@ mod tests {
             .map_err(|e| anyhow::anyhow!(e))?
             .into_contents();
 
+        let err = NameMarket::push_from(&chain, account!("bob"))
+            .claim(account!("test"))
+            .trace
+            .error
+            .expect("bob cannot claim alice's purchase");
+        assert!(
+            err.contains("credit record not found with account bob"),
+            "unexpected error: {err}"
+        );
+
+        NameMarket::push_from(&chain, alice)
+            .claim(account!("test"))
+            .get()?;
+
+        credit_namemarket(&chain, alice, sys, 1000_0000u64.into())?;
+        NameMarket::push_from(&chain, alice)
+            .buy(account!("cat"), None)
+            .get()?;
         let raw: serde_json::Value = chain.graphql(
             NameMarket::SERVICE,
-            "query { purchasedAccount(account: \"test\") { nftId } }",
+            "query { purchasedAccount(account: \"cat\") { nftId } }",
         )?;
         let nft_id = raw
             .pointer("/data/purchasedAccount/nftId")
             .and_then(|v| v.as_u64())
             .expect("purchasedAccount.nftId") as u32;
-
         Nfts::push_from(&chain, alice)
             .try_debit(nft_id, "".into())
             .get()?;
         Nfts::push_from(&chain, alice)
             .credit(nft_id, NameMarket::SERVICE, "".into())
             .get()?;
-
         NameMarket::push_from(&chain, alice)
-            .claim(account!("test"))
+            .claim(account!("cat"))
             .get()?;
 
         // --- marketParams + configure ---
