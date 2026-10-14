@@ -377,7 +377,7 @@ fn current_user() -> Result<String, Error> {
 
 /// Credits the redemption NFT to namemarket when `take` would not already succeed.
 fn schedule_claim(account: &str, nft_id: u32) -> Result<(), Error> {
-    if !can_take(account, nft_id)? {
+    if !can_take(nft_id)? {
         bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
     }
     add_claim(account)
@@ -399,7 +399,8 @@ fn buyer_auto_debit() -> Result<bool, Error> {
     Ok(response.data.auto_debit)
 }
 
-fn can_take(account: &str, nft_id: u32) -> Result<bool, Error> {
+fn can_take(nft_id: u32) -> Result<bool, Error> {
+    let user = current_user()?;
     let query = format!("query {{ nftCredit(nftId: {nft_id}) {{ creditor debitor }} }}");
     let body = CommonServer::post_graphql_get_json(&query)?;
     let response = serde_json::from_str::<NftCreditResponse>(&body)
@@ -408,8 +409,8 @@ fn can_take(account: &str, nft_id: u32) -> Result<bool, Error> {
         return Ok(false);
     };
     let service = name_market::SERVICE.to_string();
-    Ok((credit.creditor == service && credit.debitor == account)
-        || (credit.creditor == account && credit.debitor == service))
+    Ok((credit.creditor == service && credit.debitor == user)
+        || (credit.creditor == user && credit.debitor == service))
 }
 
 fn fetch_purchased_nft_id(account: &str) -> Result<u32, Error> {
