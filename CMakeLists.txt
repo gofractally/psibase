@@ -135,7 +135,7 @@ if(DEFINED WASI_SDK_PREFIX)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
     # C++ packages
-    set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
+    set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthScope CommonApi
         CpuLimit Db DynLd Events EventIndex Explorer Invite
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate RDynLd REvents RInvite RPackages RProducers
@@ -729,6 +729,18 @@ psibase_package(
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthScope.psi
+    NAME AuthScope
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Auth service that limits a key to a whitelist of actions"
+    SERVICE auth-scope
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthScope.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthScope-schema.json
+    DEPENDS wasm
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1379,7 +1391,7 @@ function(write_package_index target dir reserve)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
-    Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
+    Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthScope AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
@@ -1390,6 +1402,7 @@ install(
           ${SERVICE_DIR}/AccountsService.psi
           ${SERVICE_DIR}/Aes.psi
           ${SERVICE_DIR}/AuthAny.psi
+          ${SERVICE_DIR}/AuthScope.psi
           ${SERVICE_DIR}/AuthDyn.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthDelegateService.psi
