@@ -11,7 +11,6 @@ mod service {
         Auction as AuctionRow, AuctionsTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use name_market::Wrapper as NameMarketService;
-    use nft::tables::{CreditRecord, CreditTable};
     use psibase::services::diff_adjust::{RateLimit, Wrapper as DiffAdjust};
     use psibase::services::nft::{NftHolderFlags, Wrapper as Nfts};
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as TokensWrapper};
@@ -166,21 +165,26 @@ mod service {
         debitor: AccountNumber,
     }
 
-    fn credits_for(user: AccountNumber, as_creditor: bool) -> Vec<CreditRecord> {
-        let table = CreditTable::with_service(psibase::services::nft::SERVICE);
-        let range = (user, 0u32)..=(user, u32::MAX);
-        if as_creditor {
-            table.get_index_by_creditor().range(range).collect()
-        } else {
-            table.get_index_by_debitor().range(range).collect()
-        }
-    }
-
-    fn purchased_from_credits(credits: Vec<CreditRecord>) -> Vec<PurchasedAccount> {
+    /// Unclaimed purchases whose redemption credit matches `user`.
+    ///
+    /// Credited names are NFTs the user holds. Debited names are NFTs namemarket holds.
+    fn owed_by_credit(user: AccountNumber, user_is_creditor: bool) -> Vec<PurchasedAccount> {
+        let service = NameMarketService::SERVICE;
+        let holder = if user_is_creditor { user } else { service };
         let by_nft = PurchasedAccountsTable::read().get_index_by_nft();
-        credits
+        Nfts::call()
+            .getHeldIds(service, holder)
             .into_iter()
-            .filter_map(|credit| by_nft.get(&credit.nftId))
+            .filter_map(|nft_id| {
+                let row = by_nft.get(&nft_id)?;
+                let credit = Nfts::call().getCredRecord(nft_id)?;
+                let matches = if user_is_creditor {
+                    credit.creditor == user && credit.debitor == service
+                } else {
+                    credit.creditor == service && credit.debitor == user
+                };
+                matches.then_some(row)
+            })
             .collect()
     }
 
@@ -265,7 +269,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
             let user = self.require_authenticated()?;
-            let rows = purchased_from_credits(credits_for(user, true));
+            let rows = owed_by_credit(user, true);
             page_purchased_accounts(rows, first, after)
         }
 
@@ -276,7 +280,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
             let user = self.require_authenticated()?;
-            let rows = purchased_from_credits(credits_for(user, false));
+            let rows = owed_by_credit(user, false);
             page_purchased_accounts(rows, first, after)
         }
 
