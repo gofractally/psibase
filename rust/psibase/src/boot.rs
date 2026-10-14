@@ -163,8 +163,6 @@ pub fn get_initial_actions<
     // If a package sets an auth service for an account, we should not override it
     let mut accounts_with_auth = HashSet::new();
     let mut installed_packages = PackageList::new();
-    // SingleProd's postinstall names this account the fee receiver and credits it.
-    // Create it once accounts::init has run, before those later postinstalls.
     let mut producer_created = false;
 
     for s in &mut service_packages[..] {
