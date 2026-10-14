@@ -1,8 +1,11 @@
 use crate::bindings::exports::host::prompt::admin::PromptDetails;
 use crate::host::client::api::{get_active_app, get_sender};
 use crate::host::db::store::{DbMode::*, StorageDuration::*, *};
-use chrono::Utc;
+use chrono::{DateTime, Duration, Utc};
 use psibase::fracpack::{Pack, Unpack};
+
+/// Seconds until a prompt is too old to read. Matches the supervisor prompt page window.
+const PROMPT_EXPIRATION_SECS: i64 = 300;
 
 mod tables {
     use super::*;
@@ -37,6 +40,14 @@ impl ActivePrompt {
             packed_context,
         }
     }
+
+    pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
+        let created_at = self
+            .created
+            .parse::<DateTime<Utc>>()
+            .expect("prompt created time");
+        now.signed_duration_since(created_at) > Duration::seconds(PROMPT_EXPIRATION_SECS)
+    }
 }
 
 impl From<ActivePrompt> for PromptDetails {
@@ -60,7 +71,35 @@ impl ActivePrompts {
     }
 
     pub fn get() -> Option<ActivePrompt> {
-        let val = tables::active_prompt().get(PROMPT_KEY).unwrap();
-        Some(<ActivePrompt>::unpacked(&val).unwrap())
+        let val = tables::active_prompt().get(PROMPT_KEY)?;
+        Some(ActivePrompt::unpacked(&val).unwrap())
+    }
+
+    pub fn clear() {
+        tables::active_prompt().delete(PROMPT_KEY);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prompt(created: &str) -> ActivePrompt {
+        ActivePrompt {
+            prompt_app: "host".into(),
+            active_app: "homepage".into(),
+            prompt_name: "connect".into(),
+            created: created.into(),
+            packed_context: None,
+        }
+    }
+
+    fn at(rfc3339: &str) -> DateTime<Utc> {
+        rfc3339.parse().unwrap()
+    }
+
+    #[test]
+    fn at_window_boundary() {
+        assert!(!prompt("2026-01-01T00:00:00+00:00").is_expired(at("2026-01-01T00:05:00Z")));
     }
 }

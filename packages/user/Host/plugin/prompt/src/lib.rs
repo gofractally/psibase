@@ -8,6 +8,7 @@ use errors::ErrorType;
 mod db;
 use db::*;
 
+use chrono::Utc;
 use exports::host::prompt::admin::PromptDetails;
 use exports::host::prompt::{admin::Guest as Admin, api::Guest as Api};
 use host::client::api::get_sender;
@@ -15,10 +16,19 @@ use host::types::types::Error;
 use supervisor::bridge::prompt::request_prompt;
 struct HostPrompt;
 
+fn assert_supervisor() {
+    assert_eq!(get_sender(), "supervisor", "Unauthorized");
+}
+
 impl Admin for HostPrompt {
     fn get_active_prompt() -> PromptDetails {
-        assert_eq!(get_sender(), "supervisor", "Unauthorized");
-        ActivePrompts::get().unwrap().into()
+        assert_supervisor();
+        ActivePrompts::get().expect("No active prompt").into()
+    }
+
+    fn clear_active_prompt() {
+        assert_supervisor();
+        ActivePrompts::clear();
     }
 }
 
@@ -37,7 +47,9 @@ impl Api for HostPrompt {
     }
 
     fn get_context() -> Result<Vec<u8>, Error> {
-        let prompt = ActivePrompts::get().unwrap();
+        let prompt = ActivePrompts::get().expect("No active prompt");
+        assert_eq!(get_sender(), prompt.prompt_app, "Unauthorized");
+        assert!(!prompt.is_expired(Utc::now()), "This prompt has expired.");
         prompt
             .packed_context
             .ok_or_else(|| Error::from(ErrorType::PromptContextNotFound(prompt.prompt_name)))

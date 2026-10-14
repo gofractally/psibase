@@ -19,6 +19,15 @@ interface PromptDetails {
 // NOTE: This expiration also guards page refresh.
 const PROMPT_EXPIRATION_SEC = 300;
 
+const promptAdmin = (method: string) =>
+    supervisor.functionCall({
+        service: "host",
+        plugin: "prompt",
+        intf: "admin",
+        method,
+        params: [],
+    });
+
 export const App = () => {
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -31,13 +40,9 @@ export const App = () => {
             setReturnPath(urlParams.get("returnPath") || "/");
 
             try {
-                const promptDetails = (await supervisor.functionCall({
-                    service: "host",
-                    plugin: "prompt",
-                    intf: "admin",
-                    method: "getActivePrompt",
-                    params: [],
-                })) as PromptDetails;
+                const promptDetails = (await promptAdmin(
+                    "getActivePrompt",
+                )) as PromptDetails;
 
                 if (promptDetails.created) {
                     const createdDate = new Date(promptDetails.created);
@@ -79,6 +84,13 @@ export const App = () => {
             }
 
             if (event.data === "finished") {
+                try {
+                    await promptAdmin("clearActivePrompt");
+                } catch (e) {
+                    setError("Prompt error: " + e);
+                    return;
+                }
+
                 const rootDomain =
                     activeApp !== "homepage"
                         ? new URL(siblingUrl(null, activeApp, returnPath))

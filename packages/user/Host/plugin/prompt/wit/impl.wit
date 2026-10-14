@@ -16,6 +16,10 @@ interface admin {
     /// Also sets the return-payload on the prompt object to ensure it persists and can 
     ///    be queried in `get-return-payload`.
     get-active-prompt: func() -> prompt-details;
+
+    /// Deletes the active prompt, including its context.
+    /// Only the supervisor may call this.
+    clear-active-prompt: func();
 } 
 
 world impl {
