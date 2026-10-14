@@ -44,7 +44,7 @@ interface api {
     /// `psibase.ws-ticket.<ticket>` websocket subprotocol.
     ///
     /// Parameters
-    /// * `service` - The account of the local (`x-`) service that will accept the websocket
+    /// * `service` - The account of the service that will accept the websocket
     get-ws-ticket: func(service: string) -> result<string, error>;
 
     // Todo: Probably will need to implement most/all js library functionality:

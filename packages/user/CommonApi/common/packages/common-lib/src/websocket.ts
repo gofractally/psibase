@@ -4,9 +4,9 @@ import { getSupervisor } from "./supervisor";
 const WS_TICKET_SUBPROTOCOL_PREFIX = "psibase.ws-ticket.";
 
 /**
- * Opens an authenticated websocket to a local service.
+ * Opens an authenticated websocket to a service.
  *
- * @param service - The local (`x-`) service that will accept the websocket.
+ * @param service - The service that will accept the websocket.
  * @param path - The path on the service to connect to (e.g. "/ws").
  * @param protocols - Additional subprotocols requested by the app.
  * @returns A new WebSocket. Listen for `open` before sending.

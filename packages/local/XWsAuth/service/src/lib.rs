@@ -6,6 +6,8 @@ use psibase::{
 
 const TICKET_LIFETIME_US: i64 = 60_000_000;
 const CLOCK_MONOTONIC: u32 = 1;
+/// Drop at most this many of the oldest expired tickets per mint.
+const MAX_EXPIRED_ERASE: usize = 32;
 
 mod transact {
     #[psibase::service(name = "r-transact", dispatch = false)]
@@ -34,6 +36,13 @@ pub mod tables {
         pub app: AccountNumber,
         pub service: AccountNumber,
         pub expiration: i64,
+    }
+
+    impl WsTicketRow {
+        #[secondary_key(1)]
+        fn by_expiration(&self) -> (i64, String) {
+            (self.expiration, self.ticket.clone())
+        }
     }
 }
 
@@ -94,18 +103,12 @@ mod service {
                 "expected JSON {\"app\",\"service\"}\n",
             ));
         };
-        if !body.service.to_string().starts_with("x-") {
-            return Some(text_reply(
-                &request,
-                400,
-                "service must be a local service\n",
-            ));
-        }
-
         let ticket = random_ticket();
-        let expiration = monotonic_us() + TICKET_LIFETIME_US;
+        let now = monotonic_us();
+        // Cleanup is best-effort. A failed commit is not retried; the next mint tries again.
+        erase_expired_once(now);
+        let expiration = now + TICKET_LIFETIME_US;
         psibase::subjective_tx! {
-            erase_expired(monotonic_us());
             WsTicketTable::new()
                 .put(&WsTicketRow {
                     ticket: ticket.clone(),
@@ -173,7 +176,7 @@ fn text_reply(request: &HttpRequest, status: u16, message: &str) -> HttpReply {
 fn random_ticket() -> String {
     let mut bytes = [0u8; 16];
     unsafe { native_raw::getRandom(bytes.as_mut_ptr(), bytes.len()) };
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    hex::encode(bytes)
 }
 
 fn monotonic_us() -> i64 {
@@ -185,15 +188,22 @@ fn monotonic_us() -> i64 {
     (nanos / 1000) as i64
 }
 
+fn erase_expired_once(now: i64) {
+    psibase::checkout_subjective();
+    let guard = psibase::scopeguard::guard((), |_| psibase::abort_subjective());
+    erase_expired(now);
+    if psibase::commit_subjective() {
+        psibase::scopeguard::ScopeGuard::into_inner(guard);
+    }
+}
+
 fn erase_expired(now: i64) {
     let table = WsTicketTable::new();
-    let expired: Vec<String> = table
-        .get_index_pk()
-        .iter()
-        .filter(|row| row.expiration <= now)
-        .map(|row| row.ticket.clone())
-        .collect();
-    for ticket in expired {
-        table.erase(&ticket);
+    let index = table.get_index_by_expiration();
+    for row in index.iter().take(MAX_EXPIRED_ERASE) {
+        if row.expiration > now {
+            break;
+        }
+        table.erase(&row.ticket);
     }
 }

@@ -956,7 +956,7 @@ name = "fracpack"
 version = "0.29.0"
 dependencies = [
  "custom_error",
- "hex",
+ "hex 0.3.2",
  "indexmap",
  "psibase-rust-workspace-hack",
  "psibase_macros",
@@ -1145,6 +1145,12 @@ name = "hex"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
+
+[[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hmac"
@@ -3601,6 +3607,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 name = "x-wsauth"
 version = "0.29.0"
 dependencies = [
+ "hex 0.4.3",
  "psibase",
  "psibase_service",
  "serde",

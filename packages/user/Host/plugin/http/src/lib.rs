@@ -228,9 +228,6 @@ impl Api for HostHttp {
 
         AccountNumber::from_exact(&service)
             .map_err(|_| make_error(&format!("Invalid service: {}", service)))?;
-        if !service.starts_with("x-") {
-            return Err(make_error(&format!("Not a local service: {}", service)));
-        }
 
         let Some(token) = get_auth_token() else {
             return Err(make_error("No authenticated user"));
