@@ -35,11 +35,11 @@ namespace UserService
       void setUserConf(std::uint8_t flag, bool enable);
 
       // Read-only:
-      NftRecord       getNft(NID nftId);
-      NftHolderRecord getNftHolder(psibase::AccountNumber account);
-      CreditRecord    getCredRecord(NID nftId);
-      bool            exists(NID nftId);
-      bool            getUserConf(psibase::AccountNumber account, std::uint8_t flag);
+      std::optional<NftRecord> getNft(NID nftId);
+      NftHolderRecord          getNftHolder(psibase::AccountNumber account);
+      std::optional<CreditRecord> getCredRecord(NID nftId);
+      bool                     exists(NID nftId);
+      bool                     getUserConf(psibase::AccountNumber account, std::uint8_t flag);
 
      public:
       struct Events

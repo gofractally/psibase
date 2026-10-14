@@ -84,7 +84,7 @@ mod service {
     }
 
     #[action]
-    fn getNft(nftId: crate::services::nft::NID) -> super::Nft {
+    fn getNft(nftId: crate::services::nft::NID) -> Option<super::Nft> {
         unimplemented!()
     }
 
@@ -94,7 +94,7 @@ mod service {
     }
 
     #[action]
-    fn getCredRecord(nftId: crate::services::nft::NID) -> super::CreditRecord {
+    fn getCredRecord(nftId: crate::services::nft::NID) -> Option<super::CreditRecord> {
         unimplemented!()
     }
 

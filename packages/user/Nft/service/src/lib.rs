@@ -73,13 +73,13 @@ pub mod tables {
 
     impl Nft {
         #[secondary_key(1)]
-        fn by_owner(&self) -> (AccountNumber, NID) {
-            (self.owner, self.id)
+        fn by_owner(&self) -> (AccountNumber, AccountNumber, NID) {
+            (self.owner, self.issuer, self.id)
         }
 
         #[secondary_key(2)]
-        fn by_issuer(&self) -> (AccountNumber, NID) {
-            (self.issuer, self.id)
+        fn by_issuer(&self) -> (AccountNumber, AccountNumber, NID) {
+            (self.issuer, self.owner, self.id)
         }
 
         pub fn get(nft_id: NID) -> Option<Self> {
@@ -225,10 +225,6 @@ pub mod tables {
 
         pub fn get(nft_id: NID) -> Option<Self> {
             CreditTable::read().get_index_pk().get(&nft_id)
-        }
-
-        pub fn get_assert(nft_id: NID) -> Self {
-            Self::get(nft_id).expect("Nothing to uncredit. Must first credit.")
         }
 
         pub fn add(
@@ -471,8 +467,8 @@ pub mod service {
     }
 
     #[action]
-    fn getCredRecord(nftId: NID) -> CreditRecord {
-        CreditRecord::get_assert(nftId)
+    fn getCredRecord(nftId: NID) -> Option<CreditRecord> {
+        CreditRecord::get(nftId)
     }
 
     #[action]
@@ -508,8 +504,8 @@ pub mod service {
     }
 
     #[action]
-    pub fn getNft(nftId: NID) -> Nft {
-        Nft::get_assert(nftId)
+    pub fn getNft(nftId: NID) -> Option<Nft> {
+        Nft::get(nftId)
     }
 
     #[action]

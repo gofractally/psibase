@@ -94,9 +94,9 @@ namespace
 
    struct Data
    {
-      UserNfts userNfts;
+      UserNfts nfts;
    };
-   PSIO_REFLECT(Data, userNfts);
+   PSIO_REFLECT(Data, nfts);
 
    struct QueryRoot
    {
@@ -163,7 +163,7 @@ SCENARIO("Producers")
 
       auto getNfts = [](DefaultTestChain& t, AccountNumber acc)
       {
-         std::string      query_str = "query UserNfts { userNfts( user: \"" + acc.str() +
+         std::string      query_str = "query Nfts { nfts( user: \"" + acc.str() +
                                       "\" ) { edges { node { id issuer owner } } } "
                                       "}";
          std::string_view query_sv  = query_str;
@@ -177,7 +177,7 @@ SCENARIO("Producers")
          //psibase::writeConsole(body + "\n");
          auto response_root = psio::convert_from_json<QueryRoot>(body);
 
-         return response_root.data.userNfts.edges.size();
+         return response_root.data.nfts.edges.size();
       };
 
       t.startBlock();
