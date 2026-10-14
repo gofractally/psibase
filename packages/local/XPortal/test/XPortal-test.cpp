@@ -6,10 +6,13 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <psibase/DefaultTestChain.hpp>
+#include <psibase/base64.hpp>
 #include <psibase/fileUtil.hpp>
+#include <psibase/testerApi.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XKeys.hpp>
+#include <services/local/XTimer.hpp>
 #include <services/system/AuthScope.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/HttpServer.hpp>
@@ -68,11 +71,19 @@ namespace
        "HEfwKktshavRCyzHq3X55sdfgs6hRANCAARZ0Aumf5wa4PWSWxJFdN1qliUbma5a\n"
        "CgAuh9li58vzfwZFSjjdS6gbPG7+ZblPqv0jHj+pziAfYH5lzpVjD+kp\n"
        "-----END PRIVATE KEY-----\n");
-   const auto otherPub = pubFromPem(
+   const std::string visitorPem =
        "-----BEGIN PUBLIC KEY-----\n"
        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEM3slPkmtyksK3oqx2FX8gdIzTGjV\n"
        "rRo8o1cU24xxx8qven95ahpWwKSHvbtQlA54P6pY9Ixm7s+bDnniGPw1iQ==\n"
-       "-----END PUBLIC KEY-----\n");
+       "-----END PUBLIC KEY-----\n";
+   const auto otherPub = pubFromPem(visitorPem);
+
+   struct SignupBody
+   {
+      std::string name;
+      std::string pubkey_pem;
+      PSIO_REFLECT(SignupBody, name, pubkey_pem)
+   };
 
    void installPortal(DefaultTestChain& t)
    {
@@ -201,6 +212,62 @@ namespace
          actions.push_back(tokens.credit(sys->id, XPortal::creatorAccount, *grant, ""));
       }
       expect(t.pushTransaction(t.makeTransaction(std::move(actions))));
+   }
+
+   std::string replyText(const HttpReply& reply)
+   {
+      return {reply.body.begin(), reply.body.end()};
+   }
+
+   HttpRequest signupRequest(std::string name, std::string pem = visitorPem)
+   {
+      return HttpRequestBuilder{}
+          .header("X-Forwarded-For", "203.0.113.8")
+          .post(XPortal::service, "/signup", SignupBody{std::move(name), std::move(pem)});
+   }
+
+   void storeCreatorKey()
+   {
+      XPortal{}.open<AgentKeyTable>().put(
+          AgentKey{.name = std::string{XPortal::creatorAgent}, .pubkey = agentPub});
+      XKeys{}.open<KeyTable>().put(
+          KeyRow{.id    = sha256(agentPub.data.data(), agentPub.data.size()),
+                 .owner = XPortal::service,
+                 .key   = agentPriv});
+   }
+
+   void skipCreatorSetup()
+   {
+      XPortal{}.open<AgentSetupTable>().put(
+          AgentSetup{.name = std::string{XPortal::creatorAgent}});
+   }
+
+   Checksum256 idFrom(std::string_view text)
+   {
+      auto raw = fromBase64Url(text);
+      REQUIRE(raw.size() == 32);
+      Checksum256 id{};
+      std::ranges::copy(raw, reinterpret_cast<char*>(id.data()));
+      return id;
+   }
+
+   std::optional<Signup> signupRow(std::string_view idText)
+   {
+      return XPortal{}.open<SignupTable>().get(idFrom(idText));
+   }
+
+   template <typename T>
+   TransactionTrace runAs(DefaultTestChain&  t,
+                          AccountNumber      sender,
+                          AccountNumber      service,
+                          std::string_view   method,
+                          const T&           args)
+   {
+      return tester::runAction(t.nativeHandle(), RunMode::rpc, false,
+                               Action{.sender  = sender,
+                                      .service = service,
+                                      .method  = MethodNumber{method},
+                                      .rawData = psio::convert_to_frac(args)});
    }
 }  // namespace
 
@@ -390,4 +457,70 @@ TEST_CASE("producer funds ac-creator when billing is enabled")
    auto conflict = t.http(keygenRequest(token));
    CHECK(conflict.status == HttpStatus::conflict);
    requireStoredKey(key.pubkey);
+}
+
+TEST_CASE("provision commits one attempt before signing")
+{
+   DefaultTestChain t{{"TestDefault", "TokenUsers", "AuthScope"}};
+   installPortal(t);
+   auto alice   = AccountNumber{"alice"};
+   auto creator = XPortal::creatorAccount;
+   XAdmin{}.open<AdminAccountTable>().put(AdminAccountRow{alice});
+   auto token = t.login(alice, XPortal::service);
+   storeCreatorKey();
+   // Debit-only whitelist: newAccount is outside it, so signTx aborts after the attempt commits.
+   transactor<AuthScope> scope{alice, AuthScope::service};
+   expect(t.pushTransaction(t.makeTransaction({scope.newAccount(
+       creator, agentPub, alice, std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})})));
+   skipCreatorSetup();
+   t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
+
+   auto created = t.http<SignupReceipt>(signupRequest("abcd1234"));
+   auto fired   = runAs(t, AccountNumber{}, XTimer::service, "runOne", std::tuple{});
+   REQUIRE(fired.error.has_value());
+   CHECK(fired.error->find("Failed to sign transaction") != std::string::npos);
+   auto row = signupRow(created.signup_id);
+   REQUIRE(row.has_value());
+   CHECK(row->state == "queued");
+   CHECK(row->attempts == 1);
+   CHECK(row->last_error == "signing aborted");
+   auto again =
+       runAs(t, XTimer::service, XPortal::service, "provision", std::tuple{std::uint64_t{0}});
+   CHECK(!again.error.has_value());
+   CHECK(signupRow(created.signup_id)->attempts == 1);
+
+   XPortal{}.open<PendingPushTable>().put(PendingPush{.socket = 11, .signup = row->id});
+   auto pushed = runAs(t, XHttp::service, XPortal::service, "onPushReply",
+                       std::tuple{std::int32_t{11},
+                                  HttpReply{.status = HttpStatus::ok,
+                                            .body   = psio::to_frac(TransactionTrace{})}});
+   CHECK(!pushed.error.has_value());
+   auto done = t.http<SignupView>(forwarded("GET", "/signup/" + created.signup_id));
+   CHECK(done.state == "created");
+   CHECK(done.account == AccountNumber{"abcd1234"});
+
+   auto second = t.http<SignupReceipt>(signupRequest("abcde12345"));
+   auto claimed =
+       runAs(t, XTimer::service, XPortal::service, "provision", std::tuple{std::uint64_t{1}});
+   REQUIRE(claimed.error.has_value());
+   XPortal{}.open<PendingPushTable>().put(
+       PendingPush{.socket = 12, .signup = signupRow(second.signup_id)->id});
+   auto failedPush = runAs(
+       t, XHttp::service, XPortal::service, "onPushReply",
+       std::tuple{std::int32_t{12},
+                  HttpReply{.status = HttpStatus::ok,
+                            .body = psio::to_frac(TransactionTrace{
+                                .error = std::string{"account already exists"}})}});
+   CHECK(!failedPush.error.has_value());
+   auto hidden = t.http(forwarded("GET", "/signup/" + second.signup_id));
+   CHECK(hidden.status == HttpStatus::ok);
+   CHECK(replyText(hidden).find("account already exists") == std::string::npos);
+   auto view = t.http<SignupView>(forwarded("GET", "/signup/" + second.signup_id));
+   CHECK(view.state == "failed");
+   CHECK(!view.account.has_value());
+   auto rows =
+       t.http<std::vector<FailedSignup>>(forwarded("GET", "/admin/signups?state=failed", token));
+   REQUIRE(rows.size() == 1);
+   CHECK(rows[0].name == AccountNumber{"abcde12345"});
+   CHECK(rows[0].last_error == "account already exists");
 }

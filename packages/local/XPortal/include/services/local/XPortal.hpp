@@ -86,12 +86,14 @@ namespace LocalService
       PSIO_REFLECT(PushReplyTo, socket, headers)
    };
 
-   /// An agent transaction sent to `transact` that has no final reply yet
+   /// An agent transaction sent to `transact` that has no final reply yet.
+   /// `signup` is set when the push provisions a signup record.
    struct PendingPush
    {
-      std::int32_t               socket;
-      std::optional<PushReplyTo> replyTo;
-      PSIO_REFLECT(PendingPush, socket, replyTo)
+      std::int32_t                        socket;
+      std::optional<PushReplyTo>          replyTo;
+      std::optional<psibase::Checksum256> signup;
+      PSIO_REFLECT(PendingPush, socket, replyTo, signup)
    };
    using PendingPushTable = psibase::Table<PendingPush, &PendingPush::socket>;
    PSIO_REFLECT_TYPENAME(PendingPushTable)
@@ -137,6 +139,33 @@ namespace LocalService
       PSIO_REFLECT(Status, requests_enabled, billing_enabled, ready, conditions)
    };
 
+   /// `POST /signup` returns the new signup's id, base64url of its 32 bytes.
+   struct SignupReceipt
+   {
+      std::string signup_id;
+      PSIO_REFLECT(SignupReceipt, signup_id)
+   };
+
+   /// `GET /signup/:id`. `account` is set only after the account is created.
+   /// A failed signup carries no error text.
+   struct SignupView
+   {
+      std::string                           state;
+      std::optional<psibase::AccountNumber> account;
+      PSIO_REFLECT(SignupView, state, account)
+   };
+
+   /// One row of `GET /admin/signups?state=failed`.
+   struct FailedSignup
+   {
+      std::string            id;
+      psibase::AccountNumber name;
+      psibase::TimePointUSec created;
+      uint32_t               attempts = 0;
+      std::string            last_error;
+      PSIO_REFLECT(FailedSignup, id, name, created, attempts, last_error)
+   };
+
    /// Node-local account requests.
    ///
    /// `GET /status` is anonymous. `GET` and `PUT /admin/config` require an
@@ -149,6 +178,25 @@ namespace LocalService
    /// transaction (enable auto-debit and debit any pending producer credit)
    /// and replies with its JSON trace once final. The same push runs once on
    /// its own when `creator_ready` first reports `ok`.
+   ///
+   /// `POST /signup` `{name, pubkey_pem}` is anonymous. It returns 403 unless
+   /// `requests_enabled`, `free_tier.enabled`, and `/status` `ready` all hold.
+   /// `name` must be 8 to 10 `[a-z0-9-]` characters, with no leading or
+   /// trailing hyphen and no `--`, and must name no existing account. The
+   /// signup is stored `queued` with the free tier's `usd_cents` and `tokens`
+   /// (both 0 when billing is disabled). An immediate `x-timer` callback
+   /// provisions it.
+   ///
+   /// `provision` attempts each due queued signup once. It commits
+   /// `attempts += 1` and `last_error = "signing aborted"`, then pushes as
+   /// `ac-creator`: `auth-sig::newAccount(name, pubkey)` and, when billing is
+   /// enabled, `tokens::credit(sys, vserver, tokens, "x-portal signup")` and
+   /// `vserver::buy_res_for(tokens, name, "x-portal signup")`. Success sets
+   /// `created` and `account`. A failed push sets `failed` and `last_error`.
+   /// A `signTx` abort leaves the signup `queued` with the placeholder error.
+   ///
+   /// `GET /signup/:id` returns `SignupView`. `GET /admin/signups?state=failed`
+   /// returns `FailedSignup` rows for an administrator.
    struct XPortal : psibase::Service
    {
       static constexpr auto service        = psibase::AccountNumber{"x-portal"};
@@ -163,8 +211,9 @@ namespace LocalService
                                                  std::optional<std::int32_t>           socket,
                                                  std::optional<psibase::AccountNumber> user);
 
-      // x-timer callback
+      // x-timer callbacks
       void creatorSetup(std::uint64_t timer);
+      void provision(std::uint64_t timer);
 
       // x-http callbacks for pushed transactions
       void onPushReply(std::int32_t socket, psibase::HttpReply reply);
@@ -173,6 +222,7 @@ namespace LocalService
    PSIO_REFLECT(XPortal,
                 method(serveSys, request, socket, user),
                 method(creatorSetup, timer),
+                method(provision, timer),
                 method(onPushReply, socket, reply),
                 method(onPushError, socket))
    PSIBASE_REFLECT_TABLES(XPortal, XPortal::Subjective, XPortal::Session)
