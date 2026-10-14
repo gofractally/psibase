@@ -5,8 +5,6 @@ import { z } from "zod";
 
 import { prompt } from "@psibase/common-lib";
 
-import { ConfirmKeyStep } from "@shared/components/account-key/confirm-key-step";
-import { SaveKeyStep } from "@shared/components/account-key/save-key-step";
 import { AvailableBalanceLabel } from "@shared/components/accounts-marketplace/available-balance-label";
 import { BuyNameConfirmationDialog } from "@shared/components/accounts-marketplace/buy-name-confirmation-dialog";
 import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
@@ -44,6 +42,10 @@ import { Progress } from "@shared/shadcn/ui/progress";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { Loader } from "./components/create-prompt/loader";
+import {
+    SaveAndConfirmKey,
+    type KeyStep,
+} from "./components/save-and-confirm-key";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { loginPromptCall } from "./lib/login-prompt";
 import { useCreateAccount } from "./hooks/use-create-account";
@@ -53,9 +55,7 @@ export const CreatePrompt = () => {
     const queryClient = useQueryClient();
     const { data: currentUser } = useCurrentUser();
     const [key, setKey] = useState<string>("");
-    const [step, setStep] = useState<"1_CREATE" | "2_SAVE" | "3_CONFIRM">(
-        "1_CREATE",
-    );
+    const [step, setStep] = useState<"1_CREATE" | KeyStep>("1_CREATE");
     const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
     const [confirmPrice, setConfirmPrice] = useState<Quantity | null>(null);
     const [isAccountTaken, setIsAccountTaken] = useState<boolean | null>(null);
@@ -212,7 +212,7 @@ export const CreatePrompt = () => {
             setKey(pemToB64(privateKey));
             setBuyConfirmOpen(false);
             setConfirmPrice(null);
-            setStep("2_SAVE");
+            setStep("save");
         } catch (error) {
             setBuyConfirmOpen(false);
             setConfirmPrice(null);
@@ -345,7 +345,7 @@ export const CreatePrompt = () => {
             <div className="-mt-6 px-6">
                 <Progress
                     value={
-                        step === "1_CREATE" ? 33 : step === "2_SAVE" ? 67 : 100
+                        step === "1_CREATE" ? 33 : step === "save" ? 67 : 100
                     }
                 />
             </div>
@@ -441,18 +441,11 @@ export const CreatePrompt = () => {
                 </createForm.AppForm>
             )}
 
-            {step === "2_SAVE" && (
-                <SaveKeyStep
+            {step !== "1_CREATE" && (
+                <SaveAndConfirmKey
                     accountName={createdAccount}
                     keyB64={key}
-                    onContinue={() => setStep("3_CONFIRM")}
-                />
-            )}
-
-            {step === "3_CONFIRM" && (
-                <ConfirmKeyStep
-                    expectedAccount={createdAccount}
-                    onBack={() => setStep("2_SAVE")}
+                    onStepChange={setStep}
                     onImported={async (account) => {
                         await connectAccountMutation.mutateAsync(account);
                         prompt.finished();

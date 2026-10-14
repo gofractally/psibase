@@ -5,11 +5,15 @@ mod db;
 mod errors;
 mod helpers;
 mod import;
+#[path = "../../../import_new_context.rs"]
+mod import_context;
+
 use db::{apps_table::AppsTable, user_table::UserTable};
 /// App id for Host plugins and UI (no on-chain service).
 pub(crate) const HOST_APP: &str = "host";
 use errors::ErrorType::NotConnected;
 use helpers::*;
+use import_context::ImportNewContext;
 
 use bindings::exports::host::accounts::active_app::Guest as ActiveApp;
 use bindings::exports::host::accounts::admin::{Credential, Guest as Admin};
@@ -17,6 +21,7 @@ use bindings::exports::host::accounts::api::Guest as API;
 use bindings::host::client::api as Client;
 use bindings::host::prompt::api as Prompt;
 use bindings::host::types::types::Error;
+use psibase::fracpack::Pack;
 
 struct HostAccounts;
 
@@ -71,6 +76,20 @@ impl ActiveApp for HostAccounts {
 
         Ok(())
     }
+
+    fn import_new_account(account: String, key: String, login: bool) -> Result<(), Error> {
+        get_assert_top_level_app("import_new_account", &[])?;
+
+        let packed = ImportNewContext {
+            account,
+            key,
+            login,
+        }
+        .packed();
+        Prompt::prompt("importnew", Some(packed.as_slice()));
+
+        Ok(())
+    }
 }
 
 impl Admin for HostAccounts {
@@ -98,10 +117,7 @@ impl Admin for HostAccounts {
     }
 
     fn disconnect(account: String, app: String) {
-        check_caller(
-            &["accounts", HOST_APP],
-            "disconnect@host:accounts/admin",
-        );
+        check_caller(&["accounts", HOST_APP], "disconnect@host:accounts/admin");
         AppsTable::new(&app).disconnect(&account);
     }
 

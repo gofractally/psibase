@@ -1,9 +1,9 @@
 use crate::bindings::accounts::plugin::api as AccountsPlugin;
 use crate::bindings::auth_sig::plugin as AuthSig;
-use crate::bindings::exports::host::login_prompt::api::{Credential, Guest as Api};
+use crate::bindings::exports::host::login_prompt::api::{Credential, Guest as Api, ImportContext};
 use crate::bindings::host::{
-    client::api as Client, crypto::keyvault as HostCrypto, accounts::admin as HostAccountsAdmin,
-    accounts::api as HostAccountsApi, types::types::Error,
+    accounts::admin as HostAccountsAdmin, accounts::api as HostAccountsApi, client::api as Client,
+    crypto::keyvault as HostCrypto, prompt::api as HostPrompt, types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::{api as NameMarket, types::MarketsOverview};
@@ -13,10 +13,31 @@ use crate::bindings::tokens::plugin::{
 };
 use crate::bindings::transact::plugin::api as Transact;
 use crate::errors::ErrorType;
+use crate::import_context::ImportNewContext;
 use crate::plugin::LoginPrompt;
 use crate::HOST_APP;
+use psibase::fracpack::Unpack;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
+
+fn connect_imported(account: &str, login: bool) {
+    assert!(HostAccountsAdmin::get_connected_accounts(HOST_APP)
+        .iter()
+        .any(|known| known == account));
+
+    let app = Client::get_active_app();
+    HostAccountsAdmin::add_connected_app(account, &app);
+
+    if !login {
+        HostAccountsAdmin::connect(account, &app);
+        return;
+    }
+
+    if HostAccountsAdmin::login(account, &app).is_err() {
+        HostAccountsAdmin::remove_connected_app(account, &app);
+    }
+}
+
 impl Api for LoginPrompt {
     fn can_create_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
@@ -81,20 +102,27 @@ impl Api for LoginPrompt {
 
     fn connect_account(account: String) {
         assert_eq!(Client::get_sender(), Client::get_receiver());
-
-        // The account must already have been imported
-        assert!(HostAccountsAdmin::get_connected_accounts(HOST_APP).contains(&account));
-
-        let app = Client::get_active_app();
-        HostAccountsAdmin::add_connected_app(&account, &app);
-
-        if HostAccountsAdmin::login(&account, &app).is_err() {
-            HostAccountsAdmin::remove_connected_app(&account, &app);
-        }
+        connect_imported(&account, true);
 
         if Invites::get_active_invite().is_some() {
             Invites::accept();
         }
+    }
+
+    fn get_import_context() -> ImportContext {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        let raw = HostPrompt::get_context().expect("import context");
+        let context = ImportNewContext::unpacked(&raw).expect("import context");
+        ImportContext {
+            account: context.account,
+            key: context.key,
+            login: context.login,
+        }
+    }
+
+    fn finish_import(account: String, login: bool) {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+        connect_imported(&account, login);
     }
 
     fn get_system_token() -> Result<Option<SystemTokenInfo>, Error> {

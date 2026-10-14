@@ -12,7 +12,7 @@ interface api {
 /// This interface is only available to the top-level app, or its plugin.
 /// The "top-level" app is the app with which the user is directly interacting.
 interface active-app {
-    use host:types/types.{error};
+    use host:types/types.{error, pem};
 
     /// Directly log in a user by their account name.
     /// The user must have already been connected to the app.
@@ -30,6 +30,13 @@ interface active-app {
 
     /// Prompts the user to connect an account to the active app
     connect-account: func() -> result<_, error>;
+
+    /// Prompts the user to save and confirm a newly created account, then imports it.
+    ///
+    /// Only the top-level app may call this. `key` is the account's private key in PEM
+    /// format. Opens the `importnew` prompt. The host connects the account to the calling
+    /// app and logs in only when `login` is true.
+    import-new-account: func(account: string, key: pem, login: bool) -> result<_, error>;
 }
 
 /// Callable by the accounts plugin and by host.
