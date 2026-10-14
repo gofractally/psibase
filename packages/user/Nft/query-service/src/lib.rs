@@ -52,22 +52,6 @@ mod service {
             }
             Ok(())
         }
-
-        fn page_nfts<Key: ToKey>(
-            query: TableQuery<Key, Nft>,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> impl std::future::Future<Output = async_graphql::Result<Connection<RawKey, Nft>>>
-        {
-            query
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-        }
     }
 
     #[Object]
@@ -110,8 +94,7 @@ mod service {
 
         /// NFTs filtered by issuer, holder, or both.
         ///
-        /// Neither argument lists every NFT. `issuer` uses the issuer index.
-        /// `user` uses the owner index. Both list that issuer's NFTs held by `user`.
+        /// With neither argument, lists every NFT.
         async fn nfts(
             &self,
             issuer: Option<AccountNumber>,
@@ -124,50 +107,46 @@ mod service {
             let table = NftTable::with_service(psibase::services::nft::SERVICE);
             match (issuer, user) {
                 (None, None) => {
-                    Self::page_nfts(
-                        TableQuery::subindex::<NID>(table.get_index_pk(), &()),
-                        first,
-                        last,
-                        before,
-                        after,
-                    )
-                    .await
+                    TableQuery::subindex::<NID>(table.get_index_pk(), &())
+                        .first(first)
+                        .last(last)
+                        .before(before)
+                        .after(after)
+                        .query()
+                        .await
                 }
                 (Some(issuer), None) => {
-                    Self::page_nfts(
-                        TableQuery::subindex::<(AccountNumber, NID)>(
-                            table.get_index_by_issuer(),
-                            &(issuer),
-                        ),
-                        first,
-                        last,
-                        before,
-                        after,
+                    TableQuery::subindex::<(AccountNumber, NID)>(
+                        table.get_index_by_issuer(),
+                        &(issuer),
                     )
+                    .first(first)
+                    .last(last)
+                    .before(before)
+                    .after(after)
+                    .query()
                     .await
                 }
                 (None, Some(user)) => {
-                    Self::page_nfts(
-                        TableQuery::subindex::<(AccountNumber, NID)>(
-                            table.get_index_by_owner(),
-                            &(user),
-                        ),
-                        first,
-                        last,
-                        before,
-                        after,
+                    TableQuery::subindex::<(AccountNumber, NID)>(
+                        table.get_index_by_owner(),
+                        &(user),
                     )
+                    .first(first)
+                    .last(last)
+                    .before(before)
+                    .after(after)
+                    .query()
                     .await
                 }
                 (Some(issuer), Some(user)) => {
-                    Self::page_nfts(
-                        TableQuery::subindex::<NID>(table.get_index_by_issuer(), &(issuer, user)),
-                        first,
-                        last,
-                        before,
-                        after,
-                    )
-                    .await
+                    TableQuery::subindex::<NID>(table.get_index_by_issuer(), &(issuer, user))
+                        .first(first)
+                        .last(last)
+                        .before(before)
+                        .after(after)
+                        .query()
+                        .await
                 }
             }
         }
