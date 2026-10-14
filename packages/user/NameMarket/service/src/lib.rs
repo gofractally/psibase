@@ -133,9 +133,10 @@ pub mod service {
 
     /// Buy a premium account name.
     ///
-    /// Mints a redemption NFT, credits it to the buyer, and leaves the new
-    /// account owned by this service until the NFT holder claims it.
-    /// `nft_id` is minted when set; otherwise the next free id is used.
+    /// Credits the buyer a redemption NFT and leaves the account with this
+    /// service. `claim` succeeds only for a credit between this service and
+    /// the sender, then burns the NFT. `nft_id` is minted when set;
+    /// otherwise the next free id is used.
     #[action]
     fn buy(account: AccountNumber, nft_id: Option<u32>) {
         let length = account.to_string().len() as u8;
