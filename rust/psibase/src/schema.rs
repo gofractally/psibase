@@ -107,12 +107,12 @@ pub struct Schema {
 }
 
 #[cfg(test)]
-pub(crate) fn assert_schemas_equivalent(lhs: &Schema, rhs: &Schema) {
-    let mut matcher = fracpack::SchemaMatcher::new(
-        &lhs.types,
-        &rhs.types,
-        fracpack::SchemaDifference::EQUIVALENT,
-    );
+pub(crate) fn assert_schemas_match(
+    lhs: &Schema,
+    rhs: &Schema,
+    allowed: fracpack::SchemaDifference,
+) {
+    let mut matcher = fracpack::SchemaMatcher::new(&lhs.types, &rhs.types, allowed);
     for (name, lty) in &lhs.actions {
         if let Some(rty) = rhs.actions.get(name) {
             if !matcher.compare(&lty.params, &rty.params) {
@@ -211,6 +211,14 @@ pub(crate) fn assert_schemas_equivalent(lhs: &Schema, rhs: &Schema) {
 
 #[cfg(test)]
 pub(crate) fn assert_schema_matches_package<Wrapper: ToServiceSchema>() {
+    assert_schema_matches_package_allowing::<Wrapper>(fracpack::SchemaDifference::EQUIVALENT);
+}
+
+/// Compares against the packaged schema, tolerating the differences in `allowed`
+#[cfg(test)]
+pub(crate) fn assert_schema_matches_package_allowing<Wrapper: ToServiceSchema>(
+    allowed: fracpack::SchemaDifference,
+) {
     use crate::{DirectoryRegistry, PackageRegistry, SchemaMap};
     use futures::executor::block_on;
     use std::collections::HashSet;
@@ -244,7 +252,7 @@ pub(crate) fn assert_schema_matches_package<Wrapper: ToServiceSchema>() {
             names.join(", "),
         )
     });
-    assert_schemas_equivalent(real_schema, &my_schema);
+    assert_schemas_match(real_schema, &my_schema, allowed);
 }
 
 pub trait ToActionsSchema {

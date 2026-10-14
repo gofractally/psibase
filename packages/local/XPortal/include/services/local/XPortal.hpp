@@ -69,6 +69,33 @@ namespace LocalService
    using SignupTable = psibase::Table<Signup, &Signup::id>;
    PSIO_REFLECT_TYPENAME(SignupTable)
 
+   /// Agents whose one-time setup push has been scheduled. It never runs twice.
+   struct AgentSetup
+   {
+      std::string name;
+      PSIO_REFLECT(AgentSetup, name)
+   };
+   using AgentSetupTable = psibase::Table<AgentSetup, &AgentSetup::name>;
+   PSIO_REFLECT_TYPENAME(AgentSetupTable)
+
+   /// An admin request waiting for a push's final result
+   struct PushReplyTo
+   {
+      std::int32_t                     socket;
+      std::vector<psibase::HttpHeader> headers;
+      PSIO_REFLECT(PushReplyTo, socket, headers)
+   };
+
+   /// An agent transaction sent to `transact` that has no final reply yet
+   struct PendingPush
+   {
+      std::int32_t               socket;
+      std::optional<PushReplyTo> replyTo;
+      PSIO_REFLECT(PendingPush, socket, replyTo)
+   };
+   using PendingPushTable = psibase::Table<PendingPush, &PendingPush::socket>;
+   PSIO_REFLECT_TYPENAME(PendingPushTable)
+
    /// `GET /admin/config`. `tokens` is computed; it is not stored.
    struct TierView
    {
@@ -117,18 +144,36 @@ namespace LocalService
    /// `POST /admin/agents/creator/keygen` returns `AgentKey("creator")`,
    /// creating it in `x-keys` when absent. It returns 409 when `ac-creator`
    /// already exists.
+   ///
+   /// `POST /admin/agents/creator/test` pushes the `ac-creator` setup
+   /// transaction (enable auto-debit and debit any pending producer credit)
+   /// and replies with its JSON trace once final. The same push runs once on
+   /// its own when `creator_ready` first reports `ok`.
    struct XPortal : psibase::Service
    {
       static constexpr auto service        = psibase::AccountNumber{"x-portal"};
       static constexpr auto creatorAccount = psibase::AccountNumber{"ac-creator"};
       static constexpr auto creatorAgent   = std::string_view{"creator"};
 
-      using Subjective = psibase::SubjectiveTables<PortalConfigTable, AgentKeyTable, SignupTable>;
+      using Subjective =
+          psibase::SubjectiveTables<PortalConfigTable, AgentKeyTable, SignupTable, AgentSetupTable>;
+      using Session = psibase::SessionTables<PendingPushTable>;
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest                  request,
                                                  std::optional<std::int32_t>           socket,
                                                  std::optional<psibase::AccountNumber> user);
+
+      // x-timer callback
+      void creatorSetup(std::uint64_t timer);
+
+      // x-http callbacks for pushed transactions
+      void onPushReply(std::int32_t socket, psibase::HttpReply reply);
+      void onPushError(std::int32_t socket);
    };
-   PSIO_REFLECT(XPortal, method(serveSys, request, socket, user))
-   PSIBASE_REFLECT_TABLES(XPortal, XPortal::Subjective)
+   PSIO_REFLECT(XPortal,
+                method(serveSys, request, socket, user),
+                method(creatorSetup, timer),
+                method(onPushReply, socket, reply),
+                method(onPushError, socket))
+   PSIBASE_REFLECT_TABLES(XPortal, XPortal::Subjective, XPortal::Session)
 }  // namespace LocalService
