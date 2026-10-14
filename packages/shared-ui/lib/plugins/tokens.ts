@@ -9,8 +9,7 @@ export type SystemTokenInfo = {
     id: number;
     symbol: string | undefined;
     precision: number;
-    /** Absent until the tokens plugin's system-token-info record includes this flag. */
-    untransferable?: boolean;
+    untransferable: boolean;
 };
 
 export type UserBalance = {

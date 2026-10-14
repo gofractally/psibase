@@ -29,7 +29,7 @@ export function toSystemTokenInfo(
         id: String(token.id),
         symbol: symbol ? symbol : `ID: ${token.id}`,
         precision: token.precision,
-        untransferable: token.untransferable === true,
+        untransferable: token.untransferable,
     };
 }
 
