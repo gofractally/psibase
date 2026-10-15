@@ -32,8 +32,6 @@ interface util {
 }
 
 world impl {
-    import host:accounts/admin;
-
     export boot;
     export util;
     export packages;
