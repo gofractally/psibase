@@ -366,7 +366,9 @@ fn schedule_buy(account: &str, max_cost: &String) -> Result<u32, Error> {
         return Err(ErrorType::MaxCostBelowCurrentAsk.into());
     }
 
-    TokensUser::credit(sys_token_id, &service_account, max_cost, "account purchase")?;
+    if max_cost_u64 > 0 {
+        TokensUser::credit(sys_token_id, &service_account, max_cost, "account purchase")?;
+    }
     name_market::Wrapper::add_to_tx().buy(acct_name, Some(nft_id));
     Ok(nft_id)
 }

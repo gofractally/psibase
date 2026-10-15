@@ -172,8 +172,9 @@ pub mod service {
             .put(&PurchasedAccount { account, nft_id })
             .unwrap();
 
-        let cost = current_price;
-        Tokens::Wrapper::call().debit(sys_token_id, sender, cost, "".into());
+        if current_price.value > 0 {
+            Tokens::Wrapper::call().debit(sys_token_id, sender, current_price, "".into());
+        }
 
         Tokens::Wrapper::call().reject(sys_token_id, sender, "return change".into());
 
