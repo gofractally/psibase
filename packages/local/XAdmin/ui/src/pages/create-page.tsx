@@ -44,7 +44,6 @@ import { usePackages } from "../hooks/use-packages";
 import { useSelectedRows } from "../hooks/use-selected-rows";
 import { useStepper } from "../hooks/use-stepper";
 import {
-    type BootTemplate,
     bootTemplatesAvailable,
     getDefaultSelectedPackages,
     nodeLocalPackageForTemplate,
