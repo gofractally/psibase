@@ -18,27 +18,21 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
 interface SaveKeyStepProps {
-    /** Name of the newly created/claimed account. */
+    /** Name of the newly created account. */
     accountName: string;
     /** The account's private key, base64 encoded. */
     keyB64: string;
     onContinue: () => void;
-    /** Extra classes for the content area (e.g. "px-0" inside a dialog). */
-    contentClassName?: string;
-    /** Extra classes for the footer area (e.g. "px-0" inside a dialog). */
-    footerClassName?: string;
 }
 
 /**
- * Step UI that presents a newly generated private key to the user and
- * requires them to acknowledge they have saved it before continuing.
+ * Presents a newly generated private key and requires the user to
+ * acknowledge they have saved it before continuing.
  */
 export const SaveKeyStep = ({
     accountName,
     keyB64,
     onContinue,
-    contentClassName,
-    footerClassName,
 }: SaveKeyStepProps) => {
     const { data: networkName } = useBranding();
     const [showPassword, setShowPassword] = useState(false);
@@ -46,9 +40,7 @@ export const SaveKeyStep = ({
 
     return (
         <>
-            <CardContent
-                className={`flex flex-col gap-8 ${contentClassName ?? ""}`}
-            >
+            <CardContent className="flex flex-col gap-8">
                 <div>
                     <CardTitle className="text-3xl font-normal">
                         Secure your {networkName} account
@@ -134,9 +126,7 @@ export const SaveKeyStep = ({
                     </Label>
                 </div>
             </CardContent>
-            <CardFooter
-                className={`flex flex-1 justify-end ${footerClassName ?? ""}`}
-            >
+            <CardFooter className="flex flex-1 justify-end">
                 <CardAction>
                     <Button
                         type="button"

@@ -114,7 +114,11 @@ pub mod prompt {
     use crate::wasm::bindings::host::prompt::api as PromptApi;
     use psibase::fracpack::{Pack, UnpackOwned};
 
-    /// Retrieves the context data associated with the currently active prompt
+    /// Retrieves the context data associated with the currently active prompt.
+    ///
+    /// The caller must be the prompt's `prompt-app`, and the prompt must be within
+    /// the supervisor prompt page expiry window. Otherwise this traps.
+    /// Returns `None` when the prompt has no context.
     pub fn get_context<T: UnpackOwned>() -> Option<T> {
         PromptApi::get_context()
             .ok()

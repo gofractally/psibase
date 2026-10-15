@@ -35,7 +35,10 @@ export const ConnectPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
     const handleLogin = async (accountName: string) => {
         if (!isPrompt) return;
         try {
-            await connectAccountMutation.mutateAsync(accountName);
+            await connectAccountMutation.mutateAsync({
+                account: accountName,
+                login: true,
+            });
             prompt.finished();
         } catch (e) {
             console.error("Login failed");

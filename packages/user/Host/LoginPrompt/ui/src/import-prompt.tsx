@@ -63,7 +63,10 @@ export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
                 key: pemFormatted,
             });
             if (isPrompt) {
-                await connectAccountMutation.mutateAsync(account);
+                await connectAccountMutation.mutateAsync({
+                    account,
+                    login: true,
+                });
                 prompt.finished();
             } else {
                 navigate(-1);

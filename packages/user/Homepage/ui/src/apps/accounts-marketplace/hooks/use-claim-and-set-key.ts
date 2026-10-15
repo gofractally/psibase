@@ -12,7 +12,6 @@ export const useClaimAndSetKey = () => {
             toast: {
                 loading: "Claiming account...",
                 error: "Failed to claim account",
-                success: "Account claimed",
             },
         },
     );

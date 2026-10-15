@@ -6,6 +6,7 @@ type QueryKeyGenerator<Prefix extends string = string> = (
 const QueryKey = {
     getAllAccounts: () => ["getAllAccounts"] as const,
     canCreateAccount: () => ["canCreateAccount"] as const,
+    importNewPrompt: () => ["importNewPrompt"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;
