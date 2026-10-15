@@ -13,11 +13,20 @@ const IDB_NAME = "supervisor";
 const IDB_STORE = "device-storage";
 
 /**
- * Heuristic from MDN's rendering-engine UA table
- * (https://developer.mozilla.org/en-US/docs/Web/HTTP/Browser_detection_using_the_user_agent#rendering_engine):
- * WebKit sends AppleWebKit, Blink sends Chrome/. We exclude Chrome/,
- * Chromium/, and Edg/ so desktop Chromium is out while iOS browsers
- * (CriOS/FxiOS/EdgiOS) stay in.
+ * Heuristically detect WebKit.
+ *
+ * Both WebKit and Blink browsers advertise "AppleWebKit". Exclude Blink
+ * browsers using their Chrome/, Chromium/, or desktop Edge (Edg/) tokens.
+ *
+ * iOS browsers generally use different tokens (CriOS/, EdgiOS/, FxiOS/)
+ * or Safari-like user agents, so they remain included. This detects
+ * likely WebKit engines, not the Safari browser specifically.
+ *
+ * References:
+ * - https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Browser_detection_using_the_user_agent#rendering_engine
+ * - https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Browser_detection_using_the_user_agent#browser_name_and_version
+ * - https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/User-Agent
+ * - https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/User-Agent/Firefox#firefox_for_ios
  */
 function isWebKit(userAgent: string): boolean {
     return (
