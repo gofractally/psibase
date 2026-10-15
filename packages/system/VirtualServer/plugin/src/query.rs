@@ -106,10 +106,6 @@ pub fn billing_enabled() -> Result<bool, Error> {
     Ok(get_billing_config()?.enabled)
 }
 
-/// Whether `auto_fill_gas_tank` should inject a refill for `user`.
-///
-/// Refill is skipped when the user has no system-token balance, so networks
-/// where users do not hold the system token do not get a refill action.
 pub fn should_auto_refill_gas_tank(user: &str) -> Result<bool, Error> {
     let Some(sys_id) = TokensPlugin::helpers::fetch_network_token()? else {
         return Ok(false);
