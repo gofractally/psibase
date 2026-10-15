@@ -37,10 +37,10 @@ export const ImportNewPrompt = () => {
             </div>
             <CardContent className="pb-2">
                 <CardDescription>
+                    New account created on{" "}
                     <span className="text-foreground font-semibold">
                         {data.app}
-                    </span>{" "}
-                    created this account for you
+                    </span>
                 </CardDescription>
             </CardContent>
             <SaveAndConfirmKey
