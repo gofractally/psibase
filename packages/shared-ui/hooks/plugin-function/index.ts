@@ -5,7 +5,7 @@ import { UseMutationOptions } from "@tanstack/react-query";
 import { PluginCall } from "../../lib/plugins/lib/call-plugin-function";
 
 type Toast = {
-    success: string;
+    success?: string;
     error: string;
     loading: string;
 };

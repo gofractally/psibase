@@ -5,7 +5,6 @@ import { z } from "zod";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
-import { useImportExisting } from "@shared/hooks/use-import-existing";
 import { b64ToPem, validateB64 } from "@shared/lib/b64-key-utils";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
@@ -16,6 +15,8 @@ import {
     CardFooter,
     CardTitle,
 } from "@shared/shadcn/ui/card";
+
+import { useImportExisting } from "../../hooks/use-import-existing";
 
 interface ConfirmKeyStepProps {
     /** The account the user must re-enter to confirm they saved their credentials. */
@@ -28,15 +29,11 @@ interface ConfirmKeyStepProps {
     submitLabels?: [label: string, submittingLabel: string];
     mismatchMessage?: string;
     importErrorMessage?: string;
-    /** Extra classes for the content area (e.g. "px-0" inside a dialog). */
-    contentClassName?: string;
-    /** Extra classes for the footer area (e.g. "px-0" inside a dialog). */
-    footerClassName?: string;
 }
 
 /**
- * Step UI that asks the user to re-enter their new account name and private
- * key, then imports the credentials onto this device via the host login prompt.
+ * Asks the user to re-enter their new account name and private key, then
+ * imports the credentials onto this device.
  */
 export const ConfirmKeyStep = ({
     expectedAccount,
@@ -47,8 +44,6 @@ export const ConfirmKeyStep = ({
     submitLabels = ["Confirm", "Confirming..."],
     mismatchMessage = "Account name must match the account name you just created",
     importErrorMessage = "Error signing in. Check your private key and try again.",
-    contentClassName,
-    footerClassName,
 }: ConfirmKeyStepProps) => {
     const { data: networkName } = useBranding();
     const importExistingMutation = useImportExisting();
@@ -125,7 +120,7 @@ export const ConfirmKeyStep = ({
                 }}
                 className="flex flex-col gap-6"
             >
-                <CardContent className={`flex flex-col ${contentClassName ?? ""}`}>
+                <CardContent className="flex flex-col">
                     <div className="mb-6 flex-1 space-y-2">
                         <CardTitle className="text-3xl font-normal">
                             {title ?? "Sign in"}
@@ -165,7 +160,7 @@ export const ConfirmKeyStep = ({
                     </div>
                 </CardContent>
                 <CardFooter
-                    className={`mt-4 flex flex-1 ${onBack ? "justify-between" : "justify-end"} ${footerClassName ?? ""}`}
+                    className={`mt-4 flex flex-1 ${onBack ? "justify-between" : "justify-end"}`}
                 >
                     {onBack ? (
                         <CardAction>

@@ -3,6 +3,7 @@ package host:login-prompt;
 world impl {
     include host:client/imports;
     include host:accounts/imports;
+    include host:prompt/imports;
     import host:accounts/admin;
     include host:crypto/imports;
     include transact:plugin/imports;
@@ -14,6 +15,7 @@ world impl {
     import accounts:plugin/api;
     import invite:plugin/redemption;
 
+    export types;
     export api;
     export admin;
 }

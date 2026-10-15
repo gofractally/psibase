@@ -273,7 +273,7 @@ SCENARIO("Interactions with the Issuer NFT")
 
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      auto nft     = alice.to<Nft>().getNft(token.nft_id).returnVal();
+      auto nft     = alice.to<Nft>().getNft(token.nft_id).returnVal().value();
 
       a.setUserConf(Tokens::autoDebit, true);
       b.setUserConf(Tokens::autoDebit, true);
@@ -288,7 +288,7 @@ SCENARIO("Interactions with the Issuer NFT")
 
          THEN("The NFT is owned by Bob")
          {
-            auto newNft = alice.to<Nft>().getNft(token.nft_id).returnVal();
+            auto newNft = alice.to<Nft>().getNft(token.nft_id).returnVal().value();
             nft.owner   = bob.id;
             CHECK((newNft.id == nft.id && newNft.issuer == nft.issuer  //
                    && newNft.owner == nft.owner));
