@@ -1,5 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { siblingUrl } from "@psibase/common-lib";
+
+import { NetworkLogo } from "@shared/components/network-logo";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 
 import { AdminPage } from "./components/admin-page";
@@ -15,7 +18,11 @@ const STATUS_QUERY_KEY = ["status"];
 
 const Requests = () => {
     const queryClient = useQueryClient();
-    const { data: isOpen, isPending, isError } = useQuery({
+    const {
+        data: isOpen,
+        isPending,
+        isError,
+    } = useQuery({
         queryKey: STATUS_QUERY_KEY,
         queryFn: isRequestsOpen,
     });
@@ -52,13 +59,15 @@ const Visitor = () => {
     return <Requests />;
 };
 
-export const App = () => {
-    if (isAdminPath()) return <AdminPage />;
-    return (
-        <div className="flex min-h-dvh w-full items-center justify-center p-4">
-            <div className="w-full min-w-0">
-                <Visitor />
-            </div>
-        </div>
-    );
-};
+export const App = () => (
+    <>
+        <header className="bg-background/80 sticky top-0 z-10 flex h-16 shrink-0 items-center border-b px-4 backdrop-blur">
+            <NetworkLogo
+                onClick={() => {
+                    window.top!.location.href = siblingUrl();
+                }}
+            />
+        </header>
+        {isAdminPath() ? <AdminPage /> : <Visitor />}
+    </>
+);

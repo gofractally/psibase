@@ -1,13 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { siblingUrl } from "@psibase/common-lib";
 
-import { GlowingCard } from "@shared/components/glowing-card";
-import { NetworkLogo } from "@shared/components/network-logo";
 import { CopyButton } from "@shared/components/copy-button";
+import { PageContainer } from "@shared/components/page-container";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
-import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Switch } from "@shared/shadcn/ui/switch";
 import {
@@ -19,15 +16,14 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-import { PortalCard } from "./portal-card";
 import {
+    type FailedSignup,
     createAdminAccounts,
     getAdminConfig,
     getFailedSignups,
     getPortalStatus,
     loadCreatorKey,
     putRequestsEnabled,
-    type FailedSignup,
 } from "../lib/admin-api";
 import { PortalError } from "../lib/portal-api";
 
@@ -46,6 +42,22 @@ const formatUtc = (iso: string) => {
 const errorText = (error: unknown) =>
     error instanceof Error ? error.message : String(error);
 
+const errorMessage = (error: unknown) =>
+    error == null ? "Request failed" : errorText(error);
+
+const AdminSection = ({
+    title,
+    children,
+}: {
+    title: string;
+    children: React.ReactNode;
+}) => (
+    <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-medium">{title}</h2>
+        {children}
+    </section>
+);
+
 const ReadinessRow = ({
     label,
     ok,
@@ -58,9 +70,7 @@ const ReadinessRow = ({
     <div className="flex items-start justify-between gap-4 px-4 py-3">
         <div className="min-w-0">
             <div className="text-sm">{label}</div>
-            {!ok && (
-                <p className="text-muted-foreground text-sm">{unmet}</p>
-            )}
+            {!ok && <p className="text-muted-foreground text-sm">{unmet}</p>}
         </div>
         <span
             className={
@@ -81,8 +91,7 @@ const FailedRequests = ({
     rows: FailedSignup[] | undefined;
     error: unknown;
 }) => (
-    <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">Failed requests</h2>
+    <AdminSection title="Failed requests">
         <div className="rounded-lg border">
             {error ? (
                 <p className="text-destructive px-4 py-6 text-sm">
@@ -110,7 +119,7 @@ const FailedRequests = ({
                                     {formatUtc(row.created)}
                                 </TableCell>
                                 <TableCell>{row.attempts}</TableCell>
-                                <TableCell className="break-words whitespace-pre-wrap">
+                                <TableCell className="whitespace-pre-wrap break-words">
                                     {row.last_error}
                                 </TableCell>
                             </TableRow>
@@ -119,44 +128,41 @@ const FailedRequests = ({
                 </Table>
             )}
         </div>
-    </section>
+    </AdminSection>
 );
 
 const SignIn = () => {
     const connect = useConnectAccount();
     return (
-        <div className="flex min-h-dvh w-full items-center justify-center p-4">
-            <div className="w-full min-w-0">
-                <PortalCard>
-                    <CardContent className="flex flex-col gap-6">
-                        <CardTitle className="text-3xl font-normal">
-                            Sign in
-                        </CardTitle>
-                        <Button
-                            type="button"
-                            className="self-start"
-                            disabled={connect.isPending}
-                            onClick={() => connect.mutate()}
-                        >
-                            Node admin? Sign in
-                        </Button>
-                        {connect.error && (
-                            <p className="text-destructive text-sm">
-                                {errorText(connect.error)}
-                            </p>
-                        )}
-                    </CardContent>
-                </PortalCard>
-            </div>
-        </div>
+        <PageContainer className="space-y-6">
+            <h2 className="text-lg font-medium">Sign in</h2>
+            <Button
+                type="button"
+                disabled={connect.isPending}
+                onClick={() => connect.mutate()}
+            >
+                Node admin? Sign in
+            </Button>
+            {connect.error && (
+                <p className="text-destructive text-sm">
+                    {errorText(connect.error)}
+                </p>
+            )}
+        </PageContainer>
     );
 };
 
 const AdminLoading = () => (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
+    <PageContainer className="space-y-6">
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
-    </div>
+    </PageContainer>
+);
+
+const AdminError = ({ message }: { message: string }) => (
+    <PageContainer>
+        <p className="text-destructive text-sm">{message}</p>
+    </PageContainer>
 );
 
 export const AdminPage = () => {
@@ -214,21 +220,11 @@ export const AdminPage = () => {
     }
     if (config.error || !config.data || status.error || !status.data) {
         return (
-            <div className="flex min-h-dvh w-full items-center justify-center p-4">
-                <p className="text-destructive text-sm">
-                    {errorText(config.error ?? status.error)}
-                </p>
-            </div>
+            <AdminError message={errorMessage(config.error ?? status.error)} />
         );
     }
     if (creator.error || !creator.data) {
-        return (
-            <div className="flex min-h-dvh w-full items-center justify-center p-4">
-                <p className="text-destructive text-sm">
-                    {errorText(creator.error)}
-                </p>
-            </div>
-        );
+        return <AdminError message={errorMessage(creator.error)} />;
     }
 
     const enabled = requests.isPending
@@ -236,12 +232,13 @@ export const AdminPage = () => {
         : config.data.requests_enabled;
     const isProducer = Boolean(
         config.data.account &&
-            config.data.producer &&
-            config.data.account === config.data.producer,
+        config.data.producer &&
+        config.data.account === config.data.producer,
     );
     const creatorReady =
-        status.data.conditions.find((condition) => condition.id === "creator_ready")
-            ?.ok ?? false;
+        status.data.conditions.find(
+            (condition) => condition.id === "creator_ready",
+        )?.ok ?? false;
     const creatorFunded =
         status.data.conditions.find(
             (condition) => condition.id === "creator_funded",
@@ -249,130 +246,107 @@ export const AdminPage = () => {
     const pubkey = creator.data.pubkey ?? config.data.creator_pubkey ?? null;
 
     return (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
+        <PageContainer className="space-y-6">
             {!enabled && (
                 <Alert variant="warning">
                     <AlertDescription variant="warning">
-                        Account requests are disabled - No new user accounts
-                        can be created by this node.
+                        Account requests are disabled - No new user accounts can
+                        be created by this node.
                     </AlertDescription>
                 </Alert>
             )}
-            <GlowingCard>
-                <CardHeader className="-ml-2 -mt-2">
-                    <NetworkLogo
-                        onClick={() => {
-                            window.top!.location.href = siblingUrl();
-                        }}
-                    />
-                </CardHeader>
-                <CardContent className="flex flex-col gap-8">
-                    <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
-                        <div className="min-w-0">
-                            <div className="text-sm font-medium">
-                                Account requests
-                            </div>
-                            <p className="text-muted-foreground text-sm">
-                                Turning this off prevents users from creating
-                                new accounts.
-                            </p>
-                            {requests.error && (
-                                <p className="text-destructive mt-1 text-sm">
-                                    {errorText(requests.error)}
-                                </p>
-                            )}
-                        </div>
-                        <Switch
-                            checked={enabled}
-                            disabled={requests.isPending}
-                            onCheckedChange={(next) => requests.mutate(next)}
-                            aria-label="Account requests"
-                        />
-                    </div>
 
-                    <section className="flex flex-col gap-2">
-                        <h2 className="text-sm font-medium">Readiness</h2>
-                        <div className="divide-y rounded-lg border">
-                            <ReadinessRow
-                                label="Admin accounts created"
-                                ok={creatorReady}
-                                unmet="Create admin accounts below."
-                            />
-                            {status.data.billing_enabled && (
-                                <ReadinessRow
-                                    label="ac-creator funded"
-                                    ok={creatorFunded}
-                                    unmet="Needs funds."
-                                />
-                            )}
-                        </div>
-                        {!status.data.billing_enabled && (
-                            <p className="text-muted-foreground text-sm">
-                                Billing is off. New accounts aren&apos;t
-                                funded.
+            <AdminSection title="Account requests">
+                <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+                    <div className="min-w-0">
+                        <p className="text-muted-foreground text-sm">
+                            Turning this off prevents users from creating new
+                            accounts.
+                        </p>
+                        {requests.error && (
+                            <p className="text-destructive mt-1 text-sm">
+                                {errorText(requests.error)}
                             </p>
                         )}
-                    </section>
-
-                    <section className="flex flex-col gap-2">
-                        <h2 className="text-sm font-medium">ac-creator</h2>
-                        <div className="flex flex-col gap-4 rounded-lg border px-4 py-3">
-                            {pubkey && (
-                                <div className="flex items-start gap-2">
-                                    <div className="min-w-0 flex-1">
-                                        <div className="text-muted-foreground text-xs">
-                                            Public key
-                                        </div>
-                                        <p className="whitespace-pre-wrap font-mono text-xs">
-                                            {pubkey}
-                                        </p>
-                                    </div>
-                                    <CopyButton
-                                        text={pubkey}
-                                        ariaLabel="Copy ac-creator public key"
-                                    />
-                                </div>
-                            )}
-                            {!creator.data.accountExists && (
-                                <Button
-                                    type="button"
-                                    className="self-start"
-                                    disabled={
-                                        !isProducer ||
-                                        create.isPending ||
-                                        !pubkey
-                                    }
-                                    onClick={() => {
-                                        if (
-                                            pubkey &&
-                                            config.data.producer
-                                        ) {
-                                            create.mutate({
-                                                pubkeyPem: pubkey,
-                                                owner: config.data.producer,
-                                                allowed: config.data
-                                                    .creator_allowed,
-                                            });
-                                        }
-                                    }}
-                                >
-                                    Create admin accounts
-                                </Button>
-                            )}
-                            {create.error && (
-                                <p className="text-destructive text-sm">
-                                    {errorText(create.error)}
-                                </p>
-                            )}
-                        </div>
-                    </section>
-
-                    <FailedRequests
-                        rows={failed.data}
-                        error={failed.error}
+                    </div>
+                    <Switch
+                        checked={enabled}
+                        disabled={requests.isPending}
+                        onCheckedChange={(next) => requests.mutate(next)}
+                        aria-label="Account requests"
                     />
-                </CardContent>
-            </GlowingCard>
-        </div>
+                </div>
+            </AdminSection>
+
+            <AdminSection title="Readiness">
+                <div className="divide-y rounded-lg border">
+                    <ReadinessRow
+                        label="Admin accounts created"
+                        ok={creatorReady}
+                        unmet="Create admin accounts below."
+                    />
+                    {status.data.billing_enabled && (
+                        <ReadinessRow
+                            label="ac-creator funded"
+                            ok={creatorFunded}
+                            unmet="Needs funds."
+                        />
+                    )}
+                </div>
+                {!status.data.billing_enabled && (
+                    <p className="text-muted-foreground text-sm">
+                        Billing is off. New accounts aren&apos;t funded.
+                    </p>
+                )}
+            </AdminSection>
+
+            <AdminSection title="ac-creator">
+                <div className="flex flex-col gap-4 rounded-lg border px-4 py-3">
+                    {pubkey && (
+                        <div className="flex items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                                <div className="text-muted-foreground text-xs">
+                                    Public key
+                                </div>
+                                <p className="whitespace-pre-wrap font-mono text-xs">
+                                    {pubkey}
+                                </p>
+                            </div>
+                            <CopyButton
+                                text={pubkey}
+                                ariaLabel="Copy ac-creator public key"
+                            />
+                        </div>
+                    )}
+                    {!creator.data.accountExists && (
+                        <Button
+                            type="button"
+                            className="self-start"
+                            disabled={
+                                !isProducer || create.isPending || !pubkey
+                            }
+                            onClick={() => {
+                                if (pubkey && config.data.producer) {
+                                    create.mutate({
+                                        pubkeyPem: pubkey,
+                                        owner: config.data.producer,
+                                        allowed: config.data.creator_allowed,
+                                    });
+                                }
+                            }}
+                        >
+                            Create admin accounts
+                        </Button>
+                    )}
+                    {create.error && (
+                        <p className="text-destructive text-sm">
+                            {errorText(create.error)}
+                        </p>
+                    )}
+                </div>
+            </AdminSection>
+
+            <FailedRequests rows={failed.data} error={failed.error} />
+        </PageContainer>
     );
 };

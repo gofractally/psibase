@@ -1,22 +1,18 @@
 import { siblingUrl } from "@psibase/common-lib";
 
+import { PageContainer } from "@shared/components/page-container";
 import { Button } from "@shared/shadcn/ui/button";
-import { CardContent, CardFooter, CardTitle } from "@shared/shadcn/ui/card";
-
-import { PortalCard } from "./portal-card";
 
 export const DoneStep = ({ account }: { account: string }) => (
-    <PortalCard progress={100}>
-        <CardContent>
-            <CardTitle className="text-3xl font-normal">
-                <span className="font-semibold">{account}</span> has been
-                imported on this device.
-            </CardTitle>
-        </CardContent>
-        <CardFooter className="flex flex-1 justify-end">
+    <PageContainer className="space-y-6">
+        <h2 className="text-lg font-medium">
+            <span className="font-semibold">{account}</span> has been imported
+            on this device.
+        </h2>
+        <div className="flex justify-end">
             <Button asChild>
                 <a href={siblingUrl()}>Go to Homepage</a>
             </Button>
-        </CardFooter>
-    </PortalCard>
+        </div>
+    </PageContainer>
 );

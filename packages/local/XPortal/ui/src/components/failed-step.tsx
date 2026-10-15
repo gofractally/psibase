@@ -1,22 +1,17 @@
+import { PageContainer } from "@shared/components/page-container";
 import { Button } from "@shared/shadcn/ui/button";
-import { CardContent, CardFooter, CardTitle } from "@shared/shadcn/ui/card";
-
-import { PortalCard } from "./portal-card";
 
 export const FailedStep = ({ onBack }: { onBack?: () => void }) => (
-    <PortalCard>
-        <CardContent>
-            <CardTitle className="text-3xl font-normal">
-                This node is having a problem right now, please try again
-                later.
-            </CardTitle>
-        </CardContent>
+    <PageContainer className="space-y-6">
+        <h2 className="text-lg font-medium">
+            This node is having a problem right now, please try again later.
+        </h2>
         {onBack && (
-            <CardFooter className="flex flex-1 justify-end">
+            <div className="flex justify-end">
                 <Button type="button" variant="outline" onClick={onBack}>
                     Back
                 </Button>
-            </CardFooter>
+            </div>
         )}
-    </PortalCard>
+    </PageContainer>
 );

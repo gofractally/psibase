@@ -2,20 +2,14 @@ import { Check } from "lucide-react";
 import { useState } from "react";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { PageContainer } from "@shared/components/page-container";
 import { isAccountAvailable } from "@shared/lib/get-account";
 import {
     MIN_FREE_ACCOUNT_NAME_LENGTH,
     zAccountFree,
 } from "@shared/lib/schemas/account";
-import {
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
-import { PortalCard } from "./portal-card";
 import { PortalError } from "../lib/portal-api";
 import { type SignupRequest, startSignup } from "../lib/signup-request";
 
@@ -95,42 +89,38 @@ export const NameStep = ({
     );
 
     return (
-        <PortalCard progress={25}>
+        <PageContainer className="space-y-6">
+            <div>
+                <h2 className="text-lg font-medium">Request a free account</h2>
+                <p className="text-muted-foreground text-sm">
+                    Choose an account name (8–10 characters). Use lowercase
+                    letters, numbers, and hyphens.
+                </p>
+            </div>
             <form.AppForm>
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
                         void form.handleSubmit();
                     }}
-                    className="flex flex-col gap-6"
+                    className="space-y-6"
                 >
-                    <CardContent className="flex flex-col">
-                        <div className="mb-6 flex-1 space-y-2">
-                            <CardTitle className="text-3xl font-normal">
-                                Request a free account
-                            </CardTitle>
-                            <CardDescription>
-                                Choose an account name (8–10 characters). Use
-                                lowercase letters, numbers, and hyphens.
-                            </CardDescription>
-                        </div>
-                        <form.AppField
-                            name="account"
-                            asyncDebounceMs={500}
-                            validators={{ onChangeAsync: checkName }}
-                            children={(field) => (
-                                <field.TextField
-                                    label="Account name"
-                                    autoComplete="off"
-                                    autoCorrect="off"
-                                    autoCapitalize="off"
-                                    spellCheck={false}
-                                    endContent={nameStatus}
-                                />
-                            )}
-                        />
-                    </CardContent>
-                    <CardFooter className="flex flex-1 justify-end">
+                    <form.AppField
+                        name="account"
+                        asyncDebounceMs={500}
+                        validators={{ onChangeAsync: checkName }}
+                        children={(field) => (
+                            <field.TextField
+                                label="Account name"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                spellCheck={false}
+                                endContent={nameStatus}
+                            />
+                        )}
+                    />
+                    <div className="flex justify-end">
                         <form.Subscribe
                             selector={(state) =>
                                 !state.isFieldsValidating &&
@@ -144,9 +134,9 @@ export const NameStep = ({
                                 />
                             )}
                         </form.Subscribe>
-                    </CardFooter>
+                    </div>
                 </form>
             </form.AppForm>
-        </PortalCard>
+        </PageContainer>
     );
 };
