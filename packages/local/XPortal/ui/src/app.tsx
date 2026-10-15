@@ -1,0 +1,48 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+
+import { DoneStep } from "./components/done-step";
+import { FailedStep } from "./components/failed-step";
+import { Loader } from "./components/loader";
+import { NotOpen } from "./components/not-open";
+import { RequestWizard } from "./components/request-wizard";
+import { hasReturnedFromImport } from "./lib/import-return";
+import { isRequestsOpen } from "./lib/portal-api";
+
+const STATUS_QUERY_KEY = ["status"];
+
+const Requests = () => {
+    const queryClient = useQueryClient();
+    const { data: isOpen, isPending, isError } = useQuery({
+        queryKey: STATUS_QUERY_KEY,
+        queryFn: isRequestsOpen,
+    });
+
+    if (isPending) return <Loader />;
+    if (isError) return <FailedStep />;
+    if (!isOpen) return <NotOpen />;
+    return (
+        <RequestWizard
+            onClosed={() =>
+                void queryClient.invalidateQueries({
+                    queryKey: STATUS_QUERY_KEY,
+                })
+            }
+        />
+    );
+};
+
+export const App = () => {
+    const returnedFromImport = hasReturnedFromImport();
+    const { data: currentUser, isPending } = useCurrentUser({
+        enabled: returnedFromImport,
+    });
+
+    if (returnedFromImport && isPending) return <Loader />;
+    if (returnedFromImport && currentUser) {
+        return <DoneStep account={currentUser} />;
+    }
+    // With no one logged in (e.g. a revisited `?imported` link after logout), start a new request.
+    return <Requests />;
+};

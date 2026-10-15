@@ -1259,8 +1259,9 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPortal-schema.json
         FLAGS isPrivileged
         SERVER x-portal
-    DEPENDS wasm
-    PACKAGE_DEPENDS XKeys XTimer XHttp XAdmin
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XPortal/ui/dist/* /
+    DEPENDS wasm ${XPortal_js_DEP}
+    PACKAGE_DEPENDS XKeys XTimer XHttp XSites XAdmin XCommonApi
 )
 
 psibase_package(
