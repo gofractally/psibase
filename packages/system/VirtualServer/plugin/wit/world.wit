@@ -110,8 +110,8 @@ interface admin {
     /// Register or update the caller as a resource provider.
     ///
     /// Parameters:
-    /// * `app` - Node-local payment app account (must start with `x-`)
-    /// * `accepted` - Currencies accepted for resource payment (free-form, non-empty)
+    /// * `app` - App subdomain local to this node (begins with `x-`)
+    /// * `accepted` - Currency codes (non-empty). Each is stored lowercase and must be a valid account name.
     reg-res-provider: func(app: string, accepted: list<string>) -> result<_, error>;
 
     /// Remove the caller's resource provider registration, if any.

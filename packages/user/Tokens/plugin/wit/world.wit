@@ -175,7 +175,7 @@ interface helpers {
     /// Fetches primary token balances for a user.
     get-user-balances: func(user: string) -> result<list<user-balance>, error>;
 
-    /// Returns `true` if the token is transferable (not marked untransferable).
+    /// Returns `true` if the token is transferable.
     is-token-transferable: func(token-id: u32) -> result<bool, error>;
 
     /// Uses the precision of the specified token to convert from a token

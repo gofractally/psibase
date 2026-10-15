@@ -48,6 +48,17 @@ impl ResourceProvider {
             !accepted.is_empty(),
             "accepted currencies must be non-empty"
         );
+        let accepted: Vec<String> = accepted
+            .into_iter()
+            .map(|code| {
+                let lower = code.to_ascii_lowercase();
+                assert!(
+                    AccountNumber::from_exact(&lower).is_ok(),
+                    "accepted currency must be a valid account name: {code}"
+                );
+                lower
+            })
+            .collect();
 
         ResourceProviderTable::read_write()
             .put(&ResourceProvider {

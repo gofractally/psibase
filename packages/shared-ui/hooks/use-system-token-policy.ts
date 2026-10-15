@@ -15,9 +15,9 @@ interface TokenSettingsResponse {
 }
 
 /**
- * Private network: billing is enabled and the system token is not transferable.
+ * Billing is enabled and the system token is not transferable.
  */
-export const useIsPrivateNetwork = () => {
+export const useSystemTokenPolicy = () => {
     const {
         data: billingConfig,
         isLoading: isLoadingBilling,
@@ -49,11 +49,11 @@ export const useIsPrivateNetwork = () => {
 
     const billingEnabled = !!billingConfig?.enabled;
     const isTransferable = transferableQuery.data;
-    const isPrivateNetwork =
+    const systemTokenUntransferable =
         billingEnabled && isTransferable === false;
 
     return {
-        isPrivateNetwork,
+        systemTokenUntransferable,
         billingEnabled,
         isTransferable,
         isLoading:

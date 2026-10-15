@@ -1,6 +1,6 @@
-use crate::Error;
 use crate::bindings::tokens::plugin as TokensPlugin;
 use crate::errors::ErrorType;
+use crate::Error;
 use psibase::services::tokens::Decimal;
 use psibase_plugin::host::server;
 use serde::Deserialize;
@@ -106,15 +106,19 @@ pub fn billing_enabled() -> Result<bool, Error> {
     Ok(get_billing_config()?.enabled)
 }
 
-/// Private network: billing is enabled and the system token is not transferable.
-pub fn is_private_network() -> Result<bool, Error> {
-    if !billing_enabled()? {
-        return Ok(false);
-    }
-
+/// Whether `auto_fill_gas_tank` should inject a refill for `user`.
+///
+/// Refill is skipped when the user has no system-token balance, so networks
+/// where users do not hold the system token do not get a refill action.
+pub fn should_auto_refill_gas_tank(user: &str) -> Result<bool, Error> {
     let Some(sys_id) = TokensPlugin::helpers::fetch_network_token()? else {
         return Ok(false);
     };
 
-    Ok(!TokensPlugin::helpers::is_token_transferable(sys_id)?)
+    let balances = TokensPlugin::helpers::get_user_balances(user)?;
+    let Some(row) = balances.into_iter().find(|row| row.token_id == sys_id) else {
+        return Ok(false);
+    };
+
+    Ok(TokensPlugin::helpers::decimal_to_u64(sys_id, &row.balance)? > 0)
 }

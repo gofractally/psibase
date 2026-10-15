@@ -46,7 +46,7 @@ export const ResourceProviders = () => {
         currentUser && producerAccounts?.includes(currentUser),
     );
     const existing = useMemo(
-        () => providers?.find((row) => row.producer === currentUser),
+        () => providers?.find((row) => row.provider === currentUser),
         [providers, currentUser],
     );
 
@@ -56,12 +56,13 @@ export const ResourceProviders = () => {
     useEffect(() => {
         if (existing) {
             setApp(existing.app);
-            setAccepted(existing.accepted.join(", "));
+            setAccepted(
+                existing.accepted.map((code) => code.toUpperCase()).join(", "),
+            );
         }
     }, [existing]);
 
-    const isLoading =
-        candidatesLoading || providersLoading || producersLoading;
+    const isLoading = candidatesLoading || providersLoading || producersLoading;
 
     // Same gates as the disabled inputs — keep reason and canSubmit in lockstep.
     const submitBlockReason = !currentUser
@@ -140,7 +141,11 @@ export const ResourceProviders = () => {
                                 <span className="font-medium">
                                     {existing.app}
                                 </span>{" "}
-                                ({existing.accepted.join(", ")})
+                                (
+                                {existing.accepted
+                                    .map((code) => code.toUpperCase())
+                                    .join(", ")}
+                                )
                             </p>
                         )}
 
@@ -193,7 +198,9 @@ export const ResourceProviders = () => {
                                     }
                                 />
                                 <p className="text-muted-foreground text-xs">
-                                    Comma-separated list. Values are free-form.
+                                    Comma-separated list. Each code must be a
+                                    valid account name (up to 10 letters,
+                                    digits, or hyphens).
                                 </p>
                             </div>
 
