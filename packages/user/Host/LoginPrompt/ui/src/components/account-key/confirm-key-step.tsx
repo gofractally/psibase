@@ -48,27 +48,6 @@ export const ConfirmKeyStep = ({
     const { data: networkName } = useBranding();
     const importExistingMutation = useImportExisting();
 
-    const handleImport = async (account: string, b64: string) => {
-        const pemFormatted = b64ToPem(b64);
-
-        try {
-            await importExistingMutation.mutateAsync({
-                account: account,
-                key: pemFormatted,
-            });
-            await onImported(account);
-        } catch (e) {
-            console.error("Import and login failed");
-            console.error(e);
-            form.setFieldMeta("privateKey", (prev) => ({
-                ...prev,
-                isTouched: true,
-                errors: [importErrorMessage],
-                errorMap: { onSubmit: importErrorMessage },
-            }));
-        }
-    };
-
     const form = useAppForm({
         defaultValues: {
             account: {
@@ -109,6 +88,27 @@ export const ConfirmKeyStep = ({
             );
         },
     });
+
+    const handleImport = async (account: string, b64: string) => {
+        const pemFormatted = b64ToPem(b64);
+
+        try {
+            await importExistingMutation.mutateAsync({
+                account: account,
+                key: pemFormatted,
+            });
+            await onImported(account);
+        } catch (e) {
+            console.error("Import and login failed");
+            console.error(e);
+            form.setFieldMeta("privateKey", (prev) => ({
+                ...prev,
+                isTouched: true,
+                errors: [importErrorMessage],
+                errorMap: { onSubmit: importErrorMessage },
+            }));
+        }
+    };
 
     return (
         <form.AppForm>
