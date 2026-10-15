@@ -27,7 +27,6 @@ pub struct PsibaseMetadata {
     package_name: Option<String>,
     scope: Option<String>,
     server: Option<String>,
-    // Rejected when set. Authors list crates in `plugins`.
     plugin: Option<String>,
     plugins: Vec<String>,
     flags: Vec<String>,
@@ -234,7 +233,6 @@ fn component_package_id(package: &Package) -> Result<&str, anyhow::Error> {
     }
 }
 
-/// `<namespace>:<name>` is served at `/<name>.wasm`. The name is copied as written.
 fn plugin_serve_path(plugin_crate: &str, component_package: &str) -> Result<String, anyhow::Error> {
     let valid = match component_package.split_once(':') {
         Some((namespace, name))

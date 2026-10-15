@@ -56,7 +56,7 @@ description = "A service to be included in the package"
 flags = []
 # This service handles its own HTTP requests
 server = "service1"
-# Plugin for the front end. With component package `service1:plugin`, this is served at `/plugin.wasm`.
+# Plugin for the front end
 plugins = ["service1-plugin"]
 # Upload the UI
 data = [{src = "../ui/dist", dst = "/"}]
