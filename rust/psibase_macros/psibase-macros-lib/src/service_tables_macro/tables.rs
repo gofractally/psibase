@@ -114,7 +114,7 @@ pub fn process_service_tables(
     table_record_struct_name: &Ident,
     items: &mut Vec<Item>,
     table_idxs: &Vec<usize>,
-    table_names: &mut Vec<(proc_macro2::TokenStream, proc_macro2::TokenStream)>,
+    table_names: &mut Vec<(u16, proc_macro2::TokenStream, proc_macro2::TokenStream)>,
 ) -> Result<u16, ()> {
     let mut pk_data: Option<PkIdentData> = None;
     let mut secondary_keys = Vec::new();
@@ -258,7 +258,11 @@ pub fn process_service_tables(
         (table_name, table_record_struct_name.clone())
     };
 
-    table_names.push((quote! { #table_name_id }, quote! { #record_name_id }));
+    table_names.push((
+        table_options.index,
+        quote! { #table_name_id },
+        quote! { #record_name_id },
+    ));
 
     // TODO: This specific naming convention is a bit of a hack. Figure out a way of using an associated type
     let table_record_type_id = Ident::new(
