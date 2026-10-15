@@ -5,27 +5,38 @@ import { NAME_EVENTS_EXISTENCE_PAGE_SIZE } from "@/apps/accounts-marketplace/lib
 
 import { useAccountMarkets } from "@shared/hooks/use-account-markets";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import { hasActiveAccountMarket } from "@shared/lib/schemas/account-markets";
 
 export function useAccountMarketplaceVisibility(): SidebarVisibility {
+    const { data: systemToken, isPending: isPendingToken } = useSystemToken();
+    const premiumBlocked = systemToken?.untransferable === true;
+
     const { data: currentUser, isPending: isPendingUser } = useCurrentUser();
     const {
         data: markets,
         isPending: isPendingMarkets,
         isSuccess: isSuccessMarkets,
-    } = useAccountMarkets();
+    } = useAccountMarkets({
+        enabled: !isPendingToken && !premiumBlocked,
+    });
     const isMarketEnabled = hasActiveAccountMarket(markets);
 
     const { data: history, isLoading: isLoadingHistory } = useNameEvents(
         currentUser,
         {
             first: NAME_EVENTS_EXISTENCE_PAGE_SIZE,
-            enabled: isSuccessMarkets && !isMarketEnabled,
+            enabled:
+                !premiumBlocked && isSuccessMarkets && !isMarketEnabled,
         },
     );
 
-    if (isPendingMarkets) {
+    if (isPendingToken || (!premiumBlocked && isPendingMarkets)) {
         return { visible: false, isLoading: true }; // loading
+    }
+
+    if (premiumBlocked) {
+        return { visible: false, isLoading: false };
     }
 
     if (isMarketEnabled) {
