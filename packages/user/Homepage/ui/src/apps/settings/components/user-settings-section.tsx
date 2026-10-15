@@ -14,19 +14,28 @@ import {
 import { useUserResources } from "../hooks/use-user-resources";
 import { GasTank } from "./gas-tank";
 
-export const UserSettingsSection = () => {
+interface UserSettingsSectionProps {
+    /** When true, show the meter but disable refill and resize. */
+    readOnly?: boolean;
+    /** Shown in place of the default explanation when `readOnly` is set. */
+    disabledMessage?: string;
+}
+
+export const UserSettingsSection = ({
+    readOnly = false,
+    disabledMessage,
+}: UserSettingsSectionProps) => {
     const { data: currentUser } = useCurrentUser();
     const { data: billingConfig, isLoading: isLoadingBillingConfig } =
         useBillingConfig();
-    const billingInited =
-        !isLoadingBillingConfig && !!billingConfig?.feeReceiver;
+    const billingEnabled = !isLoadingBillingConfig && !!billingConfig?.enabled;
     const { data: systemToken, isLoading: isLoadingToken } = useSystemToken();
     const {
         data: userResources,
         isLoading: isLoadingResources,
         isError: isUserResourcesError,
         error: userResourcesError,
-    } = useUserResources(currentUser, { enabled: billingInited });
+    } = useUserResources(currentUser, { enabled: billingEnabled });
     const { mutateAsync: fillGasTank, isPending: isFilling } = useFillGasTank();
     const {
         mutateAsync: resizeAndFillGasTank,
@@ -82,12 +91,19 @@ export const UserSettingsSection = () => {
         }
     };
 
-    const isDisabled = !billingInited || isPending || isLoadingResources;
+    const isDisabled =
+        readOnly || !billingEnabled || isPending || isLoadingResources;
 
     return (
         <div className="space-y-6">
             <div>
                 <h2 className="mb-2 text-2xl font-bold">Resources</h2>
+                {readOnly && (
+                    <p className="text-muted-foreground text-sm">
+                        {disabledMessage ??
+                            "Resource self-service isn't available on this network. Purchase resources from a provider (just below)."}
+                    </p>
+                )}
             </div>
 
             <div className="flex items-stretch gap-6">

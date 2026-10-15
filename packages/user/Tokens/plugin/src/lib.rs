@@ -21,6 +21,7 @@ pub mod query {
     pub mod fetch_token;
     pub mod get_system_token;
     pub mod get_user_balances;
+    pub mod is_token_transferable;
 }
 
 struct TokensPlugin;
@@ -132,7 +133,7 @@ impl Helpers for TokensPlugin {
         }))
     }
 
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "host", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "vserver", "host", "config"])]
     fn get_user_balances(user: String) -> Result<Vec<Exports::types::UserBalance>, Error> {
         Ok(query::get_user_balances::get_user_balances(&user)?
             .into_iter()
@@ -144,6 +145,13 @@ impl Helpers for TokensPlugin {
                 account: balance.account,
             })
             .collect())
+    }
+
+    #[psibase_plugin::authorized(None)]
+    fn is_token_transferable(token_id: u32) -> Result<bool, Error> {
+        Ok(query::is_token_transferable::is_token_transferable(
+            token_id,
+        )?)
     }
 
     #[psibase_plugin::authorized(None)]

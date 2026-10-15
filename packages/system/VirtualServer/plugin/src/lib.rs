@@ -112,6 +112,26 @@ impl Admin for VirtualServerPlugin {
 
         Ok(())
     }
+
+    fn reg_res_provider(app: String, accepted: Vec<String>) -> Result<(), Error> {
+        let sender = host::client::get_sender();
+        assert!(
+            sender == "config" || sender == host::client::get_receiver(),
+            "reg_res_provider can only be called by config or self"
+        );
+        VirtualServer::add_to_tx().reg_res_provider(app, accepted);
+        Ok(())
+    }
+
+    fn unreg_res_provider() -> Result<(), Error> {
+        let sender = host::client::get_sender();
+        assert!(
+            sender == "config" || sender == host::client::get_receiver(),
+            "unreg_res_provider can only be called by config or self"
+        );
+        VirtualServer::add_to_tx().unreg_res_provider();
+        Ok(())
+    }
 }
 
 // Refills to the specified capacity, or if not specified, to the user's current
@@ -217,6 +237,10 @@ impl TransactInterface for VirtualServerPlugin {
 
         let user = HostAccounts::api::get_current_user();
         if !query::billing_enabled()? || user.is_none() || user.unwrap() != account {
+            return Ok(());
+        }
+
+        if !query::should_auto_refill_gas_tank(&account)? {
             return Ok(());
         }
 
