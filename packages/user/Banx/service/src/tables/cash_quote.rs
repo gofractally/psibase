@@ -96,6 +96,9 @@ impl CashQuote {
     }
 
     /// Poster's sub-account → `to` (via Banx primary).
+    ///
+    /// `credit` is not delivery. Without auto-debit the tokens sit in a shared
+    /// balance, and a later reject leaves them in Banx's primary balance.
     pub fn pay_tokens(
         poster: AccountNumber,
         to: AccountNumber,
@@ -103,8 +106,15 @@ impl CashQuote {
         amount: Quantity,
         memo: &str,
     ) {
+        let tokens = Tokens::call();
+        let before = tokens.getBalance(token_id, to);
         Self::from_sub(poster, token_id, amount);
-        Tokens::call().credit(token_id, to, amount, Self::token_memo(memo));
+        tokens.credit(token_id, to, amount, Self::token_memo(memo));
+        let after = tokens.getBalance(token_id, to);
+        assert!(
+            after - before == amount,
+            "token credit was not delivered; recipient must enable auto-debit"
+        );
     }
 
     fn spend(&mut self, amount: Quantity) {

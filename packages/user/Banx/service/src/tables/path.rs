@@ -37,8 +37,8 @@ pub(crate) fn execute_path(
     let mut path_debtor = sender;
     let mut forward = amount;
     let mut prev_asset = hops[0].asset_id;
-    // Search will not route the same account twice in one asset. A submitted
-    // path must not either, or one payment can draw that line again.
+    // Search will not route the sender, or the same account twice in one asset.
+    // A submitted path must not either, or one payment draws that party again.
     let mut seen: Vec<(AccountNumber, u16)> = Vec::new();
 
     for (i, hop) in hops.into_iter().enumerate() {
@@ -47,6 +47,10 @@ pub(crate) fn execute_path(
             asset_id,
         } = hop;
         assert!(next_creditor != path_debtor, "path cannot draw on self");
+        assert!(
+            next_creditor != sender,
+            "path cannot route back through the sender"
+        );
         assert!(
             !seen.contains(&(next_creditor, asset_id)),
             "path cannot revisit an account in the same asset"

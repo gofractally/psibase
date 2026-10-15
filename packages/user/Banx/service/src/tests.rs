@@ -2247,7 +2247,11 @@ mod tests {
         chain.new_account(isabelle).unwrap();
 
         let weetbix = Wrapper::push_from(&chain, john)
-            .add_asset(account!("weetbix"), Precision::new(0).unwrap(), "biscuit".into())
+            .add_asset(
+                account!("weetbix"),
+                Precision::new(0).unwrap(),
+                "biscuit".into(),
+            )
             .get()?;
         // Precision 1: 80.0g is 800 raw units.
         let coffee = Wrapper::push_from(&chain, john)
@@ -2306,19 +2310,16 @@ mod tests {
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
 
         Wrapper::push_from(&chain, isabelle)
-            .convert(
-                john,
-                coffee,
-                aud,
-                Quantity::new(800),
-                Quantity::new(40_000),
-            )
+            .convert(john, coffee, aud, Quantity::new(800), Quantity::new(40_000))
             .get()?;
         assert_eq!(exp(&chain, isabelle, john, coffee), 0);
         assert_eq!(exp(&chain, isabelle, john, aud), 40_000);
         assert_eq!(exp(&chain, isabelle, john, weetbix), 9);
         assert_eq!(
-            CurrencyPolicy::get(john, coffee, aud).unwrap().remaining.value,
+            CurrencyPolicy::get(john, coffee, aud)
+                .unwrap()
+                .remaining
+                .value,
             0
         );
         let aud_claim = Obligation::get_by_interest_rate(isabelle, john, aud, 0).unwrap();
@@ -2361,7 +2362,15 @@ mod tests {
             .st_crd_lne(john, merlo, grams, false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, isabelle)
-            .st_cur_pol(merlo, aud, Quantity::new(0), RATE_SCALE * 50, 0, grams, never())
+            .st_cur_pol(
+                merlo,
+                aud,
+                Quantity::new(0),
+                RATE_SCALE * 50,
+                0,
+                grams,
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, isabelle)
             .st_fwd_ofr(michelle, aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
@@ -5322,6 +5331,92 @@ mod tests {
         Ok(())
     }
 
+    /// A cash-out that the taker has not auto-debited must not book the claim.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_cash_out_requires_delivered_tokens(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let gas = mint_gas(&chain, bob, bob, 1_000_000);
+        fund_vault(&chain, bob, gas, 500_000);
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(100_000), true, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_csh_qte(
+                usd,
+                gas,
+                true,
+                0.into(),
+                RATE_SCALE,
+                Quantity::new(100_000),
+                never(),
+            )
+            .get()?;
+
+        let err = Wrapper::push_from(&chain, alice)
+            .cash_out(
+                bob,
+                usd,
+                gas,
+                Quantity::new(100_000),
+                Quantity::new(100_000),
+            )
+            .get()
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("token credit was not delivered"),
+            "got {err}"
+        );
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        assert_eq!(token_balance(&chain, gas, alice), 0);
+        assert_eq!(vault_bal(&chain, bob, gas), 500_000);
+        assert_eq!(
+            CreditLine::get_assert(bob, alice, usd).remaining.value,
+            100_000
+        );
+        assert_eq!(
+            CashQuote::get_assert(bob, usd, gas, true).remaining.value,
+            100_000
+        );
+        Ok(())
+    }
+
+    /// Withdrawing the vault without auto-debit must leave the vault in place.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_cash_withdraw_requires_delivered_tokens(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let bob = account!("bob");
+        chain.new_account(bob).unwrap();
+        let gas = mint_gas(&chain, bob, bob, 1_000_000);
+        fund_vault(&chain, bob, gas, 400_000);
+        psibase::services::tokens::Wrapper::push_from(&chain, bob)
+            .setUserConf(
+                psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+                false,
+            )
+            .get()?;
+
+        let err = Wrapper::push_from(&chain, bob)
+            .csh_wd(gas, Quantity::new(400_000))
+            .get()
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("token credit was not delivered"),
+            "got {err}"
+        );
+        assert_eq!(vault_bal(&chain, bob, gas), 400_000);
+        assert_eq!(token_balance(&chain, gas, bob), 600_000);
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_cash_james_friends(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -6798,6 +6893,51 @@ mod tests {
         Ok(())
     }
 
+    /// A round trip through the sender must not burn a depleting line.
+    ///
+    /// Carol's global forward unwinds the draw, so the books would net to
+    /// zero while `remaining` stayed spent.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_path_cannot_round_trip_through_sender(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let carol = account!("carol");
+        chain.new_account(alice).unwrap();
+        chain.new_account(carol).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, carol)
+            .st_crd_lne(alice, usd, Quantity::new(100), true, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        let err = Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(carol, usd), hop(alice, usd)],
+                Quantity::new(100),
+                Quantity::new(0),
+                0,
+            )
+            .get()
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("path cannot route back through the sender"),
+            "got {err}"
+        );
+        assert_eq!(exp(&chain, carol, alice, usd), 0);
+        assert_eq!(exp(&chain, alice, carol, usd), 0);
+        assert_eq!(
+            CreditLine::get_assert(carol, alice, usd).remaining.value,
+            100
+        );
+        Ok(())
+    }
+
     /// A cycle that returns to the payer is not one authorized period.
     ///
     /// `max_spend` is the most that period may draw the payer. Repeating
@@ -6858,6 +6998,87 @@ mod tests {
         assert_eq!(
             CreditLine::get_assert(bob, alice, usd).remaining.value,
             AMOUNT * 2
+        );
+        Ok(())
+    }
+
+    /// `[Carol, Dave, Alice, Bob]` does not repeat a creditor, but it draws
+    /// the payer onto Carol and then draws the payer's line to Dave.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_return_through_payer_does_not_draw_twice(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let carol = account!("carol");
+        let dave = account!("dave");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
+        chain.new_account(dave).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const AMOUNT: u64 = 100;
+
+        Wrapper::push_from(&chain, carol)
+            .st_crd_lne(alice, usd, Quantity::new(AMOUNT), true, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, dave)
+            .st_crd_lne(carol, usd, Quantity::new(AMOUNT), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(dave, usd, Quantity::new(AMOUNT), true, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(AMOUNT), true, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .st_fwd_ofr(dave, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, dave)
+            .st_fwd_ofr(alice, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_fwd_ofr(bob, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        const START: i64 = 1_700_000_000;
+        pin(&chain, START);
+        let id = schedule(&chain, alice, bob, usd, AMOUNT, AMOUNT, 100, START, 0);
+
+        let err = Wrapper::push_from(&chain, bob)
+            .run_pay_ath(
+                id,
+                vec![
+                    hop(carol, usd),
+                    hop(dave, usd),
+                    hop(alice, usd),
+                    hop(bob, usd),
+                ],
+            )
+            .get()
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("path cannot route back through the sender"),
+            "got {err}"
+        );
+        assert_eq!(pay_row(id).next_due.seconds, START);
+        assert_eq!(exp(&chain, carol, alice, usd), 0);
+        assert_eq!(exp(&chain, dave, carol, usd), 0);
+        assert_eq!(exp(&chain, alice, dave, usd), 0);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+        assert_eq!(
+            CreditLine::get_assert(carol, alice, usd).remaining.value,
+            AMOUNT
+        );
+        assert_eq!(
+            CreditLine::get_assert(alice, dave, usd).remaining.value,
+            AMOUNT
+        );
+        assert_eq!(
+            CreditLine::get_assert(bob, alice, usd).remaining.value,
+            AMOUNT
         );
         Ok(())
     }
