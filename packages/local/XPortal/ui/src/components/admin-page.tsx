@@ -131,26 +131,59 @@ const FailedRequests = ({
     </AdminSection>
 );
 
-const SignIn = () => {
+const currentPagePath = () =>
+    `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+const AccountLogin = ({
+    account,
+    signedOutLabel = "Sign in",
+    variant = "outline",
+}: {
+    account: string | null;
+    signedOutLabel?: string;
+    variant?: React.ComponentProps<typeof Button>["variant"];
+}) => {
     const connect = useConnectAccount();
     return (
-        <PageContainer className="space-y-6">
-            <h2 className="text-lg font-medium">Sign in</h2>
-            <Button
-                type="button"
-                disabled={connect.isPending}
-                onClick={() => connect.mutate()}
-            >
-                Node admin? Sign in
-            </Button>
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+                <p className="min-w-0 truncate text-sm">
+                    {account ?? "Not signed in"}
+                </p>
+                <Button
+                    type="button"
+                    variant={variant}
+                    disabled={connect.isPending}
+                    onClick={() =>
+                        connect.mutate({
+                            enabled: true,
+                            returnPath: currentPagePath(),
+                        })
+                    }
+                >
+                    {account ? "Switch account" : signedOutLabel}
+                </Button>
+            </div>
             {connect.error && (
                 <p className="text-destructive text-sm">
                     {errorText(connect.error)}
                 </p>
             )}
-        </PageContainer>
+        </div>
     );
 };
+
+const SignIn = () => (
+    <PageContainer className="space-y-6">
+        <AdminSection title="Sign in">
+            <AccountLogin
+                account={null}
+                signedOutLabel="Node admin? Sign in"
+                variant="default"
+            />
+        </AdminSection>
+    </PageContainer>
+);
 
 const AdminLoading = () => (
     <PageContainer className="space-y-6">
@@ -176,11 +209,11 @@ export const AdminPage = () => {
         queryKey: portalStatusKey,
         queryFn: getPortalStatus,
     });
-    const authenticated = config.isSuccess;
+    const adminConfigReady = config.isSuccess;
     const creator = useQuery({
         queryKey: creatorKey,
         queryFn: loadCreatorKey,
-        enabled: authenticated,
+        enabled: adminConfigReady,
         retry: false,
         staleTime: Infinity,
         refetchOnWindowFocus: false,
@@ -189,7 +222,7 @@ export const AdminPage = () => {
     const failed = useQuery({
         queryKey: failedSignupsKey,
         queryFn: getFailedSignups,
-        enabled: authenticated,
+        enabled: adminConfigReady,
         retry: false,
     });
     const requests = useMutation({
@@ -211,7 +244,7 @@ export const AdminPage = () => {
     if (
         config.isPending ||
         status.isPending ||
-        (authenticated && creator.isPending)
+        (adminConfigReady && creator.isPending)
     ) {
         return <AdminLoading />;
     }
@@ -255,6 +288,10 @@ export const AdminPage = () => {
                     </AlertDescription>
                 </Alert>
             )}
+
+            <AdminSection title="Account">
+                <AccountLogin account={config.data.account ?? null} />
+            </AdminSection>
 
             <AdminSection title="Account requests">
                 <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
