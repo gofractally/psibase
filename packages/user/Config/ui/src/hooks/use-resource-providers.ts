@@ -6,7 +6,7 @@ import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { vserver } from "@shared/lib/plugins";
 
 export interface ResourceProvider {
-    producer: string;
+    provider: string;
     app: string;
     accepted: string[];
     endpoint: string;
@@ -30,7 +30,7 @@ export const useResourceProviders = () => {
                     resourceProviders {
                         edges {
                             node {
-                                producer
+                                provider
                                 app
                                 accepted
                                 endpoint

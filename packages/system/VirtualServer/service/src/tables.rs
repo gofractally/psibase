@@ -231,13 +231,12 @@ pub mod tables {
     pub struct ResourceProvider {
         /// Producer account that provides resources
         #[primary_key]
-        #[graphql(name = "producer")]
         pub provider: AccountNumber,
 
         /// Node-local app account (must start with `x-`) that accepts payments
         pub app: String,
 
-        /// Currencies the provider accepts for resource payment (free-form)
+        /// Currencies the provider accepts. Stored lowercase; each must be a valid account name.
         pub accepted: Vec<String>,
     }
 }

@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { siblingUrl } from "@psibase/common-lib";
-
-import { useIsPrivateNetwork } from "@shared/hooks/use-is-private-network";
-
 import {
     type ResourceProvider,
     useResourceProviders,
@@ -31,7 +27,9 @@ function shuffleInPlace<T>(items: T[]): T[] {
 
 function purchaseUrl(provider: ResourceProvider): string {
     try {
-        return siblingUrl(provider.endpoint, provider.app);
+        const url = new URL(provider.endpoint);
+        url.hostname = `${provider.app}.${url.hostname}`;
+        return url.origin;
     } catch {
         return provider.endpoint;
     }
@@ -39,7 +37,6 @@ function purchaseUrl(provider: ResourceProvider): string {
 
 export const ResourceProvidersSection = () => {
     const { data: providers, isLoading } = useResourceProviders();
-    const { isPrivateNetwork } = useIsPrivateNetwork();
     const [ordered, setOrdered] = useState<ResourceProvider[]>([]);
 
     useEffect(() => {
@@ -60,9 +57,8 @@ export const ResourceProvidersSection = () => {
         setOrdered([...pinned, ...rest]);
     }, [providers]);
 
-    if (!isPrivateNetwork && (isLoading || ordered.length === 0)) {
-        return null;
-    }
+    const showEmpty =
+        !isLoading && (providers?.length ?? 0) === 0 && ordered.length === 0;
 
     return (
         <div id="resource-providers" className="space-y-4 border-t pt-8">
@@ -73,11 +69,11 @@ export const ResourceProvidersSection = () => {
                 </p>
             </div>
 
-            {isLoading ? null : ordered.length === 0 ? (
+            {showEmpty ? (
                 <p className="text-muted-foreground text-sm">
                     No resource providers are registered on this network.
                 </p>
-            ) : (
+            ) : ordered.length === 0 ? null : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead>
@@ -94,14 +90,16 @@ export const ResourceProvidersSection = () => {
                         <tbody>
                             {ordered.map((provider) => (
                                 <tr
-                                    key={provider.producer}
+                                    key={provider.provider}
                                     className="border-b last:border-0"
                                 >
                                     <td className="py-2 pr-4">
-                                        {provider.producer}
+                                        {provider.provider}
                                     </td>
                                     <td className="py-2 pr-4">
-                                        {provider.accepted.join(", ")}
+                                        {provider.accepted
+                                            .map((code) => code.toUpperCase())
+                                            .join(", ")}
                                     </td>
                                     <td className="py-2">
                                         <a

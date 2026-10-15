@@ -392,10 +392,6 @@ impl Query {
     }
 
     /// Registered resource providers and their payment portals.
-    ///
-    /// Returns all registered providers. Dynamic fields `endpoint` and
-    /// `activeInfraProvider` are resolved from the current producer state;
-    /// filtering for UI purposes is left to the client.
     async fn resource_providers(
         &self,
         first: Option<i32>,

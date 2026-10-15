@@ -9,7 +9,7 @@ use super::query;
 #[allow(non_snake_case)]
 #[derive(Deserialize, Debug)]
 struct ResourceProviderNode {
-    producer: String,
+    provider: String,
     app: String,
     accepted: Vec<String>,
     endpoint: Option<String>,
@@ -37,7 +37,7 @@ fn resource_providers(chain: &psibase::Chain) -> Result<Vec<ResourceProviderNode
             resourceProviders {
                 edges {
                     node {
-                        producer
+                        provider
                         app
                         accepted
                         endpoint
@@ -65,9 +65,9 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
 
     let providers = resource_providers(&chain)?;
     assert_eq!(providers.len(), 1);
-    assert_eq!(providers[0].producer, PRODUCER_ACCOUNT.to_string());
+    assert_eq!(providers[0].provider, PRODUCER_ACCOUNT.to_string());
     assert_eq!(providers[0].app, "x-portal");
-    assert_eq!(providers[0].accepted, vec!["USD", "EUR"]);
+    assert_eq!(providers[0].accepted, vec!["usd", "eur"]);
     assert_eq!(
         providers[0].endpoint.as_deref(),
         Some("https://prod.example.com")
@@ -79,7 +79,7 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
         .reg_res_provider("x-portal".into(), vec!["GBP".into()])
         .get()?;
     let providers = resource_providers(&chain)?;
-    assert_eq!(providers[0].accepted, vec!["GBP"]);
+    assert_eq!(providers[0].accepted, vec!["gbp"]);
 
     // Unregister
     Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
@@ -128,7 +128,7 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
 
     let providers = resource_providers(&chain)?;
     assert_eq!(providers.len(), 1);
-    assert_eq!(providers[0].producer, PRODUCER_ACCOUNT.to_string());
+    assert_eq!(providers[0].provider, PRODUCER_ACCOUNT.to_string());
     assert!(
         !providers[0].activeInfraProvider,
         "inactive producers must report activeInfraProvider=false"

@@ -285,10 +285,12 @@ impl VirtualServer for ConfigPlugin {
     }
 
     fn reg_res_provider(app: String, accepted: Vec<String>) -> Result<(), Error> {
+        assert_caller_self();
         virtual_server::plugin::admin::reg_res_provider(&app, &accepted)
     }
 
     fn unreg_res_provider() -> Result<(), Error> {
+        assert_caller_self();
         virtual_server::plugin::admin::unreg_res_provider()
     }
 }

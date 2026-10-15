@@ -243,8 +243,8 @@ namespace SystemService
       /// Register or update the sender as a resource provider.
       ///
       /// The sender must be an active producer with a non-empty candidate endpoint.
-      /// `app` must be a valid account name starting with `x-`.
-      /// `accepted` must be non-empty (currency codes are free-form).
+      /// `app` must be a valid app subdomain local to this node (begins with `x-`).
+      /// `accepted` must be non-empty. Each currency code is stored lowercase and must be a valid account name.
       void reg_res_provider(std::string app, std::vector<std::string> accepted);
 
       /// Remove the sender's resource provider registration, if any.

@@ -15,18 +15,20 @@ import { useUserResources } from "../hooks/use-user-resources";
 import { GasTank } from "./gas-tank";
 
 interface UserSettingsSectionProps {
-    /** When true, show the meter but disable refill/resize (private network). */
+    /** When true, show the meter but disable refill and resize. */
     readOnly?: boolean;
+    /** Shown in place of the default explanation when `readOnly` is set. */
+    disabledMessage?: string;
 }
 
 export const UserSettingsSection = ({
     readOnly = false,
+    disabledMessage,
 }: UserSettingsSectionProps) => {
     const { data: currentUser } = useCurrentUser();
     const { data: billingConfig, isLoading: isLoadingBillingConfig } =
         useBillingConfig();
-    const billingEnabled =
-        !isLoadingBillingConfig && !!billingConfig?.enabled;
+    const billingEnabled = !isLoadingBillingConfig && !!billingConfig?.enabled;
     const { data: systemToken, isLoading: isLoadingToken } = useSystemToken();
     const {
         data: userResources,
@@ -98,9 +100,8 @@ export const UserSettingsSection = ({
                 <h2 className="mb-2 text-2xl font-bold">Resources</h2>
                 {readOnly && (
                     <p className="text-muted-foreground text-sm">
-                        Resource self-service isn&apos;t available on this
-                        network. Purchase resources from a provider (just
-                        below).
+                        {disabledMessage ??
+                            "Resource self-service isn't available on this network. Purchase resources from a provider (just below)."}
                     </p>
                 )}
             </div>

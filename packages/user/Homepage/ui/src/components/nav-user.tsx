@@ -14,14 +14,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate-invite-dialog";
 
 import { useGenerateInvite } from "@/hooks/use-generate-invite";
+import { useSystemTokenBalance } from "@/hooks/use-system-token-balance";
 
 import { Avatar } from "@shared/components/avatar";
 import { useTheme } from "@shared/components/theme-provider";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useIsPrivateNetwork } from "@shared/hooks/use-is-private-network";
 import { useLogout } from "@shared/hooks/use-logout";
 import { useProfile } from "@shared/hooks/use-profile";
+import { useSystemTokenPolicy } from "@shared/hooks/use-system-token-policy";
 import { Dialog } from "@shared/shadcn/ui/dialog";
 import {
     DropdownMenu,
@@ -53,7 +54,20 @@ export function NavUser() {
 
     const { data: user, isPending: isPendingUser } = useCurrentUser();
     const { data: profile } = useProfile(user, true);
-    const { isPrivateNetwork } = useIsPrivateNetwork();
+    const {
+        systemTokenUntransferable,
+        isLoading: isNetworkLoading,
+        billingEnabled,
+        isTransferable,
+    } = useSystemTokenPolicy();
+    const { hasBalance, isLoading: isBalanceLoading } = useSystemTokenBalance();
+    const balanceGatesInvites =
+        !!user && billingEnabled && isTransferable === true;
+    const showCreateInvite =
+        !isNetworkLoading &&
+        !(balanceGatesInvites && isBalanceLoading) &&
+        !systemTokenUntransferable;
+    const inviteNeedsBalance = balanceGatesInvites && !hasBalance;
 
     const { mutateAsync: logout } = useLogout();
     const { mutateAsync: login } = useConnectAccount({
@@ -186,16 +200,24 @@ export function NavUser() {
                                 </DropdownMenuSub>
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator />
-                            {!isPrivateNetwork && (
-                                <DropdownMenuItem
-                                    disabled={!user}
-                                    onClick={() => {
-                                        onGenerateInvite();
-                                    }}
-                                >
-                                    <UserPlus className="mr-2 h-4 w-4" />
-                                    Create invite
-                                </DropdownMenuItem>
+                            {showCreateInvite && (
+                                <>
+                                    <DropdownMenuItem
+                                        disabled={!user || inviteNeedsBalance}
+                                        onClick={() => {
+                                            onGenerateInvite();
+                                        }}
+                                    >
+                                        <UserPlus className="mr-2 h-4 w-4" />
+                                        Create invite
+                                    </DropdownMenuItem>
+                                    {inviteNeedsBalance && (
+                                        <p className="text-destructive px-2 pb-1 text-xs">
+                                            You need a system token balance to
+                                            create an invite.
+                                        </p>
+                                    )}
+                                </>
                             )}
 
                             <DropdownMenuItem
