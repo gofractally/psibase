@@ -57,7 +57,7 @@ flags = []
 # This service handles its own HTTP requests
 server = "service1"
 # Plugin for the front end
-plugins = ["service1-plugin"]
+plugins = ["service1-plugin", "service1-admin"]
 # Upload the UI
 data = [{src = "../ui/dist", dst = "/"}]
 # Run the service's init action.

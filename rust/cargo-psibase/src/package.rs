@@ -250,7 +250,7 @@ fn plugin_serve_path(plugin_crate: &str, component_package: &str) -> Result<Stri
     Ok(format!("/{name}.wasm"))
 }
 
-fn note_plugin_path(
+fn claim_plugin_path(
     service: &str,
     plugin_crate: &str,
     path: &str,
@@ -379,7 +379,7 @@ impl<'a> PackageBuilder<'a> {
                         return Err(anyhow!("{} is not a workspace member", plugin));
                     };
                     let path = plugin_serve_path(&p.name, component_package_id(p)?)?;
-                    note_plugin_path(
+                    claim_plugin_path(
                         &package.name,
                         &p.name,
                         &path,
@@ -756,7 +756,7 @@ mod tests {
     fn two_plugins_cannot_serve_the_same_path() {
         let data_dests = HashSet::new();
         let mut plugin_paths = HashMap::new();
-        note_plugin_path(
+        claim_plugin_path(
             "transact",
             "transact",
             "/plugin.wasm",
@@ -764,7 +764,7 @@ mod tests {
             &mut plugin_paths,
         )
         .unwrap();
-        let error = note_plugin_path(
+        let error = claim_plugin_path(
             "transact",
             "other-plugin",
             "/plugin.wasm",
@@ -783,7 +783,7 @@ mod tests {
         let mut data_dests = HashSet::new();
         data_dests.insert(normalize_data_dest("plugin.wasm"));
         data_dests.insert(normalize_data_dest("/admin.wasm/"));
-        let error = note_plugin_path(
+        let error = claim_plugin_path(
             "accounts",
             "accounts",
             "/plugin.wasm",
@@ -794,7 +794,7 @@ mod tests {
         .to_string();
         assert!(error.contains("/plugin.wasm"));
         assert!(error.contains("data destination"));
-        note_plugin_path(
+        claim_plugin_path(
             "accounts",
             "accounts-query",
             "/query.wasm",
@@ -802,7 +802,7 @@ mod tests {
             &mut HashMap::new(),
         )
         .unwrap();
-        note_plugin_path(
+        claim_plugin_path(
             "transact",
             "transact-admin",
             "/admin.wasm",
