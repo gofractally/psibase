@@ -2,14 +2,24 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
+import { getArrayBuffer } from "@psibase/common-lib";
+
 import { checkLastTx } from "@/lib/check-staging";
 import QueryKey from "@/lib/query-keys";
 
+import { callPluginFunction, config } from "@shared/lib/plugins";
+import type {
+    PackageInstallOp,
+    PackagePreference,
+} from "@shared/lib/plugins/config";
 import { queryClient } from "@shared/lib/query-client";
-import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { zPackageSchemaWithSha } from "./use-available-packages";
+import {
+    PackageRepo,
+    getPackageIndex,
+    zPackageSchemaWithSha,
+} from "./use-available-packages";
 
 const zPackageOp = z.object({
     old: z.unknown().optional(),
@@ -18,82 +28,46 @@ const zPackageOp = z.object({
 
 type PackageOp = z.infer<typeof zPackageOp>;
 
-type PackageInstallOp = {
-    old?: unknown;
-    new?: ArrayBuffer;
-};
-
-async function getAvailablePackageIndex(owner: string) {
-    return zPackageSchemaWithSha.array().parse(
-        await supervisor.functionCall({
-            service: "packages",
-            intf: "queries",
-            method: "getAvailablePackages",
-            params: [owner],
-        }),
-    );
-}
-
 async function resolvePackageOps(
     owner: string,
     packages: string[],
-    requestPref: string,
-    nonRequestPref: string,
+    requestPref: PackagePreference,
+    nonRequestPref: PackagePreference,
 ): Promise<PackageOp[]> {
-    const index = await getAvailablePackageIndex(owner);
+    const index = flattenPackageIndex(await getPackageIndex(owner));
     return zPackageOp.array().parse(
-        await supervisor.functionCall({
-            service: "packages",
-            intf: "privateApi",
-            method: "resolve",
-            params: [index, packages, requestPref, nonRequestPref],
-        }),
+        await callPluginFunction(config.packaging.resolvePackages, [
+            index,
+            packages,
+            requestPref,
+            nonRequestPref,
+        ]),
     );
 }
 
 async function installPackages(
     owner: string,
     packages: string[],
-    request_pref: string,
-    non_request_pref: string,
+    requestPref: PackagePreference,
+    nonRequestPref: PackagePreference,
 ) {
     const resolved = await resolvePackageOps(
         owner,
         packages,
-        request_pref,
-        non_request_pref,
+        requestPref,
+        nonRequestPref,
     );
+    const ops = await loadPackages(resolved);
+    await callPluginFunction(config.packaging.installPackages, [owner, ops]);
+}
 
-    const ops = (await supervisor.functionCall({
-        service: "packages",
-        intf: "privateApi",
-        method: "loadPackageOps",
-        params: [resolved],
-    })) as PackageInstallOp[];
-
-    const [data, install] = (await supervisor.functionCall({
-        service: "packages",
-        intf: "privateApi",
-        method: "buildTransactions",
-        params: [owner, ops, 4],
-    })) as [ArrayBuffer[], ArrayBuffer[]];
-
-    for (const tx of data) {
-        await supervisor.functionCall({
-            service: "packages",
-            intf: "privateApi",
-            method: "pushData",
-            params: [tx],
-        });
-    }
-    for (const tx of install) {
-        await supervisor.functionCall({
-            service: "packages",
-            intf: "privateApi",
-            method: "proposeInstall",
-            params: [tx],
-        });
-    }
+function flattenPackageIndex(index: PackageRepo[]) {
+    return index.flatMap((repo) =>
+        repo.index.map((info) => ({
+            ...info,
+            file: new URL(info.file, repo.baseUrl).toString(),
+        })),
+    );
 }
 
 export async function resolveRequiredPackageNames(
@@ -106,6 +80,18 @@ export async function resolveRequiredPackageNames(
         "current",
     );
     return [...new Set(resolved.flatMap((op) => (op.new ? [op.new.name] : [])))];
+}
+
+async function loadPackages(ops: PackageOp[]): Promise<PackageInstallOp[]> {
+    return await Promise.all(
+        ops.map(async (op) => {
+            if (op.new) {
+                return { old: op.old, new: await getArrayBuffer(op.new.file) };
+            } else {
+                return { old: op.old };
+            }
+        }),
+    );
 }
 
 export const useInstallPackages = () => {

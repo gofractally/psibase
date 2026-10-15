@@ -3,9 +3,7 @@ use std::str::FromStr;
 use psibase::{services::guilds::GuildRole, AccountNumber};
 
 use crate::bindings::host::types::types::Error;
-use crate::bindings::{
-    host::client::api::get_receiver, transact::plugin::api::set_propose_latch,
-};
+use crate::bindings::{host::client::api::get_receiver, transact::plugin::api::set_propose_latch};
 
 fn latch(account: &str) -> Result<(), Error> {
     set_propose_latch(Some(account))

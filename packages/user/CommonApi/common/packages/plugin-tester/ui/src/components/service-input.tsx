@@ -1,7 +1,6 @@
 interface ServiceInputProps {
     service: string;
     plugin: string;
-    onServiceChange: (value: string) => void;
     onPluginChange: (value: string) => void;
     onLoad: () => void;
 }
@@ -9,7 +8,6 @@ interface ServiceInputProps {
 export function ServiceInput({
     service,
     plugin,
-    onServiceChange,
     onPluginChange,
     onLoad,
 }: ServiceInputProps) {
@@ -25,7 +23,8 @@ export function ServiceInput({
                 className="service-input"
                 placeholder="Service name"
                 value={service}
-                onChange={(e) => onServiceChange(e.target.value)}
+                readOnly
+                title="Plugin tester may only call plugins of this origin's service"
                 onKeyDown={handleKeyDown}
             />
             <input
