@@ -2,7 +2,6 @@ import { useUserTokenBalances } from "@/apps/tokens/hooks/tokens-plugin/use-user
 
 import { useSystemToken } from "@shared/hooks/use-system-token";
 
-/** Whether the logged-in user holds a non-zero system-token balance. */
 export const useSystemTokenBalance = () => {
     const { data: systemToken, isLoading: isLoadingToken } = useSystemToken();
     const balances = useUserTokenBalances();
