@@ -89,6 +89,11 @@ pub(crate) fn process_mod(psibase_mod: &proc_macro2::TokenStream, impl_mod: &mut
             }
         }
 
+        table_names.sort_by_key(|(index, _, _)| *index);
+        let table_names = table_names
+            .into_iter()
+            .map(|(_, table, record)| (table, record))
+            .collect();
         process_table_schema_root(psibase_mod, items, table_names);
 
         // Validate table indexes

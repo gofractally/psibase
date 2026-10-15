@@ -69,4 +69,42 @@ mod tests {
 
         service_macro_impl(attr, before);
     }
+
+    #[test]
+    fn schema_tables_follow_table_index() {
+        use crate::service_tables_macro::service_tables_macro_impl;
+        use quote::quote;
+
+        let attr = quote! {};
+        let before = quote! {
+            mod tables {
+                #[table(name = "SecondTable", index = 1)]
+                struct SecondRow {
+                    id: u32,
+                }
+                impl SecondRow {
+                    #[primary_key]
+                    fn pk(&self) {}
+                }
+
+                #[table(name = "FirstTable", index = 0)]
+                struct FirstRow {
+                    id: u32,
+                }
+                impl FirstRow {
+                    #[primary_key]
+                    fn pk(&self) {}
+                }
+            }
+        };
+
+        let expanded = service_tables_macro_impl(attr, before).to_string();
+        let first = expanded
+            .find("\"FirstTable\"")
+            .expect("schema names FirstTable");
+        let second = expanded
+            .find("\"SecondTable\"")
+            .expect("schema names SecondTable");
+        assert!(first < second, "schema emission should follow table index");
+    }
 }
