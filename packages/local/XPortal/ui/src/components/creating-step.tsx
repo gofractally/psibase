@@ -1,18 +1,14 @@
+import type { SignupRequest } from "../lib/signup-request";
+
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
+import { PageContainer } from "@shared/components/page-container";
 import { supervisor } from "@shared/lib/supervisor";
-import {
-    CardContent,
-    CardDescription,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
-import { PortalCard } from "./portal-card";
 import { IMPORT_RETURN_PATH } from "../lib/import-return";
 import { getSignup } from "../lib/portal-api";
-import type { SignupRequest } from "../lib/signup-request";
 
 const POLL_INTERVAL_MS = 1000;
 
@@ -61,20 +57,16 @@ export const CreatingStep = ({
     }, [signup?.state, isError, isImportIdle, importAccount, onFailed]);
 
     return (
-        <PortalCard progress={50}>
-            <CardContent className="flex flex-col gap-6">
-                <div className="space-y-2">
-                    <CardTitle className="text-3xl font-normal">
-                        Creating account...
-                    </CardTitle>
-                    <CardDescription>
-                        This should only take a few seconds.
-                    </CardDescription>
-                </div>
-                <div className="bg-muted/40 flex items-center justify-center rounded-lg border px-6 py-10">
-                    <Spinner className="text-muted-foreground size-5" />
-                </div>
-            </CardContent>
-        </PortalCard>
+        <PageContainer className="space-y-6">
+            <div>
+                <h2 className="text-lg font-medium">Creating account...</h2>
+                <p className="text-muted-foreground text-sm">
+                    This should only take a few seconds.
+                </p>
+            </div>
+            <div className="bg-muted/40 flex items-center justify-center rounded-lg border px-6 py-10">
+                <Spinner className="text-muted-foreground size-5" />
+            </div>
+        </PageContainer>
     );
 };
