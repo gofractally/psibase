@@ -14,7 +14,7 @@ In the top-level crate:
 In any crate that builds a service:
 
 - `server`: The value is a crate which will handle HTTP requests sent to this service. The other crate will be built and included in the current package. If HTTP requests are handled in the base service, it should reference the service. Can be omitted if service serves no HTTP requests.
-- `plugin`: The value is a crate that should be built with `cargo component` and uploaded as `/plugin.wasm`
+- `plugins`: A list of crates to build with `cargo component` and upload onto this service. A plugin whose `[package.metadata.component] package` is `<namespace>:<name>` is served at `/<name>.wasm` (`host:login-prompt` is `/login-prompt.wasm`). Two plugins on one service that resolve to the same path, or a plugin path that is also a `data` destination, is an error. `plugin = "<crate>"` is rejected; use `plugins = ["<crate>"]`.
 - `flags`: [Flags](../../../specifications/data-formats/package.md#serviceservicejson) for the service.
 - `data`: An array of `{src, dst}` paths to upload to the service's subdomain. `src` is relative to the location of Cargo.toml. If `src` is a directory, its contents will be included recursively.
 
@@ -56,8 +56,8 @@ description = "A service to be included in the package"
 flags = []
 # This service handles its own HTTP requests
 server = "service1"
-# Plugin for the front end
-plugin = "service1-plugin"
+# Plugin for the front end. With component package `service1:plugin`, this is served at `/plugin.wasm`.
+plugins = ["service1-plugin"]
 # Upload the UI
 data = [{src = "../ui/dist", dst = "/"}]
 # Run the service's init action.
