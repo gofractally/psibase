@@ -30,8 +30,11 @@ pub mod service {
     use crate::policy::StagedTxPolicy;
     use fracpack::Pack;
     use psibase::services::transact::ServiceMethod;
-    use psibase::services::{events::Wrapper as Events, transact::Wrapper as Transact};
+    use psibase::services::{
+        accounts::Wrapper as Accounts, events::Wrapper as Events, transact::Wrapper as Transact,
+    };
     use psibase::*;
+    use std::collections::HashSet;
 
     const ENABLE_PRINT: bool = false;
 
@@ -67,6 +70,19 @@ pub mod service {
         Events::call().addIndex(EventDb::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter
     }
 
+    fn ensure_not_frozen(actions: &[Action]) {
+        let mut seen = HashSet::new();
+        let mut senders = Vec::new();
+        for action in actions {
+            if seen.insert(action.sender) {
+                senders.push(action.sender);
+            }
+        }
+        if Accounts::call().isFrozen(senders) {
+            abort_message("at least one of the action senders are frozen");
+        }
+    }
+
     /// Proposes a new staged transaction containing the specified actions.
     /// Returns the ID of the database record containing the staged transaction.
     ///
@@ -74,6 +90,7 @@ pub mod service {
     /// * `auto_exec`: Enables automatic execution as soon as the transaction has enough approvals
     #[action]
     fn propose(actions: Vec<Action>, auto_exec: bool) -> u32 {
+        ensure_not_frozen(&actions);
         let new_tx = StagedTx::add(actions, auto_exec);
 
         emit_update(new_tx.txid.clone(), StagedTxEvent::PROPOSED);
@@ -94,6 +111,7 @@ pub mod service {
     #[action]
     fn accept(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
+        ensure_not_frozen(&staged_tx.action_list.actions);
 
         staged_tx.accept();
 
@@ -124,6 +142,7 @@ pub mod service {
     #[action]
     fn reject(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
+        ensure_not_frozen(&staged_tx.action_list.actions);
 
         staged_tx.reject();
 
@@ -165,6 +184,7 @@ pub mod service {
     }
 
     fn execute_impl(staged_tx: StagedTx) {
+        ensure_not_frozen(&staged_tx.action_list.actions);
         debug_print("Executing staged tx\n");
 
         let accepters = staged_tx.accepters();

@@ -170,6 +170,7 @@ function(add suffix)
             ../../packages/system/AuthDelegate/include
             ../../packages/system/AuthSig/include
             ../../packages/system/AuthAny/include
+            ../../packages/system/AuthNone/include
             ../../packages/system/CpuLimit/include
             ../../packages/system/HttpServer/include
             ../../packages/system/SetCode/include

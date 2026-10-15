@@ -71,6 +71,27 @@ mod service {
     fn incAuthSeq(num: AccountNumber) {
         unimplemented!()
     }
+
+    #[action]
+    fn freeze(accounts: Vec<AccountNumber>, memo: Option<String>) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn unfreeze(accounts: Vec<AccountNumber>, memo: Option<String>) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn isFrozen(accounts: Vec<AccountNumber>) -> bool {
+        unimplemented!()
+    }
+
+    #[event(history)]
+    fn froze(account: AccountNumber, memo: Option<String>) {}
+
+    #[event(history)]
+    fn unfroze(account: AccountNumber, memo: Option<String>) {}
 }
 
 #[test]

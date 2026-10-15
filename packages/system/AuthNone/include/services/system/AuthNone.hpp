@@ -2,20 +2,20 @@
 
 #include <services/system/Transact.hpp>
 
-namespace TestService
+namespace SystemService
 {
    struct AuthNone : psibase::Service
    {
       static constexpr psibase::AccountNumber service = psibase::AccountNumber("auth-none");
 
-      bool checkAuthSys(uint32_t                     flags,
-                        psibase::AccountNumber       sender,
-                        SystemService::ServiceMethod action,
-                        std::vector<psibase::Claim>  claims);
+      bool checkAuthSys(uint32_t                    flags,
+                        psibase::AccountNumber      sender,
+                        ServiceMethod               action,
+                        std::vector<psibase::Claim> claims);
 
       void canAuthUserSys(psibase::AccountNumber user);
 
-      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber);
+      std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
 
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers);
@@ -26,10 +26,10 @@ namespace TestService
    PSIO_REFLECT(AuthNone,  //
                 method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
-                method(getDlgsSys, account),
+                method(getDlgsSys, sender),
                 method(isAuthSys, sender, authorizers),
                 method(isRejectSys, sender, rejecters)
                 //
    )
    PSIBASE_REFLECT_TABLES(AuthNone)
-}  // namespace TestService
+}  // namespace SystemService
