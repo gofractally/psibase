@@ -303,6 +303,7 @@ add_rs_component_workspace(packages/:Plugins
     web-crypto
     transact
     transact-admin
+    transact-query-auth
     workshop
     fractal-core
     config
@@ -346,6 +347,7 @@ psibase_package(
     SERVICE transact
         DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
         DATA ${Plugins_OUTPUT_FILE_transact_admin} /admin.wasm
+        DATA ${Plugins_OUTPUT_FILE_transact_query_auth} /query-auth.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "TransactService(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )
