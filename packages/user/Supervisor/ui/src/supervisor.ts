@@ -51,6 +51,17 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("webcrypto", "plugin"),
 ];
 
+// The homepage is served from the network name's subdomain, but its plugins are
+//   registered (e.g. in dyn-ld) under the "homepage" service.
+const toHomepageAlias = async <T extends { service: string }>(
+    id: T,
+): Promise<T> => {
+    const network = await networkNamePromise;
+    return network && id.service === network
+        ? { ...id, service: "homepage" }
+        : id;
+};
+
 // Control-flow signal thrown to unwind out of a plugin call.
 //
 // It extends Error so that JCO-transpiled glue never intercepts it: JCO's
@@ -402,6 +413,7 @@ export class Supervisor implements AppInterface {
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
             await networkNamePromise;
+            plugin = await toHomepageAlias(plugin);
             this.setParentOrigination(callerOrigin);
             await this.preload([plugin]);
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
@@ -426,7 +438,7 @@ export class Supervisor implements AppInterface {
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
-            await this.preload(plugins);
+            await this.preload(await Promise.all(plugins.map(toHomepageAlias)));
         } catch (e) {
             result = e;
         } finally {
@@ -444,6 +456,7 @@ export class Supervisor implements AppInterface {
     ): Promise<any> {
         try {
             await networkNamePromise;
+            args = await toHomepageAlias(args);
             this.setParentOrigination(callerOrigin);
 
             // This is the time-intensive step. It includes: downloading, parsing, and transpiling the
