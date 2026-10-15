@@ -4,7 +4,10 @@ package host:prompt;
 interface api {
     use host:types/types.{error};
 
-    /// Retrieves the context data associated with the currently active prompt
+    /// Retrieves the context data associated with the currently active prompt.
+    ///
+    /// The caller must be the prompt's `prompt-app`. The prompt must still be
+    /// within the supervisor prompt page expiry window.
     get-context: func() -> result<list<u8>, error>;
 
     /// Initiates a procedure that prompts the user with the prompt corresponding to the 
