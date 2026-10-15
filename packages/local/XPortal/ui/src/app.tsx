@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 
+import { AdminPage } from "./components/admin-page";
 import { DoneStep } from "./components/done-step";
 import { FailedStep } from "./components/failed-step";
 import { Loader } from "./components/loader";
@@ -33,7 +34,11 @@ const Requests = () => {
     );
 };
 
-export const App = () => {
+const isAdminPath = () =>
+    window.location.pathname === "/admin" ||
+    window.location.pathname === "/admin/";
+
+const Visitor = () => {
     const returnedFromImport = hasReturnedFromImport();
     const { data: currentUser, isPending } = useCurrentUser({
         enabled: returnedFromImport,
@@ -45,4 +50,15 @@ export const App = () => {
     }
     // With no one logged in (e.g. a revisited `?imported` link after logout), start a new request.
     return <Requests />;
+};
+
+export const App = () => {
+    if (isAdminPath()) return <AdminPage />;
+    return (
+        <div className="flex min-h-dvh w-full items-center justify-center p-4">
+            <div className="w-full min-w-0">
+                <Visitor />
+            </div>
+        </div>
+    );
 };

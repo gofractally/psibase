@@ -308,6 +308,7 @@ add_rs_component_workspace(packages/:Plugins
     config
     homepage
     producers
+    auth-scope-plugin
 )
 
 include(GNUInstallDirs)
@@ -739,8 +740,9 @@ psibase_package(
     SERVICE auth-scope
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthScope.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthScope-schema.json
-    DEPENDS wasm
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
+        DATA ${Plugins_OUTPUT_FILE_auth_scope_plugin} /plugin.wasm
+    DEPENDS wasm ${Plugins_DEP}
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(

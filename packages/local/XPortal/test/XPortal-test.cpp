@@ -115,17 +115,6 @@ namespace
       t.kvPut(HostConfigRow::db, row->key(), *row);
    }
 
-   std::vector<AllowedAction> creatorAllowed()
-   {
-      return {
-          {AccountNumber{"auth-sig"}, MethodNumber{"newAccount"}},
-          {Tokens::service, MethodNumber{"credit"}},
-          {Tokens::service, MethodNumber{"debit"}},
-          {Tokens::service, MethodNumber{"setUserConf"}},
-          {VirtualServer::service, MethodNumber{"buy_res_for"}},
-      };
-   }
-
    HttpRequest keygenRequest(std::string_view token = {})
    {
       return forwarded("POST", "/admin/agents/creator/keygen", token);
@@ -201,7 +190,7 @@ namespace
       transactor<Tokens>        tokens{producer, Tokens::service};
       transactor<VirtualServer> vserver{producer, VirtualServer::service};
       std::vector<Action>       actions{
-          scope.newAccount(XPortal::creatorAccount, pub, producer, creatorAllowed())};
+          scope.newAccount(XPortal::creatorAccount, pub, producer, XPortal::creatorAllowed())};
       REQUIRE(buffer.has_value() == grant.has_value());
       if (buffer)
       {
@@ -298,6 +287,7 @@ TEST_CASE("status, requests switch, and seeded pricing")
    CHECK(!config.free_tier.tokens.has_value());
    CHECK(!config.producer.has_value());
    CHECK(!config.account.has_value());
+   CHECK(!config.creator_pubkey.has_value());
 
    setProducer(t, "myprod");
    config = t.get<AdminConfig>(XPortal::service, "/admin/config");
@@ -342,6 +332,8 @@ TEST_CASE("status, requests switch, and seeded pricing")
 
    XPortal{}.open<AgentKeyTable>().put(
        AgentKey{.name = std::string{XPortal::creatorAgent}, .pubkey = agentPub});
+   config = t.get<AdminConfig>(XPortal::service, "/admin/config");
+   CHECK(config.creator_pubkey == agentPub);
    status = t.get<Status>(XPortal::service, "/status");
    CHECK(status.conditions[0].ok);
    CHECK(status.ready);
@@ -437,7 +429,7 @@ TEST_CASE("producer funds ac-creator when billing is enabled")
    REQUIRE(row.has_value());
    CHECK(row->owner == alice);
    CHECK(row->pubkey == key.pubkey);
-   CHECK(row->allowed == creatorAllowed());
+   CHECK(row->allowed == XPortal::creatorAllowed());
 
    auto status = t.get<Status>(XPortal::service, "/status");
    CHECK(status.billing_enabled);

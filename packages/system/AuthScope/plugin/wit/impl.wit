@@ -1,0 +1,17 @@
+package auth-scope:plugin;
+
+interface api {
+    use host:types/types.{error};
+
+    record allowed-action {
+        service: string,
+        method: string,
+    }
+
+    /// Adds `auth-scope::newAccount` to the current transaction.
+    new-account: func(name: string, pubkey-pem: string, owner: string, allowed: list<allowed-action>) -> result<_, error>;
+}
+
+world impl {
+    export api;
+}
