@@ -213,7 +213,6 @@ export const CreatePage = () => {
     );
     const devTemplate = packages.find((pack) => pack.name === "DevDefault");
     const prodTemplate = packages.find((pack) => pack.name === "ProdWithFG");
-    const privTemplate = packages.find((pack) => pack.name === "PrivDefault");
 
     const [
         { dependencies, show: showDependencyDialog, removingPackage },
@@ -412,7 +411,6 @@ export const CreatePage = () => {
                                     <ChainTypeForm
                                         form={chainTypeForm}
                                         next={next}
-                                        privAvailable={Boolean(privTemplate)}
                                     />
                                 )}
                             </div>

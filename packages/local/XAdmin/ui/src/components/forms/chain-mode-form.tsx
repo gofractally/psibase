@@ -27,7 +27,6 @@ type ChainTypeShape = z.infer<typeof chainTypeSchema>;
 interface Props {
     form: UseFormReturn<ChainTypeShape>;
     next: () => Promise<void>;
-    privAvailable: boolean;
 }
 
 type Spec = {
@@ -124,7 +123,7 @@ const TemplateCard = ({
     </button>
 );
 
-export const ChainTypeForm = ({ form, next, privAvailable }: Props) => {
+export const ChainTypeForm = ({ form, next }: Props) => {
     const secureContextFooter = !window.isSecureContext ? (
         <p className="text-muted-foreground pt-3 text-sm">
             Only available via HTTPS or localhost
@@ -170,24 +169,12 @@ export const ChainTypeForm = ({ form, next, privAvailable }: Props) => {
                                     subtitle="Single-provider network"
                                     specs={specsFor("priv")}
                                     selected={field.value === "priv"}
-                                    disabled={
-                                        !window.isSecureContext ||
-                                        !privAvailable
-                                    }
+                                    disabled={!window.isSecureContext}
                                     onSelect={() => {
                                         field.onChange("priv");
                                         void next();
                                     }}
-                                    footer={
-                                        !window.isSecureContext ? (
-                                            secureContextFooter
-                                        ) : !privAvailable ? (
-                                            <p className="text-muted-foreground pt-3 text-sm">
-                                                PrivDefault is not available on
-                                                this node
-                                            </p>
-                                        ) : null
-                                    }
+                                    footer={secureContextFooter}
                                 />
                             </div>
                             <div className="flex justify-center">
