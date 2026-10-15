@@ -1,8 +1,9 @@
 package host:login-prompt;
 
 interface api {
-    use host:types/types.{error, pem};
+    use host:types/types.{error};
     use host:accounts/admin.{credential};
+    use types.{import-context};
     use tokens:plugin/types.{system-token-info, user-balance};
     use name-market:plugin/types.{markets-overview};
 
@@ -35,28 +36,15 @@ interface api {
     create-premium: func(account-name: string, max-cost: string) -> result<string, error>;
 
     /// Will connect the specified account with the active app, if not already
-    ///   connected, and login.
+    ///   connected, and login if `login` is true.
+    /// The account must already be imported on this device.
     /// If there is currently an active invite, calling this will automatically accept it.
-    connect-account: func(account: string);
-
-    /// Account, private key, and login flag for the active `importnew` prompt.
-    record import-context {
-        account: string,
-        /// Private key in PEM format.
-        key: pem,
-        /// Log the account into the calling app after import.
-        login: bool,
-    }
+    connect-account: func(account: string, login: bool);
 
     /// Reads the active `importnew` prompt context.
     ///
     /// Callable only by this app, and only while that prompt is live.
     get-import-context: func() -> import-context;
-
-    /// Connects an imported account to the active app. Logs in when `login` is true.
-    ///
-    /// The account must already be imported on this device.
-    finish-import: func(account: string, login: bool);
 
     /// Fetches the configured system token.
     get-system-token: func() -> result<option<system-token-info>, error>;

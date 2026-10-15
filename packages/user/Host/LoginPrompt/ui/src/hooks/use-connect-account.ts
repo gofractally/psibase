@@ -2,12 +2,17 @@ import { type UseMutationOptions, useMutation } from "@tanstack/react-query";
 
 import { callLoginPrompt } from "../lib/login-prompt";
 
+type ConnectAccount = {
+    account: string;
+    login: boolean;
+};
+
 export const useConnectAccount = (
-    options: UseMutationOptions<void, Error, string> = {},
+    options: UseMutationOptions<void, Error, ConnectAccount> = {},
 ) => {
     return useMutation({
-        mutationFn: (accountName: string) =>
-            callLoginPrompt<void>("api", "connectAccount", [accountName]),
+        mutationFn: ({ account, login }: ConnectAccount) =>
+            callLoginPrompt<void>("api", "connectAccount", [account, login]),
         ...options,
     });
 };

@@ -1,7 +1,7 @@
 use psibase::fracpack::{Pack, Unpack};
 
 /// Fracpack layout for the `importnew` prompt context.
-/// Field order matches `host:login-prompt/api.import-context`.
+/// Field order matches `host:login-prompt/types.import-context`.
 #[derive(Pack, Unpack, Debug, PartialEq, Eq)]
 pub struct ImportNewContext {
     pub account: String,

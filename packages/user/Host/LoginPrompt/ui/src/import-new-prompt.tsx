@@ -10,12 +10,12 @@ import { Progress } from "@shared/shadcn/ui/progress";
 
 import { SaveAndConfirmKey, type KeyStep } from "./components/save-and-confirm-key";
 import { Loader } from "./components/create-prompt/loader";
-import { useFinishImport } from "./hooks/use-finish-import";
+import { useConnectAccount } from "./hooks/use-connect-account";
 import { useImportNewPrompt } from "./hooks/use-import-new-prompt";
 
 export const ImportNewPrompt = () => {
     const { data, isPending, error } = useImportNewPrompt();
-    const finishImport = useFinishImport();
+    const connectAccount = useConnectAccount();
     const [step, setStep] = useState<KeyStep>("save");
 
     if (error) {
@@ -48,7 +48,7 @@ export const ImportNewPrompt = () => {
                 keyB64={pemToB64(data.key)}
                 onStepChange={setStep}
                 onImported={async (account) => {
-                    await finishImport.mutateAsync({
+                    await connectAccount.mutateAsync({
                         account,
                         login: data.login,
                     });

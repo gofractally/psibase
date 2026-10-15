@@ -1,6 +1,7 @@
 use crate::bindings::accounts::plugin::api as AccountsPlugin;
 use crate::bindings::auth_sig::plugin as AuthSig;
-use crate::bindings::exports::host::login_prompt::api::{Credential, Guest as Api, ImportContext};
+use crate::bindings::exports::host::login_prompt::api::{Credential, Guest as Api};
+use crate::bindings::exports::host::login_prompt::types::ImportContext;
 use crate::bindings::host::{
     accounts::admin as HostAccountsAdmin, accounts::api as HostAccountsApi, client::api as Client,
     crypto::keyvault as HostCrypto, prompt::api as HostPrompt, types::types::Error,
@@ -19,24 +20,6 @@ use crate::HOST_APP;
 use psibase::fracpack::Unpack;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
-
-fn connect_imported(account: &str, login: bool) {
-    assert!(HostAccountsAdmin::get_connected_accounts(HOST_APP)
-        .iter()
-        .any(|known| known == account));
-
-    let app = Client::get_active_app();
-    HostAccountsAdmin::add_connected_app(account, &app);
-
-    if !login {
-        HostAccountsAdmin::connect(account, &app);
-        return;
-    }
-
-    if HostAccountsAdmin::login(account, &app).is_err() {
-        HostAccountsAdmin::remove_connected_app(account, &app);
-    }
-}
 
 impl Api for LoginPrompt {
     fn can_create_account() -> bool {
@@ -100,9 +83,20 @@ impl Api for LoginPrompt {
         Ok(keypair.private_key)
     }
 
-    fn connect_account(account: String) {
+    fn connect_account(account: String, login: bool) {
         assert_eq!(Client::get_sender(), Client::get_receiver());
-        connect_imported(&account, true);
+
+        // The account must already have been imported
+        assert!(HostAccountsAdmin::get_connected_accounts(HOST_APP).contains(&account));
+
+        let app = Client::get_active_app();
+        HostAccountsAdmin::add_connected_app(&account, &app);
+
+        if !login {
+            HostAccountsAdmin::connect(&account, &app);
+        } else if HostAccountsAdmin::login(&account, &app).is_err() {
+            HostAccountsAdmin::remove_connected_app(&account, &app);
+        }
 
         if Invites::get_active_invite().is_some() {
             Invites::accept();
@@ -118,11 +112,6 @@ impl Api for LoginPrompt {
             key: context.key,
             login: context.login,
         }
-    }
-
-    fn finish_import(account: String, login: bool) {
-        assert_eq!(Client::get_sender(), Client::get_receiver());
-        connect_imported(&account, login);
     }
 
     fn get_system_token() -> Result<Option<SystemTokenInfo>, Error> {

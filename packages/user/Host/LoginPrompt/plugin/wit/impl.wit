@@ -15,6 +15,7 @@ world impl {
     import accounts:plugin/api;
     import invite:plugin/redemption;
 
+    export types;
     export api;
     export admin;
 }

@@ -447,7 +447,10 @@ export const CreatePrompt = () => {
                     keyB64={key}
                     onStepChange={setStep}
                     onImported={async (account) => {
-                        await connectAccountMutation.mutateAsync(account);
+                        await connectAccountMutation.mutateAsync({
+                            account,
+                            login: true,
+                        });
                         prompt.finished();
                     }}
                 />

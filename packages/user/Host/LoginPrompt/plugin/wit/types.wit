@@ -1,0 +1,15 @@
+package host:login-prompt;
+
+interface types {
+    use host:types/types.{pem};
+
+    /// Account, private key, and login flag for the active `importnew` prompt.
+    record import-context {
+        /// Account being imported.
+        account: string,
+        /// Private key in PEM format.
+        key: pem,
+        /// Log the account into the calling app after import.
+        login: bool,
+    }
+}
