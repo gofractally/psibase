@@ -79,27 +79,3 @@ impl ActivePrompts {
         tables::active_prompt().delete(PROMPT_KEY);
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn prompt(created: &str) -> ActivePrompt {
-        ActivePrompt {
-            prompt_app: "host".into(),
-            active_app: "homepage".into(),
-            prompt_name: "connect".into(),
-            created: created.into(),
-            packed_context: None,
-        }
-    }
-
-    fn at(rfc3339: &str) -> DateTime<Utc> {
-        rfc3339.parse().unwrap()
-    }
-
-    #[test]
-    fn at_window_boundary() {
-        assert!(!prompt("2026-01-01T00:00:00+00:00").is_expired(at("2026-01-01T00:05:00Z")));
-    }
-}

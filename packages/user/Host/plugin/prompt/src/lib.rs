@@ -16,18 +16,14 @@ use host::types::types::Error;
 use supervisor::bridge::prompt::request_prompt;
 struct HostPrompt;
 
-fn assert_supervisor() {
-    assert_eq!(get_sender(), "supervisor", "Unauthorized");
-}
-
 impl Admin for HostPrompt {
     fn get_active_prompt() -> PromptDetails {
-        assert_supervisor();
+        assert_eq!(get_sender(), "supervisor", "Unauthorized");
         ActivePrompts::get().expect("No active prompt").into()
     }
 
     fn clear_active_prompt() {
-        assert_supervisor();
+        assert_eq!(get_sender(), "supervisor", "Unauthorized");
         ActivePrompts::clear();
     }
 }
