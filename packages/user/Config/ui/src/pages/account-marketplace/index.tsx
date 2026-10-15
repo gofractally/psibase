@@ -163,7 +163,7 @@ export const NameMarketConfig = () => {
         form.reset(defaultValues);
     }, [defaultValues, form, isLoading, isSaving, isDirty]);
 
-    if (!systemTokenLoading && systemToken?.untransferable) {
+    if (systemToken?.untransferable) {
         return (
             <PageContainer className="space-y-6">
                 <Card className="gap-4 py-4 shadow-sm">
