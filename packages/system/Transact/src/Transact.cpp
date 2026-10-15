@@ -78,9 +78,10 @@ namespace SystemService
          return true;
       }
 
+      // Db rejects a read of another service's prefix, so this cannot open FrozenTable.
       void checkNotFrozen(AccountNumber account)
       {
-         if (Accounts{}.open<FrozenTable>(KvMode::read).get(account))
+         if (to<Accounts>().isFrozen(std::vector<AccountNumber>{account}))
          {
             abortMessage("account " + account.str() + " has been frozen");
          }
