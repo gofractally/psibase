@@ -15,4 +15,8 @@ pub enum ErrorType {
     InvalidAdjustPct,
     #[error("initial_price is required when creating a name market for length {0}")]
     InitialPriceRequired(u8),
+    #[error("no purchased account {0}")]
+    PurchasedAccountNotFound(String),
+    #[error("not logged in")]
+    NotLoggedIn,
 }

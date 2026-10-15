@@ -4,6 +4,8 @@ mod events;
 #[allow(non_snake_case)]
 mod service {
 
+    use std::collections::HashSet;
+
     use async_graphql::{connection::Connection, *};
     use psibase::services::{http_server, nft::Wrapper as Nfts, tokens::TID};
 
@@ -175,18 +177,15 @@ mod service {
 
         /// Returns a list of all tokens for which the specified user is the owner/issuer.
         async fn user_tokens(&self, user: AccountNumber) -> Vec<Token> {
-            let tokens: Vec<Token> = TokenTable::with_service(tokens::SERVICE)
-                .get_index_pk()
-                .range(0..=(u32::MAX))
+            let held: HashSet<u32> = Nfts::call_from(Wrapper::SERVICE)
+                .getHeldIds(tokens::SERVICE, user)
+                .into_iter()
                 .collect();
 
-            tokens
-                .into_iter()
-                .filter(|token| {
-                    Nfts::call_from(Wrapper::SERVICE)
-                        .getNft(token.nft_id)
-                        .is_some_and(|nft| nft.owner == user)
-                })
+            TokenTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .range(0..=(u32::MAX))
+                .filter(|token| held.contains(&token.nft_id))
                 .collect()
         }
 

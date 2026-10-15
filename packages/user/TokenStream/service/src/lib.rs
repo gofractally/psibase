@@ -54,7 +54,7 @@ pub mod tables {
             let now = TransactSvc::call().currentBlock().time.seconds();
 
             Self {
-                nft_id: Nfts::call().mint(),
+                nft_id: Nfts::call().mint(None),
                 token_id,
                 half_life_seconds,
                 total_deposited: 0.into(),

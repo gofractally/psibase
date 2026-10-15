@@ -3,12 +3,16 @@
 mod service {
     use std::sync::OnceLock;
 
-    use async_graphql::{connection::Connection, *};
+    use async_graphql::{
+        connection::{Connection, Edge},
+        *,
+    };
     use name_market::tables::{
         Auction as AuctionRow, AuctionsTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use name_market::Wrapper as NameMarketService;
     use psibase::services::diff_adjust::{RateLimit, Wrapper as DiffAdjust};
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nfts};
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
@@ -129,6 +133,61 @@ mod service {
         )))
     }
 
+    fn page_purchased_accounts(
+        mut rows: Vec<PurchasedAccount>,
+        first: Option<i32>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
+        rows.sort_by_key(|row| row.account.value);
+
+        if let Some(cursor) = after.as_deref() {
+            let Ok(cursor_account) = AccountNumber::from_exact(cursor) else {
+                return Ok(Connection::new(false, false));
+            };
+            rows.retain(|row| row.account.value > cursor_account.value);
+        }
+
+        let limit = first.unwrap_or(i32::MAX).max(0) as usize;
+        let has_next = rows.len() > limit;
+        rows.truncate(limit);
+
+        let mut conn = Connection::new(after.is_some(), has_next);
+        conn.edges = rows
+            .into_iter()
+            .map(|row| Edge::new(row.account.to_string(), row))
+            .collect();
+        Ok(conn)
+    }
+
+    #[derive(SimpleObject)]
+    struct NftCredit {
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+    }
+
+    /// Unclaimed purchases whose redemption credit matches `user`.
+    ///
+    /// Credited names are NFTs the user holds. Debited names are NFTs namemarket holds.
+    fn owed_by_credit(user: AccountNumber, user_is_creditor: bool) -> Vec<PurchasedAccount> {
+        let service = NameMarketService::SERVICE;
+        let holder = if user_is_creditor { user } else { service };
+        let by_nft = PurchasedAccountsTable::read().get_index_by_nft();
+        Nfts::call()
+            .getHeldIds(service, holder)
+            .into_iter()
+            .filter_map(|nft_id| {
+                let row = by_nft.get(&nft_id)?;
+                let credit = Nfts::call().getCredRecord(nft_id)?;
+                let matches = if user_is_creditor {
+                    credit.creditor == user && credit.debitor == service
+                } else {
+                    credit.creditor == service && credit.debitor == user
+                };
+                matches.then_some(row)
+            })
+            .collect()
+    }
+
     fn serve_sys() -> services::transact::ServiceMethod {
         services::transact::ServiceMethod {
             service: crate::Wrapper::SERVICE,
@@ -187,26 +246,63 @@ mod service {
                 .collect()
         }
 
-        /// Bought-but-unclaimed account records for the authenticated user
+        /// Unclaimed accounts whose redemption NFT is owned by the authenticated user.
         async fn unclaimed_names(
             &self,
             first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, PurchasedAccount>> {
+        ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
             let user = self.require_authenticated()?;
+            let by_nft = PurchasedAccountsTable::read().get_index_by_nft();
+            let rows = Nfts::call()
+                .getHeldIds(NameMarketService::SERVICE, user)
+                .into_iter()
+                .filter_map(|nft_id| by_nft.get(&nft_id))
+                .collect();
+            page_purchased_accounts(rows, first, after)
+        }
 
-            TableQuery::subindex::<AccountNumber>(
-                PurchasedAccountsTable::read().get_index_by_owner(),
-                &user,
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
+        /// Unclaimed accounts whose redemption NFT the user has credited.
+        async fn credited_names(
+            &self,
+            first: Option<i32>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
+            let user = self.require_authenticated()?;
+            let rows = owed_by_credit(user, true);
+            page_purchased_accounts(rows, first, after)
+        }
+
+        /// Unclaimed accounts whose redemption NFT is credited to the user.
+        async fn debited_names(
+            &self,
+            first: Option<i32>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<String, PurchasedAccount>> {
+            let user = self.require_authenticated()?;
+            let rows = owed_by_credit(user, false);
+            page_purchased_accounts(rows, first, after)
+        }
+
+        /// Parties on the NFT credit record, if one exists.
+        async fn nft_credit(&self, nft_id: u32) -> Option<NftCredit> {
+            let credit = Nfts::call().getCredRecord(nft_id)?;
+            Some(NftCredit {
+                creditor: credit.creditor,
+                debitor: credit.debitor,
+            })
+        }
+
+        /// NFT auto-debit flag for `account`. A missing holder row is false.
+        async fn auto_debit(&self, account: AccountNumber) -> bool {
+            Nfts::call().getUserConf(account, NftHolderFlags::AUTO_DEBIT.index())
+        }
+
+        /// Purchased account row, if `account` is still unclaimed.
+        async fn purchased_account(&self, account: AccountNumber) -> Option<PurchasedAccount> {
+            PurchasedAccountsTable::read()
+                .get_index_pk()
+                .get(&account)
         }
 
         /// Events: account **name** history for `owner`

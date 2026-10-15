@@ -7,8 +7,8 @@ mod service {
     use nft::{
         service::NID,
         tables::{
-            CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftTable, UserPending,
-            UserPendingTable,
+            Burned, CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftTable,
+            UserPending, UserPendingTable,
         },
     };
     use psibase::services::{accounts::Account, http_server};
@@ -202,16 +202,39 @@ mod service {
             }
         }
 
-        async fn nftDetails(&self, nftId: NID) -> NftDetail {
+        /// Id that `mint` would assign when its id argument is omitted.
+        async fn nextId(&self) -> u32 {
+            Nft::peek_next_id()
+        }
+
+        /// Whether `mint` can create `id`.
+        async fn idAvailable(&self, id: u32) -> bool {
+            Nft::id_available(id)
+        }
+
+        /// Id `mint(Some)` should use for `id`.
+        ///
+        /// Returns `id` when it is free. A taken id above `nextId` walks
+        /// forward. A taken id at or below `nextId` resumes there.
+        async fn chooseId(&self, id: u32) -> u32 {
+            Nft::choose_id(id)
+        }
+
+        async fn nftDetails(&self, nftId: NID) -> async_graphql::Result<Option<NftDetail>> {
             use psibase::services::accounts::Wrapper as Accounts;
 
-            let nft = Nft::get_assert(nftId);
+            let Some(nft) = Nft::get(nftId) else {
+                if Burned::contains(nftId) {
+                    return Err(async_graphql::Error::new("NFT was burned"));
+                }
+                return Ok(None);
+            };
 
-            NftDetail {
+            Ok(Some(NftDetail {
                 id: nftId,
                 issuer: Accounts::call().getAccount(nft.issuer).unwrap().into(),
                 owner: Accounts::call().getAccount(nft.owner).unwrap().into(),
-            }
+            }))
         }
 
         /// NFTs `user` has credited and not yet debited or uncredited.

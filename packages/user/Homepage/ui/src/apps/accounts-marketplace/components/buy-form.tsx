@@ -153,7 +153,7 @@ export function BuyForm({
     );
 
     const hasInsufficientFunds = useMemo(() => {
-        if (!livePrice || isPendingBalances) {
+        if (!livePrice || isPendingBalances || livePrice.amount === 0) {
             return false;
         }
         if (!availableBalance) {

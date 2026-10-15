@@ -4,8 +4,17 @@ interface issuer {
     use host:types/types.{error};
 
 
-    /// Mint new NFT into existence.
-    mint: func() -> result<_, error>;
+    /// Mint a new NFT.
+    ///
+    /// Returns the id of NFT.
+    mint: func() -> result<u32, error>;
+
+    /// Pick an id for a later `mint`, without scheduling the mint.
+    ///
+    /// Submits a random guess to `chooseId`. A free guess is used. A taken
+    /// guess above the sequential cursor walks forward; one at or below it
+    /// resumes at the cursor.
+    guess-id: func() -> result<u32, error>;
 }
 
 
@@ -36,6 +45,10 @@ interface user {
     /// * `nft_id` - Unique NFT identifier
     /// * `memo`     - Memo describing the debit
     debit: func(nft-id: u32, memo: string) -> result<_, error>;
+
+    /// Debit a pending credit. The sender must be the debitor.
+    /// Ownership is checked only when no credit record exists.
+    try-debit: func(nft-id: u32, memo: string) -> result<_, error>;
 
     /// Burn NFT from the caller's posession.
     ///

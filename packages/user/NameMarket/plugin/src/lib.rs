@@ -222,41 +222,24 @@ impl Api for NameMarketPlugin {
 
     #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
-        let acct_name = AccountNumber::from_exact(&account)
-            .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
-
-        let service_account = name_market::SERVICE.to_string();
-
-        let sys_token_id =
-            TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
-
-        let length = account.len() as u8;
-        let ask_u64 = require_active_market_ask(length, sys_token_id)?;
-        let max_cost_u64 = TokensHelpers::decimal_to_u64(sys_token_id, &max_cost)?;
-        if max_cost_u64 < ask_u64 {
-            return Err(ErrorType::MaxCostBelowCurrentAsk.into());
-        }
-
-        TokensUser::credit(
-            sys_token_id,
-            &service_account,
-            &max_cost,
-            "account purchase",
-        )?;
-
-        name_market::Wrapper::add_to_tx().buy(acct_name);
-
+        schedule_buy(&account, &max_cost)?;
         Ok(())
+    }
+
+    #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
+    fn buy_and_claim(account: String, max_cost: String) -> Result<(), Error> {
+        let nft_id = schedule_buy(&account, &max_cost)?;
+        // Auto-debit consumes the purchase credit inside buy, so return the NFT for take.
+        if buyer_auto_debit()? {
+            bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
+        }
+        add_claim(&account)
     }
 
     #[psibase_plugin::authorized(Medium, whitelist = ["host", "homepage"])]
     fn claim(account: String) -> Result<(), Error> {
-        let account = AccountNumber::from_exact(&account)
-            .map_err(|_| ErrorType::InvalidAccountName(account))?;
-
-        name_market::Wrapper::add_to_tx().claim(account);
-
-        Ok(())
+        let nft_id = fetch_purchased_nft_id(&account)?;
+        schedule_claim(&account, nft_id)
     }
 }
 
@@ -320,6 +303,128 @@ struct MarketParamsData {
 #[serde(rename_all = "camelCase")]
 struct MarketParamsResponse {
     data: MarketParamsData,
+}
+
+#[derive(serde::Deserialize)]
+struct PurchasedAccountResponse {
+    data: PurchasedAccountData,
+}
+
+#[derive(serde::Deserialize)]
+struct PurchasedAccountData {
+    #[serde(rename = "purchasedAccount")]
+    purchased_account: Option<PurchasedAccountFields>,
+}
+
+#[derive(serde::Deserialize)]
+struct PurchasedAccountFields {
+    #[serde(rename = "nftId")]
+    nft_id: u32,
+}
+
+#[derive(serde::Deserialize)]
+struct AutoDebitResponse {
+    data: AutoDebitData,
+}
+
+#[derive(serde::Deserialize)]
+struct AutoDebitData {
+    #[serde(rename = "autoDebit")]
+    auto_debit: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct NftCreditResponse {
+    data: NftCreditData,
+}
+
+#[derive(serde::Deserialize)]
+struct NftCreditData {
+    #[serde(rename = "nftCredit")]
+    nft_credit: Option<NftCreditParties>,
+}
+
+#[derive(serde::Deserialize)]
+struct NftCreditParties {
+    creditor: String,
+    debitor: String,
+}
+
+fn schedule_buy(account: &str, max_cost: &String) -> Result<u32, Error> {
+    let acct_name = AccountNumber::from_exact(account)
+        .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
+    let nft_id = bindings::nft::plugin::issuer::guess_id()?;
+
+    let service_account = name_market::SERVICE.to_string();
+    let sys_token_id =
+        TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
+
+    let length = account.len() as u8;
+    let ask_u64 = require_active_market_ask(length, sys_token_id)?;
+    let max_cost_u64 = TokensHelpers::decimal_to_u64(sys_token_id, max_cost)?;
+    if max_cost_u64 < ask_u64 {
+        return Err(ErrorType::MaxCostBelowCurrentAsk.into());
+    }
+
+    if max_cost_u64 > 0 {
+        TokensUser::credit(sys_token_id, &service_account, max_cost, "account purchase")?;
+    }
+    name_market::Wrapper::add_to_tx().buy(acct_name, Some(nft_id));
+    Ok(nft_id)
+}
+
+fn current_user() -> Result<String, Error> {
+    bindings::host::accounts::api::get_current_user().ok_or_else(|| ErrorType::NotLoggedIn.into())
+}
+
+/// Credits the redemption NFT to namemarket when `take` would not already succeed.
+fn schedule_claim(account: &str, nft_id: u32) -> Result<(), Error> {
+    if !can_take(nft_id)? {
+        bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
+    }
+    add_claim(account)
+}
+
+fn add_claim(account: &str) -> Result<(), Error> {
+    let acct = AccountNumber::from_exact(account)
+        .map_err(|_| ErrorType::InvalidAccountName(account.to_string()))?;
+    name_market::Wrapper::add_to_tx().claim(acct);
+    Ok(())
+}
+
+fn buyer_auto_debit() -> Result<bool, Error> {
+    let user = current_user()?;
+    let query = format!("query {{ autoDebit(account: \"{user}\") }}");
+    let body = CommonServer::post_graphql_get_json(&query)?;
+    let response = serde_json::from_str::<AutoDebitResponse>(&body)
+        .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+    Ok(response.data.auto_debit)
+}
+
+fn can_take(nft_id: u32) -> Result<bool, Error> {
+    let user = current_user()?;
+    let query = format!("query {{ nftCredit(nftId: {nft_id}) {{ creditor debitor }} }}");
+    let body = CommonServer::post_graphql_get_json(&query)?;
+    let response = serde_json::from_str::<NftCreditResponse>(&body)
+        .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+    let Some(credit) = response.data.nft_credit else {
+        return Ok(false);
+    };
+    let service = name_market::SERVICE.to_string();
+    Ok((credit.creditor == service && credit.debitor == user)
+        || (credit.creditor == user && credit.debitor == service))
+}
+
+fn fetch_purchased_nft_id(account: &str) -> Result<u32, Error> {
+    let query = format!("query {{ purchasedAccount(account: \"{account}\") {{ nftId }} }}");
+    let body = CommonServer::post_graphql_get_json(&query)?;
+    let response = serde_json::from_str::<PurchasedAccountResponse>(&body)
+        .map_err(|err| Error::from(ErrorType::QueryResponseParseError(err.to_string())))?;
+    response
+        .data
+        .purchased_account
+        .map(|row| row.nft_id)
+        .ok_or_else(|| Error::from(ErrorType::PurchasedAccountNotFound(account.to_string())))
 }
 
 fn fetch_market_params() -> Result<Vec<MarketParamsRow>, Error> {
