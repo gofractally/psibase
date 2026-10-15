@@ -232,7 +232,6 @@ class LiveChainStore {
     private timer: ReturnType<typeof setTimeout> | null = null;
     private running = false;
     private inFlight = false;
-    private controller: AbortController | null = null;
     private viewer: string | null | undefined = undefined;
     private generation = 0;
 
@@ -268,13 +267,10 @@ class LiveChainStore {
         document.removeEventListener("visibilitychange", this.onVisibility);
         if (this.timer) clearTimeout(this.timer);
         this.timer = null;
-        this.controller?.abort();
     }
 
     private reset() {
         this.generation++;
-        this.controller?.abort();
-        this.controller = null;
         if (this.timer) clearTimeout(this.timer);
         this.timer = null;
         this.inFlight = false;
@@ -306,15 +302,10 @@ class LiveChainStore {
         if (this.inFlight) return;
         this.inFlight = true;
         const generation = this.generation;
-        const controller = new AbortController();
-        this.controller = controller;
         try {
-            await this.poll(controller.signal, generation);
+            await this.poll(generation);
         } catch (err) {
-            if (
-                generation === this.generation &&
-                !(err instanceof DOMException && err.name === "AbortError")
-            ) {
+            if (generation === this.generation) {
                 this.emit({
                     status: "error",
                     error: err instanceof Error ? err.message : String(err),
@@ -325,11 +316,10 @@ class LiveChainStore {
         // A reset while this poll was in flight already started a new one
         if (generation !== this.generation) return;
         this.inFlight = false;
-        this.controller = null;
         this.schedule();
     }
 
-    private async poll(signal: AbortSignal, generation: number) {
+    private async poll(generation: number) {
         const { blocks, seeded } = this.state;
         const lastNum = blocks.length
             ? blocks[blocks.length - 1].header.blockNum
@@ -338,7 +328,6 @@ class LiveChainStore {
             seeded && lastNum !== null
                 ? { gt: lastNum, first: WINDOW }
                 : { last: SEED },
-            signal,
         );
         if (generation !== this.generation) return;
         const incoming = connection.edges

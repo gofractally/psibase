@@ -59,9 +59,8 @@ export const useResourcePricing = (enabled = true) =>
     });
 
 /**
- * The VirtualServer plugin only serves its authorized GraphQL to first-party
- * apps, so from Explorer these calls may be rejected outright. Don't retry or
- * keep polling a query that has been refused; the UI shows a fallback instead.
+ * Don't retry or keep polling a query the VirtualServer plugin has refused;
+ * the UI shows a fallback instead.
  */
 const pollUnlessRefused =
     (interval: number) =>

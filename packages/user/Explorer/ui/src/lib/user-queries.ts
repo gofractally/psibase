@@ -1,16 +1,17 @@
 /**
  * Queries backing the signed-in user's dashboard.
  *
- * Network-wide facts (billing config, system token, resource prices) are read
- * from the services' public `/graphql` endpoints. Data that is only visible to
- * the account that owns it (balances, transfers, resource buffer, consumption)
- * goes through the services' authorized GraphQL plugins, which attach the
- * user's credentials after they grant Explorer permission.
+ * Everything is read through the explorer plugin, which forwards queries to the
+ * VirtualServer and Tokens plugins. Those attach the user's credentials, so
+ * data only visible to the account that owns it (balances, transfers, resource
+ * buffer, consumption) is included once the user grants Explorer permission.
  */
-import { gqlString, graphql } from "@/lib/graphql";
+import { explorer } from "@/lib/plugin";
+import { gqlString } from "@/lib/queries";
 
+import { toSystemTokenInfo } from "@shared/hooks/use-system-token";
 import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
-import { tokens, vserver } from "@shared/lib/plugins";
+import { callPluginFunction } from "@shared/lib/plugins";
 
 // ---------------------------------------------------------------------------
 // Network-wide billing facts (public)
@@ -25,13 +26,14 @@ export interface BillingConfig {
 
 /** `null` when resource billing has never been initialized on this network. */
 export const fetchBillingConfig = async (): Promise<BillingConfig | null> => {
-    const data = await graphql<{
+    const data = await graphqlAuth<{
         getBillingConfig: {
             sys: number;
             feeReceiver: string;
             enabled: boolean;
         } | null;
     }>(
+        explorer.virtualServer.graphql,
         `
             {
                 getBillingConfig {
@@ -41,7 +43,6 @@ export const fetchBillingConfig = async (): Promise<BillingConfig | null> => {
                 }
             }
         `,
-        "vserver",
     );
     return data.getBillingConfig;
 };
@@ -54,37 +55,10 @@ export interface SystemTokenInfo {
 }
 
 /** `null` when the network has no system token configured. */
-export const fetchSystemToken = async (): Promise<SystemTokenInfo | null> => {
-    const config = await graphql<{ config: { sysTid: number | null } | null }>(
-        `
-            {
-                config {
-                    sysTid
-                }
-            }
-        `,
-        "tokens",
+export const fetchSystemToken = async (): Promise<SystemTokenInfo | null> =>
+    toSystemTokenInfo(
+        await callPluginFunction(explorer.tokens.getSystemToken, []),
     );
-    const sysTid = config.config?.sysTid;
-    if (!sysTid) return null;
-    const res = await graphql<{
-        token: {
-            id: string | number;
-            precision: number;
-            symbol?: string | null;
-        } | null;
-    }>(
-        `{ token(tokenId: ${gqlString(String(sysTid))}) { id precision symbol } }`,
-        "tokens",
-    );
-    if (!res.token) return null;
-    const id = String(res.token.id);
-    return {
-        id,
-        symbol: res.token.symbol?.trim() || `ID: ${id}`,
-        precision: res.token.precision,
-    };
-};
 
 export interface RateLimitPricing {
     /** Smallest billable unit (CPU: ns, NET: bits). */
@@ -112,19 +86,19 @@ const RATE_FIELDS = `billableUnit pricePerUnit availableUnits avgUsagePct thresh
 
 /** Current market prices for CPU, network and storage. Requires billing to be initialized. */
 export const fetchResourcePricing = async (): Promise<ResourcePricing> => {
-    const data = await graphql<{
+    const data = await graphqlAuth<{
         cpuPricing: RateLimitPricing | null;
         networkPricing: RateLimitPricing | null;
         diskPricing: { remainingCapacity: number; maxCapacity: number } | null;
         diskCost: string;
     }>(
+        explorer.virtualServer.graphql,
         `{
             cpuPricing { ${RATE_FIELDS} }
             networkPricing { ${RATE_FIELDS} }
             diskPricing { remainingCapacity maxCapacity }
             diskCost(bytes: 1048576)
         }`,
-        "vserver",
     );
     return {
         cpu: data.cpuPricing,
@@ -158,7 +132,7 @@ export const fetchUserResources = async (
             autoFillThresholdPercent: string | number;
         } | null;
     }>(
-        vserver.authorized.graphql,
+        explorer.virtualServer.graphql,
         `{ userResources(account: ${gqlString(user)}) {
             balance bufferCapacity autoFillThresholdPercent
         } }`,
@@ -215,7 +189,7 @@ export const fetchConsumedHistory = async (
             }[];
         };
     }>(
-        vserver.authorized.graphql,
+        explorer.virtualServer.graphql,
         `{ consumedHistory(account: ${gqlString(user)}, last: ${last}) {
             edges { node {
                 block { blockNum blockTime }
@@ -273,7 +247,7 @@ export const fetchTokenTransfers = async (
             }[];
         };
     }>(
-        tokens.authorized.graphql,
+        explorer.tokens.graphql,
         `{ balChanges(tokenId: ${Number(tokenId)}, account: ${gqlString(user)}, last: ${last}) {
             edges { node {
                 block { blockNum blockTime }
@@ -324,7 +298,7 @@ export const fetchPendingTransfers = async (
             }[];
         };
     }>(
-        tokens.authorized.graphql,
+        explorer.tokens.graphql,
         `{ userPending(user: ${gqlString(user)}, first: 50) {
             nodes { sharedBal {
                 token { id symbol precision }

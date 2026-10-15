@@ -9,184 +9,68 @@ import type {
 
 import { getJson } from "@psibase/common-lib";
 
-import { FIRST_VISIBLE_BLOCK } from "./types";
-import { gqlString, graphql } from "./graphql";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { callPluginFunction } from "@shared/lib/plugins";
+
+import { type BlockRange, explorer } from "./plugin";
+
+export const gqlString = (value: string) => JSON.stringify(value);
+
+const parseOptional = <T>(json: string | undefined): T | null =>
+    json === undefined ? null : (JSON.parse(json) as T);
 
 // ---------------------------------------------------------------------------
 // Explorer service (block log)
+//
+// Block and transaction lookups go through the explorer plugin, which sends the
+// logged-in user's credentials (the service redacts transactions the viewer is
+// not a party to) and decodes action payloads into `data`.
 // ---------------------------------------------------------------------------
 
-/**
- * Fields fetched for list/feed views. Deliberately omits action payloads.
- *
- * `transaction` is redacted (null) unless the logged-in user is a party to it;
- * `numActions` and `actionsReceived` are public.
- */
-const BLOCK_SUMMARY_FIELDS = `
-    id
-    header {
-        previous
-        blockNum
-        time
-        producer
-        term
-        commitNum
-    }
-    actionsReceived { service count }
-    transactions {
-        id
-        numActions
-        transaction {
-            actions { sender service method }
-        }
-    }
-`;
-
-/** Full block including action payloads, merkle roots, and consensus changes. */
-const BLOCK_FULL_FIELDS = `
-    id
-    header {
-        previous
-        blockNum
-        time
-        producer
-        term
-        commitNum
-        consensusState
-        trxMerkleRoot
-        eventMerkleRoot
-        newConsensus {
-            data {
-                ... on CftConsensus { cft: producers { name auth { service rawData } } }
-                ... on BftConsensus { bft: producers { name auth { service rawData } } }
-            }
-            services { codeNum codeHash vmType vmVersion }
-            wasmConfig {
-                numExecutionMemories
-                vmOptions {
-                    max_mutable_global_bytes
-                    max_pages
-                    max_table_elements
-                    max_stack_bytes
-                }
-            }
-        }
-    }
-    actionsReceived { service count }
-    transactions {
-        id
-        numActions
-        transaction {
-            actions { sender service method rawData data }
-        }
-        proofs
-    }
-`;
-
-export interface BlockRangeArgs {
-    gt?: number;
-    ge?: number;
-    lt?: number;
-    le?: number;
-    first?: number;
-    last?: number;
-    before?: string;
-    after?: string;
-}
-
-const rangeArgs = (args: BlockRangeArgs) => {
-    // Never fetch the genesis block.
-    const merged: BlockRangeArgs = { ...args };
-    if (merged.ge === undefined && merged.gt === undefined) {
-        merged.ge = FIRST_VISIBLE_BLOCK;
-    } else if (merged.ge !== undefined && merged.ge < FIRST_VISIBLE_BLOCK) {
-        merged.ge = FIRST_VISIBLE_BLOCK;
-    } else if (merged.gt !== undefined && merged.gt < FIRST_VISIBLE_BLOCK - 1) {
-        merged.gt = FIRST_VISIBLE_BLOCK - 1;
-    }
-    return Object.entries(merged)
-        .filter(([, v]) => v !== undefined && v !== null && v !== "")
-        .map(([k, v]) =>
-            typeof v === "string" ? `${k}: ${gqlString(v)}` : `${k}: ${v}`,
-        )
-        .join(", ");
-};
+export type BlockRangeArgs = BlockRange;
 
 export const fetchBlocks = async (
     args: BlockRangeArgs,
-    signal?: AbortSignal,
-): Promise<Connection<BlockRecord>> => {
-    const data = await graphql<{ blocks: Connection<BlockRecord> }>(
-        `{ blocks(${rangeArgs(args)}) {
-            pageInfo { hasPreviousPage hasNextPage startCursor endCursor }
-            edges { cursor node { ${BLOCK_SUMMARY_FIELDS} } }
-        } }`,
-        undefined,
-        signal,
-    );
-    return data.blocks;
-};
+): Promise<Connection<BlockRecord>> =>
+    JSON.parse(
+        await callPluginFunction(explorer.blockLog.getBlocks, [args]),
+    ) as Connection<BlockRecord>;
 
+/** Full block including decoded action payloads, merkle roots, and consensus changes. */
 export const fetchBlock = async (
     blockNum: number,
-): Promise<BlockRecord | null> => {
-    if (blockNum < FIRST_VISIBLE_BLOCK) return null;
-    const data = await graphql<{ block: BlockRecord | null }>(
-        `{ block(blockNum: ${blockNum}) { ${BLOCK_FULL_FIELDS} } }`,
+): Promise<BlockRecord | null> =>
+    parseOptional<BlockRecord>(
+        await callPluginFunction(explorer.blockLog.getBlock, [blockNum]),
     );
-    return data.block;
-};
 
+/** Block without action payloads. */
 export const fetchBlockSummary = async (
     blockNum: number,
-): Promise<BlockRecord | null> => {
-    if (blockNum < FIRST_VISIBLE_BLOCK) return null;
-    const data = await graphql<{ block: BlockRecord | null }>(
-        `{ block(blockNum: ${blockNum}) { ${BLOCK_SUMMARY_FIELDS} } }`,
+): Promise<BlockRecord | null> =>
+    parseOptional<BlockRecord>(
+        await callPluginFunction(explorer.blockLog.getBlockSummary, [blockNum]),
     );
-    return data.block;
-};
 
 export const fetchBlockHeader = async (
     blockNum: number,
-): Promise<BlockHeader | null> => {
-    if (blockNum < FIRST_VISIBLE_BLOCK) return null;
-    const data = await graphql<{ block: { header: BlockHeader } | null }>(
-        `{ block(blockNum: ${blockNum}) { header { previous blockNum time producer term commitNum } } }`,
-    );
-    return data.block?.header ?? null;
-};
+): Promise<BlockHeader | null> =>
+    (await callPluginFunction(explorer.blockLog.getBlockHeader, [blockNum])) ??
+    null;
 
-export const fetchHead = async (
-    signal?: AbortSignal,
-): Promise<BlockHeader | null> => {
-    const data = await graphql<{ head: BlockHeader | null }>(
-        `{ head { previous blockNum time producer term commitNum } }`,
-        undefined,
-        signal,
-    );
-    return data.head;
-};
+export const fetchHead = async (): Promise<BlockHeader | null> =>
+    (await callPluginFunction(explorer.blockLog.getHead, [])) ?? null;
 
 export const findTransaction = async (
     id: string,
-    maxBlocks = 20000,
-): Promise<TransactionLocation | null> => {
-    const data = await graphql<{ transaction: TransactionLocation | null }>(
-        `{ transaction(id: ${gqlString(id)}, maxBlocks: ${maxBlocks}) {
-            blockNum blockId blockTime producer index
-            transaction {
-                id
-                numActions
-                transaction {
-                    actions { sender service method rawData data }
-                }
-                proofs
-            }
-        } }`,
+    maxBlocks?: number,
+): Promise<TransactionLocation | null> =>
+    parseOptional<TransactionLocation>(
+        await callPluginFunction(explorer.blockLog.findTransaction, [
+            id,
+            maxBlocks,
+        ]),
     );
-    return data.transaction;
-};
 
 // ---------------------------------------------------------------------------
 // Producers
@@ -212,13 +96,14 @@ const consensusMode = (c: ConsensusData | null | undefined) =>
     c?.cft ? "CFT" : c?.bft ? "BFT" : null;
 
 export const fetchProducersInfo = async (): Promise<ProducersInfo> => {
-    const data = await graphql<{
+    const data = await graphqlAuth<{
         producers: Producer[];
         nextProducers: Producer[];
         consensus: ConsensusData;
         nextConsensus: ConsensusData | null;
         jointStart: number | null;
     }>(
+        explorer.producers.graphql,
         `{
             producers { name auth { service rawData } }
             nextProducers { name auth { service rawData } }
@@ -232,7 +117,6 @@ export const fetchProducersInfo = async (): Promise<ProducersInfo> => {
             }
             jointStart
         }`,
-        "producers",
     );
     return {
         ...data,
@@ -245,19 +129,19 @@ export const fetchCandidates = async (
     names: string[],
 ): Promise<CandidateInfo[]> => {
     if (names.length === 0) return [];
-    const data = await graphql<{ candidatesInfo: CandidateInfo[] }>(
+    const data = await graphqlAuth<{ candidatesInfo: CandidateInfo[] }>(
+        explorer.producers.graphql,
         `{ candidatesInfo(names: [${names.map(gqlString).join(",")}]) {
             account endpoint claim { service rawData }
         } }`,
-        "producers",
     );
     return data.candidatesInfo;
 };
 
 export const fetchAllCandidates = async (): Promise<CandidateInfo[]> => {
-    const data = await graphql<{ allCandidates: Connection<CandidateInfo> }>(
+    const data = await graphqlAuth<{ allCandidates: Connection<CandidateInfo> }>(
+        explorer.producers.graphql,
         `{ allCandidates(first: 200) { edges { node { account endpoint claim { service rawData } } } } }`,
-        "producers",
     );
     return data.allCandidates.edges.map((e) => e.node);
 };
@@ -275,11 +159,15 @@ export interface AccountInfo {
 export const fetchAccount = async (
     name: string,
 ): Promise<AccountInfo | null> => {
-    const data = await graphql<{ getAccount: AccountInfo | null }>(
-        `{ getAccount(accountName: ${gqlString(name)}) { accountNum authService authSequence } }`,
-        "accounts",
-    );
-    return data.getAccount;
+    const account = await callPluginFunction(explorer.accounts.getAccount, [
+        name,
+    ]);
+    if (!account) return null;
+    return {
+        accountNum: account.accountNum,
+        authService: account.authService,
+        authSequence: String(account.authSequence),
+    };
 };
 
 export interface AuthRecord {
@@ -291,11 +179,11 @@ export const fetchAuthRecord = async (
     name: string,
 ): Promise<AuthRecord | null> => {
     try {
-        const data = await graphql<{ account: AuthRecord | null }>(
-            `{ account(name: ${gqlString(name)}) { account pubkey } }`,
-            "auth-sig",
+        const pubkey = await callPluginFunction(
+            explorer.accounts.getAuthSigPubkey,
+            [name],
         );
-        return data.account;
+        return pubkey === undefined ? null : { account: name, pubkey };
     } catch {
         return null;
     }
@@ -310,11 +198,11 @@ export const fetchAuthDelegateOwner = async (
     name: string,
 ): Promise<AuthDelegateRecord | null> => {
     try {
-        const data = await graphql<{ owner: AuthDelegateRecord | null }>(
-            `{ owner(account: ${gqlString(name)}) { account owner } }`,
-            "auth-delg",
+        const owner = await callPluginFunction(
+            explorer.accounts.getDelegateOwner,
+            [name],
         );
-        return data.owner;
+        return owner === undefined ? null : { account: name, owner };
     } catch {
         return null;
     }
@@ -329,11 +217,11 @@ export const fetchAuthDynManagement = async (
     name: string,
 ): Promise<AuthDynManagement | null> => {
     try {
-        const data = await graphql<{ getManagement: AuthDynManagement | null }>(
-            `{ getManagement(account: ${gqlString(name)}) { account manager } }`,
-            "auth-dyn",
+        const manager = await callPluginFunction(
+            explorer.accounts.getDynManager,
+            [name],
         );
-        return data.getManagement;
+        return manager === undefined ? null : { account: name, manager };
     } catch {
         return null;
     }
@@ -353,30 +241,19 @@ export const fetchAuthDynPolicy = async (
     name: string,
 ): Promise<AuthDynPolicy | null> => {
     try {
-        const data = await graphql<{ getPolicy: AuthDynPolicy | null }>(
-            `{ getPolicy(account: ${gqlString(name)}) {
-                threshold
-                authorizers { account weight }
-            } }`,
-            "auth-dyn",
+        return (
+            (await callPluginFunction(explorer.accounts.getDynPolicy, [
+                name,
+            ])) ?? null
         );
-        return data.getPolicy;
     } catch {
         return null;
     }
 };
 
-export const fetchAccountsWithKey = async (
-    pubkeyPem: string,
-): Promise<AuthRecord[]> => {
-    const data = await graphql<{ accWithKey: Connection<AuthRecord> }>(
-        `{ accWithKey(pubkeyPem: ${gqlString(pubkeyPem)}, first: 50) {
-            edges { node { account pubkey } }
-        } }`,
-        "auth-sig",
-    );
-    return data.accWithKey.edges.map((e) => e.node);
-};
+/** Accounts whose auth-sig key is `pubkeyPem`. */
+export const fetchAccountsWithKey = (pubkeyPem: string): Promise<string[]> =>
+    callPluginFunction(explorer.accounts.getAccountsWithKey, [pubkeyPem]);
 
 export interface CodeRecord {
     codeNum: string;
@@ -390,9 +267,9 @@ export const fetchCode = async (
     account: string,
 ): Promise<CodeRecord | null> => {
     try {
-        const data = await graphql<{ code: CodeRecord | null }>(
+        const data = await graphqlAuth<{ code: CodeRecord | null }>(
+            explorer.setcode.graphql,
             `{ code(account: ${gqlString(account)}) { codeNum flags codeHash vmType vmVersion } }`,
-            "setcode",
         );
         return data.code;
     } catch {
@@ -415,21 +292,19 @@ export interface InstalledPackage {
 }
 
 export const fetchInstalledPackages = async (): Promise<InstalledPackage[]> => {
-    const result: InstalledPackage[] = [];
-    let after: string | undefined;
-    for (let i = 0; i < 20; i++) {
-        const data = await graphql<{ installed: Connection<InstalledPackage> }>(
-            `{ installed(first: 100${after ? `, after: ${gqlString(after)}` : ""}) {
-                pageInfo { hasNextPage endCursor }
-                edges { node { name version description depends { name version } accounts services owner } }
-            } }`,
-            "packages",
-        );
-        result.push(...data.installed.edges.map((e) => e.node));
-        if (!data.installed.pageInfo.hasNextPage) break;
-        after = data.installed.pageInfo.endCursor;
-    }
-    return result;
+    const packages = await callPluginFunction(
+        explorer.network.getInstalledPackages,
+        [],
+    );
+    return packages.map(({ meta, owner }) => ({
+        name: meta.name,
+        version: meta.version,
+        description: meta.description,
+        depends: meta.depends,
+        accounts: meta.accounts,
+        services: meta.services,
+        owner,
+    }));
 };
 
 // ---------------------------------------------------------------------------
@@ -452,11 +327,11 @@ export const fetchAppMetadata = async (
     account: string,
 ): Promise<AppMetadata | null> => {
     try {
-        const data = await graphql<{ appMetadata: AppMetadata | null }>(
+        const data = await graphqlAuth<{ appMetadata: AppMetadata | null }>(
+            explorer.registry.graphql,
             `{ appMetadata(accountId: ${gqlString(account)}) {
                 accountId name shortDesc longDesc icon iconMimeType createdAt tags status
             } }`,
-            "registry",
         );
         return data.appMetadata;
     } catch {
@@ -479,9 +354,9 @@ export const fetchSiteConfig = async (
     account: string,
 ): Promise<SiteConfig | null> => {
     try {
-        const data = await graphql<{ getConfig: SiteConfig | null }>(
+        const data = await graphqlAuth<{ getConfig: SiteConfig | null }>(
+            explorer.sites.graphql,
             `{ getConfig(account: ${gqlString(account)}) { account spa cache globalCsp } }`,
-            "sites",
         );
         return data.getConfig;
     } catch {
@@ -500,9 +375,9 @@ export interface SnapshotInfo {
 
 export const fetchSnapshotInfo = async (): Promise<SnapshotInfo | null> => {
     try {
-        const data = await graphql<{ snapshotInfo: SnapshotInfo | null }>(
+        const data = await graphqlAuth<{ snapshotInfo: SnapshotInfo | null }>(
+            explorer.transact.graphql,
             `{ snapshotInfo { lastSnapshot snapshotInterval } }`,
-            "transact",
         );
         return data.snapshotInfo;
     } catch {
@@ -512,11 +387,7 @@ export const fetchSnapshotInfo = async (): Promise<SnapshotInfo | null> => {
 
 export const fetchNetworkName = async (): Promise<string> => {
     try {
-        const data = await graphql<{ networkName: string }>(
-            `{ networkName }`,
-            "branding",
-        );
-        return data.networkName;
+        return await callPluginFunction(explorer.network.getNetworkName, []);
     } catch {
         return "";
     }

@@ -64,18 +64,14 @@ export const resolveSearch = async (raw: string): Promise<SearchResolution> => {
 
     if (kind === "public-key") {
         try {
-            const records = await fetchAccountsWithKey(term);
-            if (records.length === 1) {
+            const accounts = await fetchAccountsWithKey(term);
+            if (accounts.length === 1) {
                 return {
                     type: "navigate",
-                    to: `/accounts/${records[0].account}`,
+                    to: `/accounts/${accounts[0]}`,
                 };
             }
-            return {
-                type: "accounts",
-                accounts: records.map((r) => r.account),
-                term,
-            };
+            return { type: "accounts", accounts, term };
         } catch {
             return { type: "not-found", term, kind };
         }

@@ -132,7 +132,7 @@ impl Helpers for TokensPlugin {
         }))
     }
 
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "host", "config"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "host", "config", "explorer"])]
     fn get_user_balances(user: String) -> Result<Vec<Exports::types::UserBalance>, Error> {
         Ok(query::get_user_balances::get_user_balances(&user)?
             .into_iter()
