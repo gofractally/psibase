@@ -11,7 +11,6 @@ mod import_context;
 use db::{apps_table::AppsTable, user_table::UserTable};
 /// App id for Host plugins and UI (no on-chain service).
 pub(crate) const HOST_APP: &str = "host";
-pub(crate) const X_ADMIN_APP: &str = "x-admin";
 use errors::ErrorType::NotConnected;
 use helpers::*;
 use import_context::ImportNewContext;
@@ -95,7 +94,7 @@ impl ActiveApp for HostAccounts {
 
 impl Admin for HostAccounts {
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
-        check_caller(&[HOST_APP, X_ADMIN_APP], "import-existing@host:accounts/admin");
+        check_caller(&[HOST_APP, "x-admin"], "import-existing@host:accounts/admin");
         import::import_existing(credentials)
     }
 
