@@ -381,13 +381,17 @@ namespace
 
    AdminConfig adminView(const HttpRequest& req, const PortalConfig& config)
    {
+      auto key = readCreatorAgentKey();
       return AdminConfig{.requests_enabled           = config.requests_enabled,
                          .price_per_token_usd_micros = config.price_per_token_usd_micros,
                          .free_tier                  = TierView{.enabled   = config.free_tier.enabled,
                                                                 .usd_cents = config.free_tier.usd_cents,
                                                                 .tokens    = tierTokens(config)},
                          .producer                   = configuredProducer(),
-                         .account                    = to<RTransact>().getUser(req)};
+                         .account                    = to<RTransact>().getUser(req),
+                         .creator_pubkey = key ? std::optional<AuthSig::SubjectPublicKeyInfo>{key->pubkey}
+                                              : std::nullopt,
+                         .creator_allowed = XPortal::creatorAllowed()};
    }
 
    Status portalStatus(const PortalConfig& config)

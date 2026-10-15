@@ -21,7 +21,7 @@ export class PortalError extends Error {
     }
 }
 
-const parseReply = async <T>(
+export const parseReply = async <T>(
     reply: Promise<Response>,
     schema: z.ZodType<T>,
 ): Promise<T> => {

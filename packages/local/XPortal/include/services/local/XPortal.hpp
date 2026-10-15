@@ -5,7 +5,10 @@
 #include <psibase/Service.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/time.hpp>
+#include <services/system/AuthScope.hpp>
 #include <services/system/Spki.hpp>
+#include <services/system/VirtualServer.hpp>
+#include <services/user/Tokens.hpp>
 #include <services/user/tokenTypes.hpp>
 #include <string>
 #include <vector>
@@ -114,12 +117,18 @@ namespace LocalService
       TierView                              free_tier;
       std::optional<psibase::AccountNumber> producer;
       std::optional<psibase::AccountNumber> account;
+      /// PEM public key once `POST /admin/agents/creator/keygen` has stored one.
+      std::optional<SystemService::AuthSig::SubjectPublicKeyInfo> creator_pubkey;
+      /// Canonical whitelist applied when `ac-creator` is created. Not the on-chain row.
+      std::vector<SystemService::AllowedAction> creator_allowed;
       PSIO_REFLECT(AdminConfig,
                    requests_enabled,
                    price_per_token_usd_micros,
                    free_tier,
                    producer,
-                   account)
+                   account,
+                   creator_pubkey,
+                   creator_allowed)
    };
 
    struct Condition
@@ -172,7 +181,9 @@ namespace LocalService
    /// x-admin administrator. `PUT` changes only `requests_enabled`.
    /// `POST /admin/agents/creator/keygen` returns `AgentKey("creator")`,
    /// creating it in `x-keys` when absent. It returns 409 when `ac-creator`
-   /// already exists.
+   /// already exists. `GET /admin/config` includes that key as `creator_pubkey`
+   /// and `creator_allowed`, the canonical whitelist applied when `ac-creator`
+   /// is created.
    ///
    /// `POST /admin/agents/creator/test` pushes the `ac-creator` setup
    /// transaction (enable auto-debit and debit any pending producer credit)
@@ -202,6 +213,18 @@ namespace LocalService
       static constexpr auto service        = psibase::AccountNumber{"x-portal"};
       static constexpr auto creatorAccount = psibase::AccountNumber{"ac-creator"};
       static constexpr auto creatorAgent   = std::string_view{"creator"};
+
+      /// Actions `ac-creator`'s key may authorize. `GET /admin/config` returns this list.
+      static std::vector<SystemService::AllowedAction> creatorAllowed()
+      {
+         return {
+             {psibase::AccountNumber{"auth-sig"}, psibase::MethodNumber{"newAccount"}},
+             {UserService::Tokens::service, psibase::MethodNumber{"credit"}},
+             {UserService::Tokens::service, psibase::MethodNumber{"debit"}},
+             {UserService::Tokens::service, psibase::MethodNumber{"setUserConf"}},
+             {SystemService::VirtualServer::service, psibase::MethodNumber{"buy_res_for"}},
+         };
+      }
 
       using Subjective =
           psibase::SubjectiveTables<PortalConfigTable, AgentKeyTable, SignupTable, AgentSetupTable>;
