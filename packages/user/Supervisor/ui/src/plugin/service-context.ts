@@ -21,7 +21,8 @@ type ServiceUiDeps = {
 };
 
 async function getServiceMap(service: string): Promise<ServiceMap | null> {
-    const url = siblingUrl(null, "dyn-ld", `/graphql`);
+    const dynLd = service.startsWith("x-") ? "x-dyn-ld" : "dyn-ld";
+    const url = siblingUrl(null, dynLd, `/graphql`);
     const query = `query { depsFor(service: "${service}") { deps { name service }}}`;
     const result = await postGraphQLGetJson<ServiceUiDeps>(url, query);
     if (result.data.depsFor) {
