@@ -28,7 +28,6 @@ import { getRequiredPackages } from "@/lib/get-required-packages";
 import { ErrorCard } from "@shared/components/error-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { pemToB64 } from "@shared/lib/b64-key-utils";
-import { cn } from "@shared/lib/utils";
 import { zAccount } from "@shared/lib/schemas/account";
 import {
     Card,
@@ -46,7 +45,6 @@ import { useStepper } from "../hooks/use-stepper";
 import {
     bootTemplatesAvailable,
     getDefaultSelectedPackages,
-    nodeLocalPackageForTemplate,
 } from "../hooks/use-templated-packages";
 import {
     BootCompleteSchema,
@@ -118,10 +116,6 @@ export const CreatePage = () => {
 
     const template = chainTypeForm.watch("type");
     const isDev = template === "dev";
-    const nodeLocalPackage =
-        template !== undefined
-            ? nodeLocalPackageForTemplate(template)
-            : undefined;
     const keyDevice = keyDeviceForm.watch("id");
 
     const importForm = useAppForm({
@@ -289,7 +283,6 @@ export const CreatePage = () => {
                     blockSigningPubKey,
                     txSigningPubKeyPem: txSigningKeyPair?.[0],
                     compression: isDev ? 4 : 7,
-                    nodeLocalPackage,
                     onProgressUpdate: (state) => {
                         if (isRequestingUpdate(state)) {
                             const [, completed, started, labels] = state;
@@ -344,7 +337,6 @@ export const CreatePage = () => {
         rows,
         config,
         isDev,
-        nodeLocalPackage,
         keyDevice,
         packages,
         createAndSetKey,
@@ -393,14 +385,7 @@ export const CreatePage = () => {
             )}
             <div className="relative flex min-h-0 flex-1 flex-col">
                 <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-8">
-                    <div
-                        className={cn(
-                            "mx-auto flex flex-col pb-6",
-                            currentStep === Step.ChainType
-                                ? "max-w-6xl"
-                                : "max-w-3xl",
-                        )}
-                    >
+                    <div className="mx-auto flex max-w-3xl flex-col pb-6">
                         <div className="mb-8">
                             <Steps
                                 currentStep={currentStepNum}

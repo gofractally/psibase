@@ -38,9 +38,6 @@ import {
     extractPackage,
 } from "./chain-endpoints/package-extraction";
 import { recursiveFetch } from "./recursive-fetch";
-import { adminGraphql } from "./admin-graphql";
-import { getRequiredPackages } from "./get-required-packages";
-import { PackageInfo } from "../types";
 
 export const Peer = z
     .object({
@@ -347,119 +344,6 @@ class Chain {
                 headers: await adminBearerAuthHeaders(),
             }),
         );
-    }
-
-    public async installNodeLocalPackageByFile(
-        fileName: string,
-    ): Promise<{
-        success: boolean;
-        installed: string[];
-        failed?: { name: string; error: string };
-        notAttempted: string[];
-    }> {
-        const buffer = await getPackageBuffer(fileName);
-        const file = new File([buffer], fileName, { type: "application/zip" });
-        return this.installNodeLocalPackage(file);
-    }
-
-    public async installNodeLocalPackageSet(packageName: string): Promise<{
-        success: boolean;
-        installed: string[];
-        failed?: { name: string; error: string };
-        notAttempted: string[];
-    }> {
-        const index = await getJson<PackageInfo[]>("/packages/index.json");
-        if (!index) {
-            return {
-                success: false,
-                installed: [],
-                failed: {
-                    name: packageName,
-                    error: "Failed to load /packages/index.json",
-                },
-                notAttempted: [],
-            };
-        }
-        const localPackages = index.filter((p) => p.scope === "local");
-        let resolved: PackageInfo[];
-        try {
-            resolved = getRequiredPackages(localPackages, [packageName]);
-        } catch (error) {
-            return {
-                success: false,
-                installed: [],
-                failed: {
-                    name: packageName,
-                    error:
-                        error instanceof Error ? error.message : String(error),
-                },
-                notAttempted: [],
-            };
-        }
-        if (resolved.length === 0) {
-            return {
-                success: false,
-                installed: [],
-                failed: {
-                    name: packageName,
-                    error: `No packages resolved for ${packageName}`,
-                },
-                notAttempted: [],
-            };
-        }
-
-        const InstalledLocal = z.object({
-            installed: z.object({
-                edges: z.array(
-                    z.object({ node: z.object({ name: z.string() }) }),
-                ),
-            }),
-        });
-        const installedRes = InstalledLocal.parse(
-            await adminGraphql(
-                "{ installed(first: 100) { edges { node { name } } } }",
-                { service: "x-packages" },
-            ),
-        );
-        const installedNames = new Set(
-            installedRes.installed.edges.map((e) => e.node.name),
-        );
-
-        const installedServices: string[] = [];
-        for (const pack of resolved) {
-            if (installedNames.has(pack.name)) {
-                continue;
-            }
-            const result = await this.installNodeLocalPackageByFile(pack.file);
-            installedServices.push(...result.installed);
-            if (!result.success) {
-                return {
-                    success: false,
-                    installed: installedServices,
-                    failed: result.failed,
-                    notAttempted: result.notAttempted,
-                };
-            }
-            installedNames.add(pack.name);
-        }
-
-        if (!installedNames.has(packageName)) {
-            return {
-                success: false,
-                installed: installedServices,
-                failed: {
-                    name: packageName,
-                    error: `${packageName} was not installed`,
-                },
-                notAttempted: [],
-            };
-        }
-
-        return {
-            success: true,
-            installed: installedServices,
-            notAttempted: [],
-        };
     }
 
     public async installNodeLocalPackage(file: File): Promise<{

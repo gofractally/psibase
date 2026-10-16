@@ -55,7 +55,6 @@ interface Props {
 const templateLabel: Record<BootTemplate, string> = {
     dev: "Developer",
     prod: "Production",
-    priv: "Private",
 };
 
 const devAccountTypeHint =

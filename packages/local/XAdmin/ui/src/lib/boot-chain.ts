@@ -14,7 +14,6 @@ type BootChainParams = {
     blockSigningPubKey: CryptoKey | undefined;
     txSigningPubKeyPem: string | undefined;
     compression: number;
-    nodeLocalPackage?: string;
     onProgressUpdate: (state: BootState) => void;
 };
 
@@ -24,7 +23,6 @@ export const bootChain = async ({
     blockSigningPubKey,
     txSigningPubKeyPem,
     compression,
-    nodeLocalPackage,
     onProgressUpdate,
 }: BootChainParams): Promise<void> => {
     try {
@@ -95,32 +93,6 @@ export const bootChain = async ({
             i++;
         }
         onProgressUpdate(["push", labels.length, labels.length, labels]);
-
-        if (nodeLocalPackage) {
-            onProgressUpdate([
-                "push",
-                labels.length,
-                labels.length + 1,
-                [...labels, `Installing ${nodeLocalPackage}`],
-            ]);
-            const localInstall =
-                await chain.installNodeLocalPackageSet(nodeLocalPackage);
-            if (!localInstall.success) {
-                const detail = localInstall.failed?.error ?? "Local package install failed";
-                onProgressUpdate(detail);
-                onProgressUpdate({
-                    type: "BootComplete",
-                    success: false,
-                });
-                return;
-            }
-            onProgressUpdate([
-                "push",
-                labels.length + 1,
-                labels.length + 1,
-                [...labels, `Installing ${nodeLocalPackage}`],
-            ]);
-        }
 
         onProgressUpdate({ type: "BootComplete", success: true });
     } catch (e) {
