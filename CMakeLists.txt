@@ -742,7 +742,7 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthScope-schema.json
         DATA ${Plugins_OUTPUT_FILE_auth_scope_plugin} /plugin.wasm
     DEPENDS wasm ${Plugins_DEP}
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
