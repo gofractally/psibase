@@ -21,6 +21,9 @@ interface boot {
 
 interface packages {
     resolve-packages: func(index-json-str: string, packages: list<string>) -> result<string, string>;
+    local-upload-needs-network-installed: func(index-json-str: string, package-meta-json: string, local-installed-json: string) -> result<bool, string>;
+    check-local-upload-network-deps: func(index-json-str: string, package-meta-json: string, local-installed-json: string, network-installed-json: string) -> result<_, string>;
+    local-upload-dyn-ld-links: func(package-bytes: list<u8>, local-installed-json: string, network-installed-json: string) -> result<string, string>;
 }
 
 interface crypto {

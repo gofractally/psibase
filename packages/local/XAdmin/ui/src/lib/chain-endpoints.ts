@@ -34,6 +34,10 @@ import {
     installManifest,
 } from "./chain-endpoints/package-api";
 import {
+    linkLocalUploadDynLd,
+    prepareLocalUploadResolution,
+} from "./chain-endpoints/local-package-resolution";
+import {
     buildManifestPayload,
     extractPackage,
 } from "./chain-endpoints/package-extraction";
@@ -356,8 +360,11 @@ class Chain {
         let allServices: string[] = [];
 
         try {
-            const { zip, services, meta, sha256 } = await extractPackage(file);
+            const { zip, services, meta, sha256, packageBytes } =
+                await extractPackage(file);
             allServices = services;
+
+            const resolution = await prepareLocalUploadResolution(meta);
 
             await callPreinstall(meta);
 
@@ -366,6 +373,8 @@ class Chain {
 
             installed = await installAllServices(zip, services);
             await installDataFiles(zip);
+
+            await linkLocalUploadDynLd(packageBytes, resolution);
 
             await callPostinstall(meta);
 

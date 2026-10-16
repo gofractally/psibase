@@ -37,6 +37,20 @@ fn parse_public_key_pem(public_key_pem: Option<String>) -> Result<Option<AnyPubl
 
 struct XAdminPlugin;
 
+fn installed_lists_from_json(
+    local_installed_json: &str,
+    network_installed_json: &str,
+) -> Result<(PackageList, PackageList), String> {
+    let local: Vec<LocalPackageInfo> =
+        serde_json::from_str(local_installed_json).map_err(|e| e.to_string())?;
+    let network: Vec<InstalledPackageInfo> =
+        serde_json::from_str(network_installed_json).map_err(|e| e.to_string())?;
+    Ok((
+        package_list_from_local_installed(&local),
+        package_list_from_network_installed(&network),
+    ))
+}
+
 impl Boot for XAdminPlugin {
     fn boot_transactions(
         producer: String,
@@ -152,6 +166,61 @@ impl Packages for XAdminPlugin {
         .map_err(|e| e.to_string())?;
 
         Ok(serde_json::to_string(&solved).map_err(|e| e.to_string())?)
+    }
+
+    fn local_upload_needs_network_installed(
+        index_json_str: String,
+        package_meta_json: String,
+        local_installed_json: String,
+    ) -> Result<bool, String> {
+        let index: Vec<PackageInfo> =
+            serde_json::from_str(&index_json_str).map_err(|e| e.to_string())?;
+        let package: Meta =
+            serde_json::from_str(&package_meta_json).map_err(|e| e.to_string())?;
+        let local: Vec<LocalPackageInfo> =
+            serde_json::from_str(&local_installed_json).map_err(|e| e.to_string())?;
+        local_upload_needs_network_installed(
+            &index,
+            &package_list_from_local_installed(&local),
+            &package,
+        )
+        .map_err(|e| e.to_string())
+    }
+
+    fn check_local_upload_network_deps(
+        index_json_str: String,
+        package_meta_json: String,
+        local_installed_json: String,
+        network_installed_json: String,
+    ) -> Result<(), String> {
+        let index: Vec<PackageInfo> =
+            serde_json::from_str(&index_json_str).map_err(|e| e.to_string())?;
+        let package: Meta =
+            serde_json::from_str(&package_meta_json).map_err(|e| e.to_string())?;
+        let (installed_local, network_installed) =
+            installed_lists_from_json(&local_installed_json, &network_installed_json)?;
+        check_local_upload_network_deps(
+            &index,
+            &installed_local,
+            &network_installed,
+            &package,
+        )
+        .map_err(|e| e.to_string())
+    }
+
+    fn local_upload_dyn_ld_links(
+        package_bytes: Vec<u8>,
+        local_installed_json: String,
+        network_installed_json: String,
+    ) -> Result<String, String> {
+        let package =
+            PackagedService::new(Cursor::new(package_bytes)).map_err(|e| e.to_string())?;
+        let (installed_local, network_installed) =
+            installed_lists_from_json(&local_installed_json, &network_installed_json)?;
+        let links = package
+            .local_dyn_ld_links(&installed_local, &network_installed)
+            .map_err(|e| e.to_string())?;
+        serde_json::to_string(&links).map_err(|e| e.to_string())
     }
 }
 

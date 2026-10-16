@@ -2,7 +2,7 @@
 
 use crate::services::{
     brotli_svc::brotli_impl, dyn_ld, http_server, packages, producers, setcode, sites, transact,
-    x_sites,
+    x_dyn_ld, x_sites,
 };
 use crate::{
     deserialize_pretty_action, new_account_owned_action, preapprove_action, reg_server,
@@ -31,7 +31,7 @@ use std::str::FromStr;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
-use crate::services::{x_admin, x_dyn_ld, x_http, x_packages};
+use crate::services::{x_admin, x_http, x_packages};
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
@@ -1142,6 +1142,34 @@ impl<R: Read + Seek> PackagedService<R> {
         ))
     }
 
+    fn x_dyn_ld_link_requests(
+        &self,
+        packages: &PackageList,
+    ) -> Result<Vec<x_dyn_ld::LinkRequest>, anyhow::Error> {
+        let (services, imports) = self.linked_imports(packages)?;
+        Ok(services
+            .into_iter()
+            .map(|service| x_dyn_ld::LinkRequest {
+                service,
+                group: self.meta.name.clone(),
+                deps: imports.clone(),
+            })
+            .collect())
+    }
+
+    pub fn local_dyn_ld_links(
+        &self,
+        installed_local: &PackageList,
+        network_installed: &PackageList,
+    ) -> Result<Vec<x_dyn_ld::LinkRequest>, anyhow::Error> {
+        let link_packages = installed_local.for_local_upload(
+            network_installed.clone(),
+            self.meta(),
+            self.hash().clone(),
+        );
+        self.x_dyn_ld_link_requests(&link_packages)
+    }
+
     // packages must contain
     // - all packages being installed
     // - installed packages that are not being updated, and that
@@ -1247,19 +1275,8 @@ impl<R: Read + Seek> PackagedService<R> {
         client: &mut reqwest::Client,
         packages: &PackageList,
     ) -> Result<(), anyhow::Error> {
-        let (services, imports) = self.linked_imports(packages)?;
-        for service in services {
-            post_local_dyn_ld(
-                base_url,
-                client,
-                "/link",
-                &x_dyn_ld::LinkRequest {
-                    service,
-                    group: self.meta.name.clone(),
-                    deps: imports.clone(),
-                },
-            )
-            .await?;
+        for request in self.x_dyn_ld_link_requests(packages)? {
+            post_local_dyn_ld(base_url, client, "/link", &request).await?;
         }
         Ok(())
     }
@@ -3060,6 +3077,26 @@ impl PackageList {
         packages
     }
 
+    // Local installed, network packages whose names are not shadowed by local
+    // installs, and the package being uploaded as Local with the given sha256.
+    pub fn for_local_upload(
+        &self,
+        network_installed: PackageList,
+        package: &Meta,
+        sha256: Checksum256,
+    ) -> Self {
+        let mut packages = self.clone();
+        packages.merge_unshadowed_network(network_installed);
+        packages.apply_resolution_edits([LocalResolutionEdit {
+            remove: None,
+            insert: Some((
+                package.clone(),
+                PackageOrigin::Local { sha256 },
+            )),
+        }]);
+        packages
+    }
+
     #[cfg(test)]
     fn local_resolution_list(
         &self,
@@ -3116,6 +3153,79 @@ impl PackageList {
 struct LocalResolutionEdit {
     remove: Option<String>,
     insert: Option<(Meta, PackageOrigin)>,
+}
+
+pub fn package_list_from_local_installed(infos: &[LocalPackageInfo]) -> PackageList {
+    let mut list = PackageList::new();
+    for info in infos {
+        list.insert_local(info.clone());
+    }
+    list
+}
+
+pub fn package_list_from_network_installed(infos: &[InstalledPackageInfo]) -> PackageList {
+    let mut list = PackageList::new();
+    for info in infos {
+        list.insert_installed(info.clone());
+    }
+    list
+}
+
+pub fn local_upload_needs_network_installed(
+    index: &[PackageInfo],
+    installed_local: &PackageList,
+    package: &Meta,
+) -> Result<bool, anyhow::Error> {
+    let local_index: Vec<_> = index
+        .iter()
+        .filter(|info| included_in_scope(info, true))
+        .cloned()
+        .collect();
+    let local = local_candidates(&local_index, installed_local);
+    let mut checker = NetworkDepChecker {
+        local: &local,
+        network_installed: &PackageList::new(),
+        memo: HashMap::new(),
+        stack: HashSet::new(),
+    };
+    let request = PackageRef {
+        name: package.name.clone(),
+        version: package.version.clone(),
+    };
+    let matching = checker.matching_indexes(&request)?;
+    if matching.is_empty() {
+        return Ok(false);
+    }
+    for &idx in &matching {
+        if matches!(checker.status(idx)?, DepStatus::Network(_)) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+pub fn check_local_upload_network_deps(
+    index: &[PackageInfo],
+    installed_local: &PackageList,
+    network_installed: &PackageList,
+    package: &Meta,
+) -> Result<(), anyhow::Error> {
+    let local_index: Vec<_> = index
+        .iter()
+        .filter(|info| included_in_scope(info, true))
+        .cloned()
+        .collect();
+    let request = PackageRef {
+        name: package.name.clone(),
+        version: package.version.clone(),
+    };
+    require_installed_network_deps(
+        index,
+        &local_index,
+        installed_local,
+        network_installed,
+        &[request],
+    )
 }
 
 // Own exports first, then direct dependency exports. Duplicate export names

@@ -41,6 +41,7 @@ export interface ExtractedPackage {
     services: string[];
     meta: PackageMeta;
     sha256: string;
+    packageBytes: Uint8Array;
 }
 
 /**
@@ -83,12 +84,8 @@ export async function loadPackageMeta(zip: JSZip): Promise<z.infer<typeof packag
     return packageMetaSchema.parse(parsed);
 }
 
-/**
- * Compute SHA256 hash of the package file
- */
-export async function computePackageSha256(file: File): Promise<string> {
-    const fileArrayBuffer = await file.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest("SHA-256", fileArrayBuffer);
+async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+    const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
     return Array.from(new Uint8Array(hashBuffer))
         .map((byte) => byte.toString(16).padStart(2, "0"))
         .join("");
@@ -98,12 +95,14 @@ export async function computePackageSha256(file: File): Promise<string> {
  * Extract and prepare package data from a File
  */
 export async function extractPackage(file: File): Promise<ExtractedPackage> {
-    const zip: JSZip = await JSZip.loadAsync(file);
+    const fileArrayBuffer = await file.arrayBuffer();
+    const packageBytes = new Uint8Array(fileArrayBuffer);
+    const zip: JSZip = await JSZip.loadAsync(fileArrayBuffer);
     const services = extractServicesFromZip(zip);
     validateNodeLocalServices(services);
     const metaJson = await loadPackageMeta(zip);
-    const sha256 = await computePackageSha256(file);
-    
+    const sha256 = await sha256Hex(fileArrayBuffer);
+
     const meta: PackageMeta = {
         ...metaJson,
         sha256,
@@ -114,6 +113,7 @@ export async function extractPackage(file: File): Promise<ExtractedPackage> {
         services,
         meta,
         sha256,
+        packageBytes,
     };
 }
 
