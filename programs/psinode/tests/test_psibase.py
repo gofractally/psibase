@@ -31,9 +31,15 @@ class TestPackage:
         self.description = description
         self.accounts = accounts
         self._depends = depends
+        self._exports = None
         self.files = dict()
     def depends(self, name, version='*'):
         self._depends.append({'name': name, 'version': version})
+        return self
+    def export(self, name, service):
+        if self._exports is None:
+            self._exports = []
+        self._exports.append({'name': name, 'service': service})
         return self
     def service(self, name, wasm=None, flags=[], server=None, data=[]):
         if wasm is not None:
@@ -62,10 +68,14 @@ class TestPackage:
         self.files[name] = contents
     def filename(self):
         return self.name + '-' + self.version + '.psi'
+    def _meta_exports(self):
+        if self._exports is None:
+            return [{'name': a, 'service': a} for a in self.accounts]
+        return self._exports
     def write(self, directory):
         filename = self.filename()
         package_filename = os.path.join(directory, filename)
-        meta = {'name': self.name, 'version': self.version, 'scope': self.scope, 'description': self.description, 'depends': self._depends, 'accounts': self.accounts, 'exports': [{'name': a, 'service': a} for a in self.accounts]}
+        meta = {'name': self.name, 'version': self.version, 'scope': self.scope, 'description': self.description, 'depends': self._depends, 'accounts': self.accounts, 'exports': self._meta_exports()}
         with zipfile.ZipFile(package_filename, 'w', zipfile.ZIP_DEFLATED) as archive:
             with archive.open('meta.json', 'w') as file:
                 json.dump(meta, TextIOWrapper(file, encoding='utf-8'))
@@ -99,6 +109,15 @@ def make_wasm(name=''):
             bytes.fromhex('0305737461727400010663616c6c65640002') +
             bytes([len(encoded)]) + encoded +
             bytes.fromhex('00010a0d0202000b08004100410410000b0b07010041000b0101'))
+
+class PermsPortal:
+    def __init__(self):
+        self.perms = (TestPackage('Perms', '1.0.0')
+            .service('perms', wasm=make_wasm('perms'))
+            .export('permissions', 'perms'))
+        self.portal = (TestPackage('XPortal', '1.0.0', scope='local')
+            .depends('Perms')
+            .service('x-portal', wasm=make_wasm('x-portal')))
 
 class Foo:
     def __init__(self):
@@ -376,6 +395,37 @@ class TestPsibase(unittest.TestCase):
         # If no server is registered, requests should return 404
         with a.get('/id', service='x-r-server') as reply:
             self.assertEqual(reply.status_code, 404)
+
+    @testutil.psinode_test
+    def test_local_install_x_dyn_ld(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer'])
+
+        perms_portal = PermsPortal()
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [perms_portal.perms, perms_portal.portal])
+            a.run_psibase(['install', '-y'] + a.node_args() + ['Perms', '--package-source', dir])
+            a.wait(new_block())
+            a.run_psibase(['install', '--local', '-y'] + a.node_args() + ['XPortal', '--package-source', dir])
+            data = a.graphql('x-dyn-ld', 'query { depsFor(service: "x-portal") { deps { name service } } }')
+            self.assertEqual(data['depsFor']['deps'], [
+                {'name': 'permissions', 'service': 'perms'},
+                {'name': 'x-portal', 'service': 'x-portal'},
+            ])
+
+    @testutil.psinode_test
+    def test_local_install_missing_network_dependency(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer'])
+
+        perms_portal = PermsPortal()
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [perms_portal.perms, perms_portal.portal])
+            status = a.run_psibase(
+                ['install', '--local', '-y'] + a.node_args() + ['XPortal', '--package-source', dir],
+                encoding='utf-8', stderr=subprocess.PIPE, stdout=subprocess.PIPE, check=False)
+            self.assertNotEqual(status.returncode, 0)
+            self.assertIn('Perms must be installed on the network first', status.stderr)
 
     @testutil.psinode_test
     def test_configure_sources(self, cluster):
