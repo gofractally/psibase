@@ -1,9 +1,10 @@
 use psibase::{account, AccountNumber};
 
-/// ISO 4217 list one currencies, published 2026-09-17, plus gold, silver, bitcoin, ether, and electricity.
+/// ISO 4217 list one currencies, published 2026-09-17, plus gold, silver, bitcoin, ether, electricity, and distance.
 /// Currency precision is the minor-unit places plus two, capped at 8.
 /// Gold and silver are 1 gram at 6 decimals. Bitcoin and ether are 1 coin at 8 decimals.
 /// Electricity is 1 kilowatt-hour at 3 decimals, so the last place is 1 Wh.
+/// Distance is 1 kilometre at 3 decimals, so the last place is 1 metre.
 /// Each row is `(symbol, precision, description)`.
 #[rustfmt::skip]
 pub const SEEDED_ASSETS: &[(AccountNumber, u8, &str)] = &[
@@ -77,6 +78,7 @@ pub const SEEDED_ASSETS: &[(AccountNumber, u8, &str)] = &[
     (account!("kes"), 4, "Kenyan Shilling"),
     (account!("kgs"), 4, "Som"),
     (account!("khr"), 4, "Riel"),
+    (account!("km"), 3, "1.000 = 1 kilometre"),
     (account!("kmf"), 2, "Comorian Franc"),
     (account!("kpw"), 4, "North Korean Won"),
     (account!("krw"), 2, "Won"),
