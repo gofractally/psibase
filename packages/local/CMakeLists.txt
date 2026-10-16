@@ -28,6 +28,7 @@ target_mapped_include_directories(services_local INTERFACE
     XAdmin/include
     XBasic/include
     XDb/include
+    XDynLd/include
     XHttp/include
     XKeys/include
     XPackages/include
@@ -43,6 +44,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(XAdmin)
     add_subdirectory(XBasic)
     add_subdirectory(XDb)
+    add_subdirectory(XDynLd)
     add_subdirectory(XHttp)
     add_subdirectory(XKeys)
     add_subdirectory(XPackages)

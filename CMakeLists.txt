@@ -140,7 +140,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate RDynLd REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
-        Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
+        Transact VerifySig XAdmin XBasic XDb XDynLd XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
         XPackages XPeers XProxy XSocketListService WSEcho XDelay ServerId)
@@ -1182,6 +1182,20 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XDynLd.psi
+    NAME XDynLd
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Node-local dynamic linker metadata"
+    LOCAL
+    SERVICE x-dyn-ld
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XDynLd.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XDynLd-schema.json
+        SERVER x-dyn-ld
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XHttp.psi
     NAME XHttp
     VERSION ${PSIBASE_VERSION}.0
@@ -1352,7 +1366,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
     LOCAL
-    PACKAGE_DEPENDS XHttp XAdmin XDb XKeys XPackages XPeers XRun XSites XTimer XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XDynLd XKeys XPackages XPeers XRun XSites XTimer XTransact
 )
 
 function(write_package_index target dir reserve)
@@ -1382,7 +1396,7 @@ write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XCommonApi XDb XDefault XDynLd XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1464,6 +1478,7 @@ install(
           ${SERVICE_DIR}/XCommonApi.psi
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
+          ${SERVICE_DIR}/XDynLd.psi
           ${SERVICE_DIR}/XHttp.psi
           ${SERVICE_DIR}/XKeys.psi
           ${SERVICE_DIR}/XPackages.psi
