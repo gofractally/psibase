@@ -22,7 +22,7 @@ use regex::Regex;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
-use std::collections::{hash_map, HashMap, HashSet};
+use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek};
@@ -2233,12 +2233,16 @@ impl<T: PackageRegistry> FilteredRegistry<T> {
     }
 }
 
+fn included_in_scope(info: &PackageInfo, local: bool) -> bool {
+    info.is_local() != Some(!local)
+}
+
 #[async_trait(?Send)]
 impl<T: PackageRegistry> PackageRegistry for FilteredRegistry<T> {
     type R = T::R;
     fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
         let mut result = self.source.index()?;
-        result.retain(|info| info.is_local() != Some(!self.local));
+        result.retain(|info| included_in_scope(info, self.local));
         Ok(result)
     }
     async fn get_by_info(
@@ -2400,6 +2404,216 @@ fn max_version(versions: &HashMap<String, (Meta, PackageOrigin)>) -> Result<&str
     Ok(&*result)
 }
 
+fn local_candidates(
+    local_index: &[PackageInfo],
+    installed_local: &PackageList,
+) -> Vec<PackageInfo> {
+    let mut result = local_index.to_vec();
+    for meta in installed_local.metas() {
+        if !result
+            .iter()
+            .any(|info| info.name == meta.name && info.version == meta.version)
+        {
+            result.push(meta.info(Checksum256::default(), String::new()));
+        }
+    }
+    result
+}
+
+fn network_version_matches(
+    index: &[PackageInfo],
+    package: &PackageRef,
+) -> Result<bool, anyhow::Error> {
+    for info in index {
+        if info.is_local() == Some(false)
+            && info.name == package.name
+            && version_match(&package.version, &info.version)?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+#[derive(Clone)]
+enum DepStatus {
+    Ok,
+    Cycle,
+    Other,
+    Network(BTreeSet<String>),
+}
+
+fn and_deps(deps: Vec<DepStatus>) -> DepStatus {
+    let mut network = BTreeSet::new();
+    let mut other = false;
+    let mut cycle = false;
+    for dep in deps {
+        match dep {
+            DepStatus::Ok => {}
+            DepStatus::Cycle => cycle = true,
+            DepStatus::Other => other = true,
+            DepStatus::Network(names) => network.extend(names),
+        }
+    }
+    if !network.is_empty() {
+        DepStatus::Network(network)
+    } else if other {
+        DepStatus::Other
+    } else if cycle {
+        DepStatus::Cycle
+    } else {
+        DepStatus::Ok
+    }
+}
+
+fn any_version(versions: Vec<DepStatus>) -> DepStatus {
+    let mut network = BTreeSet::new();
+    let mut other = false;
+    let mut cycle = false;
+    for version in versions {
+        match version {
+            DepStatus::Ok => return DepStatus::Ok,
+            DepStatus::Cycle => cycle = true,
+            DepStatus::Other => other = true,
+            DepStatus::Network(names) => network.extend(names),
+        }
+    }
+    if cycle {
+        DepStatus::Cycle
+    } else if !network.is_empty() && !other {
+        DepStatus::Network(network)
+    } else if other {
+        DepStatus::Other
+    } else {
+        DepStatus::Ok
+    }
+}
+
+struct NetworkDepChecker<'a> {
+    local: &'a [PackageInfo],
+    network_installed: &'a PackageList,
+    memo: HashMap<usize, DepStatus>,
+    stack: HashSet<usize>,
+}
+
+impl<'a> NetworkDepChecker<'a> {
+    fn matching_indexes(&self, package: &PackageRef) -> Result<Vec<usize>, anyhow::Error> {
+        let mut result = Vec::new();
+        for (idx, info) in self.local.iter().enumerate() {
+            if info.name == package.name && version_match(&package.version, &info.version)? {
+                result.push(idx);
+            }
+        }
+        Ok(result)
+    }
+
+    fn status(&mut self, idx: usize) -> Result<DepStatus, anyhow::Error> {
+        if let Some(status) = self.memo.get(&idx) {
+            return Ok(status.clone());
+        }
+        if !self.stack.insert(idx) {
+            return Ok(DepStatus::Cycle);
+        }
+        let depends = self.local[idx].depends.clone();
+        let mut children = Vec::new();
+        for dep in &depends {
+            children.push(self.dep_status(dep)?);
+        }
+        self.stack.remove(&idx);
+        let status = and_deps(children);
+        if !matches!(status, DepStatus::Cycle) {
+            self.memo.insert(idx, status.clone());
+        }
+        Ok(status)
+    }
+
+    fn dep_status(&mut self, dep: &PackageRef) -> Result<DepStatus, anyhow::Error> {
+        let matching = self.matching_indexes(dep)?;
+        if matching.is_empty() {
+            if self.network_installed.get_by_ref(dep)?.is_some() {
+                return Ok(DepStatus::Ok);
+            }
+            if self.local.iter().any(|info| info.name == dep.name) {
+                return Ok(DepStatus::Other);
+            }
+            return Ok(DepStatus::Network(BTreeSet::from([dep.name.clone()])));
+        }
+        let mut versions = Vec::new();
+        for idx in &matching {
+            versions.push(self.status(*idx)?);
+        }
+        let combined = any_version(versions);
+        if matches!(combined, DepStatus::Ok) || self.network_installed.get_by_ref(dep)?.is_some() {
+            return Ok(DepStatus::Ok);
+        }
+        Ok(combined)
+    }
+}
+
+fn not_local_package_error(name: &str) -> anyhow::Error {
+    anyhow!(
+        "The package you are installing, or one of its dependencies ({}), is not a local package. Remove the `--local` flag to install this package.",
+        name
+    )
+}
+
+// A requested local package can use a network dependency only when that
+// dependency is already installed at a matching version. Versions that are
+// merely published are not candidates.
+fn require_installed_network_deps(
+    index: &[PackageInfo],
+    local_index: &[PackageInfo],
+    installed_local: &PackageList,
+    network_installed: &PackageList,
+    requests: &[PackageRef],
+) -> Result<(), anyhow::Error> {
+    let local = local_candidates(local_index, installed_local);
+    let mut checker = NetworkDepChecker {
+        local: &local,
+        network_installed,
+        memo: HashMap::new(),
+        stack: HashSet::new(),
+    };
+    let mut missing = BTreeSet::new();
+    for request in requests {
+        let matching = checker.matching_indexes(request)?;
+        if matching.is_empty() {
+            if network_version_matches(index, request)?
+                || network_installed.get_by_ref(request)?.is_some()
+            {
+                Err(not_local_package_error(&request.name))?
+            }
+            continue;
+        }
+        let mut any_ok = false;
+        for &idx in &matching {
+            if matches!(checker.status(idx)?, DepStatus::Ok) {
+                any_ok = true;
+                break;
+            }
+        }
+        if any_ok {
+            continue;
+        }
+        let mut preferred = matching[0];
+        for &idx in &matching[1..] {
+            if Version::new(&local[preferred].version)? < Version::new(&local[idx].version)? {
+                preferred = idx;
+            }
+        }
+        if let DepStatus::Network(names) = checker.status(preferred)? {
+            missing.extend(names);
+        }
+    }
+    if missing.is_empty() {
+        return Ok(());
+    }
+    Err(anyhow!(
+        "{} must be installed on the network first",
+        missing.into_iter().collect::<Vec<_>>().join(", ")
+    ))
+}
+
 fn check_destination(packages: &Vec<PackageOp>, local: bool) -> Result<(), anyhow::Error> {
     for package in packages {
         match package {
@@ -2411,12 +2625,7 @@ fn check_destination(packages: &Vec<PackageOp>, local: bool) -> Result<(), anyho
                             &info.name
                         ))?
                     }
-                    (Some(false), true) => {
-                        Err(anyhow!(
-                            "The package you are installing, or one of its dependencies ({}), is not a local package. Remove the `--local` flag to install this package.",
-                            &info.name
-                        ))?
-                    }
+                    (Some(false), true) => Err(not_local_package_error(&info.name))?,
                     _ => {}
                 }
             }
@@ -2517,6 +2726,12 @@ impl PackageList {
         self.packages.get(name).is_some()
     }
 
+    fn metas(&self) -> impl Iterator<Item = &Meta> {
+        self.packages
+            .values()
+            .flat_map(|versions| versions.values().map(|(meta, _)| meta))
+    }
+
     fn contains_version(&self, name: &str, version: &str) -> bool {
         if let Some(packages) = self.packages.get(name) {
             return packages.contains_key(version);
@@ -2532,6 +2747,66 @@ impl PackageList {
         }
         result
     }
+    fn existing_with_fixed_network(
+        &self,
+        network_installed: &PackageList,
+    ) -> Vec<(Meta, PackageDisposition)> {
+        let mut existing = self.as_upgradable();
+        for meta in network_installed.metas() {
+            if !self.contains_package(&meta.name) {
+                existing.push((meta.clone(), PackageDisposition::pinned(&meta.version)));
+            }
+        }
+        existing
+    }
+
+    // Installed network packages stay fixed during a local install: they are
+    // omitted from the registry index and pinned, so resolution can use them
+    // but will not install, replace, or remove them.
+    fn plan_changes<T: PackageRegistry + ?Sized>(
+        &self,
+        reg: &T,
+        packages: &[String],
+        reinstall: bool,
+        local: bool,
+        network_installed: &PackageList,
+        request_pref: PackagePreference,
+        non_request_pref: PackagePreference,
+    ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        let index = reg.index()?;
+        let requests = make_refs(packages)?;
+        let (index, existing) = if local {
+            let local_index: Vec<_> = index
+                .iter()
+                .filter(|info| included_in_scope(info, true))
+                .cloned()
+                .collect();
+            require_installed_network_deps(
+                &index,
+                &local_index,
+                self,
+                network_installed,
+                &requests,
+            )?;
+            (
+                local_index,
+                self.existing_with_fixed_network(network_installed),
+            )
+        } else {
+            (index, self.as_upgradable())
+        };
+        let result = solve_dependencies(
+            index,
+            requests,
+            existing,
+            reinstall,
+            request_pref,
+            non_request_pref,
+        )?;
+        check_destination(&result, local)?;
+        Ok(result)
+    }
+
     pub async fn resolve_changes<T: PackageRegistry + ?Sized>(
         &self,
         reg: &T,
@@ -2539,17 +2814,32 @@ impl PackageList {
         reinstall: bool,
         local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
-        let index = reg.index()?;
-        let result = solve_dependencies(
-            index,
-            make_refs(packages)?,
-            self.as_upgradable(),
+        self.plan_changes(
+            reg,
+            packages,
             reinstall,
+            local,
+            &PackageList::new(),
             PackagePreference::Latest,
             PackagePreference::Current,
-        )?;
-        check_destination(&result, local)?;
-        Ok(result)
+        )
+    }
+    pub async fn resolve_local_changes<T: PackageRegistry + ?Sized>(
+        &self,
+        reg: &T,
+        packages: &[String],
+        reinstall: bool,
+        network_installed: &PackageList,
+    ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        self.plan_changes(
+            reg,
+            packages,
+            reinstall,
+            true,
+            network_installed,
+            PackagePreference::Latest,
+            PackagePreference::Current,
+        )
     }
     pub async fn resolve_upgrade<T: PackageRegistry + ?Sized>(
         &self,
@@ -2558,21 +2848,40 @@ impl PackageList {
         pref: PackagePreference,
         local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
-        let index = reg.index()?;
-        let result = solve_dependencies(
-            index,
-            make_refs(packages)?,
-            self.as_upgradable(),
+        self.plan_changes(
+            reg,
+            packages,
             false,
+            local,
+            &PackageList::new(),
             pref,
             if packages.is_empty() {
                 pref
             } else {
                 PackagePreference::Current
             },
-        )?;
-        check_destination(&result, local)?;
-        Ok(result)
+        )
+    }
+    pub async fn resolve_local_upgrade<T: PackageRegistry + ?Sized>(
+        &self,
+        reg: &T,
+        packages: &[String],
+        pref: PackagePreference,
+        network_installed: &PackageList,
+    ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        self.plan_changes(
+            reg,
+            packages,
+            false,
+            true,
+            network_installed,
+            pref,
+            if packages.is_empty() {
+                pref
+            } else {
+                PackagePreference::Current
+            },
+        )
     }
     pub fn into_info(self) -> Vec<(Meta, PackageOrigin)> {
         let mut result = vec![];
@@ -2751,5 +3060,75 @@ mod resolve_imports_tests {
         assert_eq!(deps[0].service, app_svc);
         assert_eq!(deps[1].name, "ns:api");
         assert_eq!(deps[1].service, dep_svc);
+    }
+}
+
+#[cfg(test)]
+mod local_network_dep_tests {
+    use super::*;
+    use async_trait::async_trait;
+    use std::io::Cursor;
+
+    struct IndexOnly(Vec<PackageInfo>);
+
+    #[async_trait(?Send)]
+    impl PackageRegistry for IndexOnly {
+        type R = Cursor<Vec<u8>>;
+        fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
+            Ok(self.0.clone())
+        }
+        async fn get_by_info(
+            &self,
+            _info: &PackageInfo,
+        ) -> Result<PackagedService<Self::R>, anyhow::Error> {
+            Err(anyhow!("unused"))
+        }
+    }
+
+    fn pkg(name: &str, version: &str, scope: &str, depends: &[(&str, &str)]) -> PackageInfo {
+        PackageInfo {
+            name: name.to_string(),
+            version: version.to_string(),
+            scope: scope.to_string(),
+            depends: depends
+                .iter()
+                .map(|(name, version)| PackageRef {
+                    name: name.to_string(),
+                    version: version.to_string(),
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn network_installed(packages: &[PackageInfo]) -> PackageList {
+        let mut list = PackageList::new();
+        for package in packages {
+            list.insert(
+                package.meta(),
+                PackageOrigin::Installed {
+                    owner: AccountNumber::new(1),
+                },
+            );
+        }
+        list
+    }
+
+    #[test]
+    fn incompatible_network_dependency_is_not_taken_from_the_registry() {
+        let app = pkg("App", "1.0.0", "local", &[("Sites", "^1.0.0")]);
+        let network = network_installed(&[pkg("Sites", "2.0.0", "network", &[])]);
+        let request = vec!["App".to_string()];
+        let err = futures::executor::block_on(PackageList::new().resolve_local_changes(
+            &IndexOnly(vec![app, pkg("Sites", "1.5.0", "network", &[])]),
+            &request,
+            false,
+            &network,
+        ))
+        .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Sites must be installed on the network first"
+        );
     }
 }

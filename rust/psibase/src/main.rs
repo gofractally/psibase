@@ -1906,9 +1906,22 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let to_install = installed
-        .resolve_changes(&package_registry, &packages, args.reinstall, args.local)
-        .await?;
+    let to_install = if args.local {
+        let network_installed =
+            installed_network_packages(&args.node_args.api, &mut client).await?;
+        installed
+            .resolve_local_changes(
+                &package_registry,
+                &packages,
+                args.reinstall,
+                &network_installed,
+            )
+            .await?
+    } else {
+        installed
+            .resolve_changes(&package_registry, &packages, args.reinstall, false)
+            .await?
+    };
 
     if !confirm_install(args.yes, &to_install)? {
         return Ok(());
@@ -2211,18 +2224,22 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    let to_install = installed
-        .resolve_upgrade(
-            &package_registry,
-            &packages,
-            if args.latest {
-                PackagePreference::Latest
-            } else {
-                PackagePreference::Compatible
-            },
-            args.local,
-        )
-        .await?;
+    let preference = if args.latest {
+        PackagePreference::Latest
+    } else {
+        PackagePreference::Compatible
+    };
+    let to_install = if args.local {
+        let network_installed =
+            installed_network_packages(&args.node_args.api, &mut client).await?;
+        installed
+            .resolve_local_upgrade(&package_registry, &packages, preference, &network_installed)
+            .await?
+    } else {
+        installed
+            .resolve_upgrade(&package_registry, &packages, preference, false)
+            .await?
+    };
 
     if !confirm_install(args.yes, &to_install)? {
         return Ok(());
@@ -2480,6 +2497,14 @@ async fn show_package<T: PackageRegistry + ?Sized>(
         );
     }
     Ok(())
+}
+
+// Installed network packages for a local install. An unbooted chain has none.
+async fn installed_network_packages(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+) -> Result<PackageList, anyhow::Error> {
+    handle_unbooted(PackageList::installed(base_url, client).await)
 }
 
 // an unbooted chain has no packages installed

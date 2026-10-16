@@ -291,7 +291,7 @@ impl<'a> DepGraph<'a> {
     }
     pub fn solve(mut self) -> Result<Vec<PackageOp>, anyhow::Error> {
         self.adjust_currently_broken()?;
-        self.apply_existing();
+        self.apply_existing()?;
         self.add_roots()?;
         self.add_depends()?;
         self.add_conflicts();
@@ -480,13 +480,15 @@ impl<'a> DepGraph<'a> {
         }
         Ok(())
     }
-    fn apply_existing(&mut self) {
+    fn apply_existing(&mut self) -> Result<(), anyhow::Error> {
         for (name, (meta, disp, _)) in &self.existing {
             if let Some(packages) = self.packages.get(name) {
                 let mut allowed_versions = vec![];
                 let current_version = Version::new(&meta.version).unwrap();
                 for (k, v) in packages {
-                    if &Version::new(&k).unwrap() < &current_version {
+                    if &Version::new(k).unwrap() < &current_version
+                        || (!disp.can_break && !version_match(&disp.allowed_versions, k)?)
+                    {
                         self.solver.add_clause(&[!v.1]);
                     } else {
                         allowed_versions.push(v.1);
@@ -497,6 +499,7 @@ impl<'a> DepGraph<'a> {
                 }
             }
         }
+        Ok(())
     }
 }
 
