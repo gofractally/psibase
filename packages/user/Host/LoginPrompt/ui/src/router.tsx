@@ -3,6 +3,7 @@ import { createBrowserRouter } from "react-router-dom";
 import ErrorBoundary from "./components/error-boundary";
 import { ConnectPrompt } from "./connect-prompt";
 import { CreatePrompt } from "./create-prompt";
+import { ImportNewPrompt } from "./import-new-prompt";
 import { ImportPrompt } from "./import-prompt";
 import Root from "./root";
 
@@ -31,6 +32,10 @@ const Router = createBrowserRouter([
             {
                 path: "/plugin/web/prompt/create",
                 element: <CreatePrompt />,
+            },
+            {
+                path: "/plugin/web/prompt/importnew",
+                element: <ImportNewPrompt />,
             },
         ],
     },

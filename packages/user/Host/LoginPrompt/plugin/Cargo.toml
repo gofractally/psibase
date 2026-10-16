@@ -21,6 +21,7 @@ world = "impl"
 "host:client" = { path = "../../plugin/client/wit/world.wit" }
 "host:types" = { path = "../../plugin/types/wit/world.wit" }
 "host:accounts" = { path = "../../plugin/accounts/wit/world.wit" }
+"host:prompt" = { path = "../../plugin/prompt/wit/world.wit" }
 "host:crypto" = { path = "../../plugin/crypto/wit/world.wit" }
 "transact:plugin" = { path = "../../../../system/Transact/plugin/transact/wit/world.wit" }
 "permissions:plugin" = { path = "../../../Permissions/plugin/wit/world.wit" }

@@ -70,10 +70,12 @@ export const usePluginFunctionMutation = <TCall extends PluginCall>(
         onSuccess: (data, variables, toastId, context) => {
             options.onSuccess?.(data, variables, toastId, context);
 
-            if (options.toast) {
+            if (options.toast?.success) {
                 toast.success(options.toast.success, {
                     id: toastId,
                 });
+            } else if (toastId !== undefined) {
+                toast.dismiss(toastId);
             }
         },
     });
