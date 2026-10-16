@@ -626,6 +626,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/WsAuth.psi
+    PATH packages/system/WsAuth
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Subgroups.psi
     PATH packages/user/Subgroups
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1301,11 +1307,6 @@ psibase_package(
     DEPENDS wasm
 )
 
-cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/XWsAuth.psi
-    PATH packages/local/XWsAuth
-)
-
 psibase_package(
     OUTPUT ${SERVICE_DIR}/DevDefault.psi
     NAME DevDefault
@@ -1313,7 +1314,7 @@ psibase_package(
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
 psibase_package(
@@ -1323,7 +1324,7 @@ psibase_package(
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
 psibase_package(
@@ -1386,8 +1387,8 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact XWsAuth)
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
+    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1463,6 +1464,7 @@ install(
           ${SERVICE_DIR}/VirtualServer.psi
           ${SERVICE_DIR}/WebCrypto.psi
           ${SERVICE_DIR}/Workshop.psi
+          ${SERVICE_DIR}/WsAuth.psi
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
           ${SERVICE_DIR}/XBasic.psi
@@ -1478,7 +1480,6 @@ install(
           ${SERVICE_DIR}/XSites.psi
           ${SERVICE_DIR}/XTimer.psi
           ${SERVICE_DIR}/XTransact.psi
-          ${SERVICE_DIR}/XWsAuth.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 

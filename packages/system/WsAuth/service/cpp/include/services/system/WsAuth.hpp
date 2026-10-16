@@ -3,9 +3,10 @@
 #include <optional>
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
+#include <psibase/nativeTables.hpp>
 #include <string>
 
-namespace LocalService
+namespace SystemService
 {
    struct WsTicketInfo
    {
@@ -14,9 +15,10 @@ namespace LocalService
       PSIO_REFLECT(WsTicketInfo, user, app)
    };
 
-   struct XWsAuth : psibase::Service
+   struct WsAuth : psibase::Service
    {
-      static constexpr auto service           = psibase::AccountNumber{"x-wsauth"};
+      static constexpr auto service           = psibase::AccountNumber("wsauth");
+      static constexpr auto serviceFlags      = psibase::CodeRow::isPrivileged;
       static constexpr auto subprotocolPrefix = std::string_view{"psibase.ws-ticket."};
 
       auto serveSys(psibase::HttpRequest        request,
@@ -39,5 +41,5 @@ namespace LocalService
          return std::nullopt;
       }
    };
-   PSIO_REFLECT(XWsAuth, method(serveSys, request, socket), method(consume, ticket))
-}  // namespace LocalService
+   PSIO_REFLECT(WsAuth, method(serveSys, request, socket), method(consume, ticket))
+}  // namespace SystemService

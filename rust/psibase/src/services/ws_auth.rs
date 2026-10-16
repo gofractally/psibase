@@ -1,4 +1,4 @@
-#[crate::service(name = "x-wsauth", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "wsauth", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{AccountNumber, HttpReply, HttpRequest};

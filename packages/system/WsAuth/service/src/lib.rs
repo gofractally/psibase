@@ -45,7 +45,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "x-wsauth", tables = "tables")]
+#[psibase::service(name = "wsauth", tables = "tables")]
 #[allow(non_snake_case)]
 mod service {
     use super::*;

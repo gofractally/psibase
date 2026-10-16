@@ -140,7 +140,7 @@ impl Api for HostHttp {
 
         let body = serde_json::json!({ "app": app, "service": service }).to_string();
         let res = do_post(
-            "x-wsauth".to_string(),
+            "wsauth".to_string(),
             "ws-ticket".to_string(),
             BodyTypes::Json(body),
         )?;

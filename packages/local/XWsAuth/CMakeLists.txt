@@ -1,1 +1,0 @@
-install(DIRECTORY include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
