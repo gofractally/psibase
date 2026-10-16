@@ -14,7 +14,6 @@ import {
     KeyRound,
     Landmark,
     Pencil,
-    PiggyBank,
     Receipt,
     Repeat,
     Route,
@@ -230,8 +229,7 @@ export function AccountDetailPage() {
                                 {user && account !== user ? (
                                     <Button
                                         type="button"
-                                        size="icon"
-                                        className="bg-[color-mix(in_oklch,var(--primary)_72%,var(--background))] text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary)_58%,var(--background))]"
+                                        className="gap-1.5 bg-[color-mix(in_oklch,var(--primary)_72%,var(--background))] text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary)_58%,var(--background))]"
                                         aria-label="Request a transfer"
                                         title="Request a transfer"
                                         onClick={() => {
@@ -243,6 +241,7 @@ export function AccountDetailPage() {
                                         }}
                                     >
                                         <Send className="size-4" />
+                                        Request
                                     </Button>
                                 ) : null}
                             </ButtonGroup>
@@ -260,8 +259,7 @@ export function AccountDetailPage() {
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        size="icon"
-                                        className="bg-foreground/10 hover:bg-foreground/15 dark:bg-foreground/15 dark:hover:bg-foreground/20"
+                                        className="gap-1.5 bg-foreground/10 hover:bg-foreground/15 dark:bg-foreground/15 dark:hover:bg-foreground/20"
                                         aria-label="Request a deposit"
                                         title="Request a deposit"
                                         onClick={() => {
@@ -273,6 +271,7 @@ export function AccountDetailPage() {
                                         }}
                                     >
                                         <Send className="size-4" />
+                                        Request
                                     </Button>
                                 ) : null}
                             </ButtonGroup>
@@ -446,16 +445,13 @@ export function AccountDetailPage() {
             ) : !hasAnything ? (
                 <p className="text-muted-foreground text-sm">
                     No lines or balances with {display} yet. Offer a credit
-                    line to put them on your book.
+                    line so they can draw on you.
                 </p>
             ) : (
                 <div className="space-y-8">
                     {savingsHere.length > 0 ? (
                         <section className="space-y-3">
-                            <h2 className="flex items-center gap-2 text-sm font-medium">
-                                <PiggyBank className="size-4" />
-                                You hold (savings)
-                            </h2>
+                            <h2 className="text-sm font-medium">Assets</h2>
                             {savingsHere.map((g) => (
                                 <AssetRelationCard
                                     key={g.key}
@@ -605,9 +601,7 @@ export function AccountDetailPage() {
 
                     {loansHere.length > 0 ? (
                         <section className="space-y-3">
-                            <h2 className="flex items-center gap-2 text-sm font-medium">
-                                You owe (loans)
-                            </h2>
+                            <h2 className="text-sm font-medium">Liabilities</h2>
                             {loansHere.map((g) => (
                                 <AssetRelationCard
                                     key={g.key}

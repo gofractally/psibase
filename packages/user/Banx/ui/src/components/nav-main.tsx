@@ -29,7 +29,7 @@ const items: {
     { to: "/payees", label: "Payees", icon: Contact },
     { to: "/invites", label: "Invites", icon: UserPlus },
     { to: "/cash", label: "Cash", icon: Banknote },
-    { to: "/policies", label: "Policies", icon: ArrowLeftRight },
+    { to: "/policies", label: "Swaps", icon: ArrowLeftRight },
 ];
 
 export function NavMain() {

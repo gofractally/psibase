@@ -4,14 +4,14 @@ import { useLocalStorage } from "usehooks-ts";
 import NumberFlow from "@number-flow/react";
 
 import {
-    Building2,
     GitBranch,
+    Handshake,
     History,
     Landmark,
-    PiggyBank,
-    Handshake,
     Plus,
     Route,
+    Scale,
+    Wallet,
 } from "lucide-react";
 
 import { ActivityFeed } from "@/components/activity-feed";
@@ -199,7 +199,7 @@ export function ObligationsPage() {
         <div className="space-y-6 overflow-x-hidden sm:space-y-10">
             <PageHeader
                 title="Accounts"
-                description="Claims you hold act like savings; amounts you owe act like loans. Totals and lists stay in the selected currency."
+                description="Assets are what others owe you. Liabilities are what you owe. Totals stay in the selected currency."
                 action={
                     <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                         <Button
@@ -214,13 +214,12 @@ export function ObligationsPage() {
                             <TooltipTrigger asChild>
                                 <Button
                                     type="button"
-                                    size="icon"
                                     variant="outline"
                                     className={cn(
-                                        "size-11 shrink-0 sm:size-9 transition-shadow",
+                                        "min-h-11 flex-1 gap-1.5 sm:min-h-9 sm:flex-none",
                                         globalForwardOn
-                                            ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
-                                            : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
+                                            ? "border-emerald-500/60 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+                                            : "border-red-500/70 text-red-700 hover:bg-red-500/10 dark:text-red-400",
                                     )}
                                     aria-label={
                                         globalForwardOn
@@ -236,25 +235,25 @@ export function ObligationsPage() {
                                     }
                                 >
                                     <Route className="size-4" />
+                                    Forward
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs">
                                 {globalForwardOn
                                     ? "Path-forward on — friends can pay through you. Click to edit."
-                                    : "Path-forward is off. Friends cannot pay through you until you enable it (route icon). Closed, 0% fee."}
+                                    : "Path-forward is off. Friends cannot pay through you until you turn Forward on. Closed, 0% fee."}
                             </TooltipContent>
                         </Tooltip>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
                                     type="button"
-                                    size="icon"
                                     variant="outline"
                                     className={cn(
-                                        "size-11 shrink-0 sm:size-9 transition-shadow",
+                                        "min-h-11 flex-1 gap-1.5 sm:min-h-9 sm:flex-none",
                                         globalBuyClaimOn
-                                            ? "border-emerald-500/60 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.55)] hover:bg-emerald-500/10 dark:text-emerald-400 dark:shadow-[0_0_14px_rgba(52,211,153,0.45)]"
-                                            : "border-red-500/70 text-red-700 shadow-[0_0_14px_rgba(239,68,68,0.65)] hover:bg-red-500/10 dark:text-red-400 dark:shadow-[0_0_16px_rgba(248,113,113,0.5)] animate-pulse",
+                                            ? "border-emerald-500/60 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+                                            : "border-red-500/70 text-red-700 hover:bg-red-500/10 dark:text-red-400",
                                     )}
                                     aria-label={
                                         globalBuyClaimOn
@@ -270,6 +269,7 @@ export function ObligationsPage() {
                                     }
                                 >
                                     <Handshake className="size-4" />
+                                    Buy claims
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs">
@@ -326,13 +326,13 @@ export function ObligationsPage() {
                 prefill={buyClaimPrefill}
             />
 
-            {/* ── Savings / deposits (you are creditor) ───────────────── */}
+            {/* Assets: others owe you. */}
             <section className="space-y-4">
                 <SectionHeader
                     tone="savings"
-                    icon={PiggyBank}
-                    title="Savings & deposits"
-                    description="You are the creditor — balances others owe you, like funds on deposit. Offer a credit line so they can draw."
+                    icon={Wallet}
+                    title="Assets"
+                    description="What others owe you. Offer a credit line so they can draw."
                     count={savingsInCurrency.length}
                     countLabel="account"
                     action={
@@ -381,14 +381,14 @@ export function ObligationsPage() {
                     </p>
                 ) : savingsGroups.length === 0 ? (
                     <EmptyAccounts
-                        icon={PiggyBank}
+                        icon={Wallet}
                         tone="savings"
                         title={
                             currencySymbol
-                                ? `No ${currencySymbol} deposits yet`
-                                : "No deposit balances yet"
+                                ? `No ${currencySymbol} assets yet`
+                                : "No assets yet"
                         }
-                        body="Offer a credit line with +, or wait for someone to deposit with you / draw on a line you extend."
+                        body="Offer a credit line so someone can draw on you, or wait for a deposit."
                     />
                 ) : (
                     <div className="divide-y overflow-hidden rounded-xl border border-emerald-500/20">
@@ -412,15 +412,15 @@ export function ObligationsPage() {
 
             <Separator />
 
-            {/* ── Loans (you are debtor) ──────────────────────────────── */}
+            {/* Liabilities: you owe others. */}
             <section className="space-y-4">
                 <SectionHeader
                     tone="loan"
-                    icon={Building2}
-                    title="Loans & liabilities"
-                    description="You are the debtor — what you owe, presented like a home loan or line of credit."
+                    icon={Scale}
+                    title="Liabilities"
+                    description="What you owe."
                     count={loansInCurrency.length}
-                    countLabel="loan"
+                    countLabel="account"
                     action={
                         <>
                             <HideFacilitiesToggle
@@ -458,14 +458,14 @@ export function ObligationsPage() {
                     </p>
                 ) : loanGroups.length === 0 ? (
                     <EmptyAccounts
-                        icon={Building2}
+                        icon={Scale}
                         tone="loan"
                         title={
                             currencySymbol
-                                ? `No open ${currencySymbol} loans`
-                                : "No open loans"
+                                ? `No ${currencySymbol} liabilities`
+                                : "No liabilities"
                         }
-                        body="Draws against credit lines and path payments that leave you owing show up here."
+                        body="A draw on a credit line, or a transfer that leaves you owing, shows up here."
                     />
                 ) : (
                     <div className="divide-y overflow-hidden rounded-xl border border-amber-500/25">

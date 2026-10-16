@@ -51,6 +51,7 @@ type ThemeColors = {
     path: string;
     foreground: string;
     ring: string;
+    background: string;
 };
 
 function themeColors(): ThemeColors {
@@ -69,6 +70,7 @@ function themeColors(): ThemeColors {
         path: css("--chart-5", "#ca8a04"),
         foreground: css("--foreground", "#171717"),
         ring: css("--ring", "#a3a3a3"),
+        background: css("--background", "#ffffff"),
     };
 }
 
@@ -512,18 +514,30 @@ function YouSummary({
         if (line.creditor === user) extended.add(line.debtor);
         if (line.debtor === user) received.add(line.creditor);
     }
+    const extendedSentence =
+        extended.size === 0
+            ? "You have not extended a line to anyone."
+            : `You have extended lines to ${extended.size} ${
+                  extended.size === 1 ? "account" : "accounts"
+              }.`;
+    const receivedSentence =
+        received.size === 0
+            ? "Nobody has extended a line to you."
+            : received.size === 1
+              ? "1 account has extended a line to you."
+              : `${received.size} accounts have extended a line to you.`;
     const forwarding =
         forwardingCount === 0
-            ? "Global path forwarding is off."
-            : `Global path forwarding is on for ${forwardingCount} ${
+            ? "Path forwarding is off."
+            : `Path forwarding is on for ${forwardingCount} ${
                   forwardingCount === 1 ? "currency" : "currencies"
               }.`;
     return (
         <p className="text-muted-foreground text-sm">
-            You have extended lines to {extended.size}{" "}
-            {extended.size === 1 ? "account" : "accounts"}. {received.size}{" "}
-            {received.size === 1 ? "account has" : "accounts have"} extended
-            you a line. {forwarding}
+            {extended.size === 0 && received.size === 0
+                ? "Offer a credit line from Accounts so someone can draw on you. "
+                : null}
+            {extendedSentence} {receivedSentence} {forwarding}
         </p>
     );
 }
@@ -690,11 +704,20 @@ export function NetworkPage() {
                       ? colors.received
                       : colors.other;
             ctx.fill();
+            const youInside = !!node.you && radius * globalScale >= 16;
+            if (youInside) {
+                ctx.font = `600 ${12 / globalScale}px ui-sans-serif, system-ui, sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = colors.background;
+                ctx.fillText("You", node.x, node.y);
+            }
             if (id === selected || id === hover) {
                 ctx.lineWidth = 2 / globalScale;
                 ctx.strokeStyle = colors.ring;
                 ctx.stroke();
             }
+            if (youInside) return;
             if (!showAllLabels && !focusIds.has(id)) return;
             const fontSize = 11 / globalScale;
             ctx.font = `500 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
@@ -942,7 +965,7 @@ export function NetworkPage() {
         <div className="flex min-h-0 flex-1 flex-col">
             <PageHeader
                 title="Network"
-                description="Solid lines are credit and point at who can draw. Arrows at both ends mean credit runs both ways. A dashed stroke on that line is path forwarding. Click You to edit path forwarding."
+                description="Lines show who can draw on whom. Offer a credit line from Accounts to show up here."
                 action={
                     assetIds.length > 1 ? (
                         <select
@@ -1064,7 +1087,8 @@ export function NetworkPage() {
                                     {assetId === "all"
                                         ? " on the network"
                                         : " in this currency"}{" "}
-                                    yet. Click You to set path forwarding.
+                                    yet. Offer a credit line from Accounts so
+                                    someone can draw on you.
                                 </p>
                             ) : null}
                             <Button

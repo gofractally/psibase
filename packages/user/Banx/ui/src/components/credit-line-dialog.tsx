@@ -173,7 +173,7 @@ export function CreditLineDialog({
                     <DialogDescription>
                         {isEdit
                             ? `Update limit, interest, or revolving terms for ${editing!.debtor} in ${editSymbol}. A zero limit still keeps them as a known counterparty (needed if they may hold a claim on you). Remove the line to drop that.`
-                            : "You are the creditor. Set how much the debtor may draw (and hold outstanding) against you. Drawn amounts show up here as savings-style claims. A zero limit is still a line — they are on your book."}
+                            : "Set how much they may draw, and keep outstanding, against you. What they draw is an asset you hold. A zero limit still keeps the line."}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -191,8 +191,8 @@ export function CreditLineDialog({
                                 validators={existingAccountValidators()}
                                 children={(field) => (
                                     <field.TextField
-                                        label="Debtor account"
-                                        placeholder="alice"
+                                        label="Who can draw"
+                                        placeholder="account"
                                         required
                                     />
                                 )}
@@ -309,7 +309,7 @@ export function CreditLineDialog({
                     <form.AppField
                         name="deplete"
                         children={(field) => (
-                            <field.CheckboxField label="Deplete limit on each draw (non-revolving)" />
+                            <field.CheckboxField label="Shrink the limit with each draw" />
                         )}
                     />
                     <form.Subscribe

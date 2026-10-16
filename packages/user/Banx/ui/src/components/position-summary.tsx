@@ -41,7 +41,7 @@ export function PositionSummary({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <dl className="grid min-w-0 flex-1 grid-cols-3 items-start gap-x-3 sm:gap-x-6">
                     <Stat
-                        label="Liability"
+                        label="Liabilities"
                         amount={owed}
                         limit={hasLimit ? limit : undefined}
                         precision={precision}

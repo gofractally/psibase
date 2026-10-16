@@ -94,7 +94,7 @@ function InviteTable({
                         <TableHead>Asset</TableHead>
                         <TableHead className="text-right">Limit</TableHead>
                         <TableHead>APR</TableHead>
-                        <TableHead>Grace</TableHead>
+                        <TableHead>Interest-free</TableHead>
                         <TableHead>Expires</TableHead>
                         <TableHead />
                     </TableRow>
@@ -324,10 +324,10 @@ export function InvitesPage() {
                     <DialogHeader>
                         <DialogTitle>New Banx invite</DialogTitle>
                         <DialogDescription>
-                            Anyone with the link can join Banx. A new network
-                            account can be created with it. On claim you extend
-                            this credit line (default grace{" "}
-                            {formatGracePeriod(DEFAULT_GRACE_SECONDS)}).
+                            Anyone with the link can join Banx and create a new
+                            account. On claim you extend this credit line. The
+                            interest-free period starts at{" "}
+                            {formatGracePeriod(DEFAULT_GRACE_SECONDS)}.
                         </DialogDescription>
                     </DialogHeader>
                     <form
@@ -438,7 +438,7 @@ export function InvitesPage() {
                         <form.AppField
                             name="deplete"
                             children={(field) => (
-                                <field.CheckboxField label="Deplete limit on each draw (non-revolving)" />
+                                <field.CheckboxField label="Shrink the limit with each draw" />
                             )}
                         />
                         <DialogFooter>

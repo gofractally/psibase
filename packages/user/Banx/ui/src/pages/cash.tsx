@@ -436,12 +436,12 @@ export function CashPage() {
             <Tabs defaultValue="swap" className="gap-6">
                 <TabsList>
                     <TabsTrigger value="swap">Swap</TabsTrigger>
-                    <TabsTrigger value="desk">Your desk</TabsTrigger>
+                    <TabsTrigger value="desk">Post rates</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="swap">
                     <form
-                        className="mx-auto grid w-full max-w-md gap-4"
+                        className="mx-auto grid w-full max-w-md gap-4 rounded-xl border p-4"
                         onSubmit={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -483,7 +483,12 @@ export function CashPage() {
                                 {cashier} has no rates up right now.
                             </p>
                         ) : null}
-                        {!cashier ? (
+                        {!cashier && desks.length === 0 ? (
+                            <p className="text-muted-foreground text-sm">
+                                No rates are posted yet. Someone posts a rate
+                                on Post rates, then you can swap here.
+                            </p>
+                        ) : !cashier ? (
                             <p className="text-muted-foreground text-sm">
                                 Choose a cashier to see what they offer.
                             </p>
@@ -641,7 +646,7 @@ export function CashPage() {
                                                     <p className="text-muted-foreground text-sm">
                                                         Tokens come from your
                                                         own vault. Add them on
-                                                        Your desk.
+                                                        Post rates.
                                                     </p>
                                                 ) : null}
                                                 <div className="bg-muted/60 rounded-2xl p-3">
@@ -773,7 +778,7 @@ export function CashPage() {
                 </TabsContent>
 
                 <TabsContent value="desk" className="grid gap-6">
-                    <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="grid items-start gap-6 lg:grid-cols-2">
                         <section className="grid content-start gap-4 rounded-xl border p-4">
                             <div>
                                 <h2 className="font-medium">Tokens you hold</h2>
@@ -795,9 +800,9 @@ export function CashPage() {
                                         name="tokenId"
                                         children={(field) => (
                                             <field.TextField
-                                                label="Token"
+                                                label="Token number"
                                                 inputMode="numeric"
-                                                placeholder="Id"
+                                                placeholder="Token number"
                                             />
                                         )}
                                     />
@@ -830,7 +835,7 @@ export function CashPage() {
                                             className="flex items-center justify-between gap-3 px-3 py-2"
                                         >
                                             <span className="font-mono text-sm">
-                                                #{v.tokenId}
+                                                Token {v.tokenId}
                                             </span>
                                             <span className="font-mono text-sm">
                                                 {displayAmount(v.balance)}
@@ -977,9 +982,9 @@ export function CashPage() {
                                                 name="tokenId"
                                                 children={(field) => (
                                                     <field.TextField
-                                                        label="Token"
+                                                        label="Token number"
                                                         inputMode="numeric"
-                                                        placeholder="Id"
+                                                        placeholder="Token number"
                                                     />
                                                 )}
                                             />

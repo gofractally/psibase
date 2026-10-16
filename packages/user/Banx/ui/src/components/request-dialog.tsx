@@ -51,7 +51,7 @@ function kindHelp(kind: number, lockedParty?: string): string {
 }
 
 function partyLabel(kind: number): string {
-    if (kind === REQUEST_PLEASE_BOOK) return "Creditor";
+    if (kind === REQUEST_PLEASE_BOOK) return "Who owes you";
     return "Payer (optional)";
 }
 

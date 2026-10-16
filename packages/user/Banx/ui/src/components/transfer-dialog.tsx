@@ -289,6 +289,8 @@ export function TransferDialog({
     const currencyUnresolvedRef = useRef(currencyUnresolved);
     currencyUnresolvedRef.current = currencyUnresolved;
     const clearAfterPayRef = useRef<() => void>(() => {});
+    const minEditedRef = useRef(false);
+    const minSyncedRef = useRef("");
 
     const rememberQuotedKey = (key: string | null) => {
         quotedKeyRef.current = key;
@@ -305,7 +307,7 @@ export function TransferDialog({
             fromAsset: undefined as number | undefined,
             toAsset: undefined as number | undefined,
             maxHops: "6",
-            amount: prefill?.amount ?? "1",
+            amount: prefill?.amount ?? "",
         },
         onSubmit: async ({ value }) => {
             if (currencyUnresolvedRef.current) return;
@@ -365,6 +367,7 @@ export function TransferDialog({
                                     })),
                                 );
                                 execForm.setFieldValue("amount", q.amountIn);
+                                minSyncedRef.current = q.minReturn;
                                 execForm.setFieldValue(
                                     "minReturn",
                                     q.minReturn,
@@ -390,6 +393,7 @@ export function TransferDialog({
                                         { account: "", assetId: undefined },
                                     ]);
                                     execForm.setFieldValue("amount", "");
+                                    minSyncedRef.current = "";
                                     execForm.setFieldValue("minReturn", "");
                                 }
                                 reject(e);
@@ -408,8 +412,8 @@ export function TransferDialog({
     const execForm = useAppForm({
         defaultValues: {
             hops: [{ account: "", assetId: undefined }] as Hop[],
-            amount: "1.00",
-            minReturn: "0.01",
+            amount: "",
+            minReturn: "",
         },
         onSubmit: async ({ value }) => {
             if (currencyUnresolvedRef.current) {
@@ -496,10 +500,18 @@ export function TransferDialog({
         },
     });
 
+    const followMin = (next: string) => {
+        if (minEditedRef.current) return;
+        minSyncedRef.current = next;
+        execForm.setFieldValue("minReturn", next);
+    };
+
     useEffect(() => {
         if (!open || !assetsReady || assets.length === 0) return;
         const payee = prefill?.payee;
-        const amount = prefill?.amount;
+        const amount = prefill?.amount?.trim() ?? "";
+        minEditedRef.current = false;
+        minSyncedRef.current = amount;
         // `currency=usd` is a suggested transfer: both sides use it.
         // Otherwise a set page currency wins over an invoice's from-asset.
         // An unknown symbol does not use either fallback.
@@ -519,13 +531,9 @@ export function TransferDialog({
               parseAssetId(prefill?.fromAsset, assets) ??
               toAsset);
         findForm.setFieldValue("payee", payee?.trim() ?? "");
-        findForm.setFieldValue("amount", amount ?? "1");
-        if (amount) {
-            execForm.setFieldValue("minReturn", amount);
-            if (requestId) {
-                execForm.setFieldValue("amount", amount);
-            }
-        }
+        findForm.setFieldValue("amount", amount);
+        execForm.setFieldValue("amount", requestId && amount ? amount : "");
+        execForm.setFieldValue("minReturn", amount);
         findForm.setFieldValue("toAsset", toAsset);
         findForm.setFieldValue("fromAsset", fromAsset);
         rememberQuotedKey(null);
@@ -573,6 +581,8 @@ export function TransferDialog({
         quotingKeyRef.current = null;
         quoteSeq.current += 1;
         findForm.setFieldValue("amount", "");
+        minEditedRef.current = false;
+        minSyncedRef.current = "";
         findForm.setFieldMeta("amount", (prev) => ({
             ...prev,
             errors: [],
@@ -656,7 +666,7 @@ export function TransferDialog({
                         children={(field) => (
                             <field.TextField
                                 label="Payee"
-                                placeholder="brandon"
+                                placeholder="account"
                             />
                         )}
                     />
@@ -739,6 +749,9 @@ export function TransferDialog({
                                         name="amount"
                                         validators={amountValidators}
                                         listeners={{
+                                            onChange: ({ value }) => {
+                                                followMin(String(value ?? ""));
+                                            },
                                             onBlur: () => findNow(),
                                         }}
                                         children={(field) => (
@@ -973,11 +986,7 @@ export function TransferDialog({
                                                 children={(field) => (
                                                     <field.TextField
                                                         label={`Hop ${i + 1} account`}
-                                                        placeholder={
-                                                            i === 0
-                                                                ? "gary"
-                                                                : "steve"
-                                                        }
+                                                        placeholder="account"
                                                         required
                                                     />
                                                 )}
@@ -1182,6 +1191,16 @@ export function TransferDialog({
                                     <execForm.AppField
                                         name="minReturn"
                                         validators={minValidators}
+                                        listeners={{
+                                            onChange: ({ value }) => {
+                                                if (
+                                                    String(value ?? "") !==
+                                                    minSyncedRef.current
+                                                ) {
+                                                    minEditedRef.current = true;
+                                                }
+                                            },
+                                        }}
                                         children={(field) => (
                                             <field.TextField
                                                 label="Payee min"

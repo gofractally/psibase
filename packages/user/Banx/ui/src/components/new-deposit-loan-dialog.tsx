@@ -105,8 +105,8 @@ export function NewDepositLoanDialog({
                     <DialogTitle>Book a deposit</DialogTitle>
                     <DialogDescription>
                         {lockedDepositor
-                            ? `You received value off-graph. You become the debtor; ${lockedDepositor} holds the claim. Mutual claims auto-net when possible.`
-                            : "You received value off-graph. You become the debtor; the depositor holds the claim. Mutual claims auto-net when possible."}
+                            ? `You received value outside Banx. You owe ${lockedDepositor}, and they hold the asset. Overlapping claims net on their own.`
+                            : "You received value outside Banx. You owe the depositor, and they hold the asset. Overlapping claims net on their own."}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -123,8 +123,8 @@ export function NewDepositLoanDialog({
                             validators={existingAccountValidators()}
                             children={(field) => (
                                 <field.TextField
-                                    label="Depositor account"
-                                    placeholder="alice"
+                                    label="Who holds the asset"
+                                    placeholder="account"
                                     required
                                 />
                             )}

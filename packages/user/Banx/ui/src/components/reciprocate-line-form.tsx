@@ -215,7 +215,7 @@ export function ReciprocateLineForm({
                     <dd className="text-foreground text-right">
                         {formatGracePeriod(terms.graceSeconds)}
                     </dd>
-                    <dt>Deplete</dt>
+                    <dt>Limit shrinks</dt>
                     <dd className="text-foreground text-right">
                         {terms.depleteOnDebit ? "yes" : "no"}
                     </dd>
@@ -295,7 +295,7 @@ export function ReciprocateLineForm({
                     <form.AppField
                         name="deplete"
                         children={(field) => (
-                            <field.CheckboxField label="Deplete limit on each draw (non-revolving)" />
+                            <field.CheckboxField label="Shrink the limit with each draw" />
                         )}
                     />
                     <form.Subscribe

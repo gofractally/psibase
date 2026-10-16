@@ -317,7 +317,7 @@ export function InvitePage() {
                     <dd className="text-foreground text-right">
                         {formatGracePeriod(row.graceSeconds)}
                     </dd>
-                    <dt>Deplete</dt>
+                    <dt>Limit shrinks</dt>
                     <dd className="text-foreground text-right">
                         {row.depleteOnDebit ? "yes" : "no"}
                     </dd>

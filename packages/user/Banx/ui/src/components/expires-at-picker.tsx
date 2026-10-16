@@ -171,8 +171,8 @@ export function ExpiresAtPicker({
                     <DialogHeader>
                         <DialogTitle>Set expiry</DialogTitle>
                         <DialogDescription>
-                            Policies can run indefinitely, or expire at a future
-                            local date and time. Past times are not allowed.
+                            This can last forever, or stop at a future date and
+                            time. Past times are not allowed.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -208,7 +208,7 @@ export function ExpiresAtPicker({
 
                     {mode === "never" ? (
                         <p className="text-muted-foreground text-sm">
-                            This policy will not expire.
+                            It never expires.
                         </p>
                     ) : (
                         <div className="space-y-3">
@@ -302,7 +302,7 @@ export function ExpiresAtPicker({
                             variant="ghost"
                             onClick={handleClear}
                         >
-                            Clear to never
+                            Never expires
                         </Button>
                         <div className="flex gap-2">
                             <Button

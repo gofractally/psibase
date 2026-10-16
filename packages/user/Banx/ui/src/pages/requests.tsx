@@ -226,16 +226,15 @@ export function RequestsPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Requests"
-                description="Invoices ask someone to path-pay you (they do not clear an existing loan). A deposit request asks them to book value they received off-graph — only they can book it."
+                description="An invoice asks someone to pay you. A deposit request asks them to book value they already received. Only they can book it."
                 action={
                     <Button
                         type="button"
-                        size="icon"
-                        className="size-9 shrink-0 rounded-full"
-                        aria-label="New request"
+                        className="gap-1.5"
                         onClick={() => setCreateOpen(true)}
                     >
-                        <Plus className="size-5" />
+                        <Plus className="size-4" />
+                        New request
                     </Button>
                 }
             />
@@ -255,7 +254,7 @@ export function RequestsPage() {
                     renderRows(
                         incoming,
                         "in",
-                        "None — invoices to path-pay or deposits to book.",
+                        "None yet. An invoice asks for a payment. A deposit request asks them to book value they received.",
                     )
                 )}
             </section>
@@ -267,10 +266,13 @@ export function RequestsPage() {
 
             <section className="space-y-3">
                 <h2 className="font-medium">Repeating payments</h2>
-                <p className="text-muted-foreground text-sm">
-                    Collect pays one due period at a time. Cancel deletes the
-                    series and does not pay a period that is already due.
-                </p>
+                {payAuths.length > 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                        Collect pays one due period at a time. Cancel deletes
+                        the series and does not pay a period that is already
+                        due.
+                    </p>
+                ) : null}
                 {payAuthsLoading ? (
                     <p className="text-muted-foreground text-sm">Loading…</p>
                 ) : payAuths.length === 0 ? (

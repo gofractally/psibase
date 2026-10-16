@@ -108,30 +108,23 @@ function previewClaimProceeds(
     return out > 0 ? out : null;
 }
 
-function ClaimRow({
+function ClaimSentence({
     creditor,
     debtor,
     amount,
 }: {
     creditor: string;
-    debtor?: string;
-    amount: string | null;
+    debtor: string;
+    amount: string;
 }) {
-    if (amount === null || !debtor) {
-        return (
-            <p className="font-mono text-xs leading-relaxed">
-                <span className="text-foreground font-medium">{creditor}</span>{" "}
-                <span className="text-muted-foreground/50">—</span>
-            </p>
-        );
-    }
     return (
-        <p className="font-mono text-xs leading-relaxed">
+        <p className="text-sm leading-relaxed">
             <span className="text-foreground font-medium">{debtor}</span>
             <span className="text-muted-foreground"> owes </span>
             <span className="text-foreground">{amount}</span>
             <span className="text-muted-foreground"> to </span>
             <span className="text-foreground font-medium">{creditor}</span>
+            .
         </p>
     );
 }
@@ -175,28 +168,34 @@ function ClaimFeeExample({
     const buyer = isSell ? other : you;
 
     return (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
             <div className="space-y-1">
                 <p className="text-muted-foreground font-sans text-[0.7rem] uppercase tracking-wide">
-                    Before
+                    Before, for an example of {faceStr}
                 </p>
-                <ClaimRow
+                <ClaimSentence
                     creditor={seller}
                     debtor={debtor}
                     amount={faceStr}
                 />
-                <ClaimRow creditor={buyer} amount={null} />
             </div>
             <div className="space-y-1">
                 <p className="text-muted-foreground font-sans text-[0.7rem] uppercase tracking-wide">
                     After
                 </p>
-                <ClaimRow
-                    creditor={seller}
-                    debtor={buyer}
-                    amount={proceedsStr}
-                />
-                <ClaimRow
+                {proceedsStr ? (
+                    <ClaimSentence
+                        creditor={seller}
+                        debtor={buyer}
+                        amount={proceedsStr}
+                    />
+                ) : (
+                    <p className="text-sm leading-relaxed">
+                        The fee uses the whole example, so {seller} is paid
+                        nothing.
+                    </p>
+                )}
+                <ClaimSentence
                     creditor={buyer}
                     debtor={debtor}
                     amount={faceStr}

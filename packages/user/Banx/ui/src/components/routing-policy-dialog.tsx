@@ -149,16 +149,30 @@ function HopFeeExample({
               ) ?? out.toFixed(precision));
 
     return (
-        <p className="text-muted-foreground text-center text-xs font-mono leading-relaxed">
-            <span className="text-foreground">{inStr}</span> {prior}{" "}
-            <span className="opacity-50">←</span>{" "}
-            <span className="text-foreground font-medium">{intermediate}</span>{" "}
-            <span className="opacity-50">→</span>{" "}
-            <span className="text-foreground">{outStr}</span> {nextHop}
-            <span className="text-muted-foreground mt-0.5 block font-sans text-[0.7rem] normal-case tracking-normal">
-                percent of amount, then fixed fee
-            </span>
-        </p>
+        <div className="text-muted-foreground space-y-1 text-sm leading-relaxed">
+            <p>Example payment of {inStr}.</p>
+            <p>
+                <span className="text-foreground">{prior}</span> sends {inStr}{" "}
+                to{" "}
+                <span className="text-foreground font-medium">
+                    {intermediate}
+                </span>
+                .
+            </p>
+            <p>
+                <span className="text-foreground font-medium">
+                    {intermediate}
+                </span>{" "}
+                forwards {out === null ? "nothing" : outStr} to{" "}
+                <span className="text-foreground">{nextHop}</span>.
+                {out === null
+                    ? " The fee uses the whole example payment."
+                    : null}
+            </p>
+            <p className="text-xs">
+                The fee is a percent of the amount, then a fixed amount.
+            </p>
+        </div>
     );
 }
 
