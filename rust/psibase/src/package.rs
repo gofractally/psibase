@@ -31,7 +31,7 @@ use std::str::FromStr;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
-use crate::services::{x_admin, x_http, x_packages};
+use crate::services::{x_admin, x_dyn_ld, x_http, x_packages};
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
@@ -1132,6 +1132,16 @@ impl<R: Read + Seek> PackagedService<R> {
         services
     }
 
+    fn linked_imports(
+        &self,
+        packages: &PackageList,
+    ) -> Result<(Vec<AccountNumber>, Vec<dyn_ld::DynDep>), anyhow::Error> {
+        Ok((
+            self.linked_services(),
+            resolve_imports(&self.meta, packages)?,
+        ))
+    }
+
     // packages must contain
     // - all packages being installed
     // - installed packages that are not being updated, and that
@@ -1141,9 +1151,8 @@ impl<R: Read + Seek> PackagedService<R> {
         packages: &PackageList,
         actions: &mut A,
     ) -> Result<(), anyhow::Error> {
-        let imports = resolve_imports(&self.meta, packages)?;
-
-        for service in self.linked_services() {
+        let (services, imports) = self.linked_imports(packages)?;
+        for service in services {
             actions.push_action(
                 dyn_ld::Wrapper::pack_from(service).link(self.meta.name.clone(), imports.clone()),
             )?
@@ -1214,6 +1223,43 @@ impl<R: Read + Seek> PackagedService<R> {
                     path: file.name().to_string(),
                 })?
             }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn install_and_link_local(
+        &mut self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+        compression_level: u32,
+        packages: &PackageList,
+    ) -> Result<(), anyhow::Error> {
+        self.install_local(base_url, client, compression_level)
+            .await?;
+        self.link_local(base_url, client, packages).await
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn link_local(
+        &self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+        packages: &PackageList,
+    ) -> Result<(), anyhow::Error> {
+        let (services, imports) = self.linked_imports(packages)?;
+        for service in services {
+            post_local_dyn_ld(
+                base_url,
+                client,
+                "/link",
+                &x_dyn_ld::LinkRequest {
+                    service,
+                    group: self.meta.name.clone(),
+                    deps: imports.clone(),
+                },
+            )
+            .await?;
         }
         Ok(())
     }
@@ -1391,6 +1437,22 @@ impl PackageManifest {
 }
 
 #[cfg(not(target_family = "wasm"))]
+async fn post_local_dyn_ld(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    path: &str,
+    body: &impl Serialize,
+) -> Result<(), anyhow::Error> {
+    crate::as_text(
+        client
+            .post(x_dyn_ld::SERVICE.url(base_url)?.join(path)?)
+            .json(body),
+    )
+    .await?;
+    Ok(())
+}
+
+#[cfg(not(target_family = "wasm"))]
 impl PackageManifest {
     // This removes every part of self that is not overwritten by other
     pub async fn upgrade_local(
@@ -1398,7 +1460,9 @@ impl PackageManifest {
         base_url: &reqwest::Url,
         client: &mut reqwest::Client,
         other: PackageManifest,
+        package_name: &str,
     ) -> Result<(), anyhow::Error> {
+        let new_linked_services = other.linked_services_set();
         let new_files: HashSet<_> = other.data.into_iter().collect();
         for file in &self.data {
             if !new_files.contains(file) {
@@ -1419,12 +1483,15 @@ impl PackageManifest {
                 .await?;
             }
         }
+        self.unlink_local(base_url, client, package_name, new_linked_services)
+            .await?;
         Ok(())
     }
     pub async fn remove_local(
         &self,
         base_url: &reqwest::Url,
         client: &mut reqwest::Client,
+        package_name: &str,
     ) -> Result<(), anyhow::Error> {
         for file in &self.data {
             crate::as_text(client.delete(file.account.url(base_url)?.join(&file.filename)?))
@@ -1437,6 +1504,30 @@ impl PackageManifest {
                         .url(base_url)?
                         .join(&format!("/services/{}", service))?,
                 ),
+            )
+            .await?;
+        }
+        self.unlink_local(base_url, client, package_name, HashSet::new())
+            .await?;
+        Ok(())
+    }
+
+    async fn unlink_local(
+        &self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+        package_name: &str,
+        keep: HashSet<AccountNumber>,
+    ) -> Result<(), anyhow::Error> {
+        for service in self.linked_services(keep) {
+            post_local_dyn_ld(
+                base_url,
+                client,
+                "/unlink",
+                &x_dyn_ld::UnlinkRequest {
+                    service,
+                    group: package_name.to_string(),
+                },
             )
             .await?;
         }
@@ -2253,13 +2344,14 @@ impl<T: PackageRegistry> PackageRegistry for FilteredRegistry<T> {
     }
 }
 
+#[derive(Clone)]
 pub enum PackageOrigin {
     Installed { owner: AccountNumber },
     Repo { sha256: Checksum256, file: String },
     Local { sha256: Checksum256 },
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct PackageList {
     packages: HashMap<String, HashMap<String, (Meta, PackageOrigin)>>,
 }
@@ -2902,20 +2994,7 @@ impl PackageList {
         ops: &Vec<PackageOpFull<R>>,
         owner: AccountNumber,
     ) -> Self {
-        for op in ops {
-            match op {
-                PackageOpFull::Install(package) => {
-                    self.insert(package.meta().clone(), PackageOrigin::Installed { owner });
-                }
-                PackageOpFull::Replace(old, package) => {
-                    self.packages.remove(&old.name);
-                    self.insert(package.meta().clone(), PackageOrigin::Installed { owner });
-                }
-                PackageOpFull::Remove(meta) => {
-                    self.packages.remove(&meta.name);
-                }
-            }
-        }
+        self.apply_package_ops(ops, |_| PackageOrigin::Installed { owner });
         self
     }
     pub fn get_by_ref(
@@ -2964,6 +3043,79 @@ impl PackageList {
             None
         })
     }
+
+    // Installed local packages, installed network packages whose names are
+    // not already local, and packages this operation installs or replaces.
+    // Removed packages are dropped.
+    pub fn for_local_linking<R: Read + Seek>(
+        &self,
+        network_installed: PackageList,
+        ops: &[PackageOpFull<R>],
+    ) -> Self {
+        let mut packages = self.clone();
+        packages.merge_unshadowed_network(network_installed);
+        packages.apply_package_ops(ops, |package| PackageOrigin::Local {
+            sha256: package.hash().clone(),
+        });
+        packages
+    }
+
+    #[cfg(test)]
+    fn local_resolution_list(
+        &self,
+        network_installed: PackageList,
+        edits: impl IntoIterator<Item = LocalResolutionEdit>,
+    ) -> Self {
+        let mut packages = self.clone();
+        packages.merge_unshadowed_network(network_installed);
+        packages.apply_resolution_edits(edits);
+        packages
+    }
+
+    fn merge_unshadowed_network(&mut self, network_installed: PackageList) {
+        for (name, versions) in network_installed.packages {
+            if !self.contains_package(&name) {
+                self.packages.insert(name, versions);
+            }
+        }
+    }
+
+    fn apply_resolution_edits(&mut self, edits: impl IntoIterator<Item = LocalResolutionEdit>) {
+        for edit in edits {
+            if let Some(name) = &edit.remove {
+                self.remove_all_versions(name);
+            }
+            if let Some((meta, origin)) = edit.insert {
+                self.insert(meta, origin);
+            }
+        }
+    }
+
+    fn apply_package_ops<R: Read + Seek>(
+        &mut self,
+        ops: &[PackageOpFull<R>],
+        mut origin: impl FnMut(&PackagedService<R>) -> PackageOrigin,
+    ) {
+        self.apply_resolution_edits(ops.iter().map(|op| match op {
+            PackageOpFull::Install(package) => LocalResolutionEdit {
+                remove: None,
+                insert: Some((package.meta().clone(), origin(package))),
+            },
+            PackageOpFull::Replace(old, package) => LocalResolutionEdit {
+                remove: Some(old.name.clone()),
+                insert: Some((package.meta().clone(), origin(package))),
+            },
+            PackageOpFull::Remove(meta) => LocalResolutionEdit {
+                remove: Some(meta.name.clone()),
+                insert: None,
+            },
+        }));
+    }
+}
+
+struct LocalResolutionEdit {
+    remove: Option<String>,
+    insert: Option<(Meta, PackageOrigin)>,
 }
 
 // Own exports first, then direct dependency exports. Duplicate export names
@@ -3060,6 +3212,35 @@ mod resolve_imports_tests {
         assert_eq!(deps[0].service, app_svc);
         assert_eq!(deps[1].name, "ns:api");
         assert_eq!(deps[1].service, dep_svc);
+    }
+
+    fn app_depending_on(name: &str) -> Meta {
+        Meta {
+            name: "app".to_string(),
+            version: "1.0.0".to_string(),
+            depends: vec![PackageRef {
+                name: name.to_string(),
+                version: "1.0.0".to_string(),
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn local_resolution_includes_installed_network_exports() {
+        let net_svc = AccountNumber::new(account_raw!("net-svc"));
+        let mut network = PackageList::new();
+        network.insert(
+            dep_meta("net", vec![("ns:net", net_svc)]),
+            PackageOrigin::Installed {
+                owner: AccountNumber::new(1),
+            },
+        );
+        let packages = PackageList::new().local_resolution_list(network, []);
+        let deps = resolve_imports(&app_depending_on("net"), &packages).unwrap();
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].name, "ns:net");
+        assert_eq!(deps[0].service, net_svc);
     }
 }
 

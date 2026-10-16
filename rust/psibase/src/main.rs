@@ -1906,15 +1906,18 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let to_install = if args.local {
-        let network_installed =
-            installed_network_packages(&args.node_args.api, &mut client).await?;
+    let network_installed = if args.local {
+        Some(installed_network_packages(&args.node_args.api, &mut client).await?)
+    } else {
+        None
+    };
+    let to_install = if let Some(network_installed) = &network_installed {
         installed
             .resolve_local_changes(
                 &package_registry,
                 &packages,
                 args.reinstall,
-                &network_installed,
+                network_installed,
             )
             .await?
     } else {
@@ -1927,11 +1930,12 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    if args.local {
+    if let Some(network_installed) = network_installed {
         do_install_local(
             client,
             package_registry,
             installed,
+            network_installed,
             to_install,
             &args.node_args,
             args.compression_level,
@@ -2072,6 +2076,7 @@ async fn do_install_local<T: Read + Seek>(
     mut client: reqwest::Client,
     package_registry: JointRegistry<T>,
     installed: PackageList,
+    network_installed: PackageList,
     to_install: Vec<PackageOp>,
     node_args: &NodeArgs,
     compression_level: u32,
@@ -2089,6 +2094,7 @@ async fn do_install_local<T: Read + Seek>(
         &EssentialServices::empty(),
     )
     .await?;
+    let link_packages = installed.for_local_linking(network_installed, &to_install);
     progress.set_message("Installing packages");
     let res: Result<(), anyhow::Error> = async {
         for op in to_install {
@@ -2104,7 +2110,12 @@ async fn do_install_local<T: Read + Seek>(
                     put_local_manifest(&node_args.api, &mut client, &(&package).into(), &package)
                         .await?;
                     package
-                        .install_local(&node_args.api, &mut client, compression_level)
+                        .install_and_link_local(
+                            &node_args.api,
+                            &mut client,
+                            compression_level,
+                            &link_packages,
+                        )
                         .await?;
                     post_local_info(
                         &node_args.api,
@@ -2130,7 +2141,12 @@ async fn do_install_local<T: Read + Seek>(
                         )
                         .await?;
                         package
-                            .install_local(&node_args.api, &mut client, compression_level)
+                            .install_and_link_local(
+                                &node_args.api,
+                                &mut client,
+                                compression_level,
+                                &link_packages,
+                            )
                             .await?;
                         post_local_info(
                             &node_args.api,
@@ -2162,7 +2178,15 @@ async fn do_install_local<T: Read + Seek>(
                             .install_local(&node_args.api, &mut client, compression_level)
                             .await?;
                         old_manifest
-                            .upgrade_local(&node_args.api, &mut client, package.manifest())
+                            .upgrade_local(
+                                &node_args.api,
+                                &mut client,
+                                package.manifest(),
+                                &old.name,
+                            )
+                            .await?;
+                        package
+                            .link_local(&node_args.api, &mut client, &link_packages)
                             .await?;
                         delete_local_manifest(&node_args.api, &mut client, &old_info).await?;
                         post_local_info(&node_args.api, &mut client, &old_info, "/postrm").await?;
@@ -2181,7 +2205,7 @@ async fn do_install_local<T: Read + Seek>(
                         get_local_manifest(&node_args.api, &mut client, info.sha256).await?;
                     post_local_info(&node_args.api, &mut client, &info, "/prerm").await?;
                     old_manifest
-                        .remove_local(&node_args.api, &mut client)
+                        .remove_local(&node_args.api, &mut client, &meta.name)
                         .await?;
                     delete_local_manifest(&node_args.api, &mut client, &info).await?;
                     post_local_info(&node_args.api, &mut client, &info, "/postrm").await?;
@@ -2229,11 +2253,14 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
     } else {
         PackagePreference::Compatible
     };
-    let to_install = if args.local {
-        let network_installed =
-            installed_network_packages(&args.node_args.api, &mut client).await?;
+    let network_installed = if args.local {
+        Some(installed_network_packages(&args.node_args.api, &mut client).await?)
+    } else {
+        None
+    };
+    let to_install = if let Some(network_installed) = &network_installed {
         installed
-            .resolve_local_upgrade(&package_registry, &packages, preference, &network_installed)
+            .resolve_local_upgrade(&package_registry, &packages, preference, network_installed)
             .await?
     } else {
         installed
@@ -2245,11 +2272,12 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    if args.local {
+    if let Some(network_installed) = network_installed {
         do_install_local(
             client,
             package_registry,
             installed,
+            network_installed,
             to_install,
             &args.node_args,
             args.compression_level,

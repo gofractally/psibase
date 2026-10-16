@@ -123,6 +123,8 @@ void load_local_packages(TransactionContext&           tc,
           .contentType = "application/json",
           .body        = package.manifest(),
       });
+      // TODO: writes no x-dyn-ld rows, so plugin imports whose namespace
+      // differs from the owning service won't resolve for template packages.
       HttpRequest postinstall{
           .host        = XPackages::service.str() + "." + rootHost,
           .method      = "POST",
