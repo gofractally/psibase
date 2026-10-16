@@ -100,7 +100,7 @@ s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
             true,
             vec![RECOVERYKEY, BOBKEY2],
             None,
-        )?
+        )
     }
     #[psibase::test_case(packages("AuthRecover"))]
     fn test_recover_missing_new_key(chain: psibase::Chain) -> Result<(), psibase::Error> {
