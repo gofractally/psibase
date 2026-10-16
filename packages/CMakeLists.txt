@@ -32,6 +32,7 @@ add_subdirectory(user)
 add_subdirectory(psibase_tests)
 
 if(DEFINED IS_WASM)
+    add_sys_cargo_psibase_test(AuthRecover)
     add_sys_cargo_psibase_test(StagedTx)
     add_sys_cargo_psibase_test(VirtualServer)
 

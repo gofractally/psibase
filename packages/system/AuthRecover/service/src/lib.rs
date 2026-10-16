@@ -4,11 +4,7 @@ pub mod service {
     use async_graphql::SimpleObject;
     use psibase::*;
     use serde::{Deserialize, Serialize};
-    use services::{
-        accounts,
-        auth_sig::{self, SubjectPublicKeyInfo},
-        transact,
-    };
+    use services::{accounts, auth_sig::SubjectPublicKeyInfo, transact, verify_sig};
     use std::cell::RefCell;
 
     const RECOVERY_TIME: Seconds = Seconds::new(15 * 60);
@@ -51,7 +47,7 @@ pub mod service {
         let has_key = |key: &SubjectPublicKeyInfo| {
             claims
                 .iter()
-                .any(|claim| claim.service == auth_sig::SERVICE && claim.rawData.0 == key.0)
+                .any(|claim| claim.service == verify_sig::SERVICE && claim.rawData.0 == key.0)
         };
         let row = AuthTable::read()
             .get_index_pk()
