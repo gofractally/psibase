@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
-import { vserver } from "@shared/lib/plugins";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { config } from "@shared/lib/plugins";
 
 // import { CpuPricing, NetPricing } from "./use-resource-pricing";
 
@@ -78,8 +78,8 @@ export const useVirtualServerResources = () => {
                 }
             `;
 
-            const res = await callGraphqlViaPlugin(
-                vserver.authorized.graphql,
+            const res = await graphqlAuth(
+                config.virtualServer.graphql,
                 query,
             );
             const parsed = zResourcesResponse.parse(res);

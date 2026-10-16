@@ -42,6 +42,7 @@ const rootDomain = siblingUrl();
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
     pluginId("accounts", "query"),
+    pluginId("host", "accounts"),
     pluginId("host", "auth"),
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
@@ -49,6 +50,17 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("clientdata", "plugin"),
     pluginId("webcrypto", "plugin"),
 ];
+
+// The homepage is served from the network name's subdomain, but its plugins are
+//   registered (e.g. in dyn-ld) under the "homepage" service.
+const toHomepageAlias = async <T extends { service: string }>(
+    id: T,
+): Promise<T> => {
+    const network = await networkNamePromise;
+    return network && id.service === network
+        ? { ...id, service: "homepage" }
+        : id;
+};
 
 // Control-flow signal thrown to unwind out of a plugin call.
 //
@@ -135,7 +147,7 @@ export class Supervisor implements AppInterface {
                 return;
             }
 
-            // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
+            // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., host:accounts, host:auth
             this.loader.trackPlugins([...systemPlugins]);
             await this.loader.processPlugins();
             await this.loader.awaitReady();
@@ -235,7 +247,7 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
         const user = this.supervisorCall(
-            getCallArgs("accounts", "query", "api", "get-current-user", []),
+            getCallArgs("host", "accounts", "api", "get-current-user", []),
         );
 
         if (!user) {
@@ -401,6 +413,7 @@ export class Supervisor implements AppInterface {
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
             await networkNamePromise;
+            plugin = await toHomepageAlias(plugin);
             this.setParentOrigination(callerOrigin);
             await this.preload([plugin]);
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
@@ -425,7 +438,7 @@ export class Supervisor implements AppInterface {
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
-            await this.preload(plugins);
+            await this.preload(await Promise.all(plugins.map(toHomepageAlias)));
         } catch (e) {
             result = e;
         } finally {
@@ -443,6 +456,7 @@ export class Supervisor implements AppInterface {
     ): Promise<any> {
         try {
             await networkNamePromise;
+            args = await toHomepageAlias(args);
             this.setParentOrigination(callerOrigin);
 
             // This is the time-intensive step. It includes: downloading, parsing, and transpiling the

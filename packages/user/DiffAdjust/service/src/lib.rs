@@ -225,7 +225,10 @@ pub mod tables {
 
         fn check_sender_has_nft(&self) {
             assert_eq!(
-                Nft::call().getNft(self.nft_id).owner,
+                Nft::call()
+                    .getNft(self.nft_id)
+                    .expect("NFT was burned")
+                    .owner,
                 get_sender(),
                 "must be owner of rate limiter",
             );
@@ -302,8 +305,8 @@ pub mod tables {
 
     #[ComplexObject]
     impl RateLimit {
-        pub async fn admin(&self) -> AccountNumber {
-            Nft::call().getNft(self.nft_id).owner
+        pub async fn admin(&self) -> Option<AccountNumber> {
+            Nft::call().getNft(self.nft_id).map(|nft| nft.owner)
         }
     }
 }

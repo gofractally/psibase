@@ -34,3 +34,4 @@ world = "impl"
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "virtual-server:plugin" = { path = "../../../system/VirtualServer/plugin/wit/world.wit" }
 "name-market:plugin" = { path = "../../NameMarket/plugin/wit/world.wit" }
+"staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }

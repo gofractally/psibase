@@ -9,12 +9,22 @@ class Api extends PluginInterface {
     }
 }
 
+class Contacts extends PluginInterface {
+    protected override readonly _intf = "contacts" as const;
+
+    get get() {
+        return this._call<[], unknown[]>("get");
+    }
+}
+
 export class Plugin {
     readonly api: Api;
+    readonly contacts: Contacts;
 
     constructor(readonly service: Account) {
-        // Initialize all interfaces with the correct service
         this.api = new Api();
+        this.contacts = new Contacts();
         Object.assign(this.api, { _service: service });
+        Object.assign(this.contacts, { _service: service });
     }
 }

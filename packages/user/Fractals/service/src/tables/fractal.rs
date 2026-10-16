@@ -1,6 +1,7 @@
 use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::sites;
+use psibase::services::nft::Wrapper as Nft;
 use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
 
 use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
@@ -40,9 +41,13 @@ impl Fractal {
 
         let max_supply: Quantity = TOKEN_SUPPLY.into();
         let precision: Precision = TOKEN_PRECISION.try_into().unwrap();
+        let tokens = Tokens::call();
+        let token_id = tokens.create(precision, max_supply);
+        let nft_id = tokens.getToken(token_id).nft_id;
+        Nft::call().debit(nft_id, "".into());
 
         Self {
-            token_id: Tokens::call().create(precision, max_supply),
+            token_id,
             account,
             created_at: now,
             mission,

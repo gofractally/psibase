@@ -1,6 +1,6 @@
 import z from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { invite } from "@shared/lib/plugins";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
@@ -15,7 +15,7 @@ const zInviteDetailsResponse = z.object({
 });
 
 export const getInviteById = async (inviteId: number) => {
-    const response = await callGraphqlViaPlugin(
+    const response = await graphqlAuth(
         invite.authorized.graphql,
         `
             query InviteById {
