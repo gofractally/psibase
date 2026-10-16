@@ -59,6 +59,8 @@ custom_error! {
     MissingSchema{service: AccountNumber} = "Cannot find schema for {service}",
     InvalidPackageSource = "Invalid package source",
     InvalidVerifyService = "Invalid verify service",
+    ImportListMissingDep{name: String, version: String} = "Package list does not contain {name}-{version}",
+    AmbiguousImport{name: String} = "Ambiguous import for {name}",
 }
 
 fn should_compress(content_type: &str) -> bool {
@@ -1139,35 +1141,7 @@ impl<R: Read + Seek> PackagedService<R> {
         packages: &PackageList,
         actions: &mut A,
     ) -> Result<(), anyhow::Error> {
-        let mut visited_imports = HashMap::new();
-        let mut imports = Vec::new();
-        for export in &self.meta.exports {
-            imports.push(dyn_ld::DynDep {
-                name: export.name.clone(),
-                service: export.service.clone(),
-            });
-        }
-        for dep in &self.meta.depends {
-            let Some((meta, _)) = packages.get_by_ref(dep)? else {
-                Err(anyhow!(
-                    "Package list does not contain {}-{}",
-                    dep.name,
-                    dep.version
-                ))?
-            };
-            for export in &meta.exports {
-                if let Some(old) = visited_imports.insert(&export.name, export.service) {
-                    if old != export.service {
-                        Err(anyhow!("Ambiguous import for {}", export.name))?
-                    }
-                } else {
-                    imports.push(dyn_ld::DynDep {
-                        name: export.name.clone(),
-                        service: export.service.clone(),
-                    })
-                }
-            }
-        }
+        let imports = resolve_imports(&self.meta, packages)?;
 
         for service in self.linked_services() {
             actions.push_action(
@@ -2680,5 +2654,102 @@ impl PackageList {
         } else {
             None
         })
+    }
+}
+
+// Own exports first, then direct dependency exports. Duplicate export names
+// among dependencies resolve to one service; conflicting services error.
+pub fn resolve_imports(
+    meta: &Meta,
+    packages: &PackageList,
+) -> Result<Vec<dyn_ld::DynDep>, anyhow::Error> {
+    let mut imports: Vec<_> = meta
+        .exports
+        .iter()
+        .map(|export| dyn_ld::DynDep {
+            name: export.name.clone(),
+            service: export.service,
+        })
+        .collect();
+    let mut seen = HashMap::new();
+    for dep in &meta.depends {
+        let Some((dep_meta, _)) = packages.get_by_ref(dep)? else {
+            Err(Error::ImportListMissingDep {
+                name: dep.name.clone(),
+                version: dep.version.clone(),
+            })?
+        };
+        for export in &dep_meta.exports {
+            match seen.entry(export.name.clone()) {
+                hash_map::Entry::Vacant(entry) => {
+                    entry.insert(export.service);
+                    imports.push(dyn_ld::DynDep {
+                        name: export.name.clone(),
+                        service: export.service,
+                    });
+                }
+                hash_map::Entry::Occupied(entry) => {
+                    if *entry.get() != export.service {
+                        Err(Error::AmbiguousImport {
+                            name: export.name.clone(),
+                        })?
+                    }
+                }
+            }
+        }
+    }
+    Ok(imports)
+}
+
+#[cfg(test)]
+mod resolve_imports_tests {
+    use super::*;
+    use crate::account_raw;
+
+    fn dep_meta(name: &str, exports: Vec<(&str, AccountNumber)>) -> Meta {
+        Meta {
+            name: name.to_string(),
+            version: "1.0.0".to_string(),
+            exports: exports
+                .into_iter()
+                .map(|(n, service)| PackageExport {
+                    name: n.to_string(),
+                    service,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn own_exports_then_dependency_exports() {
+        let mut packages = PackageList::new();
+        let dep_svc = AccountNumber::new(account_raw!("dep-svc"));
+        packages.insert(
+            dep_meta("dep", vec![("ns:api", dep_svc)]),
+            PackageOrigin::Local {
+                sha256: Checksum256::default(),
+            },
+        );
+        let app_svc = AccountNumber::new(account_raw!("app-svc"));
+        let meta = Meta {
+            name: "app".to_string(),
+            version: "1.0.0".to_string(),
+            depends: vec![PackageRef {
+                name: "dep".to_string(),
+                version: "1.0.0".to_string(),
+            }],
+            exports: vec![PackageExport {
+                name: "ns:own".to_string(),
+                service: app_svc,
+            }],
+            ..Default::default()
+        };
+        let deps = resolve_imports(&meta, &packages).unwrap();
+        assert_eq!(deps.len(), 2);
+        assert_eq!(deps[0].name, "ns:own");
+        assert_eq!(deps[0].service, app_svc);
+        assert_eq!(deps[1].name, "ns:api");
+        assert_eq!(deps[1].service, dep_svc);
     }
 }
