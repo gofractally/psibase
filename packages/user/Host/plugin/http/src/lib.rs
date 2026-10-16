@@ -12,6 +12,7 @@ use exports::host::http::api::Guest as Api;
 use helpers::make_error;
 use host::client::api as CallContext;
 use host::types::types::{BodyTypes, Error, PostRequest};
+use psibase::AccountNumber;
 use supervisor::bridge::types::{self as BridgeTypes, HttpRequest};
 
 struct HostHttp;
@@ -69,6 +70,18 @@ fn do_get(app: String, endpoint: String) -> Result<BridgeTypes::HttpResponse, Er
     .send()?)
 }
 
+fn assert_active_app_caller(context: &str) -> String {
+    let sender = CallContext::get_sender();
+    let active_app = CallContext::get_active_app();
+    assert!(
+        sender == active_app,
+        "[{}] Unauthorized caller: {}",
+        context,
+        sender
+    );
+    active_app
+}
+
 impl Api for HostHttp {
     fn post_graphql_get_json(graphql: String) -> Result<String, Error> {
         let res = do_post(
@@ -113,6 +126,41 @@ impl Api for HostHttp {
             Some(BridgeTypes::BodyTypes::Json(body)) => Ok(body),
             _ => Err(make_error("Http response body absent or wrong type")),
         }
+    }
+
+    fn get_ws_ticket(service: String) -> Result<String, Error> {
+        let app = assert_active_app_caller("get-ws-ticket@host:http/api");
+
+        AccountNumber::from_exact(&service)
+            .map_err(|_| make_error(&format!("Invalid service: {}", service)))?;
+
+        let Some(token) = get_auth_token() else {
+            return Err(make_error("No authenticated user"));
+        };
+
+        let body = serde_json::json!({ "app": app, "service": service }).to_string();
+        let res = do_post(
+            "wsauth".to_string(),
+            "ws-ticket".to_string(),
+            BodyTypes::Json(body),
+        )?;
+
+        let Some(BridgeTypes::BodyTypes::Json(body)) = res.body else {
+            return Err(make_error(
+                "Invalid ws-ticket response: 'body' must be JSON",
+            ));
+        };
+        let json: serde_json::Value =
+            serde_json::from_str(&body).map_err(|e| make_error(&e.to_string()))?;
+        let ticket = json["ticket"]
+            .as_str()
+            .ok_or_else(|| make_error("Invalid ws-ticket response: missing 'ticket'"))?;
+        if ticket.contains(&token) {
+            return Err(make_error(
+                "Invalid ws-ticket response: ticket contains session token",
+            ));
+        }
+        Ok(ticket.to_string())
     }
 }
 

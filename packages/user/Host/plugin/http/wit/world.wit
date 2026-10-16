@@ -24,6 +24,15 @@ interface api {
     /// * `endpoint` - The subpath being requested (e.g. `/common/tapos/head` or `/api/some-request`)
     get-json: func(endpoint: string) -> result<string, error>;
 
+    /// Mint a single-use websocket ticket to `service` for the current user.
+    /// Only callable by the active app.
+    /// Request a new ticket for each connection and pass it as the
+    /// `psibase.ws-ticket.<ticket>` websocket subprotocol.
+    ///
+    /// Parameters
+    /// * `service` - The account of the service that will accept the websocket
+    get-ws-ticket: func(service: string) -> result<string, error>;
+
     // Todo: Probably will need to implement most/all js library functionality:
     // https://docs.psibase.io/development/front-ends/reference/js-libraries.html
 }
