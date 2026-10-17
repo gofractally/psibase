@@ -22,26 +22,59 @@ namespace
 {
    constexpr auto autoDebit = Nft::autoDebit;
 
-   struct AvailableData
+   struct FirstIdData
    {
-      bool idAvailable;
-      NID  nextId;
+      NID firstAvailableId;
    };
-   PSIO_REFLECT(AvailableData, idAvailable, nextId);
+   PSIO_REFLECT(FirstIdData, firstAvailableId);
 
-   struct AvailableRoot
+   struct FirstIdRoot
    {
-      AvailableData data;
+      FirstIdData data;
    };
-   PSIO_REFLECT(AvailableRoot, data);
+   PSIO_REFLECT(FirstIdRoot, data);
 
-   AvailableData availableQuery(DefaultTestChain& t, NID id)
+   struct StatusNft
    {
-      auto query = std::format("query {{ idAvailable(id: {}) nextId }}", id);
+      NID id;
+   };
+   PSIO_REFLECT(StatusNft, id);
+
+   struct StatusData
+   {
+      string                state;
+      optional<StatusNft>   nftDetail;
+   };
+   PSIO_REFLECT(StatusData, state, nftDetail);
+
+   struct StatusNode
+   {
+      StatusData nftStatus;
+   };
+   PSIO_REFLECT(StatusNode, nftStatus);
+
+   struct StatusRoot
+   {
+      StatusNode data;
+   };
+   PSIO_REFLECT(StatusRoot, data);
+
+   NID firstAvailable(DefaultTestChain& t, NID begin)
+   {
+      auto query = std::format("query {{ firstAvailableId(begin: {}) }}", begin);
       auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
       auto body  = std::string(res.body.begin(), res.body.end());
       UNSCOPED_INFO(body);
-      return psio::convert_from_json<AvailableRoot>(body).data;
+      return psio::convert_from_json<FirstIdRoot>(body).data.firstAvailableId;
+   }
+
+   StatusData nftStatus(DefaultTestChain& t, NID id)
+   {
+      auto query = std::format("query {{ nftStatus(nftId: {}) {{ state nftDetail {{ id }} }} }}", id);
+      auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
+      auto body  = std::string(res.body.begin(), res.body.end());
+      UNSCOPED_INFO(body);
+      return psio::convert_from_json<StatusRoot>(body).data.nftStatus;
    }
 }  // namespace
 
@@ -284,10 +317,8 @@ SCENARIO("mint with an explicit id")
       THEN("A free id above the counter can be chosen")
       {
          NID chosen = next + 10;
-         auto before = availableQuery(t, chosen);
-         CHECK(before.idAvailable);
-         CHECK(before.nextId == next);
-         CHECK_FALSE(availableQuery(t, 0).idAvailable);
+         CHECK(firstAvailable(t, chosen) == chosen);
+         CHECK(firstAvailable(t, 0) == next);
 
          auto minted = a.mint(chosen);
          REQUIRE(minted.succeeded());
@@ -297,9 +328,12 @@ SCENARIO("mint with an explicit id")
          CHECK(nft.owner == alice.id);
          CHECK(nft.issuer == alice.id);
 
-         auto after = availableQuery(t, chosen);
-         CHECK_FALSE(after.idAvailable);
-         CHECK(after.nextId == next);
+         auto active = nftStatus(t, chosen);
+         CHECK(active.state == "active");
+         REQUIRE(active.nftDetail.has_value());
+         CHECK(active.nftDetail->id == chosen);
+         CHECK(firstAvailable(t, chosen) == chosen + 1);
+         CHECK(firstAvailable(t, 0) == next);
 
          AND_THEN("That id cannot be minted again")
          {
@@ -328,7 +362,13 @@ SCENARIO("mint with an explicit id")
          CHECK(!a.getNft(sequential).returnVal().has_value());
          CHECK(a.exists(sequential).returnVal() == false);
          CHECK(a.mint(sequential).failed(nftIdTaken));
-         CHECK_FALSE(availableQuery(t, sequential).idAvailable);
+         CHECK(firstAvailable(t, sequential) == next);
+         auto burned = nftStatus(t, sequential);
+         CHECK(burned.state == "burned");
+         CHECK_FALSE(burned.nftDetail.has_value());
+         auto missing = nftStatus(t, next + 50);
+         CHECK(missing.state == "available");
+         CHECK_FALSE(missing.nftDetail.has_value());
       }
       THEN("A burned explicit id cannot be reused")
       {
@@ -338,10 +378,17 @@ SCENARIO("mint with an explicit id")
          CHECK(!a.getNft(chosen).returnVal().has_value());
          CHECK(a.exists(chosen).returnVal() == false);
          CHECK(a.mint(chosen).failed(nftIdTaken));
-
-         auto available = availableQuery(t, chosen);
-         CHECK_FALSE(available.idAvailable);
-         CHECK(available.nextId == next);
+         CHECK(firstAvailable(t, chosen) == chosen + 1);
+         CHECK(firstAvailable(t, 0) == next);
+      }
+      THEN("Search wraps past the last id and skips 0")
+      {
+         constexpr NID last = 0xffffffffu;
+         CHECK(firstAvailable(t, last) == last);
+         REQUIRE(a.mint(last).succeeded());
+         CHECK(firstAvailable(t, last) == firstAvailable(t, 0));
+         CHECK(firstAvailable(t, 0) != 0);
+         CHECK(firstAvailable(t, last) != last);
       }
    }
 }

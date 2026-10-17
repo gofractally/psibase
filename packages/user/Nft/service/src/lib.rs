@@ -47,11 +47,7 @@ pub mod tables {
         }
 
         pub fn get_next_id(&mut self) -> NID {
-            let next_id = Nft::next_free_id(
-                self.next_id
-                    .checked_add(1)
-                    .expect("overflow in id generation"),
-            );
+            let next_id = Nft::first_available_id(self.next_id.wrapping_add(1));
             self.next_id = next_id;
             self.save();
             next_id
@@ -63,12 +59,19 @@ pub mod tables {
     }
 
     #[table(name = "NftTable", index = 1)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, PartialEq, SimpleObject)]
     pub struct Nft {
         #[primary_key]
         pub id: NID,
         pub issuer: AccountNumber,
         pub owner: AccountNumber,
+    }
+
+    #[derive(PartialEq)]
+    pub enum NftStatus {
+        Available,
+        Burned,
+        Active(Nft),
     }
 
     impl Nft {
@@ -86,27 +89,32 @@ pub mod tables {
             NftTable::read().get_index_pk().get(&nft_id)
         }
 
-        /// First id at or after `start` that is neither minted nor burned.
-        pub fn next_free_id(mut id: NID) -> NID {
-            while Self::get(id).is_some() || Burned::contains(id) {
-                id = id.checked_add(1).expect("overflow in id generation");
+        pub fn status(id: NID) -> NftStatus {
+            if let Some(nft) = Self::get(id) {
+                NftStatus::Active(nft)
+            } else if Burned::contains(id) {
+                NftStatus::Burned
+            } else {
+                NftStatus::Available
             }
-            id
         }
 
-        /// Id `mint(None)` would assign, without moving the counter.
-        pub fn peek_next_id() -> NID {
-            Self::next_free_id(
-                ConfigRow::get_assert()
-                    .next_id
-                    .checked_add(1)
-                    .expect("overflow in id generation"),
-            )
-        }
-
-        /// True when `mint(Some(id))` can create this id. Id 0 is never available.
-        pub fn id_available(id: NID) -> bool {
-            id != 0 && Self::get(id).is_none() && !Burned::contains(id)
+        /// First id at or after `begin` that mint can create. Wraps, and never returns 0.
+        pub fn first_available_id(begin: NID) -> NID {
+            let mut id = if begin == 0 { 1 } else { begin };
+            let start = id;
+            loop {
+                if Self::status(id) == NftStatus::Available {
+                    return id;
+                }
+                id = id.wrapping_add(1);
+                if id == 0 {
+                    id = 1;
+                }
+                if id == start {
+                    abort_message("no NFT id available");
+                }
+            }
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
@@ -114,13 +122,11 @@ pub mod tables {
         }
 
         pub fn get_assert(nft_id: NID) -> Self {
-            if let Some(nft) = Self::get(nft_id) {
-                return nft;
+            match Self::status(nft_id) {
+                NftStatus::Active(nft) => nft,
+                NftStatus::Burned => abort_message("NFT was burned"),
+                NftStatus::Available => abort_message("NFT does not exist"),
             }
-            if Burned::contains(nft_id) {
-                abort_message("NFT was burned");
-            }
-            abort_message("NFT does not exist");
         }
 
         pub fn new(sender: AccountNumber, id: NID) -> Self {
@@ -136,10 +142,12 @@ pub mod tables {
             let id = match id {
                 Some(id) => {
                     assert!(id != 0, "NFT ID invalid");
-                    if Self::get(id).is_some() || Burned::contains(id) {
-                        abort_message("NFT ID already taken");
+                    match Self::status(id) {
+                        NftStatus::Available => id,
+                        NftStatus::Active(_) | NftStatus::Burned => {
+                            abort_message("NFT ID already taken")
+                        }
                     }
-                    id
                 }
                 None => ConfigRow::get_assert().get_next_id(),
             };

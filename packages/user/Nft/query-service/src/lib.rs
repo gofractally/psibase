@@ -7,7 +7,7 @@ mod service {
     use nft::{
         service::NID,
         tables::{
-            Burned, CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftTable,
+            CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftStatus, NftTable,
             UserPending, UserPendingTable,
         },
     };
@@ -38,11 +38,37 @@ mod service {
         issuer: UserDetail,
     }
 
+    #[derive(Enum, Copy, Clone, Eq, PartialEq)]
+    enum NftLife {
+        #[graphql(name = "available")]
+        Available,
+        #[graphql(name = "burned")]
+        Burned,
+        #[graphql(name = "active")]
+        Active,
+    }
+
+    #[derive(SimpleObject)]
+    struct NftStatusView {
+        state: NftLife,
+        nftDetail: Option<NftDetail>,
+    }
+
     struct Query {
         user: Option<AccountNumber>,
     }
 
     impl Query {
+        fn nft_detail(&self, nft: &Nft) -> NftDetail {
+            use psibase::services::accounts::Wrapper as Accounts;
+
+            NftDetail {
+                id: nft.id,
+                issuer: Accounts::call().getAccount(nft.issuer).unwrap().into(),
+                owner: Accounts::call().getAccount(nft.owner).unwrap().into(),
+            }
+        }
+
         fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
             if self.user != Some(user) {
                 return Err(async_graphql::Error::new(format!(
@@ -202,31 +228,34 @@ mod service {
             }
         }
 
-        /// Id that `mint` with an empty id would assign.
-        async fn nextId(&self) -> u32 {
-            Nft::peek_next_id()
+        /// First id at or after `begin` that `mint` can create. The search wraps, and never returns 0.
+        async fn firstAvailableId(&self, begin: u32) -> u32 {
+            Nft::first_available_id(begin)
         }
 
-        /// Whether `mint` can create `id`.
-        async fn idAvailable(&self, id: u32) -> bool {
-            Nft::id_available(id)
+        async fn nftDetails(&self, nftId: NID) -> Option<NftDetail> {
+            match Nft::status(nftId) {
+                NftStatus::Active(nft) => Some(self.nft_detail(&nft)),
+                NftStatus::Available | NftStatus::Burned => None,
+            }
         }
 
-        async fn nftDetails(&self, nftId: NID) -> async_graphql::Result<Option<NftDetail>> {
-            use psibase::services::accounts::Wrapper as Accounts;
-
-            let Some(nft) = Nft::get(nftId) else {
-                if Burned::contains(nftId) {
-                    return Err(async_graphql::Error::new("NFT was burned"));
-                }
-                return Ok(None);
-            };
-
-            Ok(Some(NftDetail {
-                id: nftId,
-                issuer: Accounts::call().getAccount(nft.issuer).unwrap().into(),
-                owner: Accounts::call().getAccount(nft.owner).unwrap().into(),
-            }))
+        /// `available` when `nftId` was never minted, `burned` after burn, `active` while it exists.
+        async fn nftStatus(&self, nftId: NID) -> NftStatusView {
+            match Nft::status(nftId) {
+                NftStatus::Available => NftStatusView {
+                    state: NftLife::Available,
+                    nftDetail: None,
+                },
+                NftStatus::Burned => NftStatusView {
+                    state: NftLife::Burned,
+                    nftDetail: None,
+                },
+                NftStatus::Active(nft) => NftStatusView {
+                    state: NftLife::Active,
+                    nftDetail: Some(self.nft_detail(&nft)),
+                },
+            }
         }
 
         /// NFTs `user` has credited and not yet debited or uncredited.

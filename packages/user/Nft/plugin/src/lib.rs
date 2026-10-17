@@ -44,11 +44,9 @@ struct MintChoiceResponse {
 }
 
 #[derive(Deserialize)]
+#[allow(non_snake_case)]
 struct MintChoiceData {
-    #[serde(rename = "idAvailable")]
-    available: bool,
-    #[serde(rename = "nextId")]
-    next_id: u32,
+    firstAvailableId: u32,
 }
 
 fn plugin_error(message: impl Into<String>) -> Error {
@@ -62,11 +60,11 @@ fn plugin_error(message: impl Into<String>) -> Error {
     }
 }
 
-fn mint_choice(guess: u32) -> Result<MintChoiceData, Error> {
-    let query = format!("query {{ idAvailable(id: {guess}) nextId }}");
+fn first_available_id(begin: u32) -> Result<u32, Error> {
+    let query = format!("query {{ firstAvailableId(begin: {begin}) }}");
     let body = post_graphql_get_json(&query)?;
     serde_json::from_str::<MintChoiceResponse>(&body)
-        .map(|response| response.data)
+        .map(|response| response.data.firstAvailableId)
         .map_err(|err| plugin_error(err.to_string()))
 }
 
@@ -77,12 +75,7 @@ impl Issuer for NftPlugin {
         trust::assert_authorized(trust::FunctionName::mint)?;
 
         let guess: u32 = rand::rng().random();
-        let choice = mint_choice(guess)?;
-        let id = if choice.available {
-            guess
-        } else {
-            choice.next_id
-        };
+        let id = first_available_id(guess)?;
         let packed_args = Nft::action_structs::mint { nftId: Some(id) }.packed();
         add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)?;
         Ok(id)
