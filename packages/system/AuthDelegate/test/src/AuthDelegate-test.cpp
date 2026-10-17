@@ -89,7 +89,7 @@ SCENARIO("AuthDelegate")
       auto mintAction = Action{.sender  = alice.id,
                                .service = Nft::service,
                                .method  = "mint"_m,
-                               .rawData = psio::to_frac(std::tuple(std::optional<NID>{}))
+                               .rawData = psio::to_frac(std::tuple())
 
       };
       auto proposed   = std::vector<Action>{mintAction};

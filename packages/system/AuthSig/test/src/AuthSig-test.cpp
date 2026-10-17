@@ -98,7 +98,7 @@ SCENARIO("AuthSig")
       auto mint         = Action{.sender  = alice.id,
                                  .service = Nft::service,
                                  .method  = "mint"_m,
-                                 .rawData = psio::to_frac(std::tuple(std::optional<NID>{}))
+                                 .rawData = psio::to_frac(std::tuple())
 
       };
       auto proposedMint = std::vector<Action>{mint};
@@ -172,8 +172,8 @@ SCENARIO("AuthSig")
       // Test atomic swaps
       WHEN("Alice and Bob have NFTs")
       {
-         auto aliceMint = alice.to<Nft>().mint(std::nullopt);
-         auto bobMint   = bob.to<Nft>().mint(std::nullopt);
+         auto aliceMint = alice.to<Nft>().mint();
+         auto bobMint   = bob.to<Nft>().mint();
          REQUIRE(aliceMint.succeeded());
          REQUIRE(bobMint.succeeded());
          auto aliceNfts = getNfts(t, alice.id);
