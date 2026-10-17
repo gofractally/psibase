@@ -124,6 +124,10 @@ impl Connection {
 
     /// Reduce this leftover claim by `take` and credit the same pair in
     /// `to_asset`. Caller must already have netted `from_asset`.
+    ///
+    /// `add_fee` prices the poster's fee on top of `take` (they are owed the
+    /// from-asset): `apply_rate` sees `take + fee` and a zero fee. Otherwise
+    /// the fee is taken out of `take`. The claim still shrinks by `take`.
     pub fn rebook(
         self,
         take: Quantity,
@@ -131,11 +135,21 @@ impl Connection {
         to_asset: u16,
         fee_fixed: Quantity,
         fx_rate: u64,
+        add_fee: bool,
         to_interest_rate: u32,
     ) -> Quantity {
         assert!(take.value > 0, "convert amount must be positive");
         Obligation::apply_reduction(self.creditor, self.debtor, self.asset_id, take.value);
-        let to_qty = apply_rate(take, fee_fixed, fx_rate);
+        let (priced, fee) = if add_fee {
+            let gross = take
+                .value
+                .checked_add(fee_fixed.value)
+                .expect("rate conversion failed");
+            (Quantity::new(gross), Quantity::new(0))
+        } else {
+            (take, fee_fixed)
+        };
+        let to_qty = apply_rate(priced, fee, fx_rate);
         assert!(to_qty.value >= min_to.value, "convert output below min_to");
         Obligation::credit_pair(
             self.creditor,

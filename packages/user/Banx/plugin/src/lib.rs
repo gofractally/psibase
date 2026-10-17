@@ -70,6 +70,7 @@ define_trust! {
             remove_sell_claim_offer,
             remove_global_sell_claim_offer,
             set_currency_policy,
+            set_exchange_quotes,
             remove_currency_policy,
             create_request,
             cancel_request,
@@ -531,6 +532,7 @@ impl Api for BanxPlugin {
     fn set_currency_policy(
         from_asset: u16,
         to_asset: u16,
+        poster_is_creditor: bool,
         fee_fixed: String,
         to_rate: String,
         to_interest_rate_ppm: u32,
@@ -544,6 +546,7 @@ impl Api for BanxPlugin {
         let packed = banx::action_structs::st_cur_pol {
             from_asset,
             to_asset,
+            poster_is_creditor,
             fee_fixed,
             fx_rate,
             to_interest_rate: to_interest_rate_ppm,
@@ -554,11 +557,66 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::st_cur_pol::ACTION_NAME, &packed)
     }
 
-    fn remove_currency_policy(from_asset: u16, to_asset: u16) -> Result<(), Error> {
+    fn set_exchange_quotes(
+        asset_a: u16,
+        asset_b: u16,
+        market_rate: String,
+        spread_ppm: u32,
+        remaining_a: String,
+        remaining_b: String,
+        to_interest_rate_ppm: u32,
+        expires_at_seconds: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_exchange_quotes)?;
+        if asset_a == asset_b {
+            return Err(ErrorType::ConversionError(
+                "currency convert requires different assets".into(),
+            )
+            .into());
+        }
+        let market_fx = human_to_fx_rate(asset_a, asset_b, &market_rate)?;
+        let Some((forward, back)) = banx::math::try_exchange_rates(market_fx, spread_ppm) else {
+            return Err(ErrorType::ConversionError(
+                "spread consumes the market rate".into(),
+            )
+            .into());
+        };
+        let remaining_a = parse_amount_nonzero(asset_a, &remaining_a)?;
+        let remaining_b = parse_amount_nonzero(asset_b, &remaining_b)?;
+        let expires_at = time_point(expires_at_seconds);
+        let zero = Quantity::new(0);
+        for (from_asset, to_asset, fx_rate, remaining, poster_is_creditor) in [
+            (asset_a, asset_b, forward, remaining_a, true),
+            (asset_a, asset_b, forward, remaining_a, false),
+            (asset_b, asset_a, back, remaining_b, true),
+            (asset_b, asset_a, back, remaining_b, false),
+        ] {
+            let packed = banx::action_structs::st_cur_pol {
+                from_asset,
+                to_asset,
+                poster_is_creditor,
+                fee_fixed: zero,
+                fx_rate,
+                to_interest_rate: to_interest_rate_ppm,
+                remaining,
+                expires_at,
+            }
+            .packed();
+            add_action_to_transaction(banx::action_structs::st_cur_pol::ACTION_NAME, &packed)?;
+        }
+        Ok(())
+    }
+
+    fn remove_currency_policy(
+        from_asset: u16,
+        to_asset: u16,
+        poster_is_creditor: bool,
+    ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::remove_currency_policy)?;
         let packed = banx::action_structs::rm_cur_pol {
             from_asset,
             to_asset,
+            poster_is_creditor,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::rm_cur_pol::ACTION_NAME, &packed)

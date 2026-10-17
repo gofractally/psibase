@@ -40,6 +40,10 @@ mod tests {
             .value
     }
 
+    fn banx_gql(chain: &psibase::Chain, query: &str) -> Result<serde_json::Value, psibase::Error> {
+        Ok(chain.graphql(Wrapper::SERVICE, query)?)
+    }
+
     /// Replay a stored obligation the service can no longer create.
     ///
     /// A service-db write is rejected while a block is open. Between blocks
@@ -340,6 +344,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
@@ -445,6 +450,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 65 / 100,
                 0,
@@ -664,6 +670,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 65 / 100,
                 0,
@@ -724,6 +731,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
@@ -738,6 +746,617 @@ mod tests {
 
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
+
+        Ok(())
+    }
+
+    /// Isabelle owes John 10 kWh. He posts the creditor side: 1 kWh → 0.30 AUD
+    /// with a 1 kWh fee. The fee is his charge, so she owes 3.30 AUD
+    /// (3.00 for the kWh plus 0.30 for the fee). The kWh debt is gone.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_posted_fee_favours_john_when_isabelle_converts_kwh(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let john = account!("john");
+        let isabelle = account!("isabelle");
+        chain.new_account(john).unwrap();
+        chain.new_account(isabelle).unwrap();
+
+        let kwh = Asset::get_by_symbol_assert(account!("kwh")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        // kWh is 3 decimals (1.000 = 1 kWh). AUD is 4 decimals.
+        let one_kwh = 1_000u64;
+        let ten_kwh = 10 * one_kwh;
+        let fee_kwh = one_kwh;
+        let aud_for_one_kwh = 3_000u64;
+        let rate = aud_for_one_kwh * RATE_SCALE / one_kwh;
+        // 10 × 0.30 AUD, plus the 1 kWh fee priced at the same rate.
+        let fair_aud = aud_for_one_kwh * 10 + aud_for_one_kwh;
+
+        // Isabelle books the kWh, so she owes John.
+        Wrapper::push_from(&chain, isabelle)
+            .deposit(john, kwh, Quantity::new(ten_kwh), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, john, isabelle, kwh), ten_kwh);
+
+        Wrapper::push_from(&chain, john)
+            .st_cur_pol(
+                kwh,
+                aud,
+                true,
+                Quantity::new(fee_kwh),
+                rate,
+                0,
+                Quantity::new(ten_kwh),
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, isabelle)
+            .convert(john, kwh, aud, Quantity::new(ten_kwh), Quantity::new(0))
+            .get()?;
+
+        assert_eq!(exp(&chain, john, isabelle, kwh), 0);
+        assert_eq!(
+            exp(&chain, john, isabelle, aud),
+            fair_aud,
+            "fee should favour John: 3.30 AUD, not (10 kWh − 1 kWh fee) × 0.30"
+        );
+
+        Ok(())
+    }
+
+    /// John owes Isabelle 10 kWh. His creditor-side quote does not apply.
+    /// He posts the debtor side at the same 1 kWh → 0.30 AUD with a 1 kWh
+    /// fee. She takes it, and the fee comes off what he owes: 2.70 AUD.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_posted_fee_shrinks_debt_when_john_owes_isabelle_kwh(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let john = account!("john");
+        let isabelle = account!("isabelle");
+        chain.new_account(john).unwrap();
+        chain.new_account(isabelle).unwrap();
+
+        let kwh = Asset::get_by_symbol_assert(account!("kwh")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        let one_kwh = 1_000u64;
+        let ten_kwh = 10 * one_kwh;
+        let fee_kwh = one_kwh;
+        let aud_for_one_kwh = 3_000u64;
+        let rate = aud_for_one_kwh * RATE_SCALE / one_kwh;
+        // (10 kWh − 1 kWh fee) × 0.30 AUD.
+        let owing_aud = aud_for_one_kwh * 9;
+
+        // John books the kWh, so he owes Isabelle.
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, kwh, Quantity::new(ten_kwh), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, kwh), ten_kwh);
+
+        Wrapper::push_from(&chain, john)
+            .st_cur_pol(
+                kwh,
+                aud,
+                true,
+                Quantity::new(fee_kwh),
+                rate,
+                0,
+                Quantity::new(ten_kwh),
+                never(),
+            )
+            .get()?;
+
+        let wrong_side = Wrapper::push_from(&chain, isabelle).convert(
+            john,
+            kwh,
+            aud,
+            Quantity::new(ten_kwh),
+            Quantity::new(0),
+        );
+        let err = wrong_side
+            .trace
+            .error
+            .as_deref()
+            .unwrap_or("(no error — convert succeeded)");
+        assert!(
+            err.contains("CurrencyPolicy not found"),
+            "creditor-side quote must not rebook debt John owes, got {err}"
+        );
+        assert_eq!(exp(&chain, isabelle, john, kwh), ten_kwh);
+        assert_eq!(exp(&chain, isabelle, john, aud), 0);
+        assert_eq!(
+            CurrencyPolicy::get(john, kwh, aud, true)
+                .unwrap()
+                .remaining
+                .value,
+            ten_kwh
+        );
+
+        Wrapper::push_from(&chain, john)
+            .st_cur_pol(
+                kwh,
+                aud,
+                false,
+                Quantity::new(fee_kwh),
+                rate,
+                0,
+                Quantity::new(ten_kwh),
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, isabelle)
+            .convert(john, kwh, aud, Quantity::new(ten_kwh), Quantity::new(0))
+            .get()?;
+
+        assert_eq!(exp(&chain, isabelle, john, kwh), 0);
+        assert_eq!(
+            exp(&chain, isabelle, john, aud),
+            owing_aud,
+            "fee should favour John: 2.70 AUD"
+        );
+        assert_eq!(
+            CurrencyPolicy::get(john, kwh, aud, false)
+                .unwrap()
+                .remaining
+                .value,
+            0
+        );
+        assert_eq!(
+            CurrencyPolicy::get(john, kwh, aud, true)
+                .unwrap()
+                .remaining
+                .value,
+            ten_kwh,
+            "the other side's budget stays"
+        );
+
+        Ok(())
+    }
+
+    /// Isabelle owes John 10 kWh. She converts 5, with a 1 kWh fee.
+    /// Creditor side prices 6 kWh (1.80 AUD). Debtor side prices 4 kWh
+    /// (1.20 AUD). The budget falls by the 5 kWh she converted.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_fx_quote_partial_take_prices_the_fee_and_spends_the_take(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let john = account!("john");
+        let isabelle = account!("isabelle");
+        chain.new_account(john).unwrap();
+        chain.new_account(isabelle).unwrap();
+
+        let kwh = Asset::get_by_symbol_assert(account!("kwh")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        let one_kwh = 1_000u64;
+        let ten_kwh = 10 * one_kwh;
+        let five_kwh = 5 * one_kwh;
+        let fee_kwh = one_kwh;
+        let aud_for_one_kwh = 3_000u64;
+        let rate = aud_for_one_kwh * RATE_SCALE / one_kwh;
+        // (5 kWh + 1 kWh fee) × 0.30 AUD.
+        let creditor_aud = aud_for_one_kwh * 6;
+        // (5 kWh − 1 kWh fee) × 0.30 AUD.
+        let debtor_aud = aud_for_one_kwh * 4;
+
+        Wrapper::push_from(&chain, isabelle)
+            .deposit(john, kwh, Quantity::new(ten_kwh), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_cur_pol(
+                kwh,
+                aud,
+                true,
+                Quantity::new(fee_kwh),
+                rate,
+                0,
+                Quantity::new(ten_kwh),
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, isabelle)
+            .convert(john, kwh, aud, Quantity::new(five_kwh), Quantity::new(0))
+            .get()?;
+
+        assert_eq!(exp(&chain, john, isabelle, kwh), five_kwh);
+        assert_eq!(exp(&chain, john, isabelle, aud), creditor_aud);
+        assert_eq!(
+            CurrencyPolicy::get(john, kwh, aud, true)
+                .unwrap()
+                .remaining
+                .value,
+            five_kwh,
+            "budget falls by the 5 kWh converted, not by take plus fee"
+        );
+
+        // Clear that book, then the same numbers the other way.
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, kwh, Quantity::new(five_kwh), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, aud, Quantity::new(creditor_aud), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, john, isabelle, kwh), 0);
+        assert_eq!(exp(&chain, john, isabelle, aud), 0);
+
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, kwh, Quantity::new(ten_kwh), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_cur_pol(
+                kwh,
+                aud,
+                false,
+                Quantity::new(fee_kwh),
+                rate,
+                0,
+                Quantity::new(ten_kwh),
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .convert(john, kwh, aud, Quantity::new(five_kwh), Quantity::new(0))
+            .get()?;
+
+        assert_eq!(exp(&chain, isabelle, john, kwh), five_kwh);
+        assert_eq!(exp(&chain, isabelle, john, aud), debtor_aud);
+        assert_eq!(
+            CurrencyPolicy::get(john, kwh, aud, false)
+                .unwrap()
+                .remaining
+                .value,
+            five_kwh
+        );
+        assert_eq!(
+            CurrencyPolicy::get(john, kwh, aud, true)
+                .unwrap()
+                .remaining
+                .value,
+            five_kwh,
+            "the creditor-side budget stays at the earlier partial take"
+        );
+
+        Ok(())
+    }
+
+    /// A debtor-side fee that is the whole take, or more than the take, is
+    /// rejected and changes nothing. The same take on the creditor side
+    /// prices take + fee, so it goes through.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_fx_quote_debtor_fee_that_consumes_the_take_fails(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let john = account!("john");
+        let isabelle = account!("isabelle");
+        chain.new_account(john).unwrap();
+        chain.new_account(isabelle).unwrap();
+
+        let kwh = Asset::get_by_symbol_assert(account!("kwh")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        let one_kwh = 1_000u64;
+        let ten_kwh = 10 * one_kwh;
+        let fee_kwh = one_kwh;
+        let aud_for_one_kwh = 3_000u64;
+        let rate = aud_for_one_kwh * RATE_SCALE / one_kwh;
+        // (1 kWh + 1 kWh fee) × 0.30 AUD.
+        let creditor_aud = aud_for_one_kwh * 2;
+
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, kwh, Quantity::new(ten_kwh), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_cur_pol(
+                kwh,
+                aud,
+                false,
+                Quantity::new(fee_kwh),
+                rate,
+                0,
+                Quantity::new(ten_kwh),
+                never(),
+            )
+            .get()?;
+
+        for take in [one_kwh, one_kwh / 2] {
+            let rejected = Wrapper::push_from(&chain, isabelle).convert(
+                john,
+                kwh,
+                aud,
+                Quantity::new(take),
+                Quantity::new(0),
+            );
+            let err = rejected
+                .trace
+                .error
+                .as_deref()
+                .unwrap_or("(no error — convert succeeded)");
+            assert!(
+                err.contains("fixed fee consumes entire amount"),
+                "take {take} with a {fee_kwh} fee: {err}"
+            );
+        }
+        assert_eq!(exp(&chain, isabelle, john, kwh), ten_kwh);
+        assert_eq!(exp(&chain, isabelle, john, aud), 0);
+        assert_eq!(
+            CurrencyPolicy::get(john, kwh, aud, false)
+                .unwrap()
+                .remaining
+                .value,
+            ten_kwh
+        );
+
+        // Flip the book: Isabelle owes John 1 kWh. Adding the fee prices 2 kWh.
+        Wrapper::push_from(&chain, isabelle)
+            .deposit(john, kwh, Quantity::new(ten_kwh + one_kwh), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, john, isabelle, kwh), one_kwh);
+        assert_eq!(exp(&chain, isabelle, john, kwh), 0);
+        Wrapper::push_from(&chain, john)
+            .st_cur_pol(
+                kwh,
+                aud,
+                true,
+                Quantity::new(fee_kwh),
+                rate,
+                0,
+                Quantity::new(ten_kwh),
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .convert(john, kwh, aud, Quantity::new(one_kwh), Quantity::new(0))
+            .get()?;
+
+        assert_eq!(exp(&chain, john, isabelle, kwh), 0);
+        assert_eq!(exp(&chain, john, isabelle, aud), creditor_aud);
+        assert_eq!(
+            CurrencyPolicy::get(john, kwh, aud, true)
+                .unwrap()
+                .remaining
+                .value,
+            ten_kwh - one_kwh
+        );
+        assert_eq!(
+            CurrencyPolicy::get(john, kwh, aud, false)
+                .unwrap()
+                .remaining
+                .value,
+            ten_kwh
+        );
+
+        Ok(())
+    }
+
+    /// 1.20 with 5% off each way. Posts the four rows an exchange would:
+    /// both directions, both debt sides, no fixed fee. A USD→AUD row does
+    /// not quote AUD→USD.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_fx_quote_exchange_both_directions_and_both_debt_sides(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let spread = PPM_SCALE * 5 / 100;
+        let (forward, back) = crate::math::try_exchange_rates(1_200_000, spread).unwrap();
+        assert_eq!((forward, back), (1_140_000, 791_666));
+        assert_eq!(crate::math::try_exchange_rates(0, 0), None);
+        assert_eq!(crate::math::try_exchange_rates(1_200_000, PPM_SCALE), None);
+        assert_eq!(crate::math::try_exchange_rates(1, PPM_SCALE - 1), None);
+        assert_eq!(
+            crate::math::try_exchange_rates(1_000_000_000_001, 0),
+            None
+        );
+
+        Wrapper::push(&chain).init().get()?;
+
+        let john = account!("john");
+        let isabelle = account!("isabelle");
+        chain.new_account(john).unwrap();
+        chain.new_account(isabelle).unwrap();
+
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        // Precision 4: 10.0000 of either asset.
+        let ten = 100_000u64;
+
+        let same = Wrapper::push_from(&chain, john).st_cur_pol(
+            usd,
+            usd,
+            true,
+            Quantity::new(0),
+            forward,
+            0,
+            Quantity::new(ten),
+            never(),
+        );
+        let err = same.trace.error.as_deref().unwrap_or("(no error)");
+        assert!(
+            err.contains("currency convert requires different assets"),
+            "{err}"
+        );
+        assert!(CurrencyPolicy::get(john, usd, usd, true).is_none());
+
+        for side in [true, false] {
+            Wrapper::push_from(&chain, john)
+                .st_cur_pol(
+                    usd,
+                    aud,
+                    side,
+                    Quantity::new(0),
+                    forward,
+                    0,
+                    Quantity::new(ten),
+                    never(),
+                )
+                .get()?;
+        }
+
+        // She owes him 1 raw AUD. USD→AUD rows must not fill in the other way.
+        Wrapper::push_from(&chain, isabelle)
+            .deposit(john, aud, Quantity::new(1), 0, 0)
+            .get()?;
+        let missing = Wrapper::push_from(&chain, isabelle).convert(
+            john,
+            aud,
+            usd,
+            Quantity::new(1),
+            Quantity::new(0),
+        );
+        let err = missing
+            .trace
+            .error
+            .as_deref()
+            .unwrap_or("(no error — convert succeeded)");
+        assert!(
+            err.contains("CurrencyPolicy not found"),
+            "USD→AUD must not quote AUD→USD, got {err}"
+        );
+        assert_eq!(exp(&chain, john, isabelle, aud), 1);
+        assert_eq!(exp(&chain, john, isabelle, usd), 0);
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, aud, Quantity::new(1), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, john, isabelle, aud), 0);
+        assert_eq!(exp(&chain, isabelle, john, aud), 0);
+
+        // They owe him 10 USD. 10 × 1.14 = 11.4000 AUD.
+        Wrapper::push_from(&chain, isabelle)
+            .deposit(john, usd, Quantity::new(ten), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .convert(john, usd, aud, Quantity::new(ten), Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, john, isabelle, usd), 0);
+        assert_eq!(exp(&chain, john, isabelle, aud), 114_000);
+        assert_eq!(
+            CurrencyPolicy::get(john, usd, aud, true)
+                .unwrap()
+                .remaining
+                .value,
+            0
+        );
+        assert_eq!(
+            CurrencyPolicy::get(john, usd, aud, false)
+                .unwrap()
+                .remaining
+                .value,
+            ten
+        );
+
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, aud, Quantity::new(114_000), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, john, isabelle, aud), 0);
+
+        // He owes her 10 USD. Same rate, the other debt side.
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, usd, Quantity::new(ten), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .convert(john, usd, aud, Quantity::new(ten), Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, usd), 0);
+        assert_eq!(exp(&chain, isabelle, john, aud), 114_000);
+        assert_eq!(
+            CurrencyPolicy::get(john, usd, aud, false)
+                .unwrap()
+                .remaining
+                .value,
+            0
+        );
+        Wrapper::push_from(&chain, isabelle)
+            .deposit(john, aud, Quantity::new(114_000), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, aud), 0);
+
+        for side in [true, false] {
+            Wrapper::push_from(&chain, john)
+                .st_cur_pol(
+                    aud,
+                    usd,
+                    side,
+                    Quantity::new(0),
+                    back,
+                    0,
+                    Quantity::new(ten),
+                    never(),
+                )
+                .get()?;
+        }
+        for (from, to, rate, side, left) in [
+            (usd, aud, forward, true, 0u64),
+            (usd, aud, forward, false, 0u64),
+            (aud, usd, back, true, ten),
+            (aud, usd, back, false, ten),
+        ] {
+            let row = CurrencyPolicy::get(john, from, to, side).unwrap();
+            assert_eq!(row.fee_fixed.value, 0);
+            assert_eq!(row.fx_rate, rate);
+            assert_eq!(row.remaining.value, left);
+        }
+
+        // 10 AUD × 0.791666, truncated, is 7.9166 USD.
+        Wrapper::push_from(&chain, isabelle)
+            .deposit(john, aud, Quantity::new(ten), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .convert(john, aud, usd, Quantity::new(ten), Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, john, isabelle, aud), 0);
+        assert_eq!(exp(&chain, john, isabelle, usd), 79_166);
+        assert_eq!(
+            CurrencyPolicy::get(john, aud, usd, true)
+                .unwrap()
+                .remaining
+                .value,
+            0
+        );
+        assert_eq!(
+            CurrencyPolicy::get(john, aud, usd, false)
+                .unwrap()
+                .remaining
+                .value,
+            ten
+        );
+
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, usd, Quantity::new(79_166), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .deposit(isabelle, aud, Quantity::new(ten), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .convert(john, aud, usd, Quantity::new(ten), Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, aud), 0);
+        assert_eq!(exp(&chain, isabelle, john, usd), 79_166);
+        assert_eq!(
+            CurrencyPolicy::get(john, aud, usd, false)
+                .unwrap()
+                .remaining
+                .value,
+            0
+        );
+        assert_eq!(
+            CurrencyPolicy::get(john, usd, aud, true)
+                .unwrap()
+                .remaining
+                .value,
+            0,
+            "the other direction's budget stays spent"
+        );
 
         Ok(())
     }
@@ -773,6 +1392,7 @@ mod tests {
         let zero = Wrapper::push_from(&chain, gary).st_cur_pol(
             aud,
             usd,
+            true,
             Quantity::new(0),
             RATE_SCALE * 50 / 100,
             0,
@@ -784,12 +1404,13 @@ mod tests {
             err.contains("currency policy remaining must be positive"),
             "zero remaining: {err}"
         );
-        assert!(CurrencyPolicy::get(gary, aud, usd).is_none());
+        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
 
         Wrapper::push_from(&chain, gary)
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
@@ -813,7 +1434,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 100);
         assert_eq!(exp(&chain, gary, alice, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
             40
         );
 
@@ -823,7 +1444,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 60);
         assert_eq!(exp(&chain, gary, alice, usd), 20);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
             0
         );
         assert!(Wrapper::push_from(&chain, alice)
@@ -837,6 +1458,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
@@ -859,7 +1481,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 60);
         assert_eq!(exp(&chain, gary, alice, usd), 20);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
             50
         );
 
@@ -867,6 +1489,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
@@ -880,7 +1503,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
             0
         );
 
@@ -895,6 +1518,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
@@ -917,7 +1541,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
             500
         );
 
@@ -955,7 +1579,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 500);
         assert_eq!(exp(&chain, steve, gary, usd), 350);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
             0
         );
         assert!(Wrapper::push_from(&chain, alice)
@@ -998,6 +1622,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE,
                 0,
@@ -1005,18 +1630,18 @@ mod tests {
                 never(),
             )
             .get()?;
-        assert!(CurrencyPolicy::get(gary, aud, usd).is_some());
+        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_some());
 
         Wrapper::push_from(&chain, gary)
-            .rm_cur_pol(aud, usd)
+            .rm_cur_pol(aud, usd, true)
             .get()?;
-        assert!(CurrencyPolicy::get(gary, aud, usd).is_none());
+        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
             .convert(gary, aud, usd, Quantity::new(100), Quantity::new(100))
             .get()
             .is_err());
         assert!(Wrapper::push_from(&chain, gary)
-            .rm_cur_pol(aud, usd)
+            .rm_cur_pol(aud, usd, true)
             .get()
             .is_err());
         Ok(())
@@ -1057,6 +1682,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE,
                 0,
@@ -1106,6 +1732,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE,
                 0,
@@ -2201,10 +2828,12 @@ mod tests {
             )
             .get()?;
 
+        // Alice owes Gary the AUD, so she posts that side of the quote.
         Wrapper::push_from(&chain, alice)
             .st_cur_pol(
                 aud,
                 usd,
+                false,
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
@@ -2216,6 +2845,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 80 / 100,
                 0,
@@ -2283,6 +2913,7 @@ mod tests {
             .st_cur_pol(
                 coffee,
                 aud,
+                false,
                 Quantity::new(0),
                 RATE_SCALE * 50,
                 0,
@@ -2316,7 +2947,7 @@ mod tests {
         assert_eq!(exp(&chain, isabelle, john, aud), 40_000);
         assert_eq!(exp(&chain, isabelle, john, weetbix), 9);
         assert_eq!(
-            CurrencyPolicy::get(john, coffee, aud)
+            CurrencyPolicy::get(john, coffee, aud, false)
                 .unwrap()
                 .remaining
                 .value,
@@ -2365,6 +2996,7 @@ mod tests {
             .st_cur_pol(
                 merlo,
                 aud,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 50,
                 0,
@@ -2401,7 +3033,7 @@ mod tests {
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(exp(&chain, michelle, isabelle, merlo), 0);
         assert_eq!(
-            CurrencyPolicy::get(isabelle, merlo, aud)
+            CurrencyPolicy::get(isabelle, merlo, aud, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -2433,6 +3065,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
@@ -2464,6 +3097,347 @@ mod tests {
         Ok(())
     }
 
+    /// Alice pays Steve 1_000 AUD through Gary. Gary's fee is 100 and his
+    /// rate is 0.70, so he is owed the full 1_000 and owes Steve 630.
+    /// A debtor-side row at 0.50 must not be the one that prices the hop.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_fx_quote_path_fee_comes_off_what_is_owed_onward(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        // Fee equal to the send. The hop prices nothing, and the books stay put.
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                true,
+                Quantity::new(1_000),
+                RATE_SCALE * 70 / 100,
+                0,
+                Quantity::new(1_000),
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                false,
+                Quantity::new(0),
+                RATE_SCALE * 50 / 100,
+                0,
+                Quantity::new(9_000),
+                never(),
+            )
+            .get()?;
+        let consumed = Wrapper::push_from(&chain, alice).path_pay(
+            vec![hop(gary, aud), hop(steve, usd)],
+            Quantity::new(1_000),
+            Quantity::new(0),
+            0,
+        );
+        let err = consumed
+            .trace
+            .error
+            .as_deref()
+            .unwrap_or("(no error — path_pay succeeded)");
+        assert!(
+            err.contains("fixed fee consumes entire amount"),
+            "{err}"
+        );
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
+        assert_eq!(
+            CurrencyPolicy::get(gary, aud, usd, true)
+                .unwrap()
+                .remaining
+                .value,
+            1_000
+        );
+
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                true,
+                Quantity::new(100),
+                RATE_SCALE * 70 / 100,
+                0,
+                Quantity::new(1_000),
+                never(),
+            )
+            .get()?;
+
+        // (1000 − 100) × 0.70 = 630. Asking for 700 must fail and leave the budget.
+        let short = Wrapper::push_from(&chain, alice).path_pay(
+            vec![hop(gary, aud), hop(steve, usd)],
+            Quantity::new(1_000),
+            Quantity::new(700),
+            0,
+        );
+        let err = short
+            .trace
+            .error
+            .as_deref()
+            .unwrap_or("(no error — path_pay succeeded)");
+        assert!(
+            err.contains("path_pay final amount below min_return"),
+            "{err}"
+        );
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
+        assert_eq!(
+            CurrencyPolicy::get(gary, aud, usd, true)
+                .unwrap()
+                .remaining
+                .value,
+            1_000
+        );
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+                Quantity::new(630),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, aud), 1_000);
+        assert_eq!(exp(&chain, steve, gary, usd), 630);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        assert_eq!(
+            CurrencyPolicy::get(gary, aud, usd, true)
+                .unwrap()
+                .remaining
+                .value,
+            0,
+            "the budget falls by the incoming 1_000, not by 1_000 − fee"
+        );
+        assert_eq!(
+            CurrencyPolicy::get(gary, aud, usd, false)
+                .unwrap()
+                .remaining
+                .value,
+            9_000,
+            "the debtor-side row is not the path rate"
+        );
+        assert_eq!(
+            CurrencyPolicy::get(gary, aud, usd, false).unwrap().fx_rate,
+            RATE_SCALE * 50 / 100
+        );
+
+        Ok(())
+    }
+
+    /// A debtor-side quote is not a path rate. pathGraph omits it.
+    /// currencyPolicies still lists it. Removing the creditor row makes
+    /// the path fail again while the debtor row remains.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_fx_quote_path_ignores_debtor_side(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        let steve = account!("steve");
+        for a in [alice, gary, steve] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, steve)
+            .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                false,
+                Quantity::new(0),
+                RATE_SCALE * 50 / 100,
+                0,
+                Quantity::new(5_000),
+                never(),
+            )
+            .get()?;
+
+        fn gary_sides(raw: &serde_json::Value, key: &str, aud: u16, usd: u16) -> Vec<bool> {
+            let list = raw
+                .pointer(key)
+                .and_then(|v| v.as_array())
+                .unwrap_or_else(|| panic!("no {key} in {raw}"));
+            let mut sides: Vec<bool> = list
+                .iter()
+                .filter(|row| {
+                    row.get("poster").and_then(|v| v.as_str()) == Some("gary")
+                        && row.get("fromAsset").and_then(|v| v.as_u64()) == Some(aud as u64)
+                        && row.get("toAsset").and_then(|v| v.as_u64()) == Some(usd as u64)
+                })
+                .map(|row| {
+                    row.get("posterIsCreditor")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or_else(|| panic!("posterIsCreditor in {raw}"))
+                })
+                .collect();
+            sides.sort();
+            sides
+        }
+        let policies_q = r#"{ currencyPolicies(poster: "gary") {
+            poster fromAsset toAsset posterIsCreditor
+        } }"#;
+        let graph_q = r#"{ pathGraph(from: "alice", to: "steve", maxHops: 4) {
+            currencyPolicies { poster fromAsset toAsset posterIsCreditor }
+        } }"#;
+
+        let listed = banx_gql(&chain, policies_q)?;
+        let graph = banx_gql(&chain, graph_q)?;
+        assert_eq!(
+            gary_sides(&listed, "/data/currencyPolicies", aud, usd),
+            vec![false],
+            "{listed}"
+        );
+        assert!(
+            gary_sides(&graph, "/data/pathGraph/currencyPolicies", aud, usd).is_empty(),
+            "{graph}"
+        );
+
+        let debtor_only = Wrapper::push_from(&chain, alice).path_pay(
+            vec![hop(gary, aud), hop(steve, usd)],
+            Quantity::new(1_000),
+            Quantity::new(0),
+            0,
+        );
+        let err = debtor_only
+            .trace
+            .error
+            .as_deref()
+            .unwrap_or("(no error — path_pay succeeded)");
+        assert!(err.contains("CurrencyPolicy not found"), "{err}");
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, steve, gary, usd), 0);
+        assert_eq!(
+            CurrencyPolicy::get(gary, aud, usd, false)
+                .unwrap()
+                .remaining
+                .value,
+            5_000
+        );
+
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                true,
+                Quantity::new(0),
+                RATE_SCALE * 70 / 100,
+                0,
+                Quantity::new(1_000),
+                never(),
+            )
+            .get()?;
+        let listed = banx_gql(&chain, policies_q)?;
+        let graph = banx_gql(&chain, graph_q)?;
+        assert_eq!(
+            gary_sides(&listed, "/data/currencyPolicies", aud, usd),
+            vec![false, true],
+            "{listed}"
+        );
+        assert_eq!(
+            gary_sides(&graph, "/data/pathGraph/currencyPolicies", aud, usd),
+            vec![true],
+            "{graph}"
+        );
+
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud), hop(steve, usd)],
+                Quantity::new(1_000),
+                Quantity::new(700),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, gary, alice, aud), 1_000);
+        assert_eq!(exp(&chain, steve, gary, usd), 700);
+        assert_eq!(
+            CurrencyPolicy::get(gary, aud, usd, true)
+                .unwrap()
+                .remaining
+                .value,
+            0
+        );
+        assert_eq!(
+            CurrencyPolicy::get(gary, aud, usd, false)
+                .unwrap()
+                .remaining
+                .value,
+            5_000
+        );
+
+        Wrapper::push_from(&chain, gary)
+            .rm_cur_pol(aud, usd, true)
+            .get()?;
+        let again = Wrapper::push_from(&chain, alice).path_pay(
+            vec![hop(gary, aud), hop(steve, usd)],
+            Quantity::new(1_000),
+            Quantity::new(0),
+            0,
+        );
+        let err = again
+            .trace
+            .error
+            .as_deref()
+            .unwrap_or("(no error — path_pay succeeded)");
+        assert!(err.contains("CurrencyPolicy not found"), "{err}");
+        assert_eq!(exp(&chain, gary, alice, aud), 1_000);
+        assert_eq!(exp(&chain, steve, gary, usd), 700);
+        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
+        assert_eq!(
+            CurrencyPolicy::get(gary, aud, usd, false)
+                .unwrap()
+                .remaining
+                .value,
+            5_000
+        );
+
+        let listed = banx_gql(&chain, policies_q)?;
+        let graph = banx_gql(&chain, graph_q)?;
+        assert_eq!(
+            gary_sides(&listed, "/data/currencyPolicies", aud, usd),
+            vec![false],
+            "{listed}"
+        );
+        assert!(
+            gary_sides(&graph, "/data/pathGraph/currencyPolicies", aud, usd).is_empty(),
+            "{graph}"
+        );
+
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_fx_after_partial_reverse_net(
         chain: psibase::Chain,
@@ -2487,6 +3461,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
@@ -2555,6 +3530,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
@@ -2567,6 +3543,7 @@ mod tests {
             .st_cur_pol(
                 usd,
                 gbp,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 80 / 100,
                 0,
@@ -2654,6 +3631,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
@@ -2713,6 +3691,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
@@ -2738,6 +3717,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
@@ -2877,6 +3857,7 @@ mod tests {
             .st_cur_pol(
                 usd,
                 missing,
+                true,
                 Quantity::new(0),
                 RATE_SCALE,
                 0,
@@ -2889,6 +3870,7 @@ mod tests {
             .st_cur_pol(
                 missing,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE,
                 0,
@@ -4344,6 +5326,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
@@ -4608,6 +5591,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 0.into(),
                 RATE_SCALE,
                 0,
@@ -4636,6 +5620,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 50 / 100,
                 0,
@@ -4852,6 +5837,7 @@ mod tests {
             .st_cur_pol(
                 aud,
                 usd,
+                true,
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,

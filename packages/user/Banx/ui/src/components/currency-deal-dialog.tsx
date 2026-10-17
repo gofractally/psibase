@@ -27,16 +27,18 @@ import {
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 
-/** Live from-asset quotes with budget left. */
+/** Live quotes for one debt direction, with budget left. */
 export function liveFromPolicies(
     policies: CurrencyPolicy[],
     fromAsset: number,
     fromPrecision: number,
     nowSec: number,
+    posterIsCreditor: boolean,
 ): CurrencyPolicy[] {
     return policies.filter(
         (p) =>
             p.fromAsset === fromAsset &&
+            p.posterIsCreditor === posterIsCreditor &&
             (p.expiresAt === 0 || p.expiresAt >= nowSec) &&
             humanToRaw(p.remaining || "0", fromPrecision) > 0n,
     );
@@ -52,9 +54,12 @@ export function quoteSummary(
     const rate = formatFxToRate(policy.fxRate, fromPrecision, toPrecision);
     const left = formatRawAmount(policy.remaining, fromPrecision);
     const fee = humanToRaw(policy.feeFixed || "0", fromPrecision);
+    const feeAmount = formatRawAmount(policy.feeFixed, fromPrecision);
     const feeText =
         fee > 0n
-            ? `, fee ${formatRawAmount(policy.feeFixed, fromPrecision)} ${fromSymbol}`
+            ? policy.posterIsCreditor
+                ? `, fee ${feeAmount} ${fromSymbol} added`
+                : `, fee ${feeAmount} ${fromSymbol} comes off`
             : "";
     return `${rate} ${toSymbol} per 1 ${fromSymbol}${feeText}, ${left} ${fromSymbol} left`;
 }
@@ -63,10 +68,14 @@ function policyFor(
     policies: CurrencyPolicy[],
     fromAsset: number,
     toAsset: number | undefined,
+    posterIsCreditor = false,
 ): CurrencyPolicy | undefined {
     if (toAsset === undefined) return undefined;
     return policies.find(
-        (p) => p.fromAsset === fromAsset && p.toAsset === toAsset,
+        (p) =>
+            p.fromAsset === fromAsset &&
+            p.toAsset === toAsset &&
+            p.posterIsCreditor === posterIsCreditor,
     );
 }
 
@@ -130,6 +139,7 @@ export function OfferRepayDialog({
                     {
                         fromAsset,
                         toAsset: value.toAsset!,
+                        posterIsCreditor: false,
                         feeFixed: editPolicy?.feeFixed ?? "0",
                         toRate: value.toRate.trim(),
                         toInterestRatePpm: editPolicy?.toInterestRatePpm ?? 0,
@@ -190,7 +200,7 @@ export function OfferRepayDialog({
                     <DialogDescription>
                         {editPolicy
                             ? `Change the rate or budget for this pair. The budget is still the cap for everyone who holds ${fromSymbol} on you.`
-                            : `${counterparty} can turn what you owe them in ${fromSymbol} into the asset you pick, at your rate. Remaining starts at this claim and is the cap for everyone who holds ${fromSymbol} on you. Posting replaces any quote you already have for the pair.`}
+                            : `${counterparty} can turn what you owe them in ${fromSymbol} into the asset you pick, at your rate. Remaining starts at this claim and is the cap for everyone who holds ${fromSymbol} on you. Posting replaces the rate you already have for debt you owe.`}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -284,7 +294,7 @@ export function OfferRepayDialog({
                                                 existing.remaining,
                                                 fromPrecision,
                                             )}{" "}
-                                            {fromSymbol} on this pair. Posting
+                                            {fromSymbol} of debt you owe. Posting
                                             replaces that budget.
                                         </p>
                                     ) : null}
@@ -322,6 +332,7 @@ export function OfferRepayDialog({
                                         {
                                             fromAsset,
                                             toAsset: editPolicy.toAsset,
+                                            posterIsCreditor: false,
                                         },
                                         {
                                             onSuccess: () =>
@@ -421,6 +432,7 @@ export function TakeConvertDialog({
                 policy.fxRate,
                 fromPrecision,
                 precisionOf(policy.toAsset),
+                policy.posterIsCreditor,
             );
             if (!expected) return;
             await new Promise<void>((resolve, reject) => {
@@ -564,6 +576,7 @@ export function TakeConvertDialog({
                                 policy.fxRate,
                                 fromPrecision,
                                 toPrecision,
+                                policy.posterIsCreditor,
                             );
                             return (
                                 <>
@@ -620,6 +633,7 @@ export function TakeConvertDialog({
                                                         policy.fxRate,
                                                         fromPrecision,
                                                         toPrecision,
+                                                        policy.posterIsCreditor,
                                                     )
                                                 ) {
                                                     return "That amount is too small at their rate";

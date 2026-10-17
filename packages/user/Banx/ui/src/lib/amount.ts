@@ -242,17 +242,22 @@ export function formatToPrecision(
     return `${whole}.${frac}`;
 }
 
-/** `to = (from − fee_fixed) × fx_rate / RATE_SCALE` as a human to-amount. */
+/**
+ * `to = (from ± fee_fixed) × fx_rate / RATE_SCALE` as a human to-amount.
+ * `addFee` prices the fee on top. Otherwise the fee comes off first.
+ */
 export function applyQuotedRate(
     amountFrom: string,
     feeFixed: string,
     fxRate: string,
     fromPrecision: number,
     toPrecision: number,
+    addFee = false,
 ): string | null {
     const inn = humanToRaw(amountFrom, fromPrecision);
     const fee = humanToRaw(feeFixed, fromPrecision);
-    if (inn <= 0n || fee >= inn) return null;
+    if (inn <= 0n || fee < 0n) return null;
+    if (!addFee && fee >= inn) return null;
     let rate: bigint;
     try {
         rate = BigInt(fxRate || "0");
@@ -260,9 +265,47 @@ export function applyQuotedRate(
         return null;
     }
     if (rate <= 0n) return null;
-    const out = ((inn - fee) * rate) / BigInt(RATE_SCALE);
+    const base = addFee ? inn + fee : inn - fee;
+    if (base <= 0n) return null;
+    const out = (base * rate) / BigInt(RATE_SCALE);
     if (out <= 0n) return null;
     return formatRawAmount(out.toString(), toPrecision);
+}
+
+/**
+ * FX rates for a two-way market quote.
+ * Forward is the market rate with `spreadPpm` taken off.
+ * Back is the fair inverse with the same percent taken off.
+ * Matches `try_exchange_rates`: 1.20 at 5% is 1.14 and 0.791666… before
+ * the destination asset's precision.
+ */
+export function exchangeFxRates(
+    marketRate: string,
+    spreadPpm: number,
+    fromPrecision: number,
+    toPrecision: number,
+): { forwardFx: bigint; backFx: bigint } | null {
+    if (
+        !Number.isInteger(spreadPpm) ||
+        spreadPpm < 0 ||
+        spreadPpm >= RATE_SCALE ||
+        fromPrecision < 0 ||
+        toPrecision < 0
+    ) {
+        return null;
+    }
+    const toRaw = humanToRaw(marketRate, toPrecision);
+    if (toRaw <= 0n) return null;
+    const oneFrom = 10n ** BigInt(fromPrecision);
+    const scale = BigInt(RATE_SCALE);
+    const marketFx = (toRaw * scale) / oneFrom;
+    if (marketFx <= 0n) return null;
+    const keep = scale - BigInt(spreadPpm);
+    const forwardFx = (marketFx * keep) / scale;
+    if (forwardFx <= 0n) return null;
+    const backFx = (scale * scale * keep) / (marketFx * scale);
+    if (backFx <= 0n) return null;
+    return { forwardFx, backFx };
 }
 
 /**

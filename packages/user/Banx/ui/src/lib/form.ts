@@ -98,11 +98,15 @@ export function existingAccountValidators(opts?: { optional?: boolean }) {
 /**
  * TanStack field validator: percent string in [0, maxPercent].
  * Rejects non-numeric / out of range; notes ppm precision (0.0001%).
+ * `allowEmpty` treats a blank field as valid (the caller reads it as 0).
  */
-export function percentFieldValidator(maxPercent: number) {
+export function percentFieldValidator(
+    maxPercent: number,
+    allowEmpty = false,
+) {
     return ({ value }: { value: string }) => {
         const t = String(value).trim();
-        if (t === "") return "Required";
+        if (t === "") return allowEmpty ? undefined : "Required";
         const n = Number(t);
         if (!Number.isFinite(n)) return "Enter a number";
         if (n < 0) return "Cannot be negative";

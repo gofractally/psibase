@@ -24,6 +24,35 @@ pub fn try_apply_rate(amount_in: u64, fee_fixed: u64, rate: u64) -> Option<u64> 
     (out > 0).then_some(out)
 }
 
+/// Two FX rates around a market rate, each worse for the taker by `spread_ppm`.
+///
+/// `market_fx` is to-asset per from-asset (`out = in * market_fx / RATE_SCALE`).
+/// The forward rate is that market rate with the percent taken off.
+/// The back rate is the fair inverse (`RATE_SCALE^2 / market_fx`) with the
+/// same percent taken off. A 5% spread on 1.20 (`market_fx` 1_200_000 when
+/// both assets share a precision) is forward 1_140_000 and back 791_666.
+/// `spread_ppm` of 0 posts the market and its inverse. `spread_ppm` of 100%
+/// or a rate that rounds to zero returns `None`.
+pub fn try_exchange_rates(market_fx: u64, spread_ppm: u32) -> Option<(u64, u64)> {
+    if market_fx == 0 || spread_ppm >= PPM_SCALE {
+        return None;
+    }
+    let keep = (PPM_SCALE - spread_ppm) as u128;
+    let forward = (market_fx as u128)
+        .checked_mul(keep)?
+        .checked_div(PPM_SCALE as u128)?;
+    let forward = u64::try_from(forward).ok()?;
+    if forward == 0 {
+        return None;
+    }
+    let back = (RATE_SCALE as u128)
+        .checked_mul(RATE_SCALE as u128)?
+        .checked_mul(keep)?
+        .checked_div((market_fx as u128).checked_mul(PPM_SCALE as u128)?)?;
+    let back = u64::try_from(back).ok()?;
+    (back > 0).then_some((forward, back))
+}
+
 /// `out = in * (1 - spread_ppm) - fee_fixed`.
 ///
 /// `spread_ppm > 0` haircuts. `spread_ppm < 0` is a premium.
@@ -118,6 +147,22 @@ mod tests {
             try_invert_rate(6_500, 0, RATE_SCALE * 65 / 100),
             Some(10_000)
         );
+    }
+
+    #[test]
+    fn exchange_spread_five_percent_on_one_point_two() {
+        let (forward, back) = try_exchange_rates(1_200_000, PPM_SCALE * 5 / 100).unwrap();
+        assert_eq!(forward, 1_140_000);
+        assert_eq!(back, 791_666);
+        let (fair_fwd, fair_back) = try_exchange_rates(1_200_000, 0).unwrap();
+        assert_eq!(fair_fwd, 1_200_000);
+        assert_eq!(fair_back, 833_333);
+        assert_eq!(try_exchange_rates(1_200_000, PPM_SCALE), None);
+        assert_eq!(try_exchange_rates(0, 0), None);
+        // 1 * (PPM_SCALE - 1) / PPM_SCALE truncates to 0.
+        assert_eq!(try_exchange_rates(1, PPM_SCALE - 1), None);
+        // RATE_SCALE^2 / market_fx truncates to 0.
+        assert_eq!(try_exchange_rates(1_000_000_000_001, 0), None);
     }
 
     #[test]

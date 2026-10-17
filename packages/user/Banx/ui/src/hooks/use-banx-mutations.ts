@@ -767,17 +767,20 @@ export function useSetCurrencyPolicy() {
         mutationFn: async (p: {
             fromAsset: number;
             toAsset: number;
+            /** True when they owe you the from-asset. False when you owe them. */
+            posterIsCreditor: boolean;
             feeFixed: string;
             /** Human to-asset units per 1 from-asset unit, e.g. `"0.45"`. */
             toRate: string;
             toInterestRatePpm: number;
-            /** From-asset still accepted. Saving replaces what is left. */
+            /** From-asset still accepted on this side. Saving replaces what is left. */
             remaining: string;
             expiresAtSeconds: number;
         }) =>
             banxCall("setCurrencyPolicy", [
                 p.fromAsset,
                 p.toAsset,
+                p.posterIsCreditor,
                 p.feeFixed,
                 p.toRate,
                 p.toInterestRatePpm,
@@ -792,11 +795,52 @@ export function useSetCurrencyPolicy() {
     });
 }
 
+export function useSetExchangeQuotes() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetA: number;
+            assetB: number;
+            /** Human units of B per 1 A. The real market rate. */
+            marketRate: string;
+            /** Percent taken off each direction, in ppm. 5% is 50_000. */
+            spreadPpm: number;
+            remainingA: string;
+            remainingB: string;
+            toInterestRatePpm: number;
+            expiresAtSeconds: number;
+        }) =>
+            banxCall("setExchangeQuotes", [
+                p.assetA,
+                p.assetB,
+                p.marketRate,
+                p.spreadPpm,
+                p.remainingA,
+                p.remainingB,
+                p.toInterestRatePpm,
+                p.expiresAtSeconds,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Both rates saved");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
 export function useRemoveCurrencyPolicy() {
     const invalidate = useInvalidateBanx();
     return useMutation({
-        mutationFn: async (p: { fromAsset: number; toAsset: number }) =>
-            banxCall("removeCurrencyPolicy", [p.fromAsset, p.toAsset]),
+        mutationFn: async (p: {
+            fromAsset: number;
+            toAsset: number;
+            posterIsCreditor: boolean;
+        }) =>
+            banxCall("removeCurrencyPolicy", [
+                p.fromAsset,
+                p.toAsset,
+                p.posterIsCreditor,
+            ]),
         onSuccess: () => {
             invalidate();
             toast.success("Currency policy removed");

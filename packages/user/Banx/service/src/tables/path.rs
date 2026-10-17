@@ -14,7 +14,8 @@ pub fn path_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
         let offer = ForwardOffer::get_live(prev.account, hop.account, hop.asset_id);
         need = invert_hop_fee(need, offer.fee_fixed, offer.fee_percent);
         if hop.asset_id != prev.asset_id {
-            let pol = CurrencyPolicy::get_assert(prev.account, prev.asset_id, hop.asset_id);
+            let pol =
+                CurrencyPolicy::get_assert(prev.account, prev.asset_id, hop.asset_id, true);
             pol.assert_live();
             need = invert_rate(need, pol.fee_fixed, pol.fx_rate);
             assert!(
@@ -65,7 +66,7 @@ pub(crate) fn execute_path(
         }
 
         if asset_id != prev_asset {
-            let mut pol = CurrencyPolicy::get_assert(path_debtor, prev_asset, asset_id);
+            let mut pol = CurrencyPolicy::get_assert(path_debtor, prev_asset, asset_id, true);
             pol.spend(forward);
             forward = pol.apply(forward);
         }

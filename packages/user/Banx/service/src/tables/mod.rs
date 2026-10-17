@@ -18,7 +18,8 @@ mod pay_request;
 pub use connection::Connection;
 pub(crate) use helpers::emit_pair_activity_as;
 pub(crate) use helpers::{
-    apply_hop_fee, apply_rate, apply_spread, expires_live, invert_hop_fee, invert_rate,
+    apply_hop_fee, apply_rate, apply_spread, expires_live, invert_hop_fee,
+    invert_rate,
     live_specific_or_global,
 };
 pub use helpers::{assert_account_exists, cash_sub, emit_pair_activity, GLOBAL};
@@ -187,13 +188,16 @@ pub mod tables {
         }
     }
 
-    /// Standing from→to quote posted by `poster`.
+    /// Standing from→to quote posted by `poster`, for one debt direction.
     ///
-    /// `convert`: the other party takes this offer and rebooks leftover
-    /// exposure at this rate. The poster does not re-denominate their own claims.
+    /// `poster_is_creditor` selects the book it applies to. The other
+    /// direction is a second row. `convert` loads only the row that matches
+    /// the leftover from-asset debt. The poster's fee is added when they are
+    /// owed that asset and subtracted when they owe it.
     ///
-    /// `path_pay`: the previous hop's **creditor** (middle man) applies their
-    /// quote to size the next hop only. Does not rebook.
+    /// `path_pay` uses only the creditor-side row (`poster_is_creditor`).
+    /// It sizes the next hop with the fee subtracted. It does not rebook:
+    /// the payer still owes the middle man the full from-asset.
     #[table(name = "CurrencyPolicyTab", index = 4)]
     #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct CurrencyPolicy {
@@ -201,10 +205,13 @@ pub mod tables {
         pub poster: AccountNumber,
         pub from_asset: u16,
         pub to_asset: u16,
+        /// True when this quote applies to debt the poster is owed.
+        pub poster_is_creditor: bool,
 
-        /// Flat fee in **from_asset** before FX (0 = none).
+        /// Flat fee in **from_asset**. Added or subtracted per the side.
         pub fee_fixed: Quantity,
-        /// `to = (from - fee_fixed) * fx_rate / RATE_SCALE`.
+        /// `to = (amount ± fee_fixed) * fx_rate / RATE_SCALE`. The fee is
+        /// added when `poster_is_creditor` and subtracted otherwise.
         pub fx_rate: u64,
         /// Interest rate (ppm APR) for the new `to_asset` obligation bucket.
         pub to_interest_rate: u32,
@@ -217,8 +224,13 @@ pub mod tables {
 
     impl CurrencyPolicy {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, u16, u16) {
-            (self.poster, self.from_asset, self.to_asset)
+        fn pk(&self) -> (AccountNumber, u16, u16, bool) {
+            (
+                self.poster,
+                self.from_asset,
+                self.to_asset,
+                self.poster_is_creditor,
+            )
         }
     }
 

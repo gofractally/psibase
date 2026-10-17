@@ -168,6 +168,7 @@ export function AccountDetailPage() {
         policies: CurrencyPolicy[],
         assetId: number,
         prefix: string,
+        posterIsCreditor: boolean,
         onEdit?: (policy: CurrencyPolicy) => void,
     ) =>
         liveFromPolicies(
@@ -175,8 +176,9 @@ export function AccountDetailPage() {
             assetId,
             precisionOf(assetId),
             nowSec,
+            posterIsCreditor,
         ).map((p) => ({
-            key: `${p.fromAsset}-${p.toAsset}`,
+            key: `${p.fromAsset}-${p.toAsset}-${p.posterIsCreditor ? 1 : 0}`,
             text: `${prefix} ${quoteSummary(
                 p,
                 symbolOf(assetId),
@@ -560,6 +562,7 @@ export function AccountDetailPage() {
                                         theirPolicies,
                                         g.assetId,
                                         `${display} offers anyone who holds ${symbolOf(g.assetId)}:`,
+                                        false,
                                     )}
                                     onConvert={
                                         canDeal &&
@@ -569,6 +572,7 @@ export function AccountDetailPage() {
                                             g.assetId,
                                             precisionOf(g.assetId),
                                             nowSec,
+                                            false,
                                         ).length > 0
                                             ? () =>
                                                   setTake({
@@ -590,6 +594,7 @@ export function AccountDetailPage() {
                                                                   g.assetId,
                                                               ),
                                                               nowSec,
+                                                              false,
                                                           ),
                                                   })
                                             : undefined
@@ -636,6 +641,7 @@ export function AccountDetailPage() {
                                         myPolicies,
                                         g.assetId,
                                         `You offer anyone who holds ${symbolOf(g.assetId)}:`,
+                                        false,
                                         (policy) =>
                                             setOffer({
                                                 fromAsset: g.assetId,

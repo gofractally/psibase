@@ -476,15 +476,21 @@ pub mod service {
         offer.execute(seller, buyer, debtor, amount, "buy_claim");
     }
 
-    /// Poster posts a from→to FX offer. Others `convert` against it; path
-    /// pay uses it to size a hop when the poster is the middle man.
+    /// Poster posts one side of a from→to quote.
     ///
-    /// `remaining` is from-asset still accepted. Convert and path FX spend it.
-    /// Posting again replaces what is left.
+    /// `poster_is_creditor`: the quote applies when the poster is owed
+    /// `from_asset`. The other direction is a separate post. On convert the
+    /// fee is added on this side and subtracted when the poster owes the
+    /// from-asset. Path pay uses only the creditor side, and subtracts the
+    /// fee when sizing the next hop.
+    ///
+    /// `remaining` is from-asset still accepted on this side. Posting again
+    /// replaces what is left.
     #[action]
     fn st_cur_pol(
         from_asset: u16,
         to_asset: u16,
+        poster_is_creditor: bool,
         fee_fixed: Quantity,
         fx_rate: u64,
         to_interest_rate: u32,
@@ -495,6 +501,7 @@ pub mod service {
             get_sender(),
             from_asset,
             to_asset,
+            poster_is_creditor,
             fee_fixed,
             fx_rate,
             to_interest_rate,
@@ -503,10 +510,11 @@ pub mod service {
         );
     }
 
-    /// Remove a from→to FX offer.
+    /// Remove one side of a from→to quote.
     #[action]
-    fn rm_cur_pol(from_asset: u16, to_asset: u16) {
-        CurrencyPolicy::get_assert(get_sender(), from_asset, to_asset).remove();
+    fn rm_cur_pol(from_asset: u16, to_asset: u16, poster_is_creditor: bool) {
+        CurrencyPolicy::get_assert(get_sender(), from_asset, to_asset, poster_is_creditor)
+            .remove();
     }
 
     /// Post a cash quote: Banx `asset_id` ↔ Tokens `token_id`.
@@ -588,10 +596,10 @@ pub mod service {
         quote.cash_in(get_sender(), amount_tokens, min_banx);
     }
 
-    /// Take the **counterparty's** [`CurrencyPolicy`]: rebook leftover
-    /// `from_asset` on this pair into `to_asset` at their quote. Sender does
-    /// not use their own policy. Nets `from_asset` first; requires output
-    /// ≥ `min_to`; auto-nets `to_asset` after the rebook.
+    /// Take the **counterparty's** [`CurrencyPolicy`] for the leftover
+    /// `from_asset` debt. Only the side that matches that debt is used.
+    /// Sender does not use their own policy. Nets `from_asset` first when
+    /// the quote exists; requires output ≥ `min_to`; auto-nets `to_asset`.
     #[action]
     fn convert(
         counterparty: AccountNumber,
@@ -600,11 +608,11 @@ pub mod service {
         amount_from: Quantity,
         min_to: Quantity,
     ) {
-        let sender = get_sender();
-        assert!(sender != counterparty, "cannot convert with self");
-        CurrencyPolicy::get_assert(counterparty, from_asset, to_asset).convert(
-            sender,
+        CurrencyPolicy::take(
+            get_sender(),
             counterparty,
+            from_asset,
+            to_asset,
             amount_from,
             min_to,
         );
@@ -709,9 +717,10 @@ pub mod service {
     /// 1. **First hop** — sender draws `amount` on Gary in **AUD** (line and/or
     ///    reverse claim that auto-nets).
     /// 2. **Currency change** — apply the previous-hop **creditor's**
-    ///    [`CurrencyPolicy`] to size the next hop. Does **not** rebook the
-    ///    previous claim: the payer still owes the middle man in the from-asset;
-    ///    the middle man takes the to-asset liability onward.
+    ///    creditor-side [`CurrencyPolicy`] to size the next hop. The fee is
+    ///    subtracted from what they owe onward. Does **not** rebook the
+    ///    previous claim: the payer still owes the middle man the full
+    ///    from-asset.
     /// 3. **Later hops** — intermediate's live [`ForwardOffer`] (fee + max
     ///    line APR); draw on next line.
     /// 4. **`min_return`** — final hop principal (in **last** asset) ≥ this.

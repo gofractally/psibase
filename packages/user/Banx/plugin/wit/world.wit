@@ -221,16 +221,20 @@ interface api {
         amount: string,
     ) -> result<_, error>;
 
-    /// Post a from→to FX offer. Others take it with `convert`. Path pay uses
-    /// it to size a hop when you are the middle man. Fee and `remaining` are
-    /// human decimals in **from-asset** units. `remaining` is how much
-    /// from-asset is still accepted; saving again replaces what is left.
-    /// `to-rate` is how many **to-asset** units you get for 1 full
-    /// **from-asset** unit (e.g. `"0.45"`). The plugin converts this to the
-    /// chain `fx_rate` (RATE_SCALE fixed-point), including precisions.
+    /// Post one side of a from→to quote. Others take it with `convert`.
+    /// `poster-is-creditor` true: the quote applies when they owe you
+    /// `from-asset`. The fee is added. False: it applies when you owe them.
+    /// The fee comes off. The other direction is a second post.
+    /// Path pay uses only the true side, and subtracts the fee onward.
+    /// Fee and `remaining` are human decimals in **from-asset** units.
+    /// `remaining` is how much from-asset this side still accepts; saving
+    /// again replaces what is left. `to-rate` is how many **to-asset** units
+    /// for 1 full **from-asset** unit (e.g. `"0.45"`). The plugin converts
+    /// this to the chain `fx_rate` (RATE_SCALE fixed-point), including precisions.
     set-currency-policy: func(
         from-asset: u16,
         to-asset: u16,
+        poster-is-creditor: bool,
         fee-fixed: string,
         to-rate: string,
         to-interest-rate-ppm: u32,
@@ -238,8 +242,29 @@ interface api {
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
-    /// Remove a from→to FX offer.
-    remove-currency-policy: func(from-asset: u16, to-asset: u16) -> result<_, error>;
+    /// Post a two-way market quote. `market-rate` is how many units of
+    /// `asset-b` equal 1 unit of `asset-a`. `spread-ppm` comes off that rate
+    /// and off the fair inverse, so each direction is worse for the taker.
+    /// 5% of 1.20 is 1.14 one way. Fee is zero. Each direction is posted for
+    /// both debt sides (they owe you, and you owe them). `remaining-a` and
+    /// `remaining-b` are the budgets, in that asset, copied onto both sides.
+    set-exchange-quotes: func(
+        asset-a: u16,
+        asset-b: u16,
+        market-rate: string,
+        spread-ppm: u32,
+        remaining-a: string,
+        remaining-b: string,
+        to-interest-rate-ppm: u32,
+        expires-at-seconds: u32,
+    ) -> result<_, error>;
+
+    /// Remove one side of a from→to quote.
+    remove-currency-policy: func(
+        from-asset: u16,
+        to-asset: u16,
+        poster-is-creditor: bool,
+    ) -> result<_, error>;
 
     /// Invoice (`kind` = 1): you are the payee; `counterparty` is who was
     /// billed (empty / `"0"` = anyone with a path may pay). Please-book

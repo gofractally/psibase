@@ -233,6 +233,8 @@ mod service {
         debtor: AccountNumber,
         fromAsset: u16,
         toAsset: u16,
+        /// True when the quote applies to debt the poster is owed.
+        posterIsCreditor: bool,
         /// Fixed fee in **from** asset units (human decimal).
         feeFixed: Decimal,
         /// Chain `fx_rate` (RATE_SCALE fixed-point), not an asset amount.
@@ -250,6 +252,7 @@ mod service {
                 debtor: p.poster,
                 fromAsset: p.from_asset,
                 toAsset: p.to_asset,
+                posterIsCreditor: p.poster_is_creditor,
                 feeFixed: Decimal::new(p.fee_fixed, asset_precision(p.from_asset)),
                 fxRate: p.fx_rate.to_string(),
                 toInterestRatePpm: p.to_interest_rate,
@@ -816,7 +819,7 @@ mod service {
                 CurrencyPolicyTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&p.poster) && p.is_live())
+                    .filter(|p| debtors.contains(&p.poster) && p.is_live() && p.poster_is_creditor)
                     .map(CurrencyPolicyView::from)
                     .collect();
 
