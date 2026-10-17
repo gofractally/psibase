@@ -92,7 +92,7 @@ SCENARIO("Minting & burning nfts")
 
       THEN("Alice can mint an NFT")
       {
-         auto mint = a.mint();
+         auto mint = a.mint(std::nullopt);
          CHECK(mint.succeeded());
 
          AND_THEN("The NFT exists")
@@ -111,8 +111,8 @@ SCENARIO("Minting & burning nfts")
       }
       WHEN("Alice mints an NFT")
       {
-         auto mint  = a.mint();
-         auto mint2 = a.mint();
+         auto mint  = a.mint(std::nullopt);
+         auto mint2 = a.mint(std::nullopt);
          auto nft1  = a.getNft(mint.returnVal()).returnVal().value();
 
          THEN("Alice can burn the NFT")
@@ -134,7 +134,7 @@ SCENARIO("Minting & burning nfts")
          }
          AND_WHEN("Alice mints a second NFT")
          {
-            auto mint3 = a.mint();
+            auto mint3 = a.mint(std::nullopt);
 
             THEN("The NFT is identical in every way, except the ID is incremented")
             {
@@ -182,7 +182,7 @@ SCENARIO("Transferring NFTs")
       }
       AND_GIVEN("Alice has minted an NFT")
       {
-         auto mint = a.mint();
+         auto mint = a.mint(std::nullopt);
          auto nft  = a.getNft(mint.returnVal()).returnVal().value();
 
          THEN("No one can debit or uncredit the NFT")
@@ -309,7 +309,7 @@ SCENARIO("mint with an explicit id")
       auto             alice = t.from(t.addAccount("alice"_a));
       auto             a     = alice.to<Nft>();
 
-      auto first = a.mint();
+      auto first = a.mint(std::nullopt);
       REQUIRE(first.succeeded());
       NID sequential = first.returnVal();
       NID next       = sequential + 1;
@@ -344,7 +344,7 @@ SCENARIO("mint with an explicit id")
             NID id = next - 1;
             while (id < chosen)
             {
-               auto mint = a.mint();
+               auto mint = a.mint(std::nullopt);
                REQUIRE(mint.succeeded());
                id = mint.returnVal();
                CHECK(id != chosen);
