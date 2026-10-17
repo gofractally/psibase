@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useStore } from "@tanstack/react-form";
+import { ArrowDownUp } from "lucide-react";
 
 import { AssetField, ExpiresField } from "@/components/form-fields";
 import { formatExpiresAt } from "@/components/expires-at-picker";
@@ -430,7 +431,7 @@ export function CashPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Cash"
-                description="Swap Banx and tokens at a posted rate."
+                description="Sell tokens for a Banx debt, or buy tokens by owing Banx."
             />
 
             <Tabs defaultValue="swap" className="gap-6">
@@ -607,10 +608,22 @@ export function CashPage() {
                                                             }}
                                                         >
                                                             <span className="flex items-baseline justify-between gap-3">
-                                                                <span className="font-medium">
-                                                                    {q.isOut
-                                                                        ? "Get tokens"
-                                                                        : "Get Banx"}
+                                                                <span>
+                                                                    <span className="block font-medium">
+                                                                        Pay{" "}
+                                                                        {q.isOut
+                                                                            ? symbolOf(
+                                                                                  q.assetId,
+                                                                              )
+                                                                            : tokenName(
+                                                                                  q.tokenId,
+                                                                              )}
+                                                                    </span>
+                                                                    <span className="text-muted-foreground block text-sm">
+                                                                        {q.isOut
+                                                                            ? `Get ${tokenName(q.tokenId)}`
+                                                                            : `Get ${symbolOf(q.assetId)} owed to you`}
+                                                                    </span>
                                                                 </span>
                                                                 <span className="text-muted-foreground text-xs">
                                                                     {displayAmount(
@@ -623,7 +636,7 @@ export function CashPage() {
                                                                         : tokenName(
                                                                               q.tokenId,
                                                                           )}{" "}
-                                                                    open
+                                                                    still open
                                                                 </span>
                                                             </span>
                                                             <span className="text-muted-foreground mt-1 block font-mono text-sm">
@@ -754,9 +767,9 @@ export function CashPage() {
                                         <takeForm.AppForm>
                                             <takeForm.SubmitButton
                                                 labels={[
-                                                    values.isOut
-                                                        ? "Get tokens"
-                                                        : "Get Banx",
+                                                    selected
+                                                        ? `Pay ${payUnit}`
+                                                        : "Choose a rate",
                                                     "Sending…",
                                                 ]}
                                                 loading={
@@ -783,8 +796,8 @@ export function CashPage() {
                             <div>
                                 <h2 className="font-medium">Tokens you hold</h2>
                                 <p className="text-muted-foreground mt-1 text-sm">
-                                    These pay out when someone gets tokens from
-                                    you. Tokens you receive land here too.
+                                    Tokens you sell come out of here. Tokens
+                                    you buy are added here.
                                 </p>
                             </div>
                             <form
@@ -871,8 +884,9 @@ export function CashPage() {
                             <div>
                                 <h2 className="font-medium">Post a rate</h2>
                                 <p className="text-muted-foreground mt-1 text-sm">
-                                    What you will trade, and how much is still
-                                    open.
+                                    Sell tokens: they pay you in Banx and you
+                                    send tokens. Buy tokens: they pay you in
+                                    tokens and you owe them Banx.
                                 </p>
                             </div>
                             <quoteForm.Subscribe
@@ -886,12 +900,6 @@ export function CashPage() {
                                         values.tokenId,
                                     );
                                     const tokenLabel = tokenName(tokenId);
-                                    const payLabel = values.isOut
-                                        ? banxSym
-                                        : tokenLabel;
-                                    const getLabel = values.isOut
-                                        ? tokenLabel
-                                        : banxSym;
                                     const ratePrecision = values.isOut
                                         ? tokPrec(tokenId)
                                         : assetPrecision(values.assetId);
@@ -961,38 +969,113 @@ export function CashPage() {
                                                     </div>
                                                 )}
                                             />
-                                            <quoteForm.Field
-                                                name="assetId"
-                                                children={(field) => (
-                                                    <AssetField
-                                                        label="Banx"
-                                                        assets={assets}
-                                                        value={
-                                                            field.state.value
-                                                        }
-                                                        onChange={(id) =>
-                                                            field.handleChange(
-                                                                id,
-                                                            )
-                                                        }
+                                            {(() => {
+                                                const banxControl = (
+                                                    <quoteForm.Field
+                                                        name="assetId"
+                                                        children={(field) => (
+                                                            <AssetField
+                                                                label="Banx"
+                                                                assets={
+                                                                    assets
+                                                                }
+                                                                value={
+                                                                    field.state
+                                                                        .value
+                                                                }
+                                                                onChange={(
+                                                                    id,
+                                                                ) =>
+                                                                    field.handleChange(
+                                                                        id,
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
                                                     />
-                                                )}
-                                            />
-                                            <quoteForm.AppField
-                                                name="tokenId"
-                                                children={(field) => (
-                                                    <field.TextField
-                                                        label="Token number"
-                                                        inputMode="numeric"
-                                                        placeholder="Token number"
+                                                );
+                                                const tokenControl = (
+                                                    <quoteForm.AppField
+                                                        name="tokenId"
+                                                        children={(field) => (
+                                                            <field.TextField
+                                                                label="Token number"
+                                                                inputMode="numeric"
+                                                                placeholder="Token number"
+                                                            />
+                                                        )}
                                                     />
-                                                )}
-                                            />
+                                                );
+                                                const selling = values.isOut;
+                                                return (
+                                                    <>
+                                                        <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
+                                                            <div>
+                                                                <p className="text-sm font-medium">
+                                                                    {selling
+                                                                        ? "Tokens you send"
+                                                                        : "Banx you owe"}
+                                                                </p>
+                                                                <p className="text-muted-foreground text-xs">
+                                                                    {selling
+                                                                        ? "These leave your vault."
+                                                                        : "You take on this debt."}
+                                                                </p>
+                                                            </div>
+                                                            {selling
+                                                                ? tokenControl
+                                                                : banxControl}
+                                                        </div>
+                                                        <div className="relative z-10 -my-3 flex justify-center">
+                                                            <Button
+                                                                type="button"
+                                                                size="icon"
+                                                                variant="outline"
+                                                                className="bg-background size-9 rounded-full border-2"
+                                                                aria-label="Switch sell and buy"
+                                                                onClick={() =>
+                                                                    applyDirection(
+                                                                        !values.isOut,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <ArrowDownUp className="size-4" />
+                                                            </Button>
+                                                        </div>
+                                                        <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
+                                                            <div>
+                                                                <p className="text-sm font-medium">
+                                                                    {selling
+                                                                        ? "Banx they owe you"
+                                                                        : "Tokens you receive"}
+                                                                </p>
+                                                                <p className="text-muted-foreground text-xs">
+                                                                    {selling
+                                                                        ? "This is the debt they take on."
+                                                                        : "These are added to your vault."}
+                                                                </p>
+                                                            </div>
+                                                            {selling
+                                                                ? banxControl
+                                                                : tokenControl}
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
                                             <quoteForm.AppField
                                                 name="toRate"
                                                 children={(field) => (
                                                     <field.TextField
-                                                        label={`${getLabel} per 1 ${payLabel}`}
+                                                        label={
+                                                            values.isOut
+                                                                ? `${tokenLabel} for each 1 ${banxSym}`
+                                                                : `${banxSym} for each 1 ${tokenLabel}`
+                                                        }
+                                                        description={
+                                                            values.isOut
+                                                                ? "How many tokens you send"
+                                                                : "How much Banx you owe"
+                                                        }
                                                         inputMode="decimal"
                                                         placeholder="1"
                                                     />
@@ -1000,17 +1083,32 @@ export function CashPage() {
                                             />
                                             <p className="text-muted-foreground text-sm">
                                                 {ready ? (
-                                                    <>
-                                                        They pay 1 {payLabel}{" "}
-                                                        and get {rateShown}{" "}
-                                                        {getLabel}
-                                                        {feeOn
-                                                            ? ", before your fee"
-                                                            : ""}
-                                                        .
-                                                    </>
+                                                    values.isOut ? (
+                                                        <>
+                                                            They pay 1{" "}
+                                                            {banxSym}. You send{" "}
+                                                            {rateShown}{" "}
+                                                            {tokenLabel}
+                                                            {feeOn
+                                                                ? ", before your fee"
+                                                                : ""}
+                                                            .
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            They pay 1{" "}
+                                                            {tokenLabel}. You
+                                                            owe them{" "}
+                                                            {rateShown}{" "}
+                                                            {banxSym}
+                                                            {feeOn
+                                                                ? ", before your fee"
+                                                                : ""}
+                                                            .
+                                                        </>
+                                                    )
                                                 ) : (
-                                                    "Choose the Banx asset, the token, and the rate."
+                                                    "Choose the token, the Banx asset, and the rate."
                                                 )}
                                             </p>
                                             <div className="grid gap-3 sm:grid-cols-2">
@@ -1019,7 +1117,11 @@ export function CashPage() {
                                                     children={(field) => (
                                                         <field.TextField
                                                             label="Fee"
-                                                            description="Taken from what they pay"
+                                                            description={
+                                                                values.isOut
+                                                                    ? `Taken from the ${banxSym} they pay`
+                                                                    : "Taken from the tokens they pay"
+                                                            }
                                                             inputMode="decimal"
                                                             placeholder={
                                                                 values.isOut
@@ -1069,8 +1171,12 @@ export function CashPage() {
                                                     }
                                                     children={(field) => (
                                                         <field.TextField
-                                                            label="Open amount"
-                                                            description="How much more they can pay"
+                                                            label={
+                                                                values.isOut
+                                                                    ? `Most ${banxSym}`
+                                                                    : "Most tokens"
+                                                            }
+                                                            description="The most they can pay. Saving again replaces it."
                                                             inputMode="decimal"
                                                             placeholder={amountPlaceholder(
                                                                 budgetPrec ??
@@ -1177,7 +1283,7 @@ function QuoteTable({
                         >
                             <TableCell>
                                 <div className="font-medium">
-                                    {q.isOut ? "You pay tokens" : "You owe Banx"}
+                                    {q.isOut ? "Sell tokens" : "Buy tokens"}
                                 </div>
                                 <div className="text-muted-foreground font-mono text-xs">
                                     {tradeLine(
