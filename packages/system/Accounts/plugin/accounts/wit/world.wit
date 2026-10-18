@@ -1,53 +1,17 @@
 package accounts:plugin;
 
-/// This interface is only available to the top-level app, or its plugin.
-/// The "top-level" app is the app with which the user is directly interacting.
-interface active-app {
-    use host:types/types.{error};
-
-    /// Directly log in a user by their account name.
-    /// The user must have already been connected to the app.
-    login: func(user: string) -> result<_, error>;
-
-    /// Logs out the currently logged-in user.
-    logout: func() -> result<_, error>;
-
-    /// Disconnects a previously connected account from the active app
-    disconnect: func(account: string) -> result<_, error>;
-
-    /// Retrieves a list of accounts that the user has connected to this app.
-    /// The user may only log in to accounts that have been connected.
-    get-connected-accounts: func() -> result<list<string>, error>;
-
-    /// Called to connect an account to the active app
-    connect-account: func() -> result<_, error>;
-}
-
 /// This is the typical API
 interface api {
     use host:types/types.{error};
 
     /// Sets the auth service used to authenticate the currently logged-in user
-    /// Currently calling this is restricted to the homepage app.
+    /// Currently calling this is restricted.
     set-auth-service: func(service-name: string) -> result<_, error>;
 }
 
 /// This interface is only callable by the accounts app itself.
 interface admin {
     use host:types/types.{error};
-
-    /// Gets the names of all apps to which the user has connected
-    get-connected-apps: func(user: string) -> list<string>;
-
-    /// Adds an account into the accounts table so that it can be used on this device.
-    import-account: func(account: string);
-
-    /// Removes an account from the accounts table and disconnects it from any connected
-    /// apps so that it can no longer be used on this device.
-    remove-account: func(account: string);
-
-    /// Gets a list of all accounts that are known by the accounts app on this device.
-    get-all-accounts: func() -> list<string>;
 
     /// Get a list of auth accounts
     get-auth-services: func() -> result<list<string>, error>;
@@ -58,5 +22,4 @@ interface admin {
 
 world imports {
     import api;
-    import active-app;
 }

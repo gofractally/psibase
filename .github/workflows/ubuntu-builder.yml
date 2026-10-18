@@ -7,6 +7,11 @@ on:
         type: boolean
         required: false
         default: true
+      ref:
+        description: "Ref to build; defaults to the ref that triggered the run"
+        type: string
+        required: false
+        default: ""
     outputs:
       ubuntu-versions:
         description: Full list of Ubuntu versions for all-platforms builds
@@ -46,6 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
+          ref: ${{ inputs.ref }}
           submodules: false
           fetch-depth: 0
       - name: Preserve ccache

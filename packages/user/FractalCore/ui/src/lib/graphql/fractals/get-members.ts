@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { fractals } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
@@ -13,7 +13,7 @@ export const zMemberListInstance = z.object({
 export type MembershipListInstance = z.infer<typeof zMemberListInstance>;
 
 export const getMembers = async (fractalAccount: Account) => {
-    const member = await callGraphqlViaPlugin(
+    const member = await graphqlAuth(
         fractals.authorized.graphql,
         `
     {

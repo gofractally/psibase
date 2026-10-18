@@ -77,7 +77,15 @@ interface user-guild {
     attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;
 }
 
+/// Only callable by the fractal-core app itself.
+interface embedded {
+    use host:types/types.{error};
+    use profiles:plugin/types.{contact};
 
+    import-invite-token: func(token: string) -> result<u32, error>;
+    get-contacts: func() -> result<list<contact>, error>;
+    can-read-contacts: func() -> bool;
+}
 
 world imports {
     import user-guild;

@@ -3,9 +3,9 @@ import { usePluginMutation } from "./use-plugin-mutation";
 export const useAcceptStaged = () =>
     usePluginMutation<[number]>(
         {
-            intf: "respondent",
+            intf: "staged",
             method: "accept",
-            service: "staged-tx",
+            service: "config",
         },
         {
             error: "Failed accepting proposal",

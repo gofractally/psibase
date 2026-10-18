@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { guilds } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
@@ -24,7 +24,7 @@ const getCompletedEvaluationIds = async (guild: Account) => {
         }
     }`;
 
-    const evaluations = await callGraphqlViaPlugin(
+    const evaluations = await graphqlAuth(
         guilds.authorized.graphql,
         gql,
     );
@@ -57,7 +57,7 @@ const getEvaluationsMetadata = async (guild: Account) => {
         }
     }`;
 
-    const evaluations = await callGraphqlViaPlugin(
+    const evaluations = await graphqlAuth(
         guilds.authorized.graphql,
         gql,
     );

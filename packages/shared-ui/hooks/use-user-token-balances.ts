@@ -1,11 +1,15 @@
 import { type UseQueryResult, useQuery } from "@tanstack/react-query";
 
-import { fetchUserTokenBalances } from "@shared/lib/graphql/tokens";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { hostingAppCall } from "@shared/lib/plugins/host-app";
+import {
+    type PluginCall,
+    callPluginFunction,
+} from "@shared/lib/plugins/lib/call-plugin-function";
+import { type UserBalance } from "@shared/lib/plugins/tokens";
 import { Quantity } from "@shared/lib/quantity";
 import QueryKey from "@shared/lib/query-keys";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
-
-import { useCurrentUser } from "./use-current-user";
 
 export interface UserTokenBalance {
     id: number;
@@ -22,40 +26,42 @@ export function getSystemTokenBalance(
         ?.balance;
 }
 
-type UserTokenBalancesQueryKey = ReturnType<typeof QueryKey.userTokenBalances>;
+export function toUserTokenBalances(nodes: UserBalance[]): UserTokenBalance[] {
+    return nodes.map((node) => ({
+        id: node.tokenId,
+        symbol: node.symbol ?? null,
+        precision: node.precision,
+        balance: new Quantity(
+            node.balance,
+            node.precision,
+            node.tokenId,
+            node.symbol,
+        ),
+    }));
+}
 
 export const useUserTokenBalances = (
     optionalUsername?: Account | undefined | null,
-    options?: { enabled?: boolean },
+    options?: {
+        enabled?: boolean;
+        call?: PluginCall<[user: string], UserBalance[]>;
+    },
 ): UseQueryResult<UserTokenBalance[], Error> => {
     const { data: currentUser } = useCurrentUser();
     const username = optionalUsername ?? currentUser;
 
-    return useQuery<
-        UserTokenBalance[],
-        Error,
-        UserTokenBalance[],
-        UserTokenBalancesQueryKey
-    >({
+    return useQuery({
         queryKey: QueryKey.userTokenBalances(username),
         queryFn: async (): Promise<UserTokenBalance[]> => {
-            const nodes = await fetchUserTokenBalances(
-                zAccount.parse(username),
-            );
-
-            return nodes.map(
-                (node): UserTokenBalance => ({
-                    id: node.tokenId,
-                    symbol: node.symbol,
-                    precision: node.precision,
-                    balance: new Quantity(
-                        node.balance,
-                        node.precision,
-                        node.tokenId,
-                        node.symbol,
+            const nodes = await callPluginFunction(
+                options?.call ??
+                    hostingAppCall<[user: string], UserBalance[]>(
+                        "tokens",
+                        "getUserBalances",
                     ),
-                }),
+                [zAccount.parse(username)],
             );
+            return toUserTokenBalances(nodes);
         },
         enabled: !!username && (options?.enabled ?? true),
     });

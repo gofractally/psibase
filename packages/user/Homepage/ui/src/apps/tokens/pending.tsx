@@ -49,9 +49,8 @@ export const PendingPageContents = () => {
     );
 
     const pendingBalances: PendingBalance[] = selectedToken
-        ? (data?.filter(
-              (pt) => pt.balance.tokenNumber === selectedToken.id,
-          ) ?? [])
+        ? (data?.filter((pt) => pt.balance.tokenNumber === selectedToken.id) ??
+          [])
         : (data ?? []);
 
     if (isLoading || isPending) {

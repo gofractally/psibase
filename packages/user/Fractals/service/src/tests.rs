@@ -113,7 +113,6 @@ mod chain {
     };
     use crate::helpers::donation_sub_account;
     use crate::Wrapper;
-    use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::tokens::{BalanceFlags, Quantity, Wrapper as Tokens};
     use psibase::*;
 
@@ -192,12 +191,6 @@ mod chain {
         chain.start_block();
 
         let tid = token_id(chain);
-        let nft_id = Tokens::push(chain).getToken(tid).get().unwrap().nft_id;
-        Nfts::push_from(chain, Wrapper::SERVICE)
-            .debit(nft_id, "".into())
-            .get()
-            .unwrap();
-
         chain
             .propose::<Wrapper>(ALICE, FRACTAL)
             .init_token()

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useGuilds } from "@/hooks/fractals/use-guilds";
+import { embeddedContactCalls } from "@/lib/plugin";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
@@ -94,6 +95,7 @@ export const Guilds = () => {
                                                         account={
                                                             guild.rep.member
                                                         }
+                                                        {...embeddedContactCalls}
                                                     />
                                                 ) : (
                                                     "Council"

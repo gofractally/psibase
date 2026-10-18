@@ -40,10 +40,6 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
     let tokens = tokens::Wrapper::SERVICE;
     let auth_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
 
-    // This is still needed even though the package config specifies the server...
-    http_server::Wrapper::push_from(&chain, vserver)
-        .registerServer(vserver)
-        .get()?;
     chain.finish_block();
 
     chain

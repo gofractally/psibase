@@ -9,7 +9,8 @@ export const useLogout = (
     return useMutation({
         mutationFn: async () =>
             supervisor.functionCall({
-                service: "accounts",
+                service: "host",
+                plugin: "accounts",
                 intf: "activeApp",
                 method: "logout",
                 params: [],

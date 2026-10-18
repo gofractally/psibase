@@ -138,6 +138,21 @@ namespace psibase
             raw::getResult(c.data(), c.size(), 0);
          }
       }
+      template <typename T>
+      void read(psio::shared_view_ptr<T>& p) const
+      {
+         std::uint32_t sz = raw::kvGet(db, key.data(), key.size());
+         check(sz != std::uint32_t(-1), "no such key");
+         if (is_secondary)
+         {
+            std::vector<char> buf(sz);
+            raw::getResult(buf.data(), buf.size(), 0);
+            sz = raw::kvGet(db, buf.data(), buf.size());
+            check(sz != std::uint32_t(-1), "primary key not found");
+         }
+         p = psio::shared_view_ptr<T>(psio::size_tag{sz});
+         raw::getResult(p.data(), p.size(), 0);
+      }
       std::vector<char> operator*() const
       {
          std::vector<char> result;
@@ -303,6 +318,13 @@ namespace psibase
       /// This reads an object from the database. It does not cache; it returns a fresh object
       /// each time it's used.
       T operator*() const { return psio::from_frac<T>(psio::prevalidated{*base}); }
+
+      psio::shared_view_ptr<T> view() const
+      {
+         psio::shared_view_ptr<T> result;
+         base.read(result);
+         return result;
+      }
 
       /// Comparisons
       std::weak_ordering operator<=>(const KvIterator& rhs) const = default;

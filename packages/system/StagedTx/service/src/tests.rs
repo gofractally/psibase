@@ -19,7 +19,7 @@ mod tests {
 
     #[derive(Deserialize)]
     struct Data {
-        userNfts: UserNfts,
+        nfts: UserNfts,
     }
 
     #[derive(Deserialize)]
@@ -38,8 +38,8 @@ mod tests {
             Nft::SERVICE,
             &format!(
                 r#"
-                query UserNfts {{
-                    userNfts(user: "{}") {{
+                query Nfts {{
+                    nfts(user: "{}") {{
                         edges {{
                             node {{
                                 id
@@ -54,7 +54,7 @@ mod tests {
         )?;
 
         let response_root: Response = serde_json::from_value(res)?;
-        Ok(response_root.data.userNfts.edges.len())
+        Ok(response_root.data.nfts.edges.len())
     }
 
     #[psibase::test_case(packages("StagedTx", "Nft", "AuthSig"))]

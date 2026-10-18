@@ -42,6 +42,7 @@ function(add suffix)
         CommonApi/include
         DynLd/include
         Events/include
+        Explorer/include
         Invite/include
         Nft/include
         Nop/include

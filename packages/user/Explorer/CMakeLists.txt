@@ -3,3 +3,5 @@ function(add suffix)
 endfunction(add)
 
 conditional_add()
+
+add_subdirectory(test)

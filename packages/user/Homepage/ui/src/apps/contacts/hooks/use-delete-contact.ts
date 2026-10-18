@@ -10,7 +10,7 @@ export const useDeleteContact = () =>
     useMutation({
         mutationFn: async (account: Account) => {
             await supervisor.functionCall({
-                service: zAccount.parse("profiles"),
+                service: zAccount.parse("homepage"),
                 method: "remove",
                 params: [zAccount.parse(account)],
                 intf: "contacts",

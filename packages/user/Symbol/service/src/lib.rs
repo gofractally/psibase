@@ -188,7 +188,7 @@ pub mod tables {
 
         fn check_is_owner_of_nft(nft_id: NID, user: AccountNumber) {
             assert_eq!(
-                Nft::call().getNft(nft_id).owner,
+                Nft::call().getNft(nft_id).expect("NFT was burned").owner,
                 user,
                 "Missing required authority",
             );
@@ -218,7 +218,7 @@ pub mod tables {
 
     #[ComplexObject]
     impl Symbol {
-        pub async fn owner_nft(&self) -> NftRecord {
+        pub async fn owner_nft(&self) -> Option<NftRecord> {
             Nft::call().getNft(self.ownerNft)
         }
 
