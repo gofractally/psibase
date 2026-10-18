@@ -119,6 +119,7 @@ export function useSetBookAuth() {
             assetId: number;
             remaining: string;
             maxInterestRatePpm: number;
+            minInterestRatePpm: number;
             expiresAtSeconds: number;
         }) =>
             banxCall("setBookAuth", [
@@ -126,6 +127,7 @@ export function useSetBookAuth() {
                 p.assetId,
                 p.remaining,
                 p.maxInterestRatePpm,
+                p.minInterestRatePpm,
                 p.expiresAtSeconds,
             ]),
         onSuccess: () => {

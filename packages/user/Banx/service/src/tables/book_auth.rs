@@ -32,6 +32,7 @@ impl BookAuth {
         asset_id: u16,
         remaining: Quantity,
         max_interest_rate: u32,
+        min_interest_rate: i32,
         expires_at: TimePointSec,
     ) {
         assert!(debtor != creditor, "cannot book-auth self");
@@ -42,12 +43,22 @@ impl BookAuth {
             max_interest_rate <= PPM_SCALE,
             "max_interest_rate exceeds 100% (PPM_SCALE)"
         );
+        let bound = PPM_SCALE as i32;
+        assert!(
+            (-bound..=bound).contains(&min_interest_rate),
+            "min_interest_rate outside ±100% (PPM_SCALE)"
+        );
+        assert!(
+            min_interest_rate <= max_interest_rate as i32,
+            "min_interest_rate above max_interest_rate"
+        );
         Self {
             debtor,
             creditor,
             asset_id,
             remaining,
             max_interest_rate,
+            min_interest_rate,
             expires_at,
         }
         .save();
@@ -68,8 +79,8 @@ impl BookAuth {
         );
         assert!(self.is_live(), "book-auth expired");
         assert!(
-            interest_rate <= self.max_interest_rate as i32,
-            "interest_rate exceeds book-auth max"
+            (self.min_interest_rate..=self.max_interest_rate as i32).contains(&interest_rate),
+            "interest_rate outside book-auth range"
         );
         assert!(
             amount.value <= self.remaining.value,

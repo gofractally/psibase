@@ -75,13 +75,15 @@ interface api {
     remove-credit-line: func(debtor: string, asset-id: u16) -> result<_, error>;
 
     /// Debtor (sender) lets `creditor` book deposits onto them, up to
-    /// `remaining` (human decimal). `max-interest-rate-ppm` is a ceiling; 0
-    /// still allows a negative rate. `expires-at-seconds` 0 = never.
+    /// `remaining` (human decimal). The booked APR must sit in
+    /// `min-interest-rate-ppm..=max-interest-rate-ppm`. A floor of 0 refuses
+    /// decay. `expires-at-seconds` 0 = never.
     set-book-auth: func(
         creditor: string,
         asset-id: u16,
         remaining: string,
         max-interest-rate-ppm: u32,
+        min-interest-rate-ppm: s32,
         expires-at-seconds: u32,
     ) -> result<_, error>;
 
@@ -90,7 +92,7 @@ interface api {
 
     /// Creditor (sender) books `amount` onto `debtor` under their live
     /// book-auth. `interest-rate-ppm` is a signed APR (`10_000` = 1%,
-    /// negative decays the claim), within ±1_000_000 and ≤ the auth max.
+    /// negative decays the claim), within ±1_000_000 and the auth's min..=max.
     /// `memo` max 80 bytes.
     book: func(
         debtor: string,

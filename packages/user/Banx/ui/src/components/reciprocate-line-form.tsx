@@ -113,6 +113,7 @@ export function ReciprocateLineForm({
                             value.interestPct,
                             PPM_SCALE,
                         ),
+                        minInterestRatePpm: 0,
                         expiresAtSeconds: 0,
                     });
                 }

@@ -152,14 +152,16 @@ pub mod service {
 
     /// Debtor (sender) lets `creditor` book deposits onto them in `asset_id`,
     /// up to `remaining`. Dual of a credit line: they may *write* that you
-    /// owe them. `max_interest_rate` is a ceiling; 0 still allows a negative
-    /// rate. `expires_at` 0 = never. Replaces any existing row for this pair/asset.
+    /// owe them. The booked APR must sit in `min_interest_rate..=max_interest_rate`.
+    /// A floor of 0 refuses decay. `expires_at` 0 = never. Replaces any existing
+    /// row for this pair/asset.
     #[action]
     fn st_bk_ath(
         creditor: AccountNumber,
         asset_id: u16,
         remaining: Quantity,
         max_interest_rate: u32,
+        min_interest_rate: i32,
         expires_at: TimePointSec,
     ) {
         let debtor = get_sender();
@@ -169,6 +171,7 @@ pub mod service {
             asset_id,
             remaining,
             max_interest_rate,
+            min_interest_rate,
             expires_at,
         );
         emit_pair_activity(
@@ -205,8 +208,9 @@ pub mod service {
     /// Creditor (sender) books `amount` onto `debtor` under their live
     /// book-auth. Same ledger as [`deposit`], spends remaining (row stays at
     /// 0 so it can be topped up), auto-nets. `interest_rate` must be within
-    /// ±100% and ≤ the auth's max. A negative rate decays the claim; the
-    /// creditor signs it. Memo is stored on activity.
+    /// ±100% and inside the auth's min..=max. A negative rate decays the claim;
+    /// the creditor signs it, and only after the debtor set a negative floor.
+    /// Memo is stored on activity.
     #[action]
     fn book(
         debtor: AccountNumber,
@@ -513,8 +517,7 @@ pub mod service {
     /// Remove one side of a from→to quote.
     #[action]
     fn rm_cur_pol(from_asset: u16, to_asset: u16, poster_is_creditor: bool) {
-        CurrencyPolicy::get_assert(get_sender(), from_asset, to_asset, poster_is_creditor)
-            .remove();
+        CurrencyPolicy::get_assert(get_sender(), from_asset, to_asset, poster_is_creditor).remove();
     }
 
     /// Post a cash quote: Banx `asset_id` ↔ Tokens `token_id`.

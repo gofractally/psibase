@@ -15,6 +15,8 @@ import {
     existingAccountValidators,
     percentFieldValidator,
     percentStringToPpm,
+    signedPercentFieldValidator,
+    signedPercentStringToPpm,
     useAppForm,
 } from "@/lib/form";
 import type { Asset, BookAuth } from "@/lib/graphql";
@@ -28,6 +30,35 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
+
+const APR_ORDER_ERROR = "Lowest APR must be at or below the highest APR";
+
+/** Floor ppm above ceiling ppm. Skipped while either field fails its own check. */
+function bookAuthAprOrderError(
+    minAprPct: string,
+    maxAprPct: string,
+): string | undefined {
+    if (
+        signedPercentFieldValidator(MAX_PERCENT)({ value: minAprPct }) ||
+        percentFieldValidator(MAX_PERCENT)({ value: maxAprPct })
+    ) {
+        return undefined;
+    }
+    const minPpm = signedPercentStringToPpm(minAprPct, PPM_SCALE);
+    const maxPpm = percentStringToPpm(maxAprPct, PPM_SCALE);
+    if (minPpm > maxPpm) return APR_ORDER_ERROR;
+    return undefined;
+}
+
+function bookAuthAprOrderValidator({
+    value,
+}: {
+    value: { minAprPct: string; maxAprPct: string };
+}) {
+    const message = bookAuthAprOrderError(value.minAprPct, value.maxAprPct);
+    if (!message) return undefined;
+    return { fields: { minAprPct: message, maxAprPct: message } };
+}
 
 export function BookAuthDialog({
     open,
@@ -56,20 +87,32 @@ export function BookAuthDialog({
             assetId: undefined as number | undefined,
             remaining: "100",
             maxAprPct: "0",
+            minAprPct: "0",
             expiresAtSeconds: 0,
+        },
+        validators: {
+            onChange: bookAuthAprOrderValidator,
         },
         onSubmit: async ({ value }) => {
             const creditor = (lockedCreditor ?? value.creditor).trim();
             const assetId = lockedAsset ?? value.assetId;
             if (assetId === undefined || !creditor) return;
+            const maxInterestRatePpm = percentStringToPpm(
+                value.maxAprPct,
+                PPM_SCALE,
+            );
+            const minInterestRatePpm = signedPercentStringToPpm(
+                value.minAprPct,
+                PPM_SCALE,
+            );
+            // BookAuth::upsert rejects this with min_interest_rate above max_interest_rate.
+            if (minInterestRatePpm > maxInterestRatePpm) return;
             await setAuth.mutateAsync({
                 creditor,
                 assetId,
                 remaining: value.remaining.trim(),
-                maxInterestRatePpm: percentStringToPpm(
-                    value.maxAprPct,
-                    PPM_SCALE,
-                ),
+                maxInterestRatePpm,
+                minInterestRatePpm,
                 expiresAtSeconds: value.expiresAtSeconds,
             });
             onOpenChange(false);
@@ -84,6 +127,7 @@ export function BookAuthDialog({
                 assetId: existing.assetId,
                 remaining: displayAmount(existing.remaining),
                 maxAprPct: ppmToPercentInput(existing.maxInterestRatePpm),
+                minAprPct: ppmToPercentInput(existing.minInterestRatePpm),
                 expiresAtSeconds: existing.expiresAt,
             });
         } else {
@@ -92,6 +136,7 @@ export function BookAuthDialog({
                 assetId: prefill?.assetId,
                 remaining: "100",
                 maxAprPct: "0",
+                minAprPct: "0",
                 expiresAtSeconds: 0,
             });
         }
@@ -178,6 +223,22 @@ export function BookAuthDialog({
                         }}
                     />
                     <form.AppField
+                        name="minAprPct"
+                        validators={{
+                            onChange: signedPercentFieldValidator(MAX_PERCENT),
+                            onSubmit: signedPercentFieldValidator(MAX_PERCENT),
+                        }}
+                        children={(field) => (
+                            <field.TextField
+                                label="Lowest APR % they may apply"
+                                inputMode="decimal"
+                                min={-MAX_PERCENT}
+                                max={MAX_PERCENT}
+                                step={MIN_PERCENT_STEP}
+                            />
+                        )}
+                    />
+                    <form.AppField
                         name="maxAprPct"
                         validators={{
                             onChange: percentFieldValidator(MAX_PERCENT),
@@ -185,7 +246,7 @@ export function BookAuthDialog({
                         }}
                         children={(field) => (
                             <field.TextField
-                                label="Max APR % they may apply"
+                                label="Highest APR % they may apply"
                                 inputMode="decimal"
                                 min={0}
                                 max={MAX_PERCENT}

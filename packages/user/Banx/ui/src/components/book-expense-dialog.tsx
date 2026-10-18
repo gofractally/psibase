@@ -8,7 +8,6 @@ import {
     ppmToPercentInput,
 } from "@/lib/constants";
 import {
-    MAX_PERCENT,
     MIN_PERCENT_STEP,
     PPM_SCALE,
     amountFieldValidator,
@@ -44,6 +43,8 @@ export function BookExpenseDialog({
     const book = useBook();
     const remaining = auth ? displayAmount(auth.remaining) : "0";
     const maxApr = auth ? ppmToPercentInput(auth.maxInterestRatePpm) : "0";
+    const minPpm = auth?.minInterestRatePpm ?? 0;
+    const maxPpm = auth?.maxInterestRatePpm ?? 0;
 
     const form = useAppForm({
         defaultValues: {
@@ -85,11 +86,12 @@ export function BookExpenseDialog({
                 <DialogHeader>
                     <DialogTitle>Book expense onto {auth.debtor}</DialogTitle>
                     <DialogDescription>
-                        They authorized you to record that they owe you, up to{" "}
-                        {remaining} {symbol}. APR can be from{" "}
-                        {ppmToPercent(-PPM_SCALE)} to{" "}
-                        {ppmToPercent(auth.maxInterestRatePpm)}; a negative rate
-                        decays the claim. This writes the IOU immediately.
+                        {`They authorized you to record that they owe you, up to ${remaining} ${symbol}.` +
+                            ` APR must be from ${ppmToPercent(minPpm)} to ${ppmToPercent(maxPpm)}.` +
+                            (minPpm < 0
+                                ? " A negative rate decays the claim."
+                                : "") +
+                            " This writes the IOU immediately."}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -121,21 +123,15 @@ export function BookExpenseDialog({
                     <form.AppField
                         name="aprPct"
                         validators={{
-                            onChange: ppmRangeValidator(
-                                -PPM_SCALE,
-                                auth.maxInterestRatePpm,
-                            ),
-                            onSubmit: ppmRangeValidator(
-                                -PPM_SCALE,
-                                auth.maxInterestRatePpm,
-                            ),
+                            onChange: ppmRangeValidator(minPpm, maxPpm),
+                            onSubmit: ppmRangeValidator(minPpm, maxPpm),
                         }}
                         children={(field) => (
                             <field.TextField
                                 label="Interest APR %"
                                 inputMode="decimal"
-                                min={-MAX_PERCENT}
-                                max={auth.maxInterestRatePpm / PPM_PER_PERCENT}
+                                min={minPpm / PPM_PER_PERCENT}
+                                max={maxPpm / PPM_PER_PERCENT}
                                 step={MIN_PERCENT_STEP}
                             />
                         )}

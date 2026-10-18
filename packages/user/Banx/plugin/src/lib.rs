@@ -245,6 +245,7 @@ impl Api for BanxPlugin {
         asset_id: u16,
         remaining: String,
         max_interest_rate_ppm: u32,
+        min_interest_rate_ppm: i32,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_book_auth)?;
@@ -254,6 +255,7 @@ impl Api for BanxPlugin {
             asset_id,
             remaining,
             max_interest_rate: max_interest_rate_ppm,
+            min_interest_rate: min_interest_rate_ppm,
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
@@ -576,10 +578,9 @@ impl Api for BanxPlugin {
         }
         let market_fx = human_to_fx_rate(asset_a, asset_b, &market_rate)?;
         let Some((forward, back)) = banx::math::try_exchange_rates(market_fx, spread_ppm) else {
-            return Err(ErrorType::ConversionError(
-                "spread consumes the market rate".into(),
-            )
-            .into());
+            return Err(
+                ErrorType::ConversionError("spread consumes the market rate".into()).into(),
+            );
         };
         let remaining_a = parse_amount_nonzero(asset_a, &remaining_a)?;
         let remaining_b = parse_amount_nonzero(asset_b, &remaining_b)?;
@@ -1095,8 +1096,8 @@ impl Api for BanxPlugin {
         }
         let precision =
             Precision::new(precision).map_err(|e| ErrorType::ConversionError(e.to_string()))?;
-        let description = Memo::new(description)
-            .map_err(|e| ErrorType::ConversionError(e.to_string()))?;
+        let description =
+            Memo::new(description).map_err(|e| ErrorType::ConversionError(e.to_string()))?;
         let packed = banx::action_structs::add_asset {
             symbol,
             precision,

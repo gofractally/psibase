@@ -430,6 +430,7 @@ mod service {
         assetId: u16,
         remaining: Decimal,
         maxInterestRatePpm: u32,
+        minInterestRatePpm: i32,
         expiresAt: i64,
     }
 
@@ -441,6 +442,7 @@ mod service {
                 assetId: row.asset_id,
                 remaining: Decimal::new(row.remaining, asset_precision(row.asset_id)),
                 maxInterestRatePpm: row.max_interest_rate,
+                minInterestRatePpm: row.min_interest_rate,
                 expiresAt: time_sec(row.expires_at),
             }
         }

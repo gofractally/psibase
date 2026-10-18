@@ -18,8 +18,7 @@ mod pay_request;
 pub use connection::Connection;
 pub(crate) use helpers::emit_pair_activity_as;
 pub(crate) use helpers::{
-    apply_hop_fee, apply_rate, apply_spread, expires_live, invert_hop_fee,
-    invert_rate,
+    apply_hop_fee, apply_rate, apply_spread, expires_live, invert_hop_fee, invert_rate,
     live_specific_or_global,
 };
 pub use helpers::{assert_account_exists, cash_sub, emit_pair_activity, GLOBAL};
@@ -403,8 +402,10 @@ pub mod tables {
         pub asset_id: u16,
         /// Live budget the creditor may still book. 0 means spent; row stays so it can be topped up.
         pub remaining: Quantity,
-        /// Ceiling on the booked APR ppm. 0 still allows a negative rate.
+        /// Highest booked APR ppm the creditor may use. 0 with a 0 floor is 0% only.
         pub max_interest_rate: u32,
+        /// Lowest booked APR ppm. 0 refuses decay; a negative floor allows it down to that rate.
+        pub min_interest_rate: i32,
         /// Absolute expiry (`seconds == 0` → never).
         pub expires_at: TimePointSec,
     }

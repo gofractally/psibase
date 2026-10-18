@@ -17,6 +17,7 @@ const zBookAuth = z.object({
     assetId: z.number(),
     remaining: z.string(),
     maxInterestRatePpm: z.number(),
+    minInterestRatePpm: z.number(),
     expiresAt: z.number(),
 });
 
@@ -188,7 +189,7 @@ export async function fetchAssets(): Promise<Asset[]> {
     }));
 }
 
-const bookAuthFields = `debtor creditor assetId remaining maxInterestRatePpm expiresAt`;
+const bookAuthFields = `debtor creditor assetId remaining maxInterestRatePpm minInterestRatePpm expiresAt`;
 
 export async function fetchBookAuths(account: string): Promise<BookAuth[]> {
     const data = await gql<{ bookAuths: BookAuth[] }>(

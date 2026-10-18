@@ -1154,10 +1154,7 @@ mod tests {
         assert_eq!(crate::math::try_exchange_rates(0, 0), None);
         assert_eq!(crate::math::try_exchange_rates(1_200_000, PPM_SCALE), None);
         assert_eq!(crate::math::try_exchange_rates(1, PPM_SCALE - 1), None);
-        assert_eq!(
-            crate::math::try_exchange_rates(1_000_000_000_001, 0),
-            None
-        );
+        assert_eq!(crate::math::try_exchange_rates(1_000_000_000_001, 0), None);
 
         Wrapper::push(&chain).init().get()?;
 
@@ -1434,7 +1431,9 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 100);
         assert_eq!(exp(&chain, gary, alice, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true)
+                .remaining
+                .value,
             40
         );
 
@@ -1444,7 +1443,9 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 60);
         assert_eq!(exp(&chain, gary, alice, usd), 20);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true)
+                .remaining
+                .value,
             0
         );
         assert!(Wrapper::push_from(&chain, alice)
@@ -1481,7 +1482,9 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 60);
         assert_eq!(exp(&chain, gary, alice, usd), 20);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true)
+                .remaining
+                .value,
             50
         );
 
@@ -1503,7 +1506,9 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true)
+                .remaining
+                .value,
             0
         );
 
@@ -1541,7 +1546,9 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true)
+                .remaining
+                .value,
             500
         );
 
@@ -1579,7 +1586,9 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 500);
         assert_eq!(exp(&chain, steve, gary, usd), 350);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true).remaining.value,
+            CurrencyPolicy::get_assert(gary, aud, usd, true)
+                .remaining
+                .value,
             0
         );
         assert!(Wrapper::push_from(&chain, alice)
@@ -3159,10 +3168,7 @@ mod tests {
             .error
             .as_deref()
             .unwrap_or("(no error — path_pay succeeded)");
-        assert!(
-            err.contains("fixed fee consumes entire amount"),
-            "{err}"
-        );
+        assert!(err.contains("fixed fee consumes entire amount"), "{err}");
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
@@ -3251,9 +3257,7 @@ mod tests {
     /// currencyPolicies still lists it. Removing the creditor row makes
     /// the path fail again while the debtor row remains.
     #[psibase::test_case(packages("Banx"))]
-    fn test_fx_quote_path_ignores_debtor_side(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_fx_quote_path_ignores_debtor_side(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let gary = account!("gary");
@@ -6751,11 +6755,12 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, alice)
-            .st_bk_ath(bob, usd, Quantity::new(10_000), 0, never())
+            .st_bk_ath(bob, usd, Quantity::new(10_000), 0, 0, never())
             .get()?;
         let auth = BookAuth::get_assert(alice, bob, usd);
         assert_eq!(auth.remaining.value, 10_000);
         assert_eq!(auth.max_interest_rate, 0);
+        assert_eq!(auth.min_interest_rate, 0);
 
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(3_000), 0, "dinner".into())
@@ -6776,7 +6781,7 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, alice)
-            .st_bk_ath(bob, usd, Quantity::new(1_000), 0, never())
+            .st_bk_ath(bob, usd, Quantity::new(1_000), 0, 0, never())
             .get()?;
 
         assert!(Wrapper::push_from(&chain, bob)
@@ -6785,6 +6790,10 @@ mod tests {
             .is_err());
         assert!(Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(100), 1, "".into())
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(100), -1, "".into())
             .get()
             .is_err());
         assert!(Wrapper::push_from(&chain, alice)
@@ -6799,7 +6808,7 @@ mod tests {
         assert_eq!(BookAuth::get_assert(alice, bob, usd).remaining.value, 0);
 
         Wrapper::push_from(&chain, alice)
-            .st_bk_ath(bob, usd, Quantity::new(500), 0, never())
+            .st_bk_ath(bob, usd, Quantity::new(500), 0, 0, never())
             .get()?;
         assert_eq!(BookAuth::get_assert(alice, bob, usd).remaining.value, 500);
 
@@ -6816,7 +6825,7 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, alice)
-            .st_bk_ath(bob, usd, Quantity::new(5_000), 12_000, never())
+            .st_bk_ath(bob, usd, Quantity::new(5_000), 12_000, 0, never())
             .get()?;
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(100), 12_000, "".into())
@@ -6837,6 +6846,7 @@ mod tests {
                 bob,
                 usd,
                 Quantity::new(5_000),
+                0,
                 0,
                 TimePointSec { seconds: 1 },
             )
@@ -6864,7 +6874,7 @@ mod tests {
         assert_eq!(exp(&chain, alice, bob, usd), 2_000);
 
         Wrapper::push_from(&chain, alice)
-            .st_bk_ath(bob, usd, Quantity::new(5_000), 0, never())
+            .st_bk_ath(bob, usd, Quantity::new(5_000), 0, 0, never())
             .get()?;
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(2_000), 0, "tab".into())
@@ -7050,9 +7060,17 @@ mod tests {
         debtor: AccountNumber,
         creditor: AccountNumber,
         asset: u16,
+        min_interest_rate: i32,
     ) {
         Wrapper::push_from(chain, debtor)
-            .st_bk_ath(creditor, asset, Quantity::new(u64::MAX), 0, never())
+            .st_bk_ath(
+                creditor,
+                asset,
+                Quantity::new(u64::MAX),
+                0,
+                min_interest_rate,
+                never(),
+            )
             .get()
             .unwrap();
     }
@@ -7066,7 +7084,7 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        allow_book(&chain, alice, bob, usd);
+        allow_book(&chain, alice, bob, usd, -100_000);
 
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(1_000_000), -100_000, "".into())
@@ -7193,8 +7211,8 @@ mod tests {
         chain.new_account(bob).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
-        allow_book(&chain, alice, bob, usd);
-        allow_book(&chain, alice, bob, aud);
+        allow_book(&chain, alice, bob, usd, -10_000);
+        allow_book(&chain, alice, bob, aud, -10_000);
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(PRINCIPAL), RATE, "".into())
             .get()?;
@@ -7227,7 +7245,7 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        allow_book(&chain, alice, bob, usd);
+        allow_book(&chain, alice, bob, usd, -10_000);
 
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(100), 0, "".into())
@@ -7279,7 +7297,7 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        allow_book(&chain, alice, bob, usd);
+        allow_book(&chain, alice, bob, usd, -1_000_000);
 
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(1), -1_000_000, "".into())
@@ -7305,7 +7323,7 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        allow_book(&chain, alice, bob, usd);
+        allow_book(&chain, alice, bob, usd, -100_000);
         const RATE: i32 = -100_000;
 
         Wrapper::push_from(&chain, bob)
@@ -7337,7 +7355,7 @@ mod tests {
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(alice, usd, Quantity::new(0), false, 0, 7 * 86_400)
             .get()?;
-        allow_book(&chain, alice, bob, usd);
+        allow_book(&chain, alice, bob, usd, -100_000);
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(1_000_000), -100_000, "".into())
             .get()?;
@@ -7353,7 +7371,7 @@ mod tests {
         Ok(())
     }
 
-    /// max 0 still allows a negative rate. Past −100% is rejected.
+    /// A floor of 0 with a ceiling of 0 is 0% only. Decay requires an explicit floor.
     #[psibase::test_case(packages("Banx"))]
     fn test_book_negative_rate_bounds(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -7362,8 +7380,23 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
-        allow_book(&chain, alice, bob, usd);
+        allow_book(&chain, alice, bob, usd, 0);
 
+        assert!(Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(10), -1, "".into())
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(10), 1, "".into())
+            .get()
+            .is_err());
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(10), 0, "".into())
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .st_bk_ath(bob, usd, Quantity::new(u64::MAX), 0, -1_000_000, never())
+            .get()?;
         assert!(Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(10), -1_000_001, "".into())
             .get()
@@ -7403,7 +7436,14 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(0), false, 0, WEEK)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_bk_ath(bob, usd, Quantity::new(u64::MAX), POSITIVE as u32, never())
+            .st_bk_ath(
+                bob,
+                usd,
+                Quantity::new(u64::MAX),
+                POSITIVE as u32,
+                -1_000_000,
+                never(),
+            )
             .get()?;
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(1), -1_000_000, "".into())
@@ -7460,7 +7500,7 @@ mod tests {
         Wrapper::push_from(&chain, bob)
             .st_crd_lne(alice, usd, Quantity::new(0), false, 0, WEEK)
             .get()?;
-        allow_book(&chain, alice, bob, usd);
+        allow_book(&chain, alice, bob, usd, RATE);
         Wrapper::push_from(&chain, bob)
             .book(alice, usd, Quantity::new(1), RATE, "".into())
             .get()?;
@@ -7507,7 +7547,7 @@ mod tests {
         const WEEK: u32 = 7 * 86_400;
         const RATE: i32 = 100_000;
 
-        allow_book(&chain, bob, peter, usd);
+        allow_book(&chain, bob, peter, usd, -1_000_000);
         Wrapper::push_from(&chain, peter)
             .book(bob, usd, Quantity::new(1), -1_000_000, "".into())
             .get()?;
