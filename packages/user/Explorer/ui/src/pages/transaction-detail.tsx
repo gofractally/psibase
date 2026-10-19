@@ -38,11 +38,11 @@ export const TransactionDetailPage = () => {
     const id = raw.replace(/^0x/i, "").toUpperCase();
     const valid = isHash(id);
 
-    const { data, isPending, error } = useQuery({
+    const { data, isPending, isFetching, error, refetch } = useQuery({
         queryKey: ["transaction", id],
         queryFn: () => findTransaction(id, 50_000),
         enabled: valid,
-        staleTime: Infinity,
+        staleTime: (q) => (q.state.data ? Infinity : 0),
     });
 
     if (!valid) {
@@ -66,10 +66,25 @@ export const TransactionDetailPage = () => {
     if (!data) {
         return (
             <div className="flex flex-col gap-4">
-                <PageHeader title="Transaction" description={<Hash value={id} full />} />
+                <PageHeader
+                    title="Transaction"
+                    description={<Hash value={id} full />}
+                    actions={
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            disabled={isFetching}
+                            onClick={() => void refetch()}
+                        >
+                            {isFetching ? "Searching…" : "Search again"}
+                        </Button>
+                    }
+                />
                 <Notice title="Transaction not found">
                     No transaction with this ID was found in the most recent 50,000 blocks.
-                    It may be older than the search window, or the ID may be incorrect.
+                    It may not be included yet, may be older than the search window, or the ID
+                    may be incorrect.
                 </Notice>
             </div>
         );

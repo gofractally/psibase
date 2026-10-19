@@ -1,5 +1,6 @@
 import type { TransactionWithContext } from "@/lib/types";
 
+import { flattenTransactions } from "@/store/live-chain";
 import { useLiveChain } from "@/store/use-live-chain";
 import { type Query, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -154,7 +155,6 @@ const BUCKETS = 48;
 export const useUserActivity = (
     user: string | null | undefined,
 ): UserActivity => {
-    const all = useLiveChain((s) => s.recentTransactions);
     const blocks = useLiveChain((s) => s.blocks);
     const stats = useLiveChain((s) => s.stats);
 
@@ -174,6 +174,9 @@ export const useUserActivity = (
             windowSeconds: stats.windowSeconds,
         };
         if (!user) return empty;
+
+        // Newest first, so `sent[0]` is the most recent
+        const all = blocks.flatMap(flattenTransactions).reverse();
 
         const sent: TransactionWithContext[] = [];
         const received: TransactionWithContext[] = [];
@@ -297,5 +300,5 @@ export const useUserActivity = (
             windowBlocks: stats.windowBlocks,
             windowSeconds: stats.windowSeconds,
         };
-    }, [all, blocks, stats.windowBlocks, stats.windowSeconds, user]);
+    }, [blocks, stats.windowBlocks, stats.windowSeconds, user]);
 };

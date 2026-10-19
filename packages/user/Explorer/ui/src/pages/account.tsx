@@ -20,6 +20,7 @@ import {
     fetchSiteConfig,
 } from "@/lib/queries";
 
+import { flattenTransactions } from "@/store/live-chain";
 import { useLiveChain } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
@@ -98,9 +99,9 @@ export const AccountPage = () => {
     });
     const profile = useProfile(name || null);
 
-    const all = useLiveChain((s) => s.recentTransactions);
     const blocks = useLiveChain((s) => s.blocks);
     const stats = useLiveChain((s) => s.stats);
+    const all = useMemo(() => blocks.flatMap(flattenTransactions).reverse(), [blocks]);
 
     // Transactions are only visible to the accounts involved, so anything
     // beyond public per-service counts is only complete for the account
