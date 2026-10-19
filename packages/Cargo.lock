@@ -1363,23 +1363,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "host-accounts"
-version = "0.29.0"
-dependencies = [
- "psibase",
- "psibase-plugin-workspace-hack",
- "wit-bindgen-rt",
-]
-
-[[package]]
 name = "host-auth"
 version = "0.29.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
- "serde",
- "serde_json",
- "url",
  "wit-bindgen-rt",
 ]
 
@@ -1440,6 +1428,15 @@ dependencies = [
 name = "host-types"
 version = "0.29.0"
 dependencies = [
+ "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "host-wallet"
+version = "0.29.0"
+dependencies = [
+ "psibase",
  "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
 ]
@@ -3587,6 +3584,8 @@ dependencies = [
  "chrono",
  "psibase",
  "psibase-plugin-workspace-hack",
+ "serde",
+ "serde_json",
  "sha2",
  "wit-bindgen-rt",
 ]

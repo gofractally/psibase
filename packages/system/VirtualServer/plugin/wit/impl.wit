@@ -2,7 +2,7 @@ package virtual-server:plugin;
 
 world impl {
     include tokens:plugin/imports;
-    include host:accounts/imports;
+    include host:auth/imports;
 
     export billing;
     export admin;

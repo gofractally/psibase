@@ -1,5 +1,5 @@
 [package]
-name = "host-accounts"
+name = "host-wallet"
 version.workspace = true
 edition.workspace = true
 
@@ -12,7 +12,7 @@ psibase-plugin-workspace-hack.workspace = true
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "host:accounts"
+package = "host:wallet"
 
 [package.metadata.component.target]
 world = "impl"
@@ -24,4 +24,5 @@ world = "impl"
 "host:prompt" = { path = "../prompt/wit/world.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
 "accounts:query" = { path = "../../../../system/Accounts/plugin/query/wit/world.wit" }
+"transact:query-auth" = { path = "../../../../system/Transact/plugin/query-auth/wit/world.wit" }
 "auth-sig:plugin" = { path = "../../../../system/AuthSig/plugin/wit/world.wit" }

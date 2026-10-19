@@ -1,18 +1,8 @@
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use crate::bindings::host::types::types::Error;
+use crate::bindings::transact::query_auth::api as QueryAuth;
 use psibase::fracpack::{Pack, Unpack};
-
-// User logged into each app; persistent so the login survives page loads
-pub(crate) fn logged_in_user_table() -> Bucket {
-    Bucket::new(
-        Database {
-            mode: DbMode::NonTransactional,
-            duration: StorageDuration::Persistent,
-        },
-        "logged_in_user",
-    )
-}
 
 // Accounts connected to each app; persistent so connections survive sessions
 pub(crate) fn connected_accounts_table() -> Bucket {
@@ -57,21 +47,18 @@ impl AppsTable {
         }
     }
 
-    pub(crate) fn get_logged_in_user(&self) -> Option<String> {
-        logged_in_user_table()
-            .get(&self.app)
-            .map(|a| String::from_utf8(a).unwrap())
-    }
-
-    pub(crate) fn login(&self, user: &str, auth_service: &str) -> Result<(), Error> {
-        logged_in_user_table().set(&self.app, user.as_bytes());
+    /// Connects `user` to this app and starts a session for them.
+    /// Mints a query token through transact if `host:auth` has none cached.
+    pub(crate) fn login(&self, user: &str) -> Result<(), Error> {
         self.connect(user);
 
-        let result = HostAuth::set_logged_in_user(user, &self.app, auth_service);
-        if result.is_err() {
-            self.logout();
-        }
-        result
+        let token = if HostAuth::has_query_token(user, &self.app) {
+            None
+        } else {
+            Some(QueryAuth::get_query_token(&self.app, user)?)
+        };
+
+        HostAuth::set_logged_in_user(user, &self.app, token.as_deref())
     }
 
     pub(crate) fn connect(&self, user: &str) {
@@ -91,10 +78,7 @@ impl AppsTable {
             .unwrap_or_default();
         connected_accounts.remove(user);
 
-        if self
-            .get_logged_in_user()
-            .is_some_and(|logged_in_user| logged_in_user == user)
-        {
+        if HostAuth::get_logged_in_user(&self.app).is_some_and(|logged_in| logged_in == user) {
             self.logout();
         }
 
@@ -102,10 +86,7 @@ impl AppsTable {
     }
 
     pub(crate) fn logout(&self) {
-        if let Some(user) = self.get_logged_in_user() {
-            HostAuth::log_out_user(&user, &self.app);
-        }
-        logged_in_user_table().delete(&self.app);
+        HostAuth::log_out_user(&self.app);
     }
 
     pub(crate) fn get_connected_accounts(&self) -> Vec<String> {

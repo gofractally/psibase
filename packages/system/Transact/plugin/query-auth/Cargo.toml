@@ -6,6 +6,8 @@ edition.workspace = true
 [dependencies]
 wit-bindgen-rt.workspace = true
 psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 chrono = "0.4.38"
 sha2 = "0.10.6"
 psibase-plugin-workspace-hack.workspace = true
@@ -21,4 +23,6 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:client" = { path = "../../../../user/Host/plugin/client/wit/world.wit" }
+"host:http" = { path = "../../../../user/Host/plugin/http/wit/world.wit" }
 "host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
+"accounts:query" = { path = "../../../Accounts/plugin/query/wit/world.wit" }

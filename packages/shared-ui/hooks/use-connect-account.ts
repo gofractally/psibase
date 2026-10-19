@@ -12,7 +12,7 @@ export const useConnectAccount = (
             await supervisor.functionCall(
                 {
                     service: "host",
-                    plugin: "accounts",
+                    plugin: "wallet",
                     intf: "activeApp",
                     method: "connectAccount",
                     params: [],

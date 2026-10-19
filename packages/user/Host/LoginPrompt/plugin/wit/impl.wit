@@ -2,8 +2,8 @@ package host:login-prompt;
 
 world impl {
     include host:client/imports;
-    include host:accounts/imports;
-    import host:accounts/admin;
+    include host:auth/imports;
+    import host:wallet/admin;
     include host:crypto/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
@@ -12,7 +12,6 @@ world impl {
     include tokens:plugin/imports;
 
     import accounts:plugin/api;
-    include accounts:query/imports;
     import invite:plugin/redemption;
 
     export api;

@@ -1,13 +1,4 @@
-package host:accounts;
-
-interface api {
-    /// Returns true if there is a user logged in to the currently active top-level application.
-    is-logged-in: func() -> bool;
-
-    /// Gets the account name of the user logged into the active application.
-    /// May also return None if no user is logged in.
-    get-current-user: func() -> option<string>;
-}
+package host:wallet;
 
 /// This interface is only available to the top-level app, or its plugin.
 /// The "top-level" app is the app with which the user is directly interacting.
@@ -59,8 +50,8 @@ interface admin {
     import-existing: func(credentials: list<credential>) -> result<_, list<tuple<string, error>>>;
 
     /// Logs the user into the specified app and connects them to it.
-    /// `auth-service` signs the login tx on a cache miss.
-    login: func(user: string, app: string, auth-service: string) -> result<_, error>;
+    /// Host-only; the caller is responsible for any connection policy.
+    login-to-app: func(user: string, app: string) -> result<_, error>;
 
     /// Logs out the user logged into the specified app
     logout: func(app: string);
@@ -85,5 +76,5 @@ interface admin {
 }
 
 world imports {
-    import api;
+    import active-app;
 }

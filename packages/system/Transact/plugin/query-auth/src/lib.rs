@@ -6,23 +6,20 @@ use bindings::*;
 mod errors;
 use errors::ErrorType::*;
 
+use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::host::client::api::get_sender;
-use crate::bindings::host::types::types::{Error, PluginRef};
+use crate::bindings::host::http::api as Server;
+use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, Error, PluginRef};
 use crate::bindings::transact::query_auth::hook_handlers::{self, Claim};
 
 use exports::transact::query_auth::api::Guest as Api;
 
 use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction};
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 struct TransactQueryAuth;
-
-fn sha256(data: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    hasher.finalize().into()
-}
 
 fn check_caller(allowed: &[&str], context: &str) {
     let app = get_sender();
@@ -40,6 +37,12 @@ impl From<Claim> for psibase::Claim {
     }
 }
 
+fn auth_service_of(user: &str) -> Result<String, Error> {
+    AccountsQuery::get_account(user)?
+        .map(|a| a.auth_service)
+        .ok_or_else(|| AccountNotFound(user).into())
+}
+
 fn user_auth_claim(user: &str, auth_service: &str) -> Result<Option<Claim>, Error> {
     let plugin_ref = PluginRef::new(auth_service, "plugin", "transact-hook-user-auth");
     hook_handlers::on_user_auth_claim(plugin_ref, user)
@@ -54,14 +57,21 @@ fn user_auth_proof(
     Ok(hook_handlers::on_user_auth_proof(plugin_ref, user, tx_hash)?.map(|proof| proof.signature))
 }
 
+#[derive(Deserialize)]
+struct LoginReply {
+    access_token: String,
+    #[allow(dead_code)]
+    token_type: String,
+}
+
 impl Api for TransactQueryAuth {
-    fn build_query_token_tx(
-        app: String,
-        user: String,
-        root_host: String,
-        auth_service: String,
-    ) -> Result<Vec<u8>, Error> {
-        check_caller(&["host"], "build-query-token-tx@transact:query-auth/api");
+    fn get_query_token(app: String, user: String) -> Result<String, Error> {
+        check_caller(&["host"], "get-query-token@transact:query-auth/api");
+
+        let auth_service = auth_service_of(&user)?;
+
+        let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
+            .map_err(|_| BadResponse("Failed to deserialize rootdomain"))?;
 
         let claims: Vec<psibase::Claim> = user_auth_claim(&user, &auth_service)?
             .into_iter()
@@ -77,7 +87,7 @@ impl Api for TransactQueryAuth {
 
         let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
         let tapos = Tapos {
-            expiration: expiration,
+            expiration,
             refBlockSuffix: 0,
             flags: Tapos::DO_NOT_BROADCAST_FLAG,
             refBlockIndex: 0,
@@ -89,7 +99,7 @@ impl Api for TransactQueryAuth {
             claims,
         };
         let proofs: Vec<Hex<Vec<u8>>> =
-            user_auth_proof(&user, &auth_service, &sha256(&tx.packed()))?
+            user_auth_proof(&user, &auth_service, &Sha256::digest(&tx.packed()).into())?
                 .into_iter()
                 .map(Hex::from)
                 .collect();
@@ -102,7 +112,17 @@ impl Api for TransactQueryAuth {
             return Err(ClaimProofMismatch.into());
         }
 
-        Ok(signed_tx.packed())
+        let response = Server::post(&HostTypes::PostRequest {
+            endpoint: "/login".to_string(),
+            body: BodyTypes::Bytes(signed_tx.packed()),
+        })?;
+
+        match response {
+            BodyTypes::Json(t) => serde_json::from_str::<LoginReply>(&t)
+                .map(|reply| reply.access_token)
+                .map_err(|_| BadResponse("Failed to deserialize login reply").into()),
+            _ => Err(BadResponse("Invalid body type").into()),
+        }
     }
 }
 

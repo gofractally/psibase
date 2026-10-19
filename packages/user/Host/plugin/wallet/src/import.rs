@@ -1,6 +1,6 @@
 use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
-use crate::bindings::exports::host::accounts::admin::Credential;
+use crate::bindings::exports::host::wallet::admin::Credential;
 use crate::bindings::host::types::types::Error;
 use crate::db::apps_table::AppsTable;
 use crate::errors::ErrorType::{AccountNotFound, AuthorizationFailed, UnsupportedAuthService};

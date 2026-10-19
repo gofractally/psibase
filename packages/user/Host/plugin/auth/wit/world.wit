@@ -1,14 +1,31 @@
 package host:auth;
 
+/// Browser-session facts: which user is logged in to each app, and the
+/// credentials (query token / auth cookie) backing that session.
+/// This plugin stores sessions; it does not create them. Minting a query
+/// token is `transact:query-auth`'s job, and the login flow lives on `host:wallet`.
 interface api {
     use host:types/types.{error};
 
-    /// Notify of new logged in user.
-    /// `auth-service` signs the login tx on a cache miss.
-    set-logged-in-user: func(user: string, app: string, auth-service: string) -> result<_, error>;
+    /// Returns true if there is a user logged in to the currently active top-level application.
+    is-logged-in: func() -> bool;
 
-    /// Notify of user logout
-    log-out-user: func(user: string, app: string);
+    /// Gets the account name of the user logged into the active application.
+    /// May also return None if no user is logged in.
+    get-current-user: func() -> option<string>;
+
+    /// Gets the user logged in to the specified app. Host-only.
+    get-logged-in-user: func(app: string) -> option<string>;
+
+    /// Returns true if a query token for `user` on `app` is already cached. Host-only.
+    has-query-token: func(user: string, app: string) -> bool;
+
+    /// Start a session for `user` on `app`. Host-only.
+    /// `token` is required when no query token is cached for this user and app.
+    set-logged-in-user: func(user: string, app: string, token: option<string>) -> result<_, error>;
+
+    /// End the session on `app`, if any. Host-only.
+    log-out-user: func(app: string);
 
     /// Privileged apps can get the query token to make calls on user's behalf
     get-active-query-token: func(app: string, user: string) -> option<string>;

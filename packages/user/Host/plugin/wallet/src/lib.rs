@@ -8,30 +8,18 @@ mod import;
 use db::{apps_table::AppsTable, user_table::UserTable};
 /// App id for Host plugins and UI (no on-chain service).
 pub(crate) const HOST_APP: &str = "host";
-use errors::ErrorType::{AccountNotFound, NotConnected};
+use errors::ErrorType::NotConnected;
 use helpers::*;
 
-use bindings::accounts::query::api as AccountsQuery;
-use bindings::exports::host::accounts::active_app::Guest as ActiveApp;
-use bindings::exports::host::accounts::admin::{Credential, Guest as Admin};
-use bindings::exports::host::accounts::api::Guest as API;
+use bindings::exports::host::wallet::active_app::Guest as ActiveApp;
+use bindings::exports::host::wallet::admin::{Credential, Guest as Admin};
 use bindings::host::client::api as Client;
 use bindings::host::prompt::api as Prompt;
 use bindings::host::types::types::Error;
 
-struct HostAccounts;
+struct HostWallet;
 
-impl API for HostAccounts {
-    fn is_logged_in() -> bool {
-        Self::get_current_user().is_some()
-    }
-
-    fn get_current_user() -> Option<String> {
-        AppsTable::new(&Client::get_active_app()).get_logged_in_user()
-    }
-}
-
-impl ActiveApp for HostAccounts {
+impl ActiveApp for HostWallet {
     fn login(user: String) -> Result<(), Error> {
         let app = get_assert_top_level_app("login", &[])?;
 
@@ -41,11 +29,7 @@ impl ActiveApp for HostAccounts {
             return Err(NotConnected(user).into());
         }
 
-        let Some(details) = AccountsQuery::get_account(&user)? else {
-            return Err(AccountNotFound(user).into());
-        };
-
-        AppsTable::new(&app).login(&user, &details.auth_service)
+        AppsTable::new(&app).login(&user)
     }
 
     fn logout() -> Result<(), Error> {
@@ -78,57 +62,54 @@ impl ActiveApp for HostAccounts {
     }
 }
 
-impl Admin for HostAccounts {
+impl Admin for HostWallet {
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
-        check_caller(
-            &[HOST_APP, "homepage"],
-            "import-existing@host:accounts/admin",
-        );
+        check_caller(&[HOST_APP, "homepage"], "import-existing@host:wallet/admin");
         import::import_existing(credentials)
     }
 
-    fn login(user: String, app: String, auth_service: String) -> Result<(), Error> {
-        check_caller(&[HOST_APP], "login@host:accounts/admin");
-        AppsTable::new(&app).login(&user, &auth_service)
+    fn login_to_app(user: String, app: String) -> Result<(), Error> {
+        check_caller(&[HOST_APP], "login-to-app@host:wallet/admin");
+        AppsTable::new(&app).login(&user)
     }
 
     fn logout(app: String) {
-        check_caller(&[HOST_APP], "logout@host:accounts/admin");
+        check_caller(&[HOST_APP], "logout@host:wallet/admin");
         AppsTable::new(&app).logout();
     }
 
     fn connect(account: String, app: String) {
-        check_caller(&[HOST_APP], "connect@host:accounts/admin");
+        check_caller(&[HOST_APP], "connect@host:wallet/admin");
         AppsTable::new(&app).connect(&account);
     }
 
     fn disconnect(account: String, app: String) {
-        check_caller(&["accounts", HOST_APP], "disconnect@host:accounts/admin");
+        check_caller(&["accounts", HOST_APP], "disconnect@host:wallet/admin");
         AppsTable::new(&app).disconnect(&account);
     }
 
     fn get_connected_accounts(app: String) -> Vec<String> {
         check_caller(
             &["accounts", HOST_APP],
-            "get-connected-accounts@host:accounts/admin",
+            "get-connected-accounts@host:wallet/admin",
         );
         AppsTable::new(&app).get_connected_accounts()
     }
 
     fn add_connected_app(user: String, app: String) {
-        check_caller(&[HOST_APP], "add-connected-app@host:accounts/admin");
+        check_caller(&[HOST_APP], "add-connected-app@host:wallet/admin");
         UserTable::new(&user).add_connected_app(&app);
     }
 
     fn remove_connected_app(user: String, app: String) {
-        check_caller(&[HOST_APP], "remove-connected-app@host:accounts/admin");
+        check_caller(&[HOST_APP], "remove-connected-app@host:wallet/admin");
         UserTable::new(&user).remove_connected_app(&app);
     }
 
     fn get_connected_apps(user: String) -> Vec<String> {
-        check_caller(&[HOST_APP], "get-connected-apps@host:accounts/admin");
+        check_caller(&[HOST_APP], "get-connected-apps@host:wallet/admin");
         UserTable::new(&user).get_connected_apps()
     }
 }
 
-bindings::export!(HostAccounts with_types_in bindings);
+bindings::export!(HostWallet with_types_in bindings);

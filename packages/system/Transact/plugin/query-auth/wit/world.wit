@@ -3,8 +3,10 @@ package transact:query-auth;
 interface api {
     use host:types/types.{error};
 
-    /// Build and sign a packed loginSys transaction. No HTTP.
-    build-query-token-tx: func(app: string, user: string, root-host: string, auth-service: string) -> result<list<u8>, error>;
+    /// Gets a bearer token for `user` to make authenticated queries against `app`.
+    /// Builds and signs a throwaway `loginSys` transaction with the user's auth service
+    /// and submits it to transact's `/login` endpoint.
+    get-query-token: func(app: string, user: string) -> result<string, error>;
 }
 
 world imports {

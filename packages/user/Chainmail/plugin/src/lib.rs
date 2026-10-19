@@ -14,7 +14,7 @@ use bindings::exports::chainmail::plugin::{
     queries::{Guest as Query, Message},
 };
 use bindings::host::http::api as CommonServer;
-use bindings::host::accounts as HostAccounts;
+use bindings::host::auth as HostAuth;
 use bindings::transact::plugin::api as Transact;
 use chrono::DateTime;
 use errors::ErrorType;
@@ -134,7 +134,7 @@ impl Query for ChainmailPlugin {
         assert_authorized(FunctionName::get_saved_msgs)?;
         let rcvr = match receiver {
             Some(r) => r,
-            None => HostAccounts::api::get_current_user().expect("No receiver specified"),
+            None => HostAuth::api::get_current_user().expect("No receiver specified"),
         };
         // lib: construct gql query from types; generate schema
         // - generate obj based on gql schema with query methods on it

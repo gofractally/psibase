@@ -3,11 +3,17 @@ package transact:query-auth;
 interface hook-handlers {
     use host:types/types.{error, plugin-ref};
 
+    /// A claim is something the submitter of a transaction claims to know (e.g. a public key).
     record claim {
+        /// The name of the service used to verify the claim is valid
         verify-service: string,
+        /// The raw claim data (typically the DER-encoded public key
+        /// whose matching private key produces the proof)
         raw-data: list<u8>,
     }
 
+    /// The verify-service specified in the claim is the service that knows how to verify that
+    /// a proof actually proves the claim.
     record proof {
         signature: list<u8>,
     }
@@ -18,7 +24,9 @@ interface hook-handlers {
 
 world impl {
     include host:client/imports;
+    include host:http/imports;
     include host:types/imports;
+    include accounts:query/imports;
 
     import hook-handlers;
 
