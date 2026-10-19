@@ -26,7 +26,6 @@ world = "impl"
 "host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
 "host:accounts" = { path = "../../../../user/Host/plugin/accounts/wit/world.wit" }
 "permissions:plugin" = { path = "../../../../user/Permissions/plugin/wit/world.wit" }
-"transact:types" = { path = "../types/wit/world.wit" }
 
 [package.metadata.component.bindings]
 derives = ["serde::Serialize", "serde::Deserialize", "Clone"]

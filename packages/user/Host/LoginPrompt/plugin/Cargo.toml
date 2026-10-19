@@ -23,7 +23,6 @@ world = "impl"
 "host:accounts" = { path = "../../plugin/accounts/wit/world.wit" }
 "host:crypto" = { path = "../../plugin/crypto/wit/world.wit" }
 "transact:plugin" = { path = "../../../../system/Transact/plugin/transact/wit/world.wit" }
-"transact:types" = { path = "../../../../system/Transact/plugin/types/wit/world.wit" }
 "permissions:plugin" = { path = "../../../Permissions/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "accounts:query" = { path = "../../../../system/Accounts/plugin/query/wit/world.wit" }

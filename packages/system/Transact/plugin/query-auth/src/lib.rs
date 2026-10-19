@@ -8,8 +8,7 @@ use errors::ErrorType::*;
 
 use crate::bindings::host::client::api::get_sender;
 use crate::bindings::host::types::types::{Error, PluginRef};
-use crate::bindings::transact::query_auth::hook_handlers::*;
-use crate::bindings::transact::types::types::Claim;
+use crate::bindings::transact::query_auth::hook_handlers::{self, Claim};
 
 use exports::transact::query_auth::api::Guest as Api;
 
@@ -43,7 +42,7 @@ impl From<Claim> for psibase::Claim {
 
 fn user_auth_claim(user: &str, auth_service: &str) -> Result<Option<Claim>, Error> {
     let plugin_ref = PluginRef::new(auth_service, "plugin", "transact-hook-user-auth");
-    on_user_auth_claim(plugin_ref, user)
+    hook_handlers::on_user_auth_claim(plugin_ref, user)
 }
 
 fn user_auth_proof(
@@ -52,7 +51,7 @@ fn user_auth_proof(
     tx_hash: &[u8; 32],
 ) -> Result<Option<Vec<u8>>, Error> {
     let plugin_ref = PluginRef::new(auth_service, "plugin", "transact-hook-user-auth");
-    Ok(on_user_auth_proof(plugin_ref, user, tx_hash)?.map(|proof| proof.signature))
+    Ok(hook_handlers::on_user_auth_proof(plugin_ref, user, tx_hash)?.map(|proof| proof.signature))
 }
 
 impl Api for TransactQueryAuth {

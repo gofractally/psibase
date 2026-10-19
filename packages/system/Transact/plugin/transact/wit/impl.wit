@@ -2,7 +2,7 @@ package transact:plugin;
 
 interface hook-handlers {
     use host:types/types.{error, plugin-ref};
-    use transact:types/types.{claim, proof};
+    use types.{claim, proof};
 
     on-actions-sender: func(plugin: plugin-ref, service: string, method: string) -> result<option<string>, error>;
     on-user-auth-claim: func(plugin: plugin-ref, account-name: string) -> result<option<claim>, error>;
@@ -20,5 +20,6 @@ world impl {
 
     export api;
     export hooks;
+    export types;
     export network;
 }

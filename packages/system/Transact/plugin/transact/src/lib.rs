@@ -10,15 +10,15 @@ mod open_tx_table;
 use open_tx_table::OpenTx;
 
 use transact::plugin::hook_handlers::*;
-use transact::types::types::Action as ImportAction;
+use transact::plugin::types::Action as ImportAction;
 
 use host::client::api as Client;
 use host::types::types::{self as HostTypes, PluginRef};
 
+use exports::transact::plugin::types::{Action as ExportAction, Claim as ExportClaim};
 use exports::transact::plugin::{
     api::Guest as Api, hooks::Guest as Hooks, network::Guest as Network,
 };
-use transact::types::types::{Action as ExportAction, Claim as ExportClaim};
 
 use crate::trust::*;
 use psibase::fracpack::Pack;
