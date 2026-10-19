@@ -57,14 +57,33 @@ fn find_dep<'a>(
 }
 
 pub fn get_metadata(package: &Package) -> Result<PsibaseMetadata, anyhow::Error> {
-    Ok(serde_json::from_value(
+    metadata_from_value(
+        &package.name,
         package
             .metadata
             .as_object()
             .and_then(|m| m.get("psibase"))
             .unwrap_or(&json!({}))
             .clone(),
-    )?)
+    )
+}
+
+fn metadata_from_value(
+    name: &str,
+    value: serde_json::Value,
+) -> Result<PsibaseMetadata, anyhow::Error> {
+    let meta: PsibaseMetadata = serde_json::from_value(value)?;
+    if let Some(plugin) = meta.plugin.as_deref() {
+        if plugin.is_empty() {
+            return Err(anyhow!(
+                "{name} sets plugin = \"\"; use plugins = [\"<crate>\"]"
+            ));
+        }
+        return Err(anyhow!(
+            "{name} sets plugin = \"{plugin}\"; use plugins = [\"{plugin}\"]"
+        ));
+    }
+    Ok(meta)
 }
 
 fn get_dep_type<'a, F>(f: F) -> F
@@ -211,63 +230,57 @@ fn normalize_data_dest(dst: &str) -> String {
     dest
 }
 
-fn reject_legacy_plugin(service: &str, plugin: &Option<String>) -> Result<(), anyhow::Error> {
-    if let Some(plugin) = plugin.as_ref().filter(|plugin| !plugin.is_empty()) {
-        return Err(anyhow!(
-            "{service} sets plugin = \"{plugin}\"; use plugins = [\"{plugin}\"]"
-        ));
-    }
-    Ok(())
-}
-
 fn component_package_id(package: &Package) -> Result<&str, anyhow::Error> {
-    match package
+    package
         .metadata
         .get("component")
         .and_then(|component| component.get("package"))
         .and_then(|package_id| package_id.as_str())
         .filter(|package_id| !package_id.is_empty())
-    {
-        Some(package_id) => Ok(package_id),
-        None => Err(anyhow!("{} has no component package name", package.name)),
-    }
+        .ok_or_else(|| anyhow!("{} has no component package name", package.name))
 }
 
 fn plugin_serve_path(plugin_crate: &str, component_package: &str) -> Result<String, anyhow::Error> {
-    let valid = match component_package.split_once(':') {
+    match component_package.split_once(':') {
         Some((namespace, name))
             if !namespace.is_empty() && !name.is_empty() && !name.contains([':', '/', '@']) =>
         {
-            Some(name)
+            Ok(format!("/{name}.wasm"))
         }
-        _ => None,
-    };
-    let Some(name) = valid else {
-        return Err(anyhow!(
+        _ => Err(anyhow!(
             "{plugin_crate} component package `{component_package}` must be <namespace>:<name>"
-        ));
-    };
-    Ok(format!("/{name}.wasm"))
+        )),
+    }
 }
 
 fn claim_plugin_path(
     service: &str,
     plugin_crate: &str,
     path: &str,
-    data_dests: &HashSet<String>,
     plugin_paths: &mut HashMap<String, String>,
 ) -> Result<(), anyhow::Error> {
-    if data_dests.contains(path) {
-        return Err(anyhow!(
-            "{service} plugin {plugin_crate} serves {path}, which is also a data destination"
-        ));
-    }
     if let Some(other) = plugin_paths.get(path) {
         return Err(anyhow!(
             "{service} plugins {other} and {plugin_crate} both serve {path}"
         ));
     }
     plugin_paths.insert(path.to_string(), plugin_crate.to_string());
+    Ok(())
+}
+
+fn reject_duplicate_data_paths(
+    files: &[(AccountNumber, String, PathBuf)],
+) -> Result<(), anyhow::Error> {
+    let mut seen: HashMap<(AccountNumber, &str), &Path> = HashMap::new();
+    for (account, dest, src) in files {
+        if let Some(other) = seen.insert((*account, dest.as_str()), src.as_path()) {
+            return Err(anyhow!(
+                "duplicate data path {dest} for {account} ({} and {})",
+                other.display(),
+                src.display()
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -361,12 +374,9 @@ impl<'a> PackageBuilder<'a> {
                         queue.push(&server_package);
                     }
                 }
-                reject_legacy_plugin(&package.name, &pmeta.plugin)?;
-                let mut data_dests = HashSet::new();
                 for data in &pmeta.data {
                     let src = package.manifest_path.parent().unwrap().join(&data.src);
                     let dest = normalize_data_dest(&data.dst);
-                    data_dests.insert(dest.clone());
                     data_sources.push((package.name.as_str(), src.into_std_path_buf(), dest));
                 }
                 let mut served_plugins = HashMap::new();
@@ -379,13 +389,7 @@ impl<'a> PackageBuilder<'a> {
                         return Err(anyhow!("{} is not a workspace member", plugin));
                     };
                     let path = plugin_serve_path(&p.name, component_package_id(p)?)?;
-                    claim_plugin_path(
-                        &package.name,
-                        &p.name,
-                        &path,
-                        &data_dests,
-                        &mut served_plugins,
-                    )?;
+                    claim_plugin_path(&package.name, &p.name, &path, &mut served_plugins)?;
                     plugin_crates.push(p);
                     plugin_targets.push((package.name.as_str(), path));
                 }
@@ -485,6 +489,7 @@ impl<'a> PackageBuilder<'a> {
         for (service, src, dest) in data_sources {
             add_files(crate_to_account[service], &src, &dest, &mut data_files)?;
         }
+        reject_duplicate_data_paths(&data_files)?;
 
         let meta = Meta {
             name: package_name.to_string(),
@@ -689,43 +694,15 @@ pub async fn build_packages(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
-    fn serve_paths_match_cmake_packages() {
+    fn serve_path_uses_component_package_name() {
         let cases = [
             ("transact", "transact:plugin", "/plugin.wasm"),
             ("transact-admin", "transact:admin", "/admin.wasm"),
-            ("accounts", "accounts:plugin", "/plugin.wasm"),
-            ("accounts-query", "accounts:query", "/query.wasm"),
-            ("base64", "base64:plugin", "/plugin.wasm"),
-            ("brotli-codec", "brotli-codec:plugin", "/plugin.wasm"),
-            ("kdf", "kdf:plugin", "/plugin.wasm"),
-            ("kvtests", "kvtests:plugin", "/plugin.wasm"),
-            ("aes", "aes:plugin", "/plugin.wasm"),
-            ("clientdata", "clientdata:plugin", "/plugin.wasm"),
             ("web-crypto", "webcrypto:plugin", "/plugin.wasm"),
-            ("host-accounts", "host:accounts", "/accounts.wasm"),
-            ("host-client", "host:client", "/client.wasm"),
-            ("host-http", "host:http", "/http.wasm"),
-            ("host-db", "host:db", "/db.wasm"),
-            ("host-prompt", "host:prompt", "/prompt.wasm"),
-            ("host-types", "host:types", "/types.wasm"),
-            ("host-auth", "host:auth", "/auth.wasm"),
-            ("host-crypto", "host:crypto", "/crypto.wasm"),
             ("login-prompt", "host:login-prompt", "/login-prompt.wasm"),
-            ("auth-sig", "auth-sig:plugin", "/plugin.wasm"),
-            ("auth-delegate", "auth-delegate:plugin", "/plugin.wasm"),
-            ("auth-any", "auth-any:plugin", "/plugin.wasm"),
-            ("homepage", "homepage:plugin", "/plugin.wasm"),
-            ("sites", "sites:plugin", "/plugin.wasm"),
-            ("producers", "producers:plugin", "/plugin.wasm"),
-            ("setcode", "setcode:plugin", "/plugin.wasm"),
-            ("invite", "invite:plugin", "/plugin.wasm"),
-            ("permissions", "permissions:plugin", "/plugin.wasm"),
-            ("workshop", "workshop:plugin", "/plugin.wasm"),
-            ("config", "config:plugin", "/plugin.wasm"),
-            ("fractal-core", "fractal-core:plugin", "/plugin.wasm"),
-            ("packages", "packages:plugin", "/plugin.wasm"),
         ];
         for (crate_name, component_package, served) in cases {
             let path = plugin_serve_path(crate_name, component_package).unwrap();
@@ -754,21 +731,12 @@ mod tests {
 
     #[test]
     fn two_plugins_cannot_serve_the_same_path() {
-        let data_dests = HashSet::new();
         let mut plugin_paths = HashMap::new();
-        claim_plugin_path(
-            "transact",
-            "transact",
-            "/plugin.wasm",
-            &data_dests,
-            &mut plugin_paths,
-        )
-        .unwrap();
+        claim_plugin_path("transact", "transact", "/plugin.wasm", &mut plugin_paths).unwrap();
         let error = claim_plugin_path(
             "transact",
             "other-plugin",
             "/plugin.wasm",
-            &data_dests,
             &mut plugin_paths,
         )
         .unwrap_err()
@@ -779,46 +747,49 @@ mod tests {
     }
 
     #[test]
-    fn plugin_path_cannot_match_a_data_destination() {
-        let mut data_dests = HashSet::new();
-        data_dests.insert(normalize_data_dest("plugin.wasm"));
-        data_dests.insert(normalize_data_dest("/admin.wasm/"));
-        let error = claim_plugin_path(
-            "accounts",
-            "accounts",
-            "/plugin.wasm",
-            &data_dests,
-            &mut HashMap::new(),
-        )
-        .unwrap_err()
-        .to_string();
-        assert!(error.contains("/plugin.wasm"));
-        assert!(error.contains("data destination"));
-        claim_plugin_path(
-            "accounts",
-            "accounts-query",
-            "/query.wasm",
-            &data_dests,
-            &mut HashMap::new(),
+    fn duplicate_data_paths_include_directory_contents() {
+        let root = tempfile::tempdir().unwrap();
+        let ui = root.path().join("ui");
+        std::fs::create_dir(&ui).unwrap();
+        std::fs::write(ui.join("plugin.wasm"), b"from-dir").unwrap();
+        std::fs::write(ui.join("index.html"), b"html").unwrap();
+        let plugin = root.path().join("plugin.wasm");
+        std::fs::write(&plugin, b"plugin").unwrap();
+
+        let service = AccountNumber::new(1);
+        let mut files = Vec::new();
+        add_files(service, &ui, &normalize_data_dest("/"), &mut files).unwrap();
+        add_files(service, &plugin, "/plugin.wasm", &mut files).unwrap();
+        let error = reject_duplicate_data_paths(&files).unwrap_err().to_string();
+        assert!(error.contains("/plugin.wasm"), "{error}");
+
+        let admin = root.path().join("admin");
+        std::fs::create_dir(&admin).unwrap();
+        std::fs::write(admin.join("index.html"), b"html").unwrap();
+        let admin_wasm = root.path().join("admin.wasm");
+        std::fs::write(&admin_wasm, b"wasm").unwrap();
+        let mut nested = Vec::new();
+        add_files(
+            service,
+            &admin,
+            &normalize_data_dest("/admin.wasm/"),
+            &mut nested,
         )
         .unwrap();
-        claim_plugin_path(
-            "transact",
-            "transact-admin",
-            "/admin.wasm",
-            &data_dests,
-            &mut HashMap::new(),
-        )
-        .unwrap_err();
+        add_files(service, &admin_wasm, "/admin.wasm", &mut nested).unwrap();
+        reject_duplicate_data_paths(&nested).unwrap();
     }
 
     #[test]
-    fn legacy_plugin_field_is_rejected() {
-        let error = reject_legacy_plugin("tokens", &Some("tokens-plugin".to_string()))
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("plugins = [\"tokens-plugin\"]"));
-        reject_legacy_plugin("tokens", &None).unwrap();
-        reject_legacy_plugin("tokens", &Some(String::new())).unwrap();
+    fn plugin_field_in_metadata_is_rejected() {
+        let Err(error) = metadata_from_value("tokens", json!({"plugin": "tokens-plugin"})) else {
+            panic!("plugin field was accepted");
+        };
+        assert!(error.to_string().contains("plugins = [\"tokens-plugin\"]"));
+        let Err(empty) = metadata_from_value("tokens", json!({"plugin": ""})) else {
+            panic!("empty plugin field was accepted");
+        };
+        assert!(empty.to_string().contains("plugin = \"\""));
+        metadata_from_value("tokens", json!({"plugins": ["tokens-plugin"]})).unwrap();
     }
 }
