@@ -31,7 +31,7 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const DashboardPage = () => {
     const state = useLiveChain();
-    const { blocks, head, stats, recentTransactions, status } = state;
+    const { blocks, head, stats, recentUserTransactions, status } = state;
 
     const { data: producersInfo } = useQuery({
         queryKey: ["producers", "info"],
@@ -46,12 +46,13 @@ export const DashboardPage = () => {
 
     const producerNames = producersInfo?.producers.map((p) => p.name) ?? [];
     const latestBlocks = blocks.slice(-10).reverse();
-    const latestTxs = recentTransactions.slice(0, 10);
+    const latestTxs = recentUserTransactions.slice(0, 10);
     const intervals = stats.series
         .map((p) => p.interval)
         .filter((v): v is number => v !== null)
         .slice(-60);
-    const txSpark = stats.series.slice(-60).map((p) => p.txs);
+    const throughput = stats.throughput.user;
+    const txSpark = stats.series.slice(-60).map((p) => p.userTxs);
     const activeProducers = stats.producers.length;
 
     return (
@@ -118,16 +119,16 @@ export const DashboardPage = () => {
                         label="Transactions / min"
                         icon={ArrowLeftRight}
                         accent="var(--chart-1)"
-                        value={stats.txPerMinute.toFixed(1)}
-                        sub={`${stats.tps.toFixed(2)} tx/s · ${formatNumber(stats.txCount)} tx in window`}
+                        value={throughput.txPerMinute.toFixed(1)}
+                        sub={`${throughput.tps.toFixed(2)} tx/s · ${formatNumber(throughput.txCount)} user tx in window`}
                         spark={txSpark}
                     />
                     <StatCard
                         label="Actions / min"
                         icon={Layers}
                         accent="var(--chart-4)"
-                        value={stats.actionsPerMinute.toFixed(1)}
-                        sub={`${formatNumber(stats.actionCount)} actions across ${stats.serviceActivity.length} services`}
+                        value={throughput.actionsPerMinute.toFixed(1)}
+                        sub={`${formatNumber(throughput.actionCount)} user actions in window`}
                     />
                     <StatCard
                         label={
@@ -199,7 +200,7 @@ export const DashboardPage = () => {
             <div className="grid gap-4 xl:grid-cols-3">
                 <Panel
                     title="Activity"
-                    description="Transactions per block (bars) and block interval (line)"
+                    description="User transactions per block (bars) and block interval (line)"
                     className="xl:col-span-2"
                     bodyClassName="px-2 pt-3 pb-1"
                 >
@@ -243,7 +244,7 @@ export const DashboardPage = () => {
                 </Panel>
                 <Panel
                     title="Latest transactions"
-                    description="Contents are shown only for transactions you're a party to"
+                    description="System block-start transactions hidden. Contents are shown only for transactions you're a party to"
                     actions={
                         <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
                             <Link to="/transactions">View all</Link>
@@ -253,7 +254,7 @@ export const DashboardPage = () => {
                     <TransactionsTable
                         transactions={latestTxs}
                         compact
-                        emptyMessage="No transactions in the recent window yet"
+                        emptyMessage="No user transactions in the recent window yet"
                     />
                 </Panel>
             </div>

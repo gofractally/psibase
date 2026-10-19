@@ -19,22 +19,27 @@ import { useCurrentUser } from "@shared/hooks/use-current-user";
 export const TransactionsPage = () => {
     const stats = useLiveChain((s) => s.stats);
     const all = useLiveChain((s) => s.recentTransactions);
+    const user = useLiveChain((s) => s.recentUserTransactions);
     const { data: currentUser } = useCurrentUser();
 
+    const [showSystem, setShowSystem] = useState(false);
     const [mineOnly, setMineOnly] = useState(false);
     const [account, setAccount] = useState("");
     const [paused, setPaused] = useState(false);
-    const [frozen, setFrozen] = useState<TransactionWithContext[] | null>(null);
-
-    const source = all;
+    const [frozen, setFrozen] = useState<{
+        all: TransactionWithContext[];
+        user: TransactionWithContext[];
+    } | null>(null);
 
     useEffect(() => {
-        if (paused && !frozen) setFrozen([...source]);
+        if (paused && !frozen) setFrozen({ all, user });
         if (!paused && frozen) setFrozen(null);
-    }, [paused, frozen, source]);
+    }, [paused, frozen, all, user]);
+
+    const source = showSystem ? all : user;
 
     const rows = useMemo(() => {
-        const base = frozen ?? source;
+        const base = frozen ? (showSystem ? frozen.all : frozen.user) : source;
         const acct = account.trim().toLowerCase();
         return base
             .filter((t) => !(mineOnly && currentUser) || t.transaction !== null)
@@ -48,9 +53,11 @@ export const TransactionsPage = () => {
                     ),
             )
             .slice(0, 200);
-    }, [frozen, source, account, mineOnly, currentUser]);
+    }, [frozen, source, showSystem, account, mineOnly, currentUser]);
 
     const visibleCount = source.filter((t) => t.transaction !== null).length;
+    const throughput = showSystem ? stats.throughput.all : stats.throughput.user;
+    const busiest = throughput.busiestBlock;
 
     return (
         <div className="flex flex-col gap-4">
@@ -63,33 +70,33 @@ export const TransactionsPage = () => {
                 <StatCard
                     label="Tx / min"
                     accent="var(--chart-1)"
-                    value={stats.txPerMinute.toFixed(1)}
-                    sub={`${stats.tps.toFixed(2)} tx/s trailing 60s`}
+                    value={throughput.txPerMinute.toFixed(1)}
+                    sub={`${throughput.tps.toFixed(2)} tx/s trailing 60s`}
                 />
                 <StatCard
                     label="Actions / min"
                     accent="var(--chart-4)"
-                    value={stats.actionsPerMinute.toFixed(1)}
-                    sub={`${formatNumber(stats.actionCount)} in window`}
+                    value={throughput.actionsPerMinute.toFixed(1)}
+                    sub={`${formatNumber(throughput.actionCount)} in window`}
                 />
                 <StatCard
-                    label="Transactions"
+                    label={showSystem ? "Transactions" : "User transactions"}
                     accent="var(--chart-2)"
-                    value={formatNumber(stats.txCount)}
+                    value={formatNumber(throughput.txCount)}
                     sub={`in last ${formatNumber(stats.windowBlocks)} blocks`}
                 />
                 <StatCard
                     label="Busiest block"
                     accent="var(--chart-5)"
-                    value={
-                        stats.busiestBlock
-                            ? `#${formatNumber(stats.busiestBlock.blockNum)}`
-                            : "—"
-                    }
+                    value={busiest ? `#${formatNumber(busiest.blockNum)}` : "—"}
                     sub={
-                        stats.busiestBlock
-                            ? `${stats.busiestBlock.txs} tx · ${stats.busiestBlock.actions} actions`
-                            : "no blocks yet"
+                        busiest
+                            ? showSystem
+                                ? `${busiest.txs} tx · ${busiest.actions} actions`
+                                : `${busiest.userTxs} tx · ${busiest.userActions} actions`
+                            : showSystem
+                              ? "no blocks yet"
+                              : "no user activity yet"
                     }
                 />
             </div>
@@ -117,6 +124,10 @@ export const TransactionsPage = () => {
                                 Mine only
                             </label>
                         )}
+                        <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                            <Switch checked={showSystem} onCheckedChange={setShowSystem} className="scale-90" />
+                            System
+                        </label>
                         <Button
                             size="sm"
                             variant={paused ? "default" : "outline"}
@@ -142,7 +153,9 @@ export const TransactionsPage = () => {
                     emptyMessage={
                         account || mineOnly
                             ? "No visible transactions match the current filters"
-                            : "No transactions in the recent window yet"
+                            : showSystem
+                              ? "No transactions in the recent window yet"
+                              : "No user transactions in the recent window. Toggle “System” to see block-start transactions."
                     }
                 />
             </Panel>

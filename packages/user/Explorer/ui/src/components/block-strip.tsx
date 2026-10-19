@@ -19,16 +19,12 @@ interface Props {
 
 /**
  * The network "heartbeat": one cell per recent block, colored by provider, with
- * a bar whose height reflects how many transactions the block carried relative
- * to the quietest block in view. Every block carries system transactions, so
- * the quietest block is the baseline.
+ * a bar whose height reflects how many user transactions the block carried.
  */
 export const BlockStrip = ({ series, count = 90, className }: Props) => {
     const navigate = useNavigate();
     const recent = series.slice(-count);
-    const minTx = Math.min(...recent.map((p) => p.txs));
-    const maxTx = Math.max(...recent.map((p) => p.txs));
-    const range = Math.max(1, maxTx - minTx);
+    const maxTx = Math.max(1, ...recent.map((p) => p.userTxs));
     return (
         <div
             className={cn(
@@ -37,7 +33,7 @@ export const BlockStrip = ({ series, count = 90, className }: Props) => {
             )}
         >
             {recent.map((p) => {
-                const h = 20 + ((p.txs - minTx) / range) * 80;
+                const h = 20 + (p.userTxs / maxTx) * 80;
                 const slow = p.interval !== null && p.interval > 2;
                 return (
                     <Tooltip key={p.blockNum}>
@@ -52,7 +48,7 @@ export const BlockStrip = ({ series, count = 90, className }: Props) => {
                                 style={{
                                     height: `${h}%`,
                                     backgroundColor:
-                                        p.txs > minTx
+                                        p.userTxs > 0
                                             ? colorFor(p.producer, 80, 60)
                                             : colorFor(p.producer, 30, 40),
                                     outline: slow
@@ -70,7 +66,7 @@ export const BlockStrip = ({ series, count = 90, className }: Props) => {
                                 {formatClock(new Date(p.time))} · {p.producer}
                             </div>
                             <div>
-                                {p.txs} tx · {p.actions} actions
+                                {p.userTxs} user tx · {p.userActions} actions
                                 {p.interval !== null &&
                                     ` · ${p.interval.toFixed(1)}s`}
                             </div>

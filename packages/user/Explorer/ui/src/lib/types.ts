@@ -115,6 +115,7 @@ export interface TransactionWithContext {
     numActions: number;
     /** `null` when the viewer is not a party to the transaction. */
     transaction: Transaction | null;
+    isSystem: boolean;
 }
 
 /** Genesis is block #2; it cannot currently be displayed, so the UI starts at #3. */

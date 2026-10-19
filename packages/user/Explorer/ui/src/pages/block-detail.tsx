@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import {
@@ -27,11 +28,13 @@ import { DOC_PATHS, consensusDocPath } from "@/lib/docs";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { Switch } from "@shared/shadcn/ui/switch";
 
 export const BlockDetailPage = () => {
     const { blockNum: raw } = useParams();
     const blockNum = Number(raw);
     const head = useHead();
+    const [showSystem, setShowSystem] = useState(false);
 
     const valid = Number.isInteger(blockNum) && blockNum >= 0;
     const isGenesis = valid && blockNum < FIRST_VISIBLE_BLOCK;
@@ -137,6 +140,8 @@ export const BlockDetailPage = () => {
     }
 
     const txs = flattenTransactions(block);
+    const userTxs = txs.filter((t) => !t.isSystem);
+    const shown = showSystem ? txs : userTxs;
     const visibleTxs = txs.filter((t) => t.transaction !== null);
     const privateCount = txs.length - visibleTxs.length;
     const actionCount = countActions(block);
@@ -210,9 +215,10 @@ export const BlockDetailPage = () => {
                     </KeyValue>
                     <KeyValue label="Transactions">
                         <span className="tabular-nums">
-                            {txs.length} transactions
+                            {userTxs.length} user
                             <span className="text-muted-foreground">
-                                {" "}· {actionCount} actions · {visibleTxs.length} visible to you
+                                {" "}· {txs.length - userTxs.length} system · {actionCount} actions ·{" "}
+                                {visibleTxs.length} visible to you
                             </span>
                         </span>
                     </KeyValue>
@@ -314,18 +320,28 @@ export const BlockDetailPage = () => {
             )}
 
             <Panel
-                title={`Transactions (${txs.length})`}
+                title={`Transactions (${shown.length})`}
                 description={
-                    privateCount > 0
+                    shown.some((t) => t.transaction === null)
                         ? "Contents are shown only for transactions you're a party to"
                         : undefined
                 }
+                actions={
+                    <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                        <Switch checked={showSystem} onCheckedChange={setShowSystem} className="scale-90" />
+                        Show system
+                    </label>
+                }
             >
                 <TransactionsTable
-                    transactions={txs}
+                    transactions={shown}
                     showBlock={false}
                     animateNew={false}
-                    emptyMessage="This block carries no transactions"
+                    emptyMessage={
+                        showSystem
+                            ? "This block carries no transactions"
+                            : "This block carries only the system block-start transaction"
+                    }
                 />
             </Panel>
 

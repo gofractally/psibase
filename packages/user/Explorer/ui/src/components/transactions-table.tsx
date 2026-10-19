@@ -12,6 +12,7 @@ import { PrivateMarker } from "@/components/private-marker";
 import { TimeAgo } from "@/components/time-ago";
 
 import { cn } from "@shared/lib/utils";
+import { Badge } from "@shared/shadcn/ui/badge";
 
 interface Props {
     transactions: TransactionWithContext[];
@@ -111,6 +112,14 @@ export const TransactionsTable = ({
                                         head={8}
                                         tail={6}
                                     />
+                                    {t.isSystem && (
+                                        <Badge
+                                            variant="outline"
+                                            className="text-muted-foreground ml-2 h-4 px-1 text-[9px] uppercase"
+                                        >
+                                            sys
+                                        </Badge>
+                                    )}
                                 </Td>
                                 {showBlock && (
                                     <Td>

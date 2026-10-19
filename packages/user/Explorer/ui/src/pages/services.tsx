@@ -105,7 +105,7 @@ export const ServicesPage = () => {
                 <StatCard
                     label="Actions"
                     accent="var(--chart-5)"
-                    value={formatNumber(stats.actionCount)}
+                    value={formatNumber(stats.throughput.all.actionCount)}
                     sub={`across ${formatNumber(stats.windowBlocks)} blocks`}
                 />
             </div>

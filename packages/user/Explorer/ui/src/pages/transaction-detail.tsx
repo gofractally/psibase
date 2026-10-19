@@ -13,6 +13,7 @@ import {
 } from "@/lib/format";
 import { findTransaction } from "@/lib/queries";
 import type { Action } from "@/lib/types";
+import { isSystemTransaction } from "@/store/live-chain";
 
 import { AccountLink } from "@/components/account-link";
 import { MethodChip } from "@/components/action-chips";
@@ -84,6 +85,11 @@ export const TransactionDetailPage = () => {
                 title={
                     <span className="flex items-center gap-3">
                         Transaction
+                        {isSystemTransaction(data.index) && (
+                            <Badge variant="outline" className="text-muted-foreground">
+                                System
+                            </Badge>
+                        )}
                         {!trx && (
                             <Badge variant="outline" className="text-muted-foreground gap-1">
                                 <Lock className="size-3" /> Private

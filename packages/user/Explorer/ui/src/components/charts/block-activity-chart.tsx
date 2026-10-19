@@ -41,9 +41,9 @@ const ChartTooltip = ({
             </div>
             <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
                 <span className="text-muted-foreground">Transactions</span>
-                <span className="text-right tabular-nums">{p.txs}</span>
+                <span className="text-right tabular-nums">{p.userTxs}</span>
                 <span className="text-muted-foreground">Actions</span>
-                <span className="text-right tabular-nums">{p.actions}</span>
+                <span className="text-right tabular-nums">{p.userActions}</span>
                 <span className="text-muted-foreground">Interval</span>
                 <span className="text-right tabular-nums">
                     {p.interval === null ? "—" : `${p.interval.toFixed(2)}s`}
@@ -123,7 +123,7 @@ export const BlockActivityChart = ({
                     />
                     <Bar
                         yAxisId="left"
-                        dataKey="txs"
+                        dataKey="userTxs"
                         name="Transactions"
                         fill="url(#txGrad)"
                         radius={[2, 2, 0, 0]}

@@ -15,6 +15,8 @@ export interface BlockPoint {
     time: number;
     txs: number;
     actions: number;
+    userTxs: number;
+    userActions: number;
     interval: number | null;
     producer: string;
 }
@@ -27,23 +29,32 @@ export interface ProducerStats {
     share: number;
 }
 
+export interface ThroughputStats {
+    txCount: number;
+    actionCount: number;
+    tps: number;
+    txPerMinute: number;
+    actionsPerMinute: number;
+    /** `null` when no block in the window carried a counted transaction. */
+    busiestBlock: BlockPoint | null;
+}
+
 export interface ChainStats {
     windowBlocks: number;
     windowSeconds: number;
     avgInterval: number;
     medianInterval: number;
     maxInterval: number;
-    txCount: number;
-    actionCount: number;
-    tps: number;
-    txPerMinute: number;
-    actionsPerMinute: number;
+    throughput: {
+        all: ThroughputStats;
+        /** Excludes system transactions. */
+        user: ThroughputStats;
+    };
     producers: ProducerStats[];
     serviceActivity: { service: string; count: number }[];
     series: BlockPoint[];
     commitLag: number;
     term: number;
-    busiestBlock: BlockPoint | null;
 }
 
 export interface LiveChainState {
@@ -57,6 +68,8 @@ export interface LiveChainState {
     version: number;
     stats: ChainStats;
     recentTransactions: TransactionWithContext[];
+    /** Buffered separately so system transactions don't evict user ones. */
+    recentUserTransactions: TransactionWithContext[];
 }
 
 const WINDOW = 720; // blocks kept in memory (~12 min at 1 block/s)
@@ -65,6 +78,12 @@ const POLL_MS = 1000;
 const HIDDEN_POLL_MS = 5000;
 const STALL_MS = 6000;
 const TX_HISTORY = 400;
+
+/**
+ * The only system transaction is the block-start transaction, which is always
+ * first in the block. Its contents are redacted, so position is the only signal.
+ */
+export const isSystemTransaction = (index: number) => index === 0;
 
 export const flattenTransactions = (
     block: BlockRecord,
@@ -78,10 +97,20 @@ export const flattenTransactions = (
         index,
         numActions: trx.numActions,
         transaction: trx.transaction,
+        isSystem: isSystemTransaction(index),
     }));
 
 export const countActions = (block: BlockRecord) =>
     block.transactions.reduce((n, trx) => n + trx.numActions, 0);
+
+export const countUserTransactions = (block: BlockRecord) =>
+    block.transactions.filter((_, i) => !isSystemTransaction(i)).length;
+
+export const countUserActions = (block: BlockRecord) =>
+    block.transactions.reduce(
+        (n, trx, i) => (isSystemTransaction(i) ? n : n + trx.numActions),
+        0,
+    );
 
 const median = (values: number[]) => {
     if (values.length === 0) return 0;
@@ -92,24 +121,68 @@ const median = (values: number[]) => {
         : (sorted[mid - 1] + sorted[mid]) / 2;
 };
 
+const emptyThroughput = (): ThroughputStats => ({
+    txCount: 0,
+    actionCount: 0,
+    tps: 0,
+    txPerMinute: 0,
+    actionsPerMinute: 0,
+    busiestBlock: null,
+});
+
 const emptyStats = (): ChainStats => ({
     windowBlocks: 0,
     windowSeconds: 0,
     avgInterval: 0,
     medianInterval: 0,
     maxInterval: 0,
-    txCount: 0,
-    actionCount: 0,
-    tps: 0,
-    txPerMinute: 0,
-    actionsPerMinute: 0,
+    throughput: { all: emptyThroughput(), user: emptyThroughput() },
     producers: [],
     serviceActivity: [],
     series: [],
     commitLag: 0,
     term: 0,
-    busiestBlock: null,
 });
+
+const computeThroughput = (
+    series: BlockPoint[],
+    txsOf: (p: BlockPoint) => number,
+    actionsOf: (p: BlockPoint) => number,
+): ThroughputStats => {
+    if (series.length === 0) return emptyThroughput();
+
+    let txCount = 0;
+    let actionCount = 0;
+    let busiest: BlockPoint | null = null;
+    for (const p of series) {
+        txCount += txsOf(p);
+        actionCount += actionsOf(p);
+        if (txsOf(p) > (busiest ? txsOf(busiest) : 0)) busiest = p;
+    }
+
+    // Trailing 60 seconds
+    const last = series[series.length - 1].time;
+    const cutoff = last - 60_000;
+    let recentTx = 0;
+    let recentActions = 0;
+    let recentSpan = 0;
+    for (let i = series.length - 1; i >= 0; i--) {
+        if (series[i].time < cutoff) break;
+        recentTx += txsOf(series[i]);
+        recentActions += actionsOf(series[i]);
+        recentSpan = last - series[i].time;
+    }
+    const spanSec = Math.max(1, recentSpan / 1000);
+
+    return {
+        txCount,
+        actionCount,
+        tps: recentTx / spanSec,
+        txPerMinute: (recentTx / spanSec) * 60,
+        actionsPerMinute: (recentActions / spanSec) * 60,
+        busiestBlock: busiest,
+    };
+};
 
 const computeStats = (blocks: BlockRecord[]): ChainStats => {
     if (blocks.length === 0) return emptyStats();
@@ -119,10 +192,7 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
     const producerMap = new Map<string, ProducerStats>();
     const serviceMap = new Map<string, number>();
 
-    let txCount = 0;
-    let actionCount = 0;
     let prevTime: number | null = null;
-    let busiest: BlockPoint | null = null;
 
     for (const block of blocks) {
         const time = parseChainTime(block.header.time).getTime();
@@ -134,20 +204,16 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
         for (const { service, count } of block.actionsReceived) {
             serviceMap.set(service, (serviceMap.get(service) ?? 0) + count);
         }
-        const actions = countActions(block);
-        txCount += block.transactions.length;
-        actionCount += actions;
-
-        const point: BlockPoint = {
+        series.push({
             blockNum: block.header.blockNum,
             time,
             txs: block.transactions.length,
-            actions,
+            actions: countActions(block),
+            userTxs: countUserTransactions(block),
+            userActions: countUserActions(block),
             interval,
             producer: block.header.producer,
-        };
-        series.push(point);
-        if (!busiest || point.txs > busiest.txs) busiest = point;
+        });
 
         const p = producerMap.get(block.header.producer) ?? {
             name: block.header.producer,
@@ -170,19 +236,6 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
             ? intervals.reduce((a, b) => a + b, 0) / intervals.length
             : 0;
 
-    // Throughput over the trailing 60 seconds
-    const cutoff = last - 60_000;
-    let recentTx = 0;
-    let recentActions = 0;
-    let recentSpan = 0;
-    for (let i = series.length - 1; i >= 0; i--) {
-        if (series[i].time < cutoff) break;
-        recentTx += series[i].txs;
-        recentActions += series[i].actions;
-        recentSpan = last - series[i].time;
-    }
-    const spanSec = Math.max(1, recentSpan / 1000);
-
     const producers = [...producerMap.values()]
         .map((p) => ({ ...p, share: p.blocks / blocks.length }))
         .sort((a, b) => b.blocks - a.blocks);
@@ -195,11 +248,10 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
         avgInterval,
         medianInterval: median(intervals),
         maxInterval: intervals.length ? Math.max(...intervals) : 0,
-        txCount,
-        actionCount,
-        tps: recentTx / spanSec,
-        txPerMinute: (recentTx / spanSec) * 60,
-        actionsPerMinute: (recentActions / spanSec) * 60,
+        throughput: {
+            all: computeThroughput(series, (p) => p.txs, (p) => p.actions),
+            user: computeThroughput(series, (p) => p.userTxs, (p) => p.userActions),
+        },
         producers,
         serviceActivity: [...serviceMap.entries()]
             .map(([service, count]) => ({ service, count }))
@@ -207,7 +259,6 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
         series,
         commitLag: head.blockNum - head.commitNum,
         term: head.term,
-        busiestBlock: busiest,
     };
 };
 
@@ -224,6 +275,7 @@ const initialState = (): LiveChainState => ({
     version: 0,
     stats: emptyStats(),
     recentTransactions: [],
+    recentUserTransactions: [],
 });
 
 class LiveChainStore {
@@ -342,6 +394,10 @@ class LiveChainStore {
                 ...newTxs,
                 ...this.state.recentTransactions,
             ].slice(0, TX_HISTORY);
+            const recentUserTransactions = [
+                ...newTxs.filter((t) => !t.isSystem),
+                ...this.state.recentUserTransactions,
+            ].slice(0, TX_HISTORY);
             this.emit({
                 blocks: merged,
                 head: merged[merged.length - 1].header,
@@ -352,6 +408,7 @@ class LiveChainStore {
                 seeded: true,
                 stats: computeStats(merged),
                 recentTransactions,
+                recentUserTransactions,
             });
         } else {
             const stalled =

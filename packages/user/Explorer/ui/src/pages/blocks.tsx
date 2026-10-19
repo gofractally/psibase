@@ -12,6 +12,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatNumber } from "@/lib/format";
 import { fetchBlocks } from "@/lib/queries";
 import { type BlockRecord, FIRST_VISIBLE_BLOCK } from "@/lib/types";
+import { isSystemTransaction } from "@/store/live-chain";
 import { useLiveChain } from "@/store/use-live-chain";
 
 import { BlocksTable } from "@/components/blocks-table";
@@ -68,15 +69,18 @@ export const BlocksPage = () => {
         [liveBlocks],
     );
 
-    // Every block carries system transactions, so "busy" means more
-    // transactions than the quietest block in view.
-    const rows = useMemo(() => {
-        const baseline = Math.min(...source.map((b) => b.transactions.length));
-        return source
-            .filter((b) => !onlyBusy || b.transactions.length > baseline)
-            .filter((b) => !producerFilter || b.header.producer === producerFilter)
-            .slice(0, PAGE_SIZE);
-    }, [source, onlyBusy, producerFilter]);
+    const rows = useMemo(
+        () =>
+            source
+                .filter(
+                    (b) =>
+                        !onlyBusy ||
+                        b.transactions.some((_, i) => !isSystemTransaction(i)),
+                )
+                .filter((b) => !producerFilter || b.header.producer === producerFilter)
+                .slice(0, PAGE_SIZE),
+        [source, onlyBusy, producerFilter],
+    );
 
     const oldest = rows.length ? rows[rows.length - 1].header.blockNum : null;
     const newest = rows.length ? rows[0].header.blockNum : null;
@@ -243,7 +247,7 @@ export const BlocksPage = () => {
                         animateNew={live && !paused}
                         emptyMessage={
                             onlyBusy
-                                ? "No blocks busier than the quietest block in this range"
+                                ? "No blocks with user transactions in this range"
                                 : "No blocks"
                         }
                     />
