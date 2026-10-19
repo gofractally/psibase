@@ -105,6 +105,10 @@ pub mod service {
 
     #[action]
     fn setRecovery(recovery: AccountNumber) {
+        assert!(
+            accounts::Wrapper::call().exists(recovery),
+            "Recovery account does not exist"
+        );
         let sender = get_sender();
         let table = AuthTable::read_write();
         let row = match table.get_index_pk().get(&sender) {
