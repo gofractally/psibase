@@ -227,7 +227,14 @@ pub mod tables {
             if self.is_system_token() && sender == psibase::account!("vserver") {
                 return;
             }
-            assert_eq!(sender, self.nft_holder(), "Token untradeable");
+            let holder = self.nft_holder();
+            assert_eq!(
+                sender,
+                holder,
+                "Token untradeable: {} cannot credit it; only {} can",
+                sender,
+                holder
+            );
         }
 
         pub fn recall(
