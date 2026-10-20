@@ -47,8 +47,6 @@ impl AppsTable {
         }
     }
 
-    /// Connects `user` to this app and starts a session for them.
-    /// Mints a query token through transact if `host:auth` has none cached.
     pub(crate) fn login(&self, user: &str) -> Result<(), Error> {
         self.connect(user);
 

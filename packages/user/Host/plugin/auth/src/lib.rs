@@ -35,7 +35,6 @@ fn logged_in_user_table() -> Bucket {
     Bucket::new(DB, "logged_in_user")
 }
 
-// Query tokens per user, keyed by app
 fn query_tokens_table(user: &str) -> Bucket {
     Bucket::new(DB, &format!("query_tokens-{}", user))
 }

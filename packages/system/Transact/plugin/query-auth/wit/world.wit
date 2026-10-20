@@ -3,9 +3,7 @@ package transact:query-auth;
 interface api {
     use host:types/types.{error};
 
-    /// Gets a bearer token for `user` to make authenticated queries against `app`.
-    /// Builds and signs a throwaway `loginSys` transaction with the user's auth service
-    /// and submits it to transact's `/login` endpoint.
+    /// Gets a bearer token for user to make authenticated queries
     get-query-token: func(app: string, user: string) -> result<string, error>;
 }
 

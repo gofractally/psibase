@@ -329,7 +329,7 @@ impl Sites for ConfigPlugin {
 impl Transact for ConfigPlugin {
     fn graphql(query: String) -> Result<String, Error> {
         assert_caller_self();
-        transact::plugin::authorized::graphql(&query)
+        host::http::api::post_graphql_get_json(&query)
     }
 }
 

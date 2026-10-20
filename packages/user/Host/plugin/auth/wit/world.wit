@@ -1,6 +1,6 @@
 package host:auth;
 
-/// Browser-session facts: which user is logged in to each app, and the
+/// Browser-session state: which user is logged in to each app, and the
 /// credentials (query token / auth cookie) backing that session.
 /// This plugin stores sessions; it does not create them. Minting a query
 /// token is `transact:query-auth`'s job, and the login flow lives on `host:wallet`.
