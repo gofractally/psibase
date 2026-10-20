@@ -172,8 +172,8 @@ export const NameMarketConfig = () => {
                             Account Marketplace
                         </CardTitle>
                         <CardDescription>
-                            Premium account names are not available on this
-                            network. Accounts are created with free names.
+                            Premium account names are not available by
+                            self-service.
                         </CardDescription>
                     </CardHeader>
                 </Card>

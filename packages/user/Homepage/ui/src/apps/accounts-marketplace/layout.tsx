@@ -14,7 +14,7 @@ export function AccountMarketplaceLayout() {
                     title="Not available"
                     error={
                         new Error(
-                            "Premium account names are not offered on this network. New accounts use free names.",
+                            "Premium account names are not available by self-service.",
                         )
                     }
                 />
