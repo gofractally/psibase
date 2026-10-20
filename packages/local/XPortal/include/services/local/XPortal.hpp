@@ -73,31 +73,13 @@ namespace LocalService
    using SignupTable = psibase::Table<Signup, &Signup::id>;
    PSIO_REFLECT_TYPENAME(SignupTable)
 
-   /// Agents whose one-time setup push has been scheduled. It never runs twice.
-   struct AgentSetup
-   {
-      std::string name;
-      PSIO_REFLECT(AgentSetup, name)
-   };
-   using AgentSetupTable = psibase::Table<AgentSetup, &AgentSetup::name>;
-   PSIO_REFLECT_TYPENAME(AgentSetupTable)
-
-   /// An admin request waiting for a push's final result
-   struct PushReplyTo
-   {
-      std::int32_t                     socket;
-      std::vector<psibase::HttpHeader> headers;
-      PSIO_REFLECT(PushReplyTo, socket, headers)
-   };
-
    /// An agent transaction sent to `transact` that has no final reply yet.
    /// `signup` is set when the push provisions a signup record.
    struct PendingPush
    {
-      std::int32_t                        socket;
-      std::optional<PushReplyTo>          replyTo;
-      std::optional<psibase::Checksum256> signup;
-      PSIO_REFLECT(PendingPush, socket, replyTo, signup)
+      std::int32_t           socket;
+      psibase::Checksum256   signup;
+      PSIO_REFLECT(PendingPush, socket, signup)
    };
    using PendingPushTable = psibase::Table<PendingPush, &PendingPush::socket>;
    PSIO_REFLECT_TYPENAME(PendingPushTable)
@@ -194,11 +176,6 @@ namespace LocalService
    /// and `creator_allowed`, the canonical whitelist applied when `ac-creator`
    /// is created.
    ///
-   /// `POST /admin/agents/creator/test` pushes the `ac-creator` setup
-   /// transaction (enable auto-debit and debit any pending producer credit)
-   /// and replies with its JSON trace once final. The same push runs once on
-   /// its own when `creator_ready` first reports `ok`.
-   ///
    /// `POST /signup` `{invite_id, payload, token}` is anonymous; `payload` is
    /// hex. It returns 403 unless `requests_enabled`, `free_tier.enabled`, and
    /// `/status` `ready` all hold, and 409 when `invite_id` already exists on
@@ -232,13 +209,10 @@ namespace LocalService
              {UserService::InviteNs::Invite::service, psibase::MethodNumber{"createInvite"}},
              {UserService::InviteNs::Invite::service, psibase::MethodNumber{"delInvite"}},
              {UserService::Tokens::service, psibase::MethodNumber{"credit"}},
-             {UserService::Tokens::service, psibase::MethodNumber{"debit"}},
-             {UserService::Tokens::service, psibase::MethodNumber{"setUserConf"}},
          };
       }
 
-      using Subjective =
-          psibase::SubjectiveTables<PortalConfigTable, AgentKeyTable, SignupTable, AgentSetupTable>;
+      using Subjective = psibase::SubjectiveTables<PortalConfigTable, AgentKeyTable, SignupTable>;
       using Session = psibase::SessionTables<PendingPushTable>;
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest                  request,
@@ -246,7 +220,6 @@ namespace LocalService
                                                  std::optional<psibase::AccountNumber> user);
 
       // x-timer callbacks
-      void creatorSetup(std::uint64_t timer);
       void provision(std::uint64_t timer);
 
       // x-http callbacks for pushed transactions
@@ -255,7 +228,6 @@ namespace LocalService
    };
    PSIO_REFLECT(XPortal,
                 method(serveSys, request, socket, user),
-                method(creatorSetup, timer),
                 method(provision, timer),
                 method(onPushReply, socket, reply),
                 method(onPushError, socket))

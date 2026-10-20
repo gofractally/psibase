@@ -248,17 +248,12 @@ namespace
       return IPV6Endpoint{v6, port};
    }
 
-   using PushResult = std::variant<TransactionTrace, std::string>;
-
    // Signs `actions` with x-portal's x-keys keys and sends them to this node's
-   // `transact`. The final result goes to `replyTo` when set, and updates
-   // `signup` when set.
+   // `transact`, then updates `signup` when the push completes.
    //
    // `signTx` aborts the caller when the signing account's auth rejects the
    // actions, so callers commit any attempt bookkeeping before calling this.
-   void pushAgentTx(std::vector<Action>        actions,
-                    std::optional<PushReplyTo> replyTo,
-                    std::optional<Checksum256> signup = {})
+   void pushAgentTx(std::vector<Action> actions, Checksum256 signup)
    {
       auto trx = to<XKeys>().signTx(std::move(actions));
       // An empty host resolves to the node's first configured host.
@@ -276,22 +271,19 @@ namespace
       auto socket = to<XHttp>().sendRequest(std::move(request), std::nullopt, nodeEndpoint());
       PSIBASE_SUBJECTIVE_TX
       {
-         if (replyTo)
-            to<XHttp>().autoClose(replyTo->socket, false);
          to<XHttp>().setCallback(socket, MethodNumber{"onPushReply"}, MethodNumber{"onPushError"});
-         XPortal{}.open<PendingPushTable>().put(
-             PendingPush{.socket = socket, .replyTo = replyTo, .signup = signup});
+         XPortal{}.open<PendingPushTable>().put(PendingPush{.socket = socket, .signup = signup});
       }
    }
 
-   PushResult pushResult(const HttpReply& reply)
+   std::optional<std::string> pushError(const HttpReply& reply)
    {
       if (reply.status != HttpStatus::ok)
          return std::string(reply.body.begin(), reply.body.end());
       auto trace = psio::from_frac<TransactionTrace>(reply.body);
       if (trace.error)
          return *trace.error;
-      return trace;
+      return std::nullopt;
    }
 
    TimePointUSec wallNow()
@@ -323,10 +315,9 @@ namespace
       table.put(*row);
    }
 
-   void finishPush(std::int32_t socket, PushResult result)
+   void finishPush(std::int32_t socket, std::optional<std::string> error)
    {
       std::optional<PendingPush> pending;
-      auto*                       error = std::get_if<std::string>(&result);
       PSIBASE_SUBJECTIVE_TX
       {
          {
@@ -335,50 +326,7 @@ namespace
             check(pending.has_value(), "no pending push on socket " + std::to_string(socket));
             table.remove(*pending);
          }
-         if (pending->signup)
-            applySignupResult(*pending->signup, error);
-      }
-      if (!pending->replyTo)
-      {
-         if (error && !pending->signup)
-            to<XHttp>().log(LogMessage::Severity::warning, "x-portal agent push failed: " + *error);
-         return;
-      }
-      auto& [replySocket, headers] = *pending->replyTo;
-      auto reply = error ? textError(std::move(headers), HttpStatus::internalServerError, *error)
-                         : jsonBody(std::move(headers), std::get<TransactionTrace>(result));
-      to<XHttp>().autoClose(replySocket, true);
-      to<XHttp>().sendReply(replySocket, reply);
-   }
-
-   // Enables auto-debit for ac-creator and debits the producer's pending credit
-   std::vector<Action> creatorSetupActions()
-   {
-      transactor<Tokens>  tokens{XPortal::creatorAccount, Tokens::service};
-      std::vector<Action> actions{tokens.setUserConf(Tokens::autoDebit, true)};
-      auto                sys      = to<Tokens>().getSysToken();
-      auto                producer = configuredProducer();
-      if (sys && producer)
-      {
-         auto pending = to<Tokens>().getSharedBal(sys->id, *producer, XPortal::creatorAccount);
-         if (pending.value != 0)
-            actions.push_back(tokens.debit(sys->id, *producer, pending, "x-portal setup"));
-      }
-      return actions;
-   }
-
-   // Claims the one-time setup and schedules its push, unless already claimed
-   void startCreatorSetupOnce()
-   {
-      PSIBASE_SUBJECTIVE_TX
-      {
-         auto table = XPortal{}.open<AgentSetupTable>();
-         auto name  = std::string{XPortal::creatorAgent};
-         if (!table.get(name))
-         {
-            table.put({name});
-            to<XTimer>().runAt(monotonicNow(), MethodNumber{"creatorSetup"});
-         }
+         applySignupResult(pending->signup, error ? &*error : nullptr);
       }
    }
 
@@ -415,12 +363,7 @@ namespace
          return HttpReply{.headers = cors(req)};
       if (req.method != "GET")
          return HttpReply::methodNotAllowed(req);
-      auto status = portalStatus(loadedConfig());
-      if (std::ranges::any_of(status.conditions, [](const Condition& condition) {
-             return condition.id == "creator_ready" && condition.ok;
-          }))
-         startCreatorSetupOnce();
-      return jsonBody(req, status);
+      return jsonBody(req, portalStatus(loadedConfig()));
    }
 
    enum class RequestsField
@@ -505,20 +448,6 @@ namespace
          XPortal{}.open<AgentKeyTable>().put(created);
       }
       return jsonBody(req, created);
-   }
-
-   // Replies later, from the push callbacks
-   std::optional<HttpReply> serveCreatorTest(const HttpRequest&          req,
-                                             std::optional<std::int32_t> socket)
-   {
-      if (req.method == "OPTIONS")
-         return HttpReply{.headers = cors(req)};
-      if (auto reply = to<XAdmin>().checkAuth(req, socket))
-         return reply;
-      if (req.method != "POST")
-         return HttpReply::methodNotAllowed(req);
-      pushAgentTx(creatorSetupActions(), PushReplyTo{socket.value(), cors(req)});
-      return std::nullopt;
    }
 
    // 32 bytes encode to 43 unpadded base64url characters. The final character's
@@ -718,7 +647,7 @@ namespace
       // Already attempted, or no longer queued: a later timer is not another attempt.
       if (!claimed)
          return;
-      pushAgentTx(signupActions(*claimed), std::nullopt, claimed->id);
+      pushAgentTx(signupActions(*claimed), claimed->id);
    }
 }  // namespace
 
@@ -734,8 +663,6 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
       return serveAdminConfig(request, socket);
    if (target == "/admin/agents/creator/keygen")
       return serveCreatorKeygen(request, socket);
-   if (target == "/admin/agents/creator/test")
-      return serveCreatorTest(request, socket);
    if (target == "/admin/signups")
       return serveFailedSignups(request, socket);
    if (target == "/signup")
@@ -743,12 +670,6 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
    if (target.starts_with("/signup/"))
       return serveSignupStatus(request, std::string_view{target}.substr(8));
    return std::nullopt;
-}
-
-void XPortal::creatorSetup(std::uint64_t /*timer*/)
-{
-   check(getSender() == XTimer::service, "Wrong sender");
-   pushAgentTx(creatorSetupActions(), std::nullopt);
 }
 
 void XPortal::provision(std::uint64_t /*timer*/)
@@ -761,7 +682,7 @@ void XPortal::provision(std::uint64_t /*timer*/)
 void XPortal::onPushReply(std::int32_t socket, HttpReply reply)
 {
    check(getSender() == XHttp::service, "Wrong sender");
-   finishPush(socket, pushResult(reply));
+   finishPush(socket, pushError(reply));
 }
 
 void XPortal::onPushError(std::int32_t socket)

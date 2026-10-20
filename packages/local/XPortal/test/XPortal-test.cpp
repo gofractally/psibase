@@ -233,12 +233,6 @@ namespace
                  .key   = agentPriv});
    }
 
-   void skipCreatorSetup()
-   {
-      XPortal{}.open<AgentSetupTable>().put(
-          AgentSetup{.name = std::string{XPortal::creatorAgent}});
-   }
-
    Checksum256 idFrom(std::string_view text)
    {
       auto raw = fromBase64Url(text);
@@ -467,7 +461,6 @@ TEST_CASE("provision signs the billed invite actions as ac-creator")
    auto alice = AccountNumber{"alice"};
    setProducer(t, "alice");
    storeCreatorKey();
-   skipCreatorSetup();
    auto billed = enableBilling(t, alice, 5);
 
    auto config = t.get<AdminConfig>(XPortal::service, "/admin/config");
@@ -505,7 +498,6 @@ TEST_CASE("provision commits one attempt before signing")
    transactor<AuthScope> scope{alice, AuthScope::service};
    expect(t.pushTransaction(t.makeTransaction({scope.newAccount(
        creator, agentPub, alice, std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})})));
-   skipCreatorSetup();
    t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
 
    auto created = t.http<SignupReceipt>(signupRequest(21));
