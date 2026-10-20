@@ -309,6 +309,7 @@ add_rs_component_workspace(packages/:Plugins
     homepage
     producers
     auth-scope-plugin
+    x-portal-plugin
 )
 
 include(GNUInstallDirs)
@@ -1262,7 +1263,8 @@ psibase_package(
         FLAGS isPrivileged
         SERVER x-portal
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XPortal/ui/dist/* /
-    DEPENDS wasm ${XPortal_js_DEP}
+        DATA ${Plugins_OUTPUT_FILE_x_portal_plugin} /plugin.wasm
+    DEPENDS wasm ${XPortal_js_DEP} ${Plugins_DEP}
     PACKAGE_DEPENDS XKeys XTimer XHttp XSites XAdmin XCommonApi
 )
 

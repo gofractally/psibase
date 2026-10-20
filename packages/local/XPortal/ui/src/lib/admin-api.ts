@@ -90,16 +90,16 @@ export const loadCreatorKey = async (): Promise<CreatorKey> => {
     };
 };
 
-/** The signed-in producer creates `ac-creator`, owned by `owner`, for `pubkeyPem`. */
+/** The signed-in producer creates `ac-creator`, owned by `owner`, for `pubkeyPem`, with auto-debit on. */
 export const createAdminAccounts = (args: {
     pubkeyPem: string;
     owner: string;
     allowed: AllowedAction[];
 }) =>
     supervisor.functionCall({
-        service: "auth-scope",
+        service: "x-portal",
         plugin: "plugin",
         intf: "api",
-        method: "newAccount",
-        params: ["ac-creator", args.pubkeyPem, args.owner, args.allowed],
+        method: "createAdminAccounts",
+        params: [args.pubkeyPem, args.owner, args.allowed],
     });

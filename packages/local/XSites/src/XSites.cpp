@@ -78,7 +78,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
          auto reply = HttpReply{
              .contentType = std::move(row->contentType),
              .body        = std::move(row->content),
-             .headers     = allowCors(req, XAdmin::service),
+             .headers     = allowCors(req, {XAdmin::service, AccountNumber{"supervisor"}}),
          };
          if (row->contentEncoding)
          {
