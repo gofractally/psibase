@@ -240,6 +240,7 @@ impl Inviter for InvitePlugin {
             NUM_ACCOUNTS,
             false,
             Quantity::from(min_cost_u64),
+            None,
         );
 
         Ok(i.details.invite_token)
