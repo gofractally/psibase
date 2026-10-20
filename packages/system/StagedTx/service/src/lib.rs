@@ -30,9 +30,7 @@ pub mod service {
     use crate::policy::StagedTxPolicy;
     use fracpack::Pack;
     use psibase::services::transact::ServiceMethod;
-    use psibase::services::{
-        accounts::Wrapper as Accounts, events::Wrapper as Events, transact::Wrapper as Transact,
-    };
+    use psibase::services::{events::Wrapper as Events, transact::Wrapper as Transact};
     use psibase::*;
     use std::collections::HashSet;
 
@@ -70,16 +68,26 @@ pub mod service {
         Events::call().addIndex(EventDb::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter
     }
 
-    fn ensure_not_frozen(actions: &[Action]) {
+    fn ensure_not_rejected(actions: &[Action]) {
         let mut seen = HashSet::new();
-        let mut senders = Vec::new();
         for action in actions {
-            if seen.insert(action.sender) {
-                senders.push(action.sender);
+            let key = (
+                action.sender.value,
+                action.service.value,
+                action.method.value,
+            );
+            if !seen.insert(key) {
+                continue;
             }
-        }
-        if Accounts::call().isFrozen(senders) {
-            abort_message("at least one of the action senders are frozen");
+            let Some(policy) = StagedTxPolicy::new(action.sender) else {
+                continue;
+            };
+            if policy.does_reject(
+                Vec::new(),
+                ServiceMethod::new(action.service, action.method),
+            ) {
+                abort_message(&format!("sender {} rejects the action", action.sender));
+            }
         }
     }
 
@@ -90,7 +98,7 @@ pub mod service {
     /// * `auto_exec`: Enables automatic execution as soon as the transaction has enough approvals
     #[action]
     fn propose(actions: Vec<Action>, auto_exec: bool) -> u32 {
-        ensure_not_frozen(&actions);
+        ensure_not_rejected(&actions);
         let new_tx = StagedTx::add(actions, auto_exec);
 
         emit_update(new_tx.txid.clone(), StagedTxEvent::PROPOSED);
@@ -111,7 +119,6 @@ pub mod service {
     #[action]
     fn accept(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
-        ensure_not_frozen(&staged_tx.action_list.actions);
 
         staged_tx.accept();
 
@@ -142,7 +149,6 @@ pub mod service {
     #[action]
     fn reject(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
-        ensure_not_frozen(&staged_tx.action_list.actions);
 
         staged_tx.reject();
 
@@ -184,7 +190,6 @@ pub mod service {
     }
 
     fn execute_impl(staged_tx: StagedTx) {
-        ensure_not_frozen(&staged_tx.action_list.actions);
         debug_print("Executing staged tx\n");
 
         let accepters = staged_tx.accepters();
