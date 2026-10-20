@@ -18,6 +18,7 @@ import {
 
 import {
     type FailedSignup,
+    type PortalStatus,
     createAdminAccounts,
     getAdminConfig,
     getFailedSignups,
@@ -44,6 +45,24 @@ const errorText = (error: unknown) =>
 
 const errorMessage = (error: unknown) =>
     error == null ? "Request failed" : errorText(error);
+
+const conditionOk = (
+    conditions: PortalStatus["conditions"],
+    id: string,
+) => conditions.find((condition) => condition.id === id)?.ok ?? false;
+
+const billingReadinessRows = [
+    {
+        id: "creator_tokens",
+        label: "ac-creator invite tokens",
+        unmet: "ac-creator needs system tokens to pay for invites.",
+    },
+    {
+        id: "creator_resources",
+        label: "ac-creator resource buffer",
+        unmet: "ac-creator needs resources bought for it. Sending tokens does not add resources.",
+    },
+] as const;
 
 const AdminSection = ({
     title,
@@ -266,14 +285,8 @@ export const AdminPage = () => {
         config.data.producer &&
         config.data.account === config.data.producer,
     );
-    const creatorReady =
-        status.data.conditions.find(
-            (condition) => condition.id === "creator_ready",
-        )?.ok ?? false;
-    const creatorFunded =
-        status.data.conditions.find(
-            (condition) => condition.id === "creator_funded",
-        )?.ok ?? false;
+    const conditions = status.data.conditions;
+    const creatorReady = conditionOk(conditions, "creator_ready");
     const pubkey = creator.data.pubkey ?? config.data.creator_pubkey ?? null;
 
     return (
@@ -320,13 +333,15 @@ export const AdminPage = () => {
                         ok={creatorReady}
                         unmet="Create admin accounts below."
                     />
-                    {status.data.billing_enabled && (
-                        <ReadinessRow
-                            label="ac-creator funded"
-                            ok={creatorFunded}
-                            unmet="Needs funds."
-                        />
-                    )}
+                    {status.data.billing_enabled &&
+                        billingReadinessRows.map((row) => (
+                            <ReadinessRow
+                                key={row.id}
+                                label={row.label}
+                                ok={conditionOk(conditions, row.id)}
+                                unmet={row.unmet}
+                            />
+                        ))}
                 </div>
                 {!status.data.billing_enabled && (
                     <p className="text-muted-foreground text-sm">

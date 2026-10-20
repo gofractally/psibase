@@ -122,6 +122,8 @@ namespace LocalService
    };
 
    /// `GET /status`. Conditions carry an id and whether it holds, and nothing else.
+   /// When billing is disabled, only `creator_ready` is present. When billing is
+   /// enabled, `creator_tokens` and `creator_resources` are added.
    struct Status
    {
       bool                   requests_enabled = false;

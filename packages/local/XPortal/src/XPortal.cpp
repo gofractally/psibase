@@ -189,7 +189,7 @@ namespace
       return fraccall<Quantity>(action).unpack();
    }
 
-   bool creatorFunded(const PortalConfig& config)
+   bool creatorTokens(const PortalConfig& config)
    {
       auto grant = tierTokens(config);
       check(grant.has_value(), "free tier grant is not set");
@@ -197,8 +197,12 @@ namespace
       check(sys.has_value(), "system token is not set");
       auto cost    = to<Invite>().getInvCost(1, *grant);
       auto balance = to<Tokens>().getBalance(sys->id, XPortal::creatorAccount);
-      auto buffer  = resourceBuffer(XPortal::creatorAccount);
-      return balance.value >= cost.value && buffer.value > 0;
+      return balance.value >= cost.value;
+   }
+
+   bool creatorResources()
+   {
+      return resourceBuffer(XPortal::creatorAccount).value > 0;
    }
 
    std::optional<HostSettings> hostSettings()
@@ -351,7 +355,10 @@ namespace
       Status status{.requests_enabled = config.requests_enabled, .billing_enabled = billing};
       status.conditions.push_back({.id = "creator_ready", .ok = creatorReady()});
       if (billing)
-         status.conditions.push_back({.id = "creator_funded", .ok = creatorFunded(config)});
+      {
+         status.conditions.push_back({.id = "creator_tokens", .ok = creatorTokens(config)});
+         status.conditions.push_back({.id = "creator_resources", .ok = creatorResources()});
+      }
       status.ready =
           std::ranges::all_of(status.conditions, [](const Condition& c) { return c.ok; });
       return status;

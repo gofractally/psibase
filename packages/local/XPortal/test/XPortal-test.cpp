@@ -83,6 +83,18 @@ namespace
    const std::vector<std::string> portalPackages{"TestDefault", "TokenUsers", "AuthScope",
                                                  "Invite"};
 
+   void requireBillingReadiness(const Status& status, bool tokensOk, bool resourcesOk)
+   {
+      REQUIRE(status.billing_enabled);
+      REQUIRE(status.conditions.size() == 3);
+      CHECK(status.conditions[0].id == "creator_ready");
+      CHECK(status.conditions[0].ok);
+      CHECK(status.conditions[1].id == "creator_tokens");
+      CHECK(status.conditions[1].ok == tokensOk);
+      CHECK(status.conditions[2].id == "creator_resources");
+      CHECK(status.conditions[2].ok == resourcesOk);
+   }
+
    std::vector<uint8_t> invitePayload(uint8_t seed)
    {
       auto packed = psio::to_frac(
@@ -368,12 +380,7 @@ TEST_CASE("status, requests switch, and seeded pricing")
    CHECK(again.requests_enabled == false);
 
    status = t.get<Status>(XPortal::service, "/status");
-   CHECK(status.billing_enabled);
-   REQUIRE(status.conditions.size() == 2);
-   CHECK(status.conditions[0].id == "creator_ready");
-   CHECK(status.conditions[0].ok);
-   CHECK(status.conditions[1].id == "creator_funded");
-   CHECK(status.conditions[1].ok == false);
+   requireBillingReadiness(status, false, false);
    CHECK(status.ready == false);
 
    auto grant = config.free_tier.tokens->value;
@@ -390,6 +397,7 @@ TEST_CASE("status, requests switch, and seeded pricing")
 
    status = t.get<Status>(XPortal::service, "/status");
    CHECK(status.conditions[1].ok);
+   CHECK(status.conditions[2].ok);
    CHECK(status.ready);
 }
 
@@ -435,12 +443,7 @@ TEST_CASE("producer funds ac-creator when billing is enabled")
    CHECK(row->allowed == XPortal::creatorAllowed());
 
    auto status = t.get<Status>(XPortal::service, "/status");
-   CHECK(status.billing_enabled);
-   REQUIRE(status.conditions.size() == 2);
-   CHECK(status.conditions[0].id == "creator_ready");
-   CHECK(status.conditions[0].ok);
-   CHECK(status.conditions[1].id == "creator_funded");
-   CHECK(status.conditions[1].ok == false);
+   requireBillingReadiness(status, false, true);
    CHECK(t.from(alice).to<Tokens>().getBalance(sys, XPortal::creatorAccount).returnVal().value == 0);
    CHECK(t.from(alice).to<Tokens>().getSharedBal(sys, alice, XPortal::creatorAccount).returnVal().value ==
          funded.value);
