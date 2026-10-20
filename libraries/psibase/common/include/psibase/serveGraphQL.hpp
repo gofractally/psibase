@@ -415,15 +415,14 @@ namespace psibase
       if (last && !first)
       {
          result.pageInfo.hasNextPage = end != rangeEnd;
-         while (it != end && *last > 0)
+         while (it != end && (*last)-- > 0)
          {
-            auto prev = end;
-            --prev;
-            if (!fits(prev))
+            if (!fits(--end))
+            {
+               ++end;
                break;
-            end = std::move(prev);
+            }
             add_edge(end);
-            --*last;
          }
          result.pageInfo.hasPreviousPage = end != rangeBegin;
          std::reverse(result.edges.begin(), result.edges.end());
@@ -431,12 +430,8 @@ namespace psibase
       else
       {
          result.pageInfo.hasPreviousPage = it != rangeBegin;
-         for (; it != end && (!first || *first > 0) && fits(it); ++it)
-         {
+         for (; it != end && (!first || (*first)-- > 0) && fits(it); ++it)
             add_edge(it);
-            if (first)
-               --*first;
-         }
          result.pageInfo.hasNextPage = it != rangeEnd;
          if (last && *last < result.edges.size())
          {
@@ -464,10 +459,12 @@ namespace psibase
                              std::optional<uint32_t>           last,
                              const std::optional<std::string>& before,
                              const std::optional<std::string>& after,
-                             Proj&&                            proj = {})
+                             Proj&&                            proj     = {},
+                             std::optional<uint32_t>           maxBytes = std::nullopt)
    {
-      return makeConnectionIter<Connection>(index, gt, ge, lt, le, first, last, before, after,
-                                            [&](const auto& iter) { return proj(*iter); });
+      return makeConnectionIter<Connection>(
+          index, gt, ge, lt, le, first, last, before, after,
+          [&](const auto& iter) { return proj(*iter); }, maxBytes);
    }
 
    template <typename Connection, typename T, typename Key, typename Proj = std::identity>
@@ -603,6 +600,8 @@ namespace psibase
    {
       Index index;
       F     f;
+      /// Default for the query's `maxBytes` argument; see [makeConnectionIter]
+      std::optional<uint32_t> maxBytes = std::nullopt;
    };
 
    template <typename Index, typename F>
@@ -639,10 +638,11 @@ namespace psibase
                                            std::optional<uint32_t>                first,
                                            std::optional<uint32_t>                last,
                                            const std::optional<std::string>&      before,
-                                           const std::optional<std::string>&      after)
+                                           const std::optional<std::string>&      after,
+                                           std::optional<uint32_t>                maxBytes)
       {
          return makeConnection<Connection>(index.index, gt, ge, lt, le, first, last, before, after,
-                                           index.f);
+                                           index.f, maxBytes ? maxBytes : index.maxBytes);
       }
 
       template <typename Connection, typename Index, typename F, typename Key>
@@ -678,10 +678,10 @@ namespace psibase
    }  // gql_callable_fn
 
    template <typename Index, typename F>
-   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
+   constexpr std::optional<std::array<const char*, 9>> gql_callable_args(
        TransformedConnection<Index, F>*)
    {
-      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
+      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after", "maxBytes"};
    }
 
    template <typename T, typename Key, typename F>
