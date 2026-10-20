@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import { uint8ArrayToHex } from "@psibase/common-lib";
+
+import type { InviteDetails } from "./signup-request";
+
 const zStatus = z.object({
     requests_enabled: z.boolean(),
     ready: z.boolean(),
@@ -7,9 +11,11 @@ const zStatus = z.object({
 
 const zSignupReceipt = z.object({ signup_id: z.string() });
 
-const zSignupView = z.object({
-    state: z.enum(["queued", "created", "failed"]),
-});
+const zSignupView = z.discriminatedUnion("state", [
+    z.object({ state: z.literal("queued") }),
+    z.object({ state: z.literal("invited"), token: z.string() }),
+    z.object({ state: z.literal("failed") }),
+]);
 
 /** The node refused the request. `status` is the HTTP status. */
 export class PortalError extends Error {
@@ -37,15 +43,16 @@ export const isRequestsOpen = async (): Promise<boolean> => {
     return status.requests_enabled && status.ready;
 };
 
-/** Returns the new signup's id. */
-export const requestSignup = async (
-    name: string,
-    pubkeyPem: string,
-): Promise<string> => {
+/** Asks the node to create a prepared invite. Returns the new signup's id. */
+export const requestSignup = async (invite: InviteDetails): Promise<string> => {
     const reply = fetch("/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, pubkey_pem: pubkeyPem }),
+        body: JSON.stringify({
+            invite_id: invite.inviteId,
+            payload: uint8ArrayToHex(invite.payload),
+            token: invite.inviteToken,
+        }),
     });
     return (await parseReply(reply, zSignupReceipt)).signup_id;
 };

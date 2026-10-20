@@ -7,7 +7,7 @@
 #include <psibase/time.hpp>
 #include <services/system/AuthScope.hpp>
 #include <services/system/Spki.hpp>
-#include <services/system/VirtualServer.hpp>
+#include <services/user/Invite.hpp>
 #include <services/user/Tokens.hpp>
 #include <services/user/tokenTypes.hpp>
 #include <string>
@@ -42,28 +42,29 @@ namespace LocalService
    using AgentKeyTable = psibase::Table<AgentKey, &AgentKey::name>;
    PSIO_REFLECT_TYPENAME(AgentKeyTable)
 
-   /// A signup record. Ids are 32 bytes.
+   /// A signup record. Ids are 32 bytes. `invite_id`, `payload`, and `token`
+   /// come from the visitor's Invite plugin `prepare-new-invite`.
    struct Signup
    {
-      psibase::Checksum256                  id;
-      psibase::AccountNumber                name;
-      std::string                           pubkey_pem;
-      uint64_t                              usd_cents = 0;
-      UserService::Quantity                 tokens;
-      std::string                           state;
-      std::optional<psibase::AccountNumber> account;
-      uint32_t                              attempts = 0;
-      std::string                           last_error;
-      psibase::TimePointUSec                created;
-      psibase::TimePointUSec                updated;
+      psibase::Checksum256   id;
+      uint32_t               invite_id = 0;
+      std::vector<uint8_t>   payload;
+      std::string            token;
+      uint64_t               usd_cents = 0;
+      UserService::Quantity  tokens;
+      std::string            state;
+      uint32_t               attempts = 0;
+      std::string            last_error;
+      psibase::TimePointUSec created;
+      psibase::TimePointUSec updated;
       PSIO_REFLECT(Signup,
                    id,
-                   name,
-                   pubkey_pem,
+                   invite_id,
+                   payload,
+                   token,
                    usd_cents,
                    tokens,
                    state,
-                   account,
                    attempts,
                    last_error,
                    created,
@@ -148,6 +149,15 @@ namespace LocalService
       PSIO_REFLECT(Status, requests_enabled, billing_enabled, ready, conditions)
    };
 
+   /// `POST /signup` body. A missing field is a 400, not a default.
+   struct SignupBody
+   {
+      std::optional<uint32_t>             invite_id;
+      std::optional<std::vector<uint8_t>> payload;
+      std::optional<std::string>          token;
+      PSIO_REFLECT(SignupBody, invite_id, payload, token)
+   };
+
    /// `POST /signup` returns the new signup's id, base64url of its 32 bytes.
    struct SignupReceipt
    {
@@ -155,24 +165,23 @@ namespace LocalService
       PSIO_REFLECT(SignupReceipt, signup_id)
    };
 
-   /// `GET /signup/:id`. `account` is set only after the account is created.
+   /// `GET /signup/:id`. `token` is set only once the invite is created.
    /// A failed signup carries no error text.
    struct SignupView
    {
-      std::string                           state;
-      std::optional<psibase::AccountNumber> account;
-      PSIO_REFLECT(SignupView, state, account)
+      std::string                state;
+      std::optional<std::string> token;
+      PSIO_REFLECT(SignupView, state, token)
    };
 
    /// One row of `GET /admin/signups?state=failed`.
    struct FailedSignup
    {
       std::string            id;
-      psibase::AccountNumber name;
       psibase::TimePointUSec created;
       uint32_t               attempts = 0;
       std::string            last_error;
-      PSIO_REFLECT(FailedSignup, id, name, created, attempts, last_error)
+      PSIO_REFLECT(FailedSignup, id, created, attempts, last_error)
    };
 
    /// Node-local account requests.
@@ -190,21 +199,23 @@ namespace LocalService
    /// and replies with its JSON trace once final. The same push runs once on
    /// its own when `creator_ready` first reports `ok`.
    ///
-   /// `POST /signup` `{name, pubkey_pem}` is anonymous. It returns 403 unless
-   /// `requests_enabled`, `free_tier.enabled`, and `/status` `ready` all hold.
-   /// `name` must be 8 to 10 `[a-z0-9-]` characters, with no leading or
-   /// trailing hyphen and no `--`, and must name no existing account. The
-   /// signup is stored `queued` with the free tier's `usd_cents` and `tokens`
-   /// (both 0 when billing is disabled). An immediate `x-timer` callback
-   /// provisions it.
+   /// `POST /signup` `{invite_id, payload, token}` is anonymous; `payload` is
+   /// hex. It returns 403 unless `requests_enabled`, `free_tier.enabled`, and
+   /// `/status` `ready` all hold, and 409 when `invite_id` already exists on
+   /// chain. The signup is stored `queued` with the free tier's `usd_cents` and
+   /// `tokens` (both 0 when billing is disabled). An immediate `x-timer`
+   /// callback provisions it.
    ///
    /// `provision` attempts each due queued signup once. It commits
    /// `attempts += 1` and `last_error = "signing aborted"`, then pushes as
-   /// `ac-creator`: `auth-sig::newAccount(name, pubkey)` and, when billing is
-   /// enabled, `tokens::credit(sys, vserver, tokens, "x-portal signup")` and
-   /// `vserver::buy_res_for(tokens, name, "x-portal signup")`. Success sets
-   /// `created` and `account`. A failed push sets `failed` and `last_error`.
-   /// A `signTx` abort leaves the signup `queued` with the placeholder error.
+   /// `ac-creator`. When billing is enabled, that is
+   /// `tokens::credit(sys, invite, cost, "x-portal signup")` with
+   /// `cost = invite::getInvCost(1, tokens)`, then
+   /// `invite::createInvite(invite_id, payload, 1, false, cost, tokens)`. With
+   /// billing disabled, it is `createInvite` alone with zero resources and no
+   /// subsidy. Success sets `invited`. A failed push sets `failed` and
+   /// `last_error`. A `signTx` abort leaves the signup `queued` with the
+   /// placeholder error.
    ///
    /// `GET /signup/:id` returns `SignupView`. `GET /admin/signups?state=failed`
    /// returns `FailedSignup` rows for an administrator.
@@ -218,11 +229,11 @@ namespace LocalService
       static std::vector<SystemService::AllowedAction> creatorAllowed()
       {
          return {
-             {psibase::AccountNumber{"auth-sig"}, psibase::MethodNumber{"newAccount"}},
+             {UserService::InviteNs::Invite::service, psibase::MethodNumber{"createInvite"}},
+             {UserService::InviteNs::Invite::service, psibase::MethodNumber{"delInvite"}},
              {UserService::Tokens::service, psibase::MethodNumber{"credit"}},
              {UserService::Tokens::service, psibase::MethodNumber{"debit"}},
              {UserService::Tokens::service, psibase::MethodNumber{"setUserConf"}},
-             {SystemService::VirtualServer::service, psibase::MethodNumber{"buy_res_for"}},
          };
       }
 

@@ -18,6 +18,7 @@
 #include <services/system/HttpServer.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/VirtualServer.hpp>
+#include <services/user/Invite.hpp>
 #include <services/user/Tokens.hpp>
 
 using namespace psibase;
@@ -25,6 +26,8 @@ using namespace LocalService;
 using namespace SystemService;
 using namespace SystemService::AuthSig;
 using namespace UserService;
+using UserService::InviteNs::Invite;
+using UserService::InviteNs::InvPayload;
 
 namespace
 {
@@ -71,19 +74,21 @@ namespace
        "HEfwKktshavRCyzHq3X55sdfgs6hRANCAARZ0Aumf5wa4PWSWxJFdN1qliUbma5a\n"
        "CgAuh9li58vzfwZFSjjdS6gbPG7+ZblPqv0jHj+pziAfYH5lzpVjD+kp\n"
        "-----END PRIVATE KEY-----\n");
-   const std::string visitorPem =
+   const auto otherPub = pubFromPem(
        "-----BEGIN PUBLIC KEY-----\n"
        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEM3slPkmtyksK3oqx2FX8gdIzTGjV\n"
        "rRo8o1cU24xxx8qven95ahpWwKSHvbtQlA54P6pY9Ixm7s+bDnniGPw1iQ==\n"
-       "-----END PUBLIC KEY-----\n";
-   const auto otherPub = pubFromPem(visitorPem);
+       "-----END PUBLIC KEY-----\n");
 
-   struct SignupBody
+   const std::vector<std::string> portalPackages{"TestDefault", "TokenUsers", "AuthScope",
+                                                 "Invite"};
+
+   std::vector<uint8_t> invitePayload(uint8_t seed)
    {
-      std::string name;
-      std::string pubkey_pem;
-      PSIO_REFLECT(SignupBody, name, pubkey_pem)
-   };
+      auto packed = psio::to_frac(
+          InvPayload{.fingerprint = std::vector<uint8_t>(32, seed), .secret = "secret"});
+      return {packed.begin(), packed.end()};
+   }
 
    void installPortal(DefaultTestChain& t)
    {
@@ -208,11 +213,14 @@ namespace
       return {reply.body.begin(), reply.body.end()};
    }
 
-   HttpRequest signupRequest(std::string name, std::string pem = visitorPem)
+   HttpRequest signupRequest(uint32_t inviteId)
    {
       return HttpRequestBuilder{}
           .header("X-Forwarded-For", "203.0.113.8")
-          .post(XPortal::service, "/signup", SignupBody{std::move(name), std::move(pem)});
+          .post(XPortal::service, "/signup",
+                SignupBody{.invite_id = inviteId,
+                           .payload   = invitePayload(static_cast<uint8_t>(inviteId)),
+                           .token     = "token-" + std::to_string(inviteId)});
    }
 
    void storeCreatorKey()
@@ -262,7 +270,7 @@ namespace
 
 TEST_CASE("status, requests switch, and seeded pricing")
 {
-   DefaultTestChain t{{"TestDefault", "TokenUsers", "AuthScope"}};
+   DefaultTestChain t{portalPackages};
    installPortal(t);
    auto alice   = AccountNumber{"alice"};
    auto creator = XPortal::creatorAccount;
@@ -376,13 +384,14 @@ TEST_CASE("status, requests switch, and seeded pricing")
 
    auto grant = config.free_tier.tokens->value;
    REQUIRE(grant > 0);
+   auto inviteCost = t.from(alice).to<Invite>().getInvCost(1, Quantity{grant}).returnVal();
    REQUIRE(t.from(alice).to<Tokens>().credit(sys, VirtualServer::service, cost, "").succeeded());
    REQUIRE(t.from(alice).to<VirtualServer>().buy_res_for(cost, creator, "").succeeded());
-   REQUIRE(t.from(alice).to<Tokens>().credit(sys, creator, grant, "").succeeded());
+   REQUIRE(t.from(alice).to<Tokens>().credit(sys, creator, inviteCost, "").succeeded());
    REQUIRE(t.from(creator)
                .with(KeyList{{agentPub, agentPriv}})
                .to<Tokens>()
-               .debit(sys, alice, grant, "")
+               .debit(sys, alice, inviteCost, "")
                .succeeded());
 
    status = t.get<Status>(XPortal::service, "/status");
@@ -392,7 +401,7 @@ TEST_CASE("status, requests switch, and seeded pricing")
 
 TEST_CASE("producer funds ac-creator when billing is enabled")
 {
-   DefaultTestChain t{{"TestDefault", "TokenUsers", "AuthScope"}};
+   DefaultTestChain t{portalPackages};
    installPortal(t);
    auto alice = AccountNumber{"alice"};
    setProducer(t, "alice");
@@ -451,23 +460,55 @@ TEST_CASE("producer funds ac-creator when billing is enabled")
    requireStoredKey(key.pubkey);
 }
 
+TEST_CASE("provision signs the billed invite actions as ac-creator")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+   auto alice = AccountNumber{"alice"};
+   setProducer(t, "alice");
+   storeCreatorKey();
+   skipCreatorSetup();
+   auto billed = enableBilling(t, alice, 5);
+
+   auto config = t.get<AdminConfig>(XPortal::service, "/admin/config");
+   REQUIRE(config.free_tier.tokens.has_value());
+   auto grant = *config.free_tier.tokens;
+   auto cost  = t.from(alice).to<Invite>().getInvCost(1, grant).returnVal();
+   createCreator(t, alice, agentPub, Quantity{billed.cost}, cost);
+   REQUIRE(t.from(XPortal::creatorAccount)
+               .with(KeyList{{agentPub, agentPriv}})
+               .to<Tokens>()
+               .debit(billed.id, alice, cost, "")
+               .succeeded());
+   t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
+   REQUIRE(t.get<Status>(XPortal::service, "/status").ready);
+
+   auto receipt = t.http<SignupReceipt>(signupRequest(9));
+
+   // The tester has no node to push to, so a run that gets past signTx still fails.
+   auto fired = runAs(t, AccountNumber{}, XTimer::service, "runOne", std::tuple{});
+   REQUIRE(fired.error.has_value());
+   CHECK(fired.error->find("Failed to sign transaction") == std::string::npos);
+   CHECK(signupRow(receipt.signup_id)->attempts == 1);
+}
+
 TEST_CASE("provision commits one attempt before signing")
 {
-   DefaultTestChain t{{"TestDefault", "TokenUsers", "AuthScope"}};
+   DefaultTestChain t{portalPackages};
    installPortal(t);
    auto alice   = AccountNumber{"alice"};
    auto creator = XPortal::creatorAccount;
    XAdmin{}.open<AdminAccountTable>().put(AdminAccountRow{alice});
    auto token = t.login(alice, XPortal::service);
    storeCreatorKey();
-   // Debit-only whitelist: newAccount is outside it, so signTx aborts after the attempt commits.
+   // Debit-only whitelist: createInvite is outside it, so signTx aborts after the attempt commits.
    transactor<AuthScope> scope{alice, AuthScope::service};
    expect(t.pushTransaction(t.makeTransaction({scope.newAccount(
        creator, agentPub, alice, std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})})));
    skipCreatorSetup();
    t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
 
-   auto created = t.http<SignupReceipt>(signupRequest("abcd1234"));
+   auto created = t.http<SignupReceipt>(signupRequest(21));
    auto fired   = runAs(t, AccountNumber{}, XTimer::service, "runOne", std::tuple{});
    REQUIRE(fired.error.has_value());
    CHECK(fired.error->find("Failed to sign transaction") != std::string::npos);
@@ -488,10 +529,10 @@ TEST_CASE("provision commits one attempt before signing")
                                             .body   = psio::to_frac(TransactionTrace{})}});
    CHECK(!pushed.error.has_value());
    auto done = t.http<SignupView>(forwarded("GET", "/signup/" + created.signup_id));
-   CHECK(done.state == "created");
-   CHECK(done.account == AccountNumber{"abcd1234"});
+   CHECK(done.state == "invited");
+   CHECK(done.token == "token-21");
 
-   auto second = t.http<SignupReceipt>(signupRequest("abcde12345"));
+   auto second = t.http<SignupReceipt>(signupRequest(22));
    auto claimed =
        runAs(t, XTimer::service, XPortal::service, "provision", std::tuple{std::uint64_t{1}});
    REQUIRE(claimed.error.has_value());
@@ -502,17 +543,18 @@ TEST_CASE("provision commits one attempt before signing")
        std::tuple{std::int32_t{12},
                   HttpReply{.status = HttpStatus::ok,
                             .body = psio::to_frac(TransactionTrace{
-                                .error = std::string{"account already exists"}})}});
+                                .error = std::string{"invite id is taken"}})}});
    CHECK(!failedPush.error.has_value());
    auto hidden = t.http(forwarded("GET", "/signup/" + second.signup_id));
    CHECK(hidden.status == HttpStatus::ok);
-   CHECK(replyText(hidden).find("account already exists") == std::string::npos);
+   CHECK(replyText(hidden).find("invite id is taken") == std::string::npos);
    auto view = t.http<SignupView>(forwarded("GET", "/signup/" + second.signup_id));
    CHECK(view.state == "failed");
-   CHECK(!view.account.has_value());
+   CHECK(!view.token.has_value());
    auto rows =
        t.http<std::vector<FailedSignup>>(forwarded("GET", "/admin/signups?state=failed", token));
    REQUIRE(rows.size() == 1);
-   CHECK(rows[0].name == AccountNumber{"abcde12345"});
-   CHECK(rows[0].last_error == "account already exists");
+   CHECK(rows[0].id == second.signup_id);
+   CHECK(rows[0].attempts == 1);
+   CHECK(rows[0].last_error == "invite id is taken");
 }

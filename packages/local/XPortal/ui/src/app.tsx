@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { siblingUrl } from "@psibase/common-lib";
 
@@ -13,6 +14,7 @@ import { NotOpen } from "./components/not-open";
 import { RequestWizard } from "./components/request-wizard";
 import { hasReturnedFromImport } from "./lib/import-return";
 import { isRequestsOpen } from "./lib/portal-api";
+import { forgetSignup } from "./lib/signup-request";
 
 const STATUS_QUERY_KEY = ["status"];
 
@@ -50,11 +52,14 @@ const Visitor = () => {
     const { data: currentUser, isPending } = useCurrentUser({
         enabled: returnedFromImport,
     });
+    const account = returnedFromImport ? currentUser : null;
+
+    useEffect(() => {
+        if (account) forgetSignup();
+    }, [account]);
 
     if (returnedFromImport && isPending) return <Loader />;
-    if (returnedFromImport && currentUser) {
-        return <DoneStep account={currentUser} />;
-    }
+    if (account) return <DoneStep account={account} />;
     // With no one logged in (e.g. a revisited `?imported` link after logout), start a new request.
     return <Requests />;
 };

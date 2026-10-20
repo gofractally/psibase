@@ -105,7 +105,6 @@ const FailedRequests = ({
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Account</TableHead>
                             <TableHead>Time</TableHead>
                             <TableHead>Tries</TableHead>
                             <TableHead>Error</TableHead>
@@ -114,7 +113,6 @@ const FailedRequests = ({
                     <TableBody>
                         {rows.map((row) => (
                             <TableRow key={row.id}>
-                                <TableCell>{row.name}</TableCell>
                                 <TableCell className="whitespace-nowrap">
                                     {formatUtc(row.created)}
                                 </TableCell>

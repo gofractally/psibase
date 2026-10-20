@@ -2,13 +2,18 @@ import { useState } from "react";
 
 import { CreatingStep } from "./creating-step";
 import { FailedStep } from "./failed-step";
-import { NameStep } from "./name-step";
-import type { SignupRequest } from "../lib/signup-request";
+import { SignUpStep } from "./sign-up-step";
+import { forgetSignup, storedSignupId } from "../lib/signup-request";
 
 type Step =
-    | { kind: "name"; name: string }
-    | { kind: "creating"; request: SignupRequest }
-    | { kind: "failed"; name: string };
+    | { kind: "sign-up" }
+    | { kind: "creating"; signupId: string }
+    | { kind: "failed" };
+
+const initialStep = (): Step => {
+    const signupId = storedSignupId();
+    return signupId ? { kind: "creating", signupId } : { kind: "sign-up" };
+};
 
 export const RequestWizard = ({
     onClosed,
@@ -16,34 +21,29 @@ export const RequestWizard = ({
     /** The node stopped accepting requests. */
     onClosed: () => void;
 }) => {
-    const [step, setStep] = useState<Step>({ kind: "name", name: "" });
+    const [step, setStep] = useState<Step>(initialStep);
+
+    const fail = () => {
+        forgetSignup();
+        setStep({ kind: "failed" });
+    };
 
     switch (step.kind) {
-        case "name":
+        case "sign-up":
             return (
-                <NameStep
-                    defaultName={step.name}
-                    onRequested={(request) =>
-                        setStep({ kind: "creating", request })
+                <SignUpStep
+                    onRequested={(signupId) =>
+                        setStep({ kind: "creating", signupId })
                     }
                     onClosed={onClosed}
-                    onFailed={(name) => setStep({ kind: "failed", name })}
+                    onFailed={fail}
                 />
             );
         case "creating":
-            return (
-                <CreatingStep
-                    request={step.request}
-                    onFailed={() =>
-                        setStep({ kind: "failed", name: step.request.name })
-                    }
-                />
-            );
+            return <CreatingStep signupId={step.signupId} onFailed={fail} />;
         case "failed":
             return (
-                <FailedStep
-                    onBack={() => setStep({ kind: "name", name: step.name })}
-                />
+                <FailedStep onBack={() => setStep({ kind: "sign-up" })} />
             );
     }
 };

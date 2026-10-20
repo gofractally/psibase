@@ -1,18 +1,48 @@
-import { requestSignup } from "./portal-api";
-import { generateSigningKey } from "./signing-key";
+import { z } from "zod";
 
-export interface SignupRequest {
-    name: string;
-    signupId: string;
-    privateKeyPem: string;
-}
+import { supervisor } from "@shared/lib/supervisor";
+
+import { requestSignup } from "./portal-api";
+
+const SIGNUP_ID_KEY = "x-portal-signup-id";
+
+const zInviteDetails = z.object({
+    inviteToken: z.string(),
+    inviteId: z.number(),
+    payload: z.instanceof(Uint8Array),
+});
+
+/** The Invite plugin's `prepare-new-invite` result. */
+export type InviteDetails = z.infer<typeof zInviteDetails>;
 
 /**
- * Generates the account's key in this browser and requests `name` with its
- * public key. Throws `PortalError` when the node refuses.
+ * Prepares an invite in this browser and asks the node to create it. The
+ * signup id is kept for this tab so a reload resumes the signup. Throws
+ * `PortalError` when the node refuses.
  */
-export const startSignup = async (name: string): Promise<SignupRequest> => {
-    const key = await generateSigningKey();
-    const signupId = await requestSignup(name, key.publicKeyPem);
-    return { name, signupId, privateKeyPem: key.privateKeyPem };
+export const startSignup = async (): Promise<string> => {
+    const invite = zInviteDetails.parse(
+        await supervisor.functionCall({
+            service: "invite",
+            intf: "inviter",
+            method: "prepareNewInvite",
+            params: [],
+        }),
+    );
+    const signupId = await requestSignup(invite);
+    sessionStorage.setItem(SIGNUP_ID_KEY, signupId);
+    return signupId;
 };
+
+/** Makes the created invite active for x-portal, so the host login prompt offers account creation. */
+export const importInvite = (token: string) =>
+    supervisor.functionCall({
+        service: "invite",
+        intf: "invitee",
+        method: "importInviteToken",
+        params: [token],
+    });
+
+export const storedSignupId = () => sessionStorage.getItem(SIGNUP_ID_KEY);
+
+export const forgetSignup = () => sessionStorage.removeItem(SIGNUP_ID_KEY);

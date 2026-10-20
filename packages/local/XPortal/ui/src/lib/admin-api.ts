@@ -30,7 +30,6 @@ const zPortalStatus = z.object({
 
 const zFailedSignup = z.object({
     id: z.string(),
-    name: z.string(),
     created: z.string(),
     attempts: z.number(),
     last_error: z.string(),

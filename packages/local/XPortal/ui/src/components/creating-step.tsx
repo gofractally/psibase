@@ -1,26 +1,25 @@
-import type { SignupRequest } from "../lib/signup-request";
-
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { PageContainer } from "@shared/components/page-container";
-import { supervisor } from "@shared/lib/supervisor";
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { IMPORT_RETURN_PATH } from "../lib/import-return";
 import { getSignup } from "../lib/portal-api";
+import { importInvite } from "../lib/signup-request";
 
 const POLL_INTERVAL_MS = 1000;
 
 /**
- * Once the node creates the account, leaves the page for the host import
+ * Once the node creates the invite, leaves the page for the host login
  * prompt, which returns to `IMPORT_RETURN_PATH`.
  */
 export const CreatingStep = ({
-    request: { name, signupId, privateKeyPem },
+    signupId,
     onFailed,
 }: {
-    request: SignupRequest;
+    signupId: string;
     onFailed: () => void;
 }) => {
     const { data: signup, isError } = useQuery({
@@ -30,20 +29,17 @@ export const CreatingStep = ({
             query.state.data?.state === "queued" ? POLL_INTERVAL_MS : false,
     });
 
-    const { mutate: importAccount, isIdle: isImportIdle } = useMutation({
-        mutationFn: () =>
-            supervisor.functionCall(
-                {
-                    service: "host",
-                    plugin: "accounts",
-                    intf: "activeApp",
-                    method: "importNewAccount",
-                    params: [name, privateKeyPem, true],
-                },
-                { enabled: true, returnPath: IMPORT_RETURN_PATH },
-            ),
+    const { mutateAsync: connectAccount } = useConnectAccount();
+    const { mutate: redeemInLoginPrompt, isIdle: isRedeemIdle } = useMutation({
+        mutationFn: async (token: string) => {
+            await importInvite(token);
+            await connectAccount({
+                enabled: true,
+                returnPath: IMPORT_RETURN_PATH,
+            });
+        },
         onError: (error) => {
-            console.error("Failed to open the import prompt:", error);
+            console.error("Failed to open the login prompt:", error);
             onFailed();
         },
     });
@@ -51,15 +47,15 @@ export const CreatingStep = ({
     useEffect(() => {
         if (isError || signup?.state === "failed") {
             onFailed();
-        } else if (signup?.state === "created" && isImportIdle) {
-            importAccount();
+        } else if (signup?.state === "invited" && isRedeemIdle) {
+            redeemInLoginPrompt(signup.token);
         }
-    }, [signup?.state, isError, isImportIdle, importAccount, onFailed]);
+    }, [signup, isError, isRedeemIdle, redeemInLoginPrompt, onFailed]);
 
     return (
         <PageContainer className="space-y-6">
             <div>
-                <h2 className="text-lg font-medium">Creating account...</h2>
+                <h2 className="text-lg font-medium">Getting things ready...</h2>
                 <p className="text-muted-foreground text-sm">
                     This should only take a few seconds.
                 </p>

@@ -16,6 +16,7 @@
 #include <services/system/AuthSig.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/VirtualServer.hpp>
+#include <services/user/Invite.hpp>
 #include <services/user/Tokens.hpp>
 #include <tuple>
 
@@ -23,6 +24,8 @@ using namespace psibase;
 using namespace LocalService;
 using namespace SystemService;
 using namespace UserService;
+using UserService::InviteNs::Invite;
+using UserService::InviteNs::InvPayload;
 
 namespace
 {
@@ -30,7 +33,7 @@ namespace
    constexpr uint64_t freeTierUsdCents = 250;
 
    constexpr std::string_view stateQueued    = "queued";
-   constexpr std::string_view stateCreated   = "created";
+   constexpr std::string_view stateInvited   = "invited";
    constexpr std::string_view stateFailed    = "failed";
    constexpr std::string_view signingAborted = "signing aborted";
    constexpr char              signupMemo[]  = "x-portal signup";
@@ -192,9 +195,10 @@ namespace
       check(grant.has_value(), "free tier grant is not set");
       auto sys = to<Tokens>().getSysToken();
       check(sys.has_value(), "system token is not set");
+      auto cost    = to<Invite>().getInvCost(1, *grant);
       auto balance = to<Tokens>().getBalance(sys->id, XPortal::creatorAccount);
       auto buffer  = resourceBuffer(XPortal::creatorAccount);
-      return balance.value >= grant->value && buffer.value > 0;
+      return balance.value >= cost.value && buffer.value > 0;
    }
 
    std::optional<HostSettings> hostSettings()
@@ -312,8 +316,7 @@ namespace
       }
       else
       {
-         row->state      = std::string{stateCreated};
-         row->account    = row->name;
+         row->state      = std::string{stateInvited};
          row->last_error = {};
       }
       row->updated = wallNow();
@@ -518,19 +521,6 @@ namespace
       return std::nullopt;
    }
 
-   bool validSignupName(std::string_view name)
-   {
-      if (name.size() < 8 || name.size() > 10)
-         return false;
-      if (name.front() == '-' || name.back() == '-')
-         return false;
-      if (name.find("--") != std::string_view::npos)
-         return false;
-      return std::ranges::all_of(name, [](unsigned char c) {
-         return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
-      });
-   }
-
    // 32 bytes encode to 43 unpadded base64url characters. The final character's
    // low 2 bits are padding and must be zero, or decoding aborts.
    std::optional<Checksum256> parseSignupId(std::string_view text)
@@ -572,30 +562,20 @@ namespace
       if (!config.requests_enabled || !config.free_tier.enabled || !status.ready)
          return textError(req, HttpStatus::forbidden, "account requests are not open\n");
 
-      auto object = psio::convert_from_json<psio::json::any_object>(
-          std::string(req.body.begin(), req.body.end()));
-      auto nameField = objectField(object, "name");
-      if (!nameField)
-         return textError(req, HttpStatus::badRequest, "name is required\n");
-      auto name = nameField->get_if<std::string>();
-      if (!name)
-         return textError(req, HttpStatus::badRequest, "name must be a string\n");
-      if (!validSignupName(*name))
-         return textError(req, HttpStatus::badRequest, "invalid name\n");
-      if (to<Accounts>().exists(AccountNumber{*name}))
-         return textError(req, HttpStatus::conflict, "name is taken\n");
-
-      auto keyField = objectField(object, "pubkey_pem");
-      if (!keyField)
-         return textError(req, HttpStatus::badRequest, "pubkey_pem is required\n");
-      auto pem = keyField->get_if<std::string>();
-      if (!pem)
-         return textError(req, HttpStatus::badRequest, "pubkey_pem must be a string\n");
-      if (!pem->starts_with("-----BEGIN PUBLIC KEY-----") ||
-          pem->find("-----END PUBLIC KEY-----") == std::string::npos)
-         return textError(req, HttpStatus::badRequest, "pubkey_pem must be a PEM public key\n");
-      // parseSubjectPublicKeyInfo aborts the action. The marker check is the HTTP 400.
-      (void)AuthSig::parseSubjectPublicKeyInfo(*pem);
+      // A struct, not psio::json::any, because any rejects JSON numbers. A
+      // wrongly typed field aborts.
+      auto body = psio::convert_from_json<SignupBody>(std::string(req.body.begin(), req.body.end()));
+      if (!body.invite_id)
+         return textError(req, HttpStatus::badRequest, "invite_id is required\n");
+      if (!body.payload)
+         return textError(req, HttpStatus::badRequest, "payload is required\n");
+      if (!body.token)
+         return textError(req, HttpStatus::badRequest, "token is required\n");
+      if (!psio::fracpack_validate_strict<InvPayload>(
+              {reinterpret_cast<const char*>(body.payload->data()), body.payload->size()}))
+         return textError(req, HttpStatus::badRequest, "payload is not an invite payload\n");
+      if (to<Invite>().getInvite(*body.invite_id))
+         return textError(req, HttpStatus::conflict, "invite id is taken\n");
 
       uint64_t usd    = 0;
       Quantity tokens = 0;
@@ -614,14 +594,15 @@ namespace
          Checksum256 id;
          raw::getRandom(id.data(), id.size());
          auto now = wallNow();
-         stored   = Signup{.id         = id,
-                           .name       = AccountNumber{*name},
-                           .pubkey_pem = *pem,
-                           .usd_cents  = usd,
-                           .tokens     = tokens,
-                           .state      = std::string{stateQueued},
-                           .created    = now,
-                           .updated    = now};
+         stored   = Signup{.id        = id,
+                           .invite_id = *body.invite_id,
+                           .payload   = *body.payload,
+                           .token     = *body.token,
+                           .usd_cents = usd,
+                           .tokens    = tokens,
+                           .state     = std::string{stateQueued},
+                           .created   = now,
+                           .updated   = now};
          XPortal{}.open<SignupTable>().put(stored);
          to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
       }
@@ -644,7 +625,10 @@ namespace
       }
       if (!stored)
          return textError(req, HttpStatus::notFound, "signup not found\n");
-      return jsonBody(req, SignupView{.state = stored->state, .account = stored->account});
+      SignupView view{.state = stored->state};
+      if (stored->state == stateInvited)
+         view.token = stored->token;
+      return jsonBody(req, view);
    }
 
    struct FailedQuery
@@ -673,7 +657,6 @@ namespace
             if (row.state != stateFailed)
                continue;
             rows.push_back(FailedSignup{.id         = signupId(row.id),
-                                        .name       = row.name,
                                         .created    = row.created,
                                         .attempts   = row.attempts,
                                         .last_error = row.last_error});
@@ -699,18 +682,20 @@ namespace
 
    std::vector<Action> signupActions(const Signup& signup)
    {
-      auto pubkey = AuthSig::SubjectPublicKeyInfo{AuthSig::parseSubjectPublicKeyInfo(signup.pubkey_pem)};
-      transactor<AuthSig::AuthSig> auth{XPortal::creatorAccount, AuthSig::AuthSig::service};
-      std::vector<Action>          actions{auth.newAccount(signup.name, std::move(pubkey))};
-      if (!to<VirtualServer>().is_billing_enabled())
-         return actions;
-
-      auto sys = to<Tokens>().getSysToken();
-      check(sys.has_value(), "system token is not set");
-      transactor<Tokens>        tokens{XPortal::creatorAccount, Tokens::service};
-      transactor<VirtualServer> vserver{XPortal::creatorAccount, VirtualServer::service};
-      actions.push_back(tokens.credit(sys->id, VirtualServer::service, signup.tokens, signupMemo));
-      actions.push_back(vserver.buy_res_for(signup.tokens, signup.name, signupMemo));
+      std::vector<Action>     actions;
+      Quantity                cost;
+      std::optional<Quantity> subsidy;
+      if (to<VirtualServer>().is_billing_enabled())
+      {
+         auto sys = to<Tokens>().getSysToken();
+         check(sys.has_value(), "system token is not set");
+         cost    = to<Invite>().getInvCost(1, signup.tokens);
+         subsidy = signup.tokens;
+         transactor<Tokens> tokens{XPortal::creatorAccount, Tokens::service};
+         actions.push_back(tokens.credit(sys->id, Invite::service, cost, signupMemo));
+      }
+      transactor<Invite> invite{XPortal::creatorAccount, Invite::service};
+      actions.push_back(invite.createInvite(signup.invite_id, signup.payload, 1, false, cost, subsidy));
       return actions;
    }
 
