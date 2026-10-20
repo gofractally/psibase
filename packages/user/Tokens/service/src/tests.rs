@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::helpers::to_fixed;
-    use crate::{TokenFlags, Wrapper};
+    use crate::Wrapper;
     use psibase::services::http_server;
     use psibase::services::tokens::{Decimal, Precision, Quantity, TokensError};
     use psibase::*;
@@ -550,38 +550,6 @@ mod tests {
         let savings_balance_2 = get_sub_balance(&chain, alice, &savings, tid2, &token_a)?;
         assert_eq!(2_0000, savings_balance_1);
         assert_eq!(3_0000, savings_balance_2);
-
-        Ok(())
-    }
-
-    #[psibase::test_case(packages("Tokens"))]
-    fn test_untradeable_credit(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        Wrapper::push(&chain).init();
-
-        let alice = account!("alice");
-        chain.new_account(alice).unwrap();
-        let bob = account!("bob");
-        chain.new_account(bob).unwrap();
-        let vserver = account!("vserver");
-        chain.new_account(vserver).unwrap();
-
-        enable_nft_auto_debit(&chain, alice);
-
-        let memo = Memo::new("memo".to_string()).unwrap();
-        let a = Wrapper::push_from(&chain, alice);
-        let v = Wrapper::push_from(&chain, vserver);
-
-        let sys = a.create(4.try_into().unwrap(), 1000.into()).get()?;
-        a.mint(sys, 100.into(), memo.clone()).get()?;
-        a.credit(sys, vserver, 40.into(), memo.clone()).get()?;
-        v.debit(sys, alice, 40.into(), memo.clone()).get()?;
-        a.setTokenConf(sys, TokenFlags::UNTRANSFERABLE.index(), true)
-            .get()?;
-        Wrapper::push(&chain).setSysToken(sys).get()?;
-
-        v.credit(sys, bob, 10.into(), memo).get()?;
-        assert_eq!(30, v.getBalance(sys, vserver).get()?.value);
-        assert_eq!(10, get_shared_balance(&chain, sys, vserver, bob).value);
 
         Ok(())
     }

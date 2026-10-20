@@ -109,6 +109,14 @@ pub mod tables {
         unrecallable,
     });
 
+    const PAID_SYSTEM_SERVICES: [AccountNumber; 5] = [
+        psibase::account!("vserver"),
+        psibase::account!("invite"),
+        psibase::account!("credential"),
+        psibase::account!("symbol"),
+        psibase::account!("namemarket"),
+    ];
+
     impl Token {
         fn new(precision: Precision, max_issued_supply: Quantity) -> Self {
             Self {
@@ -215,24 +223,24 @@ pub mod tables {
             );
         }
 
-        fn is_system_token(&self) -> bool {
-            ConfigRow::get().is_some_and(|config| config.sys_tid == self.id)
-        }
-
-        fn check_can_credit(&self) {
+        fn check_can_credit(&self, creditor: AccountNumber, debitor: AccountNumber) {
             if !self.get_flag(TokenFlags::UNTRANSFERABLE) {
                 return;
             }
-            let sender = get_sender();
-            if self.is_system_token() && sender == psibase::account!("vserver") {
+            let is_system_token = ConfigRow::get().is_some_and(|config| config.sys_tid == self.id);
+            if is_system_token
+                && PAID_SYSTEM_SERVICES
+                    .iter()
+                    .any(|&service| service == creditor || service == debitor)
+            {
                 return;
             }
             let holder = self.nft_holder();
             assert_eq!(
-                sender,
+                creditor,
                 holder,
                 "Token untradeable: {} cannot credit it; only {} can",
-                sender,
+                creditor,
                 holder
             );
         }
@@ -533,7 +541,7 @@ pub mod tables {
         pub fn credit(&mut self, quantity: Quantity, memo: Memo) {
             assert!(quantity.value > 0, "credit quantity must be greater than 0");
 
-            Token::get_assert(self.token_id).check_can_credit();
+            Token::get_assert(self.token_id).check_can_credit(self.creditor, self.debitor);
 
             Balance::get_or_new(self.creditor, self.token_id).sub_balance(quantity);
             self.add_balance(quantity);
