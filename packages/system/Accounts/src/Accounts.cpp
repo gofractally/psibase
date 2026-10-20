@@ -220,10 +220,8 @@ namespace SystemService
       {
          if (auto saved = frozen.get(account))
          {
-            auto previous = saved->authService;
-            if (exists(account))
-               assignAuth(account, previous);
-            frozen.erase(account);
+            assignAuth(account, saved->authService);
+            frozen.remove(*saved);
          }
          emit().history().unfroze(account, memo);
       }
