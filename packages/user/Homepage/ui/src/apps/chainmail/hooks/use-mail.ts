@@ -50,8 +50,8 @@ const transformRawMessagesToMessages = (
 const getIncomingMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getMsgs",
             params: [undefined, account],
         }),
@@ -80,78 +80,11 @@ export function useIncomingMessages() {
     };
 }
 
-const getArchivedMessages = async (account: string) => {
-    const rawMessages = zRawMessage.array().parse(
-        await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
-            method: "getArchivedMsgs",
-            params: [undefined, account],
-        }),
-    );
-    return transformRawMessagesToMessages(rawMessages, account);
-};
-
-const archivedMsgAtom = atom<Message["id"]>("");
-export function useArchivedMessages() {
-    const { data: user } = useCurrentUser();
-    const query = useQuery({
-        queryKey: QueryKey.mailbox("archived", user!),
-        queryFn: () => getArchivedMessages(user!),
-        enabled: Boolean(user),
-    });
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(archivedMsgAtom);
-    const selectedMessage = query.data?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        query,
-        selectedMessage,
-        setSelectedMessageId,
-    };
-}
-
-const getSavedMessages = async (account: string) => {
-    const rawMessages = zRawMessage.array().parse(
-        await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
-            method: "getSavedMsgs",
-            params: [account],
-        }),
-    );
-
-    return transformRawMessagesToMessages(rawMessages, account);
-};
-
-const savedMsgAtom = atom<Message["id"]>("");
-export function useSavedMessages() {
-    const { data: user } = useCurrentUser();
-    const query = useQuery({
-        queryKey: QueryKey.mailbox("saved", user!),
-        queryFn: () => getSavedMessages(user!),
-        enabled: Boolean(user),
-    });
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(savedMsgAtom);
-    const selectedMessage = query.data?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        query,
-        selectedMessage,
-        setSelectedMessageId,
-    };
-}
-
 const getSentMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getMsgs",
             params: [account],
         }),
@@ -218,9 +151,7 @@ export const useInvalidateMailboxQueries = () => {
 
     const all = [
         zMailbox.Values.inbox,
-        zMailbox.Values.archived,
         zMailbox.Values.sent,
-        zMailbox.Values.saved,
     ] as QueryableMailbox[];
 
     const invalidate = useCallback(
@@ -243,38 +174,10 @@ export const useSendMessage = () => {
         mutationFn: async (vars) => {
             const { to, subject, message } = zSendMessageSchema.parse(vars);
             await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
+                service: "homepage",
+                intf: "chainmail",
                 method: "send",
                 params: [to, subject, message],
-            });
-        },
-    });
-};
-
-export const useArchiveMessage = () => {
-    return useMutation<void, Error, string | number | bigint>({
-        mutationFn: async (id) => {
-            const messageId = z.coerce.bigint().parse(id);
-            await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
-                method: "archive",
-                params: [messageId],
-            });
-        },
-    });
-};
-
-export const useSaveMessage = () => {
-    return useMutation<void, Error, string | number | bigint>({
-        mutationFn: async (id) => {
-            const messageId = z.coerce.bigint().parse(id);
-            await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
-                method: "save",
-                params: [messageId],
             });
         },
     });

@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import QueryKey from "@/lib/query-keys";
 
-import { graphql } from "@shared/lib/graphql";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { config } from "@shared/lib/plugins";
 
 interface CandidateInfo {
     account: string;
@@ -44,9 +45,10 @@ export const useCandidates = () => {
                 }
             `;
 
-            const res = await graphql<CandidatesResponse>(query, {
-                service: "producers",
-            });
+            const res = await graphqlAuth<CandidatesResponse>(
+                config.producers.graphql,
+                query,
+            );
 
             return res.allCandidates.edges.map((edge) => edge.node);
         },

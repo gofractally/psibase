@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { graphql } from "@shared/lib/graphql";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { config } from "@shared/lib/plugins";
 
 export const SiteConfigResponse = z.object({
     getContent: z.object({
@@ -21,7 +22,8 @@ export const useLogoUploaded = () =>
     useQuery({
         queryKey: QueryKey.brandingFiles(),
         queryFn: async () => {
-            const res = await graphql(
+            const res = await graphqlAuth(
+                config.sites.graphql,
                 `
                     {
                         getContent(account: "branding", first: 99) {
@@ -33,7 +35,6 @@ export const useLogoUploaded = () =>
                         }
                     }
                 `,
-                { service: "sites" },
             );
 
             const parsed = SiteConfigResponse.parse(res);

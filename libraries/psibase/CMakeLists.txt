@@ -78,6 +78,7 @@ function(add suffix)
             service/src/wasi-polyfill/__wasi_path_filestat_get.cpp
             service/src/wasi-polyfill/__wasi_path_open.cpp
             service/src/wasi-polyfill/__wasi_proc_exit.cpp
+            service/src/wasi-polyfill/__wasi_random_get.cpp
         )
 
         add_library(psibase-service-base${suffix})
@@ -217,6 +218,7 @@ function(add suffix)
             native/src/prefix.cpp
             native/src/Prover.cpp
             native/src/RunQueue.cpp
+            native/src/Secrets.cpp
             native/src/Socket.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp

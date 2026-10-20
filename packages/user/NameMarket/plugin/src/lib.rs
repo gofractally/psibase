@@ -5,7 +5,8 @@ use bindings::exports::name_market::plugin::api::Guest as Api;
 use bindings::exports::name_market::plugin::authorized::Guest as Authorized;
 use bindings::exports::name_market::plugin::market_admin::Guest as MarketAdmin;
 use bindings::exports::name_market::plugin::market_admin::MarketConfig;
-use bindings::host::common::server as CommonServer;
+use bindings::exports::name_market::plugin::types as ExportTypes;
+use bindings::host::http::api as CommonServer;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
 
@@ -196,7 +197,30 @@ impl Api for NameMarketPlugin {
         overview.market_params.iter().any(|market| market.enabled)
     }
 
-    #[psibase_plugin::authorized(High, whitelist = ["accounts", "homepage"])]
+    #[psibase_plugin::authorized(None)]
+    fn get_markets_overview() -> Result<ExportTypes::MarketsOverview, Error> {
+        let overview = markets_overview()?;
+        Ok(ExportTypes::MarketsOverview {
+            market_params: overview
+                .market_params
+                .into_iter()
+                .map(|row| ExportTypes::MarketParam {
+                    length: row.length,
+                    enabled: row.enabled,
+                })
+                .collect(),
+            current_prices: overview
+                .current_prices
+                .into_iter()
+                .map(|row| ExportTypes::MarketPrice {
+                    length: row.length,
+                    price: row.price.to_string(),
+                })
+                .collect(),
+        })
+    }
+
+    #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
         let acct_name = AccountNumber::from_exact(&account)
             .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
@@ -225,7 +249,7 @@ impl Api for NameMarketPlugin {
         Ok(())
     }
 
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["host", "homepage"])]
     fn claim(account: String) -> Result<(), Error> {
         let account = AccountNumber::from_exact(&account)
             .map_err(|_| ErrorType::InvalidAccountName(account))?;
@@ -348,7 +372,7 @@ fn require_active_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error
 }
 
 impl Authorized for NameMarketPlugin {
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage", "config"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["host", "homepage", "config"])]
     fn graphql(query: String) -> Result<String, Error> {
         CommonServer::post_graphql_get_json(&query)
     }

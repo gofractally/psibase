@@ -131,7 +131,6 @@ namespace psibase
       ///
       /// ```
       /// auto eventANumber = this->emit().history().myEvent(a, s);
-      /// auto eventBNumber = this->emit().ui().updateDisplay();
       /// auto eventCNumber = this->emit().merkle().credit(from, to, amount);
       /// ```
       ///
@@ -150,7 +149,6 @@ namespace psibase
       /// ```
       /// EventEmitter<MyService> emitter;
       /// auto eventANumber = emitter.history().myEvent(a, s);
-      /// auto eventBNumber = emitter.ui().updateDisplay();
       /// auto eventCNumber = emitter.merkle().credit(from, to, amount);
       /// ```
       template <typename DerivedService>
@@ -181,17 +179,9 @@ namespace psibase
    };  // Service
 };  // namespace psibase
 
-#define PSIBASE_REFLECT_EVENTS(SERVICE)       \
-   using SERVICE##_Events = SERVICE ::Events; \
-   PSIO_REFLECT(SERVICE##_Events)
-
 #define PSIBASE_REFLECT_HISTORY_EVENTS(SERVICE, ...)          \
    using SERVICE##_EventsHistory = SERVICE ::Events::History; \
    PSIO_REFLECT(SERVICE##_EventsHistory, __VA_ARGS__)
-
-#define PSIBASE_REFLECT_UI_EVENTS(SERVICE, ...)     \
-   using SERVICE##_EventsUi = SERVICE ::Events::Ui; \
-   PSIO_REFLECT(SERVICE##_EventsUi, __VA_ARGS__)
 
 #define PSIBASE_REFLECT_MERKLE_EVENTS(SERVICE, ...)         \
    using SERVICE##_EventsMerkle = SERVICE ::Events::Merkle; \
@@ -199,3 +189,9 @@ namespace psibase
 
 #define PSIBASE_REFLECT_TABLES(SERVICE, ...) \
    boost::mp11::mp_list<__VA_ARGS__> psibase_get_tables(SERVICE*);
+
+#define PSIBASE_PUBLIC_EVENT(e)                                             \
+   constexpr ::std::string_view eventAccess(void*, ::psibase::nt_wrap<&e>*) \
+   {                                                                        \
+      return "public";                                                      \
+   }

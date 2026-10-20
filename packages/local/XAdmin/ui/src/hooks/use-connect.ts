@@ -20,4 +20,9 @@ export const useConnect = () =>
                 throw new Error("Failed connecting to node");
             }
         },
+        onSuccess: (_data, _variables, _onMutateResult, context) => {
+            context.client.invalidateQueries({ queryKey: queryKeys.statuses });
+            context.client.invalidateQueries({ queryKey: queryKeys.config });
+            context.client.invalidateQueries({ queryKey: queryKeys.peers });
+        },
     });

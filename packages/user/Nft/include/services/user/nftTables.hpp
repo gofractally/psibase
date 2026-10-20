@@ -2,7 +2,6 @@
 #include <compare>
 #include <cstdint>
 #include <psibase/AccountNumber.hpp>
-#include <psibase/Bitset.hpp>
 #include <psibase/Table.hpp>
 
 namespace UserService
@@ -36,8 +35,8 @@ namespace UserService
 
       static bool isValidKey(const NID& id) { return id != 0; }
 
-      using ByOwner  = psibase::CompositeKey<&NftRecord::owner, &NftRecord::id>;
-      using ByIssuer = psibase::CompositeKey<&NftRecord::issuer, &NftRecord::id>;
+      using ByOwner  = psibase::CompositeKey<&NftRecord::owner, &NftRecord::issuer, &NftRecord::id>;
+      using ByIssuer = psibase::CompositeKey<&NftRecord::issuer, &NftRecord::owner, &NftRecord::id>;
 
       auto operator<=>(const NftRecord&) const = default;
    };

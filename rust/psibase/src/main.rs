@@ -10,7 +10,9 @@ use futures::{
     FutureExt, StreamExt,
 };
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{auth_delegate, packages, sites, staged_tx, transact, x_packages};
+use psibase::services::{
+    accounts, auth_delegate, packages, sites, staged_tx, transact, x_packages,
+};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions, fetch_packages,
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
@@ -18,13 +20,13 @@ use psibase::{
     new_account_owned_action, preapprove_action, push_transaction, push_transaction_optimistic,
     push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
     set_owner_action, sign_transaction, AccountNumber, Action, ActionFormatter, AnyPrivateKey,
-    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
-    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
-    PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
-    SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction, StagedUpload, Tapos,
-    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
-    Version,
+    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, EssentialServices, ExactAccountNumber,
+    FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
+    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull,
+    PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction,
+    SchemaFetcher, SchemaMap, Seconds, ServiceInfo, ServiceWrapper, SignedTransaction,
+    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -544,17 +546,6 @@ enum Command {
     External(Vec<OsString>),
 }
 
-#[allow(dead_code)] // TODO: move to lib if still needed
-fn to_hex(bytes: &[u8]) -> String {
-    let mut result: Vec<u8> = Vec::with_capacity(bytes.len() * 2);
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    for byte in bytes {
-        result.push(DIGITS[(byte >> 4) as usize]);
-        result.push(DIGITS[(byte & 0x0f) as usize]);
-    }
-    String::from_utf8(result).unwrap()
-}
-
 fn store_sys(
     sender: AccountNumber,
     path: &str,
@@ -754,9 +745,10 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
     let mut schemas = SchemaMap::new();
 
     for action in &actions {
-        if !schemas.contains_key(&action.service.parse()?) {
+        let service = action.service.into();
+        if !schemas.contains_key(&service) {
             schemas.insert(
-                action.service.parse()?,
+                service,
                 crate::as_json(
                     client.get(
                         packages::SERVICE
@@ -877,7 +869,7 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
             auth_delegate::Wrapper::pack_from(args.sender.into()).newAccount(
                 args.account.into(),
                 args.sender.into(),
-                false,
+                accounts::NewAccountMode::KEEP_EXISTING,
             ),
         )
     }
@@ -1236,7 +1228,10 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let mut packages = package_registry.resolve(&package_names, false).await?;
+    let essential = EssentialServices::with_key(&args.block_key);
+    let mut packages = package_registry
+        .resolve(&package_names, false, &essential)
+        .await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
@@ -1244,6 +1239,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         true,
         expiration,
         &mut packages,
+        &essential,
         args.compression_level,
     )?;
 
@@ -1621,13 +1617,20 @@ async fn apply_packages<
     compression_level: u32,
     existing: PackageList,
 ) -> Result<SchemaMap, anyhow::Error> {
-    let ops = fetch_packages(reg, ops, &existing).await?;
-    let updated_packages = existing.into_updated(&ops, sender);
     let mut schemas = SchemaMap::new();
+    let ops = fetch_packages(
+        reg,
+        ops,
+        &existing,
+        &HttpSchemaFetcher { client, base_url },
+        &mut schemas,
+        &EssentialServices::empty(),
+    )
+    .await?;
+    let updated_packages = existing.into_updated(&ops, sender);
     for op in ops {
         match op {
             PackageOpFull::Install(mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 out.set_label(format!(
                     "Installing {}-{}",
                     package.name(),
@@ -1655,7 +1658,6 @@ async fn apply_packages<
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOpFull::Replace(meta, mut package) => {
-                package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
@@ -2064,7 +2066,16 @@ async fn do_install_local<T: Read + Seek>(
     let progress = ProgressBar::new(to_install.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len}\n{msg}")?,
     );
-    let to_install = fetch_packages(&package_registry, to_install, &installed).await?;
+    let mut schemas = SchemaMap::new();
+    let to_install = fetch_packages(
+        &package_registry,
+        to_install,
+        &installed,
+        &NullSchemaFetcher,
+        &mut schemas,
+        &EssentialServices::empty(),
+    )
+    .await?;
     progress.set_message("Installing packages");
     let res: Result<(), anyhow::Error> = async {
         for op in to_install {

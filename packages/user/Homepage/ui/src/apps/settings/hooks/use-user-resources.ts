@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import QueryKey from "@/lib/query-keys";
 
-import { supervisor } from "@shared/lib/supervisor";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { homepage } from "@shared/lib/plugins";
 
 interface UserResourcesResponse {
     userResources: {
@@ -31,7 +32,7 @@ export const useUserResources = (
 
             const query = `
                 query {
-                    userResources(user: "${user}") {
+                    userResources(account: "${user}") {
                         balance
                         bufferCapacity
                         autoFillThresholdPercent
@@ -39,34 +40,20 @@ export const useUserResources = (
                 }
             `;
 
-            const result = await supervisor.functionCall({
-                service: "vserver",
-                plugin: "plugin",
-                intf: "authorized",
-                method: "graphql",
-                params: [query],
-            });
+            const data = await graphqlAuth<UserResourcesResponse>(
+                homepage.virtualServer.graphql,
+                query,
+            );
 
-            const response = JSON.parse(result) as {
-                data: UserResourcesResponse;
-                errors?: Array<{ message: string }>;
-            };
-
-            if (response.errors) {
-                throw new Error(response.errors[0].message);
-            }
-
-            if (!response.data.userResources) {
+            if (!data.userResources) {
                 return null;
             }
 
             return {
-                balance: Number(response.data.userResources.balance),
-                bufferCapacity: Number(
-                    response.data.userResources.bufferCapacity,
-                ),
+                balance: Number(data.userResources.balance),
+                bufferCapacity: Number(data.userResources.bufferCapacity),
                 autoFillThresholdPercent: Number(
-                    response.data.userResources.autoFillThresholdPercent,
+                    data.userResources.autoFillThresholdPercent,
                 ),
             };
         },

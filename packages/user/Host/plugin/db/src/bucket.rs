@@ -1,7 +1,5 @@
 use crate::exports::host::db::store::{Database, DbMode, GuestBucket, StorageDuration};
-use crate::host::common::client::get_sender;
-use crate::host::types::types::Error;
-use crate::make_error;
+use crate::host::client::api::get_sender;
 use crate::supervisor::bridge::{database as HostDb, intf::get_chain_id};
 use regex::Regex;
 use std::cell::RefCell;
@@ -126,27 +124,29 @@ impl Bucket {
     }
 
     fn validate_value_size(&self, value: &[u8]) {
-        // 100kb
-        const MAX_SIZE: usize = 100 * 1024;
-        assert!(value.len() <= MAX_SIZE, "value must be less <= 100KB");
+        let max = match self.db.duration {
+            StorageDuration::Ephemeral => 1024 * 1024, // 1MB; never written to the host
+            _ => 100 * 1024,                           // 100KB
+        };
+        assert!(
+            value.len() <= max,
+            "value exceeds size limit ({} bytes) for {:?}",
+            max, self.db.duration
+        );
     }
 
-    fn validate_identifier(identifier: &str) -> Result<(), Error> {
-        // Validate identifier with regex /^[0-9a-zA-Z-]+$/
+    fn validate_identifier(identifier: &str) {
         let valid_identifier_regex = Regex::new(r"^[0-9a-zA-Z_-]+$").unwrap();
-        if !valid_identifier_regex.is_match(&identifier) {
-            return Err(make_error(
-                "Invalid bucket identifier: Identifier must conform to /^[0-9a-zA-Z_-]+$/",
-            )
-            .into());
-        }
-        Ok(())
+        assert!(
+            valid_identifier_regex.is_match(identifier),
+            "Invalid bucket identifier: Identifier must conform to /^[0-9a-zA-Z_-]+$/",
+        );
     }
 }
 
 impl GuestBucket for Bucket {
     fn new(db: Database, identifier: String) -> Self {
-        Self::validate_identifier(&identifier).unwrap();
+        Self::validate_identifier(&identifier);
         let service_account = get_sender();
         let mode = match db.mode {
             DbMode::NonTransactional => "non-trx",

@@ -9,7 +9,8 @@ using namespace psio::schema_types;
 namespace UserService
 {
    SchemaCache::SchemaCache() {}
-   const CompiledType* SchemaCache::getSchemaType(EventDb       db,
+   const CompiledType* SchemaCache::getSchemaType(AccountNumber user,
+                                                  EventDb       db,
                                                   AccountNumber service,
                                                   MethodNumber  event)
    {
@@ -25,16 +26,20 @@ namespace UserService
             return nullptr;
          }
       }
-      if (auto type = pos->second.schema.getType(db, event))
-         return pos->second.cschema.get(type);
+      bool canReadPrivate = user == AccountNumber{} || user.base() == service.base();
+      if (auto type = pos->second.schema.getType(canReadPrivate, db, event))
+      {
+         auto& entry = pos->second;
+         if (!entry.cschema)
+         {
+            entry.cschema.emplace(entry.schema.types, psibase_builtins, entry.schema.eventTypes());
+         }
+         return entry.cschema->get(type);
+      }
       return nullptr;
    }
 
-   SchemaCache::CacheEntry::CacheEntry(ServiceSchema&& schema)
-       : schema(std::move(schema)),
-         cschema(this->schema.types, psibase_builtins, this->schema.eventTypes())
-   {
-   }
+   SchemaCache::CacheEntry::CacheEntry(ServiceSchema&& schema) : schema(std::move(schema)) {}
 
    SchemaCache& SchemaCache::instance()
    {

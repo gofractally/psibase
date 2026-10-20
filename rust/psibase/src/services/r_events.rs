@@ -1,7 +1,7 @@
 #[crate::service(name = "events+1", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::HttpRequest;
+    use crate::{AccountNumber, HttpRequest};
 
     #[action]
     fn sqlQuery(query: String, params: Vec<String>) -> String {
@@ -9,7 +9,11 @@ mod service {
     }
 
     #[action]
-    fn serveSys(request: HttpRequest) -> Option<crate::http::HttpReply> {
+    fn serveSys(
+        request: HttpRequest,
+        socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<crate::http::HttpReply> {
         unimplemented!()
     }
 }

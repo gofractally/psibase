@@ -1,4 +1,5 @@
-import { callPluginFunction, nameMarket } from "@shared/lib/plugins";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { homepage } from "@shared/lib/plugins";
 
 import {
     zNameEvent,
@@ -18,20 +19,7 @@ export type FetchNameEventsPageParams =
     | { last: number; before?: string };
 
 async function nameMarketAuthorizedGraphql<T>(query: string): Promise<T> {
-    const result = await callPluginFunction(nameMarket.authorized.graphql, [
-        query,
-    ]);
-
-    const response = JSON.parse(result) as {
-        data: T;
-        errors?: Array<{ message: string }>;
-    };
-
-    if (response.errors?.length) {
-        throw new Error(response.errors[0]?.message ?? "GraphQL query failed");
-    }
-
-    return response.data;
+    return graphqlAuth(homepage.accountsMarketplace.graphql, query);
 }
 
 function mapNameEventEdges(edges: Array<{ cursor?: string; node?: unknown }>) {
@@ -103,7 +91,10 @@ const NAME_EVENT_NODE_FIELDS = `
     }
 `;
 
-export async function fetchNameEventsPage(params: FetchNameEventsPageParams) {
+export async function fetchNameEventsPage(
+    owner: string,
+    params: FetchNameEventsPageParams,
+) {
     const isBackward = "last" in params;
     const paginationArg = isBackward
         ? `last: ${params.last}${
@@ -117,7 +108,7 @@ export async function fetchNameEventsPage(params: FetchNameEventsPageParams) {
         await nameMarketAuthorizedGraphql(
             `
                 {
-                    nameEvents(${paginationArg}) {
+                    nameEvents(owner: "${owner}", ${paginationArg}) {
                         edges {
                             cursor
                             node {

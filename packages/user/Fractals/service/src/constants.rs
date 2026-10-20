@@ -22,3 +22,6 @@ pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
 pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
 pub const DEFAULT_MEMBER_DISTRIBUTION_INTERVAL: u32 = ONE_DAY;
 pub const DEFAULT_RECRUITMENT_PPM: u32 = 50_000; // 5%
+
+// Simple limitation + also related to fibonacci function limit.
+pub const MAX_PAID_OCCUPATIONS: u8 = 25;

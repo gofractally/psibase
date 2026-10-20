@@ -9,6 +9,8 @@ export const queryKeys = {
     installedLocalPackages: ["installedLocalPackages"] as const,
     packages: ["packages"] as const,
     peers: ["peers"] as const,
+    peerUsers: ["peerUsers"] as const,
+    setPeerUser: ["setPeerUser"] as const,
     producers: ["producers"] as const,
     statuses: ["statuses"] as const,
 

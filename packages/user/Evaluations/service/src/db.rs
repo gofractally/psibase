@@ -2,11 +2,11 @@
 pub mod tables {
     use async_graphql::SimpleObject;
 
-    use psibase::{AccountNumber, Fracpack, ToSchema};
+    use psibase::{AccountNumber, Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack)]
     pub struct ConfigRow {
         pub owner: AccountNumber,
         pub last_used_id: u32,
@@ -20,7 +20,7 @@ pub mod tables {
     }
 
     #[table(name = "EvaluationTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Evaluation {
         pub id: u32,
         pub created_at: u32,
@@ -35,7 +35,9 @@ pub mod tables {
     }
 
     #[table(name = "UserTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(
+        Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
+    )]
     pub struct User {
         pub owner: AccountNumber,
         pub evaluation_id: u32,
@@ -47,7 +49,9 @@ pub mod tables {
     }
 
     #[table(name = "GroupTable", index = 3)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(
+        Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
+    )]
     pub struct Group {
         pub owner: AccountNumber,
         pub evaluation_id: u32,
@@ -56,7 +60,9 @@ pub mod tables {
     }
 
     #[table(name = "UserSettingsTable", index = 4)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[derive(
+        Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
+    )]
     pub struct UserSettings {
         #[primary_key]
         pub user: AccountNumber,

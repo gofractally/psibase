@@ -20,7 +20,6 @@ import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
-import { REDIRECT_ERROR_CODE } from "./constants";
 import { getRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
@@ -42,12 +41,39 @@ const rootDomain = siblingUrl();
 //   in a given call context.
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
+    pluginId("accounts", "query"),
+    pluginId("host", "accounts"),
     pluginId("host", "auth"),
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
+    pluginId("transact", "admin"),
     pluginId("clientdata", "plugin"),
     pluginId("webcrypto", "plugin"),
 ];
+
+// The homepage is served from the network name's subdomain, but its plugins are
+//   registered (e.g. in dyn-ld) under the "homepage" service.
+const toHomepageAlias = async <T extends { service: string }>(
+    id: T,
+): Promise<T> => {
+    const network = await networkNamePromise;
+    return network && id.service === network
+        ? { ...id, service: "homepage" }
+        : id;
+};
+
+// Control-flow signal thrown to unwind out of a plugin call.
+//
+// It extends Error so that JCO-transpiled glue never intercepts it: JCO's
+// getErrorPayload() re-throws Error instances rather than converting them into a
+// component Result::Err. The one exception is an Error carrying its own "payload"
+// property, so this class must NOT define one.
+class PromptSignal extends Error {
+    constructor(readonly kind: "prompt" | "embedded-error" | "preload-error") {
+        super(`prompt-signal:${kind}`);
+        this.name = "PromptSignal";
+    }
+}
 
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
@@ -58,6 +84,8 @@ export class Supervisor implements AppInterface {
     private context: CallContext | undefined;
 
     private embedder: string | undefined;
+
+    private inPreload = false;
 
     parser: Promise<any>;
 
@@ -111,55 +139,72 @@ export class Supervisor implements AppInterface {
     }
 
     private async doPreload(plugins: QualifiedPluginId[]) {
-        await chainIdPromise;
+        this.inPreload = true;
+        try {
+            await chainIdPromise;
 
-        if (plugins.length === 0) {
-            return;
-        }
-
-        // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
-        this.loader.trackPlugins([...systemPlugins]);
-        await this.loader.processPlugins();
-        await this.loader.awaitReady();
-
-        // Required to instantiate system plugins to execute the plugin calls below
-        await this.plugins.instantiateAll();
-
-        if (isEmbedded) {
-            const promptDetails = await this.supervisorCall(
-                getCallArgs("host", "prompt", "admin", "get-active-prompt", []),
-            );
-            if (promptDetails) {
-                this.embedder = promptDetails.activeApp;
-                delete this.context; // A new one will be created with the embedder
+            if (plugins.length === 0) {
+                return;
             }
+
+            // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., host:accounts, host:auth
+            this.loader.trackPlugins([...systemPlugins]);
+            await this.loader.processPlugins();
+            await this.loader.awaitReady();
+
+            // Required to instantiate system plugins to execute the plugin calls below
+            await this.plugins.instantiateAll();
+
+            if (isEmbedded) {
+                const promptDetails = await this.supervisorCall(
+                    getCallArgs(
+                        "host",
+                        "prompt",
+                        "admin",
+                        "get-active-prompt",
+                        [],
+                    ),
+                );
+                if (promptDetails) {
+                    this.embedder = promptDetails.activeApp;
+                    delete this.context; // A new one will be created with the embedder
+                }
+            }
+
+            setQueryToken(this.getActiveQueryToken());
+
+            // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
+            // The sync call to getAuthServices below only touches Phase 0 plugins.
+            this.loader.trackPlugins([...plugins]);
+            await this.loader.processPlugins();
+            await this.loader.awaitReady();
+
+            // Phase 2: Load the auth services for all connected accounts.
+            // This sync call uses accounts:plugin (Phase 0, already instantiated).
+            const auth_services: string[] = this.supervisorCall(
+                getCallArgs(
+                    "accounts",
+                    "plugin",
+                    "admin",
+                    "get-auth-services",
+                    [],
+                ),
+            );
+
+            const addtl_plugins: QualifiedPluginId[] = [];
+            for (const service of auth_services) {
+                if (!service) continue;
+
+                // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
+                addtl_plugins.push(pluginId(service, "plugin"));
+            }
+            this.loader.trackPlugins(addtl_plugins);
+
+            await this.loader.processPlugins();
+            await this.loader.awaitReady();
+        } finally {
+            this.inPreload = false;
         }
-
-        setQueryToken(this.getActiveQueryToken());
-
-        // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
-        // The sync call to getAuthServices below only touches Phase 0 plugins.
-        this.loader.trackPlugins([...plugins]);
-        await this.loader.processPlugins();
-        await this.loader.awaitReady();
-
-        // Phase 2: Load the auth services for all connected accounts.
-        // This sync call uses accounts:plugin (Phase 0, already instantiated).
-        const auth_services: string[] = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "admin", "get-auth-services", []),
-        );
-
-        const addtl_plugins: QualifiedPluginId[] = [];
-        for (const service of auth_services) {
-            if (!service) continue;
-
-            // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
-            addtl_plugins.push(pluginId(service, "plugin"));
-        }
-        this.loader.trackPlugins(addtl_plugins);
-
-        await this.loader.processPlugins();
-        await this.loader.awaitReady();
     }
 
     private replyToParent(id: string, result: any) {
@@ -202,7 +247,7 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
         const user = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "api", "get-current-user", []),
+            getCallArgs("host", "accounts", "api", "get-current-user", []),
         );
 
         if (!user) {
@@ -253,6 +298,14 @@ export class Supervisor implements AppInterface {
         );
     }
 
+    importKeyTransient(privateKey: string): string {
+        return this.supervisorCall(
+            getCallArgs("webcrypto", "plugin", "api", "import-key-transient", [
+                privateKey,
+            ]),
+        );
+    }
+
     signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
         // future: call out to SubtleCrypto
         return this.supervisorCall(
@@ -268,6 +321,13 @@ export class Supervisor implements AppInterface {
         return this.supervisorCall(
             getCallArgs("webcrypto", "plugin", "api", "sign", [msg, publicKey]),
         );
+    }
+
+    requestPrompt(): never {
+        if (this.inPreload) {
+            throw new PromptSignal("preload-error");
+        }
+        throw new PromptSignal(isEmbedded ? "embedded-error" : "prompt");
     }
 
     call(args: QualifiedFunctionCallArgs): any {
@@ -353,6 +413,7 @@ export class Supervisor implements AppInterface {
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
             await networkNamePromise;
+            plugin = await toHomepageAlias(plugin);
             this.setParentOrigination(callerOrigin);
             await this.preload([plugin]);
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
@@ -377,7 +438,7 @@ export class Supervisor implements AppInterface {
         try {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
-            await this.preload(plugins);
+            await this.preload(await Promise.all(plugins.map(toHomepageAlias)));
         } catch (e) {
             result = e;
         } finally {
@@ -395,6 +456,7 @@ export class Supervisor implements AppInterface {
     ): Promise<any> {
         try {
             await networkNamePromise;
+            args = await toHomepageAlias(args);
             this.setParentOrigination(callerOrigin);
 
             // This is the time-intensive step. It includes: downloading, parsing, and transpiling the
@@ -413,7 +475,7 @@ export class Supervisor implements AppInterface {
 
             // Starts the tx context.
             this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "start-tx", []),
+                getCallArgs("transact", "admin", "admin", "start-tx", []),
             );
 
             // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
@@ -422,7 +484,7 @@ export class Supervisor implements AppInterface {
 
             // Closes the current tx context. If actions were added, tx is submitted.
             const txResult = this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "finish-tx", []),
+                getCallArgs("transact", "admin", "admin", "finish-tx", []),
             );
             if (txResult !== null && txResult !== undefined) {
                 console.warn(txResult);
@@ -431,21 +493,35 @@ export class Supervisor implements AppInterface {
             // Send plugin result to parent window
             this.replyToParent(id, result);
         } catch (e) {
-            const err = getRecoverableError(e);
-            if (err) {
-                let newError;
-                if (err.code === REDIRECT_ERROR_CODE) {
-                    newError = new RedirectErrorObject(
-                        err.producer,
-                        err.message,
-                    );
-                } else {
-                    newError = new PluginErrorObject(err.producer, err.message);
-                }
-                this.replyToParent(id, newError);
+            let result: any;
+            if (e instanceof PromptSignal && e.kind === "prompt") {
+                result = new RedirectErrorObject(
+                    { service: "host", plugin: "prompt" },
+                    "user_prompt_request",
+                );
+            } else if (
+                e instanceof PromptSignal &&
+                e.kind === "embedded-error"
+            ) {
+                result = new PluginErrorObject(
+                    { service: "host", plugin: "prompt" },
+                    "Cannot prompt in embedded mode",
+                );
+            } else if (
+                e instanceof PromptSignal &&
+                e.kind === "preload-error"
+            ) {
+                result = new PluginErrorObject(
+                    { service: "host", plugin: "prompt" },
+                    "Cannot trigger user prompt during plugin preload",
+                );
             } else {
-                this.replyToParent(id, e);
+                const err = getRecoverableError(e);
+                result = err
+                    ? new PluginErrorObject(err.producer, err.message)
+                    : e;
             }
+            this.replyToParent(id, result);
         } finally {
             this.plugins.disposeAll();
             this.cleanupSessionState();

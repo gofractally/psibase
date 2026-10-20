@@ -1,7 +1,5 @@
 #include <psibase/api.hpp>
 
-#include <psio/from_bin.hpp>
-
 namespace psibase
 {
    std::vector<char> getResult(uint32_t size)

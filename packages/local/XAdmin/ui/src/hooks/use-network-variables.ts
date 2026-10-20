@@ -3,12 +3,15 @@ import { z } from "zod";
 
 import { queryKeys } from "@/lib/query-keys";
 
-import { graphql } from "@shared/lib/graphql";
+import { adminGraphql } from "@/lib/admin-graphql";
+
+import { useChainReady } from "./use-statuses";
 
 interface NetworkVariables {
     blockReplayFactor: number;
     perBlockSysCpuNs: number;
     objStorageBytes: number;
+    subjStorageBytes: number;
 }
 
 const zNetworkVariablesResponse = z.object({
@@ -16,10 +19,12 @@ const zNetworkVariablesResponse = z.object({
         blockReplayFactor: z.number(),
         perBlockSysCpuNs: z.string(),
         objStorageBytes: z.string(),
+        subjStorageBytes: z.string(),
     }),
 });
 
 export const useNetworkVariables = () => {
+    const chainReady = useChainReady();
     return useQuery<NetworkVariables>({
         queryKey: [...queryKeys.configNetworkVariables],
         queryFn: async () => {
@@ -28,9 +33,10 @@ export const useNetworkVariables = () => {
                     blockReplayFactor
                     perBlockSysCpuNs
                     objStorageBytes
+                    subjStorageBytes
                 }
             }`;
-            const res = await graphql(query, { service: "vserver" });
+            const res = await adminGraphql(query, { service: "vserver" });
 
             const response = zNetworkVariablesResponse.parse(res);
 
@@ -43,7 +49,11 @@ export const useNetworkVariables = () => {
                 objStorageBytes: Number(
                     response.getNetworkVariables.objStorageBytes,
                 ),
+                subjStorageBytes: Number(
+                    response.getNetworkVariables.subjStorageBytes,
+                ),
             };
         },
+        enabled: chainReady,
     });
 };

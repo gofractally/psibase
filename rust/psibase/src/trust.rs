@@ -64,7 +64,7 @@ macro_rules! define_trust {
     ) => {
 
         pub mod trust {
-            use crate::bindings::host::common::client::get_sender;
+            use crate::bindings::host::client::api::get_sender;
             use crate::bindings::host::types::types::Error;
             use crate::bindings::permissions::plugin::api as Permissions;
 

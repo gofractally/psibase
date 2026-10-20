@@ -1,0 +1,27 @@
+name: Major matches release branch
+description: Ensure version.hpp MAJOR equals the release branch major
+inputs:
+  version:
+    description: MAJOR.MINOR.PATCH version string
+    required: true
+  release-branch:
+    description: Release branch name (release/vN)
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Enforce major matches release branch
+      shell: bash
+      run: |
+        release_branch="${{ inputs.release-branch }}"
+        if [[ ! "$release_branch" =~ ^release/v[0-9]+$ ]]; then
+          echo "Release branch $release_branch is invalid; expected release/vN" >&2
+          exit 1
+        fi
+        major="${{ inputs.version }}"
+        major="${major%%.*}"
+        expected="${release_branch#release/v}"
+        if [[ "$major" != "$expected" ]]; then
+          echo "HEAD major $major does not match release branch major $expected" >&2
+          exit 1
+        fi

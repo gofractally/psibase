@@ -10,15 +10,14 @@ pub fn pct_to_ppm(pct: u8) -> u32 {
 
 #[psibase::service_tables]
 pub mod tables {
-    use async_graphql::{ComplexObject, SimpleObject};
-    use psibase::services::diff_adjust::{RateLimit, RateLimitTable, Wrapper as DiffAdjust};
-    use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
+    use async_graphql::SimpleObject;
+    use psibase::services::tokens::Quantity;
     use psibase::AccountNumber;
-    use psibase::{Fracpack, ServiceWrapper, Table, ToSchema};
+    use psibase::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -26,75 +25,17 @@ pub mod tables {
     }
 
     #[table(name = "AuctionsTable", index = 1)]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    #[graphql(complex)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Auction {
         #[primary_key]
         pub length: u8,
-        #[graphql(skip)]
         pub nft_id: u32,
         pub enabled: bool,
-        #[graphql(skip)]
         pub initial_price: Quantity,
     }
 
-    impl Auction {
-        fn rate_limit(&self) -> Option<RateLimit> {
-            RateLimitTable::read().get_index_pk().get(&self.nft_id)
-        }
-
-        fn sys_precision() -> Precision {
-            Tokens::call()
-                .getSysToken()
-                .expect("system token must be defined")
-                .precision
-        }
-    }
-
-    #[ComplexObject]
-    impl Auction {
-        /// Stored create price, as a Decimal in the system token.
-        pub async fn initial_price(&self) -> Decimal {
-            Decimal::new(self.initial_price, Self::sys_precision())
-        }
-
-        /// DiffAdjust target (target_min == target_max in NameMarket usage).
-        pub async fn target(&self) -> u32 {
-            self.rate_limit().map(|r| r.target_min).unwrap_or(0)
-        }
-
-        /// Floor price from DiffAdjust, as a Decimal in the system token.
-        pub async fn floor_price(&self) -> Decimal {
-            Decimal::new(
-                Quantity::from(self.rate_limit().map(|r| r.floor_difficulty).unwrap_or(0)),
-                Self::sys_precision(),
-            )
-        }
-
-        pub async fn window_seconds(&self) -> u32 {
-            self.rate_limit().map(|r| r.window_seconds).unwrap_or(0)
-        }
-
-        pub async fn increase_pct(&self) -> u8 {
-            crate::ppm_to_pct(self.rate_limit().map(|r| r.increase_ppm).unwrap_or(0))
-        }
-
-        pub async fn decrease_pct(&self) -> u8 {
-            crate::ppm_to_pct(self.rate_limit().map(|r| r.decrease_ppm).unwrap_or(0))
-        }
-
-        /// Current ask price (DiffAdjust difficulty), as a Decimal in the system token.
-        pub async fn price(&self) -> Decimal {
-            let mut price_raw = DiffAdjust::call().get_diff(self.nft_id);
-            if price_raw == 0 {
-                price_raw = self.rate_limit().map(|r| r.floor_difficulty).unwrap_or(0);
-            }
-            Decimal::new(Quantity::from(price_raw), Self::sys_precision())
-        }
-    }
-
     #[table(name = "PurchasedAccountsTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PurchasedAccount {
         #[primary_key]
         pub account: AccountNumber,
@@ -116,7 +57,7 @@ pub mod service {
     };
     use psibase::services::accounts as Accounts;
     use psibase::services::auth_delegate as AuthDelegate;
-    use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
+    use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::events;
     use psibase::services::nft::{self as Nfts, NftHolderFlags};
     use psibase::services::tokens::{self as Tokens, BalanceFlags};
@@ -216,7 +157,11 @@ pub mod service {
         let current_price = Quantity::from(DiffAdjust::call().increment(auction.nft_id, 1));
 
         Accounts::Wrapper::call().preapproveAcc(account);
-        AuthDelegate::Wrapper::call().newAccount(account, get_service(), true);
+        AuthDelegate::Wrapper::call().newAccount(
+            account,
+            get_service(),
+            Accounts::NewAccountMode::REQUIRE_NEW,
+        );
 
         PurchasedAccountsTable::new()
             .put(&PurchasedAccount {
@@ -289,7 +234,7 @@ pub mod service {
 
         let auctions_table = AuctionsTable::new();
         if let Some(auction) = auctions_table.get_index_pk().get(&length) {
-            if let Some(rate_limit) = RateLimitTable::read().get_index_pk().get(&auction.nft_id) {
+            if let Some(rate_limit) = DiffAdjust::call().get(auction.nft_id) {
                 if rate_limit.window_seconds == window_seconds
                     && rate_limit.target_min == target
                     && rate_limit.target_max == target

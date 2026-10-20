@@ -10,6 +10,23 @@ using namespace SystemService;
 
 namespace
 {
+   bool isResMonitoring()
+   {
+      return to<Transact>().isResMonitoring();
+   }
+
+   void skipBilling()
+   {
+      if (isResMonitoring())
+         to<Transact>().skipBilling(1);
+   }
+
+   void endSkipBilling()
+   {
+      if (isResMonitoring())
+         to<Transact>().endSkipBilling();
+   }
+
    auto compare_claim = [](const Claim& lhs, const Claim& rhs)
    { return std::tie(lhs.service, lhs.rawData) < std::tie(rhs.service, rhs.rawData); };
 
@@ -112,7 +129,9 @@ namespace SystemService
       status->consensus.next = {{std::move(consensus), status->consensus.current.services,
                                  status->consensus.current.wasmConfig},
                                 status->current.blockNum};
+      skipBilling();
       table.put(*status);
+      endSkipBilling();
    }
 
    void Producers::setProducers(std::vector<psibase::Producer> prods)
@@ -139,7 +158,9 @@ namespace SystemService
                status->consensus.current.data),
            status->consensus.current.services, status->consensus.current.wasmConfig},
           status->current.blockNum};
+      skipBilling();
       table.put(*status);
+      endSkipBilling();
    }
 
    void Producers::regCandidate(const std::string& endpoint, psibase::Claim claim)
@@ -200,28 +221,11 @@ namespace SystemService
    }
 
    bool Producers::checkAuthSys(uint32_t                    flags,
-                                AccountNumber               requester,
                                 AccountNumber               sender,
                                 ServiceMethod               action,
-                                std::vector<ServiceMethod>  allowedActions,
                                 std::vector<psibase::Claim> claims)
    {
       // verify that all claims are valid
-
-      // Standard verification for auth type
-      // TODO: refactor duplicated code
-      auto type = flags & AuthInterface::requestMask;
-      if (type == AuthInterface::runAsRequesterReq)
-         return true;  // Request is valid
-      else if (type == AuthInterface::runAsMatchedReq)
-         return true;  // Request is valid
-      else if (type == AuthInterface::runAsMatchedExpandedReq)
-         abortMessage("runAs: caller attempted to expand powers");
-      else if (type == AuthInterface::runAsOtherReq)
-         abortMessage("runAs: caller is not authorized");
-      else if (type != AuthInterface::topActionReq)
-         abortMessage("unsupported auth type");
-
       auto expectedClaims = ::getProducers()                          //
                             | std::views::transform(&Producer::auth)  //
                             | std::ranges::to<std::vector>();
@@ -246,8 +250,7 @@ namespace SystemService
       return getProducers();
    }
 
-   bool Producers::isAuthSys(AccountNumber                sender,
-                             std::vector<AccountNumber>   authorizers)
+   bool Producers::isAuthSys(AccountNumber sender, std::vector<AccountNumber> authorizers)
    {
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
@@ -257,8 +260,7 @@ namespace SystemService
       return countOverlapping(producers, authorizers) >= threshold;
    }
 
-   bool Producers::isRejectSys(AccountNumber                sender,
-                               std::vector<AccountNumber>   rejecters)
+   bool Producers::isRejectSys(AccountNumber sender, std::vector<AccountNumber> rejecters)
    {
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //

@@ -12,11 +12,11 @@ use crate::{
     self as psibase, account, actions::login_action, create_boot_transactions, fetch_packages,
     get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
     Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
-    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
-    InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
-    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper,
-    SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
-    Transaction, TransactionBuilder, TransactionTrace,
+    DirectoryRegistry, Error, EssentialServices, HostConfigRow, HttpBody, HttpHeader, HttpReply,
+    HttpRequest, InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
+    RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, ServiceWrapper, SignedTransaction,
+    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
+    TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList};
@@ -29,9 +29,8 @@ use psibase_macros::account_raw;
 use serde::{de::DeserializeOwned, Deserialize};
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
 use std::fs::File;
-use std::io::{BufReader, Read, Seek};
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::{marker::PhantomData, ptr::null_mut};
 
@@ -150,7 +149,8 @@ impl Chain {
     }
 
     pub fn boot_with<R: PackageRegistry>(&self, reg: &R, services: &[String]) -> Result<(), Error> {
-        let mut services = block_on(reg.resolve(services, false))?;
+        let essential = EssentialServices::with_key(&None);
+        let mut services = block_on(reg.resolve(services, false, &essential))?;
 
         const COMPRESSION_LEVEL: u32 = 4;
         let (boot_tx, subsequent_tx) = create_boot_transactions(
@@ -160,6 +160,7 @@ impl Chain {
             false,
             TimePointSec { seconds: 120 },
             &mut services[..],
+            &essential,
             COMPRESSION_LEVEL,
         )
         .unwrap();
@@ -247,7 +248,8 @@ impl Chain {
         let packages_dir = packages_root.join("packages");
         let registry = DirectoryRegistry::new(packages_dir);
         let package_names = vec!["XDefault".to_string()];
-        let packages = block_on(registry.resolve(&package_names, true)).unwrap();
+        let packages =
+            block_on(registry.resolve(&package_names, true, &EssentialServices::empty())).unwrap();
         let mut requests = Vec::new();
         let mut early_requests = Vec::new();
         unsafe {
@@ -529,41 +531,12 @@ impl Chain {
         TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
     }
 
-    pub fn run_action(&mut self, mode: RunMode, head: bool, action: Action) -> TransactionTrace {
+    pub fn run_action(&self, mode: RunMode, head: bool, action: Action) -> TransactionTrace {
         let packed = action.packed();
         let size = unsafe {
             tester_raw::runAction(self.chain_handle, mode, head, packed.as_ptr(), packed.len())
         };
         TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
-    }
-
-    /// Copy database to `path`
-    ///
-    /// Runs the following shell command: `mkdir -p {path} && cp -a {src}/* {path}`,
-    /// where `{path}` is the passed-in argument and `{src}` is the chain's database.
-    ///
-    /// Returns shell exit status; 0 if successful
-    pub fn copy_database(&self, path: &str) -> i32 {
-        let src = unsafe { self.get_path() };
-        execute(&format! {"mkdir -p {path} && cp -a {src}/* {path}", src = src, path = path})
-    }
-
-    /// Get filesystem path of chain's database
-    ///
-    /// See [`copy_database`](Self::copy_database) for the most-common use case
-    ///
-    /// # Safety
-    ///
-    /// It is safe to copy the files to another location on the filesystem. However,
-    /// modifying the original files or launching `psinode` on the original files
-    /// will corrupt the database and likely crash the `psitest` process running this
-    /// wasm.
-    pub unsafe fn get_path(&self) -> String {
-        let size = tester_raw::getChainPath(self.chain_handle, null_mut(), 0);
-        let mut bytes = Vec::with_capacity(size);
-        tester_raw::getChainPath(self.chain_handle, bytes.as_mut_ptr(), size);
-        bytes.set_len(size);
-        String::from_utf8_unchecked(bytes)
     }
 
     /// Select chain for database native functions
@@ -639,7 +612,11 @@ impl Chain {
     /// Doesn't fail if the account already exists.
     pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
         services::accounts::Wrapper::push(self)
-            .newAccount(account, AccountNumber::new(account_raw!("auth-any")), false)
+            .newAccount(
+                account,
+                AccountNumber::new(account_raw!("auth-any")),
+                services::accounts::NewAccountMode::KEEP_EXISTING,
+            )
             .get()?;
         Ok(())
     }
@@ -653,6 +630,61 @@ impl Chain {
         services::setcode::Wrapper::push_from(self, account)
             .setCode(account, 0, 0, code.to_vec().into())
             .get()
+    }
+
+    /// Deploy a service and set its code flags in a single transaction.
+    pub fn deploy_service_with_flags(
+        &self,
+        account: AccountNumber,
+        code: &[u8],
+        flags: u64,
+    ) -> Result<(), anyhow::Error> {
+        self.new_account(account)?;
+        let actions = vec![
+            services::setcode::Wrapper::pack_from(account).setCode(
+                account,
+                0,
+                0,
+                code.to_vec().into(),
+            ),
+            services::setcode::Wrapper::pack().setFlags(account, flags),
+        ];
+        let mut trx = Transaction {
+            tapos: Default::default(),
+            actions,
+            claims: vec![],
+        };
+        self.fill_tapos(&mut trx, 2);
+        let trace = self.push(&SignedTransaction {
+            transaction: trx.packed().into(),
+            proofs: Default::default(),
+            subjectiveData: None,
+        });
+        self.start_block();
+        ChainEmptyResult { trace }.get()
+    }
+
+    /// Total database usage footprint in bytes
+    pub fn database_usage(&self, db: DbId) -> u64 {
+        let mut total: u64 = 0;
+        let mut key: Vec<u8> = Vec::new();
+        loop {
+            let value_size = unsafe {
+                tester_raw::kvGreaterEqual(self.chain_handle, db, key.as_ptr(), key.len() as u32, 0)
+            };
+            if value_size == u32::MAX {
+                break;
+            }
+            let key_size = unsafe { tester_raw::getKey(null_mut(), 0) };
+            key = Vec::with_capacity(key_size as usize);
+            unsafe {
+                tester_raw::getKey(key.as_mut_ptr(), key_size);
+                key.set_len(key_size as usize);
+            }
+            total += key_size as u64 + value_size as u64;
+            key.push(0); // advance the cursor past the matched key
+        }
+        total
     }
 
     fn push_transactions(
@@ -679,29 +711,6 @@ impl Chain {
         Ok(())
     }
 
-    fn load_schemas<R: Read + Seek>(
-        &self,
-        package: &mut PackagedService<R>,
-        schemas: &mut SchemaMap,
-    ) -> Result<(), anyhow::Error> {
-        use crate::Table;
-        package.get_all_schemas(schemas)?;
-        let mut required = HashSet::new();
-        package.get_required_schemas(&mut required)?;
-        let index = self
-            .open::<services::packages::InstalledSchema, services::packages::InstalledSchemaTable>()
-            .get_index_pk();
-        for account in required {
-            if !schemas.contains_key(&account) {
-                let Some(schema) = index.get(&account) else {
-                    Err(anyhow!("Could not find schema for {account}"))?
-                };
-                schemas.insert(account, schema.schema);
-            }
-        }
-        Ok(())
-    }
-
     pub fn install<R: PackageRegistry>(
         &self,
         reg: &R,
@@ -715,17 +724,23 @@ impl Chain {
             installed.insert_installed(p)
         }
         let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
-        let packages = block_on(fetch_packages(reg, packages, &installed))?;
+        let mut schemas = SchemaMap::new();
+        let packages = block_on(fetch_packages(
+            reg,
+            packages,
+            &installed,
+            &ChainSchemaFetcher { chain: self },
+            &mut schemas,
+            &EssentialServices::empty(),
+        ))?;
         let updated_packages = installed.into_updated(&packages, sender);
 
-        let mut schemas = SchemaMap::new();
         const TARGET_SIZE: usize = 1024 * 1024;
         const COMPRESSION_LEVEL: u32 = 4;
         for op in packages {
             match op {
                 PackageOpFull::Install(mut package) => {
                     let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| Ok(actions));
-                    self.load_schemas(&mut package, &mut schemas)?;
                     builder.set_label(format!(
                         "Installing {}-{}",
                         package.name(),
@@ -899,6 +914,18 @@ impl Chain {
     pub fn display_trace<'a>(&'a self, trace: &'a TransactionTrace) -> ChainDisplayTrace<'a> {
         ChainDisplayTrace { chain: self, trace }
     }
+
+    pub fn trace_disk_usage<'a>(
+        &'a self,
+        trace: &'a TransactionTrace,
+        show_all_ops: bool,
+    ) -> ChainDisplayDiskUsage<'a> {
+        ChainDisplayDiskUsage {
+            chain: self,
+            trace,
+            show_all_ops,
+        }
+    }
 }
 
 impl Chain {
@@ -920,6 +947,26 @@ impl Chain {
             }
         }
     }
+
+    /// Propose, via [`staged_tx`](crate::services::staged_tx), that `sender`
+    /// call an action on the `W` service, wrapped in a proposal by `proposer`.
+    /// Intended for tests.
+    ///
+    /// ```ignore
+    /// chain.propose::<Wrapper>(proposer, sender).some_action(args).get()?;
+    /// ```
+    pub fn propose<W: crate::ToServiceSchema + crate::ServiceWrapper>(
+        &self,
+        proposer: AccountNumber,
+        sender: AccountNumber,
+    ) -> <W as crate::ServiceWrapper>::Actions<ProposalPusher<'_>> {
+        W::with_caller(ProposalPusher {
+            chain: self,
+            proposer,
+            sender,
+            service: <W as crate::ToServiceSchema>::SERVICE,
+        })
+    }
 }
 
 #[cfg(target_family = "wasm")]
@@ -934,6 +981,26 @@ impl<'a> std::fmt::Display for ChainDisplayTrace<'a> {
         let formatter = ActionFormatter::new(ChainSchemaFetcher { chain: self.chain });
         let _ = block_on(formatter.prepare_transaction_trace(self.trace));
         write!(f, "{}", formatter.display_transaction_trace(self.trace))
+    }
+}
+
+#[cfg(target_family = "wasm")]
+pub struct ChainDisplayDiskUsage<'a> {
+    chain: &'a Chain,
+    trace: &'a TransactionTrace,
+    show_all_ops: bool,
+}
+
+#[cfg(target_family = "wasm")]
+impl<'a> std::fmt::Display for ChainDisplayDiskUsage<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let formatter = ActionFormatter::new(ChainSchemaFetcher { chain: self.chain });
+        let _ = block_on(formatter.prepare_transaction_trace(self.trace));
+        write!(
+            f,
+            "{}",
+            formatter.display_disk_usage_trace(self.trace, self.show_all_ops)
+        )
     }
 }
 
@@ -962,14 +1029,17 @@ pub struct ChainEmptyResult {
 }
 
 impl ChainEmptyResult {
+    #[track_caller]
     pub fn get(&self) -> Result<(), anyhow::Error> {
         if let Some(e) = &self.trace.error {
-            Err(anyhow!("{}", e))
+            let loc = std::panic::Location::caller();
+            Err(anyhow!("{} (at {}:{})", e, loc.file(), loc.line()))
         } else {
             Ok(())
         }
     }
 
+    #[track_caller]
     pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
         self.trace.match_error(msg)
     }
@@ -981,6 +1051,7 @@ pub struct ChainResult<T: fracpack::UnpackOwned> {
 }
 
 impl<T: fracpack::UnpackOwned> ChainResult<T> {
+    #[track_caller]
     pub fn get(&self) -> Result<T, anyhow::Error> {
         self.get_with_debug(false)
     }
@@ -1000,15 +1071,16 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
             || act.sender == AccountNumber::default())
     }
 
+    #[track_caller]
     pub fn get_with_debug(&self, debug: bool) -> Result<T, anyhow::Error> {
         if let Some(e) = &self.trace.error {
-            return Err(anyhow!("{}", e));
+            let loc = std::panic::Location::caller();
+            return Err(anyhow!("{} (at {}:{})", e, loc.file(), loc.line()));
         }
         if let Some(transact) = self.trace.action_traces.last() {
             let at = transact
                 .inner_traces
                 .iter()
-                // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
                         if Self::is_user_action(&at.action) {
@@ -1033,9 +1105,15 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
                 return Ok(unpacked_ret);
             }
         }
-        Err(anyhow!("Can't find action in trace"))
+        let loc = std::panic::Location::caller();
+        Err(anyhow!(
+            "Can't find action in trace (at {}:{})",
+            loc.file(),
+            loc.line()
+        ))
     }
 
+    #[track_caller]
     pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
         self.trace.match_error(msg)
     }
@@ -1177,6 +1255,46 @@ pub trait Push: ServiceWrapper {
 
 impl<T: ServiceWrapper> Push for T {}
 
+/// A [`Caller`] that uses [`staged_tx::propose`](crate::services::staged_tx)
+/// to wrap an action call (from `sender` to `service`) in a proposal by `proposer`.
+#[derive(Clone, Debug)]
+pub struct ProposalPusher<'a> {
+    pub chain: &'a Chain,
+    pub proposer: AccountNumber,
+    pub sender: AccountNumber,
+    pub service: AccountNumber,
+}
+
+impl<'a> Caller for ProposalPusher<'a> {
+    type ReturnsNothing = ChainEmptyResult;
+    type ReturnType<T: fracpack::UnpackOwned> = ChainEmptyResult;
+
+    fn call_returns_nothing<Args: fracpack::Pack>(
+        &self,
+        method: crate::MethodNumber,
+        args: Args,
+    ) -> Self::ReturnsNothing {
+        let action = Action {
+            sender: self.sender,
+            service: self.service,
+            method,
+            rawData: args.packed().into(),
+        };
+        let result = crate::services::staged_tx::Wrapper::push_from(self.chain, self.proposer)
+            .propose(vec![action], true);
+        ChainEmptyResult {
+            trace: result.trace,
+        }
+    }
+
+    fn call<Ret: fracpack::UnpackOwned, Args: fracpack::Pack>(
+        &self,
+        method: crate::MethodNumber,
+        args: Args,
+    ) -> Self::ReturnType<Ret> {
+        self.call_returns_nothing(method, args)
+    }
+}
 #[cfg(target_family = "wasm")]
 #[allow(non_snake_case)]
 pub mod polyfill {

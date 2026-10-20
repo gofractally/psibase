@@ -39,6 +39,11 @@ namespace psibase
       virtual bool       supportsP2P() const;
       virtual SocketInfo info() const = 0;
 
+      /// Called on shutdown after the io_context is stopped, but
+      /// before it is destroyed. This should destroy all callbacks
+      /// held by the socket.
+      virtual void abandon() noexcept;
+
       void remove(Writer& writer);
       void writeInfo(Writer& writer);
 

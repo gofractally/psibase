@@ -1,19 +1,21 @@
 import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
+import { Authorized } from "./authorized-graphql-plugin";
 
-class Authorized extends PluginInterface {
-    protected override readonly _intf = "authorized" as const;
-
-    get graphql() {
-        return this._call<[query: string], string>("graphql");
-    }
-}
+export type MarketsOverview = {
+    marketParams: Array<{ length: number; enabled: boolean }>;
+    currentPrices: Array<{ length: number; price: string }>;
+};
 
 class Api extends PluginInterface {
     protected override readonly _intf = "api" as const;
 
     get canCreateAccount() {
         return this._call<[], boolean>("canCreateAccount");
+    }
+
+    get getMarketsOverview() {
+        return this._call<[], MarketsOverview>("getMarketsOverview");
     }
 }
 

@@ -13,13 +13,13 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
         services::tokens::{Quantity, TID},
-        AccountNumber, Fracpack, TimePointSec, ToSchema,
+        AccountNumber, Pack, TimePointSec, ToSchema, Unpack,
     };
 
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Config {
         pub last_levy_id: u32,
     }
@@ -30,7 +30,7 @@ pub mod tables {
     }
 
     #[table(name = "FractalTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Fractal {
         #[primary_key]
@@ -44,8 +44,15 @@ pub mod tables {
         pub genesis_time: TimePointSec,
     }
 
+    impl Fractal {
+        #[secondary_key(1)]
+        fn by_token(&self) -> TID {
+            self.token_id
+        }
+    }
+
     #[table(name = "FractalMemberTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct FractalMember {
         pub fractal: AccountNumber,
@@ -66,7 +73,7 @@ pub mod tables {
     }
 
     #[table(name = "FractalExileTable", index = 3)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct FractalExile {
         #[graphql(skip)]
@@ -87,7 +94,7 @@ pub mod tables {
     }
 
     #[table(name = "RewardStreamTable", index = 4)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct RewardStream {
         pub fractal: AccountNumber,
         pub owner: AccountNumber,
@@ -103,10 +110,10 @@ pub mod tables {
     }
 
     #[table(name = "RoleTable", index = 5)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct Role {
         pub fractal: AccountNumber,
-        pub account: AccountNumber,
         pub role_id: u8,
         pub occupation: AccountNumber,
     }
@@ -116,15 +123,10 @@ pub mod tables {
         fn pk(&self) -> (AccountNumber, u8) {
             (self.fractal, self.role_id)
         }
-
-        #[secondary_key(1)]
-        fn by_role_account(&self) -> AccountNumber {
-            self.account
-        }
     }
 
     #[table(name = "OccupationTable", index = 6)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
     pub struct Occupation {
         pub fractal: AccountNumber,
         pub index: u8,
@@ -139,7 +141,7 @@ pub mod tables {
     }
 
     #[table(name = "LevyTable", index = 7)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Levy {
         pub id: u32,
         pub fractal: AccountNumber,

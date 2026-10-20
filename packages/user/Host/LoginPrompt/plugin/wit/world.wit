@@ -1,0 +1,5 @@
+package host:login-prompt;
+
+world imports {
+    import api;
+}

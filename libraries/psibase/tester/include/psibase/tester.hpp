@@ -21,14 +21,7 @@ namespace psibase
                              SystemService::AuthSig::PrivateKeyInfo>;
    using KeyList = std::vector<KeyPair>;
 
-   inline std::string show(bool include, TransactionTrace t)
-   {
-      if (include || t.error)
-         std::cout << prettyTrace(trimRawData(t)) << "\n";
-      if (t.error)
-         return *t.error;
-      return {};
-   }
+   std::string show(bool include, TransactionTrace t);
 
    inline bool isUserAction(const Action& action)
    {
@@ -55,17 +48,6 @@ namespace psibase
 
    inline const ActionTrace& getTopAction(TransactionTrace& t, size_t num)
    {
-      // TODO: redesign TransactionTrace to make this easier
-      // Current layout:
-      //    verify proof 0
-      //    verify proof 1
-      //    ...
-      //    transaction.sys (below is interspersed with events, console, etc. in execution order)
-      //        check_auth
-      //        action 0
-      //        check_auth
-      //        action 1
-      //        ...
       check(!t.actionTraces.empty(), "TransactionTrace has no actions");
       auto&                           root = t.actionTraces.back();
       std::vector<const ActionTrace*> top_traces;
@@ -127,7 +109,7 @@ namespace psibase
       {
          if (_t.error.has_value())
          {
-            std::cout << prettyTrace(trimRawData(_t)).c_str();
+            show(true, _t);
          }
 
          if (_return.has_value())
@@ -182,9 +164,10 @@ namespace psibase
    template <typename T>
    struct FracPackBody
    {
-      std::string       contentType() const { return "application/octet-stream"; }
-      std::vector<char> body() const { return psio::to_frac(value); }
-      T                 value;
+      static std::string  contentType() { return "application/octet-stream"; }
+      std::vector<char>   body() const { return psio::to_frac(value); }
+      static FracPackBody unpack(std::vector<char> data) { return {psio::from_frac<T>(data)}; }
+      T                   value;
    };
 
    template <typename T>
@@ -509,12 +492,6 @@ namespace psibase
        * Boots the chain.
        */
       void boot(const std::vector<std::string>& names, bool installUI);
-
-      /**
-       * Shuts down the chain to allow copying its state file. The chain's temporary path will
-       * live until this object destructs.
-       */
-      void shutdown();
 
       /**
        * By default, the TestChain will automatically advance blocks.

@@ -79,6 +79,8 @@ bool Socket::supportsP2P() const
    return false;
 }
 
+void Socket::abandon() noexcept {}
+
 void AutoCloseSocket::replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&& other)
 {
    if (auto sockets = weak_sockets.lock())
@@ -250,6 +252,11 @@ void Sockets::shutdown()
    stopped         = true;
    auto tmpsockets = std::move(sockets);
    l.unlock();
+   for (const auto& sock : tmpsockets)
+   {
+      if (sock)
+         sock->abandon();
+   }
    tmpsockets.clear();
 }
 
@@ -537,9 +544,11 @@ CloseLock::~CloseLock()
       auto* socket = static_cast<AutoCloseSocket*>(base.get());
       assert(socket->closeLocks != 0);
       --socket->closeLocks;
-      l.unlock();
       if (tryClose(*socket, *self))
+      {
+         l.unlock();
          socket->onClose(std::nullopt);
+      }
    }
 }
 

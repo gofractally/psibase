@@ -92,7 +92,7 @@ TEST_CASE("test is_empty")
    auto contents = GENERATE(from_range(data));
    auto db       = createDb();
    auto session  = db->start_write_session();
-   auto r        = std::shared_ptr<root>{};
+   auto r        = shared_root{};
    for (std::string_view row : contents.rows)
    {
       session->upsert(r, row, "");
@@ -202,7 +202,7 @@ TEST_CASE("test is_equal_weak")
    auto                              contents = GENERATE(from_range(data));
    auto                              db       = createDb();
    auto                              session  = db->start_write_session();
-   auto                              lhs      = std::shared_ptr<root>{};
+   auto                              lhs      = shared_root{};
    char                              v0[]     = {'\0'};
    char                              v1[]     = {'\1'};
    for (std::string_view row : contents.rows)
@@ -269,7 +269,7 @@ TEST_CASE("test take")
    auto contents = GENERATE(from_range(data));
    auto db       = createDb();
    auto session  = db->start_write_session();
-   auto r        = std::shared_ptr<root>{};
+   auto r        = shared_root{};
    for (std::string_view row : contents.rows)
    {
       session->upsert(r, row, "");
@@ -336,8 +336,8 @@ TEST_CASE("test splice")
    {
       auto        db      = createDb();
       auto        session = db->start_write_session();
-      auto        r1      = std::shared_ptr<root>{};
-      auto        r2      = std::shared_ptr<root>{};
+      auto        r1      = shared_root{};
+      auto        r2      = shared_root{};
       char        v0[]    = {'\0'};
       char        v1[]    = {'\1'};
       auto        opgen   = i;

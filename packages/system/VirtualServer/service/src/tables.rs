@@ -1,27 +1,37 @@
 #[psibase::service_tables]
 pub mod tables {
-    use std::u64;
-
     use async_graphql::SimpleObject;
     use psibase::services::tokens::TID;
     use psibase::*;
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, Default)]
+    pub struct InitRow {
+        /// Bytes already in db at boot (`Native` + `Service`),
+        pub used_bytes: u64,
+    }
     impl InitRow {
         #[primary_key]
         fn pk(&self) {}
     }
 
     impl InitRow {
-        pub fn init() {
-            InitTable::read_write().put(&InitRow {}).unwrap();
+        pub fn init(used_bytes: u64) {
+            InitTable::read_write()
+                .put(&InitRow { used_bytes })
+                .unwrap();
         }
 
         pub fn is_init() -> bool {
             InitTable::read().get_index_pk().get(&()).is_some()
+        }
+
+        pub fn used_bytes() -> u64 {
+            InitTable::read()
+                .get_index_pk()
+                .get(&())
+                .map_or(0, |r| r.used_bytes)
         }
 
         pub fn check_init() {
@@ -30,8 +40,9 @@ pub mod tables {
     }
 
     #[table(name = "BillingConfigTable", index = 1)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
     #[serde(rename_all = "camelCase")]
+    #[graphql(complex)]
     pub struct BillingConfig {
         /// ID of the system token used for resource billing
         pub sys: TID,
@@ -50,7 +61,7 @@ pub mod tables {
     /// The specs of the virtual server and the specs required by each node
     /// and are used to configure the network specs.
     #[table(name = "ServerSpecsTable", index = 2)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
     pub struct ServerSpecs {
         /// Amount of bandwidth capacity per second per server
         pub net_bps: u64,
@@ -72,7 +83,7 @@ pub mod tables {
     }
 
     #[table(name = "NetworkVariablesTable", index = 3)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
     /// Variables that are used to derive the specs of the network from the server specs.
     pub struct NetworkVariables {
         /// How much faster a node replays blocks compared to the live network
@@ -82,6 +93,8 @@ pub mod tables {
         pub per_block_sys_cpu_ns: u64,
         /// Amount of storage space in bytes allocated to objective state
         pub obj_storage_bytes: u64,
+        /// Amount of storage space in bytes allocated to subjective (node-local) state
+        pub subj_storage_bytes: u64,
     }
     impl NetworkVariables {
         #[primary_key]
@@ -91,8 +104,9 @@ pub mod tables {
         fn default() -> Self {
             NetworkVariables {
                 block_replay_factor: 5,
-                per_block_sys_cpu_ns: 20_000_000,  // 20ms
-                obj_storage_bytes: 20_000_000_000, // 20 GB
+                per_block_sys_cpu_ns: 20_000_000,   // 20ms
+                obj_storage_bytes: 20_000_000_000,  // 20 GB
+                subj_storage_bytes: 20_000_000_000, // 20 GB
             }
         }
     }
@@ -101,7 +115,9 @@ pub mod tables {
     /// or equal to) the server specs due to overhead in distributing server load
     /// across network peers.
     #[table(name = "NetworkSpecsTable", index = 4)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone, Default)]
+    #[derive(
+        Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone, Default,
+    )]
     pub struct NetworkSpecs {
         /// Amount of network bandwidth capacity per second in bits per second
         pub net_bps: u64,
@@ -121,7 +137,7 @@ pub mod tables {
     /// Settings related to the automatic management of an account resource buffer.
     /// If an account has not configured these settings, a default configuration will be used.
     #[table(name = "UserSettingsTable", index = 5)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
     pub struct UserSettings {
         #[primary_key]
         pub user: AccountNumber,
@@ -136,7 +152,7 @@ pub mod tables {
     }
 
     /// Parameters related to the automatic management of an account resource buffer.
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
     pub struct BufferConfig {
         /// A threshold (specified in integer percentage values) at or below which the client should
         /// attempt to automatically refill the account's resource buffer. A threshold of 0 means
@@ -147,14 +163,14 @@ pub mod tables {
         pub capacity: u64,
     }
 
-    /// Pricing configuration for a bandwidth-like resource.
+    /// Pricing configuration for a rate-limited resource.
     ///
-    /// A bandwidth-like resource is one that has a max capacity per unit time and uses
+    /// A rate-limited resource is one that has a max capacity per unit time and uses
     /// a "difficulty adjustment" algorithm to adjust price based on congestion.
-    #[table(name = "BandwidthPricingTable", index = 6)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    #[table(name = "RateLimitPricingTable", index = 6)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
-    pub struct BandwidthPricing {
+    pub struct RateLimitPricing {
         #[primary_key]
         pub resource_id: u8,
 
@@ -162,8 +178,8 @@ pub mod tables {
         pub num_blocks_to_average: u8,
 
         #[graphql(skip)]
-        /// The actual usage history over the last `num_blocks_to_average` blocks
-        pub usage_history: Vec<u64>,
+        /// The average usage over the last `num_blocks_to_average` blocks
+        pub avg_usage: u64,
 
         #[graphql(skip)]
         /// The usage consumed during the current block
@@ -183,14 +199,38 @@ pub mod tables {
         /// is rounded up to the nearest billable unit.
         pub billable_unit: u64,
     }
+
+    /// Capacity-limited pricing state
+    #[table(name = "CapacityPricingTable", index = 7)]
+    #[derive(
+        Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, Clone, Default,
+    )]
+    #[graphql(complex)]
+    pub struct CapacityPricing {
+        #[primary_key]
+        pub resource_id: u8,
+
+        /// Remaining billable resource capacity
+        pub remaining_capacity: u64,
+        /// Max reserve tokens that may be sold into the relay (e.g. max issued supply)
+        #[graphql(skip)]
+        pub max_reserve: u64,
+        /// Total resource capacity
+        pub max_capacity: u64,
+        /// Curve / virtual-offset parameter
+        pub curve_d: u64,
+        /// Fee on refunds, parts per million
+        pub fee_ppm: u32,
+    }
 }
 
-mod bandwidth_pricing;
 mod billing_config;
+pub(crate) mod capacity_limit_pricing;
 mod network_specs;
 mod network_variables;
+mod rate_limit_pricing;
 mod server_specs;
 mod user_settings;
 
-pub use bandwidth_pricing::*;
+pub use rate_limit_pricing::*;
 pub use user_settings::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;

@@ -24,7 +24,7 @@ void EventIndex::update(EventDb db, psibase::AccountNumber service, psibase::Met
 
 namespace
 {
-   std::uint64_t getNextEventNumber(const DatabaseStatusRow& status, EventDb db)
+   std::uint64_t getNextEventNumber(EventDb db)
    {
       if (auto row = EventConfig{}.open<EventNumberTable>(KvMode::read).get(db))
       {
@@ -67,7 +67,7 @@ namespace
          if (!row)
             return false;
 
-         const CompiledType* ctype = cache.getSchemaType(db, row->service(), row->type());
+         const CompiledType* ctype = cache.getSchemaType({}, db, row->service(), row->type());
          if (!ctype)
             return true;
 
@@ -162,7 +162,7 @@ namespace
          EventWrapper        wrapper;
          auto                events = EventConfig{}.openEvents(item.db, KvMode::read);
          std::vector<char>   data;
-         const CompiledType* ctype = cache.getSchemaType(item.db, item.service, item.event);
+         const CompiledType* ctype = cache.getSchemaType({}, item.db, item.service, item.event);
          wrapper.set(ctype);
          std::vector<char> subkey{key.begin(), key.begin() + prefixLen};
          subkey.back() = item.info.indexNum;
@@ -240,17 +240,14 @@ namespace
       return false;
    }
 
-   DbIndexStatus initStatus(const psibase::DatabaseStatusRow& dbStatus,
-                            DbIndexStatusTable&               table,
-                            EventDb                           db)
+   DbIndexStatus initStatus(DbIndexStatusTable& table, EventDb db)
    {
       if (auto result = table.get(db))
          return *result;
 
       auto queue = EventIndex{}.open<PendingIndexTable>();
 
-      auto queueRow =
-          PendingIndexRecord{.seq = 0, .db = db, .endKey = getNextEventNumber(dbStatus, db)};
+      auto queueRow = PendingIndexRecord{.seq = 0, .db = db, .endKey = getNextEventNumber(db)};
       // Find the first available sequence number
       {
          if (auto last = queue.getIndex<0>().last())
@@ -379,19 +376,15 @@ void queueIndexChanges()
 
 void EventIndex::sync()
 {
-   const auto dbStatus =
-       psibase::Native::tables(KvMode::read).open<psibase::DatabaseStatusTable>().get({});
-   check(!!dbStatus, "DatabaseStatusRow not found");
-
    auto        table = EventIndex{}.open<DbIndexStatusTable>();
    IndexWriter writer;
    for (auto db : {EventDb::historyEvent, EventDb::merkleEvent})
    {
       auto events = Events{}.openEvents(db, KvMode::read);
-      auto status = initStatus(*dbStatus, table, db);
+      auto status = initStatus(table, db);
 
       auto eventNum = status.nextEventNumber;
-      auto eventEnd = getNextEventNumber(*dbStatus, db);
+      auto eventEnd = getNextEventNumber(db);
       for (; eventNum != eventEnd; ++eventNum)
       {
          if (!writer(events, db, eventNum))

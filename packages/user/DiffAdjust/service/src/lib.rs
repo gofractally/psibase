@@ -3,7 +3,7 @@ pub mod tables {
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        get_sender, AccountNumber, Fracpack, ServiceWrapper, Table, TimePointSec, ToSchema,
+        get_sender, AccountNumber, Pack, ServiceWrapper, Table, TimePointSec, ToSchema, Unpack,
     };
 
     use async_graphql::{ComplexObject, SimpleObject};
@@ -13,7 +13,7 @@ pub mod tables {
     const ONE_MILLION: u32 = 1_000_000;
 
     #[table(name = "RateLimitTable", index = 0)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct RateLimit {
         #[primary_key]
         pub nft_id: u32,
@@ -160,7 +160,10 @@ pub mod tables {
                     !diff_as_f64.is_nan(),
                     "diffadjust decrease computation resulted in NaN",
                 );
-                difficulty = (diff_as_f64 as u64).max(floor);
+                difficulty = diff_as_f64 as u64;
+                if difficulty <= floor {
+                    return floor;
+                }
             }
             difficulty
         }
@@ -222,7 +225,10 @@ pub mod tables {
 
         fn check_sender_has_nft(&self) {
             assert_eq!(
-                Nft::call().getNft(self.nft_id).owner,
+                Nft::call()
+                    .getNft(self.nft_id)
+                    .expect("NFT was burned")
+                    .owner,
                 get_sender(),
                 "must be owner of rate limiter",
             );
@@ -299,8 +305,8 @@ pub mod tables {
 
     #[ComplexObject]
     impl RateLimit {
-        pub async fn admin(&self) -> AccountNumber {
-            Nft::call().getNft(self.nft_id).owner
+        pub async fn admin(&self) -> Option<AccountNumber> {
+            Nft::call().getNft(self.nft_id).map(|nft| nft.owner)
         }
     }
 }
@@ -341,6 +347,18 @@ pub mod service {
             decrease_ppm,
         )
         .nft_id
+    }
+
+    /// Get RateLimit record
+    ///
+    /// # Arguments
+    /// * `nft_id` - RateLimit / NFT ID
+    ///
+    /// # Returns
+    /// The RateLimit if it exists
+    #[action]
+    fn get(nft_id: u32) -> Option<RateLimit> {
+        RateLimit::get(nft_id)
     }
 
     /// Get RateLimit difficulty

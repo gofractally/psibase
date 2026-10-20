@@ -34,12 +34,9 @@ namespace UserService
                        psibase::AccountNumber              owner) const
       {
          std::vector<psibase::AccountNumber> result;
-         auto accountIndex = Accounts::Tables(Accounts::service).open<AccountTable>().getIndex<0>();
-         auto ownerIndex =
-             AuthDelegate::Tables(AuthDelegate::service).open<AuthDelegateTable>().getIndex<0>();
          for (auto account : accounts)
          {
-            if (auto accountRow = accountIndex.get(account))
+            if (auto accountRow = psibase::to<Accounts>().getAccount(account))
             {
                if (accountRow->authService != AuthDelegate::service)
                {
@@ -52,17 +49,16 @@ namespace UserService
                }
                else
                {
-                  if (auto ownerRow = ownerIndex.get(account))
+                  // TODO: return gql errors instead of aborting
+                  auto accountOwner = psibase::to<AuthDelegate>().getOwner(account);
+                  if (!accountOwner)
                   {
-                     if (ownerRow->owner != owner)
-                     {
-                        psibase::abortMessage("Account " + account.str() + " is not owned by " +
-                                              owner.str());
-                     }
+                     psibase::abortMessage("account does not have an owning account");
                   }
-                  else
+                  else if (*accountOwner != owner)
                   {
-                     psibase::abortMessage("Cannot find owner for " + account.str());
+                     psibase::abortMessage("Account " + account.str() + " is not owned by " +
+                                           owner.str());
                   }
                }
             }

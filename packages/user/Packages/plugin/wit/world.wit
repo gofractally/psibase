@@ -78,7 +78,7 @@ interface private-api {
 
     // Takes a list of available packages and packages to install or update
     // and returns a list of operations to apply.
-    resolve: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op-info>, error>;
+    resolve-packages: func(index: list<package-info>, request: list<string>, request-pref: package-preference, non-request-pref: package-preference) -> result<list<package-op-info>, error>;
 
     // Returns two lists of transactions
     // - Upload package data. These transactions should be executed

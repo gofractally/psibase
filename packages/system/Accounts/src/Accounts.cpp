@@ -60,6 +60,11 @@ namespace SystemService
                                      name.base().str()));
          }
       }
+      else if (name.str().starts_with("x-"))
+      {
+         check(getSender() == getReceiver(),
+               "The 'x-' account prefix is reserved for infrastructure providers");
+      }
       else
       {
          check(getSender() == getReceiver() || getSender() == AccountNumber("namemarket"),
@@ -69,8 +74,12 @@ namespace SystemService
       preapprovedAccounts.push_back(name);
    }
 
-   bool Accounts::newAccount(AccountNumber name, AccountNumber authService, bool requireMatch)
+   bool Accounts::newAccount(AccountNumber name, AccountNumber authService, NewAccountMode mode)
    {
+      check(mode == NewAccountMode::requireNew || mode == NewAccountMode::matchExisting ||
+                mode == NewAccountMode::keepExisting,
+            "invalid mode");
+
       Tables tables{getReceiver()};
       auto   statusTable  = tables.open<AccountsStatusTable>();
       auto   statusIndex  = statusTable.getIndex<0>();
@@ -113,7 +122,8 @@ namespace SystemService
 
       if (auto existing = accountIndex.get(name))
       {
-         if (requireMatch && existing->authService != authService)
+         if (mode == NewAccountMode::requireNew ||
+             mode == NewAccountMode::matchExisting && existing->authService != authService)
             abortMessage("account already exists");
          return false;
       }

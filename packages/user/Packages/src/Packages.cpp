@@ -85,7 +85,7 @@ namespace UserService
          }
          else
          {
-            if (to<AuthDelegate>().getOwner(account) != sender)
+            if (to<AuthDelegate>().checkOwner(account) != sender)
                abortMessage("Account " + account.str() + " in " + package.name +
                             " is not owned by " + sender.str());
          }
@@ -159,7 +159,6 @@ namespace UserService
                }
             }
          }
-         // UI events do not need to maintain compatibility
          for (const auto& [name, ty] : existing->schema.history)
          {
             auto pos = schema.history.find(name);
@@ -169,10 +168,11 @@ namespace UserService
             }
             else
             {
-               if (!rowMatcher.match(ty, pos->second))
+               if (!rowMatcher.match(ty.type, pos->second.type))
                {
                   abortMessage("Incompatible update to event history." + name);
                }
+               // Changing access is allowed because it doesn't break the layout
             }
          }
          for (const auto& [name, ty] : existing->schema.merkle)
@@ -184,7 +184,7 @@ namespace UserService
             }
             else
             {
-               if (!rowMatcher.match(ty, pos->second))
+               if (!rowMatcher.match(ty.type, pos->second.type))
                {
                   abortMessage("Incompatible update to event merkle." + name);
                }

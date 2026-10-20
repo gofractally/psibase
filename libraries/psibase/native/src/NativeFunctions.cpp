@@ -568,33 +568,6 @@ namespace psibase
       return setResult(*this, psio::convert_to_frac(currentActContext->action));
    }
 
-   // TODO: flags arg. potential flags:
-   //   * Prevent writes. Caution: don't accidentally allow prohibited reads.
-   //   * Not needed: prevent recursion; the dispatcher can do that
-   //   * Run in parallel
-   //      * generalization of execVerifyProofs
-   //      * needs access to proofs
-   //      * no return value
-   //      * require prevent writes flag
-   //      * allow nodes to optionally skip during block log replay. Normal replay
-   //        includes since success is part of consensus; especially if this replaces
-   //        execVerifyProofs. Production absolutely must not skip.
-   //      * read snapshot: 1 block behind? Immediately before trx?
-   //      * kvGetTransactionUsage needs to know number of parallel executions and
-   //        execution time.
-   //        CAUTION: kvGetTransactionUsage is currently objective.
-   //          * Create a subjective one?
-   //          * Make it wait until all parallel executions complete?
-   //          * Caution with waiting: vulnerability when combined with canNotTimeOut
-   //      * Flag to indicate that a parallel run failure is an authorization failure.
-   //        Only privileged services can set this since it impacts billing.
-   //        Iffy. There's got to be another way. Some of the billing policies seem to
-   //        be leaking into native.
-   //      * Need to prioritize proofs over other background tasks. Rely on the above flag?
-   //      * Don't allow RPC to invoke parallel. High cost, no reward for queries since it
-   //        can only indicate failure.
-   //      * Consensus config: number of wasm memories for a parallel execution
-   //      * Node config: number of parallel executions happening at the same time
    uint32_t NativeFunctions::call(eosio::vm::span<const char> data, std::uint64_t flagsRaw)
    {
       auto saved          = currentActContext->transactionContext.remainingStack;
@@ -873,9 +846,6 @@ namespace psibase
                 abortMessage("Cannot read from this db handle " + bucket.to_string());
              auto fullKey       = bucket.key(key);
              auto fullMatchSize = bucket.prefix.size() + matchKeySize;
-             if (keyHasServicePrefix(bucket.db))
-                check(fullMatchSize >= sizeof(AccountNumber::value),
-                      "matchKeySize is smaller than 8 bytes");
              return setResult(*this, bucket.trimResult(database.kvGreaterEqualRaw(
                                          bucket.db, fullKey, fullMatchSize)));
           });
@@ -895,9 +865,6 @@ namespace psibase
                 abortMessage("Cannot read from this db handle " + bucket.to_string());
              auto fullKey       = bucket.key(key);
              auto fullMatchSize = bucket.prefix.size() + matchKeySize;
-             if (keyHasServicePrefix(bucket.db))
-                check(fullMatchSize >= sizeof(AccountNumber::value),
-                      "matchKeySize is smaller than 8 bytes");
              return setResult(*this, bucket.trimResult(database.kvLessThanRaw(bucket.db, fullKey,
                                                                               fullMatchSize)));
           });
@@ -913,9 +880,6 @@ namespace psibase
              if (!bucket.isRead())
                 abortMessage("Cannot read from this db handle " + bucket.to_string());
              auto fullKey = bucket.key(key);
-             if (keyHasServicePrefix(bucket.db))
-                check(fullKey.size() >= sizeof(AccountNumber::value),
-                      "key is shorter than 8 bytes");
              return setResult(*this, bucket.trimResult(database.kvMaxRaw(bucket.db, fullKey)));
           });
    }

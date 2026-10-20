@@ -22,10 +22,8 @@ namespace SystemService
       void canAuthUserSys(psibase::AccountNumber user);
 
       bool checkAuthSys(uint32_t                    flags,
-                        psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
-                        std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
 
       std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber sender);
@@ -76,7 +74,7 @@ namespace SystemService
    PSIO_REFLECT(Credentials,
       method(init),
       method(canAuthUserSys, user),
-      method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
+      method(checkAuthSys, flags, sender, action, claims),
       method(getDlgsSys, sender),
       method(isAuthSys, sender, authorizers),
       method(isRejectSys, sender, rejecters),

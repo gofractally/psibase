@@ -143,11 +143,9 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
    {
       // Try the server registered in HttpServer
       // This allows RPC calls to be handled by the registered server
-      if (auto registered = HttpServer::Tables(HttpServer::service, KvMode::read)
-                                .open<RegServTable>()
-                                .get(subdomain))
+      if (auto registered = to<HttpServer>().getServer(subdomain))
       {
-         to<XHttp>().giveSocket(*socket, registered->server, false);
+         to<XHttp>().giveSocket(*socket, *registered, false);
 
          auto user = to<RTransact>().getUser(req);
 
@@ -156,7 +154,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
          req.removeCookie("SESSION");
          std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
          auto reply = from(HttpServer::service)
-                          .to<ServerInterface>(registered->server)
+                          .to<ServerInterface>(*registered)
                           .serveSys(req, socket, user);
 
          if (!to<XHttp>().takeSocket(*socket, false))

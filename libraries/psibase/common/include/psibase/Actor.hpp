@@ -256,7 +256,6 @@ namespace psibase
    /// For example, assume `SomeService` has the set of events in [Defining Events](#defining-events). `EventEmitter<MyService> e` will support the following:
    ///
    /// * `e.history().myEvent(a, s);`
-   /// * `e.ui().updateDisplay();`
    /// * `e.merkle().credit(from, to, amount);`
    ///
    /// These functions return a `psibase::EventNumber`, aka `uint64_t`, which uniquely identifies the event. This number supports lookup; see [Service::events].
@@ -381,7 +380,7 @@ namespace psibase
    /// For example, if `SomeService` has this set of methods:
    ///
    /// ```c++
-   /// struct SomeService : psibase::Service<SomeService>
+   /// struct SomeService : psibase::Service
    /// {
    ///    void        doSomething(std::string_view str);
    ///    std::string doAnother(uint32_t x, psibase::AccountNumber y);

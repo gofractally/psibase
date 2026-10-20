@@ -121,12 +121,17 @@ namespace psibase::http
       impl->shutdown_connections(restart);
    }
 
-   void server_service::shutdown() noexcept
+   void server_service::stop() noexcept
    {
       if (impl)
       {
          impl->stop();
       }
+   }
+
+   void server_service::shutdown() noexcept
+   {
+      stop();
    }
 
    // Accepts incoming connections and launches the sessions

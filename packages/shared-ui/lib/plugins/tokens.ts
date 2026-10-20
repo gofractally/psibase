@@ -1,8 +1,23 @@
 import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
+import { Authorized } from "./authorized-graphql-plugin";
 
 type TID = number;
 type Decimal = string;
+
+export type SystemTokenInfo = {
+    id: number;
+    symbol: string | undefined;
+    precision: number;
+};
+
+export type UserBalance = {
+    tokenId: number;
+    balance: string;
+    symbol: string | undefined;
+    precision: number;
+    account: string;
+};
 
 class Issuer extends PluginInterface {
     protected override readonly _intf = "issuer" as const;
@@ -37,13 +52,13 @@ class Helpers extends PluginInterface {
             number | string | bigint
         >("decimalToU64");
     }
-}
 
-class Authorized extends PluginInterface {
-    protected override readonly _intf = "authorized" as const;
+    get getSystemToken() {
+        return this._call<[], SystemTokenInfo | undefined>("getSystemToken");
+    }
 
-    get graphql() {
-        return this._call<[query: string], string>("graphql");
+    get getUserBalances() {
+        return this._call<[user: string], UserBalance[]>("getUserBalances");
     }
 }
 

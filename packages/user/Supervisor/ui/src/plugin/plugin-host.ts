@@ -1,5 +1,3 @@
-import { REDIRECT_ERROR_CODE } from "@/constants";
-
 import {
     QualifiedDynCallArgs,
     QualifiedFunctionCallArgs,
@@ -14,7 +12,7 @@ import {
     HttpResponse,
 } from "../host-interface";
 import { Supervisor } from "../supervisor";
-import { chainId, isEmbedded, networkName } from "../utils";
+import { chainId, networkName } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 function convert(
@@ -68,19 +66,27 @@ export class PluginHost implements HostInterface {
             code: 0,
             producer: {
                 service: "host",
-                plugin: "common",
+                plugin: "client",
             },
             message,
         };
     }
 
-    private getBodyTagFromContentType(contentType: string): string {
-        if (contentType.includes("application/json")) {
+    // Classifies the response body from the response's Content-Type header.
+    private getBodyTagFromContentType(
+        contentType: string,
+    ): "json" | "text" | "bytes" {
+        const ct = contentType.toLowerCase();
+        if (ct.includes("application/json")) {
             return "json";
-        } else if (contentType.includes("application/octet-stream")) {
-            return "bytes";
-        } else if (contentType.includes("text/plain")) {
+        } else if (ct.startsWith("text/")) {
             return "text";
+        } else if (
+            ct.includes("application/octet-stream") ||
+            ct.includes("application/zip") ||
+            ct.includes("application/wasm")
+        ) {
+            return "bytes";
         } else {
             throw this.recoverableError(
                 `Unsupported content type in response: ${contentType}`,
@@ -108,6 +114,14 @@ export class PluginHost implements HostInterface {
         return uri;
     }
 
+    private binaryStringToBytes(data: string): Uint8Array {
+        const bytes = new Uint8Array(data.length);
+        for (let i = 0; i < data.length; i++) {
+            bytes[i] = data.charCodeAt(i) & 0xff;
+        }
+        return bytes;
+    }
+
     // A synchronous web request.
     // This allows the plugin to make http queries.
     // It is a typescript-ified version of the wasip2 browser http shim
@@ -125,6 +139,11 @@ export class PluginHost implements HostInterface {
             );
             xhr.withCredentials = withCredentials;
 
+            // Sync XHR cannot use responseType=arraybuffer. Always read the
+            // response as a binary-safe string so every byte survives, then
+            // interpret it based on the response Content-Type below.
+            xhr.overrideMimeType("text/plain; charset=x-user-defined");
+
             const requestHeaders = new Headers(convert(req.headers));
             for (const [name, value] of requestHeaders.entries()) {
                 if (name !== "user-agent" && name !== "host") {
@@ -136,17 +155,23 @@ export class PluginHost implements HostInterface {
                     ? (req.body.val as string)
                     : null,
             );
+            const raw = xhr.responseText;
+            const bytes =
+                raw == null || raw === ""
+                    ? undefined
+                    : this.binaryStringToBytes(raw);
+            const decodeText = (b: Uint8Array) => new TextDecoder().decode(b);
+
             if (xhr.status >= 400) {
-                if (xhr.response) {
-                    console.error(xhr.response);
+                if (bytes) {
+                    console.error(decodeText(bytes));
                 }
             }
             if (xhr.status === 500) {
                 throw this.recoverableError(
-                    `Http request error: ${xhr.response}`,
+                    `Http request error: ${bytes ? decodeText(bytes) : "No response body"}`,
                 );
             }
-            const body = xhr.response || undefined;
             const headers: Array<[string, string]> = [];
             xhr.getAllResponseHeaders()
                 .trim()
@@ -158,18 +183,24 @@ export class PluginHost implements HostInterface {
                     const value = parts.join(": ");
                     headers.push([key, value]);
                 });
+            if (!bytes) {
+                return {
+                    status: xhr.status,
+                    headers: convertBack(headers),
+                    body: null,
+                };
+            }
+
             const contentType = xhr.getResponseHeader("content-type") || "";
             const tag = this.getBodyTagFromContentType(contentType);
 
             return {
                 status: xhr.status,
                 headers: convertBack(headers),
-                body: body
-                    ? {
-                          tag,
-                          val: body,
-                      }
-                    : null,
+                body: {
+                    tag,
+                    val: tag === "bytes" ? bytes : decodeText(bytes),
+                },
             };
         } catch (err: any) {
             if (
@@ -221,6 +252,8 @@ export class PluginHost implements HostInterface {
                     this.supervisor.signExplicit(msg, privateKey),
                 importKey: (privateKey) =>
                     this.supervisor.importKey(privateKey),
+                importKeyTransient: (privateKey) =>
+                    this.supervisor.importKeyTransient(privateKey),
             },
             "supervisor:bridge/database": {
                 get: (duration, key) => this.dbGet(duration, key),
@@ -228,16 +261,7 @@ export class PluginHost implements HostInterface {
                 remove: (duration, key) => this.dbRemove(duration, key),
             },
             "supervisor:bridge/prompt": {
-                requestPrompt: () => {
-                    if (isEmbedded) {
-                        throw this.recoverableError(
-                            "Cannot prompt in embedded mode",
-                        );
-                    }
-                    const err = this.recoverableError("user_prompt_request");
-                    err.code = REDIRECT_ERROR_CODE;
-                    throw err;
-                },
+                requestPrompt: () => this.supervisor.requestPrompt(),
             },
         };
     }

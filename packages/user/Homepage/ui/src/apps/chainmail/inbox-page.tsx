@@ -35,8 +35,8 @@ export default function InboxPage() {
             right={
                 selectedMessage ? (
                     <MessageDetail
-                        message={selectedMessage ?? null}
-                        mailbox={"inbox"}
+                        message={selectedMessage}
+                        mailbox="inbox"
                         onBack={
                             display === "right"
                                 ? () => setSelectedMessageId("")
@@ -44,7 +44,7 @@ export default function InboxPage() {
                         }
                     />
                 ) : (
-                    <NoMessageSelected>Select a message</NoMessageSelected>
+                    <NoMessageSelected />
                 )
             }
             header={<MailboxHeader>Inbox</MailboxHeader>}

@@ -1,50 +1,8 @@
 # C++ Web Services
 
-## Routing
-
-```mermaid
-flowchart TD
-   200[200 OK]
-   404[404 Not Found]
-   308[308 Permanent Redirect]
-
-   A[HTTP Request]
-   B[psinode]
-   C[http-server service]
-   sites[sites service's serveSys action]
-   serveSys{{serveSys handles request?}}
-
-   A --> B --> C
-   sites --> E{{was site data found?}} -->|yes| 200
-   E -->|no| 404
-   C --> R{{root host / no subdomain?}}
-   R -->|yes| homeRedir[redirect to homepage subdomain] --> 308
-   R -->|no| SR{{subdomain has HttpServer redirect?}}
-   SR -->|yes| sibRedir[308 redirect to sibling subdomain] --> 308
-   SR -->|no| G{{target begins with '/common/'?}}
-   G -->|yes| common['common-api' service's serveSys action] --> serveSys
-   G -->|no| J{{Has registered server?}}
-   J -->|yes| L[registered server's serveSys action] --> serveSys
-   J -->|no| sites
-   serveSys -->|yes| 200
-   serveSys -->|no| sites
-```
-
-`psinode` passes most HTTP requests to the [SystemService::HttpServer] service. Requests to the root host (no subdomain) are answered with a redirect to the homepage subdomain. If a subdomain owner configured [SystemService::HttpServer::setRedirect], all requests to that subdomain get a permanent redirect to the destination subdomain (path and query preserved). Otherwise, requests to the `/common/*` path are routed to [SystemService::CommonApi], and all other requests are routed to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
-
-[SystemService::CommonApi] provides services common to all domains under the `/common/` tree.
-
-[SystemService::Sites] provides web hosting for static content. Within `sites`, [SystemService::Sites::setProxy] allows requests to missing paths to fall back to another account's uploaded files (same-path lookup, optional chain); see the action documentation for details.
-
-`psinode` directly handles requests which start with `/native`, e.g. `/native/admin/status`. Services don't serve these.
-
 ## Registration
 
-Services which wish to serve HTTP requests need to register using the [SystemService::HttpServer] service's [SystemService::HttpServer::registerServer] action. There are multiple ways to do this:
-
-- `psibase deploy` has a `--register-proxy` option (shortcut `-p`) that can do this while deploying the service.
-- `psibase register-proxy` can also do it. TODO: implement `psibase register-proxy`.
-- A service may call `registerServer` during its own initialization action.
+Services which wish to serve HTTP requests need to register using the [SystemService::HttpServer] service's [SystemService::HttpServer::registerServer] action. This is usually done by setting the `SERVER` option of `psibase_package` in `CMakeLists.txt` to add this action to the package installation process.
 
 A service doesn't have to serve HTTP requests itself; it may delegate this to another service during registration.
 

@@ -73,8 +73,14 @@ namespace psibase
                if (linkValue.starts_with('/'))
                {
                   // absolute symlink: find longest matching prefix
-                  auto pos = std::ranges::find_if(mountpoints, [&](const auto& dir)
-                                                  { return linkValue.starts_with(dir->hostPath); });
+                  auto pos =
+                      std::ranges::find_if(mountpoints,
+                                           [&](const auto& dir)
+                                           {
+                                              return linkValue.starts_with(dir->hostPath) &&
+                                                     (dir->hostPath.back() == '/' ||
+                                                      linkValue[dir->hostPath.size()] == '/');
+                                           });
                   if (pos == mountpoints.end())
                      throw std::system_error{ENOENT, std::generic_category()};
                   mount          = *pos;
@@ -207,6 +213,14 @@ namespace psibase
          }
          Fd get(std::string item)
          {
+            if (dirsBelowMount == 0)
+            {
+               auto pos = mount->children.find(item);
+               if (pos != mount->children.end() && pos->second.isMountpoint)
+               {
+                  return Fd{::open(pos->second.hostPath.c_str(), O_RDONLY)};
+               }
+            }
             if (path.empty())
             {
                throw std::system_error{ENOENT, std::generic_category()};
@@ -237,8 +251,6 @@ namespace psibase
       validatePath(hostpath);
       validatePath(mountpath);
       hostpath = std::filesystem::canonical(hostpath).string();
-      if (!hostpath.ends_with('/'))
-         hostpath.push_back('/');
 
       Dir* current = &root;
       for (auto range : mountpath | std::views::split('/'))

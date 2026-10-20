@@ -1,7 +1,9 @@
 #[crate::service(name = "auth-delg", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
+    use crate::{
+        services::accounts::NewAccountMode, services::transact::ServiceMethod, AccountNumber, Claim,
+    };
 
     /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
     ///
@@ -12,18 +14,24 @@ mod service {
     #[action]
     fn checkAuthSys(
         flags: u32,
-        requester: AccountNumber,
         sender: AccountNumber,
         action: ServiceMethod,
-        allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
     ) -> bool {
         unimplemented!()
     }
 
-    /// Gets the owner account of the specified account
+    /// Returns the owner of `account`, if any
     #[action]
-    fn getOwner(account: AccountNumber) -> AccountNumber {
+    fn getOwner(account: AccountNumber) -> Option<AccountNumber> {
+        unimplemented!()
+    }
+
+    /// Returns the owner of `account`
+    ///
+    /// Aborts if the account has no owner.
+    #[action]
+    fn checkOwner(account: AccountNumber) -> AccountNumber {
         unimplemented!()
     }
 
@@ -85,11 +93,11 @@ mod service {
 
     /// Create a new account with the specified name, owned by the specified `owner` account.
     ///
-    /// Existing accounts will not be modified. If the `requireMatch` flag
-    /// is set, then the action will fail if the account exists but is not
-    /// already owned by the specified owner.
+    /// The behavior if the account already exists is determined by `mode`
+    ///
+    /// Returns true if an account was created
     #[action]
-    fn newAccount(name: AccountNumber, owner: AccountNumber, require_match: bool) -> bool {
+    fn newAccount(name: AccountNumber, owner: AccountNumber, mode: NewAccountMode) -> bool {
         unimplemented!()
     }
 }

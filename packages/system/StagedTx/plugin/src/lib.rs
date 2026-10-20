@@ -3,13 +3,15 @@ mod bindings;
 
 use bindings::*;
 
-use exports::staged_tx::plugin::{proposer::Guest as Proposer, respondent::Guest as Respondent};
-use host::common::server as Server;
+use exports::staged_tx::plugin::{
+    authorized::Guest as Authorized, proposer::Guest as Proposer, respondent::Guest as Respondent,
+};
+use host::http::api as Server;
 use host::types::types::Error;
 use psibase::fracpack::Pack;
 use psibase::Checksum256;
 use staged_tx::action_structs::*;
-use transact::plugin::intf::add_action_to_transaction;
+use transact::plugin::api::add_action_to_transaction;
 
 use serde::{Deserialize, Serialize};
 
@@ -153,6 +155,12 @@ impl Respondent for StagedTxPlugin {
             }
             .packed(),
         )
+    }
+}
+
+impl Authorized for StagedTxPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        Server::post_graphql_get_json(&query)
     }
 }
 

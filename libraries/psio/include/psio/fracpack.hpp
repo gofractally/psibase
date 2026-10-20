@@ -1,9 +1,3 @@
-// TODO: The interaction between checking for no extra data (no gaps)
-//       and the possible presence of unknown fields and variant tags
-//       has some unsolved border cases. It might be best to only check
-//       for gaps when in a mode which prohibits unknown fields and skip
-//       checking for gaps when in a mode which allows unknown fields.
-
 #pragma once
 
 #include <psio/reflect.hpp>
@@ -14,14 +8,14 @@
 
 namespace psio
 {
-   // If a type T supports the expressions `clio_unwrap_packable(T&)`,
-   // which returns a `T2&`, and `clio_unwrap_packable(const T&)`, which
+   // If a type T supports the expressions `psio_unwrap_packable(T&)`,
+   // which returns a `T2&`, and `psio_unwrap_packable(const T&)`, which
    // returns `const T2&`, then packing or unpacking T packs or unpacks
    // the returned reference instead.
    template <typename T>
    concept PackableWrapper = requires(T& x, const T& cx) {
-      clio_unwrap_packable(x);
-      clio_unwrap_packable(cx);
+      psio_unwrap_packable(x);
+      psio_unwrap_packable(cx);
    };
 
    template <typename T, bool Reflected>
@@ -46,14 +40,14 @@ namespace psio
    concept Packable = Reflected<T> || is_packable<T>::value;
 
    template <typename T>
-   concept PackableValidatedObject = requires(T& x) { clio_validate_packable(x); };
+   concept PackableValidatedObject = requires(T& x) { psio_validate_packable(x); };
 
    template <typename T>
       requires Packable<std::remove_cv_t<T>>
    class view;
 
    template <typename T>
-   concept PackableValidatedView = requires(view<const T>& p) { clio_validate_packable(p); };
+   concept PackableValidatedView = requires(view<const T>& p) { psio_validate_packable(p); };
 
    template <typename T>
    concept PackableNumeric =            //
@@ -97,6 +91,14 @@ namespace psio
    {
       static_assert(sizeof(std::array<T, N>) == N * sizeof(T));
    };
+
+   // Must be contiguous and constructible from raw pointers
+   // The value type must be PackableMemcpy and unaligned
+   template <typename T>
+   concept UnpackableBorrowed =
+       std::is_same_v<T, std::string_view> || std::is_same_v<T, std::span<const char>> ||
+       std::is_same_v<T, std::span<const unsigned char>> ||
+       std::is_same_v<T, std::span<const std::byte>>;
 
    template <typename T>
    concept RefPackable = Packable<std::remove_cvref_t<T>>;
@@ -334,7 +336,7 @@ namespace psio
    template <PackableWrapper T>
    struct is_packable<T> : std::bool_constant<true>
    {
-      using inner = std::remove_cvref_t<decltype(clio_unwrap_packable(std::declval<T&>()))>;
+      using inner = std::remove_cvref_t<decltype(psio_unwrap_packable(std::declval<T&>()))>;
       using is_p  = is_packable<inner>;
 
       static constexpr uint32_t fixed_size        = is_p::fixed_size;
@@ -342,7 +344,7 @@ namespace psio
       static constexpr bool     is_optional       = is_p::is_optional;
       static constexpr bool     supports_0_offset = is_p::supports_0_offset;
 
-      static bool has_value(const T& value) { return is_p::has_value(clio_unwrap_packable(value)); }
+      static bool has_value(const T& value) { return is_p::has_value(psio_unwrap_packable(value)); }
       template <bool Verify>
       static bool has_value(const char* src, uint32_t pos, uint32_t end_pos)
       {
@@ -353,7 +355,7 @@ namespace psio
       static inner* ptr(T* value)
       {
          if constexpr (Unpack)
-            return &clio_unwrap_packable(*value);
+            return &psio_unwrap_packable(*value);
          else
             return nullptr;
       }
@@ -361,12 +363,12 @@ namespace psio
       template <typename S>
       static void pack(const T& value, S& stream)
       {
-         return is_p::pack(clio_unwrap_packable(value), stream);
+         return is_p::pack(psio_unwrap_packable(value), stream);
       }
 
       static bool is_empty_container(const T& value)
       {
-         return is_p::is_empty_container(clio_unwrap_packable(value));
+         return is_p::is_empty_container(psio_unwrap_packable(value));
       }
       static bool is_empty_container(const char* src, uint32_t pos, uint32_t end_pos)
       {
@@ -376,7 +378,7 @@ namespace psio
       template <typename S>
       static void embedded_fixed_pack(const T& value, S& stream)
       {
-         return is_p::embedded_fixed_pack(clio_unwrap_packable(value), stream);
+         return is_p::embedded_fixed_pack(psio_unwrap_packable(value), stream);
       }
 
       template <typename S>
@@ -385,14 +387,14 @@ namespace psio
                                         uint32_t heap_pos,
                                         S&       stream)
       {
-         return is_p::embedded_fixed_repack(clio_unwrap_packable(value), fixed_pos, heap_pos,
+         return is_p::embedded_fixed_repack(psio_unwrap_packable(value), fixed_pos, heap_pos,
                                             stream);
       }
 
       template <typename S>
       static void embedded_variable_pack(const T& value, S& stream)
       {
-         return is_p::embedded_variable_pack(clio_unwrap_packable(value), stream);
+         return is_p::embedded_variable_pack(psio_unwrap_packable(value), stream);
       }
 
       template <bool Unpack, bool Verify>
@@ -482,6 +484,20 @@ namespace psio
          return fixed_size == 0;
       }
 
+      template <bool Verify>
+      static bool clear_container(T* value)
+      {
+         if constexpr (UnpackableBorrowed<T>)
+         {
+            *value = T{};
+         }
+         else
+         {
+            value->clear();
+         }
+         return true;
+      }
+
       template <bool Unpack, bool Verify>
       [[nodiscard]] static bool unpack(T*          value,
                                        bool&       has_unknown,
@@ -503,9 +519,16 @@ namespace psio
          }
          if constexpr (Unpack)
          {
-            value->resize(size);
-            if (size)
-               std::memcpy(value->data(), src + pos, fixed_size);
+            if constexpr (UnpackableBorrowed<T>)
+            {
+               *value = T{reinterpret_cast<typename T::pointer>(src + pos), size};
+            }
+            else
+            {
+               value->resize(size);
+               if (size)
+                  std::memcpy(value->data(), src + pos, fixed_size);
+            }
          }
          pos = new_pos;
          return true;
@@ -1488,18 +1511,18 @@ namespace psio
    {
       if constexpr (Unpack && PackableValidatedObject<T>)
       {
-         return clio_validate_packable(*value);
+         return psio_validate_packable(*value);
       }
       else if constexpr (!Pointer)
       {
-         return clio_validate_packable(view<const T>{prevalidated{src + orig_pos}});
+         return psio_validate_packable(view<const T>{prevalidated{src + orig_pos}});
       }
       else
       {
          std::uint32_t offset;
          std::uint32_t tmp = orig_pos;
          (void)unpack_numeric<false>(&offset, src, tmp, tmp + 4);
-         return clio_validate_packable(view<const T>{prevalidated{src + orig_pos + offset}});
+         return psio_validate_packable(view<const T>{prevalidated{src + orig_pos + offset}});
       }
    }
 

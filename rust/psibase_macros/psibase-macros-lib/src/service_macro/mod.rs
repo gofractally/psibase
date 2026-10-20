@@ -74,7 +74,6 @@ fn process_mod(
     let constant = proc_macro2::TokenStream::from_str(&options.constant).unwrap();
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
     let history_events = proc_macro2::TokenStream::from_str(&options.history_events).unwrap();
-    let ui_events = proc_macro2::TokenStream::from_str(&options.ui_events).unwrap();
     let merkle_events = proc_macro2::TokenStream::from_str(&options.merkle_events).unwrap();
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
@@ -96,7 +95,7 @@ fn process_mod(
     if let Some((_, items)) = &mut impl_mod.content {
         let mut action_fns: Vec<usize> = Vec::new();
         let mut non_action_fns: Vec<usize> = Vec::new();
-        let mut event_fns: HashMap<EventType, Vec<usize>> = HashMap::new();
+        let mut event_fns = HashMap::new();
         let pa_ret = check_for_pre_action(&mut pre_action_info, items);
         if pa_ret.is_err() {
             return pa_ret.err().unwrap();
@@ -110,8 +109,11 @@ fn process_mod(
                     non_action_fns.push(item_index);
                 }
                 for attr in &f.attrs {
-                    if let Some(kind) = parse_event_attr(attr) {
-                        event_fns.entry(kind).or_insert(Vec::new()).push(item_index);
+                    if let Some(event_opts) = parse_event_attr(attr) {
+                        event_fns
+                            .entry(event_opts.db)
+                            .or_insert(Vec::new())
+                            .push((item_index, event_opts));
                     }
                 }
             }
@@ -274,7 +276,6 @@ fn process_mod(
         items.push(parse_quote! {
             impl #psibase_mod::ToServiceSchema for #wrapper {
                 type Actions = #actions<#psibase_mod::JustSchema>;
-                type UiEvents = #ui_events;
                 type HistoryEvents = #history_events;
                 type MerkleEvents = #merkle_events;
                 type Database = #database_wrapper;
@@ -303,14 +304,6 @@ fn process_mod(
 
         items.push(parse_quote! {
             #[automatically_derived]
-            pub struct #ui_events {
-                event_log: #psibase_mod::EventDb,
-                sender: #psibase_mod::AccountNumber,
-            }
-        });
-
-        items.push(parse_quote! {
-            #[automatically_derived]
             pub struct #merkle_events {
                 event_log: #psibase_mod::EventDb,
                 sender: #psibase_mod::AccountNumber,
@@ -325,13 +318,12 @@ fn process_mod(
 
         for (id, event_name) in [
             (EventType::History, &history_events),
-            (EventType::Ui, &ui_events),
             (EventType::Merkle, &merkle_events),
         ] {
             if !event_fns.contains_key(&id) {
                 items.push( parse_quote! {
                     impl #psibase_mod::ToEventsSchema for #event_name {
-                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::AnyType> {
+                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::EventType> {
                             Default::default()
                         }
                     }
@@ -355,17 +347,14 @@ fn process_mod(
         for (kind, fns) in event_fns {
             let event_name = match kind {
                 EventType::History => &history_events,
-                EventType::Ui => &ui_events,
                 EventType::Merkle => &merkle_events,
             };
             let db = match kind {
                 EventType::History => quote! {HistoryEvent},
-                EventType::Ui => quote! {UiEvent},
                 EventType::Merkle => quote! {MerkleEvent},
             };
             let event_module_name = match kind {
                 EventType::History => quote!(history),
-                EventType::Ui => quote!(ui),
                 EventType::Merkle => quote!(merkle),
             };
             let mut event_callers = proc_macro2::TokenStream::new();
@@ -373,7 +362,7 @@ fn process_mod(
             let mut event_schema_init = quote! {};
             let mut gql_members = proc_macro2::TokenStream::new();
             let mut gql_dispatch = proc_macro2::TokenStream::new();
-            for fn_index in fns {
+            for (fn_index, event_opts) in fns {
                 if let Item::Fn(f) = &items[fn_index] {
                     let mut invoke_args = quote! {};
                     let mut invoke_struct_args = quote! {};
@@ -393,6 +382,7 @@ fn process_mod(
                         psibase_mod,
                         &quote! { #event_structs_mod::#event_module_name},
                         f,
+                        &event_opts,
                         &mut event_schema_init,
                     );
                     if options.gql {
@@ -418,7 +408,7 @@ fn process_mod(
             items.push(parse_quote! {
                 #[automatically_derived]
                 impl #psibase_mod::ToEventsSchema for #event_name {
-                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::AnyType> {
+                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::EventType> {
                         let mut events = #psibase_mod::fracpack::indexmap::IndexMap::new();
                         #event_schema_init
                         events

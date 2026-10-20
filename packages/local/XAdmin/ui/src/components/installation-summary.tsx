@@ -62,9 +62,9 @@ export const InstallationSummary = ({
     const { data: keyDevices } = useKeyDevices();
     const selectedDevice = keyDevices?.find((d) => d.id === keyDevice);
     return (
-        <div className="px-4">
-            <div className="grid grid-cols-2 py-6">
-                <h1 className="scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
+        <div>
+            <div className="grid grid-cols-1 gap-6 py-2 sm:grid-cols-2">
+                <h1 className="text-2xl font-semibold tracking-tight">
                     Installation summary
                 </h1>
                 <div className="flex flex-row-reverse ">

@@ -75,6 +75,7 @@ namespace psibase::http
             self->impl  = std::move(impl);
             hasMessages = !self->outbox.empty();
          }
+         self->server.register_connection(self);
          if (hasMessages)
             ptr->writeLoop(std::shared_ptr{self});
          ptr->readLoop(std::move(self));
@@ -202,7 +203,9 @@ namespace psibase::http
          {
             auto      inbuffer = input.cdata();
             std::span msg{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
-            callback(std::error_code{}, std::vector(msg.begin(), msg.end()));
+            auto      data = std::vector(msg.begin(), msg.end());
+            input.consume(input.size());
+            callback(std::error_code{}, std::move(data));
          }
          else
          {
@@ -238,7 +241,6 @@ namespace psibase::http
             std::lock_guard l{mutex};
             if (state == StateType::normal)
             {
-               state     = StateType::closing;
                needClose = true;
             }
          }
@@ -247,6 +249,17 @@ namespace psibase::http
             // TODO: propagate code
             server.sharedState->sockets()->asyncClose(*this);
          }
+      }
+
+      static void close(std::shared_ptr<WebSocket>&& self, bool restart)
+      {
+         self->close(restart ? close_code::restart : close_code::shutdown);
+      }
+
+      void abandon() noexcept override
+      {
+         outbox.clear();
+         readCallback = nullptr;
       }
 
       using ChannelAttr = boost::log::attributes::mutable_constant<std::string>;
@@ -339,13 +352,12 @@ namespace psibase::http
                    std::unique_lock l{self->mutex};
                    if (ec)
                    {
+                      auto outbox = std::move(self->outbox);
+                      l.unlock();  // `error()` locks the mutex
                       if (ec != make_error_code(boost::asio::error::operation_aborted))
                       {
-                         // FIXME: recursive lock
                          self->error(ec);
                       }
-                      auto outbox = std::move(self->outbox);
-                      l.unlock();
                       self->clearOutbox(std::move(outbox), ec);
                       return;
                    }
@@ -369,6 +381,7 @@ namespace psibase::http
       void readLoop(std::shared_ptr<WebSocket>&& self)
       {
          auto& input = self->input;
+         assert(input.size() == 0);
          stream.async_read(
              input,
              [self = std::move(self)](const std::error_code& ec, std::size_t bytes_read) mutable

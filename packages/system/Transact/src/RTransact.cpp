@@ -6,6 +6,7 @@
 #include <services/system/RTransact.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
+#include <services/system/VirtualServer.hpp>
 
 #include <functional>
 #include <psibase/HttpHeaders.hpp>
@@ -60,11 +61,37 @@ namespace
       return to<Transact>().checkFirstAuth(id, *trx.transaction);
    }
 
+   bool isResMonitoring()
+   {
+      auto table  = Transact{}.open<ResMonitoringConfigTable>(KvMode::read);
+      auto config = table.get({});
+      return config && config->enabled;
+   }
 }  // namespace
 
 std::optional<SignedTransaction> SystemService::RTransact::next()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
+   if (isResMonitoring())
+   {
+      if (!to<VirtualServer>().can_push_tx())
+      {
+         return {};
+      }
+   }
+   else
+   {
+      // Soft limit for boot blocks (hard limit imposed by triedent
+      // is 16 MiB for the packed block)
+      constexpr std::uint32_t blockLimit = 8 * 1024 * 1024;
+      if (auto sizeRow = open<BlockSizeTable>().get({}))
+      {
+         if (sizeRow->currentBlockSize >= blockLimit)
+         {
+            return {};
+         }
+      }
+   }
    auto unapplied    = WriteOnly{}.open<UnappliedTransactionTable>();
    auto reverify     = open<ReverifySignaturesTable>();
    auto nextSequence = unapplied.get({}).value_or(UnappliedTransactionRecord{0}).nextSequence;
@@ -149,13 +176,6 @@ namespace
       };
       PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
 
-      struct EventTrace
-      {
-         std::string_view      name;
-         std::span<const char> data;
-      };
-      PSIO_REFLECT(EventTrace, name, data)
-
       struct ConsoleTrace
       {
          std::string_view console;
@@ -164,7 +184,7 @@ namespace
 
       struct InnerTrace
       {
-         std::variant<ConsoleTrace, EventTrace, ActionTrace> inner;
+         std::variant<ConsoleTrace, ActionTrace> inner;
       };
       PSIO_REFLECT(InnerTrace, inner)
 
@@ -177,7 +197,6 @@ namespace
    }  // namespace refs
    using ActionRef           = refs::Action;
    using ActionTraceRef      = refs::ActionTrace;
-   using EventTraceRef       = refs::EventTrace;
    using ConsoleTraceRef     = refs::ConsoleTrace;
    using InnerTraceRef       = refs::InnerTrace;
    using TransactionTraceRef = refs::TransactionTrace;
@@ -208,10 +227,6 @@ namespace
       auto operator()(psio::view<const ConsoleTrace> trace)
       {
          return ConsoleTraceRef{trace.console()};
-      }
-      auto operator()(psio::view<const EventTrace> trace)
-      {
-         return EventTraceRef{trace.name(), trace.data()};
       }
       auto operator()(psio::view<const ActionTrace> at)
       {
@@ -674,6 +689,22 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
       row = clients.get(id);
    }
 
+   if (!isResMonitoring())
+   {
+      auto          table   = open<BlockSizeTable>();
+      auto          sizeRow = table.get({}).value_or(BlockSizeRecord{0});
+      std::uint32_t txSize  = 0;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (auto tx = open<TransactionDataTable>().getView(id))
+         {
+            txSize = tx.size();
+         }
+      }
+      sizeRow.currentBlockSize += txSize;
+      table.put(sizeRow);
+   }
+
    if (row)
    {
       waitForApplied = std::ranges::any_of(row->clients, WaitFor::isApplied);
@@ -719,6 +750,11 @@ void RTransact::onBlock()
    check(stat && stat->head, "Head block should be set before calling onBlock");
 
    checkReverify(stat->head->blockId);
+
+   if (!isResMonitoring())
+   {
+      open<BlockSizeTable>().erase({});
+   }
 
    auto finalized = finalizeBlocks(stat->head->header);
    if (!finalized)
@@ -1378,8 +1414,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 {
    std::vector<char>            key = getJWTKey();
    std::optional<AccountNumber> result;
-   bool                         isLocalhost = psibase::isLocalhost(request);
-   auto                         rootHost    = to<HttpServer>().rootHost(request.host);
+   auto                         rootHost = to<HttpServer>().rootHost(request.host);
 
    auto isValidJwt = [&](const LoginTokenData& decoded)
    { return decoded.aud == rootHost && checkExp(decoded.exp); };
@@ -1407,7 +1442,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
       }
    }
 
-   std::string_view cookieName = isLocalhost ? "SESSION" : "__Host-SESSION";
+   std::string_view cookieName = "__Host-SESSION";
 
    auto tokens = request.getCookie(cookieName);
    for (const auto& token : tokens)
@@ -1540,10 +1575,9 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          if (!account)
             return make404("Account not found");
          Actor<AuthInterface> auth(RTransact::service, account->authService);
-         auto                 flags = AuthInterface::topActionReq | AuthInterface::firstAuthFlag;
-         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
-                                ServiceMethod{AccountNumber{}, MethodNumber{}},
-                                std::vector<ServiceMethod>{}, claims))
+         auto                 flags = AuthInterface::firstAuthFlag;
+         if (!auth.checkAuthSys(flags, sender, ServiceMethod{AccountNumber{}, MethodNumber{}},
+                                claims))
          {
             return make400("Login failed");
          }

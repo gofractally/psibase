@@ -141,13 +141,13 @@ namespace psio
       }
 
       template <typename T>
-      T& clio_unwrap_packable(Box<T>& box)
+      T& psio_unwrap_packable(Box<T>& box)
       {
          return *box;
       }
 
       template <typename T>
-      const T& clio_unwrap_packable(const Box<T>& box)
+      const T& psio_unwrap_packable(const Box<T>& box)
       {
          return *box;
       }
@@ -176,12 +176,12 @@ namespace psio
          from_json(schema.types, stream);
       }
 
-      inline auto& clio_unwrap_packable(Schema& schema)
+      inline auto& psio_unwrap_packable(Schema& schema)
       {
          return schema.types;
       }
 
-      inline const auto& clio_unwrap_packable(const Schema& schema)
+      inline const auto& psio_unwrap_packable(const Schema& schema)
       {
          return schema.types;
       }
@@ -207,12 +207,12 @@ namespace psio
          from_json_members(type.members, stream);
       }
 
-      inline auto& clio_unwrap_packable(Object& type)
+      inline auto& psio_unwrap_packable(Object& type)
       {
          return type.members;
       }
 
-      inline auto& clio_unwrap_packable(const Object& type)
+      inline auto& psio_unwrap_packable(const Object& type)
       {
          return type.members;
       }
@@ -232,12 +232,12 @@ namespace psio
          from_json_members(type.members, stream);
       }
 
-      inline auto& clio_unwrap_packable(Struct& type)
+      inline auto& psio_unwrap_packable(Struct& type)
       {
          return type.members;
       }
 
-      inline auto& clio_unwrap_packable(const Struct& type)
+      inline auto& psio_unwrap_packable(const Struct& type)
       {
          return type.members;
       }
@@ -264,11 +264,11 @@ namespace psio
          from_json(*type.type, stream);
       }
 
-      inline auto& clio_unwrap_packable(List& type)
+      inline auto& psio_unwrap_packable(List& type)
       {
          return *type.type;
       }
-      inline auto& clio_unwrap_packable(const List& type)
+      inline auto& psio_unwrap_packable(const List& type)
       {
          return *type.type;
       }
@@ -288,11 +288,11 @@ namespace psio
          from_json(*type.type, stream);
       }
 
-      inline auto& clio_unwrap_packable(Option& type)
+      inline auto& psio_unwrap_packable(Option& type)
       {
          return *type.type;
       }
-      inline auto& clio_unwrap_packable(const Option& type)
+      inline auto& psio_unwrap_packable(const Option& type)
       {
          return *type.type;
       }
@@ -335,12 +335,12 @@ namespace psio
          from_json_members(type.members, stream);
       }
 
-      inline auto& clio_unwrap_packable(Variant& type)
+      inline auto& psio_unwrap_packable(Variant& type)
       {
          return type.members;
       }
 
-      inline auto& clio_unwrap_packable(const Variant& type)
+      inline auto& psio_unwrap_packable(const Variant& type)
       {
          return type.members;
       }
@@ -360,12 +360,12 @@ namespace psio
          from_json(type.members, stream);
       }
 
-      inline auto& clio_unwrap_packable(Tuple& type)
+      inline auto& psio_unwrap_packable(Tuple& type)
       {
          return type.members;
       }
 
-      inline auto& clio_unwrap_packable(const Tuple& type)
+      inline auto& psio_unwrap_packable(const Tuple& type)
       {
          return type.members;
       }
@@ -385,11 +385,11 @@ namespace psio
          from_json(type.type, stream);
       }
 
-      inline auto& clio_unwrap_packable(FracPack& type)
+      inline auto& psio_unwrap_packable(FracPack& type)
       {
          return *type.type;
       }
-      inline auto& clio_unwrap_packable(const FracPack& type)
+      inline auto& psio_unwrap_packable(const FracPack& type)
       {
          return *type.type;
       }
@@ -413,11 +413,11 @@ namespace psio
          from_json(type.type, stream);
       }
 
-      inline auto& clio_unwrap_packable(Type& type)
+      inline auto& psio_unwrap_packable(Type& type)
       {
          return type.type;
       }
-      inline auto& clio_unwrap_packable(const Type& type)
+      inline auto& psio_unwrap_packable(const Type& type)
       {
          return type.type;
       }
@@ -465,12 +465,12 @@ namespace psio
       {
          from_json(type.value, stream);
       }
-      inline auto& clio_unwrap_packable(AnyType& type)
+      inline auto& psio_unwrap_packable(AnyType& type)
       {
          return type.value;
       }
       template <std::same_as<AnyType> T>
-      auto& clio_unwrap_packable(const T& type)
+      auto& psio_unwrap_packable(const T& type)
       {
          return type.value;
       }
@@ -532,16 +532,57 @@ namespace psio
       struct CustomHandler
       {
          template <typename T>
-         CustomHandler(const T&)
-             : match(&T::match),
-               frac2json(&T::frac2json),
-               json2frac(&T::json2frac),
+         CustomHandler(T* arg)
+             : userData(const_cast<void*>(static_cast<const void*>(arg))),
+               match(&T::match),
+               frac2json([](void* data, const CompiledType* ty, FracStream& in, StreamBase& out)
+                         { return static_cast<T*>(data)->frac2json(ty, in, out); }),
+               json2frac([](void*                                   data,
+                            const psio::schema_types::CompiledType* ty,
+                            const psio::json::any&                  in,
+                            psio::StreamBase&                       out)
+                         { static_cast<T*>(data)->json2frac(ty, in, out); }),
                is_empty_container(&T::is_empty_container)
          {
          }
+         template <typename T, typename U = void>
+         CustomHandler(const T&, U* arg = nullptr)
+             : userData(const_cast<void*>(static_cast<const void*>(arg))),
+               match(&T::match),
+               frac2json(
+                   [](void* data, const CompiledType* ty, FracStream& in, StreamBase& out)
+                   {
+                      if constexpr (requires { T::frac2json(ty, in, out); })
+                      {
+                         return T::frac2json(ty, in, out);
+                      }
+                      else
+                      {
+                         return T::frac2json(static_cast<U*>(data), ty, in, out);
+                      }
+                   }),
+               json2frac(
+                   [](void*                                   data,
+                      const psio::schema_types::CompiledType* ty,
+                      const psio::json::any&                  in,
+                      psio::StreamBase&                       out)
+                   {
+                      if constexpr (requires { T::json2frac(ty, in, out); })
+                      {
+                         T::json2frac(ty, in, out);
+                      }
+                      else
+                      {
+                         T::json2frac(static_cast<U*>(data), ty, in, out);
+                      }
+                   }),
+               is_empty_container(&T::is_empty_container)
+         {
+         }
+         void* userData;
          bool (*match)(const CompiledType*);
-         bool (*frac2json)(const CompiledType*, FracStream& in, StreamBase& out);
-         void (*json2frac)(const CompiledType*, const json::any& in, StreamBase& out);
+         bool (*frac2json)(void*, const CompiledType*, FracStream& in, StreamBase& out);
+         void (*json2frac)(void*, const CompiledType*, const json::any& in, StreamBase& out);
          bool (*is_empty_container)(const CompiledType*, const json::any& in);
       };
 
@@ -598,7 +639,7 @@ namespace psio
                                       auto&               out) const
          {
             StreamRef stream{out};
-            return impl[index].frac2json(type, in, stream);
+            return impl[index].frac2json(impl[index].userData, type, in, stream);
          }
 
          void json2frac(const CompiledType* type,
@@ -607,7 +648,7 @@ namespace psio
                         auto&               out) const
          {
             StreamRef stream{out};
-            impl[index].json2frac(type, in, stream);
+            impl[index].json2frac(impl[index].userData, type, in, stream);
          }
 
          bool is_empty_container(const CompiledType* type,
@@ -1552,8 +1593,8 @@ namespace psio
          {
             const auto& varty = std::get<Variant>(ty.original_type->value);
             const auto& name  = obj->front().key;
-            auto        pos   = std::ranges::find_if(varty.members,
-                                                     [&](auto& member) { return member.name == name; });
+            auto pos = std::ranges::find_if(varty.members,
+                                            [&](auto& member) { return member.name == name; });
             if (pos != varty.members.end())
             {
                auto alt = checked_cast<std::uint8_t>(pos - varty.members.begin());
@@ -1772,7 +1813,7 @@ namespace psio
                }
                else if constexpr (PackableWrapper<T>)
                {
-                  schema.insert(name, insert<std::remove_cvref_t<decltype(clio_unwrap_packable(
+                  schema.insert(name, insert<std::remove_cvref_t<decltype(psio_unwrap_packable(
                                           std::declval<T&>()))>>());
                }
                else if constexpr (is_nested_wrapper_v<T>)

@@ -10,7 +10,7 @@
         "sender": "transact",
         "service": "events",
         "method": "sync",
-        "rawData": "0000"
+        "data": {}
       }
     }
   },
@@ -25,7 +25,7 @@
         "sender": "",
         "service": "events+2",
         "method": "onBlock",
-        "rawData": "0000"
+        "data": {}
       }
     }
   },

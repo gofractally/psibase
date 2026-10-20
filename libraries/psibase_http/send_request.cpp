@@ -172,7 +172,7 @@ namespace
 
          psio::finally f{[&]() { self->server.sharedState->addSystemContext(std::move(system)); }};
          BlockContext  bc{*system, system->sharedDatabase.getHead(),
-                         system->sharedDatabase.createWriter(), true};
+                          system->sharedDatabase.createWriter(), true};
          bc.start();
 
          self->writeInfo(*bc.writer);
@@ -270,6 +270,7 @@ namespace
    {
       std::string_view                                host;
       std::shared_ptr<boost::asio::ip::tcp::resolver> resolver;
+      bool                                            tls;
    };
 
    template <typename Stream, typename E, typename F>
@@ -324,7 +325,12 @@ namespace
       PSIBASE_LOG(socket->logger, debug) << "Sending HTTP request";
       auto [host, port] = split_port(endpoint.host);
       if (port.empty())
-         port = "80";
+      {
+         if (endpoint.tls)
+            port = "443";
+         else
+            port = "80";
+      }
       else
          port.remove_prefix(1);
       auto& resolver = *endpoint.resolver;
@@ -473,10 +479,11 @@ void psibase::http::send_request(boost::asio::io_context&        context,
    };
    if (!endpoint)
    {
-      return dispatch_tls(context, state, std::move(logInfo),
-                          StringEndpoint{std::move(host),
-                                         std::make_shared<boost::asio::ip::tcp::resolver>(context)},
-                          host, std::move(tls), add, std::move(next));
+      return dispatch_tls(
+          context, state, std::move(logInfo),
+          StringEndpoint{std::move(host), std::make_shared<boost::asio::ip::tcp::resolver>(context),
+                         tls.has_value()},
+          host, std::move(tls), add, std::move(next));
    }
    else
    {

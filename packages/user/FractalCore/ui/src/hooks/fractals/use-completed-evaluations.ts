@@ -8,7 +8,7 @@ import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
 export const useCompletedEvaluation = (guildAccount: OptionalAccount) => {
     return useQuery<CompletedEvaluation[]>({
-        queryKey: QueryKey.completedEvaluations(),
+        queryKey: QueryKey.completedEvaluations(guildAccount),
         queryFn: async () => {
             try {
                 return await getCompletedEvaluations(guildAccount!);

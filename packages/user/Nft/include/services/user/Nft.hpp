@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <psibase/Memo.hpp>
 #include <psibase/psibase.hpp>
 
@@ -29,11 +30,11 @@ namespace UserService
       void setUserConf(std::uint8_t flag, bool enable);
 
       // Read-only:
-      NftRecord       getNft(NID nftId);
-      NftHolderRecord getNftHolder(psibase::AccountNumber account);
-      CreditRecord    getCredRecord(NID nftId);
-      bool            exists(NID nftId);
-      bool            getUserConf(psibase::AccountNumber account, std::uint8_t flag);
+      std::optional<NftRecord> getNft(NID nftId);
+      NftHolderRecord          getNftHolder(psibase::AccountNumber account);
+      std::optional<CreditRecord> getCredRecord(NID nftId);
+      bool                     exists(NID nftId);
+      bool                     getUserConf(psibase::AccountNumber account, std::uint8_t flag);
 
      public:
       struct Events
@@ -43,21 +44,9 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void minted(NID nftId, Account issuer) {}
-            void burned(NID nftId, Account owner) {}
-            void userConfSet(Account account, std::uint8_t flag, bool enable) {}
-            void credited(NID nftId, Account sender, Account receiver, MemoView memo) {}
-            void uncredited(NID nftId, Account sender, Account receiver, MemoView memo) {}
+            void ownerChange(NID nftId, std::uint8_t action, Account account, Account counter_party, MemoView memo) {}
          };
          // clang-format on
-
-         struct Ui
-         {
-         };
-         struct Merkle
-         {
-            void transferred(NID nftId, Account creditor, Account debitor, MemoView memo) {}
-         };
       };
    };
 
@@ -77,17 +66,8 @@ namespace UserService
       method(exists, nftId),
       method(getUserConf, account, flag)
    );
-   PSIBASE_REFLECT_EVENTS(Nft);
    PSIBASE_REFLECT_HISTORY_EVENTS(Nft,
-      method(minted, nftId, issuer),
-      method(burned, nftId, owner),
-      method(userConfSet, account, flag, enable),
-      method(credited, nftId, sender, receiver, memo),
-      method(uncredited, nftId, sender, receiver, memo)
-   );
-   PSIBASE_REFLECT_UI_EVENTS(Nft);
-   PSIBASE_REFLECT_MERKLE_EVENTS(Nft,
-      method(transferred, nftId, creditor, debitor, memo)
+      method(ownerChange, nftId, action, account, counter_party, memo),
    );
 
    PSIBASE_REFLECT_TABLES(Nft, Nft::Tables)

@@ -12,7 +12,7 @@ mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -20,7 +20,7 @@ mod tables {
     }
 
     #[table(name = "AttestationTable", index = 1)]
-    #[derive(Debug, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct Attestation {
         /// The attesting account / the issuer
         pub attester: AccountNumber,
@@ -57,7 +57,7 @@ mod tables {
     }
 
     #[table(name = "AttestationStatsTable", index = 2)]
-    #[derive(Debug, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct AttestationStats {
         /// The credential subject, in this case, the subject/subject
         #[primary_key]

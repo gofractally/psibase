@@ -10,7 +10,7 @@ A React-based application for testing and interacting with psibase plugins. It p
 4. Executing functions and viewing responses
 5. Generating code snippets for embedding function calls in other applications
 
-It is accessed on the domain of any app that has published a plugin, through the `/common/plugin-tester` path.
+It is accessed on the domain of any app that has published a plugin, through the `/common/plugin-tester` path. The tester is locked to that origin's service (Supervisor only sees origin, so a path-based exception would be forgeable). To exercise another service's plugin, open `/common/plugin-tester` on that service's subdomain.
 
 ## Project Structure
 

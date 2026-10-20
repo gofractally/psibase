@@ -10,8 +10,8 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
-
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { homepage } from "@shared/lib/plugins";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -26,25 +26,23 @@ import {
 dayjs.extend(relativeTime);
 
 const inviteDetailsResponse = z.object({
-    data: z.object({
-        inviteById: z.object({
-            inviter: z.string(),
-            numAccounts: z.number(),
-            expiryDate: z.string(),
-        }),
+    inviteById: z.object({
+        inviter: z.string(),
+        numAccounts: z.number(),
+        expiryDate: z.string(),
     }),
 });
 
 const fetchInvite = async (token: string) => {
     const inviteId = await supervisor.functionCall({
-        service: "invite",
-        intf: "invitee",
+        service: "homepage",
+        intf: "invite",
         method: "importInviteToken",
         params: [token],
     });
 
-    const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "invite", "graphql"),
+    const response = await graphqlAuth(
+        homepage.invite.graphql,
         `
             query InviteById {
                 inviteById(inviteId: ${inviteId}) {
@@ -55,7 +53,7 @@ const fetchInvite = async (token: string) => {
             }
         `,
     );
-    const inviteDetails = inviteDetailsResponse.parse(response).data.inviteById;
+    const inviteDetails = inviteDetailsResponse.parse(response).inviteById;
 
     const networkName = await supervisor.functionCall({
         service: "branding",
@@ -173,7 +171,8 @@ export const Invite = () => {
                             onClick={async () => {
                                 await supervisor.functionCall(
                                     {
-                                        service: "accounts",
+                                        service: "host",
+                                        plugin: "accounts",
                                         intf: "activeApp",
                                         method: "connectAccount",
                                         params: [],

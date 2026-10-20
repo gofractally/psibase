@@ -60,14 +60,6 @@ namespace psibase
       if (!status)
          status.emplace();
 
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
-      if (!dbStatus)
-      {
-         dbStatus.emplace();
-         if (!isReadOnly)
-            db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
-      }
-
       current.header.producer = producer;
       current.header.term     = term;
       if (status->head)
@@ -123,7 +115,6 @@ namespace psibase
       return *status;
    }
 
-   // TODO: (or elsewhere) check block signature
    void BlockContext::start(Block&& src)
    {
       auto status =
@@ -752,11 +743,6 @@ namespace psibase
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
 
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
-      check(!!dbStatus, "databaseStatus not set");
-      dbStatus->blockMerkleEventNumber = dbStatus->nextMerkleEventNumber;
-      db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
-
       // These values will be replaced at the start of the next block.
       // Changing the these here gives services running in RPC mode
       // the illusion that they're running during the production of a new
@@ -768,7 +754,6 @@ namespace psibase
 
       db.kvPut(StatusRow::db, status->key(), *status);
 
-      // TODO: store block proofs somewhere
       // TODO: avoid repacking
       db.kvPut(DbId::blockLog, current.header.blockNum, current);
       db.kvPut(DbId::blockProof, current.header.blockNum,

@@ -3,40 +3,12 @@
 #include <unistd.h>
 #include <filesystem>
 #include <fstream>
-#include <random>
+#include "TempDirectory.hpp"
 
 #include <catch2/catch_all.hpp>
 #include <iostream>
 
 using namespace psibase;
-
-struct TempDirectory
-{
-   TempDirectory() : path(randomName()) { std::filesystem::create_directory(path); }
-   ~TempDirectory() { std::filesystem::remove_all(path); }
-   static std::filesystem::path randomName()
-   {
-      constexpr int                              max_tries = 8;
-      constexpr int                              len       = 24;
-      auto                                       root      = std::filesystem::temp_directory_path();
-      std::string_view                           chars     = "abcdefghijklmnopqrstuvwxyz1234567890";
-      std::uniform_int_distribution<std::size_t> dist(0, chars.size() - 1);
-      std::random_device                         rng;
-      for (int i = 0; i < max_tries; ++i)
-      {
-         std::string name;
-         for (int j = 0; j < len; ++j)
-         {
-            name += chars[dist(rng)];
-         }
-         auto result = root / name;
-         if (!std::filesystem::exists(result))
-            return result;
-      }
-      throw std::runtime_error("Failed to find unused directory name");
-   }
-   std::filesystem::path path;
-};
 
 std::string readFile(const Mount::Fd& fd)
 {
@@ -307,4 +279,35 @@ TEST_CASE(".. in virtual root")
    Mount mount;
    mount.mount(dir.path.string(), "/subdir");
    CHECK(readFile(mount.open("/subdir/../../../subdir/one")) == "1");
+}
+
+TEST_CASE("mount file")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one", "1");
+   Mount mount;
+   mount.mount((dir.path / "one").string(), "/one");
+   CHECK(readFile(mount.open("/one")) == "1");
+}
+
+TEST_CASE("mount file nested")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one", "1");
+   writeFile(dir.path / "two" / "three", "3");
+   Mount mount;
+   mount.mount((dir.path / "one").string(), "/one");
+   mount.mount((dir.path / "two").string(), "/");
+   CHECK(readFile(mount.open("/one")) == "1");
+}
+
+TEST_CASE("symlink prefix match")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one" / "two", "2");
+   writeFile(dir.path / "one" / "x" / "two", "2");
+   std::filesystem::create_directory_symlink(dir.path / "onex", dir.path / "one" / "three");
+   Mount mount;
+   mount.mount((dir.path / "one").string(), "/");
+   CHECK_THROWS_AS(readFile(mount.open("/three/two")), std::system_error);
 }

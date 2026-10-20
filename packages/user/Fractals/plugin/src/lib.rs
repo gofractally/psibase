@@ -2,10 +2,11 @@
 mod bindings;
 
 use bindings::exports::fractals::plugin::admin_fractal::Guest as AdminFractal;
+use bindings::exports::fractals::plugin::authorized::Guest as Authorized;
 use bindings::exports::fractals::plugin::queries::Guest as Queries;
 use bindings::exports::fractals::plugin::user_fractal::Guest as UserFractal;
 
-use psibase::account;
+use psibase::services::guilds::SERVICE as GUILDS_SERVICE;
 use psibase_plugin::{trust::*, *};
 
 use fractals::Wrapper as Fractals;
@@ -14,10 +15,11 @@ mod errors;
 mod graphql;
 mod helpers;
 
-use crate::bindings::accounts::plugin::api::gen_rand_account;
 use crate::bindings::exports::fractals::plugin::types;
 use crate::bindings::guilds::plugin as Guilds;
-use crate::bindings::transact::plugin::intf::set_propose_latch;
+use crate::bindings::tokens::plugin::helpers::decimal_to_u64;
+use crate::bindings::tokens::plugin::user as TokensUser;
+use crate::bindings::transact::plugin::api::set_propose_latch;
 use crate::graphql::fractal::get_fractal;
 use crate::helpers::{get_sender_app, validate_account_name};
 
@@ -31,7 +33,12 @@ impl TrustConfig for FractallyPlugin {
                 "Creating a new fractal",
                 "Claiming accrued fractal token rewards",
             ],
-            high: &["Setting the occupation service for a fractal role"],
+            high: &[
+                "Setting the occupation service for a fractal role",
+                "Setting paid occupations for token distribution",
+                "Donating tokens to a fractal",
+                "Contributing income to a fractal token stream",
+            ],
         }
     }
 }
@@ -53,15 +60,7 @@ impl AdminFractal for FractallyPlugin {
 
         let fractal = fractal_account.parse().unwrap();
 
-        Fractals::add_to_tx().create_frac(
-            fractal,
-            gen_rand_account(Some("leg"))?.parse().unwrap(),
-            gen_rand_account(Some("jud"))?.parse().unwrap(),
-            gen_rand_account(Some("exec"))?.parse().unwrap(),
-            gen_rand_account(Some("rec"))?.parse().unwrap(),
-            name,
-            mission,
-        );
+        Fractals::add_to_tx().create_frac(fractal, name, mission);
 
         Guilds::admin_guild::create_guild("Genesis", &fractal_account, &guild_account)?;
         set_propose_latch(Some(&fractal_account))?;
@@ -75,19 +74,32 @@ impl AdminFractal for FractallyPlugin {
         Guilds::admin_fractal::set_auto_join_fractal(true)?;
 
         let set_role_occ = |role_id: u8| {
-            Fractals::add_to_tx().set_r_occ(role_id, account!("guilds"));
+            Fractals::add_to_tx().set_r_occ(role_id, GUILDS_SERVICE);
         };
 
         set_role_occ(Legislature.into());
         set_role_occ(Judiciary.into());
         set_role_occ(Executive.into());
         set_role_occ(Recruitment.into());
+
+        Fractals::add_to_tx().set_paid_occ(vec![GUILDS_SERVICE]);
         Ok(())
     }
 
     #[psibase_plugin::authorized(High)]
     fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
         Fractals::add_to_tx().set_r_occ(role_id, occupation.parse().unwrap());
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High)]
+    fn set_paid_occupations(occupations: Vec<String>) -> Result<(), Error> {
+        Fractals::add_to_tx().set_paid_occ(
+            occupations
+                .into_iter()
+                .map(|occupation| occupation.parse().unwrap())
+                .collect(),
+        );
         Ok(())
     }
 
@@ -122,6 +134,30 @@ impl UserFractal for FractallyPlugin {
         Fractals::add_to_tx().dist_token(get_sender_app()?);
         Ok(())
     }
+
+    #[psibase_plugin::authorized(High)]
+    fn donate(token_id: u32, amount: String) -> Result<(), Error> {
+        TokensUser::credit(
+            token_id,
+            &Fractals::SERVICE.to_string(),
+            &amount,
+            "Fractal donate",
+        )?;
+        Fractals::add_to_tx().donate(token_id, decimal_to_u64(token_id, &amount)?.into());
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High)]
+    fn income(token_id: u32, amount: String) -> Result<(), Error> {
+        TokensUser::credit(
+            token_id,
+            &Fractals::SERVICE.to_string(),
+            &amount,
+            "Fractal income",
+        )?;
+        Fractals::add_to_tx().income(token_id, decimal_to_u64(token_id, &amount)?.into());
+        Ok(())
+    }
 }
 
 impl Queries for FractallyPlugin {
@@ -133,6 +169,13 @@ impl Queries for FractallyPlugin {
             legislature: fractal.legislature.to_string(),
             token_id: fractal.token_id,
         })
+    }
+}
+
+impl Authorized for FractallyPlugin {
+    #[psibase_plugin::authorized(None)]
+    fn graphql(query: String) -> Result<String, Error> {
+        host::server::post_graphql_get_json(&query)
     }
 }
 

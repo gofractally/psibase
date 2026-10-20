@@ -1,9 +1,9 @@
 package auth-sig:plugin;
 
 world impl {
-    include accounts:plugin/imports;
     include transact:plugin/imports;
-    include host:common/imports;
+    include host:client/imports;
+    include host:http/imports;
     include host:crypto/imports;
     include permissions:plugin/imports;
 

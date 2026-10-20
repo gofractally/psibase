@@ -1,13 +1,97 @@
 #[psibase::service(name = "namemarket+1")]
 #[allow(non_snake_case)]
 mod service {
+    use std::sync::OnceLock;
+
     use async_graphql::{connection::Connection, *};
-    use name_market::tables::{Auction, AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
+    use name_market::tables::{
+        Auction as AuctionRow, AuctionsTable, PurchasedAccount, PurchasedAccountsTable,
+    };
     use name_market::Wrapper as NameMarketService;
-    use psibase::services::tokens::Wrapper as TokensWrapper;
+    use psibase::services::diff_adjust::{RateLimit, Wrapper as DiffAdjust};
+    use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
+
+    struct Auction {
+        row: AuctionRow,
+        rate_limit: OnceLock<Option<RateLimit>>,
+    }
+
+    impl From<AuctionRow> for Auction {
+        fn from(row: AuctionRow) -> Self {
+            Self {
+                row,
+                rate_limit: OnceLock::new(),
+            }
+        }
+    }
+
+    impl Auction {
+        fn rate_limit(&self) -> Option<&RateLimit> {
+            self.rate_limit
+                .get_or_init(|| DiffAdjust::call().get(self.row.nft_id))
+                .as_ref()
+        }
+
+        fn sys_precision() -> Precision {
+            TokensWrapper::call()
+                .getSysToken()
+                .expect("system token must be defined")
+                .precision
+        }
+    }
+
+    #[Object]
+    impl Auction {
+        async fn length(&self) -> u8 {
+            self.row.length
+        }
+
+        async fn enabled(&self) -> bool {
+            self.row.enabled
+        }
+
+        /// Stored create price, as a Decimal in the system token.
+        async fn initial_price(&self) -> Decimal {
+            Decimal::new(self.row.initial_price, Self::sys_precision())
+        }
+
+        /// DiffAdjust target (target_min == target_max in NameMarket usage).
+        async fn target(&self) -> u32 {
+            self.rate_limit().map(|r| r.target_min).unwrap_or(0)
+        }
+
+        /// Floor price from DiffAdjust, as a Decimal in the system token.
+        async fn floor_price(&self) -> Decimal {
+            Decimal::new(
+                Quantity::from(self.rate_limit().map(|r| r.floor_difficulty).unwrap_or(0)),
+                Self::sys_precision(),
+            )
+        }
+
+        async fn window_seconds(&self) -> u32 {
+            self.rate_limit().map(|r| r.window_seconds).unwrap_or(0)
+        }
+
+        async fn increase_pct(&self) -> u8 {
+            name_market::ppm_to_pct(self.rate_limit().map(|r| r.increase_ppm).unwrap_or(0))
+        }
+
+        async fn decrease_pct(&self) -> u8 {
+            name_market::ppm_to_pct(self.rate_limit().map(|r| r.decrease_ppm).unwrap_or(0))
+        }
+
+        /// Current ask price (DiffAdjust difficulty), as a Decimal in the system token.
+        async fn price(&self) -> Decimal {
+            let mut price_raw = DiffAdjust::call().get_diff(self.row.nft_id);
+            if price_raw == 0 {
+                price_raw = self.rate_limit().map(|r| r.floor_difficulty).unwrap_or(0);
+            }
+            Decimal::new(Quantity::from(price_raw), Self::sys_precision())
+        }
+    }
 
     #[derive(Deserialize, SimpleObject)]
     #[graphql(complex)]
@@ -85,8 +169,9 @@ mod service {
                 .get_index_pk()
                 .iter()
                 .filter(|auction| auction.enabled)
+                .map(Auction::from)
                 .collect();
-            rows.sort_by_key(|r| r.length);
+            rows.sort_by_key(|r| r.row.length);
             rows
         }
 
@@ -95,7 +180,11 @@ mod service {
             if TokensWrapper::call().getSysToken().is_none() {
                 return vec![];
             }
-            AuctionsTable::read().get_index_pk().iter().collect()
+            AuctionsTable::read()
+                .get_index_pk()
+                .iter()
+                .map(Auction::from)
+                .collect()
         }
 
         /// Bought-but-unclaimed account records for the authenticated user

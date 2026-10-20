@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
 
-import { graphql } from "@shared/lib/graphql";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { config } from "@shared/lib/plugins";
 
 // import { CpuPricing, NetPricing } from "./use-resource-pricing";
 
@@ -17,6 +18,7 @@ const zNetworkVariables = z.object({
     blockReplayFactor: z.number(),
     perBlockSysCpuNs: z.number(),
     objStorageBytes: z.number(),
+    subjStorageBytes: z.number(),
 });
 
 const zCpuPricing = z.object({
@@ -63,6 +65,7 @@ export const useVirtualServerResources = () => {
                         blockReplayFactor
                         perBlockSysCpuNs
                         objStorageBytes
+                        subjStorageBytes
                     }
                     networkPricing {
                         availableUnits
@@ -75,7 +78,10 @@ export const useVirtualServerResources = () => {
                 }
             `;
 
-            const res = await graphql(query, { service: "vserver" });
+            const res = await graphqlAuth(
+                config.virtualServer.graphql,
+                query,
+            );
             const parsed = zResourcesResponse.parse(res);
             return {
                 serverSpecs: parsed.getServerSpecs,

@@ -108,6 +108,13 @@ export const FieldAccountExisting = withFieldGroup({
                         const notFound = !account?.accountNum;
                         setUserNotFound(notFound);
                     },
+                    // Validate the account name format when the user leaves the
+                    // field, but allow it to be empty (e.g. while drafting).
+                    // Full validation happens on submit.
+                    onBlur: ({ value, fieldApi }) => {
+                        if (!value) return undefined;
+                        return fieldApi.parseValueWithSchema(zAccount);
+                    },
                     onSubmit: ({ fieldApi }) => {
                         const errors = fieldApi.parseValueWithSchema(zAccount);
                         if (errors) return errors;

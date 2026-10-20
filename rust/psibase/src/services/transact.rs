@@ -1,9 +1,18 @@
+use crate::{self as psibase, AccountNumber, Pack, ToSchema, Unpack};
+use serde::{Deserialize, Serialize};
+
 /// Identify a service and method
 ///
 /// An empty `service` or `method` indicates a wildcard.
 pub use crate::ServiceMethod;
 
 type CallbackType = u32;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+struct AuthTarget {
+    sender: AccountNumber,
+    action: Option<ServiceMethod>,
+}
 
 /// Authenticate actions
 ///
@@ -39,8 +48,7 @@ type CallbackType = u32;
 pub mod auth_interface {
     use crate::services::transact::ServiceMethod;
 
-    /// The database is in read-only mode. This flag is only
-    /// used for `topActionReq`.
+    /// The database is in read-only mode.
     ///
     /// Auth services shouldn't try writing to the database if
     /// readOnly is set. If they do, the transaction will abort.
@@ -51,72 +59,24 @@ pub mod auth_interface {
     /// using the user's auth when they shouldn't.
     pub const READ_ONLY_FLAG: u32 = 0x8000_0000;
 
-    /// Transaction's first authorizer. This flag is only
-    /// used for `topActionReq`.
+    /// Transaction's first authorizer.
     ///
-    /// Auth services should be aware that if this flag
-    /// is set, then only the first proof has been verified.
-    /// If they rely on other proofs when this flag is set,
-    /// they'll open up the accounts they're trying to
-    /// protect to resource billing attacks.
+    /// This flag is set when checking the authorization of the
+    /// sender of the first action of a transaction.
     pub const FIRST_AUTH_FLAG: u32 = 0x4000_0000;
-
-    /// Bits which identify kind of request
-    pub const REQUEST_MASK: u32 = 0x0000_00ff;
-
-    /// Top-level action
-    pub const TOP_ACTION_REQ: u32 = 0x01;
-
-    /// `runAs` request. The requester matches the action's
-    /// sender.
-    ///
-    /// Auth services should normally approve this unless
-    /// they enforce stronger rules, e.g. by restricting
-    /// `action` or `allowedActions`.
-    pub const RUN_AS_REQUESTER_REQ: u32 = 0x02;
-
-    /// `runAs` request. The request matches the criteria from
-    /// a `runAs` request currently in the call stack. `requester`
-    /// matches the earlier `action.service`. `action` matches
-    /// one of the earlier `allowedActions` from the same request.
-    ///
-    /// Auth services should normally approve this unless
-    /// they enforce stronger rules.
-    pub const RUN_AS_MATCHED_REQ: u32 = 0x03;
-
-    /// `runAs` request. Same as `runAsMatched`, except the
-    /// requestor provided a non-empty `allowedActions`. This
-    /// expands the authority beyond what was originally granted.
-    ///
-    /// Auth services should normally reject this unless
-    /// they have filtering criteria which allow it.
-    pub const RUN_AS_MATCHED_EXPANDED_REQ: u32 = 0x04;
-
-    /// `runAs` request. The other criteria don't match.
-    ///
-    /// Auth services should normally reject this unless
-    /// they have filtering criteria which allow it.
-    pub const RUN_AS_OTHER_REQ: u32 = 0x05;
 
     /// Authenticate a top-level action or a `runAs` action
     ///
-    /// * `flags`:          One of the Req (request) constants,
-    ///                     or'ed with 0 or more of the flag
-    ///                     constants
-    /// * `requester`:      `""` if this is a top-level action, or
-    ///                     the sender of the `runAs` action.
-    ///                     This is often different from
-    ///                     `action.sender`.
+    /// * `flags`:          0 or more of the flag constants or'ed
+    ///                     together.
+    /// * `sender`:         The sender being requested for the action
     /// * `action`:         Action to authenticate
-    /// * `allowedActions`: Argument from `runAs`
-    /// * `claims`:         Claims in transaction (e.g. public keys).
-    ///                     Empty if `runAs`
+    /// * `claims`:         Claims in transaction (e.g. public keys)
     #[action]
     fn checkAuthSys(
         flags: u32,
-        requester: crate::AccountNumber,
-        action: crate::Action,
-        allowedActions: Vec<crate::services::transact::ServiceMethod>,
+        sender: crate::AccountNumber,
+        action: crate::ServiceMethod,
         claims: Vec<crate::Claim>,
     ) -> bool {
         unimplemented!()
@@ -198,8 +158,8 @@ pub mod auth_interface {
 #[crate::service(name = "transact", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use super::CallbackType;
-    use crate::{Action, Checksum256, Hex, Transaction};
+    use super::{AuthTarget, CallbackType};
+    use crate::{AccountNumber, Action, Checksum256, Hex, Transaction};
     use fracpack::Nested;
 
     /// Only called once, immediately after the boot transaction.
@@ -217,7 +177,9 @@ mod service {
     /// allows all transactions to execute without auth checks. After this point,
     /// `transact` uses
     /// [checkAuthSys](crate::services::transact::AuthActions::checkAuthSys)
-    /// to authenticate top-level actions and uses of [runAs](Self::runAs).
+    /// to authenticate top-level actions and
+    /// [isAuthSys](crate::services::transact::AuthActions::isAuthSys)
+    /// to authenticate uses of [runAs](Self::runAs).
     #[action]
     fn finishBoot() {
         unimplemented!()
@@ -292,32 +254,30 @@ mod service {
     /// may perform on `action.sender's` behalf, for as long as this call to
     /// `runAs` is in the call stack. Use `""` for `service` in
     /// `allowedActions` to allow use of any service (danger!). Use `""` for
-    /// `method` to allow any method.
+    /// `method` to allow any method. The caller must be able to authorize
+    /// all actions in `allowedActions`.
     ///
     /// Returns the action's return value, if any.
     ///
     /// This will succeed if any of the following are true:
     /// * `get_sender() == action.sender's authService`
-    /// * `get_sender() == action.sender`. Requires `action.sender's authService`
-    ///   to approve with flag
-    ///   [RUN_AS_REQUESTER_REQ](crate::services::transact::auth_interface::RUN_AS_REQUESTER_REQ)
-    ///   (normally succeeds).
+    /// * `action.sender` is `get_sender()` or a subaccount of `get_sender()`
+    /// * The auth service of `action.sender` allows `get_sender()` to authorize the action
     /// * An existing `runAs` is currently on the call stack, `get_sender()` matches
     ///   `action.service` on that earlier call, and `action` matches
-    ///   `allowedActions` from that same earlier call. Requires `action.sender's
-    ///   authService` to approve with flag
-    ///   [RUN_AS_MATCHED_REQ](crate::services::transact::auth_interface::RUN_AS_MATCHED_REQ)
-    ///   if `allowedActions` is empty (normally succeeds), or
-    ///   [RUN_AS_MATCHED_EXPANDED_REQ](crate::services::transact::auth_interface::RUN_AS_MATCHED_EXPANDED_REQ)
-    ///   if not empty (normally fails).
-    /// * All other cases, requires `action.sender's authService`
-    ///   to approve with flag [RUN_AS_OTHER_REQ](crate::services::transact::auth_interface::RUN_AS_OTHER_REQ)
-    ///   (normally fails).
+    ///   `allowedActions` from that same earlier call.
     #[action]
     fn runAs(
         action: crate::Action,
         allowedActions: Vec<crate::services::transact::ServiceMethod>,
     ) -> Hex<Vec<u8>> {
+        unimplemented!()
+    }
+
+    /// Returns true if all the actions can be authorized by authorizers.
+    /// This does not include any of the special rules of `runAs`.
+    #[action]
+    fn isAuth(actions: Vec<AuthTarget>, authorizers: Vec<AccountNumber>) -> bool {
         unimplemented!()
     }
 
@@ -330,6 +290,36 @@ mod service {
     /// Enable/disable resource monitoring
     #[action]
     fn resMonitoring(enable: bool) {
+        unimplemented!()
+    }
+
+    /// Returns true if resource monitoring is enabled
+    #[action]
+    fn isResMonitoring() -> bool {
+        unimplemented!()
+    }
+
+    /// The next `numWrites` db writes will not be billed.
+    ///
+    /// This may only be called by privileged services, and must be paired
+    /// with a call to `endSkipBilling` when the specified number of writes
+    /// have been performed.
+    #[action]
+    fn skipBilling(numWrites: u32) {
+        unimplemented!()
+    }
+
+    /// Asserts that all writes promised by [skipBilling](Self::skipBilling) were consumed.
+    #[action]
+    fn endSkipBilling() {
+        unimplemented!()
+    }
+
+    /// Attribute subsequent disk writes to the system account until `numBytes`
+    /// bytes have been written or the transaction ends. `numBytes = 0` clears
+    ///  the override. Callable only by the VirtualServer service.
+    #[action]
+    fn systemWrite(numBytes: u64) {
         unimplemented!()
     }
 
@@ -360,15 +350,6 @@ mod service {
         unimplemented!()
     }
 
-    /// Get the head block time
-    ///
-    /// This is *not* the currently executing block time.
-    /// TODO: remove
-    #[action]
-    fn headBlockTime() -> crate::TimePointSec {
-        unimplemented!()
-    }
-
     /// Returns the tapos `refBlockIndex` and `refBlockSuffix`
     /// for the head block.
     #[action]
@@ -377,7 +358,7 @@ mod service {
     }
 
     /// Emitted at the start of each block
-    #[event(history)]
+    #[event(history, public)]
     fn blockStart(blockNum: crate::BlockNum, blockTime: crate::BlockTime) {
         unimplemented!()
     }

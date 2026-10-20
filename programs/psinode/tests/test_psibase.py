@@ -142,7 +142,7 @@ class TestPsibase(unittest.TestCase):
                 [{"sender":"root",
                   "service":"accounts",
                   "method":"newAccount",
-                  "data":{"name":account,"authService":"auth-any","requireMatch":False}}])
+                  "data":{"name":account,"authService":"auth-any","mode":2}}])
         a.run_psibase(['push'] + a.node_args(), input=make_input('bbbbb12345'), text=True)
         a.run_psibase(['push', '-'] + a.node_args(), input=make_input('ccccc12345'), text=True)
         with tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8') as f:
@@ -450,6 +450,25 @@ class TestPsibase(unittest.TestCase):
         a.wait(new_block())
         result = a.graphql('accounts', '''query { getAccount(accountName: "symbol") { accountNum authService } }''')
         self.assertIsNotNone(result['getAccount'])
+
+    @testutil.psinode_test
+    def test_boot_with_key(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1), softhsm=testutil.libsofthsm2())[0]
+
+        device = a.unlock_softhsm()
+        with a.post('/native/admin/keys', service='x-admin', json={'service': 'verify-sig', 'device': device}) as reply:
+            reply.raise_for_status()
+            key = bytes.fromhex(reply.json()[0]['rawData'])
+
+        keyfile = os.path.join(a.dir, 'key.pub')
+        with open(keyfile, 'wb') as f:
+            f.write(key)
+        txkey = PrivateKey()
+        txkeyfile = os.path.join(a.dir, 'txkey.pub')
+        with open(txkeyfile, 'w') as f:
+            f.write(txkey.spki())
+        packages = ['Minimal', 'Explorer']
+        a.run_psibase(['boot'] + a.node_args() + ['-p', a.producer, '--block-key', keyfile, '--account-key', txkeyfile] + packages)
 
     @testutil.psinode_test
     def test_json_trace(self, cluster):

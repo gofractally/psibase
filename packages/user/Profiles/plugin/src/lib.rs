@@ -2,15 +2,15 @@
 mod bindings;
 
 use bindings::{
-    accounts::plugin::api::{get_account, get_current_user},
+    accounts::query::api::get_account,
     exports::profiles::plugin::{
         api::Guest as Api, contacts::Contact, contacts::Guest as Contacts,
     },
+    host::accounts::api::get_current_user,
     host::{self, types::types::Error},
     permissions,
     profiles::plugin::types::{Avatar, Profile as PluginProfile},
-    sites::plugin::types::File,
-    transact::plugin::intf::add_action_to_transaction,
+    transact::plugin::api::add_action_to_transaction,
 };
 
 use psibase::fracpack::Pack;
@@ -108,30 +108,35 @@ impl Api for ProfilesPlugin {
     fn upload_avatar(avatar: Avatar) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::upload_avatar, vec!["homepage".into()])?;
 
-        let max_avatar_size: usize = 100 * 1024;
-
-        if avatar.content.len() > max_avatar_size {
+        if avatar.content.len() > profiles::MAX_AVATAR_SIZE {
             return Err(ErrorType::AvatarTooBig("100KB".to_string()).into());
         }
 
-        let file = File {
-            content_type: avatar.content_type,
-            content: avatar.content,
-            path: "/profile/avatar".to_string(),
+        let Some(content_type) = profiles::parse_content_type(&avatar.content_type) else {
+            return Err(ErrorType::InvalidAvatarContentType(avatar.content_type).into());
         };
 
-        bindings::sites::plugin::api::upload(&file, 11)
+        let packed = profiles::action_structs::uploadAvatar {
+            image: avatar.content,
+            contentType: content_type,
+        }
+        .packed();
+
+        add_action_to_transaction(profiles::action_structs::uploadAvatar::ACTION_NAME, &packed)
     }
 
     fn remove_avatar() -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::remove_avatar, vec!["homepage".into()])?;
 
-        bindings::sites::plugin::api::remove("/profile/avatar")
+        add_action_to_transaction(
+            profiles::action_structs::removeAvatar::ACTION_NAME,
+            &profiles::action_structs::removeAvatar {}.packed(),
+        )
     }
 
     fn has_read_permission() -> bool {
         permissions::plugin::api::has_auth(
-            &host::common::client::get_sender(),
+            &host::client::api::get_sender(),
             permissions::plugin::types::TrustLevel::High,
             &["homepage".into()],
         )
