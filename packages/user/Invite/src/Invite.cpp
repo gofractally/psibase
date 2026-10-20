@@ -115,17 +115,18 @@ namespace
       return subsidy.value_or(get_std_buffer_reserve());
    }
 
-   std::vector<RedeemedAccountRecord> redeemed_accounts_for(RedeemedAccountTable& table,
-                                                            uint32_t              inviteId)
+   template <typename Fn>
+   void for_redeemed_accounts_on_invite(RedeemedAccountTable& table,
+                                        uint32_t              inviteId,
+                                        Fn&&                  fn)
    {
-      std::vector<RedeemedAccountRecord> rows;
-      auto                               index = table.getIndex<0>();
-      for (auto iter = index.lower_bound(inviteId), end = index.upper_bound(inviteId); iter != end;
-           ++iter)
+      auto index = table.getIndex<0>();
+      for (auto iter = index.lower_bound(inviteId), end = index.upper_bound(inviteId); iter != end;)
       {
-         rows.push_back(*iter);
+         auto row = *iter;
+         ++iter;
+         fn(row);
       }
-      return rows;
    }
 
    InviteRecord require_invite_from_inviter(InviteTable&        table,
@@ -186,7 +187,7 @@ uint32_t Invite::createInvite(uint32_t             inviteId,
    if (isBilling)
    {
       auto sys = getSysToken();
-      auto per_account = getInvCost(1, subsidy).value;
+      auto per_account = (get_create_action_reserve() + resolved_subsidy).value;
       if (numAccounts > 0)
       {
          check(per_account <= std::numeric_limits<uint64_t>::max() /
@@ -332,13 +333,9 @@ Quantity Invite::delInvite(uint32_t inviteId)
 
    {
       auto redeemedTable = Tables().open<RedeemedAccountTable>();
-      auto index         = redeemedTable.getIndex<0>();
-      for (auto iter = index.lower_bound(inviteId), end = index.upper_bound(inviteId); iter != end;)
-      {
-         auto row = *iter;
-         ++iter;
+      for_redeemed_accounts_on_invite(redeemedTable, inviteId, [&](const RedeemedAccountRecord& row) {
          redeemedTable.remove(row);
-      }
+      });
    }
    inviteTable.remove(invite);
    to<Credentials>().consume(invite.cid);
@@ -355,10 +352,9 @@ std::vector<AccountNumber> Invite::getNewAccts(uint32_t inviteId)
 
    std::vector<AccountNumber> accounts;
    auto redeemedTable = Tables(getReceiver(), KvMode::read).open<RedeemedAccountTable>();
-   for (const auto& row : redeemed_accounts_for(redeemedTable, inviteId))
-   {
+   for_redeemed_accounts_on_invite(redeemedTable, inviteId, [&](const RedeemedAccountRecord& row) {
       accounts.push_back(row.account);
-   }
+   });
    return accounts;
 }
 
