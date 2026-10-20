@@ -111,6 +111,22 @@ namespace SystemService
          bool hostIsSubdomain = to<XHttp>().rootHost(req.host) != req.host;
          return allowCors(req, subdomain, hostIsSubdomain);
       }
+
+      // Empty unless the request's Origin is the subdomain.
+      std::vector<HttpHeader> allowCredentialedCorsFrom(const HttpRequest& req,
+                                                        AccountNumber      subdomain)
+      {
+         auto headers = allowCorsFrom(req, subdomain);
+         if (!headers.empty())
+            headers.push_back(allowCredentials());
+         return headers;
+      }
+
+      // Browsers send Origin on every cross-origin POST, so a POST without one is same-origin.
+      bool isSameOriginPostTo(const HttpRequest& req, AccountNumber subdomain)
+      {
+         return !req.getHeader("origin") && XHttp::getService(req) == subdomain;
+      }
    }  // namespace
 
    std::optional<HttpReply> CommonApi::serveSys(HttpRequest request)
@@ -163,9 +179,7 @@ namespace SystemService
       {
          if (request.target == "/common/set-host-cookie")
          {
-            auto headers = allowCorsFrom(request, "supervisor"_a);
-            if (!headers.empty())
-               headers.push_back(allowCredentials());
+            auto headers = allowCredentialedCorsFrom(request, "supervisor"_a);
             reflectRequestedHeaders(headers, request);
 
             return HttpReply{.headers = headers};
@@ -192,9 +206,14 @@ namespace SystemService
          }
          if (request.target == "/common/set-host-cookie")
          {
-            auto headers = allowCorsFrom(request, "supervisor"_a);
-            if (!headers.empty())
-               headers.push_back(allowCredentials());
+            auto headers = allowCredentialedCorsFrom(request, "supervisor"_a);
+            if (headers.empty() && !isSameOriginPostTo(request, "supervisor"_a))
+            {
+               return HttpReply{.status      = HttpStatus::forbidden,
+                                .contentType = "text/plain",
+                                .body        = {},
+                                .headers     = {}};
+            }
 
             auto data = extractData<CookieData>(request);
 
