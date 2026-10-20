@@ -5,24 +5,17 @@ use std::marker::PhantomData;
 use std::ops::{Deref, Index};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
-#[repr(transparent)]
-pub struct ViewData<T> {
-    _phantom: PhantomData<T>,
-    pub data: [u8],
-}
-
 pub trait MakeView {
-    type ViewType: ?Sized;
+    type ViewType: ViewData + ?Sized;
 }
 
-pub trait ViewExt<'a> {
+pub trait ViewData {
+    fn new_unchecked(data: &[u8]) -> &Self;
+    fn get_data(&self) -> &[u8];
+}
+
+pub trait ViewExt<'a>: ViewData {
     type ValueType: Unpack<'a>;
-    fn new_unchecked(data: &'a [u8]) -> &'a Self;
-    fn get_data(&'a self) -> &'a [u8];
-    fn new(data: &'a [u8]) -> Result<&'a Self> {
-        Self::ValueType::verify_no_extra(data)?;
-        Ok(Self::new_unchecked(data))
-    }
     fn unpack(&'a self) -> Self::ValueType {
         let mut stream = FracInputStream::new(self.get_data());
         if Self::ValueType::IS_OPTIONAL {
@@ -32,6 +25,10 @@ pub trait ViewExt<'a> {
         } else {
             Self::ValueType::unpack(&mut stream).unwrap()
         }
+    }
+    fn new(data: &'a [u8]) -> Result<&'a Self> {
+        Self::ValueType::verify_no_extra(data)?;
+        Ok(Self::new_unchecked(data))
     }
 }
 
@@ -44,33 +41,37 @@ macro_rules! view {
         impl $crate::MakeView for $value {
             type ViewType = $name;
         }
-        impl<'a> $crate::ViewExt<'a> for $name {
-            type ValueType = $value;
-            fn new_unchecked(data: &'a [u8]) -> &'a Self {
+        impl $crate::ViewData for $name {
+            fn new_unchecked(data: &[u8]) -> &Self {
                 unsafe { &*(data as *const [u8] as *const Self) }
             }
-            fn get_data(&'a self) -> &'a [u8] {
+            fn get_data(&self) -> &[u8] {
                 return &self.0;
             }
+        }
+        impl<'a> $crate::ViewExt<'a> for $name {
+            type ValueType = $value;
         }
     };
     ( $vis:vis $name:ident<$($param:ident),+> : $value:ty ) => {
         #[repr(transparent)]
-        pub struct $name<$($param:ident),+> {
+        pub struct $name<$($param),+> {
             _phantom: PhantomData<($($param),+)>,
             data: [u8],
-        };
-        impl<$($param:ident),+> $crate::MakeView for $value {
-            type ViewType = $name;
         }
-        impl<'a, $($param:ident),+> $crate::ViewExt<'a> for $name {
-            type ValueType = $value<$($param:ident),+>;
-            fn new_unchecked(data: &'a [u8]) -> &'a Self {
+        impl<$($param),+> $crate::MakeView for $value {
+            type ViewType = $name<$($param),+>;
+        }
+        impl<$($param),+> $crate::ViewData for $name<$($param),+> {
+            fn new_unchecked(data: &[u8]) -> &Self {
                 unsafe { &*(data as *const [u8] as *const Self) }
             }
-            fn get_data(&'a self) -> &'a [u8] {
+            fn get_data(&self) -> &[u8] {
                 return &self.data;
             }
+        }
+        impl<'a, $($param),+> $crate::ViewExt<'a> for $name<$($param),+> where $value: Unpack<'a>  {
+            type ValueType = $value;
         }
     };
     ( $vis:vis <$l:lifetime> $name:ident : $value:ty ) => {
@@ -79,14 +80,16 @@ macro_rules! view {
         impl<$l> $crate::MakeView for $value {
             type ViewType = $name;
         }
-        impl<$l> $crate::ViewExt<$l> for $name {
-            type ValueType = $value;
-            fn new_unchecked(data: &$l [u8]) -> &$l Self {
+        impl<$l> $crate::ViewData for $name {
+            fn new_unchecked(data: &[u8]) -> &Self {
                 unsafe { &*(data as *const [u8] as *const Self) }
             }
-            fn get_data(&$l self) -> &$l [u8] {
+            fn get_data(&self) -> &[u8] {
                 return &self.0;
             }
+        }
+        impl<$l> $crate::ViewExt<$l> for $name {
+            type ValueType = $value;
         }
     }
 }
@@ -129,6 +132,21 @@ impl Deref for StrView {
 }
 
 view!(pub VecView<T>: Vec<T>);
+
+impl<'a, T: MakeView + Unpack<'a>> Index<usize> for VecView<T> {
+    type Output = View<T>;
+    fn index(&self, index: usize) -> &Self::Output {
+        let stream = FracInputStream::new(&self.data);
+        let orig_pos = 4 + T::FIXED_SIZE * index as u32;
+        if T::VARIABLE_SIZE && !T::IS_OPTIONAL {
+            let mut fixed_pos = orig_pos;
+            let offset = stream.unpack_at::<u32>(&mut fixed_pos).unwrap();
+            <View<T>>::new_unchecked(&self.data[(orig_pos + offset) as usize..])
+        } else {
+            <View<T>>::new_unchecked(&self.data[orig_pos as usize..])
+        }
+    }
+}
 
 // Usage should be &View<T>
 

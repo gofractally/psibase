@@ -909,38 +909,38 @@ fn test_view() {
         let v = <View<&str>>::new(&data).unwrap();
         assert_eq!(v.find('d'), Some(2));
     }
-    /*
     {
         let data = vec![42u32, 7u32].packed();
         let v = <View<Vec<u32>>>::new(&data).unwrap();
         assert_eq!(v[0].unpack(), 42);
         assert_eq!(v[1].unpack(), 7);
     }
-    {
-        let data = vec!["asdf", ""].packed();
-        let v = <View<Vec<String>>>::new(&data).unwrap();
-        assert_eq!(v[0].find('d'), Some(2));
-        assert!(v[1].is_empty());
+    /*
+        {
+            let data = vec!["asdf", ""].packed();
+            let v = <View<Vec<String>>>::new(&data).unwrap();
+            assert_eq!(v[0].find('d'), Some(2));
+            assert!(v[1].is_empty());
+        }
+        {
+            let data = vec![Some("asdf"), Some(""), None].packed();
+            let v = <View<Vec<Option<String>>>>::new(&data).unwrap();
+            assert_eq!(v[0].get().unwrap().find('d'), Some(2));
+            assert!(v[1].get().unwrap().is_empty());
+            assert!(v[2].get().is_none());
+        }
+        {
+            let data = "jkl;".packed();
+            let v = <View<Box<String>>>::new(&data).unwrap();
+            assert_eq!(v.find(';'), Some(3));
+        }
+        {
+            let data = ("asdf", 7u32, Some(42u32), Some("jkl;")).packed();
+            let v = <View<(String, u32, Option<u32>, Option<String>)>>::new(&data).unwrap();
+            assert_eq!(&v.get0().unpack(), "asdf");
+            assert_eq!(v.get1().unpack(), 7);
+            assert_eq!(v.get2().unpack(), Some(42));
+            assert_eq!(&v.get3().unpack().unwrap(), "jkl;");
     }
-    {
-        let data = vec![Some("asdf"), Some(""), None].packed();
-        let v = <View<Vec<Option<String>>>>::new(&data).unwrap();
-        assert_eq!(v[0].get().unwrap().find('d'), Some(2));
-        assert!(v[1].get().unwrap().is_empty());
-        assert!(v[2].get().is_none());
-    }
-    {
-        let data = "jkl;".packed();
-        let v = <View<Box<String>>>::new(&data).unwrap();
-        assert_eq!(v.find(';'), Some(3));
-    }
-    {
-        let data = ("asdf", 7u32, Some(42u32), Some("jkl;")).packed();
-        let v = <View<(String, u32, Option<u32>, Option<String>)>>::new(&data).unwrap();
-        assert_eq!(&v.get0().unpack(), "asdf");
-        assert_eq!(v.get1().unpack(), 7);
-        assert_eq!(v.get2().unpack(), Some(42));
-        assert_eq!(&v.get3().unpack().unwrap(), "jkl;");
-}
-    */
+        */
 }
