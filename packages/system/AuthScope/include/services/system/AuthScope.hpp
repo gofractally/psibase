@@ -34,7 +34,7 @@ namespace SystemService
 
    /// Auth service for an account whose key may authorize only whitelisted actions.
    ///
-   /// The key cannot authorize an action on `auth-scope`. The owner cannot act as the account.
+   /// The key cannot authorize an action on `auth-scope`.
    class AuthScope : public psibase::Service
    {
      public:
@@ -57,16 +57,20 @@ namespace SystemService
       /// Aborts unless `user` has a row.
       void canAuthUserSys(psibase::AccountNumber user);
 
-      /// Returns an empty list.
+      /// Get the accounts this auth service delegates authority to for a sender.
       std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
                                                      std::optional<ServiceMethod> method);
 
-      /// Aborts.
+      /// Returns whether the sender's `owner` is among `authorizers`.
+      ///
+      /// Aborts when `sender` has no row.
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers,
                      std::optional<ServiceMethod>        method);
 
-      /// Aborts.
+      /// Returns whether the sender's `owner` is among `rejecters`.
+      ///
+      /// Aborts when `sender` has no row.
       bool isRejectSys(psibase::AccountNumber              sender,
                        std::vector<psibase::AccountNumber> rejecters,
                        std::optional<ServiceMethod>        method);
@@ -93,6 +97,9 @@ namespace SystemService
       /// Aborts if `account` has no row or the sender is not the row's `owner`.
       void setAllowed(psibase::AccountNumber     account,
                       std::vector<AllowedAction> allowed);
+
+     private:
+      psibase::AccountNumber checkOwner(psibase::AccountNumber sender);
    };
    PSIO_REFLECT(AuthScope,  //
                 method(checkAuthSys, flags, sender, action, claims),

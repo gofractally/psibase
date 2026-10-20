@@ -46,26 +46,34 @@ namespace SystemService
 
    void AuthScope::canAuthUserSys(AccountNumber user)
    {
-      check(get(user).has_value(), "sender does not have a public key");
+      checkOwner(user);
    }
 
-   std::vector<AccountNumber> AuthScope::getDlgsSys(AccountNumber, std::optional<ServiceMethod>)
+   AccountNumber AuthScope::checkOwner(AccountNumber sender)
    {
-      return {};
+      auto row = get(sender);
+      check(row.has_value(), "sender does not have a public key");
+      return row->owner;
    }
 
-   bool AuthScope::isAuthSys(AccountNumber,
-                             std::vector<AccountNumber>,
+   std::vector<AccountNumber> AuthScope::getDlgsSys(AccountNumber sender,
+                                                     std::optional<ServiceMethod>)
+   {
+      return {checkOwner(sender)};
+   }
+
+   bool AuthScope::isAuthSys(AccountNumber              sender,
+                             std::vector<AccountNumber> authorizers,
                              std::optional<ServiceMethod>)
    {
-      abortMessage("isAuthSys is not supported");
+      return std::ranges::contains(authorizers, checkOwner(sender));
    }
 
-   bool AuthScope::isRejectSys(AccountNumber,
-                               std::vector<AccountNumber>,
+   bool AuthScope::isRejectSys(AccountNumber              sender,
+                               std::vector<AccountNumber> rejecters,
                                std::optional<ServiceMethod>)
    {
-      abortMessage("isRejectSys is not supported");
+      return std::ranges::contains(rejecters, checkOwner(sender));
    }
 
    void AuthScope::newAccount(AccountNumber                 name,

@@ -25,7 +25,7 @@ pub struct AuthScopeRow {
 
 /// Auth service for an account whose key may authorize only whitelisted actions.
 ///
-/// The key cannot authorize an action on `auth-scope`. The owner cannot act as the account.
+/// The key cannot authorize an action on `auth-scope`.
 #[crate::service(name = "auth-scope", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
@@ -55,13 +55,16 @@ mod service {
         unimplemented!()
     }
 
-    /// Returns an empty list.
+    /// Get the accounts this auth service delegates authority to for a sender.
     #[action]
     fn getDlgsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         unimplemented!()
     }
 
-    /// Aborts.
+    /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+    /// transaction from a specified sender.
+    ///
+    /// Returns `true` if the sender's `owner` is among the authorizers. Aborts when `sender` has no row.
     #[action]
     fn isAuthSys(
         sender: AccountNumber,
@@ -71,7 +74,10 @@ mod service {
         unimplemented!()
     }
 
-    /// Aborts.
+    /// Check whether a specified set of rejecter accounts are sufficient to reject a transaction
+    /// from a specified sender.
+    ///
+    /// Returns `true` if the sender's `owner` is among the rejecters. Aborts when `sender` has no row.
     #[action]
     fn isRejectSys(
         sender: AccountNumber,

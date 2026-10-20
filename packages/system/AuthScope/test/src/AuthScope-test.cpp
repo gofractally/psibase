@@ -113,13 +113,13 @@ TEST_CASE("auth-scope newAccount and whitelist")
    CHECK(owner.to<AuthScope>()
              .canAuthUserSys("noonehas"_a)
              .failed("sender does not have a public key"));
-   CHECK(owner.to<AuthScope>().getDlgsSys(agent, std::nullopt).returnVal().empty());
-   CHECK(owner.to<AuthScope>().getDlgsSys("noonehas"_a, nop).returnVal().empty());
    auto owners = std::vector<AccountNumber>{owner};
-   CHECK(owner.to<AuthScope>().isAuthSys(agent, owners, nop).failed("isAuthSys is not supported"));
+   CHECK(owner.to<AuthScope>().getDlgsSys(agent, std::nullopt).returnVal() == owners);
    CHECK(owner.to<AuthScope>()
-             .isRejectSys(agent, owners, std::nullopt)
-             .failed("isRejectSys is not supported"));
+             .getDlgsSys("noonehas"_a, nop)
+             .failed("sender does not have a public key"));
+   CHECK(owner.to<AuthScope>().isAuthSys(agent, owners, nop).returnVal());
+   CHECK(owner.to<AuthScope>().isRejectSys(agent, owners, std::nullopt).returnVal());
 
    auto nopAct = Action{.sender = agent, .service = UserService::Nop::service, .method = "nop"_m};
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({nopAct}), {{agentPub, agentPriv}}))
@@ -147,7 +147,7 @@ TEST_CASE("auth-scope newAccount and whitelist")
    auto runAsNop = transactor<UserService::Nop>(agent, UserService::Nop::service).nop();
    CHECK(owner.to<Transact>()
              .runAs(std::move(runAsNop), std::vector<ServiceMethod>{})
-             .failed("isAuthSys is not supported"));
+             .succeeded());
 }
 
 TEST_CASE("auth-scope setKey and setAllowed")
