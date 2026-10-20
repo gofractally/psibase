@@ -164,7 +164,8 @@ namespace SystemService
          if (request.target == "/common/set-host-cookie")
          {
             auto headers = allowCorsFrom(request, "supervisor"_a);
-            headers.push_back(allowCredentials());
+            if (!headers.empty())
+               headers.push_back(allowCredentials());
             reflectRequestedHeaders(headers, request);
 
             return HttpReply{.headers = headers};
@@ -192,14 +193,8 @@ namespace SystemService
          if (request.target == "/common/set-host-cookie")
          {
             auto headers = allowCorsFrom(request, "supervisor"_a);
-            if (headers.empty())
-            {
-               return HttpReply{.status      = HttpStatus::forbidden,
-                                .contentType = "text/plain",
-                                .body        = {},
-                                .headers     = {}};
-            }
-            headers.push_back(allowCredentials());
+            if (!headers.empty())
+               headers.push_back(allowCredentials());
 
             auto data = extractData<CookieData>(request);
 
