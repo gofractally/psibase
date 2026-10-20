@@ -4,6 +4,7 @@ use crate::Error;
 use psibase::services::tokens::Decimal;
 use psibase_plugin::host::server;
 use serde::Deserialize;
+use std::str::FromStr;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -116,5 +117,9 @@ pub fn should_auto_refill_gas_tank(user: &str) -> Result<bool, Error> {
         return Ok(false);
     };
 
-    Ok(TokensPlugin::helpers::decimal_to_u64(sys_id, &row.balance)? > 0)
+    Ok(Decimal::from_str(&row.balance)
+        .map_err(|e| ErrorType::QueryError(format!("Failed to parse balance: {e}")))?
+        .quantity
+        .value
+        > 0)
 }

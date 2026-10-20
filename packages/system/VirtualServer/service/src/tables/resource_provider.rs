@@ -26,7 +26,7 @@ impl ResourceProvider {
         ResourceProviderTable::read().get_index_pk().get(&provider)
     }
 
-    pub fn register(app: String, accepted: Vec<String>) {
+    pub fn register(app: AccountNumber, accepted: Vec<String>) {
         let sender = get_sender();
         let producers = Producers::call().getProducers();
         assert!(
@@ -42,8 +42,10 @@ impl ResourceProvider {
             "candidate endpoint must be non-empty"
         );
 
-        AccountNumber::from_exact(&app).expect("app must be a valid account name");
-        assert!(app.starts_with("x-"), "app must start with the x- prefix");
+        assert!(
+            app.to_string().starts_with("x-"),
+            "app must start with the x- prefix"
+        );
         assert!(
             !accepted.is_empty(),
             "accepted currencies must be non-empty"
@@ -54,7 +56,7 @@ impl ResourceProvider {
                 let lower = code.to_ascii_lowercase();
                 assert!(
                     AccountNumber::from_exact(&lower).is_ok(),
-                    "accepted currency must be a valid account name: {code}"
+                    "currency name invalid: {code}"
                 );
                 lower
             })
@@ -71,9 +73,6 @@ impl ResourceProvider {
 
     pub fn unregister() {
         let sender = get_sender();
-        let Some(row) = Self::get(sender) else {
-            return;
-        };
-        ResourceProviderTable::read_write().remove(&row);
+        ResourceProviderTable::read_write().erase(&sender);
     }
 }
