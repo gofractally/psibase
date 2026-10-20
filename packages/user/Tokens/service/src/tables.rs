@@ -215,6 +215,21 @@ pub mod tables {
             );
         }
 
+        fn is_system_token(&self) -> bool {
+            ConfigRow::get().is_some_and(|config| config.sys_tid == self.id)
+        }
+
+        fn check_can_credit(&self) {
+            if !self.get_flag(TokenFlags::UNTRANSFERABLE) {
+                return;
+            }
+            let sender = get_sender();
+            if self.is_system_token() && sender == psibase::account!("vserver") {
+                return;
+            }
+            assert_eq!(sender, self.nft_holder(), "Token untradeable");
+        }
+
         pub fn recall(
             &mut self,
             amount: Quantity,
@@ -511,15 +526,10 @@ pub mod tables {
         pub fn credit(&mut self, quantity: Quantity, memo: Memo) {
             assert!(quantity.value > 0, "credit quantity must be greater than 0");
 
+            Token::get_assert(self.token_id).check_can_credit();
+
             Balance::get_or_new(self.creditor, self.token_id).sub_balance(quantity);
             self.add_balance(quantity);
-
-            let token = Token::get_assert(self.token_id);
-
-            let is_untransferable = token.get_flag(TokenFlags::UNTRANSFERABLE);
-            if is_untransferable {
-                assert_eq!(token.nft_holder(), get_sender(), "Token untradeable");
-            }
 
             let is_auto_debit = BalanceConfig::get(self.debitor, self.token_id)
                 .map(|holder| holder.get_flag(BalanceFlags::AUTO_DEBIT))
@@ -783,6 +793,10 @@ pub mod tables {
     impl ConfigRow {
         #[primary_key]
         fn pk(&self) {}
+
+        pub fn get() -> Option<Self> {
+            ConfigTable::read().get_index_pk().get(&())
+        }
     }
 
     #[ComplexObject]
