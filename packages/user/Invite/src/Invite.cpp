@@ -28,12 +28,23 @@ using namespace SystemService;
 using std::optional;
 using std::string;
 using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+using std::chrono::nanoseconds;
 using std::chrono::seconds;
 using std::chrono::weeks;
 
 namespace
 {
    constexpr seconds ONE_WEEK = duration_cast<Seconds>(weeks(1));
+
+   // Measured `createAccount` redemption (billing on, nonzero subsidy):
+   // * 293 bytes network -> 300
+   // * 11.4–11.7 ms CPU -> 12 ms
+   // * 656 bytes disk written -> 700 (ignore freed-row refunds)
+   constexpr uint64_t CREATE_ACTION_NET_BYTES  = 300;
+   constexpr uint64_t CREATE_ACTION_CPU_NS =
+       duration_cast<nanoseconds>(milliseconds{12}).count();
+   constexpr uint64_t CREATE_ACTION_DISK_BYTES = 700;
 
    void hookOnInvAccept(const InviteRecord& invite, AccountNumber accepter)
    {
@@ -82,14 +93,6 @@ namespace
 {
    Quantity get_create_action_reserve()
    {
-      // The basic `createAccount` action (manually measured):
-      // * 293 bytes of network bandwidth -> Round up to 300
-      // * 6.7MS of CPU time              -> Round up to 7ms
-      // * 318 bytes of disk              -> Round up to 320
-      const uint64_t CREATE_ACTION_NET_BYTES  = 300;
-      const uint64_t CREATE_ACTION_CPU_NS     = 7000000;
-      const uint64_t CREATE_ACTION_DISK_BYTES = 320;
-
       auto virtualServer = to<VirtualServer>();
       auto net_cost      = virtualServer.get_net_cost(CREATE_ACTION_NET_BYTES);
       auto cpu_cost      = virtualServer.get_cpu_cost(CREATE_ACTION_CPU_NS);
