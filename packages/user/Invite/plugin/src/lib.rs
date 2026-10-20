@@ -79,36 +79,16 @@ fn encode_invite_token(invite_id: u32, symmetric_key: Vec<u8>) -> String {
     base64::url::encode(data.as_slice())
 }
 
-struct InviteDetailsInternal {
-    details: InviteDetails,
-    min_cost: String,
-}
-
-fn prepare_new_invite_impl(
-    num_accounts: u16,
-    service_name: String,
-) -> Result<InviteDetailsInternal, Error> {
+fn new_invite_details() -> Result<InviteDetails, Error> {
     let keypair = host::crypto::generate_unmanaged_keypair()?;
     let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
 
     let invite_id: u32 = rand::rng().random();
     let invite_token = encode_invite_token(invite_id, symmetric_key);
 
-    let sys = tokens::helpers::fetch_network_token()?;
-    let min_cost = if sys.is_some() {
-        get_invite_cost(num_accounts)?
-    } else {
-        "0".to_string()
-    };
-
     let fingerprint = psibase::sha256(&host::crypto::to_der(&keypair.public_key)?)
         .0
         .to_vec();
-
-    let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
-    if sys.is_some() && min_cost_u64 > 0 {
-        tokens::user::credit(sys.unwrap(), &service_name, &min_cost, "Create an invite")?;
-    }
 
     let payload = InvPayload {
         fingerprint,
@@ -116,14 +96,29 @@ fn prepare_new_invite_impl(
     }
     .packed();
 
-    Ok(InviteDetailsInternal {
-        details: InviteDetails {
-            invite_token,
-            invite_id,
-            payload,
-        },
-        min_cost,
+    Ok(InviteDetails {
+        invite_token,
+        invite_id,
+        payload,
     })
+}
+
+fn charge_invite(num_accounts: u16, service_name: &str) -> Result<u64, Error> {
+    // A chain with no network token does not bill invites.
+    let Some(sys) = tokens::helpers::fetch_network_token()? else {
+        return Ok(0);
+    };
+
+    let min_cost = get_invite_cost(num_accounts)?;
+    let min_cost_u64 = Decimal::from_str(&min_cost)
+        .map_err(|e| QueryError(e.to_string()))?
+        .quantity
+        .value;
+    if min_cost_u64 > 0 {
+        tokens::user::credit(sys, service_name, &min_cost, "Create an invite")?;
+    }
+
+    Ok(min_cost_u64)
 }
 
 impl Invitee for InvitePlugin {
@@ -230,25 +225,30 @@ impl Inviter for InvitePlugin {
     #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
     fn generate_invite() -> Result<String, Error> {
         const NUM_ACCOUNTS: u16 = 1;
-        let i = prepare_new_invite_impl(NUM_ACCOUNTS, Invite::SERVICE.to_string())?;
-
-        let min_cost_u64 = Decimal::from_str(&i.min_cost).unwrap().quantity.value;
+        let details = new_invite_details()?;
+        let min_cost_u64 = charge_invite(NUM_ACCOUNTS, &Invite::SERVICE.to_string())?;
 
         Invite::Wrapper::add_to_tx().createInvite(
-            i.details.invite_id,
-            i.details.payload,
+            details.invite_id,
+            details.payload,
             NUM_ACCOUNTS,
             false,
             Quantity::from(min_cost_u64),
             None,
         );
 
-        Ok(i.details.invite_token)
+        Ok(details.invite_token)
     }
 
-    #[psibase_plugin::authorized(Medium, whitelist=["guilds"])]
-    fn prepare_new_invite(num_accounts: u16, service_name: String) -> Result<InviteDetails, Error> {
-        Ok(prepare_new_invite_impl(num_accounts, service_name)?.details)
+    #[psibase_plugin::authorized(None)]
+    fn prepare_new_invite() -> Result<InviteDetails, Error> {
+        new_invite_details()
+    }
+
+    #[psibase_plugin::authorized(Medium, whitelist = ["guilds"])]
+    fn pay_for_invite(num_accounts: u16, service_name: String) -> Result<(), Error> {
+        charge_invite(num_accounts, &service_name)?;
+        Ok(())
     }
 
     #[psibase_plugin::authorized(Low)]
