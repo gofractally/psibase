@@ -205,6 +205,11 @@ static TableIndex<Block, std::uint32_t> blockLog()
    return TableIndex<Block, std::uint32_t>{DbId::blockLog, {}, false};
 }
 
+// Default limit on the stored size of a page of blocks. The rows, the query
+// results, the hex-encoded JSON, and the packed response can need about 4x
+// this much, which must fit in a query's 32 MiB of memory.
+static constexpr std::uint32_t blocksPageBytes = 6 * 1024 * 1024;
+
 static std::optional<Checksum256> parseChecksum(const std::string& hex)
 {
    std::vector<char> bytes;
@@ -221,8 +226,8 @@ struct Query
    auto                   blocks() const
    {
       return psibase::TransformedConnectionView{
-          blockLog(),
-          [this](SharedBlock&& block) { return BlockQuery{std::move(block), &transactionCensor}; }};
+          blockLog(), [this](SharedBlock&& block)
+          { return BlockQuery{std::move(block), &transactionCensor}; }, blocksPageBytes};
    }
 
    std::optional<BlockQuery> block(std::uint32_t blockNum) const

@@ -34,8 +34,10 @@ export const BlocksPage = () => {
     const head = useLiveChain((s) => s.head);
 
     // ?before=N  -> browse mode showing blocks < N (newest first)
+    // ?after=N   -> browse mode showing blocks > N (newest first)
     const before = params.get("before") ? Number(params.get("before")) : null;
-    const live = before === null;
+    const after = params.get("after") ? Number(params.get("after")) : null;
+    const live = before === null && after === null;
 
     const [paused, setPaused] = useState(false);
     const [frozen, setFrozen] = useState<BlockRecord[] | null>(null);
@@ -49,8 +51,11 @@ export const BlocksPage = () => {
     }, [paused, frozen, liveBlocks]);
 
     const page = useQuery({
-        queryKey: ["blocks", "page", before],
-        queryFn: () => fetchBlocks({ lt: before!, last: PAGE_SIZE }),
+        queryKey: ["blocks", "page", before, after],
+        queryFn: () =>
+            before !== null
+                ? fetchBlocks({ lt: before, last: PAGE_SIZE })
+                : fetchBlocks({ gt: after!, first: PAGE_SIZE }),
         enabled: !live,
         staleTime: Infinity,
     });
@@ -90,12 +95,12 @@ export const BlocksPage = () => {
         setParams({ before: String(oldest) });
     }, [oldest, setParams]);
 
+    // Pages may be shorter than PAGE_SIZE, so continue from the newest block shown
     const goNewer = useCallback(() => {
-        if (newest === null || !head) return;
-        const next = newest + PAGE_SIZE + 1;
-        if (next > head.blockNum) setParams({});
-        else setParams({ before: String(next) });
-    }, [newest, head, setParams]);
+        if (newest === null) return;
+        if (pageData && !pageData.pageInfo.hasNextPage) setParams({});
+        else setParams({ after: String(newest) });
+    }, [newest, pageData, setParams]);
 
     const goLatest = useCallback(() => {
         setParams({});
@@ -144,8 +149,10 @@ export const BlocksPage = () => {
                                 <StatusDot />
                                 {paused ? "Paused" : "Streaming"}
                             </>
+                        ) : before !== null ? (
+                            <>Blocks before #{formatNumber(before)}</>
                         ) : (
-                            <>Blocks before #{formatNumber(before!)}</>
+                            <>Blocks after #{formatNumber(after!)}</>
                         )}
                     </span>
                 }

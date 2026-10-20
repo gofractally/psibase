@@ -182,6 +182,108 @@ TEST_CASE("action counts are public")
    CHECK(nopReceived == 2);
 }
 
+struct PagedInfo
+{
+   bool        hasPreviousPage;
+   bool        hasNextPage;
+   std::string startCursor;
+   std::string endCursor;
+   PSIO_REFLECT(PagedInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
+};
+struct PagedNode
+{
+   CountsHeader header;
+   PSIO_REFLECT(PagedNode, header)
+};
+struct PagedEdge
+{
+   PagedNode node;
+   PSIO_REFLECT(PagedEdge, node)
+};
+struct PagedBlocks
+{
+   std::vector<PagedEdge> edges;
+   PagedInfo              pageInfo;
+   PSIO_REFLECT(PagedBlocks, edges, pageInfo)
+};
+struct PagedData
+{
+   PagedBlocks blocks;
+   PSIO_REFLECT(PagedData, blocks)
+};
+struct PagedRoot
+{
+   PagedData data;
+   PSIO_REFLECT(PagedRoot, data)
+};
+
+TEST_CASE("pages of large blocks are cut short")
+{
+   DefaultTestChain t;
+
+   auto alice = t.addAccount("alice");
+
+   constexpr std::size_t numBlocks   = 12;
+   constexpr std::size_t payloadSize = 1024 * 1024;
+
+   t.finishBlock();
+   t.setAutoBlockStart(false);
+   for (std::size_t i = 0; i < numBlocks; ++i)
+   {
+      Action act{.sender  = alice,
+                 .service = Nop::service,
+                 .method  = MethodNumber{"nop"},
+                 .rawData = std::vector<char>(payloadSize, static_cast<char>(i))};
+      REQUIRE(TraceResult{t.pushTransaction(t.makeTransaction({std::move(act)}))}.succeeded());
+      t.finishBlock();
+   }
+
+   auto page = [&](std::string_view args)
+   {
+      std::string query = std::format(
+          "query {{ blocks({}) {{ edges {{ node {{ header {{ blockNum }} }} }} pageInfo {{ "
+          "hasPreviousPage hasNextPage startCursor endCursor }} }} }}",
+          args);
+      return t.post<PagedRoot>(Explorer::service, "/graphql", GraphQLBody{query}).data.blocks;
+   };
+
+   // Each block holds over 1 MiB, so at most 5 fit in the default 6 MiB page
+   auto newest = page(std::format("last: {}", numBlocks));
+   REQUIRE(!newest.edges.empty());
+   CHECK(newest.edges.size() <= 5);
+   CHECK(newest.pageInfo.hasPreviousPage);
+
+   BlockNum headNum  = newest.edges.back().node.header.blockNum;
+   BlockNum firstNum = headNum - numBlocks + 1;
+
+   std::vector<BlockNum> seen;
+   for (auto p = newest;;)
+   {
+      for (auto it = p.edges.rbegin(); it != p.edges.rend(); ++it)
+         seen.push_back(it->node.header.blockNum);
+      if (seen.size() >= numBlocks)
+         break;
+      REQUIRE(p.pageInfo.hasPreviousPage);
+      p = page(
+          std::format("last: {}, before: \"{}\"", numBlocks - seen.size(), p.pageInfo.startCursor));
+      REQUIRE(!p.edges.empty());
+   }
+   REQUIRE(seen.size() == numBlocks);
+   for (std::size_t i = 0; i < seen.size(); ++i)
+      CHECK(seen[i] == headNum - i);
+
+   auto oldest = page(std::format("ge: {}, first: {}", firstNum, numBlocks));
+   REQUIRE(!oldest.edges.empty());
+   CHECK(oldest.edges.size() <= 5);
+   CHECK(oldest.edges.front().node.header.blockNum == firstNum);
+   CHECK(oldest.pageInfo.hasNextPage);
+
+   // At least one block is returned even when it alone exceeds the limit
+   CHECK(page(std::format("last: {}, maxBytes: 1", numBlocks)).edges.size() == 1);
+   CHECK(page(std::format("last: {}, maxBytes: {}", numBlocks, 64 * 1024 * 1024)).edges.size() ==
+         numBlocks);
+}
+
 struct LookupHeader
 {
    BlockNum blockNum;

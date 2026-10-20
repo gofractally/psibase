@@ -286,6 +286,8 @@ class LiveChainStore {
     private inFlight = false;
     private viewer: string | null | undefined = undefined;
     private generation = 0;
+    /** The service caps pages by size, so the seed may cover fewer than SEED blocks. */
+    private hasOlder = false;
 
     getState = () => this.state;
 
@@ -326,6 +328,7 @@ class LiveChainStore {
         if (this.timer) clearTimeout(this.timer);
         this.timer = null;
         this.inFlight = false;
+        this.hasOlder = false;
         this.emit({ ...initialState(), version: this.state.version });
         if (this.running) void this.tick();
     }
@@ -342,11 +345,14 @@ class LiveChainStore {
         for (const l of this.listeners) l();
     }
 
-    private schedule() {
+    private schedule(immediate = false) {
         if (!this.running) return;
         if (this.timer) clearTimeout(this.timer);
-        const delay =
-            document.visibilityState === "hidden" ? HIDDEN_POLL_MS : POLL_MS;
+        const delay = immediate
+            ? 0
+            : document.visibilityState === "hidden"
+              ? HIDDEN_POLL_MS
+              : POLL_MS;
         this.timer = setTimeout(() => void this.tick(), delay);
     }
 
@@ -354,8 +360,9 @@ class LiveChainStore {
         if (this.inFlight) return;
         this.inFlight = true;
         const generation = this.generation;
+        let behind = false;
         try {
-            await this.poll(generation);
+            behind = await this.poll(generation);
         } catch (err) {
             if (generation === this.generation) {
                 this.emit({
@@ -365,13 +372,55 @@ class LiveChainStore {
                 });
             }
         }
+        try {
+            await this.backfill(generation);
+        } catch {
+            // Not a connection problem; retried on the next tick
+        }
         // A reset while this poll was in flight already started a new one
         if (generation !== this.generation) return;
         this.inFlight = false;
-        this.schedule();
+        this.schedule(behind);
     }
 
-    private async poll(generation: number) {
+    /** Prepends older blocks until the window holds SEED blocks. */
+    private async backfill(generation: number) {
+        const { blocks } = this.state;
+        if (
+            generation !== this.generation ||
+            !this.hasOlder ||
+            blocks.length === 0 ||
+            blocks.length >= SEED
+        ) {
+            return;
+        }
+        const connection = await fetchBlocks({
+            lt: blocks[0].header.blockNum,
+            last: SEED - blocks.length,
+        });
+        if (generation !== this.generation) return;
+        this.hasOlder = connection.pageInfo.hasPreviousPage;
+        const older = connection.edges.map((e) => e.node);
+        if (older.length === 0) return;
+
+        const merged = [...older, ...this.state.blocks].slice(-WINDOW);
+        const olderTxs = older.flatMap(flattenTransactions).reverse();
+        this.emit({
+            blocks: merged,
+            stats: computeStats(merged),
+            recentTransactions: [
+                ...this.state.recentTransactions,
+                ...olderTxs,
+            ].slice(0, TX_HISTORY),
+            recentUserTransactions: [
+                ...this.state.recentUserTransactions,
+                ...olderTxs.filter((t) => !t.isSystem),
+            ].slice(0, TX_HISTORY),
+        });
+    }
+
+    /** Returns whether more new blocks are waiting than one page could hold. */
+    private async poll(generation: number): Promise<boolean> {
         const { blocks, seeded } = this.state;
         const lastNum = blocks.length
             ? blocks[blocks.length - 1].header.blockNum
@@ -381,7 +430,8 @@ class LiveChainStore {
                 ? { gt: lastNum, first: WINDOW }
                 : { last: SEED },
         );
-        if (generation !== this.generation) return;
+        if (generation !== this.generation) return false;
+        if (!seeded) this.hasOlder = connection.pageInfo.hasPreviousPage;
         const incoming = connection.edges
             .map((e) => e.node)
             .filter((b) => lastNum === null || b.header.blockNum > lastNum);
@@ -421,6 +471,7 @@ class LiveChainStore {
                 seeded: true,
             });
         }
+        return seeded && connection.pageInfo.hasNextPage;
     }
 }
 
