@@ -9,7 +9,6 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 
-#include <algorithm>
 #include <string>
 #include <string_view>
 
@@ -19,8 +18,6 @@ using namespace psibase;
 
 namespace
 {
-   // A base-name prefix is one account-number range: numbers follow name
-   // order, and subaccounts occupy the low 8 bits right after the base name.
    struct AccountPrefixBounds
    {
       bool                         matchNone = false;
@@ -30,45 +27,20 @@ namespace
 
    AccountPrefixBounds accountPrefixBounds(std::string_view prefix)
    {
-      constexpr std::string_view alphabet = "-0123456789abcdefghijklmnopqrstuvwxyz";
       if (prefix.empty())
          return {};
-      if (prefix.size() > 10 || prefix.front() == '-' ||
-          prefix.find("--") != std::string_view::npos ||
-          (prefix.size() == 10 && prefix.back() == '-') ||
-          !std::ranges::all_of(
-              prefix, [&](char ch) { return alphabet.find(ch) != std::string_view::npos; }))
-         return {.matchNone = true};
 
       std::string lower{prefix};
       if (lower.back() == '-')
          lower.push_back('0');
       AccountNumber lowerNum{lower};
-      if (lowerNum.str() != lower)
+      if (lowerNum.str() != lower || lowerNum.subaccount() != 0)
          return {.matchNone = true};
 
       std::string upper{prefix};
-      bool        carried = true;
-      for (int i = static_cast<int>(upper.size()) - 1; i >= 0 && carried; --i)
-      {
-         auto pos = alphabet.find(upper[static_cast<std::size_t>(i)]);
-         if (pos == std::string_view::npos)
-            return {.matchNone = true};
-         if (pos + 1 < alphabet.size())
-         {
-            upper[static_cast<std::size_t>(i)] = alphabet[pos + 1];
-            upper.resize(static_cast<std::size_t>(i) + 1);
-            carried = false;
-         }
-         else
-            upper.resize(static_cast<std::size_t>(i));
-      }
-      if (carried)
-         return {.ge = lowerNum};
-
+      upper.resize(10, 'z');
       AccountNumber upperNum{upper};
-      if (upperNum.str() != upper)
-         return {.matchNone = true};
+      upperNum.value += 256;
       return {.ge = lowerNum, .lt = upperNum};
    }
 }  // namespace
