@@ -4,6 +4,8 @@ import {
     formatDistanceToNowStrict,
 } from "date-fns";
 
+import { zAccountNumber } from "@shared/lib/schemas/account";
+
 /** psibase emits timestamps like 2026-09-08T20:31:15.000000Z (6 fractional digits). */
 export const parseChainTime = (time: string): Date => {
     const trimmed = time.replace(/\.(\d{3})\d*Z$/, ".$1Z");
@@ -156,7 +158,7 @@ export const blockNumFromId = (id: string): number | null => {
 export const isHash = (value: string) => /^[0-9a-fA-F]{64}$/.test(value);
 
 export const isAccountName = (value: string) =>
-    /^[a-z0-9][a-z0-9-]{0,17}(\+\d+)?$/.test(value);
+    zAccountNumber.safeParse(value).success;
 
 export const pct = (part: number, total: number, digits = 1) =>
     total === 0 ? "0%" : `${((part / total) * 100).toFixed(digits)}%`;
