@@ -119,6 +119,8 @@ impl Admin for VirtualServerPlugin {
             sender == "config" || sender == host::client::get_receiver(),
             "reg_res_provider can only be called by config or self"
         );
+        let app = AccountNumber::from_exact(&app)
+            .map_err(|e| ErrorType::ConversionError(e.to_string()))?;
         VirtualServer::add_to_tx().reg_res_provider(app, accepted);
         Ok(())
     }

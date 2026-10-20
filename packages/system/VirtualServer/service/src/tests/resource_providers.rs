@@ -59,8 +59,9 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
         .regCandidate("https://prod.example.com".into(), auth.clone())
         .get()?;
 
+    let portal = account!("x-portal");
     Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-        .reg_res_provider("x-portal".into(), vec!["USD".into(), "EUR".into()])
+        .reg_res_provider(portal, vec!["USD".into(), "EUR".into()])
         .get()?;
 
     let providers = resource_providers(&chain)?;
@@ -76,7 +77,7 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
 
     // Update (upsert)
     Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-        .reg_res_provider("x-portal".into(), vec!["GBP".into()])
+        .reg_res_provider(portal, vec!["GBP".into()])
         .get()?;
     let providers = resource_providers(&chain)?;
     assert_eq!(providers[0].accepted, vec!["gbp"]);
@@ -94,7 +95,7 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
         .regCandidate("https://alice.example.com".into(), auth)
         .get()?;
     assert_error(
-        Wrapper::push_from(&chain, alice).reg_res_provider("x-portal".into(), vec!["USD".into()]),
+        Wrapper::push_from(&chain, alice).reg_res_provider(portal, vec!["USD".into()]),
         "only active producers",
     );
 
@@ -104,7 +105,7 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
         .regCandidate("https://prod.example.com".into(), Claim::default())
         .get()?;
     Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-        .reg_res_provider("x-portal".into(), vec!["USD".into()])
+        .reg_res_provider(portal, vec!["USD".into()])
         .get()?;
     assert_eq!(resource_providers(&chain)?.len(), 1);
 

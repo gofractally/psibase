@@ -234,9 +234,9 @@ pub mod tables {
         pub provider: AccountNumber,
 
         /// Node-local app account (must start with `x-`) that accepts payments
-        pub app: String,
+        pub app: AccountNumber,
 
-        /// Currencies the provider accepts. Stored lowercase; each must be a valid account name.
+        /// Currencies the provider accepts. Stored lowercase.
         pub accepted: Vec<String>,
     }
 }
