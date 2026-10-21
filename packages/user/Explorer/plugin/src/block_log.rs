@@ -1,3 +1,4 @@
+use futures::executor::block_on;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -147,19 +148,19 @@ fn range_args(mut range: BlockRange) -> String {
 }
 
 /// Redacted transactions have a null `transaction` and are left untouched.
-fn decode_transaction(decoder: &mut ActionDecoder, trx: &mut Value) {
+async fn decode_transaction(decoder: &ActionDecoder, trx: &mut Value) {
     if let Some(actions) = trx
         .get_mut("transaction")
         .and_then(|t| t.get_mut("actions"))
     {
-        decoder.decode_actions(actions);
+        decoder.decode_actions(actions).await;
     }
 }
 
-fn decode_transactions(decoder: &mut ActionDecoder, transactions: &mut Value) {
+async fn decode_transactions(decoder: &ActionDecoder, transactions: &mut Value) {
     if let Some(transactions) = transactions.as_array_mut() {
         for trx in transactions {
-            decode_transaction(decoder, trx);
+            decode_transaction(decoder, trx).await;
         }
     }
 }
@@ -185,7 +186,10 @@ pub fn get_block(block_num: u32) -> Result<Option<String>, Error> {
     let Some(mut block) = non_null(data["block"].take()) else {
         return Ok(None);
     };
-    decode_transactions(&mut ActionDecoder::default(), &mut block["transactions"]);
+    block_on(decode_transactions(
+        &ActionDecoder::default(),
+        &mut block["transactions"],
+    ));
     Ok(Some(to_json(&block)))
 }
 
@@ -232,7 +236,7 @@ pub fn find_transaction(id: String, max_blocks: Option<u32>) -> Result<Option<St
         return Ok(None);
     };
     if let Some(trx) = location.get_mut("transaction") {
-        decode_transaction(&mut ActionDecoder::default(), trx);
+        block_on(decode_transaction(&ActionDecoder::default(), trx));
     }
     Ok(Some(to_json(&location)))
 }
