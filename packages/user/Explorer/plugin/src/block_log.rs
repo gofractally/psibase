@@ -8,21 +8,22 @@ use crate::bindings::host::types::types::Error;
 use crate::decode::ActionDecoder;
 use crate::errors::ErrorType;
 
-/// Genesis is block 2 and can't be displayed, so the explorer starts at block 3.
-const FIRST_VISIBLE_BLOCK: u32 = 3;
-
 const DEFAULT_MAX_SEARCH_BLOCKS: u32 = 20000;
 
 const HEADER_FIELDS: &str = "previous blockNum time producer term commitNum";
 
-/// Fields for list views. Deliberately omits action payloads.
-///
-/// `transaction` is redacted (null) unless the logged-in user is a party to it;
-/// `numActions` and `actionsReceived` are public.
+/// Fields for list views, without `transactions`.
 const BLOCK_SUMMARY_FIELDS: &str = "
     id
     header { previous blockNum time producer term commitNum }
     actionsReceived { service count }
+";
+
+/// Deliberately omits action payloads.
+///
+/// `transaction` is redacted (null) unless the logged-in user is a party to it;
+/// `numActions` and `actionsReceived` are public.
+const SUMMARY_TRANSACTIONS_FIELD: &str = "
     transactions {
         id
         numActions
@@ -30,6 +31,7 @@ const BLOCK_SUMMARY_FIELDS: &str = "
     }
 ";
 
+/// Fields for the block page, without `transactions`.
 const BLOCK_FULL_FIELDS: &str = "
     id
     header {
@@ -60,6 +62,9 @@ const BLOCK_FULL_FIELDS: &str = "
         }
     }
     actionsReceived { service count }
+";
+
+const FULL_TRANSACTIONS_FIELD: &str = "
     transactions {
         id
         numActions
@@ -116,15 +121,28 @@ fn parse_header(value: Value) -> Result<Option<BlockHeader>, Error> {
     Ok(Some(header.into()))
 }
 
-fn range_args(mut range: BlockRange) -> String {
-    if range.ge.is_none() && range.gt.is_none() {
-        range.ge = Some(FIRST_VISIBLE_BLOCK);
-    } else if range.ge.is_some_and(|ge| ge < FIRST_VISIBLE_BLOCK) {
-        range.ge = Some(FIRST_VISIBLE_BLOCK);
-    } else if range.gt.is_some_and(|gt| gt < FIRST_VISIBLE_BLOCK - 1) {
-        range.gt = Some(FIRST_VISIBLE_BLOCK - 1);
+/// Runs the query built by `graphql` with `transactions` among the block fields. If that
+/// fails, for example because the transactions are too large to return, runs it again
+/// without them; the returned flag says whether the transactions were included.
+fn query_blocks(
+    graphql: impl Fn(&str) -> String,
+    transactions: &str,
+) -> Result<(Value, bool), Error> {
+    match query(&graphql(transactions)) {
+        Ok(data) => Ok((data, true)),
+        Err(_) => Ok((query(&graphql(""))?, false)),
     }
+}
 
+/// Null `transactions` tell the UI that they can't be displayed. This differs from a
+/// redacted transaction, which has a null `transaction`.
+fn mark_transactions_unavailable(block: &mut Value) {
+    if let Some(block) = block.as_object_mut() {
+        block.insert("transactions".to_string(), Value::Null);
+    }
+}
+
+fn range_args(range: BlockRange) -> String {
     let numbers = [
         ("gt", range.gt),
         ("ge", range.ge),
@@ -166,24 +184,45 @@ async fn decode_transactions(decoder: &ActionDecoder, transactions: &mut Value) 
 }
 
 pub fn get_blocks(range: BlockRange) -> Result<String, Error> {
-    let data = query(&format!(
-        "{{ blocks({}) {{
-            pageInfo {{ hasPreviousPage hasNextPage startCursor endCursor }}
-            edges {{ cursor node {{ {BLOCK_SUMMARY_FIELDS} }} }}
-        }} }}",
-        range_args(range)
-    ))?;
+    let args = range_args(range);
+    let (mut data, has_transactions) = query_blocks(
+        |transactions| {
+            format!(
+                "{{ blocks({args}) {{
+                    pageInfo {{ hasPreviousPage hasNextPage startCursor endCursor }}
+                    edges {{ cursor node {{ {BLOCK_SUMMARY_FIELDS} {transactions} }} }}
+                }} }}"
+            )
+        },
+        SUMMARY_TRANSACTIONS_FIELD,
+    )?;
+    if !has_transactions {
+        if let Some(edges) = data["blocks"]["edges"].as_array_mut() {
+            for edge in edges {
+                mark_transactions_unavailable(&mut edge["node"]);
+            }
+        }
+    }
     Ok(to_json(&data["blocks"]))
 }
 
-pub fn get_block(block_num: u32) -> Result<Option<String>, Error> {
-    if block_num < FIRST_VISIBLE_BLOCK {
-        return Ok(None);
-    }
-    let mut data = query(&format!(
-        "{{ block(blockNum: {block_num}) {{ {BLOCK_FULL_FIELDS} }} }}"
-    ))?;
+fn query_block(block_num: u32, fields: &str, transactions: &str) -> Result<Option<Value>, Error> {
+    let (mut data, has_transactions) = query_blocks(
+        |transactions| format!("{{ block(blockNum: {block_num}) {{ {fields} {transactions} }} }}"),
+        transactions,
+    )?;
     let Some(mut block) = non_null(data["block"].take()) else {
+        return Ok(None);
+    };
+    if !has_transactions {
+        mark_transactions_unavailable(&mut block);
+    }
+    Ok(Some(block))
+}
+
+pub fn get_block(block_num: u32) -> Result<Option<String>, Error> {
+    let Some(mut block) = query_block(block_num, BLOCK_FULL_FIELDS, FULL_TRANSACTIONS_FIELD)?
+    else {
         return Ok(None);
     };
     block_on(decode_transactions(
@@ -194,19 +233,11 @@ pub fn get_block(block_num: u32) -> Result<Option<String>, Error> {
 }
 
 pub fn get_block_summary(block_num: u32) -> Result<Option<String>, Error> {
-    if block_num < FIRST_VISIBLE_BLOCK {
-        return Ok(None);
-    }
-    let mut data = query(&format!(
-        "{{ block(blockNum: {block_num}) {{ {BLOCK_SUMMARY_FIELDS} }} }}"
-    ))?;
-    Ok(non_null(data["block"].take()).map(|block| to_json(&block)))
+    let block = query_block(block_num, BLOCK_SUMMARY_FIELDS, SUMMARY_TRANSACTIONS_FIELD)?;
+    Ok(block.map(|block| to_json(&block)))
 }
 
 pub fn get_block_header(block_num: u32) -> Result<Option<BlockHeader>, Error> {
-    if block_num < FIRST_VISIBLE_BLOCK {
-        return Ok(None);
-    }
     let mut data = query(&format!(
         "{{ block(blockNum: {block_num}) {{ header {{ {HEADER_FIELDS} }} }} }}"
     ))?;

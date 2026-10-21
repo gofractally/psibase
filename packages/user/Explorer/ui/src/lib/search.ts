@@ -5,7 +5,6 @@ import {
     fetchBlockSummary,
     findTransaction,
 } from "./queries";
-import { FIRST_VISIBLE_BLOCK } from "./types";
 
 export type SearchKind =
     | "block-number"
@@ -38,16 +37,12 @@ export const resolveSearch = async (raw: string): Promise<SearchResolution> => {
     const { kind, term } = classify(raw);
 
     if (kind === "block-number") {
-        const num = Number(term);
-        if (num < FIRST_VISIBLE_BLOCK) {
-            return { type: "navigate", to: `/blocks/${FIRST_VISIBLE_BLOCK}` };
-        }
-        return { type: "navigate", to: `/blocks/${num}` };
+        return { type: "navigate", to: `/blocks/${Number(term)}` };
     }
 
     if (kind === "hash") {
         const num = blockNumFromId(term);
-        if (num !== null && num >= FIRST_VISIBLE_BLOCK) {
+        if (num !== null) {
             try {
                 const block = await fetchBlockSummary(num);
                 if (block && block.id.toUpperCase() === term) {

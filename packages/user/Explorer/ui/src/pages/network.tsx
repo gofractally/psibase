@@ -18,7 +18,7 @@ import {
     fetchProducersInfo,
     fetchSnapshotInfo,
 } from "@/lib/queries";
-import { FIRST_VISIBLE_BLOCK } from "@/lib/types";
+import { GENESIS_BLOCK } from "@/lib/types";
 import { useLiveChain, useNow } from "@/store/use-live-chain";
 
 import { AccountLink } from "@/components/account-link";
@@ -41,15 +41,15 @@ export const NetworkPage = () => {
     const producers = useQuery({ queryKey: ["producers", "info"], queryFn: fetchProducersInfo, refetchInterval: 15_000 });
     const snapshot = useQuery({ queryKey: ["transact", "snapshot"], queryFn: fetchSnapshotInfo, staleTime: 60_000 });
     const packages = useQuery({ queryKey: ["packages", "installed"], queryFn: fetchInstalledPackages, staleTime: 5 * 60_000 });
-    const firstBlock = useQuery({
-        queryKey: ["block", FIRST_VISIBLE_BLOCK, "header"],
-        queryFn: () => fetchBlockHeader(FIRST_VISIBLE_BLOCK),
+    const genesis = useQuery({
+        queryKey: ["block", GENESIS_BLOCK, "header"],
+        queryFn: () => fetchBlockHeader(GENESIS_BLOCK),
         staleTime: Infinity,
     });
 
-    const genesisTime = firstBlock.data ? parseChainTime(firstBlock.data.time).getTime() : null;
+    const genesisTime = genesis.data ? parseChainTime(genesis.data.time).getTime() : null;
     const chainAge = genesisTime ? (now - genesisTime) / 1000 : null;
-    const totalBlocks = head ? head.blockNum - FIRST_VISIBLE_BLOCK + 1 : null;
+    const totalBlocks = head ? head.blockNum - GENESIS_BLOCK + 1 : null;
     const blocksPerDay = stats.avgInterval > 0 ? Math.round(86400 / stats.avgInterval) : null;
 
     // Block interval histogram
@@ -79,7 +79,7 @@ export const NetworkPage = () => {
                     label="Network age"
                     accent="var(--chart-2)"
                     value={chainAge !== null ? formatDuration(chainAge) : "—"}
-                    sub={firstBlock.data ? `since ${formatTime(firstBlock.data.time)}` : "loading…"}
+                    sub={genesis.data ? `since ${formatTime(genesis.data.time)}` : "loading…"}
                 />
                 <StatCard
                     label="Blocks"
@@ -125,14 +125,13 @@ export const NetworkPage = () => {
                             </span>
                         ) : "—"}
                     </KeyValue>
-                    <KeyValue label="First visible block">
-                        {firstBlock.data ? (
+                    <KeyValue label="Genesis block">
+                        {genesis.data ? (
                             <span className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                                <Link to={`/blocks/${FIRST_VISIBLE_BLOCK}`} className="text-primary hover:underline">
-                                    #{FIRST_VISIBLE_BLOCK}
+                                <Link to={`/blocks/${GENESIS_BLOCK}`} className="text-primary hover:underline">
+                                    #{GENESIS_BLOCK}
                                 </Link>
-                                <span>{formatTime(firstBlock.data.time)}</span>
-                                <span className="text-muted-foreground">(genesis block #2 is not displayable)</span>
+                                <span>{formatTime(genesis.data.time)}</span>
                             </span>
                         ) : "—"}
                     </KeyValue>

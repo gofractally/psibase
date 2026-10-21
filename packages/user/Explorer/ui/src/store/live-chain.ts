@@ -85,10 +85,13 @@ const TX_HISTORY = 400;
  */
 export const isSystemTransaction = (index: number) => index === 0;
 
+/** Blocks whose transactions couldn't be queried are treated as having none. */
+export const transactionsOf = (block: BlockRecord) => block.transactions ?? [];
+
 export const flattenTransactions = (
     block: BlockRecord,
 ): TransactionWithContext[] =>
-    block.transactions.map((trx: TransactionRecord, index) => ({
+    transactionsOf(block).map((trx: TransactionRecord, index) => ({
         id: trx.id,
         blockNum: block.header.blockNum,
         blockId: block.id,
@@ -101,13 +104,13 @@ export const flattenTransactions = (
     }));
 
 export const countActions = (block: BlockRecord) =>
-    block.transactions.reduce((n, trx) => n + trx.numActions, 0);
+    transactionsOf(block).reduce((n, trx) => n + trx.numActions, 0);
 
 export const countUserTransactions = (block: BlockRecord) =>
-    block.transactions.filter((_, i) => !isSystemTransaction(i)).length;
+    transactionsOf(block).filter((_, i) => !isSystemTransaction(i)).length;
 
 export const countUserActions = (block: BlockRecord) =>
-    block.transactions.reduce(
+    transactionsOf(block).reduce(
         (n, trx, i) => (isSystemTransaction(i) ? n : n + trx.numActions),
         0,
     );
@@ -207,7 +210,7 @@ const computeStats = (blocks: BlockRecord[]): ChainStats => {
         series.push({
             blockNum: block.header.blockNum,
             time,
-            txs: block.transactions.length,
+            txs: transactionsOf(block).length,
             actions: countActions(block),
             userTxs: countUserTransactions(block),
             userActions: countUserActions(block),

@@ -11,7 +11,7 @@ import {
     hexByteLength,
 } from "@/lib/format";
 import { fetchBlock } from "@/lib/queries";
-import { FIRST_VISIBLE_BLOCK } from "@/lib/types";
+import { GENESIS_BLOCK } from "@/lib/types";
 import { countActions, flattenTransactions } from "@/store/live-chain";
 import { useHead } from "@/store/use-live-chain";
 
@@ -30,6 +30,8 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Switch } from "@shared/shadcn/ui/switch";
 
+const TRANSACTIONS_UNAVAILABLE = "This block's transactions can't be displayed.";
+
 export const BlockDetailPage = () => {
     const { blockNum: raw } = useParams();
     const blockNum = Number(raw);
@@ -37,13 +39,12 @@ export const BlockDetailPage = () => {
     const [showSystem, setShowSystem] = useState(false);
 
     const valid = Number.isInteger(blockNum) && blockNum >= 0;
-    const isGenesis = valid && blockNum < FIRST_VISIBLE_BLOCK;
     const future = valid && head !== null && blockNum > head.blockNum;
 
     const { data: block, isPending, error } = useQuery({
         queryKey: ["block", blockNum],
         queryFn: () => fetchBlock(blockNum),
-        enabled: valid && !isGenesis,
+        enabled: valid,
         // A block that hasn't arrived yet: keep polling until it exists.
         refetchInterval: (q) => (q.state.data === null ? 1000 : false),
         staleTime: Infinity,
@@ -59,9 +60,9 @@ export const BlockDetailPage = () => {
                 aria-label="Previous block"
             >
                 <Link
-                    to={`/blocks/${Math.max(FIRST_VISIBLE_BLOCK, blockNum - 1)}`}
-                    aria-disabled={blockNum <= FIRST_VISIBLE_BLOCK}
-                    className={blockNum <= FIRST_VISIBLE_BLOCK ? "pointer-events-none opacity-40" : ""}
+                    to={`/blocks/${Math.max(GENESIS_BLOCK, blockNum - 1)}`}
+                    aria-disabled={blockNum <= GENESIS_BLOCK}
+                    className={blockNum <= GENESIS_BLOCK ? "pointer-events-none opacity-40" : ""}
                 >
                     <ChevronLeft className="size-4" />
                 </Link>
@@ -84,22 +85,6 @@ export const BlockDetailPage = () => {
 
     if (!valid) {
         return <Notice title="Invalid block number" />;
-    }
-
-    if (isGenesis) {
-        return (
-            <div className="flex flex-col gap-4">
-                <PageHeader title={`Block #${blockNum}`} actions={nav} />
-                <Notice title="The genesis block is not available in the explorer">
-                    The very first block of the network cannot currently be
-                    displayed. Start from{" "}
-                    <Link to={`/blocks/${FIRST_VISIBLE_BLOCK}`} className="text-primary underline">
-                        block #{FIRST_VISIBLE_BLOCK}
-                    </Link>
-                    .
-                </Notice>
-            </div>
-        );
     }
 
     if (isPending) {
@@ -139,6 +124,7 @@ export const BlockDetailPage = () => {
         );
     }
 
+    const txsUnavailable = block.transactions === null;
     const txs = flattenTransactions(block);
     const userTxs = txs.filter((t) => !t.isSystem);
     const shown = showSystem ? txs : userTxs;
@@ -204,23 +190,24 @@ export const BlockDetailPage = () => {
                         <AccountLink name={block.header.producer} />
                     </KeyValue>
                     <KeyValue label="Previous block">
-                        {block.header.blockNum - 1 >= FIRST_VISIBLE_BLOCK ? (
+                        {block.header.blockNum > GENESIS_BLOCK ? (
                             <Hash value={block.header.previous} full to={`/blocks/${block.header.blockNum - 1}`} />
                         ) : (
-                            <span className="text-muted-foreground inline-flex items-center gap-2">
-                                <Hash value={block.header.previous} full copy={false} />
-                                <span className="text-xs">(genesis, unavailable)</span>
-                            </span>
+                            <span className="text-muted-foreground text-xs">None (genesis block)</span>
                         )}
                     </KeyValue>
                     <KeyValue label="Transactions">
-                        <span className="tabular-nums">
-                            {userTxs.length} user
-                            <span className="text-muted-foreground">
-                                {" "}· {txs.length - userTxs.length} system · {actionCount} actions ·{" "}
-                                {visibleTxs.length} visible to you
+                        {txsUnavailable ? (
+                            <span className="text-muted-foreground text-xs">{TRANSACTIONS_UNAVAILABLE}</span>
+                        ) : (
+                            <span className="tabular-nums">
+                                {userTxs.length} user
+                                <span className="text-muted-foreground">
+                                    {" "}· {txs.length - userTxs.length} system · {actionCount} actions ·{" "}
+                                    {visibleTxs.length} visible to you
+                                </span>
                             </span>
-                        </span>
+                        )}
                     </KeyValue>
                     <KeyValue label="Actions received">
                         <span className="flex flex-wrap gap-x-3 gap-y-1">
@@ -235,7 +222,9 @@ export const BlockDetailPage = () => {
                         </span>
                     </KeyValue>
                     <KeyValue label="Action payload">
-                        {visibleTxs.length === 0 ? (
+                        {txsUnavailable ? (
+                            <span className="text-muted-foreground">—</span>
+                        ) : visibleTxs.length === 0 ? (
                             <PrivateMarker />
                         ) : (
                             <span className="tabular-nums">
@@ -319,31 +308,39 @@ export const BlockDetailPage = () => {
                 </Panel>
             )}
 
-            <Panel
-                title={`Transactions (${shown.length})`}
-                description={
-                    shown.some((t) => t.transaction === null)
-                        ? "Contents are shown only for transactions you're a party to"
-                        : undefined
-                }
-                actions={
-                    <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                        <Switch checked={showSystem} onCheckedChange={setShowSystem} className="scale-90" />
-                        Show system
-                    </label>
-                }
-            >
-                <TransactionsTable
-                    transactions={shown}
-                    showBlock={false}
-                    animateNew={false}
-                    emptyMessage={
-                        showSystem
-                            ? "This block carries no transactions"
-                            : "This block carries only the system block-start transaction"
+            {txsUnavailable ? (
+                <Panel title="Transactions">
+                    <p className="text-muted-foreground p-6 text-center text-sm">
+                        {TRANSACTIONS_UNAVAILABLE}
+                    </p>
+                </Panel>
+            ) : (
+                <Panel
+                    title={`Transactions (${shown.length})`}
+                    description={
+                        shown.some((t) => t.transaction === null)
+                            ? "Contents are shown only for transactions you're a party to"
+                            : undefined
                     }
-                />
-            </Panel>
+                    actions={
+                        <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                            <Switch checked={showSystem} onCheckedChange={setShowSystem} className="scale-90" />
+                            Show system
+                        </label>
+                    }
+                >
+                    <TransactionsTable
+                        transactions={shown}
+                        showBlock={false}
+                        animateNew={false}
+                        emptyMessage={
+                            showSystem
+                                ? "This block carries no transactions"
+                                : "This block carries only the system block-start transaction"
+                        }
+                    />
+                </Panel>
+            )}
 
             <JsonView value={block} title="Raw block JSON" />
         </div>

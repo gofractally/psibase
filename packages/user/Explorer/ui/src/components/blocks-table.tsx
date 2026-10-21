@@ -12,6 +12,8 @@ import { TimeAgo } from "@/components/time-ago";
 
 import { cn } from "@shared/lib/utils";
 
+const UNAVAILABLE_TITLE = "This block's transactions can't be displayed";
+
 interface Props {
     blocks: BlockRecord[];
     compact?: boolean;
@@ -89,7 +91,8 @@ export const BlocksTable = ({
                 </thead>
                 <tbody>
                     {blocks.map((b) => {
-                        const txs = b.transactions.length;
+                        const unavailable = b.transactions === null;
+                        const txs = b.transactions?.length ?? 0;
                         const actions = countActions(b);
                         const lag = b.header.blockNum - b.header.commitNum;
                         const isNew =
@@ -134,18 +137,26 @@ export const BlocksTable = ({
                                 <Td
                                     className={cn(
                                         "text-right tabular-nums",
-                                        txs === 0 && "text-muted-foreground/60",
+                                        (unavailable || txs === 0) && "text-muted-foreground/60",
                                     )}
                                 >
-                                    {txs}
+                                    {unavailable ? (
+                                        <span title={UNAVAILABLE_TITLE}>—</span>
+                                    ) : (
+                                        txs
+                                    )}
                                 </Td>
                                 <Td
                                     className={cn(
                                         "text-right tabular-nums",
-                                        actions === 0 && "text-muted-foreground/60",
+                                        (unavailable || actions === 0) && "text-muted-foreground/60",
                                     )}
                                 >
-                                    {actions}
+                                    {unavailable ? (
+                                        <span title={UNAVAILABLE_TITLE}>—</span>
+                                    ) : (
+                                        actions
+                                    )}
                                 </Td>
                                 {!compact && (
                                     <>

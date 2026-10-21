@@ -11,8 +11,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { formatNumber } from "@/lib/format";
 import { fetchBlocks } from "@/lib/queries";
-import { type BlockRecord, FIRST_VISIBLE_BLOCK } from "@/lib/types";
-import { isSystemTransaction } from "@/store/live-chain";
+import { type BlockRecord, GENESIS_BLOCK } from "@/lib/types";
+import { isSystemTransaction, transactionsOf } from "@/store/live-chain";
 import { useLiveChain } from "@/store/use-live-chain";
 
 import { BlocksTable } from "@/components/blocks-table";
@@ -80,7 +80,7 @@ export const BlocksPage = () => {
                 .filter(
                     (b) =>
                         !onlyBusy ||
-                        b.transactions.some((_, i) => !isSystemTransaction(i)),
+                        transactionsOf(b).some((_, i) => !isSystemTransaction(i)),
                 )
                 .filter((b) => !producerFilter || b.header.producer === producerFilter)
                 .slice(0, PAGE_SIZE),
@@ -110,11 +110,11 @@ export const BlocksPage = () => {
     const onJump = (e: React.FormEvent) => {
         e.preventDefault();
         const n = Number(jump.replace(/[^0-9]/g, ""));
-        if (!Number.isFinite(n) || n < FIRST_VISIBLE_BLOCK) return;
+        if (!Number.isFinite(n) || n < GENESIS_BLOCK) return;
         navigate(`/blocks/${n}`);
     };
 
-    const canGoOlder = oldest !== null && oldest > FIRST_VISIBLE_BLOCK;
+    const canGoOlder = oldest !== null && oldest > GENESIS_BLOCK;
 
     return (
         <div className="flex flex-col gap-4">
@@ -122,7 +122,7 @@ export const BlocksPage = () => {
                 title="Blocks"
                 description={
                     head
-                        ? `${formatNumber(head.blockNum - FIRST_VISIBLE_BLOCK + 1)} blocks since genesis · head #${formatNumber(head.blockNum)}`
+                        ? `${formatNumber(head.blockNum - GENESIS_BLOCK + 1)} blocks since genesis · head #${formatNumber(head.blockNum)}`
                         : "Loading chain head…"
                 }
                 actions={

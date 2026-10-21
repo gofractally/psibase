@@ -79,7 +79,8 @@ export interface BlockHeader {
 export interface BlockRecord {
     id: string;
     header: BlockHeader;
-    transactions: TransactionRecord[];
+    /** `null` when the block's transactions couldn't be queried, e.g. because they're too large. */
+    transactions: TransactionRecord[] | null;
     actionsReceived: ServiceActionCount[];
 }
 
@@ -118,5 +119,5 @@ export interface TransactionWithContext {
     isSystem: boolean;
 }
 
-/** Genesis is block #2; it cannot currently be displayed, so the UI starts at #3. */
-export const FIRST_VISIBLE_BLOCK = 3;
+/** psibase numbers the genesis block 2; there is no block 1. */
+export const GENESIS_BLOCK = 2;

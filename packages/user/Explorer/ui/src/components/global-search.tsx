@@ -249,7 +249,7 @@ export const GlobalSearch = ({ className }: { className?: string }) => {
                                                 #{formatNumber(b.header.blockNum)}
                                             </span>
                                             <span className="text-muted-foreground ml-auto font-mono text-xs">
-                                                {b.transactions.length} tx ·{" "}
+                                                {b.transactions?.length ?? "—"} tx ·{" "}
                                                 {b.header.producer}
                                             </span>
                                         </CommandItem>
