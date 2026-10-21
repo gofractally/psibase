@@ -55,19 +55,23 @@ namespace LocalService
 
    /// A signup record. Ids are 32 bytes. `invite_id`, `payload`, and `token`
    /// come from the visitor's Invite plugin `prepare-new-invite`.
+   /// `x_id` is the X user who requested the account. `tier` is unset for the
+   /// free tier.
    struct Signup
    {
-      psibase::Checksum256   id;
-      uint32_t               invite_id = 0;
-      std::vector<uint8_t>   payload;
-      std::string            token;
-      uint64_t               usd_cents = 0;
-      UserService::Quantity  tokens;
-      std::string            state;
-      uint32_t               attempts = 0;
-      std::string            last_error;
-      psibase::TimePointUSec created;
-      psibase::TimePointUSec updated;
+      psibase::Checksum256       id;
+      uint32_t                   invite_id = 0;
+      std::vector<uint8_t>       payload;
+      std::string                token;
+      uint64_t                   usd_cents = 0;
+      UserService::Quantity      tokens;
+      std::string                state;
+      uint32_t                   attempts = 0;
+      std::string                last_error;
+      psibase::TimePointUSec     created;
+      psibase::TimePointUSec     updated;
+      std::optional<std::string> x_id;
+      std::optional<uint32_t>    tier;
       PSIO_REFLECT(Signup,
                    id,
                    invite_id,
@@ -79,7 +83,9 @@ namespace LocalService
                    attempts,
                    last_error,
                    created,
-                   updated)
+                   updated,
+                   x_id,
+                   tier)
    };
    using SignupTable = psibase::Table<Signup, &Signup::id>;
    PSIO_REFLECT_TYPENAME(SignupTable)
@@ -196,13 +202,16 @@ namespace LocalService
       PSIO_REFLECT(Status, requests_enabled, billing_enabled, ready, conditions)
    };
 
-   /// `POST /signup` body. A missing field is a 400, not a default.
+   /// `POST /signup` body. A missing `invite_id`, `payload`, or `token` is a
+   /// 400, not a default. Omitting `tier` requests the free tier; a value is
+   /// a 400.
    struct SignupBody
    {
       std::optional<uint32_t>             invite_id;
       std::optional<std::vector<uint8_t>> payload;
       std::optional<std::string>          token;
-      PSIO_REFLECT(SignupBody, invite_id, payload, token)
+      std::optional<uint32_t>             tier;
+      PSIO_REFLECT(SignupBody, invite_id, payload, token, tier)
    };
 
    /// `POST /signup` returns the new signup's id, base64url of its 32 bytes.
@@ -250,12 +259,14 @@ namespace LocalService
    /// and `creator_allowed`, the canonical whitelist applied when `ac-creator`
    /// is created.
    ///
-   /// `POST /signup` `{invite_id, payload, token}` is anonymous; `payload` is
-   /// hex. It returns 403 unless `requests_enabled`, `free_tier.enabled`, and
-   /// `/status` `ready` all hold, and 409 when `invite_id` already exists on
-   /// chain. The signup is stored `queued` with the free tier's `usd_cents` and
-   /// `tokens` (both 0 when billing is disabled). An immediate `x-timer`
-   /// callback provisions it.
+   /// `POST /signup` `{invite_id, payload, token}` requires an X session and
+   /// returns 401 when there is none. `payload` is hex. It returns 403 unless
+   /// `requests_enabled`, `free_tier.enabled`, and `/status` `ready` all hold,
+   /// and 409 when `invite_id` already exists on chain or this X user already
+   /// has a free signup that is not `failed`. The signup is stored `queued`
+   /// with that session's `x_id` and the free tier's `usd_cents` and `tokens`
+   /// (both 0 when billing is disabled). An immediate `x-timer` callback
+   /// provisions it.
    ///
    /// `provision` attempts each due queued signup once. It commits
    /// `attempts += 1` and `last_error = "signing aborted"`, then pushes as
@@ -268,8 +279,10 @@ namespace LocalService
    /// `last_error`. A `signTx` abort leaves the signup `queued` with the
    /// placeholder error.
    ///
-   /// `GET /signup/:id` returns `SignupView`. `GET /admin/signups?state=failed`
-   /// returns `FailedSignup` rows for an administrator.
+   /// `GET /signup/:id` returns `SignupView` to the owning X session. No
+   /// session is 401; anything else that is not that session's signup is 404.
+   /// `GET /admin/signups?state=failed` returns `FailedSignup` rows for an
+   /// administrator.
    ///
    /// Sign in with X is OAuth 2.0 with PKCE. `GET /auth/x/start` redirects to
    /// X's authorize page; X returns the browser to `GET /auth/x/callback`,

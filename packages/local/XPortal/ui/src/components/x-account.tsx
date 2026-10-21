@@ -2,19 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@shared/shadcn/ui/button";
 
-import { getXIdentity, signOutOfX } from "../lib/portal-api";
-
-const X_IDENTITY_QUERY_KEY = ["x-identity"];
+import { getXIdentity, signOutOfX, xIdentityQueryKey } from "../lib/portal-api";
 
 export const XAccount = () => {
     const queryClient = useQueryClient();
     const { data: identity, isPending } = useQuery({
-        queryKey: X_IDENTITY_QUERY_KEY,
+        queryKey: xIdentityQueryKey,
         queryFn: getXIdentity,
     });
     const { mutate: signOut, isPending: isSigningOut } = useMutation({
         mutationFn: signOutOfX,
-        onSuccess: () => queryClient.setQueryData(X_IDENTITY_QUERY_KEY, null),
+        onSuccess: () => queryClient.setQueryData(xIdentityQueryKey, null),
         onError: (error) => console.error("Sign out failed:", error),
     });
 
@@ -34,7 +32,7 @@ export const XAccount = () => {
                 variant="outline"
                 size="sm"
                 disabled={isSigningOut}
-                onClick={signOut}
+                onClick={() => signOut()}
             >
                 Sign out
             </Button>

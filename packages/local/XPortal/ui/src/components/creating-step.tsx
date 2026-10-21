@@ -6,7 +6,7 @@ import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { IMPORT_RETURN_PATH } from "../lib/import-return";
-import { getSignup } from "../lib/portal-api";
+import { getSignup, PortalError } from "../lib/portal-api";
 import { importInvite } from "../lib/signup-request";
 
 const POLL_INTERVAL_MS = 1000;
@@ -18,15 +18,26 @@ const POLL_INTERVAL_MS = 1000;
 export const CreatingStep = ({
     signupId,
     onFailed,
+    onSignedOut,
 }: {
     signupId: string;
     onFailed: () => void;
+    onSignedOut: () => void;
 }) => {
-    const { data: signup, isError } = useQuery({
+    const { data: signup, isError, error } = useQuery({
         queryKey: ["signup", signupId],
         queryFn: () => getSignup(signupId),
-        refetchInterval: (query) =>
-            query.state.data?.state === "queued" ? POLL_INTERVAL_MS : false,
+        retry: (failureCount, queryError) =>
+            !(queryError instanceof PortalError && queryError.status === 401) &&
+            failureCount < 3,
+        refetchInterval: (query) => {
+            const queryError = query.state.error;
+            if (queryError instanceof PortalError && queryError.status === 401)
+                return false;
+            return query.state.data?.state === "queued"
+                ? POLL_INTERVAL_MS
+                : false;
+        },
     });
 
     const { mutateAsync: connectAccount } = useConnectAccount();
@@ -45,12 +56,24 @@ export const CreatingStep = ({
     });
 
     useEffect(() => {
+        if (error instanceof PortalError && error.status === 401) {
+            onSignedOut();
+            return;
+        }
         if (isError || signup?.state === "failed") {
             onFailed();
         } else if (signup?.state === "invited" && isRedeemIdle) {
             redeemInLoginPrompt(signup.token);
         }
-    }, [signup, isError, isRedeemIdle, redeemInLoginPrompt, onFailed]);
+    }, [
+        signup,
+        isError,
+        error,
+        isRedeemIdle,
+        redeemInLoginPrompt,
+        onFailed,
+        onSignedOut,
+    ]);
 
     return (
         <PageContainer className="space-y-6">

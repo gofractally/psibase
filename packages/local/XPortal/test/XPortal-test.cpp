@@ -239,14 +239,33 @@ namespace
       return {reply.body.begin(), reply.body.end()};
    }
 
-   HttpRequest signupRequest(uint32_t inviteId)
+   HttpRequest withSession(HttpRequest request, std::string_view sessionId)
    {
-      return HttpRequestBuilder{}
-          .header("X-Forwarded-For", "203.0.113.8")
-          .post(XPortal::service, "/signup",
-                SignupBody{.invite_id = inviteId,
-                           .payload   = invitePayload(static_cast<uint8_t>(inviteId)),
-                           .token     = "token-" + std::to_string(inviteId)});
+      request.headers.push_back({"Cookie", std::format("XPORTAL_SESSION={}", sessionId)});
+      return request;
+   }
+
+   HttpRequest signupRequest(uint32_t inviteId, std::optional<std::string_view> sessionId = {})
+   {
+      auto request = HttpRequestBuilder{}
+                         .header("X-Forwarded-For", "203.0.113.8")
+                         .post(XPortal::service, "/signup",
+                               SignupBody{.invite_id = inviteId,
+                                          .payload   = invitePayload(static_cast<uint8_t>(inviteId)),
+                                          .token     = "token-" + std::to_string(inviteId)});
+      if (!sessionId)
+         return request;
+      return withSession(std::move(request), *sessionId);
+   }
+
+   void openSession(std::string sessionId, std::string xId, std::string handle = "jack")
+   {
+      auto expires = std::chrono::time_point_cast<MicroSeconds>(std::chrono::system_clock::now()) +
+                     std::chrono::hours{1};
+      XPortal{}.open<XSessionTable>().put(XSession{.session_id = std::move(sessionId),
+                                                   .x_id       = std::move(xId),
+                                                   .handle     = std::move(handle),
+                                                   .expires    = expires});
    }
 
    void storeCreatorKey()
@@ -302,12 +321,6 @@ namespace
       REQUIRE(query != std::string_view::npos);
       CHECK(location->substr(0, query) == "https://x.com/i/oauth2/authorize");
       return HttpRequest{.target = std::string{location->substr(query)}}.query<AuthorizeQuery>();
-   }
-
-   HttpRequest withSession(HttpRequest request, std::string_view sessionId)
-   {
-      request.headers.push_back({"Cookie", std::format("XPORTAL_SESSION={}", sessionId)});
-      return request;
    }
 
    std::string putXExpectBadRequest(DefaultTestChain& t, std::string_view json)
@@ -545,8 +558,10 @@ TEST_CASE("provision signs the billed invite actions as ac-creator")
    configureX(t);
    t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
    REQUIRE(t.get<Status>(XPortal::service, "/status").ready);
+   openSession("owner", "42");
 
-   auto receipt = t.http<SignupReceipt>(signupRequest(9));
+   auto receipt = t.http<SignupReceipt>(signupRequest(9, "owner"));
+   CHECK(signupRow(receipt.signup_id)->x_id == "42");
 
    // The tester has no node to push to, so a run that gets past signTx still fails.
    auto fired = runAs(t, AccountNumber{}, XTimer::service, "runOne", std::tuple{});
@@ -570,8 +585,10 @@ TEST_CASE("provision commits one attempt before signing")
        creator, agentPub, alice, std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})})));
    configureX(t);
    t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
+   openSession("owner", "42");
+   openSession("other", "99", "jane");
 
-   auto created = t.http<SignupReceipt>(signupRequest(21));
+   auto created = t.http<SignupReceipt>(signupRequest(21, "owner"));
    auto fired   = runAs(t, AccountNumber{}, XTimer::service, "runOne", std::tuple{});
    REQUIRE(fired.error.has_value());
    CHECK(fired.error->find("Failed to sign transaction") != std::string::npos);
@@ -591,11 +608,12 @@ TEST_CASE("provision commits one attempt before signing")
                                   HttpReply{.status = HttpStatus::ok,
                                             .body   = psio::to_frac(TransactionTrace{})}});
    CHECK(!pushed.error.has_value());
-   auto done = t.http<SignupView>(forwarded("GET", "/signup/" + created.signup_id));
+   auto done = t.http<SignupView>(
+       withSession(forwarded("GET", "/signup/" + created.signup_id), "owner"));
    CHECK(done.state == "invited");
    CHECK(done.token == "token-21");
 
-   auto second = t.http<SignupReceipt>(signupRequest(22));
+   auto second = t.http<SignupReceipt>(signupRequest(22, "other"));
    auto claimed =
        runAs(t, XTimer::service, XPortal::service, "provision", std::tuple{std::uint64_t{1}});
    REQUIRE(claimed.error.has_value());
@@ -608,10 +626,12 @@ TEST_CASE("provision commits one attempt before signing")
                             .body = psio::to_frac(TransactionTrace{
                                 .error = std::string{"invite id is taken"}})}});
    CHECK(!failedPush.error.has_value());
-   auto hidden = t.http(forwarded("GET", "/signup/" + second.signup_id));
+   auto hidden =
+       t.http(withSession(forwarded("GET", "/signup/" + second.signup_id), "other"));
    CHECK(hidden.status == HttpStatus::ok);
    CHECK(replyText(hidden).find("invite id is taken") == std::string::npos);
-   auto view = t.http<SignupView>(forwarded("GET", "/signup/" + second.signup_id));
+   auto view = t.http<SignupView>(
+       withSession(forwarded("GET", "/signup/" + second.signup_id), "other"));
    CHECK(view.state == "failed");
    CHECK(!view.token.has_value());
    auto rows =
@@ -752,4 +772,26 @@ TEST_CASE("an X session cookie identifies the user until logout or expiry")
          "XPORTAL_SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
    CHECK(!XPortal{}.open<XSessionTable>().get(std::string{"live"}).has_value());
    CHECK(t.http(withSession(forwarded("GET", "/me"), "live")).status == HttpStatus::unauthorized);
+}
+
+TEST_CASE("one free signup per X user")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+   auto alice = AccountNumber{"alice"};
+   REQUIRE(t.from(alice)
+               .to<AuthScope>()
+               .newAccount(XPortal::creatorAccount, agentPub, alice,
+                           std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})
+               .succeeded());
+   XPortal{}.open<AgentKeyTable>().put(
+       AgentKey{.name = std::string{XPortal::creatorAgent}, .pubkey = agentPub});
+   t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
+   REQUIRE(t.get<Status>(XPortal::service, "/status").ready);
+
+   openSession("owner", "42");
+   t.http<SignupReceipt>(signupRequest(1, "owner"));
+   auto again = t.http(signupRequest(2, "owner"));
+   CHECK(again.status == HttpStatus::conflict);
+   CHECK(replyText(again) == "free signup already exists\n");
 }

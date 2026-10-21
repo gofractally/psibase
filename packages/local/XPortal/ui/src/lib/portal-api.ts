@@ -64,6 +64,8 @@ const zXIdentity = z.object({ x_id: z.string(), handle: z.string() });
 
 export type XIdentity = z.infer<typeof zXIdentity>;
 
+export const xIdentityQueryKey = ["x-identity"] as const;
+
 /** The signed-in X user, or `null` when no one is signed in. */
 export const getXIdentity = async (): Promise<XIdentity | null> => {
     const res = await fetch("/me");

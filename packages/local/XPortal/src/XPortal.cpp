@@ -540,6 +540,37 @@ namespace
       return toBase64Url(std::string_view{reinterpret_cast<const char*>(id.data()), id.size()});
    }
 
+   std::optional<XSession> currentSession(const HttpRequest& req)
+   {
+      std::optional<XSession> session;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XPortal{}.open<XSessionTable>();
+         for (auto id : req.getCookie(sessionCookie))
+         {
+            auto row = table.get(std::string{id});
+            if (!row)
+               continue;
+            if (row->expires <= wallNow())
+            {
+               table.remove(*row);
+               continue;
+            }
+            session = std::move(row);
+            break;
+         }
+      }
+      return session;
+   }
+
+   std::optional<XSession> requireSession(const HttpRequest& req, HttpReply& denied)
+   {
+      if (auto session = currentSession(req))
+         return session;
+      denied = textError(req, HttpStatus::unauthorized, "not signed in\n");
+      return std::nullopt;
+   }
+
    HttpReply serveSignup(const HttpRequest& req)
    {
       if (req.method == "OPTIONS")
@@ -549,6 +580,11 @@ namespace
       if (req.contentType != "application/json")
          return textError(req, HttpStatus::unsupportedMediaType,
                           "Content-Type must be application/json\n");
+
+      HttpReply denied;
+      auto      session = requireSession(req, denied);
+      if (!session)
+         return denied;
 
       auto config = loadedConfig();
       auto status = portalStatus(config);
@@ -564,6 +600,8 @@ namespace
          return textError(req, HttpStatus::badRequest, "payload is required\n");
       if (!body.token)
          return textError(req, HttpStatus::badRequest, "token is required\n");
+      if (body.tier)
+         return textError(req, HttpStatus::badRequest, "tier is not supported\n");
       if (!psio::fracpack_validate_strict<InvPayload>(
               {reinterpret_cast<const char*>(body.payload->data()), body.payload->size()}))
          return textError(req, HttpStatus::badRequest, "payload is not an invite payload\n");
@@ -581,25 +619,42 @@ namespace
          tokens = *grant;
       }
 
-      Signup stored;
+      std::optional<Signup> stored;
       PSIBASE_SUBJECTIVE_TX
       {
-         Checksum256 id;
-         raw::getRandom(id.data(), id.size());
-         auto now = wallNow();
-         stored   = Signup{.id        = id,
-                           .invite_id = *body.invite_id,
-                           .payload   = *body.payload,
-                           .token     = *body.token,
-                           .usd_cents = usd,
-                           .tokens    = tokens,
-                           .state     = std::string{stateQueued},
-                           .created   = now,
-                           .updated   = now};
-         XPortal{}.open<SignupTable>().put(stored);
-         to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
+         stored.reset();
+         auto table = XPortal{}.open<SignupTable>();
+         bool taken = false;
+         for (auto row : table.getIndex<0>())
+         {
+            if (row.x_id && *row.x_id == session->x_id && !row.tier && row.state != stateFailed)
+            {
+               taken = true;
+               break;
+            }
+         }
+         if (!taken)
+         {
+            Checksum256 id;
+            raw::getRandom(id.data(), id.size());
+            auto now = wallNow();
+            stored   = Signup{.id        = id,
+                              .invite_id = *body.invite_id,
+                              .payload   = *body.payload,
+                              .token     = *body.token,
+                              .usd_cents = usd,
+                              .tokens    = tokens,
+                              .state     = std::string{stateQueued},
+                              .created   = now,
+                              .updated   = now,
+                              .x_id      = session->x_id};
+            table.put(*stored);
+            to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
+         }
       }
-      return jsonBody(req, SignupReceipt{.signup_id = signupId(stored.id)});
+      if (!stored)
+         return textError(req, HttpStatus::conflict, "free signup already exists\n");
+      return jsonBody(req, SignupReceipt{.signup_id = signupId(stored->id)});
    }
 
    HttpReply serveSignupStatus(const HttpRequest& req, std::string_view idText)
@@ -608,6 +663,10 @@ namespace
          return HttpReply{.headers = cors(req)};
       if (req.method != "GET")
          return HttpReply::methodNotAllowed(req);
+      HttpReply denied;
+      auto      session = requireSession(req, denied);
+      if (!session)
+         return denied;
       auto id = parseSignupId(idText);
       if (!id)
          return textError(req, HttpStatus::badRequest, "invalid signup id\n");
@@ -616,7 +675,7 @@ namespace
       {
          stored = XPortal{}.open<SignupTable>().get(*id);
       }
-      if (!stored)
+      if (!stored || !stored->x_id || *stored->x_id != session->x_id)
          return textError(req, HttpStatus::notFound, "signup not found\n");
       SignupView view{.state = stored->state};
       if (stored->state == stateInvited)
@@ -927,38 +986,16 @@ namespace
           redirect("/", {sessionCookieHeader(session.session_id, sessionTtl, pending.secure)}));
    }
 
-   std::optional<XSession> currentSession(const HttpRequest& req)
-   {
-      std::optional<XSession> session;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         auto table = XPortal{}.open<XSessionTable>();
-         for (auto id : req.getCookie(sessionCookie))
-         {
-            auto row = table.get(std::string{id});
-            if (!row)
-               continue;
-            if (row->expires <= wallNow())
-            {
-               table.remove(*row);
-               continue;
-            }
-            session = std::move(row);
-            break;
-         }
-      }
-      return session;
-   }
-
    HttpReply serveMe(const HttpRequest& req)
    {
       if (req.method == "OPTIONS")
          return HttpReply{.headers = cors(req)};
       if (req.method != "GET")
          return HttpReply::methodNotAllowed(req);
-      auto session = currentSession(req);
+      HttpReply denied;
+      auto      session = requireSession(req, denied);
       if (!session)
-         return textError(req, HttpStatus::unauthorized, "not signed in\n");
+         return denied;
       return jsonBody(req, XIdentity{.x_id = session->x_id, .handle = session->handle});
    }
 
