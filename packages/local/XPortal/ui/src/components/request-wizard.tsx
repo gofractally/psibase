@@ -4,13 +4,28 @@ import { useState } from "react";
 import { CreatingStep } from "./creating-step";
 import { FailedStep } from "./failed-step";
 import { Loader } from "./loader";
+import { PayStep } from "./pay-step";
 import { SignInStep } from "./sign-in-step";
 import { SignUpStep } from "./sign-up-step";
-import { getXIdentity, xIdentityQueryKey } from "../lib/portal-api";
-import { forgetSignup, storedSignupId } from "../lib/signup-request";
+import {
+    getXIdentity,
+    type SignupReceipt,
+    xIdentityQueryKey,
+} from "../lib/portal-api";
+import {
+    forgetSignup,
+    rememberSignup,
+    storedSignupId,
+} from "../lib/signup-request";
 
 type Step =
     | { kind: "sign-up" }
+    | {
+          kind: "pay";
+          signupId: string;
+          clientSecret: string;
+          publishableKey: string;
+      }
     | { kind: "creating"; signupId: string }
     | { kind: "failed" };
 
@@ -39,12 +54,38 @@ export const RequestWizard = ({
     const signedOut = () => {
         queryClient.setQueryData(xIdentityQueryKey, null);
     };
+    const waitForInvite = (signupId: string) => {
+        rememberSignup(signupId);
+        setStep({ kind: "creating", signupId });
+    };
+    const requested = (receipt: SignupReceipt) => {
+        if ("client_secret" in receipt) {
+            setStep({
+                kind: "pay",
+                signupId: receipt.signup_id,
+                clientSecret: receipt.client_secret,
+                publishableKey: receipt.publishable_key,
+            });
+        } else {
+            waitForInvite(receipt.signup_id);
+        }
+    };
 
     if (step.kind === "failed") {
         return <FailedStep onBack={() => setStep({ kind: "sign-up" })} />;
     }
     if (isPending) return <Loader />;
     if (!identity) return <SignInStep />;
+    if (step.kind === "pay") {
+        return (
+            <PayStep
+                clientSecret={step.clientSecret}
+                publishableKey={step.publishableKey}
+                onPaid={() => waitForInvite(step.signupId)}
+                onBack={() => setStep({ kind: "sign-up" })}
+            />
+        );
+    }
     if (step.kind === "creating") {
         return (
             <CreatingStep
@@ -56,7 +97,7 @@ export const RequestWizard = ({
     }
     return (
         <SignUpStep
-            onRequested={(signupId) => setStep({ kind: "creating", signupId })}
+            onRequested={requested}
             onClosed={onClosed}
             onFailed={fail}
             onSignedOut={signedOut}

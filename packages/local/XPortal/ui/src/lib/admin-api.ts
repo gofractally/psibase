@@ -9,12 +9,24 @@ const zAllowedAction = z.object({
     method: z.string(),
 });
 
+const zStripeKeys = z.object({
+    secret_key: z.string().nullish(),
+    publishable_key: z.string().nullish(),
+    webhook_secret: z.string().nullish(),
+});
+
 const zAdminConfig = z.object({
     requests_enabled: z.boolean(),
     producer: z.string().nullish(),
     account: z.string().nullish(),
     creator_pubkey: z.string().nullish(),
     creator_allowed: z.array(zAllowedAction),
+    /** Secrets show only their last four characters. */
+    x: z.object({
+        client_id: z.string().nullish(),
+        client_secret: z.string().nullish(),
+    }),
+    stripe: z.object({ sandbox: zStripeKeys }),
 });
 
 const zPortalStatus = z.object({
@@ -53,16 +65,24 @@ export type CreatorKey = {
 export const getAdminConfig = () =>
     parseReply(fetch("/admin/config"), zAdminConfig);
 
-export const putRequestsEnabled = async (requestsEnabled: boolean) => {
+/** Sets each field `patch` carries. */
+export const putAdminConfig = async (patch: {
+    requests_enabled?: boolean;
+    x?: Record<string, string>;
+    stripe?: { sandbox: Record<string, string> };
+}) => {
     const res = await fetch("/admin/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requests_enabled: requestsEnabled }),
+        body: JSON.stringify(patch),
     });
     if (!res.ok) {
         throw new PortalError(res.status, (await res.text()).trim());
     }
 };
+
+export const putRequestsEnabled = (requestsEnabled: boolean) =>
+    putAdminConfig({ requests_enabled: requestsEnabled });
 
 export const getPortalStatus = () =>
     parseReply(fetch("/status"), zPortalStatus);

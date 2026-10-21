@@ -34,7 +34,8 @@ export const CreatingStep = ({
             const queryError = query.state.error;
             if (queryError instanceof PortalError && queryError.status === 401)
                 return false;
-            return query.state.data?.state === "queued"
+            const state = query.state.data?.state;
+            return state === "pending" || state === "queued"
                 ? POLL_INTERVAL_MS
                 : false;
         },

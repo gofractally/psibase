@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { CopyButton } from "@shared/components/copy-button";
 import { PageContainer } from "@shared/components/page-container";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
+import { Input } from "@shared/shadcn/ui/input";
+import { Label } from "@shared/shadcn/ui/label";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Switch } from "@shared/shadcn/ui/switch";
 import {
@@ -24,6 +27,7 @@ import {
     getFailedSignups,
     getPortalStatus,
     loadCreatorKey,
+    putAdminConfig,
     putRequestsEnabled,
 } from "../lib/admin-api";
 import { PortalError } from "../lib/portal-api";
@@ -102,6 +106,79 @@ const ReadinessRow = ({
         </span>
     </div>
 );
+
+type CredentialField = {
+    key: string;
+    label: string;
+    /** The stored value; a secret's last four characters. */
+    current: string | null | undefined;
+    secret?: boolean;
+};
+
+const currentHint = ({ current, secret }: CredentialField) => {
+    if (!current) return "Not set";
+    return secret ? `••••${current}` : current;
+};
+
+/** Saves only the fields the admin filled in; blank fields keep their value. */
+const CredentialsForm = ({
+    fields,
+    onSave,
+}: {
+    fields: CredentialField[];
+    onSave: (values: Record<string, string>) => Promise<void>;
+}) => {
+    const [values, setValues] = useState<Record<string, string>>({});
+    const filled = Object.fromEntries(
+        Object.entries(values).filter(([, value]) => value.trim() !== ""),
+    );
+    const save = useMutation({
+        mutationFn: onSave,
+        onSuccess: () => setValues({}),
+    });
+    return (
+        <form
+            className="flex flex-col gap-4 rounded-lg border px-4 py-3"
+            onSubmit={(event) => {
+                event.preventDefault();
+                save.mutate(filled);
+            }}
+        >
+            {fields.map((field) => (
+                <div key={field.key} className="flex flex-col gap-1.5">
+                    <Label htmlFor={field.key}>{field.label}</Label>
+                    <Input
+                        id={field.key}
+                        type={field.secret ? "password" : "text"}
+                        autoComplete="off"
+                        placeholder={currentHint(field)}
+                        value={values[field.key] ?? ""}
+                        onChange={(event) =>
+                            setValues({
+                                ...values,
+                                [field.key]: event.target.value,
+                            })
+                        }
+                    />
+                </div>
+            ))}
+            {save.error && (
+                <p className="text-destructive text-sm">
+                    {errorText(save.error)}
+                </p>
+            )}
+            <Button
+                type="submit"
+                className="self-start"
+                disabled={
+                    save.isPending || Object.keys(filled).length === 0
+                }
+            >
+                Save
+            </Button>
+        </form>
+    );
+};
 
 const FailedRequests = ({
     rows,
@@ -257,6 +334,11 @@ export const AdminPage = () => {
             void queryClient.invalidateQueries({ queryKey: portalStatusKey });
         },
     });
+    const saveConfig = async (patch: Parameters<typeof putAdminConfig>[0]) => {
+        await putAdminConfig(patch);
+        void queryClient.invalidateQueries({ queryKey: adminConfigKey });
+        void queryClient.invalidateQueries({ queryKey: portalStatusKey });
+    };
 
     if (
         config.isPending ||
@@ -288,6 +370,8 @@ export const AdminPage = () => {
     const conditions = status.data.conditions;
     const creatorReady = conditionOk(conditions, "creator_ready");
     const pubkey = creator.data.pubkey ?? config.data.creator_pubkey ?? null;
+    const { x, stripe } = config.data;
+    const webhookUrl = `${window.location.origin}/stripe/webhook`;
 
     return (
         <PageContainer className="space-y-6">
@@ -342,12 +426,83 @@ export const AdminPage = () => {
                                 unmet={row.unmet}
                             />
                         ))}
+                    <ReadinessRow
+                        label="Sign in with X"
+                        ok={conditionOk(conditions, "x_configured")}
+                        unmet="Visitors can't sign up until the X credentials below are set."
+                    />
+                    <ReadinessRow
+                        label="Stripe keys"
+                        ok={conditionOk(conditions, "stripe_configured")}
+                        unmet="Paid tiers can't be sold until the Stripe keys below are set."
+                    />
                 </div>
                 {!status.data.billing_enabled && (
                     <p className="text-muted-foreground text-sm">
                         Billing is off. New accounts aren&apos;t funded.
                     </p>
                 )}
+            </AdminSection>
+
+            <AdminSection title="Sign in with X">
+                <CredentialsForm
+                    fields={[
+                        {
+                            key: "client_id",
+                            label: "Client ID",
+                            current: x.client_id,
+                        },
+                        {
+                            key: "client_secret",
+                            label: "Client secret",
+                            current: x.client_secret,
+                            secret: true,
+                        },
+                    ]}
+                    onSave={(values) => saveConfig({ x: values })}
+                />
+            </AdminSection>
+
+            <AdminSection title="Stripe (sandbox)">
+                <div className="flex items-start gap-2 rounded-lg border px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                        <div className="text-muted-foreground text-xs">
+                            Webhook endpoint, for checkout.session.completed
+                            and checkout.session.async_payment_succeeded
+                        </div>
+                        <p className="break-all font-mono text-xs">
+                            {webhookUrl}
+                        </p>
+                    </div>
+                    <CopyButton
+                        text={webhookUrl}
+                        ariaLabel="Copy Stripe webhook endpoint"
+                    />
+                </div>
+                <CredentialsForm
+                    fields={[
+                        {
+                            key: "publishable_key",
+                            label: "Publishable key",
+                            current: stripe.sandbox.publishable_key,
+                        },
+                        {
+                            key: "secret_key",
+                            label: "Secret key",
+                            current: stripe.sandbox.secret_key,
+                            secret: true,
+                        },
+                        {
+                            key: "webhook_secret",
+                            label: "Webhook signing secret",
+                            current: stripe.sandbox.webhook_secret,
+                            secret: true,
+                        },
+                    ]}
+                    onSave={(values) =>
+                        saveConfig({ stripe: { sandbox: values } })
+                    }
+                />
             </AdminSection>
 
             <AdminSection title="ac-creator">

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <format>
 #include <limits>
@@ -10,6 +11,8 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
 #include <psio/json/any.hpp>
+#include <psio/to_hex.hpp>
+#include <ranges>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XKeys.hpp>
@@ -35,6 +38,7 @@ namespace
    constexpr uint64_t seedUsdMicros    = 2'500'000;
    constexpr uint64_t freeTierUsdCents = 250;
 
+   constexpr std::string_view statePending   = "pending";
    constexpr std::string_view stateQueued    = "queued";
    constexpr std::string_view stateInvited   = "invited";
    constexpr std::string_view stateFailed    = "failed";
@@ -46,6 +50,8 @@ namespace
    constexpr std::string_view sessionCookie  = "XPORTAL_SESSION";
    constexpr auto             authRequestTtl = std::chrono::minutes{10};
    constexpr auto             sessionTtl     = std::chrono::days{7};
+
+   constexpr auto webhookTolerance = std::chrono::minutes{5};
 
    struct ListenSpec
    {
@@ -171,14 +177,42 @@ namespace
       return Quantity{(usdMicros * scale) / priceMicros};
    }
 
-   std::optional<Quantity> tierTokens(const PortalConfig& config)
+   Quantity tokensAtPrice(const PortalConfig& config, uint64_t usdCents)
+   {
+      check(config.price_per_token_usd_micros.has_value(), "token price is not set");
+      auto token = to<Tokens>().getSysToken();
+      check(token.has_value(), "system token is not set");
+      return tokensFor(usdCents, *config.price_per_token_usd_micros, token->precision.value);
+   }
+
+   std::optional<Quantity> freeTierTokens(const PortalConfig& config)
    {
       if (!config.price_per_token_usd_micros || !config.free_tier.usd_cents)
          return std::nullopt;
-      auto token = to<Tokens>().getSysToken();
-      check(token.has_value(), "system token is not set");
-      return tokensFor(*config.free_tier.usd_cents, *config.price_per_token_usd_micros,
-                       token->precision.value);
+      return tokensAtPrice(config, *config.free_tier.usd_cents);
+   }
+
+   // While billing is disabled, a free signup is charged and granted nothing.
+   TierOffer freeOffer(const PortalConfig& config, bool billing)
+   {
+      if (!billing)
+         return {};
+      check(config.free_tier.usd_cents.has_value(), "free tier amount is not set");
+      auto usd = *config.free_tier.usd_cents;
+      return {.usd_cents = usd, .tokens = tokensAtPrice(config, usd)};
+   }
+
+   // The paid tier `POST /signup` sells, or null when none is offered.
+   const PaidTier* offeredPaidTier(const PortalConfig& config, bool billing)
+   {
+      if (!billing || config.tiers.empty())
+         return nullptr;
+      return &config.tiers.front();
+   }
+
+   TierOffer paidOffer(const PortalConfig& config, const PaidTier& tier)
+   {
+      return {.usd_cents = tier.usd_cents, .tokens = tokensAtPrice(config, tier.usd_cents)};
    }
 
    bool creatorReady()
@@ -200,7 +234,7 @@ namespace
 
    bool creatorTokens(const PortalConfig& config)
    {
-      auto grant = tierTokens(config);
+      auto grant = freeTierTokens(config);
       check(grant.has_value(), "free tier grant is not set");
       auto sys = to<Tokens>().getSysToken();
       check(sys.has_value(), "system token is not set");
@@ -348,15 +382,38 @@ namespace
       return x.client_id && x.client_secret;
    }
 
+   const StripeKeys& activeStripe(const PortalConfig& config)
+   {
+      if (config.mode == "production")
+         return config.stripe.production;
+      check(config.mode == "sandbox", "unknown Stripe mode " + config.mode);
+      return config.stripe.sandbox;
+   }
+
+   bool stripeConfigured(const StripeKeys& keys)
+   {
+      return keys.secret_key && keys.publishable_key && keys.webhook_secret;
+   }
+
+   void maskSecret(std::optional<std::string>& secret)
+   {
+      if (secret)
+         *secret = secret->substr(secret->size() - std::min<std::size_t>(secret->size(), 4));
+   }
+
    XConfig maskedX(XConfig x)
    {
-      if (x.client_secret)
-      {
-         auto& secret = *x.client_secret;
-         x.client_secret =
-             std::string{secret.substr(secret.size() - std::min<std::size_t>(secret.size(), 4))};
-      }
+      maskSecret(x.client_secret);
       return x;
+   }
+
+   StripeConfig maskedStripe(StripeConfig stripe)
+   {
+      maskSecret(stripe.sandbox.secret_key);
+      maskSecret(stripe.sandbox.webhook_secret);
+      maskSecret(stripe.production.secret_key);
+      maskSecret(stripe.production.webhook_secret);
+      return stripe;
    }
 
    AdminConfig adminView(const HttpRequest& req, const PortalConfig& config)
@@ -366,13 +423,16 @@ namespace
                          .price_per_token_usd_micros = config.price_per_token_usd_micros,
                          .free_tier                  = TierView{.enabled   = config.free_tier.enabled,
                                                                 .usd_cents = config.free_tier.usd_cents,
-                                                                .tokens    = tierTokens(config)},
+                                                                .tokens    = freeTierTokens(config)},
                          .producer                   = configuredProducer(),
                          .account                    = to<RTransact>().getUser(req),
                          .creator_pubkey = key ? std::optional<AuthSig::SubjectPublicKeyInfo>{key->pubkey}
                                               : std::nullopt,
                          .creator_allowed = XPortal::creatorAllowed(),
-                         .x               = maskedX(config.x)};
+                         .x               = maskedX(config.x),
+                         .mode            = config.mode,
+                         .stripe          = maskedStripe(config.stripe),
+                         .tiers           = config.tiers};
    }
 
    Status portalStatus(const PortalConfig& config)
@@ -385,9 +445,20 @@ namespace
          status.conditions.push_back({.id = "creator_tokens", .ok = creatorTokens(config)});
          status.conditions.push_back({.id = "creator_resources", .ok = creatorResources()});
       }
-      status.ready =
-          std::ranges::all_of(status.conditions, [](const Condition& c) { return c.ok; });
       status.conditions.push_back({.id = "x_configured", .ok = xConfigured(config.x)});
+      status.conditions.push_back(
+          {.id = "stripe_configured", .ok = stripeConfigured(activeStripe(config))});
+      auto paidOffered = offeredPaidTier(config, billing) != nullptr;
+      status.ready     = std::ranges::all_of(
+          status.conditions,
+          [&](const Condition& c)
+          {
+             if (c.id == "x_configured")
+                return true;
+             if (c.id == "stripe_configured")
+                return c.ok || !paidOffered;
+             return c.ok;
+          });
       return status;
    }
 
@@ -400,6 +471,28 @@ namespace
       return jsonBody(req, portalStatus(loadedConfig()));
    }
 
+   HttpReply serveTiers(const HttpRequest& req)
+   {
+      if (req.method == "OPTIONS")
+         return HttpReply{.headers = cors(req)};
+      if (req.method != "GET")
+         return HttpReply::methodNotAllowed(req);
+      auto       config  = loadedConfig();
+      auto       billing = to<VirtualServer>().is_billing_enabled();
+      TierOffers offers;
+      if (config.free_tier.enabled)
+         offers.free = freeOffer(config, billing);
+      if (auto tier = offeredPaidTier(config, billing))
+      {
+         auto offer = paidOffer(config, *tier);
+         offers.tiers.push_back({.index     = 0,
+                                 .label     = tier->label,
+                                 .usd_cents = offer.usd_cents,
+                                 .tokens    = offer.tokens});
+      }
+      return jsonBody(req, offers);
+   }
+
    const psio::json::any* objectField(const psio::json::any_object& object, std::string_view key)
    {
       const psio::json::any* found = nullptr;
@@ -409,19 +502,40 @@ namespace
       return found;
    }
 
-   // Sets `out` when `key` is present. Returns the 400 message when its value
-   // is not a non-empty string.
-   std::optional<std::string> readXField(const psio::json::any_object& object,
-                                         std::string_view              key,
-                                         std::optional<std::string>&   out)
+   // Sets `out` when `key` is present. Returns the 400 message, naming the
+   // field `<path>.<key>`, when its value is not a non-empty string.
+   std::optional<std::string> readStringField(const psio::json::any_object& object,
+                                              std::string_view              path,
+                                              std::string_view              key,
+                                              std::optional<std::string>&   out)
    {
       auto value = objectField(object, key);
       if (!value)
          return std::nullopt;
       auto text = value->get_if<std::string>();
       if (!text || text->empty())
-         return std::format("x.{} must be a non-empty string\n", key);
+         return std::format("{}.{} must be a non-empty string\n", path, key);
       out = *text;
+      return std::nullopt;
+   }
+
+   // Sets `apiBase` when `api_base` is present. Returns the 400 message when
+   // it is not an http or https origin.
+   std::optional<std::string> readApiBase(const psio::json::any_object& object,
+                                          std::string_view              path,
+                                          std::string&                  apiBase)
+   {
+      std::optional<std::string> value;
+      if (auto error = readStringField(object, path, "api_base", value))
+         return error;
+      if (value)
+      {
+         auto origin = splitURL(*value);
+         if (origin.scheme.empty() || origin.host.empty() || origin.path != "/" ||
+             value->ends_with('/'))
+            return std::format("{}.api_base must be an http or https origin\n", path);
+         apiBase = *value;
+      }
       return std::nullopt;
    }
 
@@ -430,21 +544,52 @@ namespace
       auto fields = value.get_if<psio::json::any_object>();
       if (!fields)
          return "x must be an object\n";
-      if (auto error = readXField(*fields, "client_id", x.client_id))
+      if (auto error = readStringField(*fields, "x", "client_id", x.client_id))
          return error;
-      if (auto error = readXField(*fields, "client_secret", x.client_secret))
+      if (auto error = readStringField(*fields, "x", "client_secret", x.client_secret))
          return error;
-      std::optional<std::string> apiBase;
-      if (auto error = readXField(*fields, "api_base", apiBase))
+      return readApiBase(*fields, "x", x.api_base);
+   }
+
+   std::optional<std::string> updateStripeKeys(const psio::json::any& value,
+                                               std::string_view       path,
+                                               StripeKeys&            keys)
+   {
+      auto fields = value.get_if<psio::json::any_object>();
+      if (!fields)
+         return std::format("{} must be an object\n", path);
+      if (auto error = readStringField(*fields, path, "secret_key", keys.secret_key))
          return error;
-      if (apiBase)
-      {
-         auto origin = splitURL(*apiBase);
-         if (origin.scheme.empty() || origin.host.empty() || origin.path != "/" ||
-             apiBase->ends_with('/'))
-            return "x.api_base must be an http or https origin\n";
-         x.api_base = *apiBase;
-      }
+      if (auto error = readStringField(*fields, path, "publishable_key", keys.publishable_key))
+         return error;
+      if (auto error = readStringField(*fields, path, "webhook_secret", keys.webhook_secret))
+         return error;
+      return readApiBase(*fields, path, keys.api_base);
+   }
+
+   std::optional<std::string> updateStripe(const psio::json::any& value, StripeConfig& stripe)
+   {
+      auto fields = value.get_if<psio::json::any_object>();
+      if (!fields)
+         return "stripe must be an object\n";
+      if (auto sandbox = objectField(*fields, "sandbox"))
+         if (auto error = updateStripeKeys(*sandbox, "stripe.sandbox", stripe.sandbox))
+            return error;
+      if (auto production = objectField(*fields, "production"))
+         return updateStripeKeys(*production, "stripe.production", stripe.production);
+      return std::nullopt;
+   }
+
+   // A wrongly typed tier field aborts.
+   std::optional<std::string> updateTiers(const psio::json::any& value, std::vector<PaidTier>& tiers)
+   {
+      if (!value.get_if<psio::json::any_array>())
+         return "tiers must be an array\n";
+      auto parsed = psio::convert_from_json<std::vector<PaidTier>>(psio::convert_to_json(value));
+      for (const auto& tier : parsed)
+         if (tier.label.empty() || tier.usd_cents == 0)
+            return "each tier needs a label and a positive usd_cents\n";
+      tiers = std::move(parsed);
       return std::nullopt;
    }
 
@@ -456,8 +601,10 @@ namespace
           std::string(req.body.begin(), req.body.end()));
       auto requests = objectField(object, "requests_enabled");
       auto x        = objectField(object, "x");
-      if (!requests && !x)
-         return "requests_enabled or x is required\n";
+      auto stripe   = objectField(object, "stripe");
+      auto tiers    = objectField(object, "tiers");
+      if (!requests && !x && !stripe && !tiers)
+         return "requests_enabled, x, stripe, or tiers is required\n";
       if (requests)
       {
          auto flag = requests->get_if<bool>();
@@ -466,7 +613,13 @@ namespace
          config.requests_enabled = *flag;
       }
       if (x)
-         return updateX(*x, config.x);
+         if (auto error = updateX(*x, config.x))
+            return error;
+      if (stripe)
+         if (auto error = updateStripe(*stripe, config.stripe))
+            return error;
+      if (tiers)
+         return updateTiers(*tiers, config.tiers);
       return std::nullopt;
    }
 
@@ -571,7 +724,147 @@ namespace
       return std::nullopt;
    }
 
-   HttpReply serveSignup(const HttpRequest& req)
+   // `key=value&...` with every character outside RFC 3986's unreserved set
+   // percent-encoded. Serves both query strings and form bodies.
+   std::string formEncode(
+       std::initializer_list<std::pair<std::string_view, std::string_view>> fields)
+   {
+      constexpr std::string_view hex = "0123456789ABCDEF";
+      std::string                out;
+      auto                       append = [&](std::string_view text)
+      {
+         for (unsigned char c : text)
+         {
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+                c == '-' || c == '.' || c == '_' || c == '~')
+            {
+               out += c;
+            }
+            else
+            {
+               out += '%';
+               out += hex[c >> 4];
+               out += hex[c & 0xf];
+            }
+         }
+      };
+      for (const auto& [key, value] : fields)
+      {
+         if (!out.empty())
+            out += '&';
+         append(key);
+         out += '=';
+         append(value);
+      }
+      return out;
+   }
+
+   // Sends `request` to the host of `apiBase`, over TLS when it is https.
+   // Returns the socket x-http calls back on.
+   std::int32_t sendToApi(std::string_view apiBase, HttpRequest request)
+   {
+      auto origin  = splitURL(apiBase);
+      request.host = std::string{origin.host};
+      std::optional<TLSInfo> tls;
+      if (origin.scheme == "https")
+         tls.emplace();
+      return to<XHttp>().sendRequest(std::move(request), tls, std::nullopt);
+   }
+
+   HttpRequest checkoutSessionRequest(const StripeKeys& keys,
+                                      const PaidTier&   tier,
+                                      const Signup&     signup)
+   {
+      auto amount = std::to_string(signup.usd_cents);
+      auto id     = signupId(signup.id);
+      auto body   = formEncode({{"mode", "payment"},
+                                {"ui_mode", "embedded_page"},
+                                {"redirect_on_completion", "never"},
+                                {"payment_method_types[0]", "card"},
+                                {"line_items[0][quantity]", "1"},
+                                {"line_items[0][price_data][currency]", "usd"},
+                                {"line_items[0][price_data][unit_amount]", amount},
+                                {"line_items[0][price_data][product_data][name]", tier.label},
+                                {"metadata[signup_id]", id}});
+      // x-http does not add Content-Length to outgoing requests
+      return HttpRequest{.method      = "POST",
+                         .target      = "/v1/checkout/sessions",
+                         .contentType = "application/x-www-form-urlencoded",
+                         .headers     = {{"Authorization", "Bearer " + *keys.secret_key},
+                                         {"Content-Length", std::to_string(body.size())}},
+                         .body        = std::vector<char>(body.begin(), body.end())};
+   }
+
+   // Asks Stripe for the pending `signup`'s Checkout Session. `client` gets
+   // the reply from `onStripeSession` or `onStripeError`.
+   void startCheckout(const StripeKeys& keys,
+                      const PaidTier&   tier,
+                      const Signup&     signup,
+                      std::int32_t      client)
+   {
+      auto socket = sendToApi(keys.api_base, checkoutSessionRequest(keys, tier, signup));
+      PSIBASE_SUBJECTIVE_TX
+      {
+         to<XHttp>().setCallback(socket, MethodNumber{"onStripeSession"},
+                                 MethodNumber{"onStripeError"});
+         XPortal{}.open<PendingStripeRequestTable>().put(
+             PendingStripeRequest{.socket          = socket,
+                                  .client          = client,
+                                  .signup          = signup.id,
+                                  .publishable_key = *keys.publishable_key});
+         to<XHttp>().autoClose(client, false);
+      }
+   }
+
+   // A paid signup waits `pending` for its payment; a free one is queued for
+   // provisioning. Returns nullopt when `xId` already has a free signup.
+   std::optional<Signup> storeSignup(const SignupBody& body,
+                                     const std::string& xId,
+                                     const TierOffer&   offer)
+   {
+      bool                  paid = body.tier.has_value();
+      std::optional<Signup> stored;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         stored.reset();
+         auto table = XPortal{}.open<SignupTable>();
+         bool taken = false;
+         if (!paid)
+         {
+            for (auto row : table.getIndex<0>())
+            {
+               if (row.x_id && *row.x_id == xId && !row.tier && row.state != stateFailed)
+               {
+                  taken = true;
+                  break;
+               }
+            }
+         }
+         if (!taken)
+         {
+            Checksum256 id;
+            raw::getRandom(id.data(), id.size());
+            auto now = wallNow();
+            stored   = Signup{.id        = id,
+                              .invite_id = *body.invite_id,
+                              .payload   = *body.payload,
+                              .token     = *body.token,
+                              .usd_cents = offer.usd_cents,
+                              .tokens    = offer.tokens,
+                              .state     = std::string{paid ? statePending : stateQueued},
+                              .created   = now,
+                              .updated   = now,
+                              .x_id      = xId,
+                              .tier      = body.tier};
+            table.put(*stored);
+            if (!paid)
+               to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
+         }
+      }
+      return stored;
+   }
+
+   std::optional<HttpReply> serveSignup(const HttpRequest& req, std::optional<std::int32_t> socket)
    {
       if (req.method == "OPTIONS")
          return HttpReply{.headers = cors(req)};
@@ -588,7 +881,7 @@ namespace
 
       auto config = loadedConfig();
       auto status = portalStatus(config);
-      if (!config.requests_enabled || !config.free_tier.enabled || !status.ready)
+      if (!config.requests_enabled || !status.ready)
          return textError(req, HttpStatus::forbidden, "account requests are not open\n");
 
       // A struct, not psio::json::any, because any rejects JSON numbers. A
@@ -600,61 +893,29 @@ namespace
          return textError(req, HttpStatus::badRequest, "payload is required\n");
       if (!body.token)
          return textError(req, HttpStatus::badRequest, "token is required\n");
+      const PaidTier* paid = nullptr;
       if (body.tier)
-         return textError(req, HttpStatus::badRequest, "tier is not supported\n");
+      {
+         paid = offeredPaidTier(config, status.billing_enabled);
+         if (*body.tier != 0 || !paid)
+            return textError(req, HttpStatus::badRequest, "tier is not offered\n");
+      }
+      else if (!config.free_tier.enabled)
+         return textError(req, HttpStatus::forbidden, "account requests are not open\n");
       if (!psio::fracpack_validate_strict<InvPayload>(
               {reinterpret_cast<const char*>(body.payload->data()), body.payload->size()}))
          return textError(req, HttpStatus::badRequest, "payload is not an invite payload\n");
       if (to<Invite>().getInvite(*body.invite_id))
          return textError(req, HttpStatus::conflict, "invite id is taken\n");
 
-      uint64_t usd    = 0;
-      Quantity tokens = 0;
-      if (status.billing_enabled)
-      {
-         check(config.free_tier.usd_cents.has_value(), "free tier amount is not set");
-         auto grant = tierTokens(config);
-         check(grant.has_value(), "free tier grant is not set");
-         usd    = *config.free_tier.usd_cents;
-         tokens = *grant;
-      }
-
-      std::optional<Signup> stored;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         stored.reset();
-         auto table = XPortal{}.open<SignupTable>();
-         bool taken = false;
-         for (auto row : table.getIndex<0>())
-         {
-            if (row.x_id && *row.x_id == session->x_id && !row.tier && row.state != stateFailed)
-            {
-               taken = true;
-               break;
-            }
-         }
-         if (!taken)
-         {
-            Checksum256 id;
-            raw::getRandom(id.data(), id.size());
-            auto now = wallNow();
-            stored   = Signup{.id        = id,
-                              .invite_id = *body.invite_id,
-                              .payload   = *body.payload,
-                              .token     = *body.token,
-                              .usd_cents = usd,
-                              .tokens    = tokens,
-                              .state     = std::string{stateQueued},
-                              .created   = now,
-                              .updated   = now,
-                              .x_id      = session->x_id};
-            table.put(*stored);
-            to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
-         }
-      }
+      auto offer  = paid ? paidOffer(config, *paid) : freeOffer(config, status.billing_enabled);
+      auto stored = storeSignup(body, session->x_id, offer);
       if (!stored)
          return textError(req, HttpStatus::conflict, "free signup already exists\n");
-      return jsonBody(req, SignupReceipt{.signup_id = signupId(stored->id)});
+      if (!paid)
+         return jsonBody(req, SignupReceipt{.signup_id = signupId(stored->id)});
+      startCheckout(activeStripe(config), *paid, *stored, *socket);
+      return std::nullopt;
    }
 
    HttpReply serveSignupStatus(const HttpRequest& req, std::string_view idText)
@@ -728,41 +989,6 @@ namespace
    {
       auto hash = sha256(verifier.data(), verifier.size());
       return toBase64Url({reinterpret_cast<const char*>(hash.data()), hash.size()});
-   }
-
-   // `key=value&...` with every character outside RFC 3986's unreserved set
-   // percent-encoded. Serves both query strings and form bodies.
-   std::string formEncode(
-       std::initializer_list<std::pair<std::string_view, std::string_view>> fields)
-   {
-      constexpr std::string_view hex = "0123456789ABCDEF";
-      std::string                out;
-      auto                       append = [&](std::string_view text)
-      {
-         for (unsigned char c : text)
-         {
-            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-                c == '-' || c == '.' || c == '_' || c == '~')
-            {
-               out += c;
-            }
-            else
-            {
-               out += '%';
-               out += hex[c >> 4];
-               out += hex[c & 0xf];
-            }
-         }
-      };
-      for (const auto& [key, value] : fields)
-      {
-         if (!out.empty())
-            out += '&';
-         append(key);
-         out += '=';
-         append(value);
-      }
-      return out;
    }
 
    // Off localhost this is the canonical https origin. A localhost node serves
@@ -859,18 +1085,12 @@ namespace
                          .headers = {{"Authorization", std::format("Bearer {}", accessToken)}}};
    }
 
-   // Sends `request` to the host of `x.api_base`, over TLS when it is https.
    void sendXRequest(const XConfig&  x,
                      HttpRequest     request,
                      MethodNumber    callback,
                      PendingXRequest pending)
    {
-      auto origin  = splitURL(x.api_base);
-      request.host = std::string{origin.host};
-      std::optional<TLSInfo> tls;
-      if (origin.scheme == "https")
-         tls.emplace();
-      pending.socket = to<XHttp>().sendRequest(std::move(request), tls, std::nullopt);
+      pending.socket = sendToApi(x.api_base, std::move(request));
       PSIBASE_SUBJECTIVE_TX
       {
          to<XHttp>().setCallback(pending.socket, callback, MethodNumber{"onXError"});
@@ -878,29 +1098,31 @@ namespace
       }
    }
 
-   PendingXRequest takePendingXRequest(std::int32_t socket)
+   // Removes and returns the outbound request x-http is calling back on `socket`.
+   template <typename Table>
+   typename Table::value_type takePendingRequest(std::int32_t socket)
    {
-      std::optional<PendingXRequest> pending;
+      std::optional<typename Table::value_type> pending;
       PSIBASE_SUBJECTIVE_TX
       {
-         auto table = XPortal{}.open<PendingXRequestTable>();
+         auto table = XPortal{}.open<Table>();
          pending    = table.get(socket);
-         check(pending.has_value(), "no pending X request on socket " + std::to_string(socket));
+         check(pending.has_value(), "no pending request on socket " + std::to_string(socket));
          table.remove(*pending);
       }
       return *pending;
    }
 
-   void replyToBrowser(const PendingXRequest& pending, const HttpReply& reply)
+   void replyToBrowser(std::int32_t client, const HttpReply& reply)
    {
       PSIBASE_SUBJECTIVE_TX
       {
-         to<XHttp>().autoClose(pending.client, true);
-         to<XHttp>().sendReply(pending.client, reply);
+         to<XHttp>().autoClose(client, true);
+         to<XHttp>().sendReply(client, reply);
       }
    }
 
-   HttpReply xFailure(std::string_view message)
+   HttpReply badGateway(std::string_view message)
    {
       return textError(std::vector<HttpHeader>{}, HttpStatus::badGateway, message);
    }
@@ -965,7 +1187,7 @@ namespace
    };
 
    template <typename T>
-   T parseXReply(const HttpReply& reply)
+   T parseJsonReply(const HttpReply& reply)
    {
       return psio::convert_from_json<T>(std::string(reply.body.begin(), reply.body.end()));
    }
@@ -982,7 +1204,7 @@ namespace
          XPortal{}.open<XSessionTable>().put(session);
       }
       replyToBrowser(
-          pending,
+          pending.client,
           redirect("/", {sessionCookieHeader(session.session_id, sessionTtl, pending.secure)}));
    }
 
@@ -1015,6 +1237,170 @@ namespace
       auto headers = cors(req);
       headers.push_back(sessionCookieHeader("", std::chrono::seconds{0}, !isLocalhost(req)));
       return HttpReply{.headers = std::move(headers)};
+   }
+
+   struct StripeSessionReply
+   {
+      std::string                id;
+      std::optional<std::string> client_secret;
+      PSIO_REFLECT(StripeSessionReply, id, client_secret)
+   };
+
+   void updatePendingSignup(const Checksum256& id, auto&& update)
+   {
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XPortal{}.open<SignupTable>();
+         auto row   = table.get(id);
+         check(row.has_value() && row->state == statePending, "signup is not pending");
+         update(*row);
+         row->updated = wallNow();
+         table.put(*row);
+      }
+   }
+
+   void failCheckout(const PendingStripeRequest& pending, const std::string& error)
+   {
+      updatePendingSignup(pending.signup,
+                          [&](Signup& signup)
+                          {
+                             signup.state      = std::string{stateFailed};
+                             signup.last_error = error;
+                          });
+      replyToBrowser(pending.client, badGateway("Stripe did not create a checkout session\n"));
+   }
+
+   bool sameBytes(std::span<const char> a, const Checksum256& b)
+   {
+      if (a.size() != b.size())
+         return false;
+      unsigned char diff = 0;
+      for (std::size_t i = 0; i < b.size(); ++i)
+         diff |= static_cast<unsigned char>(a[i]) ^ b[i];
+      return diff == 0;
+   }
+
+   // `Stripe-Signature` is `t=<unix seconds>,v1=<hex>,...`. Any `v1` may match;
+   // other schemes are ignored.
+   bool verifyStripeSignature(const HttpRequest& req, std::string_view secret)
+   {
+      auto header = req.getHeader("stripe-signature");
+      if (!header)
+         return false;
+      std::string_view              timestamp;
+      std::vector<std::string_view> signatures;
+      for (auto part : *header | std::views::split(','))
+      {
+         std::string_view item{part.begin(), part.end()};
+         auto             eq = item.find('=');
+         if (eq == std::string_view::npos)
+            continue;
+         if (item.substr(0, eq) == "t")
+            timestamp = item.substr(eq + 1);
+         else if (item.substr(0, eq) == "v1")
+            signatures.push_back(item.substr(eq + 1));
+      }
+
+      std::int64_t sent = 0;
+      auto [end, ec]    = std::from_chars(timestamp.data(), timestamp.data() + timestamp.size(), sent);
+      if (timestamp.empty() || ec != std::errc{} || end != timestamp.data() + timestamp.size())
+         return false;
+      auto now =
+          std::chrono::duration_cast<std::chrono::seconds>(wallNow().time_since_epoch()).count();
+      auto tolerance = std::chrono::seconds{webhookTolerance}.count();
+      if (sent < now - tolerance || sent > now + tolerance)
+         return false;
+
+      std::string signedPayload{timestamp};
+      signedPayload += '.';
+      signedPayload.append(req.body.begin(), req.body.end());
+      auto expected = hmacSha256(secret, signedPayload);
+      for (auto signature : signatures)
+      {
+         std::vector<char> bytes;
+         if (signature.size() == 2 * expected.size() && psio::from_hex(signature, bytes) &&
+             sameBytes(bytes, expected))
+            return true;
+      }
+      return false;
+   }
+
+   struct StripeEventType
+   {
+      std::string type;
+      PSIO_REFLECT(StripeEventType, type)
+   };
+
+   struct CheckoutMetadata
+   {
+      std::optional<std::string> signup_id;
+      PSIO_REFLECT(CheckoutMetadata, signup_id)
+   };
+
+   struct CheckoutSession
+   {
+      std::string      payment_status;
+      CheckoutMetadata metadata;
+      PSIO_REFLECT(CheckoutSession, payment_status, metadata)
+   };
+
+   struct CheckoutEventData
+   {
+      CheckoutSession object;
+      PSIO_REFLECT(CheckoutEventData, object)
+   };
+
+   struct CheckoutEvent
+   {
+      std::string       id;
+      CheckoutEventData data;
+      PSIO_REFLECT(CheckoutEvent, id, data)
+   };
+
+   // A verified event that names no known signup is ignored rather than
+   // rejected, so Stripe does not keep retrying it.
+   void applyCheckoutEvent(const CheckoutEvent& event)
+   {
+      const auto& session = event.data.object;
+      if (!session.metadata.signup_id)
+         return;
+      auto id = parseSignupId(*session.metadata.signup_id);
+      if (!id)
+         return;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XPortal{}.open<SignupTable>();
+         if (auto row = table.get(*id))
+         {
+            if (!std::ranges::contains(row->stripe_event_ids, event.id))
+               row->stripe_event_ids.push_back(event.id);
+            if (session.payment_status == "paid" && row->state == statePending)
+            {
+               row->state = std::string{stateQueued};
+               to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
+            }
+            row->updated = wallNow();
+            table.put(*row);
+         }
+      }
+   }
+
+   HttpReply serveStripeWebhook(const HttpRequest& req)
+   {
+      if (req.method != "POST")
+         return HttpReply::methodNotAllowed(req);
+      auto        config = readConfig();
+      const auto& keys   = activeStripe(config);
+      if (!keys.webhook_secret || !verifyStripeSignature(req, *keys.webhook_secret))
+         return textError(std::vector<HttpHeader>{}, HttpStatus::badRequest,
+                          "invalid Stripe signature\n");
+      // Only checkout events are parsed as sessions: other event objects may
+      // type these fields differently, and an abort makes Stripe retry.
+      auto text = std::string(req.body.begin(), req.body.end());
+      auto type = psio::convert_from_json<StripeEventType>(text).type;
+      if (type == "checkout.session.completed" || type == "checkout.session.async_payment_succeeded")
+         applyCheckoutEvent(psio::convert_from_json<CheckoutEvent>(text));
+      return HttpReply{};
    }
 
    // A queued signup is due until its one attempt is committed. The commit
@@ -1082,6 +1468,8 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
    auto target = request.path();
    if (target == "/status")
       return serveStatus(request);
+   if (target == "/tiers")
+      return serveTiers(request);
    if (target == "/admin/config")
       return serveAdminConfig(request, socket);
    if (target == "/admin/agents/creator/keygen")
@@ -1089,7 +1477,9 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
    if (target == "/admin/signups")
       return serveFailedSignups(request, socket);
    if (target == "/signup")
-      return serveSignup(request);
+      return serveSignup(request, socket);
+   if (target == "/stripe/webhook")
+      return serveStripeWebhook(request);
    if (target.starts_with("/signup/"))
       return serveSignupStatus(request, std::string_view{target}.substr(8));
    if (target == "/auth/x/start")
@@ -1125,31 +1515,56 @@ void XPortal::onPushError(std::int32_t socket)
 void XPortal::onXToken(std::int32_t socket, HttpReply reply)
 {
    check(getSender() == XHttp::service, "Wrong sender");
-   auto pending = takePendingXRequest(socket);
+   auto pending = takePendingRequest<PendingXRequestTable>(socket);
    if (reply.status != HttpStatus::ok)
-      return replyToBrowser(pending, xFailure("X rejected the sign-in code\n"));
-   auto token = parseXReply<XTokenReply>(reply).access_token;
+      return replyToBrowser(pending.client, badGateway("X rejected the sign-in code\n"));
+   auto token = parseJsonReply<XTokenReply>(reply).access_token;
    if (!token)
-      return replyToBrowser(pending, xFailure("X sent no access token\n"));
+      return replyToBrowser(pending.client, badGateway("X sent no access token\n"));
    sendXRequest(readConfig().x, xUserRequest(*token), MethodNumber{"onXUser"}, pending);
 }
 
 void XPortal::onXUser(std::int32_t socket, HttpReply reply)
 {
    check(getSender() == XHttp::service, "Wrong sender");
-   auto                     pending = takePendingXRequest(socket);
+   auto                     pending = takePendingRequest<PendingXRequestTable>(socket);
    std::optional<XUserData> user;
    if (reply.status == HttpStatus::ok)
-      user = parseXReply<XUserReply>(reply).data;
+      user = parseJsonReply<XUserReply>(reply).data;
    if (!user || user->id.empty() || user->username.empty())
-      return replyToBrowser(pending, xFailure("X did not return the signed-in user\n"));
+      return replyToBrowser(pending.client, badGateway("X did not return the signed-in user\n"));
    finishSignIn(pending, *user);
 }
 
 void XPortal::onXError(std::int32_t socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
-   replyToBrowser(takePendingXRequest(socket), xFailure("X did not respond\n"));
+   replyToBrowser(takePendingRequest<PendingXRequestTable>(socket).client,
+                  badGateway("X did not respond\n"));
+}
+
+void XPortal::onStripeSession(std::int32_t socket, HttpReply reply)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   auto pending = takePendingRequest<PendingStripeRequestTable>(socket);
+   std::optional<StripeSessionReply> session;
+   if (reply.status == HttpStatus::ok)
+      session = parseJsonReply<StripeSessionReply>(reply);
+   if (!session || session->id.empty() || !session->client_secret)
+      return failCheckout(pending, std::string(reply.body.begin(), reply.body.end()));
+   updatePendingSignup(pending.signup,
+                       [&](Signup& signup) { signup.stripe_session_id = session->id; });
+   replyToBrowser(pending.client,
+                  jsonBody(std::vector<HttpHeader>{},
+                           CheckoutReceipt{.signup_id       = signupId(pending.signup),
+                                           .client_secret   = *session->client_secret,
+                                           .publishable_key = pending.publishable_key}));
+}
+
+void XPortal::onStripeError(std::int32_t socket)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   failCheckout(takePendingRequest<PendingStripeRequestTable>(socket), "Stripe did not respond");
 }
 
 PSIBASE_DISPATCH(XPortal)

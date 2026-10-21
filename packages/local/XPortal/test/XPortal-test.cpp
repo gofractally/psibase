@@ -94,7 +94,7 @@ namespace
    void requireBillingReadiness(const Status& status, bool tokensOk, bool resourcesOk)
    {
       REQUIRE(status.billing_enabled);
-      REQUIRE(status.conditions.size() == 4);
+      REQUIRE(status.conditions.size() == 5);
       CHECK(status.conditions[0].id == "creator_ready");
       CHECK(status.conditions[0].ok);
       CHECK(status.conditions[1].id == "creator_tokens");
@@ -102,6 +102,7 @@ namespace
       CHECK(status.conditions[2].id == "creator_resources");
       CHECK(status.conditions[2].ok == resourcesOk);
       CHECK(status.conditions[3].id == "x_configured");
+      CHECK(status.conditions[4].id == "stripe_configured");
    }
 
    std::vector<uint8_t> invitePayload(uint8_t seed)
@@ -211,17 +212,18 @@ namespace
       CHECK(getSubjectPublicKeyInfo(row->key) == pub);
    }
 
-   void createCreator(DefaultTestChain&              t,
-                      AccountNumber                  producer,
-                      const SubjectPublicKeyInfo&    pub,
-                      const std::optional<Quantity>& buffer = {},
-                      const std::optional<Quantity>& grant  = {})
+   void createCreator(DefaultTestChain&                 t,
+                      AccountNumber                     producer,
+                      const SubjectPublicKeyInfo&       pub,
+                      const std::optional<Quantity>&    buffer  = {},
+                      const std::optional<Quantity>&    grant   = {},
+                      const std::vector<AllowedAction>& allowed = XPortal::creatorAllowed())
    {
       transactor<AuthScope>     scope{producer, AuthScope::service};
       transactor<Tokens>        tokens{producer, Tokens::service};
       transactor<VirtualServer> vserver{producer, VirtualServer::service};
       std::vector<Action>       actions{
-          scope.newAccount(XPortal::creatorAccount, pub, producer, XPortal::creatorAllowed())};
+          scope.newAccount(XPortal::creatorAccount, pub, producer, allowed)};
       REQUIRE(buffer.has_value() == grant.has_value());
       if (buffer)
       {
@@ -323,7 +325,7 @@ namespace
       return HttpRequest{.target = std::string{location->substr(query)}}.query<AuthorizeQuery>();
    }
 
-   std::string putXExpectBadRequest(DefaultTestChain& t, std::string_view json)
+   std::string putConfigExpectBadRequest(DefaultTestChain& t, std::string_view json)
    {
       auto reply = t.http(HttpRequestBuilder{}.put(XPortal::service, "/admin/config",
                                                    RawBody{"application/json", std::string{json}}));
@@ -344,6 +346,108 @@ namespace
                                       .method  = MethodNumber{method},
                                       .rawData = psio::convert_to_frac(args)});
    }
+
+   // Billing on, ac-creator funded for one free signup, X configured, and
+   // requests open. ac-creator may also debit, which claims its grant here
+   // instead of the plugin's auto-debit.
+   BilledToken openBilledPortal(DefaultTestChain& t)
+   {
+      auto alice = AccountNumber{"alice"};
+      setProducer(t, "alice");
+      storeCreatorKey();
+      auto billed = enableBilling(t, alice, 5);
+
+      auto config = t.get<AdminConfig>(XPortal::service, "/admin/config");
+      REQUIRE(config.free_tier.tokens.has_value());
+      auto cost    = t.from(alice).to<Invite>().getInvCost(1, *config.free_tier.tokens).returnVal();
+      auto allowed = XPortal::creatorAllowed();
+      allowed.push_back({Tokens::service, MethodNumber{"debit"}});
+      createCreator(t, alice, agentPub, Quantity{billed.cost}, cost, allowed);
+      REQUIRE(t.from(XPortal::creatorAccount)
+                  .with(KeyList{{agentPub, agentPriv}})
+                  .to<Tokens>()
+                  .debit(billed.id, alice, cost, "")
+                  .succeeded());
+      configureX(t);
+      t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
+      REQUIRE(t.get<Status>(XPortal::service, "/status").ready);
+      return billed;
+   }
+
+   struct SandboxStripe
+   {
+      StripeKeys sandbox;
+      PSIO_REFLECT(SandboxStripe, sandbox)
+   };
+
+   struct StripeCredentials
+   {
+      SandboxStripe stripe;
+      PSIO_REFLECT(StripeCredentials, stripe)
+   };
+
+   const StripeKeys testStripe{.secret_key      = "sk_test_secret-wxyz",
+                               .publishable_key = "pk_test_public",
+                               .webhook_secret  = "whsec_test-5678"};
+
+   void configureStripe(DefaultTestChain& t)
+   {
+      t.put(XPortal::service, "/admin/config",
+            StripeCredentials{.stripe = {.sandbox = testStripe}});
+   }
+
+   // A paid signup for tier 0 that Stripe has not reported paid. Its id's
+   // first byte is `inviteId`.
+   Checksum256 storePendingSignup(uint8_t inviteId, std::string xId)
+   {
+      Checksum256 id{};
+      id[0]    = inviteId;
+      auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::system_clock::now());
+      XPortal{}.open<SignupTable>().put(Signup{.id        = id,
+                                               .invite_id = inviteId,
+                                               .payload   = invitePayload(inviteId),
+                                               .token     = "token-" + std::to_string(inviteId),
+                                               .usd_cents = 500,
+                                               .state     = "pending",
+                                               .created   = now,
+                                               .updated   = now,
+                                               .x_id      = std::move(xId),
+                                               .tier      = 0});
+      return id;
+   }
+
+   std::int64_t unixNow()
+   {
+      return std::chrono::duration_cast<std::chrono::seconds>(
+                 std::chrono::system_clock::now().time_since_epoch())
+          .count();
+   }
+
+   std::string stripeSignature(std::string_view secret, std::string_view body)
+   {
+      auto        t = unixNow();
+      std::string hex;
+      for (auto byte : hmacSha256(secret, std::format("{}.{}", t, body)))
+         hex += std::format("{:02x}", byte);
+      return std::format("t={},v1={}", t, hex);
+   }
+
+   std::string paidCheckoutEvent(std::string_view signupId)
+   {
+      return std::format(
+          R"({{"id":"evt_1","object":"event","type":"checkout.session.completed",)"
+          R"("data":{{"object":{{"id":"cs_test_1","object":"checkout.session","amount_total":500,)"
+          R"("customer":null,"payment_status":"paid","metadata":{{"signup_id":"{}"}}}}}}}})",
+          signupId);
+   }
+
+   HttpReply postWebhook(DefaultTestChain& t, std::string_view body, std::string_view signature)
+   {
+      return t.http(HttpRequestBuilder{}
+                        .header("Stripe-Signature", signature)
+                        .post(XPortal::service, "/stripe/webhook",
+                              RawBody{"application/json", std::string{body}}));
+   }
 }  // namespace
 
 TEST_CASE("status, requests switch, and seeded pricing")
@@ -357,11 +461,13 @@ TEST_CASE("status, requests switch, and seeded pricing")
    CHECK(status.requests_enabled == false);
    CHECK(status.billing_enabled == false);
    CHECK(status.ready == false);
-   REQUIRE(status.conditions.size() == 2);
+   REQUIRE(status.conditions.size() == 3);
    CHECK(status.conditions[0].id == "creator_ready");
    CHECK(status.conditions[0].ok == false);
    CHECK(status.conditions[1].id == "x_configured");
    CHECK(status.conditions[1].ok == false);
+   CHECK(status.conditions[2].id == "stripe_configured");
+   CHECK(status.conditions[2].ok == false);
 
    CHECK(t.http(forwarded("GET", "/admin/config")).status == HttpStatus::unauthorized);
    CHECK(t.http(forwarded("POST", "/status")).status == HttpStatus::methodNotAllowed);
@@ -390,7 +496,7 @@ TEST_CASE("status, requests switch, and seeded pricing")
                                                   RawBody{"application/json", "{}"}));
    CHECK(missing.status == HttpStatus::badRequest);
    CHECK(std::string(missing.body.begin(), missing.body.end()) ==
-         "requests_enabled or x is required\n");
+         "requests_enabled, x, stripe, or tiers is required\n");
    auto badType =
        t.http(HttpRequestBuilder{}.put(XPortal::service, "/admin/config",
                                        RawBody{"application/json", R"({"requests_enabled":1})"}));
@@ -540,24 +646,7 @@ TEST_CASE("provision signs the billed invite actions as ac-creator")
 {
    DefaultTestChain t{portalPackages};
    installPortal(t);
-   auto alice = AccountNumber{"alice"};
-   setProducer(t, "alice");
-   storeCreatorKey();
-   auto billed = enableBilling(t, alice, 5);
-
-   auto config = t.get<AdminConfig>(XPortal::service, "/admin/config");
-   REQUIRE(config.free_tier.tokens.has_value());
-   auto grant = *config.free_tier.tokens;
-   auto cost  = t.from(alice).to<Invite>().getInvCost(1, grant).returnVal();
-   createCreator(t, alice, agentPub, Quantity{billed.cost}, cost);
-   REQUIRE(t.from(XPortal::creatorAccount)
-               .with(KeyList{{agentPub, agentPriv}})
-               .to<Tokens>()
-               .debit(billed.id, alice, cost, "")
-               .succeeded());
-   configureX(t);
-   t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
-   REQUIRE(t.get<Status>(XPortal::service, "/status").ready);
+   openBilledPortal(t);
    openSession("owner", "42");
 
    auto receipt = t.http<SignupReceipt>(signupRequest(9, "owner"));
@@ -652,14 +741,14 @@ TEST_CASE("X credentials are set field by field and the secret is masked")
    CHECK(!config.x.client_secret.has_value());
    CHECK(config.x.api_base == "https://api.x.com");
 
-   CHECK(putXExpectBadRequest(t, R"({"x":"id"})") == "x must be an object\n");
-   CHECK(putXExpectBadRequest(t, R"({"x":{"client_id":""}})") == "x.client_id must be a non-empty string\n");
-   CHECK(putXExpectBadRequest(t, R"({"x":{"client_secret":true}})") ==
+   CHECK(putConfigExpectBadRequest(t, R"({"x":"id"})") == "x must be an object\n");
+   CHECK(putConfigExpectBadRequest(t, R"({"x":{"client_id":""}})") == "x.client_id must be a non-empty string\n");
+   CHECK(putConfigExpectBadRequest(t, R"({"x":{"client_secret":true}})") ==
          "x.client_secret must be a non-empty string\n");
    for (auto bad : {"api.x.com", "https://api.x.com/", "https://api.x.com/2", "https://"})
-      CHECK(putXExpectBadRequest(t, std::format(R"({{"x":{{"api_base":"{}"}}}})", bad)) ==
+      CHECK(putConfigExpectBadRequest(t, std::format(R"({{"x":{{"api_base":"{}"}}}})", bad)) ==
             "x.api_base must be an http or https origin\n");
-   CHECK(putXExpectBadRequest(t, R"({"x":{"client_id":"kept","api_base":"bad"}})").starts_with("x.api_base"));
+   CHECK(putConfigExpectBadRequest(t, R"({"x":{"client_id":"kept","api_base":"bad"}})").starts_with("x.api_base"));
    CHECK(!t.get<AdminConfig>(XPortal::service, "/admin/config").x.client_id.has_value());
 
    configureX(t);
@@ -794,4 +883,22 @@ TEST_CASE("one free signup per X user")
    auto again = t.http(signupRequest(2, "owner"));
    CHECK(again.status == HttpStatus::conflict);
    CHECK(replyText(again) == "free signup already exists\n");
+}
+
+TEST_CASE("the Stripe webhook queues a paid signup only when Stripe signed it")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+   configureStripe(t);
+   auto id     = storePendingSignup(7, "42");
+   auto idText = toBase64Url({reinterpret_cast<const char*>(id.data()), id.size()});
+   auto paid   = paidCheckoutEvent(idText);
+
+   CHECK(postWebhook(t, paid, stripeSignature("whsec_other", paid)).status ==
+         HttpStatus::badRequest);
+   CHECK(XPortal{}.open<SignupTable>().get(id)->state == "pending");
+
+   CHECK(postWebhook(t, paid, stripeSignature(*testStripe.webhook_secret, paid)).status ==
+         HttpStatus::ok);
+   CHECK(XPortal{}.open<SignupTable>().get(id)->state == "queued");
 }

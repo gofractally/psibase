@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-import { requestSignup } from "./portal-api";
+import { requestSignup, type SignupReceipt } from "./portal-api";
 
 const SIGNUP_ID_KEY = "x-portal-signup-id";
 
@@ -16,11 +16,12 @@ const zInviteDetails = z.object({
 export type InviteDetails = z.infer<typeof zInviteDetails>;
 
 /**
- * Prepares an invite in this browser and asks the node to create it. The
- * signup id is kept for this tab so a reload resumes the signup. Throws
- * `PortalError` when the node refuses.
+ * Prepares an invite in this browser and asks the node to create it for
+ * `tier`, unset for the free tier. Throws `PortalError` when the node refuses.
  */
-export const startSignup = async (): Promise<string> => {
+export const startSignup = async (
+    tier: number | undefined,
+): Promise<SignupReceipt> => {
     const invite = zInviteDetails.parse(
         await supervisor.functionCall({
             service: "invite",
@@ -29,10 +30,12 @@ export const startSignup = async (): Promise<string> => {
             params: [],
         }),
     );
-    const signupId = await requestSignup(invite);
-    sessionStorage.setItem(SIGNUP_ID_KEY, signupId);
-    return signupId;
+    return requestSignup(invite, tier);
 };
+
+/** Keeps the signup id for this tab so a reload resumes the signup. */
+export const rememberSignup = (signupId: string) =>
+    sessionStorage.setItem(SIGNUP_ID_KEY, signupId);
 
 /** Makes the created invite active for x-portal, so the host login prompt offers account creation. */
 export const importInvite = (token: string) =>

@@ -9,9 +9,32 @@ const zStatus = z.object({
     ready: z.boolean(),
 });
 
-const zSignupReceipt = z.object({ signup_id: z.string() });
+const zSignupReceipt = z.union([
+    z.object({
+        signup_id: z.string(),
+        client_secret: z.string(),
+        publishable_key: z.string(),
+    }),
+    z.object({ signup_id: z.string() }),
+]);
+
+/** A paid tier's receipt carries what Stripe Embedded Checkout needs. */
+export type SignupReceipt = z.infer<typeof zSignupReceipt>;
+
+// The node sends u64 as a JSON string.
+const zTierOffer = z.object({ usd_cents: z.coerce.number() });
+
+const zTiers = z.object({
+    free: zTierOffer.nullish(),
+    tiers: z.array(
+        zTierOffer.extend({ index: z.number(), label: z.string() }),
+    ),
+});
+
+export type Tiers = z.infer<typeof zTiers>;
 
 const zSignupView = z.discriminatedUnion("state", [
+    z.object({ state: z.literal("pending") }),
     z.object({ state: z.literal("queued") }),
     z.object({ state: z.literal("invited"), token: z.string() }),
     z.object({ state: z.literal("failed") }),
@@ -43,19 +66,26 @@ export const isRequestsOpen = async (): Promise<boolean> => {
     return status.requests_enabled && status.ready;
 };
 
-/** Asks the node to create a prepared invite. Returns the new signup's id. */
-export const requestSignup = async (invite: InviteDetails): Promise<string> => {
-    const reply = fetch("/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            invite_id: invite.inviteId,
-            payload: uint8ArrayToHex(invite.payload),
-            token: invite.inviteToken,
+export const getTiers = () => parseReply(fetch("/tiers"), zTiers);
+
+/** Asks the node to create a prepared invite. `tier` is unset for the free tier. */
+export const requestSignup = (
+    invite: InviteDetails,
+    tier: number | undefined,
+): Promise<SignupReceipt> =>
+    parseReply(
+        fetch("/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                invite_id: invite.inviteId,
+                payload: uint8ArrayToHex(invite.payload),
+                token: invite.inviteToken,
+                tier,
+            }),
         }),
-    });
-    return (await parseReply(reply, zSignupReceipt)).signup_id;
-};
+        zSignupReceipt,
+    );
 
 export const getSignup = (signupId: string) =>
     parseReply(fetch(`/signup/${encodeURIComponent(signupId)}`), zSignupView);

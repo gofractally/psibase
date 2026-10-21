@@ -32,13 +32,50 @@ namespace LocalService
       PSIO_REFLECT(XConfig, client_id, client_secret, api_base)
    };
 
+   /// Stripe API keys for one mode. A mode is configured once `secret_key`,
+   /// `publishable_key`, and `webhook_secret` are all set.
+   struct StripeKeys
+   {
+      std::optional<std::string> secret_key;
+      std::optional<std::string> publishable_key;
+      std::optional<std::string> webhook_secret;
+      std::string                api_base = "https://api.stripe.com";
+      PSIO_REFLECT(StripeKeys, secret_key, publishable_key, webhook_secret, api_base)
+   };
+
+   struct StripeConfig
+   {
+      StripeKeys sandbox;
+      StripeKeys production;
+      PSIO_REFLECT(StripeConfig, sandbox, production)
+   };
+
+   /// A tier sold through Stripe for `usd_cents`.
+   struct PaidTier
+   {
+      std::string label;
+      uint64_t    usd_cents = 0;
+      PSIO_REFLECT(PaidTier, label, usd_cents)
+   };
+
    struct PortalConfig
    {
       bool                    requests_enabled = false;
       std::optional<uint64_t> price_per_token_usd_micros;
       TierConfig              free_tier;
       XConfig                 x;
-      PSIO_REFLECT(PortalConfig, requests_enabled, price_per_token_usd_micros, free_tier, x)
+      /// `sandbox` or `production`: which `stripe` keys are active.
+      std::string           mode = "sandbox";
+      StripeConfig          stripe;
+      std::vector<PaidTier> tiers;
+      PSIO_REFLECT(PortalConfig,
+                   requests_enabled,
+                   price_per_token_usd_micros,
+                   free_tier,
+                   x,
+                   mode,
+                   stripe,
+                   tiers)
    };
    using PortalConfigTable = psibase::Table<PortalConfig, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(PortalConfigTable)
@@ -56,7 +93,9 @@ namespace LocalService
    /// A signup record. Ids are 32 bytes. `invite_id`, `payload`, and `token`
    /// come from the visitor's Invite plugin `prepare-new-invite`.
    /// `x_id` is the X user who requested the account. `tier` is unset for the
-   /// free tier.
+   /// free tier. A paid signup is `pending` until Stripe reports it paid;
+   /// `stripe_session_id` is its Checkout Session and `stripe_event_ids` are
+   /// the webhook events received for it.
    struct Signup
    {
       psibase::Checksum256       id;
@@ -72,6 +111,8 @@ namespace LocalService
       psibase::TimePointUSec     updated;
       std::optional<std::string> x_id;
       std::optional<uint32_t>    tier;
+      std::optional<std::string> stripe_session_id;
+      std::vector<std::string>   stripe_event_ids;
       PSIO_REFLECT(Signup,
                    id,
                    invite_id,
@@ -85,7 +126,9 @@ namespace LocalService
                    created,
                    updated,
                    x_id,
-                   tier)
+                   tier,
+                   stripe_session_id,
+                   stripe_event_ids)
    };
    using SignupTable = psibase::Table<Signup, &Signup::id>;
    PSIO_REFLECT_TYPENAME(SignupTable)
@@ -150,6 +193,21 @@ namespace LocalService
    using PendingXRequestTable = psibase::Table<PendingXRequest, &PendingXRequest::socket>;
    PSIO_REFLECT_TYPENAME(PendingXRequestTable)
 
+   /// A Checkout Session request to Stripe for `signup`. `client` is the
+   /// browser's `POST /signup` socket, which gets the final reply.
+   /// `publishable_key` pairs with the secret key the request used.
+   struct PendingStripeRequest
+   {
+      std::int32_t         socket;
+      std::int32_t         client;
+      psibase::Checksum256 signup;
+      std::string          publishable_key;
+      PSIO_REFLECT(PendingStripeRequest, socket, client, signup, publishable_key)
+   };
+   using PendingStripeRequestTable =
+       psibase::Table<PendingStripeRequest, &PendingStripeRequest::socket>;
+   PSIO_REFLECT_TYPENAME(PendingStripeRequestTable)
+
    /// `GET /admin/config`. `tokens` is computed; it is not stored.
    struct TierView
    {
@@ -171,7 +229,11 @@ namespace LocalService
       /// Canonical whitelist applied when `ac-creator` is created. Not the on-chain row.
       std::vector<SystemService::AllowedAction> creator_allowed;
       /// `client_secret` shows only its last four characters.
-      XConfig x;
+      XConfig     x;
+      std::string mode;
+      /// `secret_key` and `webhook_secret` show only their last four characters.
+      StripeConfig          stripe;
+      std::vector<PaidTier> tiers;
       PSIO_REFLECT(AdminConfig,
                    requests_enabled,
                    price_per_token_usd_micros,
@@ -180,7 +242,10 @@ namespace LocalService
                    account,
                    creator_pubkey,
                    creator_allowed,
-                   x)
+                   x,
+                   mode,
+                   stripe,
+                   tiers)
    };
 
    struct Condition
@@ -191,8 +256,11 @@ namespace LocalService
    };
 
    /// `GET /status`. Conditions carry an id and whether it holds, and nothing else.
-   /// When billing is disabled, `creator_ready` and `x_configured` are present.
+   /// When billing is disabled, `creator_ready`, `x_configured`, and
+   /// `stripe_configured` (the active mode's keys are set) are present.
    /// When billing is enabled, `creator_tokens` and `creator_resources` are added.
+   /// `ready` requires every condition except `x_configured`, and requires
+   /// `stripe_configured` only while paid tiers are offered.
    struct Status
    {
       bool                   requests_enabled = false;
@@ -203,8 +271,8 @@ namespace LocalService
    };
 
    /// `POST /signup` body. A missing `invite_id`, `payload`, or `token` is a
-   /// 400, not a default. Omitting `tier` requests the free tier; a value is
-   /// a 400.
+   /// 400, not a default. Omitting `tier` requests the free tier; `0` requests
+   /// the first paid tier, and any other value is a 400.
    struct SignupBody
    {
       std::optional<uint32_t>             invite_id;
@@ -219,6 +287,42 @@ namespace LocalService
    {
       std::string signup_id;
       PSIO_REFLECT(SignupReceipt, signup_id)
+   };
+
+   /// `POST /signup` for a paid tier. `client_secret` and `publishable_key`
+   /// initialize Stripe Embedded Checkout.
+   struct CheckoutReceipt
+   {
+      std::string signup_id;
+      std::string client_secret;
+      std::string publishable_key;
+      PSIO_REFLECT(CheckoutReceipt, signup_id, client_secret, publishable_key)
+   };
+
+   /// What a signup for this tier is charged and granted.
+   struct TierOffer
+   {
+      uint64_t              usd_cents = 0;
+      UserService::Quantity tokens;
+      PSIO_REFLECT(TierOffer, usd_cents, tokens)
+   };
+
+   struct PaidTierOffer
+   {
+      uint32_t              index = 0;
+      std::string           label;
+      uint64_t              usd_cents = 0;
+      UserService::Quantity tokens;
+      PSIO_REFLECT(PaidTierOffer, index, label, usd_cents, tokens)
+   };
+
+   /// `GET /tiers`. `free` is unset when the free tier is disabled. `tiers`
+   /// holds the first paid tier while billing is enabled, and is otherwise empty.
+   struct TierOffers
+   {
+      std::optional<TierOffer>   free;
+      std::vector<PaidTierOffer> tiers;
+      PSIO_REFLECT(TierOffers, free, tiers)
    };
 
    /// `GET /signup/:id`. `token` is set only once the invite is created.
@@ -250,23 +354,39 @@ namespace LocalService
 
    /// Node-local account requests.
    ///
-   /// `GET /status` is anonymous. `GET` and `PUT /admin/config` require an
-   /// x-admin administrator. `PUT` sets `requests_enabled` and each `x` field
-   /// it carries, and nothing else.
+   /// `GET /status` and `GET /tiers` are anonymous. `GET` and
+   /// `PUT /admin/config` require an x-admin administrator. `PUT` sets
+   /// `requests_enabled`, each `x` and `stripe.<mode>` field it carries, and
+   /// `tiers` when present, and nothing else.
    /// `POST /admin/agents/creator/keygen` returns `AgentKey("creator")`,
    /// creating it in `x-keys` when absent. It returns 409 when `ac-creator`
    /// already exists. `GET /admin/config` includes that key as `creator_pubkey`
    /// and `creator_allowed`, the canonical whitelist applied when `ac-creator`
    /// is created.
    ///
-   /// `POST /signup` `{invite_id, payload, token}` requires an X session and
-   /// returns 401 when there is none. `payload` is hex. It returns 403 unless
-   /// `requests_enabled`, `free_tier.enabled`, and `/status` `ready` all hold,
-   /// and 409 when `invite_id` already exists on chain or this X user already
-   /// has a free signup that is not `failed`. The signup is stored `queued`
-   /// with that session's `x_id` and the free tier's `usd_cents` and `tokens`
-   /// (both 0 when billing is disabled). An immediate `x-timer` callback
-   /// provisions it.
+   /// `POST /signup` `{invite_id, payload, token, tier}` requires an X session
+   /// and returns 401 when there is none. `payload` is hex. It returns 403
+   /// unless `requests_enabled` and `/status` `ready` hold, and 409 when
+   /// `invite_id` already exists on chain. Each signup stores that session's
+   /// `x_id` and its tier's `usd_cents` and `tokens`.
+   ///
+   /// A free signup also returns 403 unless `free_tier.enabled`, and 409 when
+   /// this X user already has a free signup that is not `failed`. It is stored
+   /// `queued` (both amounts 0 when billing is disabled), and an immediate
+   /// `x-timer` callback provisions it.
+   ///
+   /// A paid signup is stored `pending`, and x-portal creates a Stripe
+   /// Embedded Checkout Session for it with the active mode's keys. It returns
+   /// `CheckoutReceipt`, or 502 when Stripe does not create the session, which
+   /// fails the signup with Stripe's reply as `last_error`.
+   ///
+   /// `POST /stripe/webhook` returns 400 unless `Stripe-Signature` carries a
+   /// `v1` HMAC-SHA256 of `"<t>.<body>"` under the active mode's
+   /// `webhook_secret`, with `t` within 5 minutes. A verified
+   /// `checkout.session.completed` or `checkout.session.async_payment_succeeded`
+   /// for a known signup records the event id; when the session is `paid`
+   /// and the signup is `pending`, it becomes `queued` and is provisioned.
+   /// Every verified event gets 200.
    ///
    /// `provision` attempts each due queued signup once. It commits
    /// `attempts += 1` and `last_error = "signing aborted"`, then pushes as
@@ -313,7 +433,8 @@ namespace LocalService
                                                    XAuthRequestTable,
                                                    XUserTable,
                                                    XSessionTable>;
-      using Session    = psibase::SessionTables<PendingPushTable, PendingXRequestTable>;
+      using Session    = psibase::
+          SessionTables<PendingPushTable, PendingXRequestTable, PendingStripeRequestTable>;
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest                  request,
                                                  std::optional<std::int32_t>           socket,
@@ -330,6 +451,10 @@ namespace LocalService
       void onXToken(std::int32_t socket, psibase::HttpReply reply);
       void onXUser(std::int32_t socket, psibase::HttpReply reply);
       void onXError(std::int32_t socket);
+
+      // x-http callbacks for Stripe Checkout Session requests
+      void onStripeSession(std::int32_t socket, psibase::HttpReply reply);
+      void onStripeError(std::int32_t socket);
    };
    PSIO_REFLECT(XPortal,
                 method(serveSys, request, socket, user),
@@ -338,6 +463,8 @@ namespace LocalService
                 method(onPushError, socket),
                 method(onXToken, socket, reply),
                 method(onXUser, socket, reply),
-                method(onXError, socket))
+                method(onXError, socket),
+                method(onStripeSession, socket, reply),
+                method(onStripeError, socket))
    PSIBASE_REFLECT_TABLES(XPortal, XPortal::Subjective, XPortal::Session)
 }  // namespace LocalService
