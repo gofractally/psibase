@@ -600,7 +600,8 @@ namespace psibase
    {
       Index index;
       F     f;
-      /// Default for the query's `maxBytes` argument; see [makeConnectionIter]
+      /// Limits the size of a page, which may then hold fewer rows than requested;
+      /// see [makeConnectionIter]
       std::optional<uint32_t> maxBytes = std::nullopt;
    };
 
@@ -609,7 +610,8 @@ namespace psibase
    {
       Index index;
       F     f;
-      /// Default for the query's `maxBytes` argument; see [makeConnectionIter]
+      /// Limits the size of a page, which may then hold fewer rows than requested;
+      /// see [makeConnectionIter]
       std::optional<uint32_t> maxBytes = std::nullopt;
    };
 
@@ -638,11 +640,10 @@ namespace psibase
                                            std::optional<uint32_t>                first,
                                            std::optional<uint32_t>                last,
                                            const std::optional<std::string>&      before,
-                                           const std::optional<std::string>&      after,
-                                           std::optional<uint32_t>                maxBytes)
+                                           const std::optional<std::string>&      after)
       {
          return makeConnection<Connection>(index.index, gt, ge, lt, le, first, last, before, after,
-                                           index.f, maxBytes ? maxBytes : index.maxBytes);
+                                           index.f, index.maxBytes);
       }
 
       template <typename Connection, typename Index, typename F, typename Key>
@@ -654,12 +655,10 @@ namespace psibase
                                                std::optional<uint32_t>                    first,
                                                std::optional<uint32_t>                    last,
                                                const std::optional<std::string>&          before,
-                                               const std::optional<std::string>&          after,
-                                               std::optional<uint32_t>                    maxBytes)
+                                               const std::optional<std::string>&          after)
       {
          return makeConnectionView<Connection>(index.index, gt, ge, lt, le, first, last, before,
-                                               after, index.f,
-                                               maxBytes ? maxBytes : index.maxBytes);
+                                               after, index.f, index.maxBytes);
       }
    }  // namespace detail
 
@@ -678,10 +677,10 @@ namespace psibase
    }  // gql_callable_fn
 
    template <typename Index, typename F>
-   constexpr std::optional<std::array<const char*, 9>> gql_callable_args(
+   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
        TransformedConnection<Index, F>*)
    {
-      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after", "maxBytes"};
+      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
    }
 
    template <typename T, typename Key, typename F>
@@ -694,10 +693,10 @@ namespace psibase
    }  // gql_callable_fn
 
    template <typename Index, typename F>
-   constexpr std::optional<std::array<const char*, 9>> gql_callable_args(
+   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
        TransformedConnectionView<Index, F>*)
    {
-      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after", "maxBytes"};
+      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
    }
 
    template <typename T, typename Key, typename F>

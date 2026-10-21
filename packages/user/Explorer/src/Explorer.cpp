@@ -223,7 +223,9 @@ static std::optional<Checksum256> parseChecksum(const std::string& hex)
 struct Query
 {
    TransactionAuthChecker transactionCensor;
-   auto                   blocks() const
+   /// A page may hold fewer blocks than requested, but never none if any match;
+   /// use `pageInfo` to continue.
+   auto blocks() const
    {
       return psibase::TransformedConnectionView{
           blockLog(), [this](SharedBlock&& block)

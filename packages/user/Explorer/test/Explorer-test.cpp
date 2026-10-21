@@ -279,9 +279,20 @@ TEST_CASE("pages of large blocks are cut short")
    CHECK(oldest.pageInfo.hasNextPage);
 
    // At least one block is returned even when it alone exceeds the limit
-   CHECK(page(std::format("last: {}, maxBytes: 1", numBlocks)).edges.size() == 1);
-   CHECK(page(std::format("last: {}, maxBytes: {}", numBlocks, 64 * 1024 * 1024)).edges.size() ==
-         numBlocks);
+   t.startBlock();
+   for (std::size_t i = 0; i < 7; ++i)
+   {
+      Action act{.sender  = alice,
+                 .service = Nop::service,
+                 .method  = MethodNumber{"nop"},
+                 .rawData = std::vector<char>(payloadSize, static_cast<char>(i))};
+      REQUIRE(TraceResult{t.pushTransaction(t.makeTransaction({std::move(act)}))}.succeeded());
+   }
+   t.finishBlock();
+   auto huge = page(std::format("last: {}", numBlocks));
+   REQUIRE(huge.edges.size() == 1);
+   CHECK(huge.edges.front().node.header.blockNum == headNum + 1);
+   CHECK(huge.pageInfo.hasPreviousPage);
 }
 
 struct LookupHeader
