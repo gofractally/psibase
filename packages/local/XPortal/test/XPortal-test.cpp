@@ -83,16 +83,25 @@ namespace
    const std::vector<std::string> portalPackages{"TestDefault", "TokenUsers", "AuthScope",
                                                  "Invite"};
 
+   struct XCredentials
+   {
+      XConfig x;
+      PSIO_REFLECT(XCredentials, x)
+   };
+
+   const XConfig testX{.client_id = "client-id", .client_secret = "client-secret-abcd"};
+
    void requireBillingReadiness(const Status& status, bool tokensOk, bool resourcesOk)
    {
       REQUIRE(status.billing_enabled);
-      REQUIRE(status.conditions.size() == 3);
+      REQUIRE(status.conditions.size() == 4);
       CHECK(status.conditions[0].id == "creator_ready");
       CHECK(status.conditions[0].ok);
       CHECK(status.conditions[1].id == "creator_tokens");
       CHECK(status.conditions[1].ok == tokensOk);
       CHECK(status.conditions[2].id == "creator_resources");
       CHECK(status.conditions[2].ok == resourcesOk);
+      CHECK(status.conditions[3].id == "x_configured");
    }
 
    std::vector<uint8_t> invitePayload(uint8_t seed)
@@ -108,6 +117,11 @@ namespace
             WasmFileBody{"XPortal.wasm"});
       t.post(XHttp::service, "/register_server",
              JsonBody{RegisteredServiceRow{XPortal::service, XPortal::service}});
+   }
+
+   void configureX(DefaultTestChain& t)
+   {
+      t.put(XPortal::service, "/admin/config", XCredentials{.x = testX});
    }
 
    HttpRequest forwarded(std::string_view method,
@@ -259,6 +273,51 @@ namespace
       return XPortal{}.open<SignupTable>().get(idFrom(idText));
    }
 
+   struct AuthorizeQuery
+   {
+      std::string response_type;
+      std::string client_id;
+      std::string redirect_uri;
+      std::string scope;
+      std::string state;
+      std::string code_challenge;
+      std::string code_challenge_method;
+      PSIO_REFLECT(AuthorizeQuery,
+                   response_type,
+                   client_id,
+                   redirect_uri,
+                   scope,
+                   state,
+                   code_challenge,
+                   code_challenge_method)
+   };
+
+   AuthorizeQuery startXSignIn(DefaultTestChain& t)
+   {
+      auto reply = t.http(forwarded("GET", "/auth/x/start"));
+      REQUIRE(reply.status == HttpStatus::found);
+      auto location = reply.getHeader("Location");
+      REQUIRE(location.has_value());
+      auto query = location->find('?');
+      REQUIRE(query != std::string_view::npos);
+      CHECK(location->substr(0, query) == "https://x.com/i/oauth2/authorize");
+      return HttpRequest{.target = std::string{location->substr(query)}}.query<AuthorizeQuery>();
+   }
+
+   HttpRequest withSession(HttpRequest request, std::string_view sessionId)
+   {
+      request.headers.push_back({"Cookie", std::format("XPORTAL_SESSION={}", sessionId)});
+      return request;
+   }
+
+   std::string putXExpectBadRequest(DefaultTestChain& t, std::string_view json)
+   {
+      auto reply = t.http(HttpRequestBuilder{}.put(XPortal::service, "/admin/config",
+                                                   RawBody{"application/json", std::string{json}}));
+      CHECK(reply.status == HttpStatus::badRequest);
+      return replyText(reply);
+   }
+
    template <typename T>
    TransactionTrace runAs(DefaultTestChain&  t,
                           AccountNumber      sender,
@@ -285,9 +344,11 @@ TEST_CASE("status, requests switch, and seeded pricing")
    CHECK(status.requests_enabled == false);
    CHECK(status.billing_enabled == false);
    CHECK(status.ready == false);
-   REQUIRE(status.conditions.size() == 1);
+   REQUIRE(status.conditions.size() == 2);
    CHECK(status.conditions[0].id == "creator_ready");
    CHECK(status.conditions[0].ok == false);
+   CHECK(status.conditions[1].id == "x_configured");
+   CHECK(status.conditions[1].ok == false);
 
    CHECK(t.http(forwarded("GET", "/admin/config")).status == HttpStatus::unauthorized);
    CHECK(t.http(forwarded("POST", "/status")).status == HttpStatus::methodNotAllowed);
@@ -315,7 +376,8 @@ TEST_CASE("status, requests switch, and seeded pricing")
    auto missing = t.http(HttpRequestBuilder{}.put(XPortal::service, "/admin/config",
                                                   RawBody{"application/json", "{}"}));
    CHECK(missing.status == HttpStatus::badRequest);
-   CHECK(std::string(missing.body.begin(), missing.body.end()) == "requests_enabled is required\n");
+   CHECK(std::string(missing.body.begin(), missing.body.end()) ==
+         "requests_enabled or x is required\n");
    auto badType =
        t.http(HttpRequestBuilder{}.put(XPortal::service, "/admin/config",
                                        RawBody{"application/json", R"({"requests_enabled":1})"}));
@@ -338,6 +400,10 @@ TEST_CASE("status, requests switch, and seeded pricing")
    config = t.get<AdminConfig>(XPortal::service, "/admin/config");
    CHECK(config.requests_enabled == false);
    CHECK(!config.price_per_token_usd_micros.has_value());
+
+   configureX(t);
+   status = t.get<Status>(XPortal::service, "/status");
+   CHECK(status.conditions[1].ok);
 
    std::vector<AllowedAction> allowed{{Tokens::service, MethodNumber{"debit"}}};
    REQUIRE(t.from(alice).to<AuthScope>().newAccount(creator, agentPub, alice, allowed).succeeded());
@@ -476,6 +542,7 @@ TEST_CASE("provision signs the billed invite actions as ac-creator")
                .to<Tokens>()
                .debit(billed.id, alice, cost, "")
                .succeeded());
+   configureX(t);
    t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
    REQUIRE(t.get<Status>(XPortal::service, "/status").ready);
 
@@ -501,6 +568,7 @@ TEST_CASE("provision commits one attempt before signing")
    transactor<AuthScope> scope{alice, AuthScope::service};
    expect(t.pushTransaction(t.makeTransaction({scope.newAccount(
        creator, agentPub, alice, std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})})));
+   configureX(t);
    t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
 
    auto created = t.http<SignupReceipt>(signupRequest(21));
@@ -552,4 +620,136 @@ TEST_CASE("provision commits one attempt before signing")
    CHECK(rows[0].id == second.signup_id);
    CHECK(rows[0].attempts == 1);
    CHECK(rows[0].last_error == "invite id is taken");
+}
+
+TEST_CASE("X credentials are set field by field and the secret is masked")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+
+   auto config = t.get<AdminConfig>(XPortal::service, "/admin/config");
+   CHECK(!config.x.client_id.has_value());
+   CHECK(!config.x.client_secret.has_value());
+   CHECK(config.x.api_base == "https://api.x.com");
+
+   CHECK(putXExpectBadRequest(t, R"({"x":"id"})") == "x must be an object\n");
+   CHECK(putXExpectBadRequest(t, R"({"x":{"client_id":""}})") == "x.client_id must be a non-empty string\n");
+   CHECK(putXExpectBadRequest(t, R"({"x":{"client_secret":true}})") ==
+         "x.client_secret must be a non-empty string\n");
+   for (auto bad : {"api.x.com", "https://api.x.com/", "https://api.x.com/2", "https://"})
+      CHECK(putXExpectBadRequest(t, std::format(R"({{"x":{{"api_base":"{}"}}}})", bad)) ==
+            "x.api_base must be an http or https origin\n");
+   CHECK(putXExpectBadRequest(t, R"({"x":{"client_id":"kept","api_base":"bad"}})").starts_with("x.api_base"));
+   CHECK(!t.get<AdminConfig>(XPortal::service, "/admin/config").x.client_id.has_value());
+
+   configureX(t);
+   config = t.get<AdminConfig>(XPortal::service, "/admin/config");
+   CHECK(config.x.client_id == "client-id");
+   CHECK(config.x.client_secret == "abcd");
+   CHECK(config.x.api_base == "https://api.x.com");
+   CHECK(XPortal{}.open<PortalConfigTable>().get({})->x.client_secret == "client-secret-abcd");
+
+   t.put(XPortal::service, "/admin/config",
+         RawBody{"application/json", R"({"x":{"api_base":"http://127.0.0.1:9"}})"});
+   config = t.get<AdminConfig>(XPortal::service, "/admin/config");
+   CHECK(config.x.client_id == "client-id");
+   CHECK(config.x.client_secret == "abcd");
+   CHECK(config.x.api_base == "http://127.0.0.1:9");
+   CHECK(config.requests_enabled == false);
+}
+
+TEST_CASE("Sign in with X starts PKCE and consumes its state once")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+
+   auto unconfigured = t.http(forwarded("GET", "/auth/x/start"));
+   CHECK(unconfigured.status == HttpStatus::serviceUnavailable);
+   configureX(t);
+   CHECK(t.http(forwarded("POST", "/auth/x/start")).status == HttpStatus::methodNotAllowed);
+
+   auto authorize = startXSignIn(t);
+   CHECK(authorize.response_type == "code");
+   CHECK(authorize.client_id == "client-id");
+   CHECK(authorize.redirect_uri == "https://x-portal.psibase.io/auth/x/callback");
+   CHECK(authorize.scope == "users.read tweet.read");
+   CHECK(authorize.code_challenge_method == "S256");
+   CHECK(authorize.state.size() == 43);
+
+   auto started = XPortal{}.open<XAuthRequestTable>().get(authorize.state);
+   REQUIRE(started.has_value());
+   CHECK(started->code_verifier.size() == 43);
+   CHECK(started->code_verifier != started->state);
+   CHECK(started->redirect_uri == authorize.redirect_uri);
+   auto hash = sha256(started->code_verifier.data(), started->code_verifier.size());
+   CHECK(authorize.code_challenge ==
+         toBase64Url({reinterpret_cast<const char*>(hash.data()), hash.size()}));
+
+   auto callback = [&](std::string_view query)
+   { return t.http(forwarded("GET", std::format("/auth/x/callback?{}", query))); };
+
+   CHECK(callback("code=abc").status == HttpStatus::badRequest);
+   CHECK(callback("code=abc&state=unknown").status == HttpStatus::badRequest);
+
+   // X sends the user back without a code when they cancel.
+   auto cancelled = callback("error=access_denied&state=" + authorize.state);
+   CHECK(cancelled.status == HttpStatus::found);
+   CHECK(cancelled.getHeader("Location") == "/");
+   CHECK(!XPortal{}.open<XAuthRequestTable>().get(authorize.state).has_value());
+   CHECK(callback("code=abc&state=" + authorize.state).status == HttpStatus::badRequest);
+
+   auto expired = startXSignIn(t);
+   auto row     = XPortal{}.open<XAuthRequestTable>().get(expired.state);
+   REQUIRE(row.has_value());
+   row->expires = TimePointUSec{};
+   XPortal{}.open<XAuthRequestTable>().put(*row);
+   CHECK(callback("code=abc&state=" + expired.state).status == HttpStatus::badRequest);
+   CHECK(!XPortal{}.open<XAuthRequestTable>().get(expired.state).has_value());
+
+   // The next start drops authorizations that have expired.
+   auto stale   = startXSignIn(t);
+   row          = XPortal{}.open<XAuthRequestTable>().get(stale.state);
+   REQUIRE(row.has_value());
+   row->expires = TimePointUSec{};
+   XPortal{}.open<XAuthRequestTable>().put(*row);
+   auto fresh = startXSignIn(t);
+   CHECK(!XPortal{}.open<XAuthRequestTable>().get(stale.state).has_value());
+   CHECK(XPortal{}.open<XAuthRequestTable>().get(fresh.state).has_value());
+
+   // The tester cannot reach X, so the exchange fails, but the state is spent.
+   CHECK(callback("code=abc&state=" + fresh.state).status != HttpStatus::found);
+   CHECK(!XPortal{}.open<XAuthRequestTable>().get(fresh.state).has_value());
+}
+
+TEST_CASE("an X session cookie identifies the user until logout or expiry")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+
+   CHECK(t.http(forwarded("GET", "/me")).status == HttpStatus::unauthorized);
+   CHECK(t.http(withSession(forwarded("GET", "/me"), "unknown")).status ==
+         HttpStatus::unauthorized);
+
+   auto future = std::chrono::time_point_cast<MicroSeconds>(std::chrono::system_clock::now()) +
+                 std::chrono::hours{1};
+   XPortal{}.open<XSessionTable>().put(
+       XSession{.session_id = "live", .x_id = "42", .handle = "jack", .expires = future});
+   XPortal{}.open<XSessionTable>().put(
+       XSession{.session_id = "old", .x_id = "42", .handle = "jack", .expires = TimePointUSec{}});
+
+   auto me = t.http<XIdentity>(withSession(forwarded("GET", "/me"), "live"));
+   CHECK(me.x_id == "42");
+   CHECK(me.handle == "jack");
+
+   CHECK(t.http(withSession(forwarded("GET", "/me"), "old")).status == HttpStatus::unauthorized);
+   CHECK(!XPortal{}.open<XSessionTable>().get(std::string{"old"}).has_value());
+
+   CHECK(t.http(withSession(forwarded("GET", "/auth/logout"), "live")).status ==
+         HttpStatus::methodNotAllowed);
+   auto logout = t.http(withSession(forwarded("POST", "/auth/logout"), "live"));
+   CHECK(logout.status == HttpStatus::ok);
+   CHECK(logout.getHeader("Set-Cookie") ==
+         "XPORTAL_SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
+   CHECK(!XPortal{}.open<XSessionTable>().get(std::string{"live"}).has_value());
+   CHECK(t.http(withSession(forwarded("GET", "/me"), "live")).status == HttpStatus::unauthorized);
 }

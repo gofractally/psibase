@@ -59,3 +59,24 @@ export const requestSignup = async (invite: InviteDetails): Promise<string> => {
 
 export const getSignup = (signupId: string) =>
     parseReply(fetch(`/signup/${encodeURIComponent(signupId)}`), zSignupView);
+
+const zXIdentity = z.object({ x_id: z.string(), handle: z.string() });
+
+export type XIdentity = z.infer<typeof zXIdentity>;
+
+/** The signed-in X user, or `null` when no one is signed in. */
+export const getXIdentity = async (): Promise<XIdentity | null> => {
+    const res = await fetch("/me");
+    if (res.status === 401) return null;
+    if (!res.ok) {
+        throw new PortalError(res.status, (await res.text()).trim());
+    }
+    return zXIdentity.parse(await res.json());
+};
+
+export const signOutOfX = async (): Promise<void> => {
+    const res = await fetch("/auth/logout", { method: "POST" });
+    if (!res.ok) {
+        throw new PortalError(res.status, (await res.text()).trim());
+    }
+};

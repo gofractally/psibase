@@ -12,6 +12,7 @@ import { FailedStep } from "./components/failed-step";
 import { Loader } from "./components/loader";
 import { NotOpen } from "./components/not-open";
 import { RequestWizard } from "./components/request-wizard";
+import { XAccount } from "./components/x-account";
 import { hasReturnedFromImport } from "./lib/import-return";
 import { isRequestsOpen } from "./lib/portal-api";
 import { forgetSignup } from "./lib/signup-request";
@@ -66,12 +67,13 @@ const Visitor = () => {
 
 export const App = () => (
     <>
-        <header className="bg-background/80 sticky top-0 z-10 flex h-16 shrink-0 items-center border-b px-4 backdrop-blur">
+        <header className="bg-background/80 sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b px-4 backdrop-blur">
             <NetworkLogo
                 onClick={() => {
                     window.top!.location.href = siblingUrl();
                 }}
             />
+            {!isAdminPath() && <XAccount />}
         </header>
         {isAdminPath() ? <AdminPage /> : <Visitor />}
     </>

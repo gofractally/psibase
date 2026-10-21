@@ -22,12 +22,23 @@ namespace LocalService
       PSIO_REFLECT(TierConfig, enabled, usd_cents)
    };
 
+   /// X OAuth 2.0 confidential-client credentials. Sign in with X is
+   /// configured once `client_id` and `client_secret` are both set.
+   struct XConfig
+   {
+      std::optional<std::string> client_id;
+      std::optional<std::string> client_secret;
+      std::string                api_base = "https://api.x.com";
+      PSIO_REFLECT(XConfig, client_id, client_secret, api_base)
+   };
+
    struct PortalConfig
    {
       bool                    requests_enabled = false;
       std::optional<uint64_t> price_per_token_usd_micros;
       TierConfig              free_tier;
-      PSIO_REFLECT(PortalConfig, requests_enabled, price_per_token_usd_micros, free_tier)
+      XConfig                 x;
+      PSIO_REFLECT(PortalConfig, requests_enabled, price_per_token_usd_micros, free_tier, x)
    };
    using PortalConfigTable = psibase::Table<PortalConfig, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(PortalConfigTable)
@@ -84,6 +95,55 @@ namespace LocalService
    using PendingPushTable = psibase::Table<PendingPush, &PendingPush::socket>;
    PSIO_REFLECT_TYPENAME(PendingPushTable)
 
+   /// An X authorization that `GET /auth/x/start` began and
+   /// `/auth/x/callback` has not consumed.
+   struct XAuthRequest
+   {
+      std::string            state;
+      std::string            code_verifier;
+      std::string            redirect_uri;
+      psibase::TimePointUSec expires;
+      using ByExpiry = psibase::CompositeKey<&XAuthRequest::expires, &XAuthRequest::state>;
+      PSIO_REFLECT(XAuthRequest, state, code_verifier, redirect_uri, expires)
+   };
+   using XAuthRequestTable =
+       psibase::Table<XAuthRequest, &XAuthRequest::state, XAuthRequest::ByExpiry{}>;
+   PSIO_REFLECT_TYPENAME(XAuthRequestTable)
+
+   struct XUser
+   {
+      std::string x_id;
+      std::string handle;
+      PSIO_REFLECT(XUser, x_id, handle)
+   };
+   using XUserTable = psibase::Table<XUser, &XUser::x_id>;
+   PSIO_REFLECT_TYPENAME(XUserTable)
+
+   /// A signed-in browser. `session_id` is its `XPORTAL_SESSION` cookie.
+   struct XSession
+   {
+      std::string            session_id;
+      std::string            x_id;
+      std::string            handle;
+      psibase::TimePointUSec expires;
+      PSIO_REFLECT(XSession, session_id, x_id, handle, expires)
+   };
+   using XSessionTable = psibase::Table<XSession, &XSession::session_id>;
+   PSIO_REFLECT_TYPENAME(XSessionTable)
+
+   /// An X API request made while completing a sign-in. `client` is the
+   /// browser's `/auth/x/callback` socket, which gets the final reply.
+   /// `secure` marks the session cookie `Secure`.
+   struct PendingXRequest
+   {
+      std::int32_t socket;
+      std::int32_t client;
+      bool         secure = true;
+      PSIO_REFLECT(PendingXRequest, socket, client, secure)
+   };
+   using PendingXRequestTable = psibase::Table<PendingXRequest, &PendingXRequest::socket>;
+   PSIO_REFLECT_TYPENAME(PendingXRequestTable)
+
    /// `GET /admin/config`. `tokens` is computed; it is not stored.
    struct TierView
    {
@@ -104,6 +164,8 @@ namespace LocalService
       std::optional<SystemService::AuthSig::SubjectPublicKeyInfo> creator_pubkey;
       /// Canonical whitelist applied when `ac-creator` is created. Not the on-chain row.
       std::vector<SystemService::AllowedAction> creator_allowed;
+      /// `client_secret` shows only its last four characters.
+      XConfig x;
       PSIO_REFLECT(AdminConfig,
                    requests_enabled,
                    price_per_token_usd_micros,
@@ -111,7 +173,8 @@ namespace LocalService
                    producer,
                    account,
                    creator_pubkey,
-                   creator_allowed)
+                   creator_allowed,
+                   x)
    };
 
    struct Condition
@@ -122,8 +185,8 @@ namespace LocalService
    };
 
    /// `GET /status`. Conditions carry an id and whether it holds, and nothing else.
-   /// When billing is disabled, only `creator_ready` is present. When billing is
-   /// enabled, `creator_tokens` and `creator_resources` are added.
+   /// When billing is disabled, `creator_ready` and `x_configured` are present.
+   /// When billing is enabled, `creator_tokens` and `creator_resources` are added.
    struct Status
    {
       bool                   requests_enabled = false;
@@ -168,10 +231,19 @@ namespace LocalService
       PSIO_REFLECT(FailedSignup, id, created, attempts, last_error)
    };
 
+   /// `GET /me`: the signed-in X user.
+   struct XIdentity
+   {
+      std::string x_id;
+      std::string handle;
+      PSIO_REFLECT(XIdentity, x_id, handle)
+   };
+
    /// Node-local account requests.
    ///
    /// `GET /status` is anonymous. `GET` and `PUT /admin/config` require an
-   /// x-admin administrator. `PUT` changes only `requests_enabled`.
+   /// x-admin administrator. `PUT` sets `requests_enabled` and each `x` field
+   /// it carries, and nothing else.
    /// `POST /admin/agents/creator/keygen` returns `AgentKey("creator")`,
    /// creating it in `x-keys` when absent. It returns 409 when `ac-creator`
    /// already exists. `GET /admin/config` includes that key as `creator_pubkey`
@@ -198,6 +270,14 @@ namespace LocalService
    ///
    /// `GET /signup/:id` returns `SignupView`. `GET /admin/signups?state=failed`
    /// returns `FailedSignup` rows for an administrator.
+   ///
+   /// Sign in with X is OAuth 2.0 with PKCE. `GET /auth/x/start` redirects to
+   /// X's authorize page; X returns the browser to `GET /auth/x/callback`,
+   /// which is 400 unless its `state` came from an unexpired start. The
+   /// callback exchanges the code, reads `/2/users/me`, sets the
+   /// `XPORTAL_SESSION` cookie for 7 days, and redirects to `/`. A failed X
+   /// call is a 502. `GET /me` returns `XIdentity` or 401;
+   /// `POST /auth/logout` ends the session.
    struct XPortal : psibase::Service
    {
       static constexpr auto service        = psibase::AccountNumber{"x-portal"};
@@ -214,8 +294,13 @@ namespace LocalService
          };
       }
 
-      using Subjective = psibase::SubjectiveTables<PortalConfigTable, AgentKeyTable, SignupTable>;
-      using Session = psibase::SessionTables<PendingPushTable>;
+      using Subjective = psibase::SubjectiveTables<PortalConfigTable,
+                                                   AgentKeyTable,
+                                                   SignupTable,
+                                                   XAuthRequestTable,
+                                                   XUserTable,
+                                                   XSessionTable>;
+      using Session    = psibase::SessionTables<PendingPushTable, PendingXRequestTable>;
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest                  request,
                                                  std::optional<std::int32_t>           socket,
@@ -227,11 +312,19 @@ namespace LocalService
       // x-http callbacks for pushed transactions
       void onPushReply(std::int32_t socket, psibase::HttpReply reply);
       void onPushError(std::int32_t socket);
+
+      // x-http callbacks for X sign-in requests
+      void onXToken(std::int32_t socket, psibase::HttpReply reply);
+      void onXUser(std::int32_t socket, psibase::HttpReply reply);
+      void onXError(std::int32_t socket);
    };
    PSIO_REFLECT(XPortal,
                 method(serveSys, request, socket, user),
                 method(provision, timer),
                 method(onPushReply, socket, reply),
-                method(onPushError, socket))
+                method(onPushError, socket),
+                method(onXToken, socket, reply),
+                method(onXUser, socket, reply),
+                method(onXError, socket))
    PSIBASE_REFLECT_TABLES(XPortal, XPortal::Subjective, XPortal::Session)
 }  // namespace LocalService

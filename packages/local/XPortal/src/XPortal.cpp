@@ -1,6 +1,9 @@
 #include <services/local/XPortal.hpp>
 
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <format>
 #include <limits>
 #include <psibase/base64.hpp>
 #include <psibase/dispatch.hpp>
@@ -37,6 +40,12 @@ namespace
    constexpr std::string_view stateFailed    = "failed";
    constexpr std::string_view signingAborted = "signing aborted";
    constexpr char              signupMemo[]  = "x-portal signup";
+
+   constexpr std::string_view xAuthorizeUrl  = "https://x.com/i/oauth2/authorize";
+   constexpr std::string_view xScope         = "users.read tweet.read";
+   constexpr std::string_view sessionCookie  = "XPORTAL_SESSION";
+   constexpr auto             authRequestTtl = std::chrono::minutes{10};
+   constexpr auto             sessionTtl     = std::chrono::days{7};
 
    struct ListenSpec
    {
@@ -334,6 +343,22 @@ namespace
       }
    }
 
+   bool xConfigured(const XConfig& x)
+   {
+      return x.client_id && x.client_secret;
+   }
+
+   XConfig maskedX(XConfig x)
+   {
+      if (x.client_secret)
+      {
+         auto& secret = *x.client_secret;
+         x.client_secret =
+             std::string{secret.substr(secret.size() - std::min<std::size_t>(secret.size(), 4))};
+      }
+      return x;
+   }
+
    AdminConfig adminView(const HttpRequest& req, const PortalConfig& config)
    {
       auto key = readCreatorAgentKey();
@@ -346,7 +371,8 @@ namespace
                          .account                    = to<RTransact>().getUser(req),
                          .creator_pubkey = key ? std::optional<AuthSig::SubjectPublicKeyInfo>{key->pubkey}
                                               : std::nullopt,
-                         .creator_allowed = XPortal::creatorAllowed()};
+                         .creator_allowed = XPortal::creatorAllowed(),
+                         .x               = maskedX(config.x)};
    }
 
    Status portalStatus(const PortalConfig& config)
@@ -361,6 +387,7 @@ namespace
       }
       status.ready =
           std::ranges::all_of(status.conditions, [](const Condition& c) { return c.ok; });
+      status.conditions.push_back({.id = "x_configured", .ok = xConfigured(config.x)});
       return status;
    }
 
@@ -373,13 +400,6 @@ namespace
       return jsonBody(req, portalStatus(loadedConfig()));
    }
 
-   enum class RequestsField
-   {
-      missing,
-      invalid,
-      ok,
-   };
-
    const psio::json::any* objectField(const psio::json::any_object& object, std::string_view key)
    {
       const psio::json::any* found = nullptr;
@@ -389,18 +409,65 @@ namespace
       return found;
    }
 
-   RequestsField requestsEnabled(const HttpRequest& req, bool& enabled)
+   // Sets `out` when `key` is present. Returns the 400 message when its value
+   // is not a non-empty string.
+   std::optional<std::string> readXField(const psio::json::any_object& object,
+                                         std::string_view              key,
+                                         std::optional<std::string>&   out)
+   {
+      auto value = objectField(object, key);
+      if (!value)
+         return std::nullopt;
+      auto text = value->get_if<std::string>();
+      if (!text || text->empty())
+         return std::format("x.{} must be a non-empty string\n", key);
+      out = *text;
+      return std::nullopt;
+   }
+
+   std::optional<std::string> updateX(const psio::json::any& value, XConfig& x)
+   {
+      auto fields = value.get_if<psio::json::any_object>();
+      if (!fields)
+         return "x must be an object\n";
+      if (auto error = readXField(*fields, "client_id", x.client_id))
+         return error;
+      if (auto error = readXField(*fields, "client_secret", x.client_secret))
+         return error;
+      std::optional<std::string> apiBase;
+      if (auto error = readXField(*fields, "api_base", apiBase))
+         return error;
+      if (apiBase)
+      {
+         auto origin = splitURL(*apiBase);
+         if (origin.scheme.empty() || origin.host.empty() || origin.path != "/" ||
+             apiBase->ends_with('/'))
+            return "x.api_base must be an http or https origin\n";
+         x.api_base = *apiBase;
+      }
+      return std::nullopt;
+   }
+
+   // Applies a `PUT /admin/config` body to `config`. Returns the 400 message
+   // when the body sets nothing or a field has the wrong type.
+   std::optional<std::string> updateConfig(const HttpRequest& req, PortalConfig& config)
    {
       auto object = psio::convert_from_json<psio::json::any_object>(
           std::string(req.body.begin(), req.body.end()));
-      auto value = objectField(object, "requests_enabled");
-      if (!value)
-         return RequestsField::missing;
-      auto flag = value->get_if<bool>();
-      if (!flag)
-         return RequestsField::invalid;
-      enabled = *flag;
-      return RequestsField::ok;
+      auto requests = objectField(object, "requests_enabled");
+      auto x        = objectField(object, "x");
+      if (!requests && !x)
+         return "requests_enabled or x is required\n";
+      if (requests)
+      {
+         auto flag = requests->get_if<bool>();
+         if (!flag)
+            return "requests_enabled must be a boolean\n";
+         config.requests_enabled = *flag;
+      }
+      if (x)
+         return updateX(*x, config.x);
+      return std::nullopt;
    }
 
    HttpReply serveAdminConfig(const HttpRequest& req, std::optional<std::int32_t> socket)
@@ -417,19 +484,9 @@ namespace
          return textError(req, HttpStatus::unsupportedMediaType,
                           "Content-Type must be application/json\n");
 
-      bool enabled = false;
-      switch (requestsEnabled(req, enabled))
-      {
-         case RequestsField::missing:
-            return textError(req, HttpStatus::badRequest, "requests_enabled is required\n");
-         case RequestsField::invalid:
-            return textError(req, HttpStatus::badRequest, "requests_enabled must be a boolean\n");
-         case RequestsField::ok:
-            break;
-      }
-
-      auto config             = loadedConfig();
-      config.requests_enabled = enabled;
+      auto config = loadedConfig();
+      if (auto error = updateConfig(req, config))
+         return textError(req, HttpStatus::badRequest, *error);
       writeConfig(config);
       return HttpReply{.headers = cors(req)};
    }
@@ -601,6 +658,328 @@ namespace
       return jsonBody(req, rows);
    }
 
+   std::string randomToken()
+   {
+      Checksum256 id{};
+      raw::getRandom(id.data(), id.size());
+      return signupId(id);
+   }
+
+   std::string codeChallenge(std::string_view verifier)
+   {
+      auto hash = sha256(verifier.data(), verifier.size());
+      return toBase64Url({reinterpret_cast<const char*>(hash.data()), hash.size()});
+   }
+
+   // `key=value&...` with every character outside RFC 3986's unreserved set
+   // percent-encoded. Serves both query strings and form bodies.
+   std::string formEncode(
+       std::initializer_list<std::pair<std::string_view, std::string_view>> fields)
+   {
+      constexpr std::string_view hex = "0123456789ABCDEF";
+      std::string                out;
+      auto                       append = [&](std::string_view text)
+      {
+         for (unsigned char c : text)
+         {
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+                c == '-' || c == '.' || c == '_' || c == '~')
+            {
+               out += c;
+            }
+            else
+            {
+               out += '%';
+               out += hex[c >> 4];
+               out += hex[c & 0xf];
+            }
+         }
+      };
+      for (const auto& [key, value] : fields)
+      {
+         if (!out.empty())
+            out += '&';
+         append(key);
+         out += '=';
+         append(value);
+      }
+      return out;
+   }
+
+   // Off localhost this is the canonical https origin. A localhost node serves
+   // plain http, so the URL keeps that scheme and the request's port.
+   std::string xCallbackUrl(const HttpRequest& req)
+   {
+      bool        local = isLocalhost(req);
+      std::string url   = local ? "http://" : "https://";
+      url += XPortal::service.str();
+      url += '.';
+      url += to<XHttp>().rootHost(req.host);
+      if (auto host = req.getHeader("host"); local && host)
+      {
+         if (auto pos = host->rfind(':'); pos != std::string_view::npos)
+            url += host->substr(pos);
+      }
+      url += "/auth/x/callback";
+      return url;
+   }
+
+   HttpReply redirect(std::string location, std::vector<HttpHeader> headers = {})
+   {
+      headers.push_back({"Location", std::move(location)});
+      return HttpReply{.status = HttpStatus::found, .headers = std::move(headers)};
+   }
+
+   HttpHeader sessionCookieHeader(std::string_view value, std::chrono::seconds maxAge, bool secure)
+   {
+      auto cookie = std::format("{}={}; Path=/; Max-Age={}; HttpOnly; SameSite=Lax", sessionCookie,
+                                value, maxAge.count());
+      if (secure)
+         cookie += "; Secure";
+      return {"Set-Cookie", std::move(cookie)};
+   }
+
+   HttpReply serveXStart(const HttpRequest& req)
+   {
+      if (req.method != "GET")
+         return HttpReply::methodNotAllowed(req);
+      auto x = readConfig().x;
+      if (!xConfigured(x))
+         return textError(req, HttpStatus::serviceUnavailable,
+                          "Sign in with X is not configured\n");
+
+      auto         now = wallNow();
+      XAuthRequest started{.state         = randomToken(),
+                           .code_verifier = randomToken(),
+                           .redirect_uri  = xCallbackUrl(req),
+                           .expires       = now + authRequestTtl};
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto                      table = XPortal{}.open<XAuthRequestTable>();
+         std::vector<XAuthRequest> expired;
+         for (auto row : table.getIndex<1>())
+         {
+            if (row.expires > now)
+               break;
+            expired.push_back(std::move(row));
+         }
+         for (const auto& row : expired)
+            table.remove(row);
+         table.put(started);
+      }
+      auto query = formEncode({{"response_type", "code"},
+                               {"client_id", *x.client_id},
+                               {"redirect_uri", started.redirect_uri},
+                               {"scope", xScope},
+                               {"state", started.state},
+                               {"code_challenge", codeChallenge(started.code_verifier)},
+                               {"code_challenge_method", "S256"}});
+      return redirect(std::format("{}?{}", xAuthorizeUrl, query));
+   }
+
+   HttpRequest xTokenRequest(const XConfig& x, std::string_view code, const XAuthRequest& started)
+   {
+      auto body        = formEncode({{"grant_type", "authorization_code"},
+                                     {"code", code},
+                                     {"redirect_uri", started.redirect_uri},
+                                     {"code_verifier", started.code_verifier}});
+      auto credentials = *x.client_id + ":" + *x.client_secret;
+      // x-http does not add Content-Length to outgoing requests
+      return HttpRequest{.method      = "POST",
+                         .target      = "/2/oauth2/token",
+                         .contentType = "application/x-www-form-urlencoded",
+                         .headers     = {{"Authorization", "Basic " + toBase64(credentials)},
+                                         {"Content-Length", std::to_string(body.size())}},
+                         .body        = std::vector<char>(body.begin(), body.end())};
+   }
+
+   HttpRequest xUserRequest(std::string_view accessToken)
+   {
+      return HttpRequest{.method  = "GET",
+                         .target  = "/2/users/me",
+                         .headers = {{"Authorization", std::format("Bearer {}", accessToken)}}};
+   }
+
+   // Sends `request` to the host of `x.api_base`, over TLS when it is https.
+   void sendXRequest(const XConfig&  x,
+                     HttpRequest     request,
+                     MethodNumber    callback,
+                     PendingXRequest pending)
+   {
+      auto origin  = splitURL(x.api_base);
+      request.host = std::string{origin.host};
+      std::optional<TLSInfo> tls;
+      if (origin.scheme == "https")
+         tls.emplace();
+      pending.socket = to<XHttp>().sendRequest(std::move(request), tls, std::nullopt);
+      PSIBASE_SUBJECTIVE_TX
+      {
+         to<XHttp>().setCallback(pending.socket, callback, MethodNumber{"onXError"});
+         XPortal{}.open<PendingXRequestTable>().put(pending);
+      }
+   }
+
+   PendingXRequest takePendingXRequest(std::int32_t socket)
+   {
+      std::optional<PendingXRequest> pending;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XPortal{}.open<PendingXRequestTable>();
+         pending    = table.get(socket);
+         check(pending.has_value(), "no pending X request on socket " + std::to_string(socket));
+         table.remove(*pending);
+      }
+      return *pending;
+   }
+
+   void replyToBrowser(const PendingXRequest& pending, const HttpReply& reply)
+   {
+      PSIBASE_SUBJECTIVE_TX
+      {
+         to<XHttp>().autoClose(pending.client, true);
+         to<XHttp>().sendReply(pending.client, reply);
+      }
+   }
+
+   HttpReply xFailure(std::string_view message)
+   {
+      return textError(std::vector<HttpHeader>{}, HttpStatus::badGateway, message);
+   }
+
+   struct XCallbackQuery
+   {
+      std::string code;
+      std::string state;
+      PSIO_REFLECT(XCallbackQuery, code, state)
+   };
+
+   std::optional<HttpReply> serveXCallback(const HttpRequest&          req,
+                                           std::optional<std::int32_t> socket)
+   {
+      if (req.method != "GET")
+         return HttpReply::methodNotAllowed(req);
+      auto                        query = req.query<XCallbackQuery>();
+      std::optional<XAuthRequest> started;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XPortal{}.open<XAuthRequestTable>();
+         started    = table.get(query.state);
+         if (started)
+            table.remove(*started);
+      }
+      if (!started || started->expires <= wallNow())
+         return textError(req, HttpStatus::badRequest, "unknown or expired sign-in state\n");
+      // X returns `error` instead of `code` when the user cancels.
+      if (query.code.empty())
+         return redirect("/");
+      auto x = readConfig().x;
+      if (!xConfigured(x))
+         return textError(req, HttpStatus::serviceUnavailable,
+                          "Sign in with X is not configured\n");
+
+      sendXRequest(x, xTokenRequest(x, query.code, *started), MethodNumber{"onXToken"},
+                   PendingXRequest{.client = *socket, .secure = !isLocalhost(req)});
+      PSIBASE_SUBJECTIVE_TX
+      {
+         to<XHttp>().autoClose(*socket, false);
+      }
+      return std::nullopt;
+   }
+
+   struct XTokenReply
+   {
+      std::optional<std::string> access_token;
+      PSIO_REFLECT(XTokenReply, access_token)
+   };
+
+   struct XUserData
+   {
+      std::string id;
+      std::string username;
+      PSIO_REFLECT(XUserData, id, username)
+   };
+
+   struct XUserReply
+   {
+      std::optional<XUserData> data;
+      PSIO_REFLECT(XUserReply, data)
+   };
+
+   template <typename T>
+   T parseXReply(const HttpReply& reply)
+   {
+      return psio::convert_from_json<T>(std::string(reply.body.begin(), reply.body.end()));
+   }
+
+   void finishSignIn(const PendingXRequest& pending, const XUserData& user)
+   {
+      XSession session{.session_id = randomToken(),
+                       .x_id       = user.id,
+                       .handle     = user.username,
+                       .expires    = wallNow() + sessionTtl};
+      PSIBASE_SUBJECTIVE_TX
+      {
+         XPortal{}.open<XUserTable>().put(XUser{.x_id = user.id, .handle = user.username});
+         XPortal{}.open<XSessionTable>().put(session);
+      }
+      replyToBrowser(
+          pending,
+          redirect("/", {sessionCookieHeader(session.session_id, sessionTtl, pending.secure)}));
+   }
+
+   std::optional<XSession> currentSession(const HttpRequest& req)
+   {
+      std::optional<XSession> session;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XPortal{}.open<XSessionTable>();
+         for (auto id : req.getCookie(sessionCookie))
+         {
+            auto row = table.get(std::string{id});
+            if (!row)
+               continue;
+            if (row->expires <= wallNow())
+            {
+               table.remove(*row);
+               continue;
+            }
+            session = std::move(row);
+            break;
+         }
+      }
+      return session;
+   }
+
+   HttpReply serveMe(const HttpRequest& req)
+   {
+      if (req.method == "OPTIONS")
+         return HttpReply{.headers = cors(req)};
+      if (req.method != "GET")
+         return HttpReply::methodNotAllowed(req);
+      auto session = currentSession(req);
+      if (!session)
+         return textError(req, HttpStatus::unauthorized, "not signed in\n");
+      return jsonBody(req, XIdentity{.x_id = session->x_id, .handle = session->handle});
+   }
+
+   HttpReply serveLogout(const HttpRequest& req)
+   {
+      if (req.method == "OPTIONS")
+         return HttpReply{.headers = cors(req)};
+      if (req.method != "POST")
+         return HttpReply::methodNotAllowed(req);
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto table = XPortal{}.open<XSessionTable>();
+         for (auto id : req.getCookie(sessionCookie))
+            if (auto row = table.get(std::string{id}))
+               table.remove(*row);
+      }
+      auto headers = cors(req);
+      headers.push_back(sessionCookieHeader("", std::chrono::seconds{0}, !isLocalhost(req)));
+      return HttpReply{.headers = std::move(headers)};
+   }
+
    // A queued signup is due until its one attempt is committed. The commit
    // happens before signTx, so an auth rejection does not run the attempt again.
    std::vector<Checksum256> dueSignupIds()
@@ -676,6 +1055,14 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
       return serveSignup(request);
    if (target.starts_with("/signup/"))
       return serveSignupStatus(request, std::string_view{target}.substr(8));
+   if (target == "/auth/x/start")
+      return serveXStart(request);
+   if (target == "/auth/x/callback")
+      return serveXCallback(request, socket);
+   if (target == "/auth/logout")
+      return serveLogout(request);
+   if (target == "/me")
+      return serveMe(request);
    return std::nullopt;
 }
 
@@ -696,6 +1083,36 @@ void XPortal::onPushError(std::int32_t socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
    finishPush(socket, std::string{"transact sent no reply"});
+}
+
+void XPortal::onXToken(std::int32_t socket, HttpReply reply)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   auto pending = takePendingXRequest(socket);
+   if (reply.status != HttpStatus::ok)
+      return replyToBrowser(pending, xFailure("X rejected the sign-in code\n"));
+   auto token = parseXReply<XTokenReply>(reply).access_token;
+   if (!token)
+      return replyToBrowser(pending, xFailure("X sent no access token\n"));
+   sendXRequest(readConfig().x, xUserRequest(*token), MethodNumber{"onXUser"}, pending);
+}
+
+void XPortal::onXUser(std::int32_t socket, HttpReply reply)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   auto                     pending = takePendingXRequest(socket);
+   std::optional<XUserData> user;
+   if (reply.status == HttpStatus::ok)
+      user = parseXReply<XUserReply>(reply).data;
+   if (!user || user->id.empty() || user->username.empty())
+      return replyToBrowser(pending, xFailure("X did not return the signed-in user\n"));
+   finishSignIn(pending, *user);
+}
+
+void XPortal::onXError(std::int32_t socket)
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+   replyToBrowser(takePendingXRequest(socket), xFailure("X did not respond\n"));
 }
 
 PSIBASE_DISPATCH(XPortal)
