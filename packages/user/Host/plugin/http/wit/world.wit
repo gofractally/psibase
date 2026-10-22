@@ -31,7 +31,8 @@ interface api {
     ///
     /// Parameters
     /// * `service` - The account of the service that will accept the websocket
-    get-ws-ticket: func(service: string) -> result<string, error>;
+    /// * `path` - The absolute path on that service the ticket authorizes (e.g. `/ws`)
+    get-ws-ticket: func(service: string, path: string) -> result<string, error>;
 
     // Todo: Probably will need to implement most/all js library functionality:
     // https://docs.psibase.io/development/front-ends/reference/js-libraries.html

@@ -1,5 +1,5 @@
 use crate::tables::WsTicketTable;
-use psibase::services::x_http::SERVICE as X_HTTP;
+use psibase::services::http_server;
 use psibase::{
     abort_message, get_sender, native_raw, AccountNumber, HttpHeader, HttpReply, HttpRequest, Table,
 };
@@ -7,19 +7,6 @@ use psibase::{
 const TICKET_LIFETIME_US: i64 = 60_000_000;
 const CLOCK_MONOTONIC: u32 = 1;
 const MAX_EXPIRED_TICKET_ERASE_PER_MINT: usize = 32;
-
-mod transact {
-    #[psibase::service(name = "r-transact", dispatch = false)]
-    #[allow(non_snake_case)]
-    mod service {
-        use psibase::{AccountNumber, HttpRequest};
-
-        #[action]
-        fn getUser(_request: HttpRequest) -> Option<AccountNumber> {
-            unimplemented!()
-        }
-    }
-}
 
 #[psibase::service_tables]
 pub mod tables {
@@ -34,6 +21,7 @@ pub mod tables {
         pub user: AccountNumber,
         pub app: AccountNumber,
         pub service: AccountNumber,
+        pub path: String,
         pub expiration: i64,
     }
 
@@ -57,18 +45,24 @@ mod service {
     pub struct WsTicketInfo {
         pub user: AccountNumber,
         pub app: AccountNumber,
+        pub path: String,
     }
 
     #[derive(Deserialize)]
     struct MintRequest {
         app: AccountNumber,
         service: AccountNumber,
+        path: String,
     }
 
     #[action]
-    fn serveSys(request: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
+    fn serveSys(
+        request: HttpRequest,
+        socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
         let _ = socket;
-        if get_sender() != X_HTTP {
+        if get_sender() != http_server::SERVICE {
             abort_message("Wrong sender");
         }
         if request.path() != "/ws-ticket" {
@@ -92,22 +86,30 @@ mod service {
             ));
         }
 
-        let Some(user) = transact::Wrapper::call().getUser(request.clone()) else {
+        let Some(user) = user else {
             return Some(text_reply(&request, 401, "Not authenticated\n"));
         };
         let Ok(body) = serde_json::from_slice::<MintRequest>(&request.body.0) else {
             return Some(text_reply(
                 &request,
                 400,
-                "expected JSON {\"app\",\"service\"}\n",
+                "expected JSON {\"app\",\"service\",\"path\"}\n",
             ));
         };
+        if body.path.is_empty() || !body.path.starts_with('/') {
+            return Some(text_reply(
+                &request,
+                400,
+                "path must be a non-empty absolute path\n",
+            ));
+        }
         let ticket = random_ticket();
         let now = monotonic_us();
         let _ = psibase::try_subjective_tx! {
             erase_expired(now);
         };
         let expiration = now + TICKET_LIFETIME_US;
+        let path = body.path;
         psibase::subjective_tx! {
             WsTicketTable::new()
                 .put(&WsTicketRow {
@@ -115,6 +117,7 @@ mod service {
                     user,
                     app: body.app,
                     service: body.service,
+                    path: path.clone(),
                     expiration,
                 })
                 .unwrap();
@@ -141,7 +144,11 @@ mod service {
                     if row.expiration <= now {
                         None
                     } else {
-                        Some(WsTicketInfo { user: row.user, app: row.app })
+                        Some(WsTicketInfo {
+                            user: row.user,
+                            app: row.app,
+                            path: row.path,
+                        })
                     }
                 }
                 _ => None,

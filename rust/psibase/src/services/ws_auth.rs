@@ -6,13 +6,17 @@ mod service {
     use serde::{Deserialize, Serialize};
 
     #[action]
-    fn serveSys(request: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
+    fn serveSys(
+        request: HttpRequest,
+        socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
         unimplemented!()
     }
 
     /// Redeems a ticket minted for the sender.
     ///
-    /// Returns the user and app, or None if the ticket is missing,
+    /// Returns the user, app, and path, or None if the ticket is missing,
     /// expired, or was minted for another service. A redeemed ticket
     /// cannot be used again.
     #[action]
@@ -25,6 +29,7 @@ mod service {
     pub struct WsTicketInfo {
         pub user: AccountNumber,
         pub app: AccountNumber,
+        pub path: String,
     }
 }
 

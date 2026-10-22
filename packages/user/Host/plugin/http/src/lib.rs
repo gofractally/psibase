@@ -128,17 +128,20 @@ impl Api for HostHttp {
         }
     }
 
-    fn get_ws_ticket(service: String) -> Result<String, Error> {
+    fn get_ws_ticket(service: String, path: String) -> Result<String, Error> {
         let app = assert_active_app_caller("get-ws-ticket@host:http/api");
 
         AccountNumber::from_exact(&service)
             .map_err(|_| make_error(&format!("Invalid service: {}", service)))?;
+        if path.is_empty() || !path.starts_with('/') {
+            return Err(make_error("path must be a non-empty absolute path"));
+        }
 
         let Some(token) = get_auth_token() else {
             return Err(make_error("No authenticated user"));
         };
 
-        let body = serde_json::json!({ "app": app, "service": service }).to_string();
+        let body = serde_json::json!({ "app": app, "service": service, "path": path }).to_string();
         let res = do_post(
             "wsauth".to_string(),
             "ws-ticket".to_string(),

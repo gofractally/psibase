@@ -21,7 +21,7 @@ export async function openServiceWebSocket(
         plugin: "http",
         intf: "api",
         method: "get-ws-ticket",
-        params: [service],
+        params: [service, path],
     })) as string;
     const url = siblingUrl(null, service, path).replace(/^http/, "ws");
     return new WebSocket(url, [

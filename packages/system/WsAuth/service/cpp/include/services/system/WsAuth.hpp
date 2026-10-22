@@ -12,7 +12,8 @@ namespace SystemService
    {
       psibase::AccountNumber user;
       psibase::AccountNumber app;
-      PSIO_REFLECT(WsTicketInfo, user, app)
+      std::string            path;
+      PSIO_REFLECT(WsTicketInfo, user, app, path)
    };
 
    struct WsAuth : psibase::Service
@@ -21,12 +22,14 @@ namespace SystemService
       static constexpr auto serviceFlags      = psibase::CodeRow::isPrivileged;
       static constexpr auto subprotocolPrefix = std::string_view{"psibase.ws-ticket."};
 
-      auto serveSys(psibase::HttpRequest        request,
-                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest                    request,
+                    std::optional<std::int32_t>             socket,
+                    std::optional<psibase::AccountNumber>   user)
+          -> std::optional<psibase::HttpReply>;
 
       /// Redeems a ticket minted for the sender.
       ///
-      /// Returns the user and app, or nullopt if the ticket is missing,
+      /// Returns the user, app, and path, or nullopt if the ticket is missing,
       /// expired, or was minted for another service. A redeemed ticket
       /// cannot be used again.
       std::optional<WsTicketInfo> consume(std::string ticket);
@@ -41,5 +44,7 @@ namespace SystemService
          return std::nullopt;
       }
    };
-   PSIO_REFLECT(WsAuth, method(serveSys, request, socket), method(consume, ticket))
+   PSIO_REFLECT(WsAuth,
+                method(serveSys, request, socket, user),
+                method(consume, ticket))
 }  // namespace SystemService
