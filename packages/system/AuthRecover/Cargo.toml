@@ -1,6 +1,6 @@
 [package]
 name = "auth-recover-pkg"                      # Crate name
-description = "An auth service that allows the key to be reset by a trusted third party."
+description = "An auth service that authorizes a trusted third party to help a user reset his key."
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
