@@ -108,6 +108,14 @@ impl Actions for AuthRecoverPlugin {
         Ok(())
     }
 
+    #[authorized(High, whitelist = ["homepage"])]
+    fn set_recovery(account: String) -> Result<(), HostTypes::Error> {
+        let name = psibase::AccountNumber::from_exact(&account)
+            .map_err(|_| ErrorType::InvalidAccountName(&account))?;
+        MyService::add_to_tx().setRecovery(name);
+        Ok(())
+    }
+
     #[authorized(Medium, whitelist = ["accounts"])]
     fn create_account(new_account_name: String) -> Result<String, HostTypes::Error> {
         let name = psibase::AccountNumber::from_exact(&new_account_name)
