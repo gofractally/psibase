@@ -38,6 +38,11 @@ impl Api for HostPrompt {
 
     fn get_context() -> Result<Vec<u8>, Error> {
         let prompt = ActivePrompts::get().unwrap();
+        assert_eq!(
+            get_sender(),
+            prompt.prompt_app,
+            "[get-context@host:prompt/api] Unauthorized caller"
+        );
         prompt
             .packed_context
             .ok_or_else(|| Error::from(ErrorType::PromptContextNotFound(prompt.prompt_name)))

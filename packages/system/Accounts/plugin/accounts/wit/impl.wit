@@ -6,7 +6,7 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
 
-    import host:wallet/admin;
+    import host:login/admin;
 
     export api;
     export admin;

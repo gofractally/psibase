@@ -1,11 +1,18 @@
-use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
-use crate::bindings::host::types::types::Error;
-use crate::bindings::transact::query_auth::api as QueryAuth;
 use psibase::fracpack::{Pack, Unpack};
 
+fn logged_in_user_table() -> Bucket {
+    Bucket::new(
+        Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Persistent,
+        },
+        "logged_in_user",
+    )
+}
+
 // Accounts connected to each app; persistent so connections survive sessions
-pub(crate) fn connected_accounts_table() -> Bucket {
+fn connected_accounts_table() -> Bucket {
     Bucket::new(
         Database {
             mode: DbMode::NonTransactional,
@@ -21,25 +28,25 @@ struct ConnectedAccounts {
 }
 
 impl ConnectedAccounts {
-    pub(crate) fn add(&mut self, account: &str) {
+    fn add(&mut self, account: &str) {
         if self.accounts.contains(&account.to_string()) {
             return;
         }
-
         self.accounts.push(account.to_string());
     }
 
-    pub(crate) fn remove(&mut self, account: &str) {
+    fn remove(&mut self, account: &str) {
         if let Some(idx) = self.accounts.iter().position(|a| a.as_str() == account) {
             self.accounts.swap_remove(idx);
         }
     }
 }
 
-// A database with a separate namespace for each app within the `host` namespace
+/// Per-app current-user and connected-account inventory under the `host` db namespace.
 pub struct AppsTable {
     app: String,
 }
+
 impl AppsTable {
     pub(crate) fn new(app: &str) -> Self {
         Self {
@@ -47,16 +54,31 @@ impl AppsTable {
         }
     }
 
-    pub(crate) fn login(&self, user: &str) -> Result<(), Error> {
-        self.connect(user);
+    pub(crate) fn get_logged_in_user(&self) -> Option<String> {
+        logged_in_user_table()
+            .get(&self.app)
+            .map(|a| String::from_utf8(a).unwrap())
+    }
 
-        let token = if HostAuth::has_query_token(user, &self.app) {
-            None
+    pub(crate) fn set_logged_in_user(&self, user: &str) {
+        logged_in_user_table().set(&self.app, user.as_bytes());
+    }
+
+    pub(crate) fn clear_logged_in_user(&self) -> Option<String> {
+        let user = self.get_logged_in_user();
+        if user.is_some() {
+            logged_in_user_table().delete(&self.app);
+        }
+        user
+    }
+
+    pub(crate) fn revoke_login(&self, user: &str) -> bool {
+        if self.get_logged_in_user().as_deref() == Some(user) {
+            logged_in_user_table().delete(&self.app);
+            true
         } else {
-            Some(QueryAuth::get_query_token(&self.app, user)?)
-        };
-
-        HostAuth::set_logged_in_user(user, &self.app, token.as_deref())
+            false
+        }
     }
 
     pub(crate) fn connect(&self, user: &str) {
@@ -65,7 +87,6 @@ impl AppsTable {
             .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default();
         connected_accounts.add(user);
-
         connected_accounts_table().set(&self.app, &connected_accounts.packed());
     }
 
@@ -75,16 +96,7 @@ impl AppsTable {
             .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default();
         connected_accounts.remove(user);
-
-        if HostAuth::get_logged_in_user(&self.app).is_some_and(|logged_in| logged_in == user) {
-            self.logout();
-        }
-
         connected_accounts_table().set(&self.app, &connected_accounts.packed());
-    }
-
-    pub(crate) fn logout(&self) {
-        HostAuth::log_out_user(&self.app);
     }
 
     pub(crate) fn get_connected_accounts(&self) -> Vec<String> {

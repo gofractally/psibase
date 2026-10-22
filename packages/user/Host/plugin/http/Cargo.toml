@@ -23,4 +23,5 @@ world = "impl"
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
 "host:client" = { path = "../client/wit/world.wit" }
+"host:accounts" = { path = "../accounts/wit/world.wit" }
 "host:auth" = { path = "../auth/wit/world.wit" }

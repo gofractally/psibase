@@ -2,7 +2,7 @@ use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration
 use psibase::fracpack::{Pack, Unpack};
 
 // Apps each user has connected to; persistent so connections survive sessions
-pub(crate) fn connected_apps_table() -> Bucket {
+fn connected_apps_table() -> Bucket {
     Bucket::new(
         Database {
             mode: DbMode::NonTransactional,
@@ -18,16 +18,15 @@ struct ConnectedApps {
 }
 
 impl ConnectedApps {
-    pub(crate) fn add(&mut self, app: &str) {
+    fn add(&mut self, app: &str) {
         let app = app.to_string();
         if self.apps.contains(&app) {
             return;
         }
-
         self.apps.push(app);
     }
 
-    pub(crate) fn remove(&mut self, app: &str) {
+    fn remove(&mut self, app: &str) {
         let app = app.to_string();
         if let Some(idx) = self.apps.iter().position(|a| a == &app) {
             self.apps.swap_remove(idx);
@@ -35,10 +34,11 @@ impl ConnectedApps {
     }
 }
 
-// A database with a separate namespace for each user within the `host` namespace
+/// Per-user connected-apps inventory under the `host` db namespace.
 pub struct UserTable {
     user: String,
 }
+
 impl UserTable {
     pub(crate) fn new(user: &str) -> Self {
         Self {

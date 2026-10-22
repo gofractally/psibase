@@ -1,8 +1,8 @@
-package host:wallet;
+package host:login;
 
 /// This interface is only available to the top-level app, or its plugin.
 /// The "top-level" app is the app with which the user is directly interacting.
-interface active-app {
+interface api {
     use host:types/types.{error};
 
     /// Directly log in a user by their account name.
@@ -15,15 +15,11 @@ interface active-app {
     /// Disconnects a previously connected account from the active app
     disconnect: func(account: string) -> result<_, error>;
 
-    /// Retrieves a list of accounts that the user has connected to this app.
-    /// The user may only log in to accounts that have been connected.
-    get-connected-accounts: func() -> result<list<string>, error>;
-
     /// Prompts the user to connect an account to the active app
     connect-account: func() -> result<_, error>;
 }
 
-/// Callable by the accounts plugin and by host.
+/// Callable by host (and accounts for selected inventory cleanup).
 interface admin {
     use host:types/types.{error, pem};
 
@@ -76,5 +72,5 @@ interface admin {
 }
 
 world imports {
-    import active-app;
+    import api;
 }

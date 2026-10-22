@@ -20,7 +20,7 @@ export const useImportExisting = (
             const validatedCredential = CredentialSchema.parse(credential);
             await supervisor.functionCall({
                 service: "host",
-                plugin: "wallet",
+                plugin: "login",
                 intf: "admin",
                 method: "importExisting",
                 params: [[validatedCredential]],

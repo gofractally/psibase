@@ -30,19 +30,8 @@ const DB: Database = Database {
     duration: StorageDuration::Persistent,
 };
 
-// User logged into each app; persistent so the login survives page loads
-fn logged_in_user_table() -> Bucket {
-    Bucket::new(DB, "logged_in_user")
-}
-
 fn query_tokens_table(user: &str) -> Bucket {
     Bucket::new(DB, &format!("query_tokens-{}", user))
-}
-
-fn get_logged_in_user(app: &str) -> Option<String> {
-    logged_in_user_table()
-        .get(app)
-        .map(|a| String::from_utf8(a).unwrap())
 }
 
 fn get_query_token(user: &str, app: &str) -> Option<String> {
@@ -81,27 +70,16 @@ fn remove_auth_cookie(app: &str) {
     Supervisor::send_request(&req, true).unwrap();
 }
 
+/// Browser-session credentials: query tokens and auth cookies.
+/// Host-only (+ supervisor for `get-active-query-token`).
 impl Api for HostAuth {
-    fn is_logged_in() -> bool {
-        Self::get_current_user().is_some()
-    }
-
-    fn get_current_user() -> Option<String> {
-        get_logged_in_user(&CallContext::get_active_app())
-    }
-
-    fn get_logged_in_user(app: String) -> Option<String> {
-        check_caller(&["host"], "get-logged-in-user@host:auth/api");
-        get_logged_in_user(&app)
-    }
-
     fn has_query_token(user: String, app: String) -> bool {
         check_caller(&["host"], "has-query-token@host:auth/api");
         get_query_token(&user, &app).is_some()
     }
 
-    fn set_logged_in_user(user: String, app: String, token: Option<String>) -> Result<(), Error> {
-        check_caller(&["host"], "set-logged-in-user@host:auth/api");
+    fn set_session(user: String, app: String, token: Option<String>) -> Result<(), Error> {
+        check_caller(&["host"], "set-session@host:auth/api");
 
         let query_token = match token {
             Some(t) => {
@@ -113,21 +91,13 @@ impl Api for HostAuth {
         };
 
         set_auth_cookie(&query_token, &app);
-        logged_in_user_table().set(&app, user.as_bytes());
-
         Ok(())
     }
 
-    fn log_out_user(app: String) {
-        check_caller(&["host"], "log-out-user@host:auth/api");
-
-        let Some(user) = get_logged_in_user(&app) else {
-            return;
-        };
-
+    fn clear_session(user: String, app: String) {
+        check_caller(&["host"], "clear-session@host:auth/api");
         remove_auth_cookie(&app);
         query_tokens_table(&user).delete(&app);
-        logged_in_user_table().delete(&app);
     }
 
     fn get_active_query_token(app: String, user: String) -> Option<String> {
@@ -135,7 +105,6 @@ impl Api for HostAuth {
             &["host", "supervisor"],
             "get-active-query-token@host:auth/api",
         );
-
         get_query_token(&user, &app)
     }
 }

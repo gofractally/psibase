@@ -291,7 +291,7 @@ add_rs_component_workspace(packages/:Plugins
     packages
     permissions
     sites
-    host-wallet
+    host-accounts
     host-client
     host-http
     host-db
@@ -299,6 +299,7 @@ add_rs_component_workspace(packages/:Plugins
     host-types
     login-prompt
     host-auth
+    host-login
     host-crypto
     web-crypto
     transact
@@ -464,13 +465,14 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
-        DATA ${Plugins_OUTPUT_FILE_host_wallet} /wallet.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_accounts} /accounts.wasm
         DATA ${Plugins_OUTPUT_FILE_host_client} /client.wasm
         DATA ${Plugins_OUTPUT_FILE_host_http} /http.wasm
         DATA ${Plugins_OUTPUT_FILE_host_db} /db.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_login} /login.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"

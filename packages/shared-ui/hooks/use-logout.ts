@@ -10,8 +10,8 @@ export const useLogout = (
         mutationFn: async () =>
             supervisor.functionCall({
                 service: "host",
-                plugin: "wallet",
-                intf: "activeApp",
+                plugin: "login",
+                intf: "api",
                 method: "logout",
                 params: [],
             }),

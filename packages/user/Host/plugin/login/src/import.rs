@@ -1,12 +1,12 @@
 use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::auth_sig::plugin as AuthSig;
-use crate::bindings::exports::host::wallet::admin::Credential;
+use crate::bindings::exports::host::login::admin::Credential;
+use crate::bindings::host::accounts::admin as HostAccounts;
 use crate::bindings::host::types::types::Error;
-use crate::db::apps_table::AppsTable;
 use crate::errors::ErrorType::{AccountNotFound, AuthorizationFailed, UnsupportedAuthService};
 use crate::HOST_APP;
 
-fn import_credential(credential: &Credential, known_accounts: &AppsTable) -> Result<(), Error> {
+fn import_credential(credential: &Credential) -> Result<(), Error> {
     let account = &credential.account;
     let Some(details) = AccountsQuery::get_account(account)? else {
         return Err(AccountNotFound(account.clone()).into());
@@ -23,16 +23,15 @@ fn import_credential(credential: &Credential, known_accounts: &AppsTable) -> Res
         service => return Err(UnsupportedAuthService(service.to_string()).into()),
     }
 
-    known_accounts.connect(account);
+    HostAccounts::connect(account, HOST_APP);
     Ok(())
 }
 
 pub fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
-    let known_accounts = AppsTable::new(HOST_APP);
     let invalid_accounts: Vec<_> = credentials
         .into_iter()
         .filter_map(|credential| {
-            import_credential(&credential, &known_accounts)
+            import_credential(&credential)
                 .err()
                 .map(|e| (credential.account, e))
         })

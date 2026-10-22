@@ -7,6 +7,7 @@ use helpers::*;
 
 mod types;
 
+use bindings::host::accounts::api as HostAccounts;
 use bindings::host::auth::api as HostAuth;
 use exports::host::http::api::Guest as Api;
 use helpers::make_error;
@@ -17,7 +18,7 @@ use supervisor::bridge::types::{self as BridgeTypes, HttpRequest};
 struct HostHttp;
 
 fn get_auth_token() -> Option<String> {
-    let current_user = HostAuth::get_current_user();
+    let current_user = HostAccounts::get_current_user();
     if current_user.is_some() {
         HostAuth::get_active_query_token(&CallContext::get_active_app(), &current_user.unwrap())
     } else {

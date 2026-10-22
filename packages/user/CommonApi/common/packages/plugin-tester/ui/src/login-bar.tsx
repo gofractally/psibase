@@ -25,7 +25,7 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
         const fetchUser = async () => {
             try {
                 const user = await supervisor.functionCall(
-                    withArgs("host", "auth", "api", "getCurrentUser"),
+                    withArgs("host", "accounts", "api", "getCurrentUser"),
                 );
                 setCurrentUser(user || null);
             } catch (e) {
@@ -40,12 +40,12 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
         try {
             if (currentUser) {
                 await supervisor.functionCall(
-                    withArgs("host", "wallet", "activeApp", "logout"),
+                    withArgs("host", "login", "api", "logout"),
                 );
                 setCurrentUser(null);
             } else {
                 await supervisor.functionCall(
-                    withArgs("host", "wallet", "activeApp", "connectAccount"),
+                    withArgs("host", "login", "api", "connectAccount"),
                     { enabled: true, returnPath: "/common/plugin-tester" },
                 );
             }

@@ -5,7 +5,7 @@ use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
 
 use crate::bindings::exports::accounts::plugin::admin::{Error, Guest as Admin};
-use crate::bindings::host::wallet::admin as HostWalletAdmin;
+use crate::bindings::host::login::admin as HostLoginAdmin;
 use crate::bindings::transact::plugin::api as Transact;
 use crate::trust::*;
 use psibase::fracpack::Pack;
@@ -22,7 +22,7 @@ impl Admin for AccountsPlugin {
         )
         .unwrap();
 
-        let connected_accounts = HostWalletAdmin::get_connected_accounts(HOST_APP);
+        let connected_accounts = HostLoginAdmin::get_connected_accounts(HOST_APP);
         if connected_accounts.is_empty() {
             return Ok(Vec::new());
         }
@@ -75,7 +75,7 @@ impl Admin for AccountsPlugin {
 
         for account in &connected_accounts {
             if !valid_account_nums.contains(account) {
-                HostWalletAdmin::disconnect(account, HOST_APP);
+                HostLoginAdmin::disconnect(account, HOST_APP);
             }
         }
 

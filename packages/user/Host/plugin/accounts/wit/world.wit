@@ -1,0 +1,52 @@
+package host:accounts;
+
+interface api {
+    use host:types/types.{error};
+
+    /// Returns true if there is a user logged in to the currently active top-level application.
+    is-logged-in: func() -> bool;
+
+    /// Gets the account name of the user logged into the active application.
+    /// May also return None if no user is logged in.
+    get-current-user: func() -> option<string>;
+
+    /// Retrieves the accounts connected to the active app.
+    /// Callable by the top-level app (or supervisor).
+    get-connected-accounts: func() -> result<list<string>, error>;
+}
+
+/// Host-only mutators and cross-app inventory.
+interface admin {
+    use host:types/types.{error};
+
+    /// Record `user` as logged into `app`.
+    set-current-user: func(user: string, app: string);
+
+    /// Take-and-clear the logged-in user for `app`. Returns the previous user, if any.
+    clear-current-user: func(app: string) -> option<string>;
+
+    /// If `user` is logged into `app`, clear that login and return true.
+    revoke-login: func(user: string, app: string) -> bool;
+
+    /// Connect `account` to `app` in the device inventory.
+    connect: func(account: string, app: string);
+
+    /// Disconnect `account` from `app` in the device inventory (session unchanged).
+    disconnect: func(account: string, app: string);
+
+    /// Accounts connected to the specified app.
+    get-connected-accounts: func(app: string) -> list<string>;
+
+    /// Record that `user` has connected to `app` (per-user inventory).
+    add-connected-app: func(user: string, app: string);
+
+    /// Remove `app` from `user`'s connected-apps inventory.
+    remove-connected-app: func(user: string, app: string);
+
+    /// Apps to which `user` has connected.
+    get-connected-apps: func(user: string) -> list<string>;
+}
+
+world imports {
+    import api;
+}
