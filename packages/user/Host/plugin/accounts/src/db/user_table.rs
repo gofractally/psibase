@@ -34,7 +34,7 @@ impl ConnectedApps {
     }
 }
 
-/// Per-user connected-apps inventory under the `host` db namespace.
+// A database with a separate namespace for each user within the `host` namespace
 pub struct UserTable {
     user: String,
 }

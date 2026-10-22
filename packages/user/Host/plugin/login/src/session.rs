@@ -3,7 +3,6 @@ use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::types::types::Error;
 use crate::bindings::transact::query_auth::api as QueryAuth;
 
-/// Connect inventory + plant credentials + record current user.
 pub(crate) fn login(user: &str, app: &str) -> Result<(), Error> {
     HostAccounts::connect(user, app);
 
@@ -24,7 +23,6 @@ pub(crate) fn logout(app: &str) {
     }
 }
 
-/// Remove from inventory; if that user was logged in, tear down the session too.
 pub(crate) fn disconnect(user: &str, app: &str) {
     HostAccounts::disconnect(user, app);
     if HostAccounts::revoke_login(user, app) {

@@ -1,6 +1,7 @@
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use psibase::fracpack::{Pack, Unpack};
 
+// User logged into each app; persistent so the login survives page loads
 fn logged_in_user_table() -> Bucket {
     Bucket::new(
         Database {
@@ -42,7 +43,7 @@ impl ConnectedAccounts {
     }
 }
 
-/// Per-app current-user and connected-account inventory under the `host` db namespace.
+// A database with a separate namespace for each app within the `host` namespace
 pub struct AppsTable {
     app: String,
 }
