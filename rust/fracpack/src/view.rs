@@ -189,6 +189,19 @@ pub struct ViewIterator<'a, T> {
     _phantom: PhantomData<T>,
 }
 
+impl<'a, T: MakeView + Unpack<'a>> ViewIterator<'a, T>
+where
+    T: 'a,
+    View<T>: 'a,
+{
+    pub fn unpacked(self) -> impl Iterator<Item = T> + 'a {
+        self.map(|item| {
+            let mut stream = FracInputStream::new(item.get_data());
+            T::unpack(&mut stream).unwrap()
+        })
+    }
+}
+
 impl<'a, T: MakeView + Unpack<'a>> Iterator for ViewIterator<'a, T>
 where
     View<T>: 'a,
