@@ -2,8 +2,6 @@
 mod bindings;
 use bindings::*;
 
-mod errors;
-use errors::ErrorType::MissingQueryToken;
 mod helpers;
 use helpers::*;
 
@@ -15,7 +13,6 @@ use crate::bindings::{
     host::{
         client::api as CallContext,
         db::store::{Bucket, Database, DbMode, StorageDuration},
-        types::types::Error,
     },
     supervisor::bridge::{
         intf as Supervisor,
@@ -73,25 +70,10 @@ fn remove_auth_cookie(app: &str) {
 /// Browser-session credentials: query tokens and auth cookies.
 /// Host-only (+ supervisor for `get-active-query-token`).
 impl Api for HostAuth {
-    fn has_query_token(user: String, app: String) -> bool {
-        check_caller(&["host"], "has-query-token@host:auth/api");
-        get_query_token(&user, &app).is_some()
-    }
-
-    fn set_session(user: String, app: String, token: Option<String>) -> Result<(), Error> {
+    fn set_session(user: String, app: String, token: String) {
         check_caller(&["host"], "set-session@host:auth/api");
-
-        let query_token = match token {
-            Some(t) => {
-                query_tokens_table(&user).set(&app, &t.packed());
-                t
-            }
-            None => get_query_token(&user, &app)
-                .ok_or_else(|| MissingQueryToken(user.clone(), app.clone()))?,
-        };
-
-        set_auth_cookie(&query_token, &app);
-        Ok(())
+        query_tokens_table(&user).set(&app, &token.packed());
+        set_auth_cookie(&token, &app);
     }
 
     fn clear_session(user: String, app: String) {

@@ -1,19 +1,16 @@
 package host:auth;
 
 interface api {
-    use host:types/types.{error};
-
-    /// Returns true if a query token for `user` on `app` is already cached.
-    has-query-token: func(user: string, app: string) -> bool;
-
-    /// Set credentials for `user` on `app`.
-    /// `token` is required when no query token is cached for this user and app.
-    set-session: func(user: string, app: string, token: option<string>) -> result<_, error>;
+    /// Persist the token and plant the auth cookie for `user` on `app`.
+    /// Host-only. The caller obtains the token (cache hit or mint).
+    set-session: func(user: string, app: string, token: string);
 
     /// Clear credentials for `user` on `app`.
+    /// Host-only.
     clear-session: func(user: string, app: string);
 
     /// Privileged callers can get the query token to make calls on the user's behalf.
+    /// Host + supervisor.
     get-active-query-token: func(app: string, user: string) -> option<string>;
 }
 

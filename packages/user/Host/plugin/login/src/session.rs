@@ -6,13 +6,11 @@ use crate::bindings::transact::query_auth::api as QueryAuth;
 pub(crate) fn login(user: &str, app: &str) -> Result<(), Error> {
     HostAccounts::connect(user, app);
 
-    let token = if HostAuth::has_query_token(user, app) {
-        None
-    } else {
-        Some(QueryAuth::get_query_token(app, user)?)
+    let token = match HostAuth::get_active_query_token(app, user) {
+        Some(t) => t,
+        None => QueryAuth::get_query_token(app, user)?,
     };
-
-    HostAuth::set_session(user, app, token.as_deref())?;
+    HostAuth::set_session(user, app, &token);
     HostAccounts::set_current_user(user, app);
     Ok(())
 }
