@@ -215,6 +215,12 @@ impl<'a, T: MakeView + Unpack<'a>> IntoIterator for &'a VecView<T> {
     type Item = &'a View<T>;
     type IntoIter = ViewIterator<'a, T>;
     fn into_iter(self) -> ViewIterator<'a, T> {
+        self.iter()
+    }
+}
+
+impl<'a, T: MakeView + Unpack<'a>> VecView<T> {
+    pub fn iter(&'a self) -> ViewIterator<'a, T> {
         let mut pos = 0;
         let stream = FracInputStream::new(&self.get_data());
         let size = stream.unpack_at::<u32>(&mut pos).unwrap();
