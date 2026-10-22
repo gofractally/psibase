@@ -40,14 +40,6 @@ pub type View<T> = <T as MakeView>::ViewType;
 
 const EMPTY_OPTION: [u8; 4] = [1, 0, 0, 0];
 
-fn cdf<const N: usize>(mut a: [u32; N]) -> [u32; N] {
-    let mut value = 0;
-    for item in &mut a {
-        value += std::mem::replace(item, value.clone());
-    }
-    a
-}
-
 pub trait ViewFields: ViewData {
     fn get_offset(index: usize) -> u32;
     fn get_field<'a, T: MakeView + Unpack<'a>>(&'_ self, index: usize) -> &'_ View<T> {
@@ -286,8 +278,8 @@ macro_rules! tuple_impls {
             }
             impl<'a, $($name: Unpack<'a>),*> ViewFields for TupleView<($($name,)*)> {
                 fn get_offset(index: usize) -> u32 {
-                    let offsets = cdf([$($name::FIXED_SIZE),*]);
-                    offsets[index]
+                    let sizes: [u32; $len] = [$($name::FIXED_SIZE),*];
+                    sizes.into_iter().take(index).sum()
                 }
             }
             impl<'a, $($name: MakeView + Unpack<'a>),*> TupleView<($($name,)*)> {
