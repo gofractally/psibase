@@ -33,7 +33,7 @@ impl Default for ActionDecoder {
 impl ActionDecoder {
     /// Sets `data` on each action in a JSON array of `{ sender, service, method, rawData }`
     /// objects whose payload can be decoded, and restores the original spelling of hashed
-    /// method names. Other actions are left unchanged.
+    /// method names. `rawData` is kept, and other actions are left unchanged.
     pub async fn decode_actions(&self, actions: &mut Value) {
         let Some(actions) = actions.as_array_mut() else {
             return;
@@ -49,10 +49,11 @@ impl ActionDecoder {
                 rawData: (&parsed.rawData.0[..]).into(),
             };
             self.formatter.prepare_action(shared.clone()).await;
-            let (method, data) = self.formatter.unpack_action(shared);
-            action["method"] = method.0.into();
-            if let Some(data) = data.filter(|data| !data.is_null()) {
-                action["data"] = data;
+            let Value::Object(pretty) = self.formatter.action_to_json(shared) else {
+                continue;
+            };
+            for (key, value) in pretty {
+                action[key.as_str()] = value;
             }
         }
     }
