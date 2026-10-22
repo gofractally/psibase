@@ -6,7 +6,7 @@
 
 pub mod bridge;
 
-use psibase_macros::{Pack, ToSchema, Unpack};
+use psibase_macros::{Pack, ToSchema, Unpack, View};
 
 // TODO: test reading variant with future index
 #[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
@@ -40,7 +40,7 @@ pub struct DefWontChangeInnerStruct {
 #[derive(PartialEq, Eq, Debug, Default)]
 pub struct NotPackable;
 
-#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
+#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct InnerStruct {
     pub inner_u32: u32,

@@ -5,6 +5,10 @@ use std::marker::PhantomData;
 use std::ops::{Deref, Index};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
+// Requirements:
+// - The user can specialize traits for views of his own types
+// - Using views should mimic regular rust syntax as much as possible
+
 pub trait MakeView {
     type ViewType: ViewData + ?Sized;
 }
@@ -33,6 +37,61 @@ pub trait ViewExt<'a>: ViewData {
 }
 
 pub type View<T> = <T as MakeView>::ViewType;
+
+const EMPTY_OPTION: [u8; 4] = [1, 0, 0, 0];
+
+fn cdf<const N: usize>(mut a: [u32; N]) -> [u32; N] {
+    let mut value = 0;
+    for item in &mut a {
+        value += std::mem::replace(item, value.clone());
+    }
+    a
+}
+
+pub trait ViewFields: ViewData {
+    fn get_offset(index: usize) -> u32;
+    fn get_field<'a, T: MakeView + Unpack<'a>>(&'_ self, index: usize) -> &'_ View<T> {
+        let fixed_offset = Self::get_offset(index);
+        let mut stream = FracInputStream::new(self.get_data());
+        let fixed_size = u16::unpack(&mut stream).unwrap() as u32;
+        let orig_pos = fixed_offset + stream.pos;
+        if T::IS_OPTIONAL && fixed_size <= fixed_offset {
+            <View<T>>::new_unchecked(&EMPTY_OPTION)
+        } else if T::VARIABLE_SIZE && !T::IS_OPTIONAL {
+            let mut fixed_pos = orig_pos;
+            let offset = stream.unpack_at::<u32>(&mut fixed_pos).unwrap();
+            <View<T>>::new_unchecked(&self.get_data()[(orig_pos + offset) as usize..])
+        } else {
+            <View<T>>::new_unchecked(&self.get_data()[orig_pos as usize..])
+        }
+    }
+}
+
+macro_rules! define_view {
+    ( $name:ident ) => {
+        #[repr(transparent)]
+        pub struct $name<T> {
+            _phantom: PhantomData<T>,
+            data: [u8],
+        }
+        impl<T> $crate::ViewData for $name<T> {
+            fn new_unchecked(data: &[u8]) -> &Self {
+                unsafe { &*(data as *const [u8] as *const Self) }
+            }
+            fn get_data(&self) -> &[u8] {
+                return &self.data;
+            }
+        }
+        impl<'a, T> $crate::ViewExt<'a> for $name<T>
+        where
+            T: Unpack<'a>,
+        {
+            type ValueType = T;
+        }
+    };
+}
+
+define_view!(GenericView);
 
 macro_rules! view {
     ( $vis:vis $name:ident : $value:ty ) => {
@@ -96,23 +155,6 @@ macro_rules! view {
 
 view!(pub StringView: String);
 
-/*
-#[repr(transparent)]
-pub struct StringView(ViewData<String>);
-impl MakeView for String {
-    type ViewType = StringView;
-}
-impl<'a> ViewExt<'a> for StringView {
-    type ValueType = String;
-    fn new_unchecked(data: &'a [u8]) -> &'a Self {
-        unsafe { &*(data as *const [u8] as *const Self) }
-    }
-    fn get_data(&'a self) -> &'a [u8] {
-        return &self.0.data;
-    }
-}
-*/
-
 impl Deref for StringView {
     type Target = str;
     fn deref(&self) -> &str {
@@ -148,35 +190,11 @@ impl<'a, T: MakeView + Unpack<'a>> Index<usize> for VecView<T> {
     }
 }
 
-// Usage should be &View<T>
+view!(pub U32View: u32);
 
-// view!(pub BoxView<T>: Box<T>);
+view!(pub OptionView<T>: Option<T>);
 
-/*
-impl<T> View<T> {
-    fn new_unchecked<'b>(data: &'b [u8]) -> &'b View<T> {
-        unsafe { &*(data as *const [u8] as *const View<T>) }
-    }
-}
-
-impl<'a, T: Unpack<'a>> View<T> {
-    pub fn new<'b>(data: &'b [u8]) -> Result<&'b View<T>> {
-        T::verify_no_extra(data)?;
-        Ok(<View<T>>::new_unchecked(data))
-    }
-    pub fn unpack(&'a self) -> T {
-        let mut stream = FracInputStream::new(&self.data);
-        if T::IS_OPTIONAL {
-            stream.known_end = false;
-            let mut fixed_pos = 0;
-            T::embedded_unpack(&mut stream, &mut fixed_pos).unwrap()
-        } else {
-            T::unpack(&mut stream).unwrap()
-        }
-    }
-}
-
-impl<'a, T: Unpack<'a>> View<Option<T>> {
+impl<'a, T: MakeView + Unpack<'a>> OptionView<T> {
     pub fn get(&self) -> Option<&View<T>> {
         let mut stream = FracInputStream::new(&self.data);
         let offset = u32::unpack(&mut stream).unwrap();
@@ -190,21 +208,7 @@ impl<'a, T: Unpack<'a>> View<Option<T>> {
     }
 }
 
-impl<'a, T: Unpack<'a>> Index<usize> for View<Vec<T>> {
-    type Output = View<T>;
-    fn index(&self, index: usize) -> &View<T> {
-        let stream = FracInputStream::new(&self.data);
-        let orig_pos = 4 + T::FIXED_SIZE * index as u32;
-        if T::VARIABLE_SIZE && !T::IS_OPTIONAL {
-            let mut fixed_pos = orig_pos;
-            let offset = stream.unpack_at::<u32>(&mut fixed_pos).unwrap();
-            <View<T>>::new_unchecked(&self.data[(orig_pos + offset) as usize..])
-        } else {
-            <View<T>>::new_unchecked(&self.data[orig_pos as usize..])
-        }
-    }
-}
-
+/*
 impl Deref for View<Vec<u8>> {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
@@ -221,29 +225,18 @@ impl Deref for View<&[u8]> {
     }
 }
 
-impl Deref for View<String> {
-    type Target = str;
-    fn deref(&self) -> &str {
-        let mut stream = FracInputStream::new(&self.data);
-        <&str>::unpack(&mut stream).unwrap()
-    }
-}
+ */
 
-impl Deref for View<&str> {
-    type Target = str;
-    fn deref(&self) -> &str {
-        let mut stream = FracInputStream::new(&self.data);
-        <&str>::unpack(&mut stream).unwrap()
-    }
-}
+view!(pub BoxView<T>: Box<T>);
 
-impl<T> Deref for View<Box<T>> {
+impl<T: MakeView> Deref for BoxView<T> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
         <View<T>>::new_unchecked(&self.data)
     }
 }
 
+/*
 impl<T> Deref for View<Rc<T>> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
@@ -281,25 +274,27 @@ pub fn get_member<'a, T: Unpack<'a>, U>(view: &View<U>, fixed_offset: u32) -> &V
         <View<T>>::new_unchecked(&view.data[orig_pos as usize..])
     }
 }
+ */
+
+define_view!(TupleView);
 
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident $getn:ident)*))+) => {
         $(
-            impl<'a, $($name: Unpack<'a>),*> View<($($name,)*)> {
-                #[allow(unused)]
-                const fn get_offsets() -> [u32; $len] {
-                    let mut result = [0; $len];
-                    let mut pos = 0;
-                    $(
-                        result[$n] = pos;
-                        pos += $name::FIXED_SIZE;
-                    )*
-                    result
+            impl<$($name,)*> MakeView for ($($name,)*) {
+                type ViewType = TupleView<($($name,)*)>;
+            }
+            impl<'a, $($name: Unpack<'a>),*> ViewFields for TupleView<($($name,)*)> {
+                fn get_offset(index: usize) -> u32 {
+                    let offsets = cdf([$($name::FIXED_SIZE),*]);
+                    offsets[index]
                 }
+            }
+            impl<'a, $($name: MakeView + Unpack<'a>),*> TupleView<($($name,)*)> {
                 pub fn get(&self) -> ($(&View<$name>,)*) { ($(self.$getn(),)*)}
                 $(
                     pub fn $getn(&self) -> &View<$name> {
-                        get_member(self, Self::get_offsets()[$n])
+                        ViewFields::get_field::<$name>(self, $n)
                     }
                 )*
             }
@@ -326,4 +321,3 @@ tuple_impls! {
     15 => (0 T0 get0 1 T1 get1 2 T2 get2 3 T3 get3 4 T4 get4 5 T5 get5 6 T6 get6 7 T7 get7 8 T8 get8 9 T9 get9 10 T10 get10 11 T11 get11 12 T12 get12 13 T13 get13 14 T14 get14)
     16 => (0 T0 get0 1 T1 get1 2 T2 get2 3 T3 get3 4 T4 get4 5 T5 get5 6 T6 get6 7 T7 get7 8 T8 get8 9 T9 get9 10 T10 get10 11 T11 get11 12 T12 get12 13 T13 get13 14 T14 get14 15 T15 get15)
 }
- */
