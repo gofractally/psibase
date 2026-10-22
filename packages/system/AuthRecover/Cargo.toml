@@ -13,9 +13,11 @@ package-name = "AuthRecover"
 services = ["auth-recover"]
 
 [package.metadata.psibase.dependencies]
+Host = "0.29.0"
 HttpServer = "0.29.0"
-Sites = "0.29.0"
 Permissions = "0.29.0"
+Sites = "0.29.0"
+Transact = "0.29.0"
 
 [lib]
 crate-type = ["rlib"]
