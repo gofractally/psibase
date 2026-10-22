@@ -182,6 +182,51 @@ impl<'a, T: MakeView + Unpack<'a>> Index<usize> for VecView<T> {
     }
 }
 
+pub struct ViewIterator<'a, T> {
+    data: &'a [u8],
+    pos: u32,
+    end: u32,
+    _phantom: PhantomData<T>,
+}
+
+impl<'a, T: MakeView + Unpack<'a>> Iterator for ViewIterator<'a, T>
+where
+    View<T>: 'a,
+{
+    type Item = &'a View<T>;
+    fn next(&mut self) -> Option<&'a View<T>> {
+        if self.pos == self.end {
+            None
+        } else {
+            let orig_pos = self.pos;
+            let pos = if T::VARIABLE_SIZE && !T::IS_OPTIONAL {
+                let stream = FracInputStream::new(&self.data);
+                orig_pos + stream.unpack_at::<u32>(&mut self.pos).unwrap()
+            } else {
+                self.pos += T::FIXED_SIZE;
+                orig_pos
+            };
+            Some(<View<T>>::new_unchecked(&self.data[pos as usize..]))
+        }
+    }
+}
+
+impl<'a, T: MakeView + Unpack<'a>> IntoIterator for &'a VecView<T> {
+    type Item = &'a View<T>;
+    type IntoIter = ViewIterator<'a, T>;
+    fn into_iter(self) -> ViewIterator<'a, T> {
+        let mut pos = 0;
+        let stream = FracInputStream::new(&self.get_data());
+        let size = stream.unpack_at::<u32>(&mut pos).unwrap();
+        ViewIterator {
+            data: self.get_data(),
+            pos,
+            end: pos + size,
+            _phantom: Default::default(),
+        }
+    }
+}
+
 macro_rules! generic_view {
     ( $ty:ty ) => {
         impl MakeView for $ty {

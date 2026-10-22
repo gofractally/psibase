@@ -914,6 +914,11 @@ fn test_view() {
         let v = <View<Vec<u32>>>::new(&data).unwrap();
         assert_eq!(v[0].unpack(), 42);
         assert_eq!(v[1].unpack(), 7);
+        let mut values = Vec::new();
+        for i in v {
+            values.push(i.unpack());
+        }
+        assert_eq!(values, vec![42, 7]);
     }
     {
         let data = vec!["asdf", ""].packed();
