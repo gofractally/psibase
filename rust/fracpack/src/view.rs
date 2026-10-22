@@ -220,7 +220,6 @@ impl Deref for View<&[u8]> {
  */
 
 view!(pub BoxView<T>: Box<T>);
-
 impl<T: MakeView> Deref for BoxView<T> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
@@ -228,45 +227,29 @@ impl<T: MakeView> Deref for BoxView<T> {
     }
 }
 
-/*
-impl<T> Deref for View<Rc<T>> {
+view!(pub RcView<T>: Rc<T>);
+impl<T: MakeView> Deref for RcView<T> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
         <View<T>>::new_unchecked(&self.data)
     }
 }
 
-impl<T> Deref for View<Arc<T>> {
+view!(pub ArcView<T>: Arc<T>);
+impl<T: MakeView> Deref for ArcView<T> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
         <View<T>>::new_unchecked(&self.data)
     }
 }
 
-impl<T> Deref for View<RefCell<T>> {
+view!(pub RefCellView<T>: RefCell<T>);
+impl<T: MakeView> Deref for RefCellView<T> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
         <View<T>>::new_unchecked(&self.data)
     }
 }
-
-const EMPTY_OPTION: [u8; 4] = [1, 0, 0, 0];
-
-pub fn get_member<'a, T: Unpack<'a>, U>(view: &View<U>, fixed_offset: u32) -> &View<T> {
-    let mut stream = FracInputStream::new(&view.data);
-    let fixed_size = u16::unpack(&mut stream).unwrap() as u32;
-    let orig_pos = fixed_offset + stream.pos;
-    if T::IS_OPTIONAL && fixed_size <= fixed_offset {
-        <View<T>>::new_unchecked(&EMPTY_OPTION)
-    } else if T::VARIABLE_SIZE && !T::IS_OPTIONAL {
-        let mut fixed_pos = orig_pos;
-        let offset = stream.unpack_at::<u32>(&mut fixed_pos).unwrap();
-        <View<T>>::new_unchecked(&view.data[(orig_pos + offset) as usize..])
-    } else {
-        <View<T>>::new_unchecked(&view.data[orig_pos as usize..])
-    }
-}
- */
 
 define_view!(TupleView);
 
