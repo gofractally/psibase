@@ -182,7 +182,25 @@ impl<'a, T: MakeView + Unpack<'a>> Index<usize> for VecView<T> {
     }
 }
 
-view!(pub U32View: u32);
+macro_rules! generic_view {
+    ( $ty:ty ) => {
+        impl MakeView for $ty {
+            type ViewType = GenericView<$ty>;
+        }
+    };
+}
+
+generic_view!(u8);
+generic_view!(u16);
+generic_view!(u32);
+generic_view!(u64);
+generic_view!(i8);
+generic_view!(i16);
+generic_view!(i32);
+generic_view!(i64);
+generic_view!(f32);
+generic_view!(f64);
+generic_view!(bool);
 
 view!(pub OptionView<T>: Option<T>);
 
