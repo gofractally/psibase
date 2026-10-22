@@ -63,29 +63,6 @@ impl HookUserAuth for AuthRecoverPlugin {
 }
 
 impl KeyVault for AuthRecoverPlugin {
-    #[authorized(None)]
-    fn generate_unmanaged_keypair() -> Result<HostTypes::Keypair, HostTypes::Error> {
-        HostCrypto::generate_unmanaged_keypair()
-    }
-
-    #[authorized(None)]
-    fn pub_from_priv(private_key: HostTypes::Pem) -> Result<HostTypes::Pem, HostTypes::Error> {
-        HostCrypto::pub_from_priv(&private_key)
-    }
-
-    #[authorized(None)]
-    fn to_der(key: HostTypes::Pem) -> Result<Vec<u8>, HostTypes::Error> {
-        HostCrypto::to_der(&key)
-    }
-
-    #[authorized(None)]
-    fn sign_explicit(
-        hashed_message: Vec<u8>,
-        private_key: Vec<u8>,
-    ) -> Result<Vec<u8>, HostTypes::Error> {
-        HostCrypto::sign_explicit(&hashed_message, &private_key)
-    }
-
     #[authorized(High, whitelist = ["transact"])]
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
         HostCrypto::sign(&hashed_message, &public_key)
