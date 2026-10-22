@@ -33,9 +33,9 @@ pub struct NftHolderRecord {
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "CreditRecordInput")]
 pub struct CreditRecord {
-    nftId: NID,
-    creditor: AccountNumber,
-    debitor: AccountNumber,
+    pub nftId: NID,
+    pub creditor: AccountNumber,
+    pub debitor: AccountNumber,
 }
 
 crate::define_flags!(NftHolderFlags, u8, {
@@ -54,7 +54,7 @@ mod service {
     }
 
     #[action]
-    fn mint() -> crate::services::nft::NID {
+    fn mint(nftId: Option<crate::services::nft::NID>) -> crate::services::nft::NID {
         unimplemented!()
     }
 
@@ -79,12 +79,22 @@ mod service {
     }
 
     #[action]
+    fn try_debit(nftId: crate::services::nft::NID, memo: Memo) {
+        unimplemented!()
+    }
+
+    #[action]
     fn setUserConf(index: u8, enable: bool) {
         unimplemented!()
     }
 
     #[action]
     fn getNft(nftId: crate::services::nft::NID) -> Option<super::Nft> {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getHeldIds(issuer: AccountNumber, owner: AccountNumber) -> Vec<crate::services::nft::NID> {
         unimplemented!()
     }
 

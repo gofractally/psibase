@@ -15,6 +15,10 @@ use psibase::{define_trust, FlagsType};
 
 use psibase::services::nft::{self as Nft, NftHolderFlags};
 
+use bindings::host::types::types::PluginId;
+use rand::Rng;
+use serde::Deserialize;
+
 define_trust! {
     descriptions {
         Low => "",
@@ -29,26 +33,67 @@ define_trust! {
         ",
     }
     functions {
+        None => [guess_id],
         Medium => [mint],
-        High => [uncredit, debit, enable_user_auto_debit, credit, burn, graphql],
+        High => [uncredit, debit, try_debit, enable_user_auto_debit, credit, burn, graphql],
     }
+}
+
+#[derive(Deserialize)]
+struct ChooseIdResponse {
+    data: ChooseIdData,
+}
+
+#[derive(Deserialize)]
+struct ChooseIdData {
+    #[serde(rename = "chooseId")]
+    id: u32,
+}
+
+fn plugin_error(message: impl Into<String>) -> Error {
+    Error {
+        code: 1,
+        producer: PluginId {
+            service: "nft".into(),
+            plugin: "plugin".into(),
+        },
+        message: message.into(),
+    }
+}
+
+fn choose_id() -> Result<u32, Error> {
+    let guess: u32 = rand::rng().random();
+    let query = format!("query {{ chooseId(id: {guess}) }}");
+    let body = post_graphql_get_json(&query)?;
+    serde_json::from_str::<ChooseIdResponse>(&body)
+        .map(|response| response.data.id)
+        .map_err(|err| plugin_error(err.to_string()))
 }
 
 struct NftPlugin;
 
 impl Issuer for NftPlugin {
-    fn mint() -> Result<(), Error> {
+    fn mint() -> Result<u32, Error> {
         trust::assert_authorized(trust::FunctionName::mint)?;
 
-        let packed_args = Nft::action_structs::mint {}.packed();
+        let id = choose_id()?;
+        let packed_args = Nft::action_structs::mint { nftId: Some(id) }.packed();
+        add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)?;
+        Ok(id)
+    }
 
-        add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)
+    fn guess_id() -> Result<u32, Error> {
+        trust::assert_authorized(trust::FunctionName::guess_id)?;
+        choose_id()
     }
 }
 
 impl User for NftPlugin {
     fn credit(nft_id: u32, receiver: String, memo: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::credit)?;
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::credit,
+            vec!["namemarket".into()],
+        )?;
 
         let packed_args = Nft::action_structs::credit {
             memo: memo.try_into().unwrap(),
@@ -82,6 +127,21 @@ impl User for NftPlugin {
         .packed();
 
         add_action_to_transaction(Nft::action_structs::debit::ACTION_NAME, &packed_args)
+    }
+
+    fn try_debit(nft_id: u32, memo: String) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::try_debit,
+            vec!["namemarket".into()],
+        )?;
+
+        let packed_args = Nft::action_structs::try_debit {
+            memo: memo.try_into().unwrap(),
+            nftId: nft_id,
+        }
+        .packed();
+
+        add_action_to_transaction(Nft::action_structs::try_debit::ACTION_NAME, &packed_args)
     }
 
     fn burn(nft_id: u32) -> Result<(), Error> {
