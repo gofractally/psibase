@@ -1,7 +1,6 @@
 use crate::bindings::exports::transact_hook_user_auth::Claim;
-use crate::bindings::host::client::api as Client;
-use crate::bindings::host::http::api as Server;
 use crate::errors::ErrorType::*;
+use psibase_plugin::host::{client, server};
 use psibase_plugin::types as CommonTypes;
 use psibase_plugin::types::Pem;
 use serde::Deserialize;
@@ -22,7 +21,7 @@ struct Response {
 }
 
 pub fn get_pubkey(account_name: &str) -> Result<Pem, CommonTypes::Error> {
-    let user_key_json = Server::post_graphql_get_json(&format!(
+    let user_key_json = server::post_graphql_get_json(&format!(
         "query {{ account(name: \"{}\") {{ pubkey }} }}",
         account_name
     ))?;
@@ -41,5 +40,5 @@ pub fn to_claim(pubkey: Vec<u8>) -> Claim {
 }
 
 pub fn from_transact() -> bool {
-    Client::get_sender() == psibase::services::transact::SERVICE.to_string()
+    client::get_sender() == psibase::services::transact::SERVICE.to_string()
 }
