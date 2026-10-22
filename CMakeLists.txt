@@ -287,6 +287,7 @@ add_rs_component_workspace(packages/:Plugins
     kvtests
     setcode
     clientdata
+    explorer
     invite
     packages
     permissions
@@ -713,6 +714,7 @@ psibase_package(
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-delg
         DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
+        EXPORT auth-delegate
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "AuthDelegateService(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
@@ -936,10 +938,12 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Explorer-schema.json
         SERVER explorer
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/ui/dist /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_explorer} /plugin.wasm
     DEPENDS ${Explorer_js_DEP}
+    DEPENDS ${Plugins_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "AuthDelegate(^${PSIBASE_VERSION}.0)" "AuthDyn(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Packages(^${PSIBASE_VERSION}.0)" "Producers(^${PSIBASE_VERSION}.0)" "Registry(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
