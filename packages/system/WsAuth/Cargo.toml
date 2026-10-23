@@ -13,7 +13,7 @@ package-name = "WsAuth"
 services = ["wsauth"]
 
 [package.metadata.psibase.dependencies]
-XHttp = "0.29.0"
+HttpServer = "0.29.0"
 Transact = "0.29.0"
 
 [lib]
