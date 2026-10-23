@@ -246,6 +246,20 @@ impl<'a, T: MakeView + Unpack<'a>> VecView<T> {
     }
 }
 
+impl<T> VecView<T> {
+    pub fn is_empty(&self) -> bool {
+        let mut stream = FracInputStream::new(&self.get_data());
+        u32::unpack(&mut stream).unwrap() == 0
+    }
+}
+
+impl<'a, T: Unpack<'a>> VecView<T> {
+    pub fn len(&self) -> usize {
+        let mut stream = FracInputStream::new(&self.get_data());
+        (u32::unpack(&mut stream).unwrap() / T::FIXED_SIZE) as usize
+    }
+}
+
 macro_rules! generic_view {
     ( $ty:ty ) => {
         impl MakeView for $ty {

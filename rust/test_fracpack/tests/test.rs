@@ -921,6 +921,8 @@ fn test_view() {
         assert_eq!(values, vec![42, 7]);
         assert_eq!(v.iter().map(|i| i.unpack()).sum::<u32>(), 49);
         assert_eq!(v.iter().unpacked().sum::<u32>(), 49);
+        assert!(!v.is_empty());
+        assert_eq!(v.len(), 2);
     }
     {
         let data = vec!["asdf", ""].packed();
