@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/nativeTables.hpp>
@@ -61,6 +62,8 @@ namespace SystemService
       void regCandidate(const std::string& endpoint, psibase::Claim claim);
       void unregCand();
 
+      std::optional<CandidateInfo> getCandidate(psibase::AccountNumber account);
+
       std::vector<psibase::AccountNumber> getProducers();
 
       /// A maximum size of the producer set producing blocks for the network
@@ -110,6 +113,7 @@ namespace SystemService
                 method(setProducers, producers),
                 method(regCandidate, endpoint, claim),
                 method(unregCand),
+                method(getCandidate, account),
                 method(getProducers),
                 method(setMaxProds, maxProds),
                 method(getMaxProds),

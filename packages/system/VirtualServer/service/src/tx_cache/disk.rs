@@ -1,4 +1,4 @@
-use psibase::{abort_message, AccountNumber};
+use psibase::{AccountNumber, abort_message};
 use std::cell::RefCell;
 use std::collections::HashMap;
 

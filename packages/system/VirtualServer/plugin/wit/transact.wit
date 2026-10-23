@@ -5,7 +5,11 @@ interface transact {
 
     /// Fills the specified user's gas tank, if:
     /// * the user is logged-in
+    /// * the user has a non-zero system-token balance
     /// * the user is configured for auto-filling
     /// * the user is low enough on resources to need it
+    ///
+    /// When the user has no system-token balance, this is a no-op so no refill
+    /// actions are injected into the transaction.
     auto-fill-gas-tank: func(account: string) -> result<_, error>;
 }

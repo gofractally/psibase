@@ -1,8 +1,10 @@
+use crate::bindings::tokens::plugin as TokensPlugin;
 use crate::errors::ErrorType;
 use crate::Error;
 use psibase::services::tokens::Decimal;
 use psibase_plugin::host::server;
 use serde::Deserialize;
+use std::str::FromStr;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -103,4 +105,21 @@ pub fn get_billing_config() -> Result<BillingConfig, Error> {
 
 pub fn billing_enabled() -> Result<bool, Error> {
     Ok(get_billing_config()?.enabled)
+}
+
+pub fn should_auto_refill_gas_tank(user: &str) -> Result<bool, Error> {
+    let Some(sys_id) = TokensPlugin::helpers::fetch_network_token()? else {
+        return Ok(false);
+    };
+
+    let balances = TokensPlugin::helpers::get_user_balances(user)?;
+    let Some(row) = balances.into_iter().find(|row| row.token_id == sys_id) else {
+        return Ok(false);
+    };
+
+    Ok(Decimal::from_str(&row.balance)
+        .map_err(|e| ErrorType::QueryError(format!("Failed to parse balance: {e}")))?
+        .quantity
+        .value
+        > 0)
 }
