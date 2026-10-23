@@ -198,9 +198,8 @@ export const ResourceProviders = () => {
                                     }
                                 />
                                 <p className="text-muted-foreground text-xs">
-                                    Comma-separated list. Each code must be a
-                                    valid account name (up to 10 letters,
-                                    digits, or hyphens).
+                                    Comma-separated list. Each code is free-form
+                                    and at most 6 characters.
                                 </p>
                             </div>
 

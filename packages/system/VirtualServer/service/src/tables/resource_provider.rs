@@ -5,11 +5,14 @@ use psibase::*;
 
 #[ComplexObject]
 impl ResourceProvider {
-    /// Producer candidate HTTP endpoint (root origin), if registered.
+    /// Payment-portal origin: the producer's candidate endpoint with this
+    /// provider's app account as a subdomain (e.g. `https://x-portal.prod.example.com`).
     async fn endpoint(&self) -> Option<String> {
-        Producers::call()
-            .getCandidate(self.provider)
-            .map(|c| c.endpoint)
+        let candidate = Producers::call().getCandidate(self.provider)?;
+        let mut url = url::Url::parse(&candidate.endpoint).ok()?;
+        let host = url.host_str()?.to_string();
+        url.set_host(Some(&format!("{}.{}", self.app, host))).ok()?;
+        Some(url.origin().ascii_serialization())
     }
 
     /// Whether this producer is currently in the active producer set.
@@ -55,7 +58,7 @@ impl ResourceProvider {
             .map(|code| {
                 let lower = code.to_ascii_lowercase();
                 assert!(
-                    AccountNumber::from_exact(&lower).is_ok(),
+                    !lower.is_empty() && lower.chars().count() <= 6,
                     "currency name invalid: {code}"
                 );
                 lower

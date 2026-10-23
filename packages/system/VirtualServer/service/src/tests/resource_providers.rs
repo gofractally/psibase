@@ -1,4 +1,4 @@
-use psibase::{account, services::producers, tester::PRODUCER_ACCOUNT, Claim, Producer, Push};
+use psibase::{Claim, Producer, Push, account, services::producers, tester::PRODUCER_ACCOUNT};
 use serde::Deserialize;
 
 use crate::Wrapper;
@@ -71,7 +71,7 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
     assert_eq!(providers[0].accepted, vec!["usd", "eur"]);
     assert_eq!(
         providers[0].endpoint.as_deref(),
-        Some("https://prod.example.com")
+        Some("https://x-portal.prod.example.com")
     );
     assert!(providers[0].activeInfraProvider);
 
@@ -87,6 +87,13 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
         .unreg_res_provider()
         .get()?;
     assert!(resource_providers(&chain)?.is_empty());
+
+    // Currency codes are free-form but capped at 6 characters
+    assert_error(
+        Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .reg_res_provider(portal, vec!["TOOLONG".into()]),
+        "currency name invalid",
+    );
 
     // Non-producer cannot register
     let alice = account!("alice");
@@ -136,7 +143,7 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
     );
     assert_eq!(
         providers[0].endpoint.as_deref(),
-        Some("https://prod.example.com")
+        Some("https://x-portal.prod.example.com")
     );
 
     Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
