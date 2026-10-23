@@ -423,6 +423,20 @@ impl Queries for PackagesPlugin {
             serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
         Ok(result.data.sources)
     }
+    fn get_installed() -> Result<Vec<types::InstalledPackage>, HostTypes::Error> {
+        Ok(get_installed_packages()?
+            .into_iter()
+            .map(|p| types::InstalledPackage {
+                meta: p.meta().into(),
+                owner: p.owner.to_string(),
+            })
+            .collect())
+    }
+    fn get_schema(service: String) -> Result<Option<String>, HostTypes::Error> {
+        let service = AccountNumber::from_exact(&service)
+            .map_err(|e| ErrorType::JsonError(e.to_string()))?;
+        Ok(Server::get_json(&format!("/schema?service={service}")).ok())
+    }
 }
 
 impl PrivateApi for PackagesPlugin {

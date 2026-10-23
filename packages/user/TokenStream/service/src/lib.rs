@@ -88,6 +88,7 @@ pub mod tables {
             assert_eq!(
                 psibase::services::nft::Wrapper::call()
                     .getNft(self.nft_id)
+                    .expect("NFT was burned")
                     .owner,
                 account,
                 "{} must be holder of NFT ID: {}",
@@ -110,10 +111,12 @@ pub mod tables {
 
         /// Deposit `amount` into the bucket.
         pub fn deposit(&mut self, amount: Quantity) {
-            self.total_deposited = (self.total_deposited.value - self.total_claimed.value).into();
+            let already_claimable = self.balance_claimable();
+            let still_in_stream = self.unclaimed_total();
+
+            self.claimable_at_last_deposit = already_claimable;
             self.total_claimed = 0.into();
-            self.claimable_at_last_deposit = self.total_vested();
-            self.total_deposited = (self.total_deposited.value + amount.value).into();
+            self.total_deposited = (still_in_stream.value + amount.value).into();
             self.last_deposit_timestamp = TransactSvc::call().currentBlock().time.seconds();
 
             self.save();
@@ -199,7 +202,7 @@ pub mod service {
     /// * `token_id` - Token ID to be deposited into the stream.
     ///
     /// # Returns
-    /// The ID of the redeemer NFT which is also the unique ID of the stream.    
+    /// The ID of the redeemer NFT which is also the unique ID of the stream.
     #[action]
     fn create(half_life_seconds: u32, token_id: u32) -> u32 {
         psibase::services::tokens::Wrapper::call().getToken(token_id);
