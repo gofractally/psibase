@@ -19,6 +19,8 @@ members = [
     "AuthRecover/service",
     "AuthRecover/query-service",
     "AuthRecover/plugin",
+    "WsAuth",
+    "WsAuth/service",
 ]
 
 exclude = [
