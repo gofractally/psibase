@@ -10,9 +10,17 @@ use crate::bindings::transact::plugin::api as Transact;
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as Accounts;
+use psibase::AccountNumber;
 use std::collections::HashSet;
 
 const HOST_APP: &str = "host";
+
+fn parse_accounts(accounts: Vec<String>) -> Result<Vec<AccountNumber>, Error> {
+    accounts
+        .into_iter()
+        .map(|name| AccountNumber::from_exact(&name).map_err(|_| InvalidAccountName(name).into()))
+        .collect()
+}
 
 impl Admin for AccountsPlugin {
     fn get_auth_services() -> Result<Vec<String>, Error> {
@@ -94,5 +102,33 @@ impl Admin for AccountsPlugin {
             .packed(),
         )
         .unwrap();
+    }
+
+    fn freeze(accounts: Vec<String>, memo: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::freeze, vec!["config".into()])?;
+        let accounts = parse_accounts(accounts)?;
+        Transact::add_action_to_transaction(
+            Accounts::action_structs::freeze::ACTION_NAME,
+            &Accounts::action_structs::freeze {
+                accounts,
+                memo: Some(memo),
+            }
+            .packed(),
+        )?;
+        Ok(())
+    }
+
+    fn unfreeze(accounts: Vec<String>, memo: String) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::unfreeze, vec!["config".into()])?;
+        let accounts = parse_accounts(accounts)?;
+        Transact::add_action_to_transaction(
+            Accounts::action_structs::unfreeze::ACTION_NAME,
+            &Accounts::action_structs::unfreeze {
+                accounts,
+                memo: Some(memo),
+            }
+            .packed(),
+        )?;
+        Ok(())
     }
 }

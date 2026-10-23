@@ -77,6 +77,15 @@ namespace SystemService
          }
          return true;
       }
+
+      // Db rejects a read of another service's prefix, so this cannot open FrozenTable.
+      void checkNotFrozen(AccountNumber account)
+      {
+         if (to<Accounts>().isFrozen(std::vector<AccountNumber>{account}))
+         {
+            abortMessage("account " + account.str() + " has been frozen");
+         }
+      }
    }  // namespace
 
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
@@ -542,6 +551,7 @@ namespace SystemService
    std::vector<char> Transact::runAs(psibase::Action            action,
                                      std::vector<ServiceMethod> allowedActions)
    {
+      checkNotFrozen(action.sender);
       auto requester = getSender();
 
       auto statusTable    = open<TransactStatusTable>(KvMode::read);
@@ -908,6 +918,7 @@ namespace SystemService
 
       for (auto act : trx.actions())
       {
+         checkNotFrozen(act.sender());
          if (enforceAuth)
          {
             auto first = get_view_data(act) == get_view_data(trx.actions()[0]);

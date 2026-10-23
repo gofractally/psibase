@@ -1,14 +1,15 @@
 #include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psibase/testerApi.hpp>
 #include <services/system/AuthAny.hpp>
+#include <services/system/AuthNone.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
-#include <services/test/AuthNone.hpp>
 #include <services/test/AuthTest.hpp>
 #include <services/test/RemoveCode.hpp>
 #include <services/user/Nop.hpp>
@@ -27,6 +28,12 @@ namespace
    auto privFromPem = [](std::string param) {  //
       return AuthSig::PrivateKeyInfo{AuthSig::parsePrivateKeyInfo(param)};
    };
+
+   void ensureAuthNone(DefaultTestChain& t)
+   {
+      if (!t.kvGet<CodeRow>(CodeRow::db, codeKey(AuthNone::service)))
+         t.addService<AuthNone>("AuthNone.wasm");
+   }
 
    auto aliceKeys =
        KeyPair{pubFromPem("-----BEGIN PUBLIC KEY-----\n"
@@ -92,17 +99,17 @@ TEST_CASE("Test login")
 
    transactor<LoginInterface> login{alice, getUser};
    Tapos       tapos{.expiration = std::chrono::time_point_cast<std::chrono::seconds>(
-                                       std::chrono::system_clock::now()) +
-                                   std::chrono::seconds(10),
-                     .flags      = Tapos::do_not_broadcast_flag};
+                                 std::chrono::system_clock::now()) +
+                             std::chrono::seconds(10),
+                     .flags = Tapos::do_not_broadcast_flag};
    Transaction trx{.tapos = tapos, .actions = {login.loginSys("psibase.io")}};
 
    // User with no key
    {
       SignedTransaction strx{trx};
 
-      auto token  = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
-                        .access_token;
+      auto token = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
+                       .access_token;
       auto client = t.http(getUser).auth_bearer(token);
       auto user   = client.get<std::optional<AccountNumber>>("/");
       CHECK(user == std::optional{alice});
@@ -126,8 +133,8 @@ TEST_CASE("Test login")
    {
       SignedTransaction strx{t.signTransaction(trx, {aliceKeys})};
 
-      auto token  = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
-                        .access_token;
+      auto token = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
+                       .access_token;
       auto client = t.http(getUser).auth_bearer(token);
       auto user   = client.get<std::optional<AccountNumber>>("/");
       CHECK(user == std::optional{alice});
@@ -471,7 +478,7 @@ TEST_CASE("Test runAs")
    t.addService<AuthTest>("AuthTest.wasm");
    SECTION("subaccount can be authorized by base account")
    {
-      t.addService<AuthNone>("AuthNone.wasm");
+      ensureAuthNone(t);
       auto alice1 = AccountNumber("alice+1");
       REQUIRE(t.from(alice)
                   .to<Accounts>()
@@ -501,14 +508,14 @@ TEST_CASE("Test runAs")
       }
       SECTION("or left")
       {
-         t.addService<AuthNone>("AuthNone.wasm");
+         ensureAuthNone(t);
          REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{alice}, 1).succeeded());
          t.addAccount(carol, AuthNone::service);
          REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());
       }
       SECTION("or right")
       {
-         t.addService<AuthNone>("AuthNone.wasm");
+         ensureAuthNone(t);
          t.addAccount(bob, AuthNone::service);
          REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
          REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());

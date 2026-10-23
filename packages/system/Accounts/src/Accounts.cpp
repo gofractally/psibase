@@ -141,19 +141,22 @@ namespace SystemService
       return true;
    }
 
-   void Accounts::setAuthServ(psibase::AccountNumber authService)
+   void Accounts::assignAuth(AccountNumber name, AccountNumber authService)
    {
-      Tables tables{getReceiver()};
-      auto   accountTable = tables.open<AccountTable>();
-      auto   accountIndex = accountTable.getIndex<0>();
-      auto   account      = accountIndex.get((getSender()));
-      check(account.has_value(), "account " + getSender().str() + " does not exist");
+      auto accountTable = open<AccountTable>();
+      auto account      = accountTable.getIndex<0>().get(name);
+      check(account.has_value(), "account " + name.str() + " does not exist");
 
-      to<AuthInterface>(authService).canAuthUserSys(getSender());
+      to<AuthInterface>(authService).canAuthUserSys(name);
 
       account->authService = authService;
       ++account->authSequence;
       accountTable.put(*account);
+   }
+
+   void Accounts::setAuthServ(psibase::AccountNumber authService)
+   {
+      assignAuth(getSender(), authService);
    }
 
    std::optional<Account> Accounts::getAccount(AccountNumber name)
@@ -185,6 +188,54 @@ namespace SystemService
    bool Accounts::exists(AccountNumber name)
    {
       return getAccount(name) != std::nullopt;
+   }
+
+   void Accounts::freeze(std::vector<AccountNumber> accounts, std::optional<std::string> memo)
+   {
+      check(getSender() == service, "unauthorized");
+      auto frozen = open<FrozenTable>();
+      auto rows   = open<AccountTable>();
+      for (auto account : accounts)
+      {
+         AccountNumber previous;
+         {
+            auto row = rows.getIndex<0>().get(account);
+            check(row.has_value(), "account " + account.str() + " does not exist");
+            previous = row->authService;
+         }
+         if (!frozen.get(account))
+         {
+            frozen.put(FrozenAccount{.account = account, .authService = previous});
+            assignAuth(account, authNoneService);
+         }
+         emit().history().froze(account, memo);
+      }
+   }
+
+   void Accounts::unfreeze(std::vector<AccountNumber> accounts, std::optional<std::string> memo)
+   {
+      check(getSender() == service, "unauthorized");
+      auto frozen = open<FrozenTable>();
+      for (auto account : accounts)
+      {
+         if (auto saved = frozen.get(account))
+         {
+            assignAuth(account, saved->authService);
+            frozen.remove(*saved);
+         }
+         emit().history().unfroze(account, memo);
+      }
+   }
+
+   bool Accounts::isFrozen(std::vector<AccountNumber> accounts)
+   {
+      auto frozen = open<FrozenTable>(KvMode::read);
+      for (auto account : accounts)
+      {
+         if (frozen.get(account))
+            return true;
+      }
+      return false;
    }
 
 }  // namespace SystemService
