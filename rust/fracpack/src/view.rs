@@ -299,7 +299,7 @@ generic_view!(bool);
 
 view!(pub OptionView<T>: Option<T>);
 
-impl<'a, T: MakeView + Unpack<'a>> OptionView<T> {
+impl<T: MakeView> OptionView<T> {
     pub fn get(&self) -> Option<&View<T>> {
         let mut stream = FracInputStream::new(&self.data);
         let offset = u32::unpack(&mut stream).unwrap();
@@ -309,6 +309,49 @@ impl<'a, T: MakeView + Unpack<'a>> OptionView<T> {
             Some(<View<T>>::new_unchecked(&self.data))
         } else {
             Some(<View<T>>::new_unchecked(&self.data[offset as usize..]))
+        }
+    }
+}
+
+pub trait OptionLike {
+    fn make_none() -> Self;
+}
+
+impl<'a, T> OptionLike for &'a OptionView<T> {
+    fn make_none() -> Self {
+        <OptionView<T>>::new_unchecked(&EMPTY_OPTION)
+    }
+}
+
+impl<T> OptionLike for Option<T> {
+    fn make_none() -> Self {
+        None
+    }
+}
+
+impl<T> OptionView<T> {
+    pub fn is_some(&self) -> bool {
+        let mut stream = FracInputStream::new(&self.data);
+        u32::unpack(&mut stream).unwrap() != 1
+    }
+    pub fn is_none(&self) -> bool {
+        !self.is_some()
+    }
+    pub fn and<U: OptionLike>(&self, optb: U) -> U {
+        if self.is_some() {
+            optb
+        } else {
+            U::make_none()
+        }
+    }
+    pub fn and_then<U: OptionLike, F: FnOnce(&View<T>) -> U>(&self, f: F) -> U
+    where
+        T: MakeView,
+    {
+        if let Some(value) = self.get() {
+            f(value)
+        } else {
+            U::make_none()
         }
     }
 }

@@ -967,3 +967,41 @@ fn test_view() {
         assert_eq!(v.inner_option_str().unpack(), Some(String::new()));
     }
 }
+
+#[test]
+fn test_option_view() {
+    let data_none = Option::<u32>::None.packed();
+    let vnone = <View<Option<u32>>>::new(&data_none).unwrap();
+    assert!(matches!(vnone.get(), None));
+    assert!(vnone.is_none());
+    assert!(!vnone.is_some());
+    let data1 = Some(1u32).packed();
+    let v1 = <View<Option<u32>>>::new(&data1).unwrap();
+    let data2 = Some(2u32).packed();
+    let v2 = <View<Option<u32>>>::new(&data2).unwrap();
+    if let Some(v) = v1.get() {
+        assert_eq!(v.unpack(), 1);
+    } else {
+        panic!("get() failed")
+    }
+    assert!(v1.is_some());
+    assert!(!v1.is_none());
+
+    assert_eq!(vnone.and(Some(5)), None);
+    assert_eq!(vnone.and(v2).unpack(), None);
+    assert_eq!(vnone.and(Option::<u32>::None), None);
+    assert_eq!(vnone.and(vnone).unpack(), None);
+    assert_eq!(v1.and(Some(5)), Some(5));
+    assert_eq!(v1.and(v2).unpack(), Some(2));
+    assert_eq!(v1.and(Option::<u32>::None), None);
+    assert_eq!(v1.and(vnone).unpack(), None);
+
+    assert_eq!(vnone.and_then(|_| Some(5)), None);
+    assert_eq!(vnone.and_then(|i| Some(i.unpack() + 10)), None);
+    assert_eq!(vnone.and_then(|_| v2).unpack(), None);
+    assert_eq!(vnone.and_then(|_| vnone).unpack(), None);
+    assert_eq!(v1.and_then(|_| Some(5)), Some(5));
+    assert_eq!(v1.and_then(|i| Some(i.unpack() + 10)), Some(11));
+    assert_eq!(v1.and_then(|_| v2).unpack(), Some(2));
+    assert_eq!(v1.and_then(|_| vnone).unpack(), None);
+}
