@@ -1,0 +1,16 @@
+package host:login;
+
+world impl {
+    include host:client/imports;
+    include host:auth/imports;
+    include host:prompt/imports;
+    import host:accounts/admin;
+    include accounts:query/imports;
+
+    import transact:query-auth/api;
+    import auth-sig:plugin/api;
+    import auth-sig:plugin/keyvault;
+
+    export admin;
+    export api;
+}

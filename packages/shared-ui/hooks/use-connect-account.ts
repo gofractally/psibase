@@ -12,8 +12,8 @@ export const useConnectAccount = (
             await supervisor.functionCall(
                 {
                     service: "host",
-                    plugin: "accounts",
-                    intf: "activeApp",
+                    plugin: "login",
+                    intf: "api",
                     method: "connectAccount",
                     params: [],
                 },

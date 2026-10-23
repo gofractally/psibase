@@ -2,6 +2,9 @@ use crate::bindings::host::client::api::{get_active_app, get_sender};
 use crate::bindings::host::types::types::Error;
 use crate::errors::ErrorType::Unauthorized;
 
+/// App id for Host plugins and UI (no on-chain service).
+pub(crate) const HOST_APP: &str = "host";
+
 pub fn check_caller(allowed: &[&str], context: &str) {
     let app = get_sender();
     if !allowed.contains(&app.as_str()) {

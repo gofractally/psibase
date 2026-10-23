@@ -1,15 +1,16 @@
 package host:auth;
 
 interface api {
-    use host:types/types.{error};
+    /// Persist the token and plant the auth cookie for `user` on `app`.
+    /// Host-only. The caller obtains the token (cache hit or mint).
+    set-session: func(user: string, app: string, token: string);
 
-    /// Notify of new logged in user
-    set-logged-in-user: func(user: string, app: string) -> result<_, error>;
+    /// Clear credentials for `user` on `app`.
+    /// Host-only.
+    clear-session: func(user: string, app: string);
 
-    /// Notify of user logout
-    log-out-user: func(user: string, app: string);
-
-    /// Privileged apps can get the query token to make calls on user's behalf
+    /// Privileged callers can get the query token to make calls on the user's behalf.
+    /// Host + supervisor.
     get-active-query-token: func(app: string, user: string) -> option<string>;
 }
 

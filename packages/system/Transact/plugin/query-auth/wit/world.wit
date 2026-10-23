@@ -1,0 +1,12 @@
+package transact:query-auth;
+
+interface api {
+    use host:types/types.{error};
+
+    /// Gets a bearer token for user to make authenticated queries
+    get-query-token: func(app: string, user: string) -> result<string, error>;
+}
+
+world imports {
+    import api;
+}

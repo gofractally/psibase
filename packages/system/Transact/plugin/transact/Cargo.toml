@@ -9,8 +9,6 @@ psibase.workspace = true
 regex = "1"
 serde.workspace = true
 serde_json.workspace = true
-chrono = "0.4.38"
-sha2 = "0.10.6"
 psibase-plugin-workspace-hack.workspace = true
 
 [lib]
@@ -24,10 +22,8 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:client" = { path = "../../../../user/Host/plugin/client/wit/world.wit" }
-"host:http" = { path = "../../../../user/Host/plugin/http/wit/world.wit" }
 "host:db" = { path = "../../../../user/Host/plugin/db/wit/world.wit" }
 "host:types" = { path = "../../../../user/Host/plugin/types/wit/world.wit" }
-"accounts:query" = { path = "../../../Accounts/plugin/query/wit/world.wit" }
 "host:accounts" = { path = "../../../../user/Host/plugin/accounts/wit/world.wit" }
 "permissions:plugin" = { path = "../../../../user/Permissions/plugin/wit/world.wit" }
 

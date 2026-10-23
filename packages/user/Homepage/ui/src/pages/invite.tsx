@@ -172,8 +172,8 @@ export const Invite = () => {
                                 await supervisor.functionCall(
                                     {
                                         service: "host",
-                                        plugin: "accounts",
-                                        intf: "activeApp",
+                                        plugin: "login",
+                                        intf: "api",
                                         method: "connectAccount",
                                         params: [],
                                     },
