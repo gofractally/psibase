@@ -1088,7 +1088,7 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok(())
     }
 
-    pub fn get_all_schemas(&self, schemas: &mut SchemaMap) -> Result<(), anyhow::Error> {
+    pub fn get_all_schemas(&self, schemas: &mut SchemaMap) {
         for (account, _, info) in &self.services {
             if !schemas.contains_key(account) {
                 if let Some(schema) = info.schema.clone() {
@@ -1096,7 +1096,6 @@ impl<R: Read + Seek> PackagedService<R> {
                 }
             }
         }
-        Ok(())
     }
 
     pub async fn load_schemas<F: SchemaFetcher>(
@@ -1104,7 +1103,7 @@ impl<R: Read + Seek> PackagedService<R> {
         fetcher: &F,
         schemas: &mut SchemaMap,
     ) -> Result<(), anyhow::Error> {
-        self.get_all_schemas(schemas)?;
+        self.get_all_schemas(schemas);
         for act in &self.postinstall {
             act.load_schemas(fetcher, schemas).await?
         }
@@ -1270,14 +1269,12 @@ impl<R: Read + Seek> PackagedService<R> {
     }
 }
 
-pub fn get_schemas<T: Read + Seek>(
-    packages: &[PackagedService<T>],
-) -> Result<SchemaMap, anyhow::Error> {
+pub fn get_schemas<T: Read + Seek>(packages: &[PackagedService<T>]) -> SchemaMap {
     let mut schemas = HashMap::new();
     for package in &packages[..] {
-        package.get_all_schemas(&mut schemas)?
+        package.get_all_schemas(&mut schemas)
     }
-    Ok(schemas)
+    schemas
 }
 
 pub trait ActionGroup {
@@ -1587,7 +1584,7 @@ pub async fn fetch_all_schemas<R: Read + Seek, F: SchemaFetcher>(
     for op in packages {
         match op {
             PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
-                package.get_all_schemas(schemas)?
+                package.get_all_schemas(schemas)
             }
             _ => {}
         }
