@@ -5,8 +5,7 @@ use psibase::*;
 
 #[ComplexObject]
 impl ResourceProvider {
-    /// Payment-portal origin: the producer's candidate endpoint with this
-    /// provider's app account as a subdomain (e.g. `https://x-portal.prod.example.com`).
+    /// Payment-portal origin (`{app}` subdomain of the producer candidate endpoint).
     async fn endpoint(&self) -> Option<String> {
         let candidate = Producers::call().getCandidate(self.provider)?;
         let mut url = url::Url::parse(&candidate.endpoint).ok()?;
