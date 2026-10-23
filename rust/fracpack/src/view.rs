@@ -260,6 +260,23 @@ impl<'a, T: Unpack<'a>> VecView<T> {
     }
 }
 
+impl Deref for VecView<u8> {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        let mut stream = FracInputStream::new(self.get_data());
+        <&[u8]>::unpack(&mut stream).unwrap()
+    }
+}
+
+view!(pub <'a> BytesView: &'a [u8]);
+impl Deref for BytesView {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        let mut stream = FracInputStream::new(self.get_data());
+        <&[u8]>::unpack(&mut stream).unwrap()
+    }
+}
+
 macro_rules! generic_view {
     ( $ty:ty ) => {
         impl MakeView for $ty {
@@ -295,25 +312,6 @@ impl<'a, T: MakeView + Unpack<'a>> OptionView<T> {
         }
     }
 }
-
-/*
-impl Deref for View<Vec<u8>> {
-    type Target = [u8];
-    fn deref(&self) -> &[u8] {
-        let mut stream = FracInputStream::new(&self.data);
-        <&[u8]>::unpack(&mut stream).unwrap()
-    }
-}
-
-impl Deref for View<&[u8]> {
-    type Target = [u8];
-    fn deref(&self) -> &[u8] {
-        let mut stream = FracInputStream::new(&self.data);
-        <&[u8]>::unpack(&mut stream).unwrap()
-    }
-}
-
- */
 
 view!(pub BoxView<T>: Box<T>);
 impl<T: MakeView> Deref for BoxView<T> {
