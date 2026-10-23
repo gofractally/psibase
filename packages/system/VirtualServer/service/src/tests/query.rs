@@ -1,8 +1,8 @@
-use psibase::{services::tokens::Decimal, AccountNumber};
-use serde::{de::DeserializeOwned, Deserialize};
+use psibase::{AccountNumber, services::tokens::Decimal};
+use serde::{Deserialize, de::DeserializeOwned};
 
-use crate::tables::tables::{NetworkVariables, ServerSpecs};
 use crate::Wrapper;
+use crate::tables::tables::{NetworkVariables, ServerSpecs};
 
 /// Runs a GraphQL query against `service` and deserializes `data[field]` into `T`.
 pub(super) fn query<T: DeserializeOwned>(

@@ -1,9 +1,8 @@
 use crate::Wrapper;
 use psibase::{
-    account,
+    AccountNumber, ChainEmptyResult, Push, account,
     services::{http_server, tokens},
     tester::PRODUCER_ACCOUNT,
-    AccountNumber, ChainEmptyResult, Push,
 };
 
 use super::query::get_user_resources;

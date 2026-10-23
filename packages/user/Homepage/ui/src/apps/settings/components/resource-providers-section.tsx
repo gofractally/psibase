@@ -25,16 +25,6 @@ function shuffleInPlace<T>(items: T[]): T[] {
     return items;
 }
 
-function purchaseUrl(provider: ResourceProvider): string {
-    try {
-        const url = new URL(provider.endpoint);
-        url.hostname = `${provider.app}.${url.hostname}`;
-        return url.origin;
-    } catch {
-        return provider.endpoint;
-    }
-}
-
 export const ResourceProvidersSection = () => {
     const { data: providers, isLoading } = useResourceProviders();
     const [ordered, setOrdered] = useState<ResourceProvider[]>([]);
@@ -104,7 +94,7 @@ export const ResourceProvidersSection = () => {
                                     <td className="py-2">
                                         <a
                                             className="text-primary underline underline-offset-2"
-                                            href={purchaseUrl(provider)}
+                                            href={provider.endpoint}
                                             target="_blank"
                                             rel="noreferrer"
                                         >

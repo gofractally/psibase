@@ -111,7 +111,8 @@ interface admin {
     ///
     /// Parameters:
     /// * `app` - App subdomain local to this node (begins with `x-`)
-    /// * `accepted` - Currency codes (non-empty). Each is stored lowercase.
+    /// * `accepted` - Currency codes (non-empty). Each is free-form, at most 6
+    ///   characters, and stored lowercase.
     reg-res-provider: func(app: string, accepted: list<string>) -> result<_, error>;
 
     /// Remove the caller's resource provider registration, if any.

@@ -287,7 +287,8 @@ mod service {
     ///
     /// The sender must be an active producer with a non-empty candidate endpoint.
     /// `app` must be a valid app subdomain local to this node (begins with `x-`).
-    /// `accepted` must be non-empty. Each currency code is stored lowercase.
+    /// `accepted` must be non-empty. Each currency code is free-form, at most 6
+    /// characters, and stored lowercase.
     #[action]
     fn reg_res_provider(app: AccountNumber, accepted: Vec<String>) {
         unimplemented!()
