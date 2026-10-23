@@ -42,7 +42,6 @@ export const zAccountFree = accountNameSchema(
     `Account must be at least ${MIN_FREE_ACCOUNT_NAME_LENGTH} characters.`,
 );
 
-/** Node-local app account (`x-…`), e.g. a resource-provider payment portal. */
 export const zLocalAccount = baseNameSchema(
     MIN_ACCOUNT_NAME_LENGTH,
     `Account must be at least ${MIN_ACCOUNT_NAME_LENGTH} characters.`,
