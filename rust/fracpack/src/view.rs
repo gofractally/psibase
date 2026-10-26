@@ -295,6 +295,54 @@ impl<T, const N: usize> MakeView for [T; N] {
 
 type ArrayView<T, const N: usize> = GenericView<[T; N]>;
 
+impl<'a, T: MakeView + Unpack<'a>, const N: usize> Index<usize> for ArrayView<T, N> {
+    type Output = View<T>;
+    fn index(&self, index: usize) -> &Self::Output {
+        assert!(index < N);
+        let stream = FracInputStream::new(&self.data);
+        let orig_pos = T::FIXED_SIZE * index as u32;
+        if T::VARIABLE_SIZE && !T::IS_OPTIONAL {
+            let mut fixed_pos = orig_pos;
+            let offset = stream.unpack_at::<u32>(&mut fixed_pos).unwrap();
+            <View<T>>::new_unchecked(&self.data[(orig_pos + offset) as usize..])
+        } else {
+            <View<T>>::new_unchecked(&self.data[orig_pos as usize..])
+        }
+    }
+}
+
+impl<'a, T: MakeView + Unpack<'a>, const N: usize> ArrayView<T, N> {
+    pub fn map<U, F: FnMut(&'a View<T>) -> U>(&'a self, mut f: F) -> [U; N] {
+        let mut indices = [0usize; N];
+        for (i, r) in indices.iter_mut().enumerate() {
+            *r = i;
+        }
+        indices.map(move |i| f(&self[i]))
+    }
+    pub fn transpose(&'a self) -> [&'a View<T>; N] {
+        self.map(|x| x)
+    }
+    pub fn iter(&'a self) -> ViewIterator<'a, T> {
+        let mut pos = 0;
+        let stream = FracInputStream::new(&self.get_data());
+        let size = N as u32 * T::FIXED_SIZE;
+        ViewIterator {
+            data: self.get_data(),
+            pos: 0,
+            end: size,
+            _phantom: Default::default(),
+        }
+    }
+}
+
+impl<'a, T: MakeView + Unpack<'a>, const N: usize> IntoIterator for &'a ArrayView<T, N> {
+    type Item = &'a View<T>;
+    type IntoIter = ViewIterator<'a, T>;
+    fn into_iter(self) -> ViewIterator<'a, T> {
+        self.iter()
+    }
+}
+
 macro_rules! generic_view {
     ( $ty:ty ) => {
         impl MakeView for $ty {

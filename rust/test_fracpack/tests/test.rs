@@ -969,6 +969,23 @@ fn test_view() {
 }
 
 #[test]
+fn test_array_view() {
+    let data = [42u32, 7u32].packed();
+    let v = <View<[u32; 2]>>::new(&data).unwrap();
+    assert_eq!(v[0].unpack(), 42);
+    assert_eq!(v[1].unpack(), 7);
+    let mut values = Vec::new();
+    for i in v {
+        values.push(i.unpack());
+    }
+    assert_eq!(values, vec![42, 7]);
+    assert_eq!(v.iter().map(|i| i.unpack()).sum::<u32>(), 49);
+    assert_eq!(v.iter().unpacked().sum::<u32>(), 49);
+    assert_eq!(v.map(|i| i.unpack() + 1), [43, 8]);
+    assert_eq!(v.transpose().map(|i| i.unpack()), [42, 7]);
+}
+
+#[test]
 fn test_option_view() {
     let data_none = Option::<u32>::None.packed();
     let vnone = <View<Option<u32>>>::new(&data_none).unwrap();
