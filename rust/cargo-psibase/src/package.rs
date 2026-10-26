@@ -27,7 +27,6 @@ pub struct PsibaseMetadata {
     package_name: Option<String>,
     scope: Option<String>,
     server: Option<String>,
-    plugin: Option<String>,
     plugins: Vec<String>,
     flags: Vec<String>,
     dependencies: HashMap<String, String>,
@@ -57,33 +56,14 @@ fn find_dep<'a>(
 }
 
 pub fn get_metadata(package: &Package) -> Result<PsibaseMetadata, anyhow::Error> {
-    metadata_from_value(
-        &package.name,
+    Ok(serde_json::from_value(
         package
             .metadata
             .as_object()
             .and_then(|m| m.get("psibase"))
             .unwrap_or(&json!({}))
             .clone(),
-    )
-}
-
-fn metadata_from_value(
-    name: &str,
-    value: serde_json::Value,
-) -> Result<PsibaseMetadata, anyhow::Error> {
-    let meta: PsibaseMetadata = serde_json::from_value(value)?;
-    if let Some(plugin) = meta.plugin.as_deref() {
-        if plugin.is_empty() {
-            return Err(anyhow!(
-                "{name} sets plugin = \"\"; use plugins = [\"<crate>\"]"
-            ));
-        }
-        return Err(anyhow!(
-            "{name} sets plugin = \"{plugin}\"; use plugins = [\"{plugin}\"]"
-        ));
-    }
-    Ok(meta)
+    )?)
 }
 
 fn get_dep_type<'a, F>(f: F) -> F
@@ -694,7 +674,6 @@ pub async fn build_packages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn serve_path_uses_component_package_name() {
@@ -778,18 +757,5 @@ mod tests {
         .unwrap();
         add_files(service, &admin_wasm, "/admin.wasm", &mut nested).unwrap();
         reject_duplicate_data_paths(&nested).unwrap();
-    }
-
-    #[test]
-    fn plugin_field_in_metadata_is_rejected() {
-        let Err(error) = metadata_from_value("tokens", json!({"plugin": "tokens-plugin"})) else {
-            panic!("plugin field was accepted");
-        };
-        assert!(error.to_string().contains("plugins = [\"tokens-plugin\"]"));
-        let Err(empty) = metadata_from_value("tokens", json!({"plugin": ""})) else {
-            panic!("empty plugin field was accepted");
-        };
-        assert!(empty.to_string().contains("plugin = \"\""));
-        metadata_from_value("tokens", json!({"plugins": ["tokens-plugin"]})).unwrap();
     }
 }
