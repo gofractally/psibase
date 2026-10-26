@@ -1134,4 +1134,16 @@ fn view_def_wont_change() {
     let v = <View<DefWontChangeInnerStruct>>::new(&data).unwrap();
     assert_eq!(v.field_bool().unpack(), value.field_bool);
     assert_eq!(v.field_u32().unpack(), value.field_u32);
+    assert_eq!(v.field_var().unpack(), value.field_var);
+    assert_eq!(v.field_i16().unpack(), value.field_i16);
+    assert_eq!(v.field_o_var().unpack(), value.field_o_var);
+    assert_eq!(v.field_str().unpack(), value.field_str);
+    assert_eq!(v.field_a_i16_3().unpack(), value.field_a_i16_3);
+    assert_eq!(v.field_f32().unpack(), value.field_f32);
+    assert_eq!(v.field_o_v_i8().unpack(), value.field_o_v_i8);
+    assert_eq!(v.field_a_s_2().unpack(), value.field_a_s_2);
+    assert_eq!(v.field_f64().unpack(), value.field_f64);
+    assert_eq!(v.field_o_str().unpack(), value.field_o_str);
+    assert_eq!(v.field_v_u16().unpack(), value.field_v_u16);
+    assert_eq!(v.field_i32().unpack(), value.field_i32);
 }
