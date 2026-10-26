@@ -41,15 +41,19 @@ pub type View<T> = <T as MakeView>::ViewType;
 const EMPTY_OPTION: [u8; 4] = [1, 0, 0, 0];
 
 pub trait ViewFields: ViewData {
+    const IMPLICIT_FIXED_SIZE: bool;
     fn get_offset(index: usize) -> u32;
     fn get_field<'a, T: MakeView + Unpack<'a>>(&'_ self, index: usize) -> &'_ View<T> {
         let fixed_offset = Self::get_offset(index);
         let mut stream = FracInputStream::new(self.get_data());
-        let fixed_size = u16::unpack(&mut stream).unwrap() as u32;
+        if !Self::IMPLICIT_FIXED_SIZE {
+            let fixed_size = u16::unpack(&mut stream).unwrap() as u32;
+            if T::IS_OPTIONAL && fixed_size <= fixed_offset {
+                return <View<T>>::new_unchecked(&EMPTY_OPTION);
+            }
+        }
         let orig_pos = fixed_offset + stream.pos;
-        if T::IS_OPTIONAL && fixed_size <= fixed_offset {
-            <View<T>>::new_unchecked(&EMPTY_OPTION)
-        } else if T::VARIABLE_SIZE && !T::IS_OPTIONAL {
+        if T::VARIABLE_SIZE && !T::IS_OPTIONAL {
             let mut fixed_pos = orig_pos;
             let offset = stream.unpack_at::<u32>(&mut fixed_pos).unwrap();
             <View<T>>::new_unchecked(&self.get_data()[(orig_pos + offset) as usize..])
@@ -285,6 +289,12 @@ impl Deref for BytesView {
     }
 }
 
+impl<T, const N: usize> MakeView for [T; N] {
+    type ViewType = GenericView<[T; N]>;
+}
+
+type ArrayView<T, const N: usize> = GenericView<[T; N]>;
+
 macro_rules! generic_view {
     ( $ty:ty ) => {
         impl MakeView for $ty {
@@ -509,6 +519,7 @@ macro_rules! tuple_impls {
                 type ViewType = TupleView<($($name,)*)>;
             }
             impl<'a, $($name: Unpack<'a>),*> ViewFields for TupleView<($($name,)*)> {
+                const IMPLICIT_FIXED_SIZE: bool = false;
                 fn get_offset(index: usize) -> u32 {
                     let sizes: [u32; $len] = [$($name::FIXED_SIZE),*];
                     sizes.into_iter().take(index).sum()

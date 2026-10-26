@@ -1094,3 +1094,27 @@ fn test_option_view() {
     assert_eq!(vnone.xor(Some(i5)).map(|v| v.unpack()), Some(5));
     assert_eq!(vnone.xor(None).map(|v| v.unpack()), None);
 }
+
+#[test]
+fn view_def_wont_change() {
+    let value = DefWontChangeInnerStruct {
+        field_bool: true,
+        field_u32: 44,
+        field_var: Variant::ItemStr("xyz".to_string()),
+        field_i16: 55,
+        field_o_var: Some(Variant::ItemU32(88)),
+        field_str: "byebye".to_string(),
+        field_a_i16_3: [77, 88, 99],
+        field_f32: 6.4,
+        field_o_v_i8: Some(vec![44, 55, 66]),
+        field_a_s_2: ["aa".to_string(), "bb".to_string()],
+        field_f64: 128.128,
+        field_o_str: Some("lo".to_string()),
+        field_v_u16: vec![3, 2, 1],
+        field_i32: -999,
+    };
+    let data = value.packed();
+    let v = <View<DefWontChangeInnerStruct>>::new(&data).unwrap();
+    assert_eq!(v.field_bool().unpack(), value.field_bool);
+    assert_eq!(v.field_u32().unpack(), value.field_u32);
+}

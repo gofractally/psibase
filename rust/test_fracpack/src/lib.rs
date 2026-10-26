@@ -9,7 +9,7 @@ pub mod bridge;
 use psibase_macros::{Pack, ToSchema, Unpack, View};
 
 // TODO: test reading variant with future index
-#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
+#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum Variant {
     ItemU32(u32),
@@ -17,7 +17,7 @@ pub enum Variant {
     // ItemOptStr(Option<String>),  TODO: broken in C++
 }
 
-#[derive(Pack, Unpack, ToSchema, PartialEq, Debug)]
+#[derive(Pack, Unpack, ToSchema, PartialEq, Debug, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct DefWontChangeInnerStruct {

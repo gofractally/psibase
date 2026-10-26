@@ -16,25 +16,24 @@ pub fn view_macro_impl(input: TokenStream) -> TokenStream {
     };
     let fracpack_mod: TokenStream2 = opts.fracpack_mod.parse().unwrap();
 
-    match &input.data {
-        Data::Struct(data) => process_struct(&fracpack_mod, &input, data, &opts).into(),
-        Data::Enum(_data) => unimplemented!(),
+    let def = view_def(&fracpack_mod, &input, &opts);
+
+    let accessors = match &input.data {
+        Data::Struct(data) => process_struct(&fracpack_mod, &input, data, &opts),
+        Data::Enum(_data) => quote! {},
         Data::Union(_) => unimplemented!("fracpack does not support union"),
-    }
+    };
+
+    quote! { #def #accessors }.into()
 }
 
-fn process_struct(
-    fracpack_mod: &TokenStream2,
-    input: &DeriveInput,
-    data: &DataStruct,
-    _opts: &Options,
-) -> TokenStream2 {
+fn view_def(fracpack_mod: &TokenStream2, input: &DeriveInput, _opts: &Options) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let ty = &input.ident;
     let impl_params = &input.generics.params;
     // TODO: Allow override
     let view_ty = Ident::new(&(input.ident.to_string() + "View"), Span::call_site());
-    let view_def = quote! {
+    quote! {
         pub struct #view_ty #impl_generics #where_clause (#fracpack_mod::GenericView<#ty #ty_generics>);
         impl #impl_generics #fracpack_mod::ViewData for #view_ty #ty_generics #where_clause {
             fn new_unchecked(data: &[u8]) -> &Self {
@@ -47,7 +46,21 @@ fn process_struct(
         impl <'a, #impl_params> #fracpack_mod::ViewExt<'a> for #view_ty #ty_generics #where_clause {
             type ValueType = #ty #ty_generics;
         }
-    };
+        impl #impl_generics #fracpack_mod::MakeView for #ty #ty_generics #where_clause {
+            type ViewType = #view_ty;
+        }
+    }
+}
+
+fn process_struct(
+    fracpack_mod: &TokenStream2,
+    input: &DeriveInput,
+    data: &DataStruct,
+    opts: &Options,
+) -> TokenStream2 {
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    // TODO: Allow override
+    let view_ty = Ident::new(&(input.ident.to_string() + "View"), Span::call_site());
 
     let field_sizes = data.fields.iter().map(|field| {
         if skip_field(field) {
@@ -57,12 +70,11 @@ fn process_struct(
             quote! { <#field_ty as #fracpack_mod::Unpack>::FIXED_SIZE }
         }
     });
+    let implicit_fixed_size = opts.definition_will_not_change;
 
     let view_impls = quote! {
-        impl #impl_generics #fracpack_mod::MakeView for #ty #ty_generics #where_clause {
-            type ViewType = #view_ty;
-        }
         impl #impl_generics #fracpack_mod::ViewFields for #view_ty #ty_generics #where_clause {
+            const IMPLICIT_FIXED_SIZE: bool = #implicit_fixed_size;
             fn get_offset(index: usize) -> u32 {
                 [#(#field_sizes),*].into_iter().take(index).sum()
             }
@@ -79,7 +91,6 @@ fn process_struct(
         })
         .collect();
     quote! {
-        #view_def
         #view_impls
         #accessors
     }
