@@ -979,6 +979,14 @@ fn test_option_view() {
     let v1 = <View<Option<u32>>>::new(&data1).unwrap();
     let data2 = Some(2u32).packed();
     let v2 = <View<Option<u32>>>::new(&data2).unwrap();
+    let datai = 5u32.packed();
+    let i5 = <View<u32>>::new(&datai).unwrap();
+    let datanested1 = Some(Some(3u32)).packed();
+    let nested1 = <View<Option<Option<u32>>>>::new(&datanested1).unwrap();
+    let datanested2 = Some(Option::<u32>::None).packed();
+    let nested2 = <View<Option<Option<u32>>>>::new(&datanested2).unwrap();
+    let datanested3 = Option::<Option<u32>>::None.packed();
+    let nested3 = <View<Option<Option<u32>>>>::new(&datanested3).unwrap();
     if let Some(v) = v1.get() {
         assert_eq!(v.unpack(), 1);
     } else {
@@ -1004,4 +1012,85 @@ fn test_option_view() {
     assert_eq!(v1.and_then(|i| Some(i.unpack() + 10)), Some(11));
     assert_eq!(v1.and_then(|_| v2).unpack(), Some(2));
     assert_eq!(v1.and_then(|_| vnone).unpack(), None);
+
+    // testing expect properly requires panic to unwind
+    assert_eq!(v1.expect("asdf").unpack(), 1);
+
+    assert_eq!(v1.filter(|x| x.unpack() == 1).unpack(), Some(1));
+    assert_eq!(v2.filter(|x| x.unpack() == 1).unpack(), None);
+    assert_eq!(vnone.filter(|x| x.unpack() == 1).unpack(), None);
+
+    assert_eq!(nested1.flatten().unpack(), Some(3));
+    assert_eq!(nested2.flatten().unpack(), None);
+    assert_eq!(nested3.flatten().unpack(), None);
+
+    {
+        let mut out: u32 = 0;
+        v1.inspect(|x| out = x.unpack());
+        assert_eq!(out, 1);
+        vnone.inspect(|_| out = 42);
+        assert_eq!(out, 1);
+    }
+
+    assert!(v1.is_none_or(|x| x.unpack() == 1));
+    assert!(!v2.is_none_or(|x| x.unpack() == 1));
+    assert!(vnone.is_none_or(|x| x.unpack() == 1));
+
+    assert!(v1.is_some_and(|x| x.unpack() == 1));
+    assert!(!v2.is_some_and(|x| x.unpack() == 1));
+    assert!(!vnone.is_some_and(|x| x.unpack() == 1));
+
+    assert_eq!(v1.map(|x| x.unpack() + 10), Some(11));
+    assert_eq!(vnone.map(|x| x.unpack() + 10), None);
+
+    assert_eq!(v1.map_or(5, |x| x.unpack() + 10), 11);
+    assert_eq!(vnone.map_or(5, |x| x.unpack() + 10), 5);
+
+    assert_eq!(v1.map_or_default(|x| x.unpack() + 10), 11);
+    assert_eq!(vnone.map_or_default(|x| x.unpack() + 10), 0);
+
+    assert_eq!(v1.map_or_else(|| 5, |x| x.unpack() + 10), 11);
+    assert_eq!(vnone.map_or_else(|| 5, |x| x.unpack() + 10), 5);
+
+    assert_eq!(v1.ok_or(5).unwrap().unpack(), 1);
+    assert_eq!(vnone.ok_or(5).unwrap_err(), 5);
+
+    assert_eq!(v1.ok_or_else(|| 5).unwrap().unpack(), 1);
+    assert_eq!(vnone.ok_or_else(|| 5).unwrap_err(), 5);
+
+    assert_eq!(v1.or(v2).unpack(), Some(1));
+    assert_eq!(vnone.or(v2).unpack(), Some(2));
+    assert_eq!(v1.or(vnone).unpack(), Some(1));
+    assert_eq!(vnone.or(vnone).unpack(), None);
+    assert_eq!(v1.or(Some(i5)).map(|x| x.unpack()), Some(1));
+    assert_eq!(vnone.or(Some(i5)).map(|x| x.unpack()), Some(5));
+    assert_eq!(v1.or(None).map(|x| x.unpack()), Some(1));
+    assert_eq!(vnone.or(None).map(|x| x.unpack()), None);
+
+    assert_eq!(v1.or_else(|| v2).unpack(), Some(1));
+    assert_eq!(vnone.or_else(|| v2).unpack(), Some(2));
+    assert_eq!(v1.or_else(|| vnone).unpack(), Some(1));
+    assert_eq!(vnone.or_else(|| vnone).unpack(), None);
+    assert_eq!(v1.or_else(|| Some(i5)).map(|x| x.unpack()), Some(1));
+    assert_eq!(vnone.or_else(|| Some(i5)).map(|x| x.unpack()), Some(5));
+    assert_eq!(v1.or_else(|| None).map(|x| x.unpack()), Some(1));
+    assert_eq!(vnone.or_else(|| None).map(|x| x.unpack()), None);
+
+    assert_eq!(v1.unwrap().unpack(), 1);
+    //vnone.unwrap();
+
+    assert_eq!(v1.unwrap_or(i5).unpack(), 1);
+    assert_eq!(vnone.unwrap_or(i5).unpack(), 5);
+
+    assert_eq!(v1.unwrap_or_else(|| i5).unpack(), 1);
+    assert_eq!(vnone.unwrap_or_else(|| i5).unpack(), 5);
+
+    assert_eq!(v1.xor(v2).unpack(), None);
+    assert_eq!(v1.xor(vnone).unpack(), Some(1));
+    assert_eq!(vnone.xor(v1).unpack(), Some(1));
+    assert_eq!(vnone.xor(vnone).unpack(), None);
+    assert_eq!(v1.xor(Some(i5)).map(|v| v.unpack()), None);
+    assert_eq!(v1.xor(None).map(|v| v.unpack()), Some(1));
+    assert_eq!(vnone.xor(Some(i5)).map(|v| v.unpack()), Some(5));
+    assert_eq!(vnone.xor(None).map(|v| v.unpack()), None);
 }

@@ -80,6 +80,14 @@ macro_rules! define_view {
         {
             type ValueType = T;
         }
+        impl<'a, T: Unpack<'a> + std::fmt::Debug> std::fmt::Debug for &'a $name<T> {
+            fn fmt(
+                &self,
+                f: &mut std::fmt::Formatter<'_>,
+            ) -> std::result::Result<(), std::fmt::Error> {
+                self.unpack().fmt(f)
+            }
+        }
     };
 }
 
@@ -315,17 +323,39 @@ impl<T: MakeView> OptionView<T> {
 
 pub trait OptionLike {
     fn make_none() -> Self;
+    fn is_some(&self) -> bool;
 }
 
 impl<'a, T> OptionLike for &'a OptionView<T> {
     fn make_none() -> Self {
         <OptionView<T>>::new_unchecked(&EMPTY_OPTION)
     }
+    fn is_some(&self) -> bool {
+        (*self).is_some()
+    }
 }
 
 impl<T> OptionLike for Option<T> {
     fn make_none() -> Self {
         None
+    }
+    fn is_some(&self) -> bool {
+        self.is_some()
+    }
+}
+
+pub trait CommonOption<T> {
+    fn make_common(opt: T) -> Self;
+}
+
+impl<'a, T> CommonOption<&'a OptionView<T>> for &'a OptionView<T> {
+    fn make_common(opt: &'a OptionView<T>) -> &'a OptionView<T> {
+        opt
+    }
+}
+impl<'a, T: MakeView> CommonOption<&'a OptionView<T>> for Option<&'a View<T>> {
+    fn make_common(opt: &'a OptionView<T>) -> Option<&'a View<T>> {
+        opt.get()
     }
 }
 
@@ -344,15 +374,97 @@ impl<T> OptionView<T> {
             U::make_none()
         }
     }
-    pub fn and_then<U: OptionLike, F: FnOnce(&View<T>) -> U>(&self, f: F) -> U
-    where
-        T: MakeView,
-    {
+    pub fn or<'a, U: CommonOption<&'a Self>>(&'a self, optb: U) -> U {
+        if self.is_some() {
+            U::make_common(self)
+        } else {
+            optb
+        }
+    }
+    pub fn or_else<'a, U: CommonOption<&'a Self>, F: FnOnce() -> U>(&'a self, f: F) -> U {
+        if self.is_some() {
+            U::make_common(self)
+        } else {
+            f()
+        }
+    }
+    pub fn xor<'a, U: OptionLike + CommonOption<&'a Self>>(&'a self, optb: U) -> U {
+        if self.is_some() && optb.is_some() {
+            U::make_none()
+        } else {
+            self.or(optb)
+        }
+    }
+}
+
+impl<T: MakeView> OptionView<T> {
+    pub fn and_then<'a, U: OptionLike, F: FnOnce(&'a View<T>) -> U>(&'a self, f: F) -> U {
         if let Some(value) = self.get() {
             f(value)
         } else {
             U::make_none()
         }
+    }
+    pub fn expect<'a>(&'a self, msg: &'_ str) -> &'a View<T> {
+        self.get().expect(msg)
+    }
+    pub fn filter<'a, P: FnOnce(&'a View<T>) -> bool>(&'a self, pred: P) -> &'a Self {
+        if let Some(value) = self.get() {
+            if !pred(value) {
+                return Self::new_unchecked(&EMPTY_OPTION);
+            }
+        }
+        self
+    }
+    pub fn inspect<'a, F: FnOnce(&'a View<T>)>(&'a self, f: F) -> &'a Self {
+        if let Some(value) = self.get() {
+            f(value)
+        }
+        self
+    }
+    pub fn is_none_or<'a, F: FnOnce(&'a View<T>) -> bool>(&'a self, f: F) -> bool {
+        self.get().is_none_or(f)
+    }
+    pub fn is_some_and<'a, F: FnOnce(&'a View<T>) -> bool>(&'a self, f: F) -> bool {
+        self.get().is_some_and(f)
+    }
+    pub fn map<'a, U, F: FnOnce(&'a View<T>) -> U>(&'a self, f: F) -> Option<U> {
+        self.get().map(f)
+    }
+    pub fn map_or<'a, U, F: FnOnce(&'a View<T>) -> U>(&'a self, default: U, f: F) -> U {
+        self.get().map_or(default, f)
+    }
+    pub fn map_or_default<'a, U: Default, F: FnOnce(&'a View<T>) -> U>(&'a self, f: F) -> U {
+        self.get().map_or_default(f)
+    }
+    pub fn map_or_else<'a, U, D: FnOnce() -> U, F: FnOnce(&'a View<T>) -> U>(
+        &'a self,
+        default: D,
+        f: F,
+    ) -> U {
+        self.get().map_or_else(default, f)
+    }
+    pub fn ok_or<E>(&self, err: E) -> std::result::Result<&View<T>, E> {
+        self.get().ok_or(err)
+    }
+    pub fn ok_or_else<E, F: FnOnce() -> E>(&self, err: F) -> std::result::Result<&View<T>, E> {
+        self.get().ok_or_else(err)
+    }
+    pub fn unwrap(&self) -> &View<T> {
+        self.get().unwrap()
+    }
+    pub fn unwrap_or<'a>(&'a self, default: &'a View<T>) -> &'a View<T> {
+        self.get().unwrap_or(default)
+    }
+    // unwrap_or_default can't be used because views do not implement Default
+    pub fn unwrap_or_else<'a, F: FnOnce() -> &'a View<T>>(&'a self, f: F) -> &'a View<T> {
+        self.get().unwrap_or_else(f)
+    }
+}
+
+impl<T> OptionView<Option<T>> {
+    pub fn flatten(&self) -> &OptionView<T> {
+        self.and_then(|v| v)
     }
 }
 
