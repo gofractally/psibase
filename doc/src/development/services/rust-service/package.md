@@ -14,7 +14,7 @@ In the top-level crate:
 In any crate that builds a service:
 
 - `server`: The value is a crate which will handle HTTP requests sent to this service. The other crate will be built and included in the current package. If HTTP requests are handled in the base service, it should reference the service. Can be omitted if service serves no HTTP requests.
-- `plugins`: A list of crates to build with `cargo component` and upload onto this service. A plugin whose `[package.metadata.component] package` is `<namespace>:<name>` is served at `/<name>.wasm` (`host:login-prompt` is `/login-prompt.wasm`). Any duplicate data path on a service, including plugin paths and files from `data` directories, is an error. `plugin = "<crate>"` is rejected; use `plugins = ["<crate>"]`.
+- `plugins`: A list of crates to build with `cargo component` and upload onto this service. A plugin whose `[package.metadata.component] package` is `<namespace>:<name>` is served at `/<name>.wasm` (`host:login-prompt` is `/login-prompt.wasm`). Any duplicate data path on a service, including plugin paths and files from `data` directories, is an error.
 - `flags`: [Flags](../../../specifications/data-formats/package.md#serviceservicejson) for the service.
 - `data`: An array of `{src, dst}` paths to upload to the service's subdomain. `src` is relative to the location of Cargo.toml. If `src` is a directory, its contents will be included recursively.
 

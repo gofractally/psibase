@@ -17,6 +17,7 @@ members = [
     "test_contract_2",
     "test_fracpack",
     "test_fracpack_macros",
+    "test_package/admin",
     "test_package/plugin",
     "test_package/query",
     "test_package/service",

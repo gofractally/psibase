@@ -4806,6 +4806,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tpack-admin"
+version = "0.29.0"
+dependencies = [
+ "psibase",
+ "psibase-rust-workspace-hack",
+ "wit-bindgen-rt 0.26.0",
+]
+
+[[package]]
 name = "tpack-plugin"
 version = "0.29.0"
 dependencies = [
