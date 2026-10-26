@@ -297,6 +297,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "auth-recover"
+version = "0.29.0"
+dependencies = [
+ "async-graphql",
+ "auth-recover-pkg",
+ "psibase",
+ "psibase-system-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "auth-recover-pkg"
+version = "0.29.0"
+dependencies = [
+ "auth-recover",
+ "auth-recover-plugin",
+ "r-auth-recover",
+]
+
+[[package]]
+name = "auth-recover-plugin"
+version = "0.29.0"
+dependencies = [
+ "auth-recover",
+ "psibase",
+ "psibase-system-workspace-hack",
+ "psibase_plugin",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2264,6 +2301,19 @@ version = "0.29.0"
 dependencies = [
  "async-graphql",
  "auth-dyn",
+ "psibase",
+ "psibase-system-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "r-auth-recover"
+version = "0.29.0"
+dependencies = [
+ "async-graphql",
+ "auth-recover",
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_service",
