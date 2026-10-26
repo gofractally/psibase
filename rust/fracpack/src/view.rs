@@ -337,7 +337,7 @@ generic_view!(bool);
 generic_view!(OptionView<T>: Option<T>);
 
 impl<T: MakeView> OptionView<T> {
-    pub fn get(&self) -> Option<&View<T>> {
+    pub fn transpose(&self) -> Option<&View<T>> {
         let mut stream = FracInputStream::new(&self.data);
         let offset = u32::unpack(&mut stream).unwrap();
         if offset == 1 {
@@ -384,7 +384,7 @@ impl<'a, T> CommonOption<&'a OptionView<T>> for &'a OptionView<T> {
 }
 impl<'a, T: MakeView> CommonOption<&'a OptionView<T>> for Option<&'a View<T>> {
     fn make_common(opt: &'a OptionView<T>) -> Option<&'a View<T>> {
-        opt.get()
+        opt.transpose()
     }
 }
 
@@ -428,17 +428,17 @@ impl<T> OptionView<T> {
 
 impl<T: MakeView> OptionView<T> {
     pub fn and_then<'a, U: OptionLike, F: FnOnce(&'a View<T>) -> U>(&'a self, f: F) -> U {
-        if let Some(value) = self.get() {
+        if let Some(value) = self.transpose() {
             f(value)
         } else {
             U::make_none()
         }
     }
     pub fn expect<'a>(&'a self, msg: &'_ str) -> &'a View<T> {
-        self.get().expect(msg)
+        self.transpose().expect(msg)
     }
     pub fn filter<'a, P: FnOnce(&'a View<T>) -> bool>(&'a self, pred: P) -> &'a Self {
-        if let Some(value) = self.get() {
+        if let Some(value) = self.transpose() {
             if !pred(value) {
                 return Self::new_unchecked(&EMPTY_OPTION);
             }
@@ -446,48 +446,48 @@ impl<T: MakeView> OptionView<T> {
         self
     }
     pub fn inspect<'a, F: FnOnce(&'a View<T>)>(&'a self, f: F) -> &'a Self {
-        if let Some(value) = self.get() {
+        if let Some(value) = self.transpose() {
             f(value)
         }
         self
     }
     pub fn is_none_or<'a, F: FnOnce(&'a View<T>) -> bool>(&'a self, f: F) -> bool {
-        self.get().is_none_or(f)
+        self.transpose().is_none_or(f)
     }
     pub fn is_some_and<'a, F: FnOnce(&'a View<T>) -> bool>(&'a self, f: F) -> bool {
-        self.get().is_some_and(f)
+        self.transpose().is_some_and(f)
     }
     pub fn map<'a, U, F: FnOnce(&'a View<T>) -> U>(&'a self, f: F) -> Option<U> {
-        self.get().map(f)
+        self.transpose().map(f)
     }
     pub fn map_or<'a, U, F: FnOnce(&'a View<T>) -> U>(&'a self, default: U, f: F) -> U {
-        self.get().map_or(default, f)
+        self.transpose().map_or(default, f)
     }
     pub fn map_or_default<'a, U: Default, F: FnOnce(&'a View<T>) -> U>(&'a self, f: F) -> U {
-        self.get().map_or_default(f)
+        self.transpose().map_or_default(f)
     }
     pub fn map_or_else<'a, U, D: FnOnce() -> U, F: FnOnce(&'a View<T>) -> U>(
         &'a self,
         default: D,
         f: F,
     ) -> U {
-        self.get().map_or_else(default, f)
+        self.transpose().map_or_else(default, f)
     }
     pub fn ok_or<E>(&self, err: E) -> std::result::Result<&View<T>, E> {
-        self.get().ok_or(err)
+        self.transpose().ok_or(err)
     }
     pub fn ok_or_else<E, F: FnOnce() -> E>(&self, err: F) -> std::result::Result<&View<T>, E> {
-        self.get().ok_or_else(err)
+        self.transpose().ok_or_else(err)
     }
     pub fn unwrap(&self) -> &View<T> {
-        self.get().unwrap()
+        self.transpose().unwrap()
     }
     pub fn unwrap_or<'a>(&'a self, default: &'a View<T>) -> &'a View<T> {
-        self.get().unwrap_or(default)
+        self.transpose().unwrap_or(default)
     }
     // unwrap_or_default can't be used because views do not implement Default
     pub fn unwrap_or_else<'a, F: FnOnce() -> &'a View<T>>(&'a self, f: F) -> &'a View<T> {
-        self.get().unwrap_or_else(f)
+        self.transpose().unwrap_or_else(f)
     }
 }
 
@@ -545,7 +545,7 @@ macro_rules! tuple_impls {
                 }
             }
             impl<'a, $($name: MakeView + Unpack<'a>),*> TupleView<($($name,)*)> {
-                pub fn get(&self) -> ($(&View<$name>,)*) { ($(self.$getn(),)*)}
+                pub fn transpose(&self) -> ($(&View<$name>,)*) { ($(self.$getn(),)*)}
                 $(
                     pub fn $getn(&self) -> &View<$name> {
                         ViewFields::get_field::<$name>(self, $n)

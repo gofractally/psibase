@@ -933,9 +933,9 @@ fn test_view() {
     {
         let data = vec![Some("asdf"), Some(""), None].packed();
         let v = <View<Vec<Option<String>>>>::new(&data).unwrap();
-        assert_eq!(v[0].get().unwrap().find('d'), Some(2));
-        assert!(v[1].get().unwrap().is_empty());
-        assert!(v[2].get().is_none());
+        assert_eq!(v[0].unwrap().find('d'), Some(2));
+        assert!(v[1].unwrap().is_empty());
+        assert!(v[2].is_none());
     }
     {
         let data = "jkl;".packed();
@@ -989,7 +989,7 @@ fn test_array_view() {
 fn test_option_view() {
     let data_none = Option::<u32>::None.packed();
     let vnone = <View<Option<u32>>>::new(&data_none).unwrap();
-    assert!(matches!(vnone.get(), None));
+    assert!(matches!(vnone.transpose(), None));
     assert!(vnone.is_none());
     assert!(!vnone.is_some());
     let data1 = Some(1u32).packed();
@@ -1004,10 +1004,10 @@ fn test_option_view() {
     let nested2 = <View<Option<Option<u32>>>>::new(&datanested2).unwrap();
     let datanested3 = Option::<Option<u32>>::None.packed();
     let nested3 = <View<Option<Option<u32>>>>::new(&datanested3).unwrap();
-    if let Some(v) = v1.get() {
+    if let Some(v) = v1.transpose() {
         assert_eq!(v.unpack(), 1);
     } else {
-        panic!("get() failed")
+        panic!("transpose() failed")
     }
     assert!(v1.is_some());
     assert!(!v1.is_none());
