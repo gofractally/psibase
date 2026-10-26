@@ -153,6 +153,19 @@ namespace psibase
          p = psio::shared_view_ptr<T>(psio::size_tag{sz});
          raw::getResult(p.data(), p.size(), 0);
       }
+      std::uint32_t value_size() const
+      {
+         std::uint32_t sz = raw::kvGet(db, key.data(), key.size());
+         check(sz != std::uint32_t(-1), "no such key");
+         if (is_secondary)
+         {
+            std::vector<char> buf(sz);
+            raw::getResult(buf.data(), buf.size(), 0);
+            sz = raw::kvGet(db, buf.data(), buf.size());
+            check(sz != std::uint32_t(-1), "primary key not found");
+         }
+         return sz;
+      }
       std::vector<char> operator*() const
       {
          std::vector<char> result;
@@ -325,6 +338,11 @@ namespace psibase
          base.read(result);
          return result;
       }
+
+      /// Size in bytes of the serialized object
+      ///
+      /// This is cheaper than reading the object; it doesn't copy the object into memory.
+      std::uint32_t valueSize() const { return base.value_size(); }
 
       /// Comparisons
       std::weak_ordering operator<=>(const KvIterator& rhs) const = default;

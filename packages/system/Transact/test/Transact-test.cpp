@@ -602,3 +602,49 @@ TEST_CASE("Test isAuth")
                 .returnVal() == false);
    }
 }
+
+TEST_CASE("Test work")
+{
+   DefaultTestChain t;
+
+   auto alice = t.addAccount("alice");
+   auto bob   = t.addAccount("bob");
+
+   SECTION("incomplete")
+   {
+      CHECK(t.to<Transact>().setWork(true).failed("Work not completed: transact"));
+   }
+
+   auto transact = transactor<Transact>();
+
+   SECTION("complete")
+   {
+      expect(t.pushTransaction(t.makeTransaction(
+          {transact.from(alice).setWork(true), transact.from(alice).setWork(false)})));
+   }
+   SECTION("double work")
+   {
+      expect(t.pushTransaction(
+          t.makeTransaction({transact.from(alice).setWork(true), transact.from(alice).setWork(true),
+                             transact.from(alice).setWork(false)})));
+   }
+   SECTION("wrong complete")
+   {
+      expect(t.pushTransaction(t.makeTransaction(
+                 {transact.from(alice).setWork(true), transact.from(bob).setWork(false)})),
+             "Work not completed: alice");
+   }
+   SECTION("complete + incomplete")
+   {
+      expect(t.pushTransaction(t.makeTransaction({transact.from(alice).setWork(true),
+                                                  transact.from(bob).setWork(true),
+                                                  transact.from(alice).setWork(false)})),
+             "Work not completed: bob");
+   }
+   SECTION("complete overlapping")
+   {
+      expect(t.pushTransaction(t.makeTransaction(
+          {transact.from(alice).setWork(true), transact.from(bob).setWork(true),
+           transact.from(alice).setWork(false), transact.from(bob).setWork(false)})));
+   }
+}
