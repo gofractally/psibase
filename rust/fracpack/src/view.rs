@@ -123,7 +123,7 @@ macro_rules! generic_view {
         }
     };
     ( $alias:ident $(<$param:ident>)? : $ty:ty ) => {
-        type $alias $(<$param>)? = GenericView<$ty>;
+        pub type $alias $(<$param>)? = GenericView<$ty>;
         impl $(<$param>)? MakeView for $ty {
             type ViewType = GenericView<$ty>;
         }
@@ -140,7 +140,7 @@ impl Deref for StringView {
     }
 }
 
-type StrView = RefView<str>;
+pub type StrView = RefView<str>;
 impl<'a> MakeView for &'a str {
     type ViewType = StrView;
 }
@@ -256,7 +256,7 @@ impl Deref for VecView<u8> {
     }
 }
 
-type BytesView = RefView<[u8]>;
+pub type BytesView = RefView<[u8]>;
 impl<'a> MakeView for &'a [u8] {
     type ViewType = BytesView;
 }
@@ -269,7 +269,7 @@ impl Deref for BytesView {
     }
 }
 
-type ArrayView<T, const N: usize> = GenericView<[T; N]>;
+pub type ArrayView<T, const N: usize> = GenericView<[T; N]>;
 impl<T, const N: usize> MakeView for [T; N] {
     type ViewType = ArrayView<T, N>;
 }
@@ -529,7 +529,7 @@ impl<T: MakeView> Deref for RefCellView<T> {
     }
 }
 
-type TupleView<T> = GenericView<T>;
+pub type TupleView<T> = GenericView<T>;
 
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident $getn:ident)*))+) => {
