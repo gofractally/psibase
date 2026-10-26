@@ -7,6 +7,7 @@ world impl {
     include branding:plugin/imports;
     include transact:plugin/imports;
     import transact:plugin/network;
+    import transact:plugin/authorized;
     include packages:plugin/imports;
     include name-market:plugin/imports;
     include virtual-server:plugin/imports;

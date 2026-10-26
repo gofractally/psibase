@@ -13,11 +13,13 @@ use transact::plugin::hook_handlers::*;
 use transact::plugin::types::Action as ImportAction;
 
 use host::client::api as Client;
+use host::http::api::post_graphql_get_json;
 use host::types::types::{self as HostTypes, PluginRef};
 
 use exports::transact::plugin::types::{Action as ExportAction, Claim as ExportClaim};
 use exports::transact::plugin::{
-    api::Guest as Api, hooks::Guest as Hooks, network::Guest as Network,
+    api::Guest as Api, authorized::Guest as Authorized, hooks::Guest as Hooks,
+    network::Guest as Network,
 };
 
 use crate::trust::*;
@@ -232,6 +234,12 @@ impl Network for TransactPlugin {
             setSnapTime::ACTION_NAME.to_string(),
             packed_args,
         )
+    }
+}
+
+impl Authorized for TransactPlugin {
+    fn graphql(query: String) -> Result<String, HostTypes::Error> {
+        post_graphql_get_json(&query)
     }
 }
 

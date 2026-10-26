@@ -11,6 +11,7 @@ interface hook-handlers {
 
 world impl {
     include host:client/imports;
+    include host:http/imports;
     include host:db/imports;
     include host:types/imports;
     include host:accounts/imports;
@@ -21,5 +22,6 @@ world impl {
     export api;
     export hooks;
     export types;
+    export authorized;
     export network;
 }
