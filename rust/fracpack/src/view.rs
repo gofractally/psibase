@@ -63,101 +63,74 @@ pub trait ViewFields: ViewData {
     }
 }
 
-macro_rules! define_view {
-    ( $name:ident ) => {
-        #[repr(transparent)]
-        pub struct $name<T> {
-            _phantom: PhantomData<T>,
-            data: [u8],
-        }
-        impl<T> $crate::ViewData for $name<T> {
-            fn new_unchecked(data: &[u8]) -> &Self {
-                unsafe { &*(data as *const [u8] as *const Self) }
-            }
-            fn get_data(&self) -> &[u8] {
-                return &self.data;
-            }
-        }
-        impl<'a, T> $crate::ViewExt<'a> for $name<T>
-        where
-            T: Unpack<'a>,
-        {
-            type ValueType = T;
-        }
-        impl<'a, T: Unpack<'a> + std::fmt::Debug> std::fmt::Debug for &'a $name<T> {
-            fn fmt(
-                &self,
-                f: &mut std::fmt::Formatter<'_>,
-            ) -> std::result::Result<(), std::fmt::Error> {
-                self.unpack().fmt(f)
-            }
-        }
-    };
+#[repr(transparent)]
+pub struct GenericView<T> {
+    _phantom: PhantomData<T>,
+    data: [u8],
+}
+impl<T> ViewData for GenericView<T> {
+    fn new_unchecked(data: &[u8]) -> &Self {
+        unsafe { &*(data as *const [u8] as *const Self) }
+    }
+    fn get_data(&self) -> &[u8] {
+        return &self.data;
+    }
+}
+impl<'a, T> ViewExt<'a> for GenericView<T>
+where
+    T: Unpack<'a>,
+{
+    type ValueType = T;
+}
+impl<'a, T: Unpack<'a> + std::fmt::Debug> std::fmt::Debug for &'a GenericView<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        self.unpack().fmt(f)
+    }
 }
 
-define_view!(GenericView);
+#[repr(transparent)]
+pub struct RefView<T: ?Sized> {
+    _phantom: PhantomData<T>,
+    data: [u8],
+}
+impl<T: ?Sized> ViewData for RefView<T> {
+    fn new_unchecked(data: &[u8]) -> &Self {
+        unsafe { &*(data as *const [u8] as *const Self) }
+    }
+    fn get_data(&self) -> &[u8] {
+        return &self.data;
+    }
+}
+impl<'a, T: ?Sized + 'a> ViewExt<'a> for RefView<T>
+where
+    &'a T: Unpack<'a>,
+{
+    type ValueType = &'a T;
+}
+impl<'a, T: ?Sized + std::fmt::Debug + 'a> std::fmt::Debug for &'a RefView<T>
+where
+    &'a T: Unpack<'a>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        self.unpack().fmt(f)
+    }
+}
 
-macro_rules! view {
-    ( $vis:vis $name:ident : $value:ty ) => {
-        #[repr(transparent)]
-        pub struct $name([u8]);
-        impl $crate::MakeView for $value {
-            type ViewType = $name;
-        }
-        impl $crate::ViewData for $name {
-            fn new_unchecked(data: &[u8]) -> &Self {
-                unsafe { &*(data as *const [u8] as *const Self) }
-            }
-            fn get_data(&self) -> &[u8] {
-                return &self.0;
-            }
-        }
-        impl<'a> $crate::ViewExt<'a> for $name {
-            type ValueType = $value;
+macro_rules! generic_view {
+    ( $ty:ty ) => {
+        impl MakeView for $ty {
+            type ViewType = GenericView<$ty>;
         }
     };
-    ( $vis:vis $name:ident<$($param:ident),+> : $value:ty ) => {
-        #[repr(transparent)]
-        pub struct $name<$($param),+> {
-            _phantom: PhantomData<($($param),+)>,
-            data: [u8],
-        }
-        impl<$($param),+> $crate::MakeView for $value {
-            type ViewType = $name<$($param),+>;
-        }
-        impl<$($param),+> $crate::ViewData for $name<$($param),+> {
-            fn new_unchecked(data: &[u8]) -> &Self {
-                unsafe { &*(data as *const [u8] as *const Self) }
-            }
-            fn get_data(&self) -> &[u8] {
-                return &self.data;
-            }
-        }
-        impl<'a, $($param),+> $crate::ViewExt<'a> for $name<$($param),+> where $value: Unpack<'a>  {
-            type ValueType = $value;
-        }
-    };
-    ( $vis:vis <$l:lifetime> $name:ident : $value:ty ) => {
-        #[repr(transparent)]
-        pub struct $name([u8]);
-        impl<$l> $crate::MakeView for $value {
-            type ViewType = $name;
-        }
-        impl<$l> $crate::ViewData for $name {
-            fn new_unchecked(data: &[u8]) -> &Self {
-                unsafe { &*(data as *const [u8] as *const Self) }
-            }
-            fn get_data(&self) -> &[u8] {
-                return &self.0;
-            }
-        }
-        impl<$l> $crate::ViewExt<$l> for $name {
-            type ValueType = $value;
+    ( $alias:ident $(<$param:ident>)? : $ty:ty ) => {
+        type $alias $(<$param>)? = GenericView<$ty>;
+        impl $(<$param>)? MakeView for $ty {
+            type ViewType = GenericView<$ty>;
         }
     }
 }
 
-view!(pub StringView: String);
+generic_view!(StringView: String);
 
 impl Deref for StringView {
     type Target = str;
@@ -167,7 +140,10 @@ impl Deref for StringView {
     }
 }
 
-view!(pub <'a> StrView: &'a str);
+type StrView = RefView<str>;
+impl<'a> MakeView for &'a str {
+    type ViewType = StrView;
+}
 
 impl Deref for StrView {
     type Target = str;
@@ -177,7 +153,7 @@ impl Deref for StrView {
     }
 }
 
-view!(pub VecView<T>: Vec<T>);
+generic_view!(VecView<T>: Vec<T>);
 
 impl<'a, T: MakeView + Unpack<'a>> Index<usize> for VecView<T> {
     type Output = View<T>;
@@ -280,7 +256,11 @@ impl Deref for VecView<u8> {
     }
 }
 
-view!(pub <'a> BytesView: &'a [u8]);
+type BytesView = RefView<[u8]>;
+impl<'a> MakeView for &'a [u8] {
+    type ViewType = BytesView;
+}
+
 impl Deref for BytesView {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
@@ -289,11 +269,10 @@ impl Deref for BytesView {
     }
 }
 
-impl<T, const N: usize> MakeView for [T; N] {
-    type ViewType = GenericView<[T; N]>;
-}
-
 type ArrayView<T, const N: usize> = GenericView<[T; N]>;
+impl<T, const N: usize> MakeView for [T; N] {
+    type ViewType = ArrayView<T, N>;
+}
 
 impl<'a, T: MakeView + Unpack<'a>, const N: usize> Index<usize> for ArrayView<T, N> {
     type Output = View<T>;
@@ -343,14 +322,6 @@ impl<'a, T: MakeView + Unpack<'a>, const N: usize> IntoIterator for &'a ArrayVie
     }
 }
 
-macro_rules! generic_view {
-    ( $ty:ty ) => {
-        impl MakeView for $ty {
-            type ViewType = GenericView<$ty>;
-        }
-    };
-}
-
 generic_view!(u8);
 generic_view!(u16);
 generic_view!(u32);
@@ -363,7 +334,7 @@ generic_view!(f32);
 generic_view!(f64);
 generic_view!(bool);
 
-view!(pub OptionView<T>: Option<T>);
+generic_view!(OptionView<T>: Option<T>);
 
 impl<T: MakeView> OptionView<T> {
     pub fn get(&self) -> Option<&View<T>> {
@@ -526,7 +497,7 @@ impl<T> OptionView<Option<T>> {
     }
 }
 
-view!(pub BoxView<T>: Box<T>);
+generic_view!(BoxView<T>: Box<T>);
 impl<T: MakeView> Deref for BoxView<T> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
@@ -534,7 +505,7 @@ impl<T: MakeView> Deref for BoxView<T> {
     }
 }
 
-view!(pub RcView<T>: Rc<T>);
+generic_view!(RcView<T>: Rc<T>);
 impl<T: MakeView> Deref for RcView<T> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
@@ -542,7 +513,7 @@ impl<T: MakeView> Deref for RcView<T> {
     }
 }
 
-view!(pub ArcView<T>: Arc<T>);
+generic_view!(ArcView<T>: Arc<T>);
 impl<T: MakeView> Deref for ArcView<T> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
@@ -550,7 +521,7 @@ impl<T: MakeView> Deref for ArcView<T> {
     }
 }
 
-view!(pub RefCellView<T>: RefCell<T>);
+generic_view!(RefCellView<T>: RefCell<T>);
 impl<T: MakeView> Deref for RefCellView<T> {
     type Target = View<T>;
     fn deref(&self) -> &View<T> {
@@ -558,7 +529,7 @@ impl<T: MakeView> Deref for RefCellView<T> {
     }
 }
 
-define_view!(TupleView);
+type TupleView<T> = GenericView<T>;
 
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident $getn:ident)*))+) => {
