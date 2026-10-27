@@ -114,10 +114,9 @@ impl Admin for VirtualServerPlugin {
     }
 
     fn reg_res_provider(app: String, accepted: Vec<String>) -> Result<(), Error> {
-        let sender = host::client::get_sender();
         assert!(
-            sender == "config" || sender == host::client::get_receiver(),
-            "reg_res_provider can only be called by config or self"
+            host::client::get_sender() == "config",
+            "reg_res_provider can only be called by config"
         );
         let app = AccountNumber::from_exact(&app)
             .map_err(|e| ErrorType::ConversionError(e.to_string()))?;
@@ -126,10 +125,9 @@ impl Admin for VirtualServerPlugin {
     }
 
     fn unreg_res_provider() -> Result<(), Error> {
-        let sender = host::client::get_sender();
         assert!(
-            sender == "config" || sender == host::client::get_receiver(),
-            "unreg_res_provider can only be called by config or self"
+            host::client::get_sender() == "config",
+            "unreg_res_provider can only be called by config"
         );
         VirtualServer::add_to_tx().unreg_res_provider();
         Ok(())

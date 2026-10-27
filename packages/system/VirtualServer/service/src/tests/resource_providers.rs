@@ -1,4 +1,4 @@
-use psibase::{Claim, Producer, Push, account, services::producers, tester::PRODUCER_ACCOUNT};
+use psibase::{account, services::producers, tester::PRODUCER_ACCOUNT, Claim, Producer, Push};
 use serde::Deserialize;
 
 use crate::Wrapper;
@@ -123,7 +123,6 @@ fn register_and_query_resource_provider(chain: psibase::Chain) -> Result<(), psi
         }])
         .get()?;
     // Consensus updates land on `current` after several blocks (see Producers tests).
-    chain.finish_block();
     chain.start_block();
     chain.start_block();
     chain.start_block();

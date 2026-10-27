@@ -1,6 +1,6 @@
+use crate::Error;
 use crate::bindings::tokens::plugin as TokensPlugin;
 use crate::errors::ErrorType;
-use crate::Error;
 use psibase::services::tokens::Decimal;
 use psibase_plugin::host::server;
 use serde::Deserialize;
