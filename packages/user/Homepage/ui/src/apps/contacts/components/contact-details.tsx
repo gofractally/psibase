@@ -312,7 +312,7 @@ export function ContactDetails({
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                         <Avatar
                             account={contact.account}
-                            className="bg-card size-20 shrink-0 rounded-xl border-2 object-cover"
+                            className="bg-card size-20 shrink-0 border-2 object-cover"
                             style={{ borderColor: accent }}
                             alt="Contact avatar"
                         />

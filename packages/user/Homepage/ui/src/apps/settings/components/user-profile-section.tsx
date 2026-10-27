@@ -76,7 +76,7 @@ export const UserProfileSection = () => {
                 <Avatar
                     account={currentUser || ""}
                     src={avatarSrc}
-                    className="bg-card size-20 shrink-0 rounded-xl border-2 object-cover transition-opacity duration-200"
+                    className="bg-card size-20 shrink-0 border-2 object-cover transition-opacity duration-200"
                     style={{ borderColor: colorFor(currentUser || "") }}
                     alt={`Avatar of ${currentUser}`}
                 />

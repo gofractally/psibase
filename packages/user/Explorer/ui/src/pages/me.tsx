@@ -181,7 +181,7 @@ const Dashboard = ({ user }: { user: string }) => {
                     <div className="flex min-w-0 flex-1 items-start gap-3">
                         <Avatar
                             account={user}
-                            className="bg-card size-12 shrink-0 rounded-xl border-2 object-cover"
+                            className="bg-card size-12 shrink-0 border-2 object-cover"
                             style={{ borderColor: colorFor(user) }}
                         />
                         <div className="min-w-0 flex-1">
@@ -981,7 +981,7 @@ const HeroSkeleton = () => (
     <div className="flex flex-col gap-4">
         <div className="grid-bg -mx-4 -mt-4 px-4 pb-2 pt-6 md:-mx-6 md:-mt-6 md:px-6">
             <div className="flex items-start gap-3">
-                <Skeleton className="size-12 rounded-xl" />
+                <Skeleton className="size-12 rounded-full" />
                 <div className="flex flex-col gap-2">
                     <Skeleton className="h-3 w-40" />
                     <Skeleton className="h-8 w-64" />

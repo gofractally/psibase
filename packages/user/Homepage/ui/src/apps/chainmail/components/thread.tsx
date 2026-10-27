@@ -205,7 +205,7 @@ const ThreadIntro = ({
     >
         <Avatar
             account={peer}
-            className="size-16 rounded-2xl border-2 shadow-none"
+            className="size-16 border-2 shadow-none"
             style={{ borderColor: colorFor(peer) }}
             alt=""
         />

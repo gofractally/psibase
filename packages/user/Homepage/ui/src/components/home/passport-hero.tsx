@@ -38,16 +38,16 @@ export const PassportHero = ({ user }: { user: string }) => {
             <button
                 type="button"
                 onClick={() => open("profile")}
-                className="group relative shrink-0 rounded-2xl"
+                className="group relative shrink-0 rounded-full"
                 aria-label="Edit profile"
             >
                 <Avatar
                     account={user}
-                    className="bg-card size-24 rounded-2xl border-2 object-cover shadow-md"
+                    className="bg-card size-24 border-2 object-cover shadow-md"
                     style={{ borderColor: colorFor(user) }}
                     alt=""
                 />
-                <span className="bg-background/70 absolute inset-0 flex items-center justify-center rounded-2xl opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+                <span className="bg-background/70 absolute inset-0 flex items-center justify-center rounded-full opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
                     <PencilLine className="size-4" />
                 </span>
             </button>

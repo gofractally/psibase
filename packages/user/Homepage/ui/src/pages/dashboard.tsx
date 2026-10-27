@@ -1,6 +1,5 @@
-import { LatestChats } from "@/components/home/latest-chats";
+import { AppCards } from "@/components/home/app-cards";
 import { GuestHero, PassportHero } from "@/components/home/passport-hero";
-import { WalletWidget } from "@/components/home/wallet-widget";
 import { WelcomeBanner } from "@/components/welcome-banner";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
@@ -15,7 +14,7 @@ const Dashboard = () => {
                 <WelcomeBanner />
                 {isPending ? (
                     <div className="flex items-center gap-5">
-                        <Skeleton className="size-24 rounded-2xl" />
+                        <Skeleton className="size-24 rounded-full" />
                         <div className="flex flex-col gap-2">
                             <Skeleton className="h-3 w-40" />
                             <Skeleton className="h-8 w-64" />
@@ -28,12 +27,7 @@ const Dashboard = () => {
                 )}
             </div>
 
-            {user && (
-                <div className="grid gap-6 xl:grid-cols-3">
-                    <LatestChats className="xl:col-span-2" />
-                    <WalletWidget user={user} />
-                </div>
-            )}
+            {!isPending && <AppCards signedIn={!!user} />}
         </div>
     );
 };

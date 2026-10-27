@@ -65,7 +65,7 @@ export const AccountMenu = () => {
                         {user ? (
                             <Avatar
                                 account={user}
-                                className="size-8 border-0 shadow-none"
+                                className="size-8 border border-border shadow-none dark:border-border"
                                 alt=""
                             />
                         ) : (

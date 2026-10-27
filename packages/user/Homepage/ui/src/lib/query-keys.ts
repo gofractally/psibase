@@ -8,6 +8,7 @@ type QueryKeyGenerator<Prefix extends string = string> = (
 const QueryKey = {
     connectedAccounts: () => ["connectedAccounts"] as const,
     mailbox: (mailbox: Mailbox, user: string) => [mailbox, user] as const,
+    producers: () => ["producers"] as const,
     token: (tokenId: number | undefined) => ["token", tokenId] as const,
     userLinesOfCredit: (user?: string | null) =>
         ["userLinesOfCredit", user] as const,

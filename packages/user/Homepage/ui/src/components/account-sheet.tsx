@@ -48,7 +48,7 @@ export const AccountSheet = () => {
                     <div className="flex items-center gap-3 px-5 pb-4 pt-5">
                         <Avatar
                             account={user ?? ""}
-                            className="bg-card size-12 shrink-0 rounded-xl border-2 object-cover"
+                            className="bg-card size-12 shrink-0 border-2 object-cover"
                             style={{ borderColor: colorFor(user ?? "") }}
                             alt=""
                         />
