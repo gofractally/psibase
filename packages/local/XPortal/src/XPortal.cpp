@@ -780,7 +780,7 @@ namespace
       auto body   = formEncode({{"mode", "payment"},
                                 {"ui_mode", "embedded_page"},
                                 {"redirect_on_completion", "never"},
-                                {"payment_method_types[0]", "card"},
+                                {"allowed_payment_method_types[0]", "card"},
                                 {"line_items[0][quantity]", "1"},
                                 {"line_items[0][price_data][currency]", "usd"},
                                 {"line_items[0][price_data][unit_amount]", amount},
