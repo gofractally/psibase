@@ -8,53 +8,24 @@ mod tests {
     use psibase::services::auth_delegate::Wrapper as AuthDelegate;
     use psibase::services::nft as Nft;
     use psibase::*;
-    use serde::Deserialize;
-    use serde_json::Value;
-    use Nft::Nft as NftRecord;
 
-    #[derive(Deserialize)]
-    struct Response {
-        data: Data,
-    }
-
-    #[derive(Deserialize)]
-    struct Data {
-        nfts: UserNfts,
-    }
-
-    #[derive(Deserialize)]
-    struct UserNfts {
-        edges: Vec<Edge>,
-    }
-
-    #[derive(Deserialize)]
-    #[allow(dead_code)]
-    struct Edge {
-        node: NftRecord,
-    }
-
+    // nfts() requires the holder. prod is auth-any on a test chain, so it can read getNft.
     fn get_nr_nfts(chain: &Chain, user: AccountNumber) -> Result<usize, psibase::Error> {
-        let res: Value = chain.graphql(
-            Nft::SERVICE,
-            &format!(
-                r#"
-                query Nfts {{
-                    nfts(user: "{}") {{
-                        edges {{
-                            node {{
-                                id
-                                issuer
-                                owner
-                            }}
-                        }}
-                    }}
-                }}"#,
-                user
-            ),
-        )?;
-
-        let response_root: Response = serde_json::from_value(res)?;
-        Ok(response_root.data.nfts.edges.len())
+        let mut count = 0;
+        let mut id = 1u32;
+        loop {
+            let Some(nft) = Nft::Wrapper::push_from(chain, account!("prod"))
+                .getNft(id)
+                .get()?
+            else {
+                break;
+            };
+            if nft.owner == user {
+                count += 1;
+            }
+            id += 1;
+        }
+        Ok(count)
     }
 
     #[psibase::test_case(packages("StagedTx", "Nft", "AuthSig"))]
