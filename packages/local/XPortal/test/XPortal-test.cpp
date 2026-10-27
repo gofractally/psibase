@@ -980,3 +980,57 @@ TEST_CASE("the Stripe webhook queues a paid signup only when Stripe signed it")
          HttpStatus::ok);
    CHECK(XPortal{}.open<SignupTable>().get(id)->state == "queued");
 }
+
+TEST_CASE("paid tier readiness covers the paid grant")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+   auto alice   = AccountNumber{"alice"};
+   auto creator = XPortal::creatorAccount;
+   auto billed  = openBilledPortal(t);
+   configureStripe(t);
+   t.put(XPortal::service, "/admin/config",
+         RawBody{"application/json", R"({"tiers":[{"label":"Paid","usd_cents":500}]})"});
+
+   auto offers = t.get<TierOffers>(XPortal::service, "/tiers");
+   REQUIRE(offers.free.has_value());
+   REQUIRE(offers.tiers.size() == 1);
+   auto paidTokens = offers.tiers[0].tokens;
+   REQUIRE(paidTokens.value > offers.free->tokens.value);
+
+   auto inviteCost = [&] {
+      return t.from(alice).to<Invite>().getInvCost(1, paidTokens).returnVal();
+   };
+   auto creatorBalance = [&] {
+      return t.from(alice).to<Tokens>().getBalance(billed.id, creator).returnVal();
+   };
+   REQUIRE(inviteCost().value > creatorBalance().value);
+
+   auto status = t.get<Status>(XPortal::service, "/status");
+   requireBillingReadiness(status, false, true);
+   CHECK(status.ready == false);
+   openSession("payer", "42");
+   auto blocked = t.http(withSession(
+       HttpRequestBuilder{}
+           .header("X-Forwarded-For", "203.0.113.8")
+           .post(XPortal::service, "/signup",
+                 SignupBody{.invite_id = 7,
+                            .payload   = invitePayload(7),
+                            .token     = "token-7",
+                            .tier      = 0}),
+       "payer"));
+   CHECK(blocked.status == HttpStatus::forbidden);
+
+   auto keys = KeyList{{agentPub, agentPriv}};
+   auto cost = inviteCost();
+   auto held = creatorBalance();
+   REQUIRE(cost.value > held.value);
+   // The funding transaction is billed, which moves the reserve's spot price.
+   Quantity extra{cost.value - held.value + 64};
+   REQUIRE(t.from(alice).to<Tokens>().credit(billed.id, creator, extra, "").succeeded());
+   REQUIRE(t.from(creator).with(keys).to<Tokens>().debit(billed.id, alice, extra, "").succeeded());
+   status = t.get<Status>(XPortal::service, "/status");
+   requireBillingReadiness(status, true, true);
+   CHECK(status.ready);
+   CHECK(creatorBalance().value >= inviteCost().value);
+}

@@ -273,6 +273,9 @@ namespace LocalService
    /// When billing is disabled, `creator_ready`, `x_configured`, and
    /// `stripe_configured` (the active mode's keys are set) are present.
    /// When billing is enabled, `creator_tokens` and `creator_resources` are added.
+   /// `creator_tokens` holds when the creator account's balance covers the
+   /// invite cost of the free-tier grant, or of the offered paid tier's grant
+   /// when that grant is larger.
    /// `ready` requires every condition except `x_configured`, and requires
    /// `stripe_configured` only while paid tiers are offered.
    struct Status

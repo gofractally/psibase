@@ -233,13 +233,20 @@ namespace
       return fraccall<Quantity>(action).unpack();
    }
 
-   bool creatorTokens(const PortalConfig& config)
+   Quantity readinessGrant(const PortalConfig& config, const PaidTier* paid)
    {
-      auto grant = freeTierTokens(config);
-      check(grant.has_value(), "free tier grant is not set");
+      auto free = freeTierTokens(config);
+      check(free.has_value(), "free tier grant is not set");
+      if (!paid)
+         return *free;
+      return std::max(*free, paidOffer(config, *paid).tokens);
+   }
+
+   bool creatorTokens(const PortalConfig& config, const PaidTier* paid)
+   {
       auto sys = to<Tokens>().getSysToken();
       check(sys.has_value(), "system token is not set");
-      auto cost    = to<Invite>().getInvCost(1, *grant);
+      auto cost    = to<Invite>().getInvCost(1, readinessGrant(config, paid));
       auto balance = to<Tokens>().getBalance(sys->id, XPortal::creatorAccount);
       return balance.value >= cost.value;
    }
@@ -448,18 +455,19 @@ namespace
 
    Status portalStatus(const PortalConfig& config)
    {
-      auto   billing = to<VirtualServer>().is_billing_enabled();
+      auto billing = to<VirtualServer>().is_billing_enabled();
+      auto paid    = offeredPaidTier(config, billing);
       Status status{.requests_enabled = config.requests_enabled, .billing_enabled = billing};
       status.conditions.push_back({.id = "creator_ready", .ok = creatorReady()});
       if (billing)
       {
-         status.conditions.push_back({.id = "creator_tokens", .ok = creatorTokens(config)});
+         status.conditions.push_back({.id = "creator_tokens", .ok = creatorTokens(config, paid)});
          status.conditions.push_back({.id = "creator_resources", .ok = creatorResources()});
       }
       status.conditions.push_back({.id = "x_configured", .ok = xConfigured(config.x)});
       status.conditions.push_back(
           {.id = "stripe_configured", .ok = stripeConfigured(activeStripe(config))});
-      auto paidOffered = offeredPaidTier(config, billing) != nullptr;
+      auto paidOffered = paid != nullptr;
       status.ready     = std::ranges::all_of(
           status.conditions,
           [&](const Condition& c)
