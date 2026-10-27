@@ -3,7 +3,7 @@ mod bindings;
 use bindings::*;
 
 use explorer::plugin::types::BlockRange;
-use exports::homepage::explorer::block_log::Guest as BlockLog;
+use exports::homepage::explorer::{authorized::Guest as Authorized, block_log::Guest as BlockLog};
 use host::types::types::Error;
 
 fn assert_caller_self() {
@@ -19,6 +19,13 @@ impl BlockLog for HomepageExplorerPlugin {
     fn get_blocks(range: BlockRange) -> Result<String, Error> {
         assert_caller_self();
         explorer::plugin::block_log::get_blocks(&range)
+    }
+}
+
+impl Authorized for HomepageExplorerPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_caller_self();
+        explorer::plugin::authorized::graphql(&query)
     }
 }
 

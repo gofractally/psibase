@@ -12,3 +12,13 @@ interface block-log {
     /// Block summaries (without action payloads) as a JSON GraphQL connection.
     get-blocks: func(range: block-range) -> result<string, error>;
 }
+
+/// Makes authorized queries to the explorer service's http server.
+///
+/// Like `block-log`, only call this when the Explorer package is installed.
+interface authorized {
+    use host:types/types.{error};
+
+    /// Executes a GraphQL query against the explorer service.
+    graphql: func(query: string) -> result<string, error>;
+}

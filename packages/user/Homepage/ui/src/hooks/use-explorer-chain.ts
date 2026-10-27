@@ -5,7 +5,10 @@ import { parseChainTime } from "@/lib/format";
 import QueryKey from "@/lib/query-keys";
 
 import { useIsPackageInstalled } from "@shared/hooks/use-is-package-installed";
-import { graphql } from "@shared/lib/graphql";
+import {
+    type GraphqlPluginCall,
+    graphqlAuth,
+} from "@shared/lib/graphql/graphql-auth";
 import {
     type PluginCall,
     callPluginFunction,
@@ -31,12 +34,16 @@ export const useExplorerInstalled = (): boolean | undefined => {
     return isPending ? undefined : data === true;
 };
 
-/**
- * Block headers and per-block action counts are public, so these read the
- * explorer service's block log directly without auth.
- */
+/** Only call this when the Explorer package is installed. */
+const explorerGraphql: GraphqlPluginCall = {
+    service: "homepage",
+    plugin: "explorer",
+    intf: "authorized",
+    method: "graphql",
+};
+
 const queryExplorer = async <T>(query: string, schema: z.ZodType<T>) =>
-    schema.parse(await graphql(query, { service: "explorer" }));
+    schema.parse(await graphqlAuth(explorerGraphql, query));
 
 const zGenesisResponse = z.object({
     block: z.object({ header: z.object({ time: z.string() }) }).nullable(),

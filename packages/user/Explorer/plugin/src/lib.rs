@@ -10,10 +10,10 @@ use accounts::query::types::Account;
 use auth_dyn::plugin::types::DynamicAuthPolicy;
 use explorer::plugin::types::{BlockHeader, BlockRange};
 use exports::explorer::plugin::{
-    accounts::Guest as Accounts, block_log::Guest as BlockLog, network::Guest as Network,
-    producers::Guest as Producers, registry::Guest as Registry, setcode::Guest as Setcode,
-    sites::Guest as Sites, tokens::Guest as Tokens, transact::Guest as Transact,
-    virtual_server::Guest as VirtualServer,
+    accounts::Guest as Accounts, authorized::Guest as Authorized, block_log::Guest as BlockLog,
+    network::Guest as Network, producers::Guest as Producers, registry::Guest as Registry,
+    setcode::Guest as Setcode, sites::Guest as Sites, tokens::Guest as Tokens,
+    transact::Guest as Transact, virtual_server::Guest as VirtualServer,
 };
 use host::types::types::Error;
 use packages::plugin::types::InstalledPackage;
@@ -69,6 +69,13 @@ impl BlockLog for ExplorerPlugin {
     fn find_transaction(id: String, max_blocks: Option<u32>) -> Result<Option<String>, Error> {
         assert_caller_self();
         block_log::find_transaction(id, max_blocks)
+    }
+}
+
+impl Authorized for ExplorerPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_caller_self_or(&["homepage"], "authorized::graphql");
+        host::http::api::post_graphql_get_json(&query)
     }
 }
 
