@@ -74,15 +74,14 @@ namespace SystemService
          std::string cookieName = "__Host-" + name;
 
          std::string cookieAttribs;
-         cookieAttribs += "Path=/; ";
-         cookieAttribs += "SameSite=Strict; ";
-         cookieAttribs += "Secure; ";
-         cookieAttribs += "Max-Age=" + std::to_string(maxAge);
-         cookieAttribs += "; ";
+         cookieAttribs += "; Path=/";
+         cookieAttribs += "; SameSite=Strict";
+         cookieAttribs += "; Secure";
+         cookieAttribs += "; Max-Age=" + std::to_string(maxAge);
          if (httpOnly)
-            cookieAttribs += "HttpOnly; ";
+            cookieAttribs += "; HttpOnly";
 
-         std::string cookieValue = cookieName + "=" + value + "; " + cookieAttribs;
+         std::string cookieValue = cookieName + "=" + value + cookieAttribs;
          return HttpHeader{"Set-Cookie", cookieValue};
       }
 
