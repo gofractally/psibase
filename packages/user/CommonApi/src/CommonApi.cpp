@@ -121,12 +121,6 @@ namespace SystemService
             headers.push_back(allowCredentials());
          return headers;
       }
-
-      // Browsers send Origin on every cross-origin POST, so a POST without one is same-origin.
-      bool isSameOriginPostTo(const HttpRequest& req, AccountNumber subdomain)
-      {
-         return !req.getHeader("origin") && XHttp::getService(req) == subdomain;
-      }
    }  // namespace
 
    std::optional<HttpReply> CommonApi::serveSys(HttpRequest request)
@@ -188,8 +182,26 @@ namespace SystemService
 
       if (request.method == "POST")
       {
+         auto requireJson = [&] -> std::optional<HttpReply>
+         {
+            if (request.contentType != "application/json")
+            {
+               auto headers = allowCors();
+               headers.push_back({"Allow", "application/json"});
+               auto msg = std::string_view("Content-Type must be application/json");
+               return HttpReply{
+                   .status      = HttpStatus::unsupportedMediaType,
+                   .contentType = "text/html",
+                   .body        = {msg.begin(), msg.end()},
+                   .headers     = std::move(headers),
+               };
+            }
+            return {};
+         };
          if (request.target == "/common/pack/Transaction")
          {
+            if (auto result = requireJson())
+               return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(extractData<Transaction>(request)),
@@ -198,6 +210,8 @@ namespace SystemService
          }
          if (request.target == "/common/pack/SignedTransaction")
          {
+            if (auto result = requireJson())
+               return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(extractData<SignedTransaction>(request)),
@@ -206,14 +220,10 @@ namespace SystemService
          }
          if (request.target == "/common/set-host-cookie")
          {
+            if (auto result = requireJson())
+               return result;
+
             auto headers = allowCredentialedCorsFrom(request, "supervisor"_a);
-            if (headers.empty() && !isSameOriginPostTo(request, "supervisor"_a))
-            {
-               return HttpReply{.status      = HttpStatus::forbidden,
-                                .contentType = "text/plain",
-                                .body        = {},
-                                .headers     = {}};
-            }
 
             auto data = extractData<CookieData>(request);
 
@@ -226,8 +236,7 @@ namespace SystemService
                                 .headers     = headers};
             }
 
-            headers.push_back(
-                setCookieHeader(data.name, data.value, data.maxAge, data.httpOnly));
+            headers.push_back(setCookieHeader(data.name, data.value, data.maxAge, data.httpOnly));
 
             return HttpReply{.status      = HttpStatus::ok,
                              .contentType = "text/plain",
