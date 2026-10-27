@@ -6,8 +6,7 @@ import {
 } from "@/components/home/most-active-apps";
 import { NetworkStats } from "@/components/home/network-cards";
 import { OwnedOnNetwork } from "@/components/home/owned-on-network";
-import { GuestHero, PassportHero } from "@/components/home/passport-hero";
-import { WelcomeBanner } from "@/components/welcome-banner";
+import { PassportHero } from "@/components/home/passport-hero";
 
 import { useExplorerInstalled } from "@/hooks/use-explorer-chain";
 
@@ -26,22 +25,21 @@ const Dashboard = () => {
 
     return (
         <div className="flex flex-col gap-8">
-            <div className="grid-bg -mx-4 -mt-4 flex flex-col gap-8 px-4 pb-2 pt-5 md:-mx-6 md:-mt-6 md:px-6 md:pt-8">
-                <WelcomeBanner />
-                {isPending ? (
-                    <div className="flex items-center gap-5">
-                        <Skeleton className="size-24 rounded-full" />
-                        <div className="flex flex-col gap-2">
-                            <Skeleton className="h-3 w-40" />
-                            <Skeleton className="h-8 w-64" />
+            {(isPending || user) && (
+                <div className="grid-bg -mx-4 -mt-4 flex flex-col gap-8 px-4 pb-2 pt-5 md:-mx-6 md:-mt-6 md:px-6 md:pt-8">
+                    {isPending ? (
+                        <div className="flex items-center gap-5">
+                            <Skeleton className="size-24 rounded-full" />
+                            <div className="flex flex-col gap-2">
+                                <Skeleton className="h-3 w-40" />
+                                <Skeleton className="h-8 w-64" />
+                            </div>
                         </div>
-                    </div>
-                ) : user ? (
-                    <PassportHero user={user} />
-                ) : (
-                    <GuestHero />
-                )}
-            </div>
+                    ) : (
+                        user && <PassportHero user={user} />
+                    )}
+                </div>
+            )}
 
             {isPending ? <AppCardsSkeleton /> : <AppCards signedIn={!!user} />}
 

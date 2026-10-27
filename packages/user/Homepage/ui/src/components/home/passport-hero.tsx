@@ -1,5 +1,4 @@
-import { LogIn, PencilLine } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { PencilLine } from "lucide-react";
 
 import { CopyIcon } from "@/components/account-cell";
 
@@ -8,11 +7,8 @@ import { colorFor } from "@/lib/colors";
 
 import { Avatar } from "@shared/components/avatar";
 import { useBranding } from "@shared/hooks/use-branding";
-import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { useProfile } from "@shared/hooks/use-profile";
-import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { toast } from "@shared/shadcn/ui/sonner";
 
 const greeting = () => {
     const h = new Date().getHours();
@@ -90,46 +86,6 @@ export const PassportHero = ({ user }: { user: string }) => {
                     )
                 )}
             </div>
-        </div>
-    );
-};
-
-export const GuestHero = () => {
-    const location = useLocation();
-    const { data: networkName } = useBranding();
-    const { mutate: login, isPending } = useConnectAccount({
-        onError: (error) => toast.error(error.message),
-    });
-    const network = networkName || "psibase";
-
-    return (
-        <div className="flex flex-col gap-6 py-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-                <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.2em]">
-                    {network}
-                </div>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-                    One account for every app on {network}
-                </h1>
-                <p className="text-muted-foreground mt-3 text-sm leading-relaxed sm:text-base">
-                    Sign up once and use it everywhere. Your profile, tokens,
-                    contacts and chats come with you into every app on the
-                    network.
-                </p>
-            </div>
-            <Button
-                size="lg"
-                disabled={isPending}
-                onClick={() =>
-                    login({
-                        enabled: true,
-                        returnPath: `${location.pathname}${location.search}`,
-                    })
-                }
-            >
-                <LogIn className="size-4" />
-                Log in or create an account
-            </Button>
         </div>
     );
 };

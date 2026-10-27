@@ -4,8 +4,7 @@ import { UsageCreditsSection } from "@/apps/settings/components/usage-credits-se
 import { UserProfileSection } from "@/apps/settings/components/user-profile-section";
 
 import { CopyIcon } from "@/components/account-cell";
-import { KeyValue, Panel } from "@/components/page-header";
-import { useWelcomeDismissed } from "@/components/welcome-banner";
+import { Panel } from "@/components/page-header";
 
 import { type AccountTab, useAccountSheet } from "@/hooks/use-account-sheet";
 import { colorFor } from "@/lib/colors";
@@ -15,7 +14,6 @@ import { useTheme } from "@shared/components/theme-provider";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
 import { cn } from "@shared/lib/utils";
-import { Button } from "@shared/shadcn/ui/button";
 import {
     Sheet,
     SheetContent,
@@ -108,7 +106,6 @@ const THEMES = [
 
 const PreferencesSection = () => {
     const { theme, setTheme } = useTheme();
-    const [welcomeDismissed, setWelcomeDismissed] = useWelcomeDismissed();
 
     return (
         <div className="flex flex-col gap-4">
@@ -132,24 +129,6 @@ const PreferencesSection = () => {
                         </button>
                     ))}
                 </div>
-            </Panel>
-            <Panel title="Home">
-                <KeyValue label="Welcome message">
-                    <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground text-xs">
-                            {welcomeDismissed ? "Hidden" : "Showing on Home"}
-                        </span>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs"
-                            disabled={!welcomeDismissed}
-                            onClick={() => setWelcomeDismissed(false)}
-                        >
-                            Show again
-                        </Button>
-                    </div>
-                </KeyValue>
             </Panel>
         </div>
     );
