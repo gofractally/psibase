@@ -445,6 +445,20 @@ export const AdminPage = () => {
             </AdminSection>
 
             <AdminSection title="Sign in with X">
+                <div className="flex items-start gap-2 rounded-lg border px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                        <div className="text-muted-foreground text-xs">
+                            Callback URL, for the X developer portal redirect
+                        </div>
+                        <p className="break-all font-mono text-xs">
+                            {config.data.x_callback_url}
+                        </p>
+                    </div>
+                    <CopyButton
+                        text={config.data.x_callback_url}
+                        ariaLabel="Copy X OAuth callback URL"
+                    />
+                </div>
                 <CredentialsForm
                     fields={[
                         {

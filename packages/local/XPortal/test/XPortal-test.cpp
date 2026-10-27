@@ -313,9 +313,13 @@ namespace
                    code_challenge_method)
    };
 
-   AuthorizeQuery startXSignIn(DefaultTestChain& t)
+   AuthorizeQuery startXSignIn(DefaultTestChain& t,
+                               std::vector<HttpHeader> extraHeaders = {})
    {
-      auto reply = t.http(forwarded("GET", "/auth/x/start"));
+      auto builder = HttpRequestBuilder{}.header("X-Forwarded-For", "203.0.113.8");
+      for (auto& header : extraHeaders)
+         builder.header(std::move(header));
+      auto reply = t.http(builder.get(XPortal::service, "/auth/x/start"));
       REQUIRE(reply.status == HttpStatus::found);
       auto location = reply.getHeader("Location");
       REQUIRE(location.has_value());
@@ -691,6 +695,30 @@ TEST_CASE("provision commits one attempt before signing")
    CHECK(!again.error.has_value());
    CHECK(signupRow(created.signup_id)->attempts == 1);
 
+   auto retryPath = "/admin/signups/" + created.signup_id + "/retry";
+   CHECK(t.http(forwarded("POST", retryPath)).status == HttpStatus::unauthorized);
+   CHECK(t.http(forwarded("GET", retryPath, token)).status == HttpStatus::methodNotAllowed);
+   CHECK(t.http(forwarded("POST", "/admin/signups/invalid/retry", token)).status ==
+         HttpStatus::badRequest);
+   CHECK(t.http(forwarded("POST", retryPath, token)).status == HttpStatus::conflict);
+
+   // Restart drops session bookkeeping but retains the interrupted signup.
+   XPortal{}.open<ProvisionAttemptTable>().erase(row->id);
+   XPortal{}.open<PendingPushTable>().put(PendingPush{.socket = 11, .signup = row->id});
+   CHECK(t.http(forwarded("POST", retryPath, token)).status == HttpStatus::conflict);
+   XPortal{}.open<PendingPushTable>().erase(std::int32_t{11});
+
+   auto retried = t.http<SignupReceipt>(forwarded("POST", retryPath, token));
+   CHECK(retried.signup_id == created.signup_id);
+   CHECK(signupRow(created.signup_id)->attempts == 1);
+   CHECK(t.http(forwarded("POST", retryPath, token)).status == HttpStatus::conflict);
+   auto retryFired = runAs(t, AccountNumber{}, XTimer::service, "runOne", std::tuple{});
+   REQUIRE(retryFired.error.has_value());
+   CHECK(signupRow(created.signup_id)->attempts == 2);
+   CHECK(signupRow(created.signup_id)->invite_id == row->invite_id);
+   CHECK(signupRow(created.signup_id)->token == row->token);
+   CHECK(t.http(forwarded("POST", retryPath, token)).status == HttpStatus::conflict);
+
    XPortal{}.open<PendingPushTable>().put(PendingPush{.socket = 11, .signup = row->id});
    auto pushed = runAs(t, XHttp::service, XPortal::service, "onPushReply",
                        std::tuple{std::int32_t{11},
@@ -701,6 +729,8 @@ TEST_CASE("provision commits one attempt before signing")
        withSession(forwarded("GET", "/signup/" + created.signup_id), "owner"));
    CHECK(done.state == "invited");
    CHECK(done.token == "token-21");
+   CHECK(!XPortal{}.open<ProvisionAttemptTable>().get(row->id));
+   CHECK(t.http(forwarded("POST", retryPath, token)).status == HttpStatus::conflict);
 
    auto second = t.http<SignupReceipt>(signupRequest(22, "other"));
    auto claimed =
@@ -729,6 +759,34 @@ TEST_CASE("provision commits one attempt before signing")
    CHECK(rows[0].id == second.signup_id);
    CHECK(rows[0].attempts == 1);
    CHECK(rows[0].last_error == "invite id is taken");
+}
+
+TEST_CASE("admin recovery cannot replay a completed invite or an unpaid signup")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+   auto id = storePendingSignup(23, "42");
+   auto path = "/admin/signups/" +
+               toBase64Url({reinterpret_cast<const char*>(id.data()), id.size()}) + "/retry";
+   auto retry = [&] {
+      return t.http(HttpRequestBuilder{}.post(XPortal::service, path, EmptyBody{}));
+   };
+   CHECK(retry().status == HttpStatus::conflict);
+   auto table = XPortal{}.open<SignupTable>();
+   auto row = *table.get(id);
+   row.state = "queued";
+   row.attempts = 1;
+   table.put(row);
+   REQUIRE(t.from(AccountNumber{"alice"})
+               .to<Invite>()
+               .createInvite(row.invite_id, row.payload, 1, false,
+                              Quantity{static_cast<Quantity::Quantity_t>(0)}, std::nullopt)
+               .succeeded());
+   auto refused = retry();
+   CHECK(refused.status == HttpStatus::conflict);
+   CHECK(replyText(refused) == "signup invite already exists\n");
+   CHECK(table.get(id)->attempts == 1);
+   CHECK(!XPortal{}.open<ProvisionAttemptTable>().get(id));
 }
 
 TEST_CASE("X credentials are set field by field and the secret is masked")
@@ -767,6 +825,26 @@ TEST_CASE("X credentials are set field by field and the secret is masked")
    CHECK(config.requests_enabled == false);
 }
 
+TEST_CASE("X OAuth callback URL follows the browser-facing origin")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+
+   auto config = t.get<AdminConfig>(XPortal::service, "/admin/config");
+   CHECK(config.x_callback_url == "http://x-portal.psibase.io/auth/x/callback");
+
+   configureX(t);
+   auto authorize = startXSignIn(t);
+   CHECK(authorize.redirect_uri == config.x_callback_url);
+
+   authorize = startXSignIn(t, {{"Host", "x-portal.psibase.io:9090"}});
+   CHECK(authorize.redirect_uri == "http://x-portal.psibase.io:9090/auth/x/callback");
+
+   authorize = startXSignIn(t, {{"Host", "x-portal.psibase.io:9090"},
+                                {"X-Forwarded-Proto", "https"}});
+   CHECK(authorize.redirect_uri == "https://x-portal.psibase.io:9090/auth/x/callback");
+}
+
 TEST_CASE("Sign in with X starts PKCE and consumes its state once")
 {
    DefaultTestChain t{portalPackages};
@@ -780,7 +858,7 @@ TEST_CASE("Sign in with X starts PKCE and consumes its state once")
    auto authorize = startXSignIn(t);
    CHECK(authorize.response_type == "code");
    CHECK(authorize.client_id == "client-id");
-   CHECK(authorize.redirect_uri == "https://x-portal.psibase.io/auth/x/callback");
+   CHECK(authorize.redirect_uri == "http://x-portal.psibase.io/auth/x/callback");
    CHECK(authorize.scope == "users.read tweet.read");
    CHECK(authorize.code_challenge_method == "S256");
    CHECK(authorize.state.size() == 43);
@@ -858,7 +936,7 @@ TEST_CASE("an X session cookie identifies the user until logout or expiry")
    auto logout = t.http(withSession(forwarded("POST", "/auth/logout"), "live"));
    CHECK(logout.status == HttpStatus::ok);
    CHECK(logout.getHeader("Set-Cookie") ==
-         "XPORTAL_SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
+         "XPORTAL_SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
    CHECK(!XPortal{}.open<XSessionTable>().get(std::string{"live"}).has_value());
    CHECK(t.http(withSession(forwarded("GET", "/me"), "live")).status == HttpStatus::unauthorized);
 }

@@ -144,6 +144,17 @@ namespace LocalService
    using PendingPushTable = psibase::Table<PendingPush, &PendingPush::socket>;
    PSIO_REFLECT_TYPENAME(PendingPushTable)
 
+   /// Tracks scheduled retries and attempts in this node session. An aborted
+   /// attempt remains here until restart, so an admin cannot race its execution.
+   struct ProvisionAttempt
+   {
+      psibase::Checksum256 signup;
+      bool                 retry_requested = false;
+      PSIO_REFLECT(ProvisionAttempt, signup, retry_requested)
+   };
+   using ProvisionAttemptTable = psibase::Table<ProvisionAttempt, &ProvisionAttempt::signup>;
+   PSIO_REFLECT_TYPENAME(ProvisionAttemptTable)
+
    /// An X authorization that `GET /auth/x/start` began and
    /// `/auth/x/callback` has not consumed.
    struct XAuthRequest
@@ -230,6 +241,8 @@ namespace LocalService
       std::vector<SystemService::AllowedAction> creator_allowed;
       /// `client_secret` shows only its last four characters.
       XConfig     x;
+      /// OAuth redirect URI for this request; not stored.
+      std::string x_callback_url;
       std::string mode;
       /// `secret_key` and `webhook_secret` show only their last four characters.
       StripeConfig          stripe;
@@ -243,6 +256,7 @@ namespace LocalService
                    creator_pubkey,
                    creator_allowed,
                    x,
+                   x_callback_url,
                    mode,
                    stripe,
                    tiers)
@@ -388,7 +402,8 @@ namespace LocalService
    /// and the signup is `pending`, it becomes `queued` and is provisioned.
    /// Every verified event gets 200.
    ///
-   /// `provision` attempts each due queued signup once. It commits
+   /// `provision` attempts each due queued signup once unless an administrator
+   /// explicitly retries it after restart. It commits
    /// `attempts += 1` and `last_error = "signing aborted"`, then pushes as
    /// `ac-creator`. When billing is enabled, that is
    /// `tokens::credit(sys, invite, cost, "x-portal signup")` with
@@ -403,6 +418,10 @@ namespace LocalService
    /// session is 401; anything else that is not that session's signup is 404.
    /// `GET /admin/signups?state=failed` returns `FailedSignup` rows for an
    /// administrator.
+   /// `POST /admin/signups/:id/retry` requeues an interrupted `queued` signup
+   /// after a node restart, preserving its invite and attempt count. It requires
+   /// an administrator and rejects attempts active in this session, outstanding
+   /// pushes, and invite IDs already present on chain.
    ///
    /// Sign in with X is OAuth 2.0 with PKCE. `GET /auth/x/start` redirects to
    /// X's authorize page; X returns the browser to `GET /auth/x/callback`,
@@ -434,7 +453,8 @@ namespace LocalService
                                                    XUserTable,
                                                    XSessionTable>;
       using Session    = psibase::
-          SessionTables<PendingPushTable, PendingXRequestTable, PendingStripeRequestTable>;
+          SessionTables<PendingPushTable, PendingXRequestTable, PendingStripeRequestTable,
+                        ProvisionAttemptTable>;
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest                  request,
                                                  std::optional<std::int32_t>           socket,

@@ -8,6 +8,7 @@
 #include <limits>
 #include <psibase/base64.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
 #include <psio/json/any.hpp>
@@ -374,6 +375,7 @@ namespace
             table.remove(*pending);
          }
          applySignupResult(pending->signup, error ? &*error : nullptr);
+         XPortal{}.open<ProvisionAttemptTable>().erase(pending->signup);
       }
    }
 
@@ -416,7 +418,15 @@ namespace
       return stripe;
    }
 
-   AdminConfig adminView(const HttpRequest& req, const PortalConfig& config)
+   std::string xCallbackUrl(const HttpRequest& req, bool tls)
+   {
+      std::string host = XPortal::service.str();
+      host += '.';
+      host += to<XHttp>().rootHost(req.host);
+      return publicUrl(req, tls, host, "/auth/x/callback");
+   }
+
+   AdminConfig adminView(const HttpRequest& req, const PortalConfig& config, bool tls)
    {
       auto key = readCreatorAgentKey();
       return AdminConfig{.requests_enabled           = config.requests_enabled,
@@ -430,6 +440,7 @@ namespace
                                               : std::nullopt,
                          .creator_allowed = XPortal::creatorAllowed(),
                          .x               = maskedX(config.x),
+                         .x_callback_url  = xCallbackUrl(req, tls),
                          .mode            = config.mode,
                          .stripe          = maskedStripe(config.stripe),
                          .tiers           = config.tiers};
@@ -630,7 +641,10 @@ namespace
       if (auto reply = to<XAdmin>().checkAuth(req, socket))
          return *reply;
       if (req.method == "GET")
-         return jsonBody(req, adminView(req, loadedConfig()));
+      {
+         bool tls = socket && to<XHttp>().isSecure(*socket);
+         return jsonBody(req, adminView(req, loadedConfig(), tls));
+      }
       if (req.method != "PUT")
          return HttpReply::methodNotAllowed(req);
       if (req.contentType != "application/json")
@@ -944,6 +958,42 @@ namespace
       return jsonBody(req, view);
    }
 
+   HttpReply serveRetrySignup(const HttpRequest& req,
+                             std::optional<std::int32_t> socket,
+                             std::string_view idText)
+   {
+      if (req.method == "OPTIONS")
+         return HttpReply{.headers = cors(req)};
+      if (auto reply = to<XAdmin>().checkAuth(req, socket))
+         return *reply;
+      if (req.method != "POST")
+         return HttpReply::methodNotAllowed(req);
+      auto id = parseSignupId(idText);
+      if (!id)
+         return textError(req, HttpStatus::badRequest, "invalid signup id\n");
+
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto signup = XPortal{}.open<SignupTable>().get(*id);
+         if (!signup)
+            return textError(req, HttpStatus::notFound, "signup not found\n");
+         if (signup->state != stateQueued)
+            return textError(req, HttpStatus::conflict, "signup is not queued\n");
+         auto attempts = XPortal{}.open<ProvisionAttemptTable>();
+         if (attempts.get(*id))
+            return textError(req, HttpStatus::conflict,
+                             "signup already scheduled or attempted in this node session\n");
+         for (const auto& push : XPortal{}.open<PendingPushTable>().getIndex<0>())
+            if (push.signup == *id)
+               return textError(req, HttpStatus::conflict, "signup push is still pending\n");
+         if (to<Invite>().getInvite(signup->invite_id))
+            return textError(req, HttpStatus::conflict, "signup invite already exists\n");
+         attempts.put(ProvisionAttempt{.signup = *id, .retry_requested = true});
+         to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
+      }
+      return jsonBody(req, SignupReceipt{.signup_id = signupId(*id)});
+   }
+
    struct FailedQuery
    {
       std::string state;
@@ -991,24 +1041,6 @@ namespace
       return toBase64Url({reinterpret_cast<const char*>(hash.data()), hash.size()});
    }
 
-   // Off localhost this is the canonical https origin. A localhost node serves
-   // plain http, so the URL keeps that scheme and the request's port.
-   std::string xCallbackUrl(const HttpRequest& req)
-   {
-      bool        local = isLocalhost(req);
-      std::string url   = local ? "http://" : "https://";
-      url += XPortal::service.str();
-      url += '.';
-      url += to<XHttp>().rootHost(req.host);
-      if (auto host = req.getHeader("host"); local && host)
-      {
-         if (auto pos = host->rfind(':'); pos != std::string_view::npos)
-            url += host->substr(pos);
-      }
-      url += "/auth/x/callback";
-      return url;
-   }
-
    HttpReply redirect(std::string location, std::vector<HttpHeader> headers = {})
    {
       headers.push_back({"Location", std::move(location)});
@@ -1024,7 +1056,7 @@ namespace
       return {"Set-Cookie", std::move(cookie)};
    }
 
-   HttpReply serveXStart(const HttpRequest& req)
+   HttpReply serveXStart(const HttpRequest& req, std::optional<std::int32_t> socket)
    {
       if (req.method != "GET")
          return HttpReply::methodNotAllowed(req);
@@ -1033,10 +1065,11 @@ namespace
          return textError(req, HttpStatus::serviceUnavailable,
                           "Sign in with X is not configured\n");
 
+      bool         tls = socket && to<XHttp>().isSecure(*socket);
       auto         now = wallNow();
       XAuthRequest started{.state         = randomToken(),
                            .code_verifier = randomToken(),
-                           .redirect_uri  = xCallbackUrl(req),
+                           .redirect_uri  = xCallbackUrl(req, tls),
                            .expires       = now + authRequestTtl};
       PSIBASE_SUBJECTIVE_TX
       {
@@ -1158,8 +1191,10 @@ namespace
          return textError(req, HttpStatus::serviceUnavailable,
                           "Sign in with X is not configured\n");
 
+      bool tls = socket && to<XHttp>().isSecure(*socket);
       sendXRequest(x, xTokenRequest(x, query.code, *started), MethodNumber{"onXToken"},
-                   PendingXRequest{.client = *socket, .secure = !isLocalhost(req)});
+                   PendingXRequest{.client = *socket,
+                                   .secure = publicHttps(req, tls)});
       PSIBASE_SUBJECTIVE_TX
       {
          to<XHttp>().autoClose(*socket, false);
@@ -1221,7 +1256,7 @@ namespace
       return jsonBody(req, XIdentity{.x_id = session->x_id, .handle = session->handle});
    }
 
-   HttpReply serveLogout(const HttpRequest& req)
+   HttpReply serveLogout(const HttpRequest& req, std::optional<std::int32_t> socket)
    {
       if (req.method == "OPTIONS")
          return HttpReply{.headers = cors(req)};
@@ -1234,8 +1269,9 @@ namespace
             if (auto row = table.get(std::string{id}))
                table.remove(*row);
       }
-      auto headers = cors(req);
-      headers.push_back(sessionCookieHeader("", std::chrono::seconds{0}, !isLocalhost(req)));
+      bool         tls = socket && to<XHttp>().isSecure(*socket);
+      auto           headers = cors(req);
+      headers.push_back(sessionCookieHeader("", std::chrono::seconds{0}, publicHttps(req, tls)));
       return HttpReply{.headers = std::move(headers)};
    }
 
@@ -1403,8 +1439,8 @@ namespace
       return HttpReply{};
    }
 
-   // A queued signup is due until its one attempt is committed. The commit
-   // happens before signTx, so an auth rejection does not run the attempt again.
+   // An admin can explicitly requeue an interrupted attempt after restart.
+   // Otherwise committing an attempt prevents an abort from causing a retry loop.
    std::vector<Checksum256> dueSignupIds()
    {
       std::vector<Checksum256> ids;
@@ -1412,8 +1448,12 @@ namespace
       {
          ids.clear();
          for (auto row : XPortal{}.open<SignupTable>().getIndex<0>())
-            if (row.state == stateQueued && row.attempts == 0)
+         {
+            auto attempt = XPortal{}.open<ProvisionAttemptTable>().get(row.id);
+            if (row.state == stateQueued &&
+                (row.attempts == 0 || (attempt && attempt->retry_requested)))
                ids.push_back(row.id);
+         }
       }
       return ids;
    }
@@ -1444,8 +1484,12 @@ namespace
       {
          claimed.reset();
          auto table = XPortal{}.open<SignupTable>();
-         if (auto row = table.get(id); row && row->state == stateQueued && row->attempts == 0)
+         auto attempts = XPortal{}.open<ProvisionAttemptTable>();
+         auto attempt = attempts.get(id);
+         if (auto row = table.get(id); row && row->state == stateQueued &&
+             (row->attempts == 0 || (attempt && attempt->retry_requested)))
          {
+            attempts.put(ProvisionAttempt{.signup = id});
             row->attempts += 1;
             row->last_error = std::string{signingAborted};
             row->updated    = wallNow();
@@ -1453,7 +1497,7 @@ namespace
             claimed = *row;
          }
       }
-      // Already attempted, or no longer queued: a later timer is not another attempt.
+      // Without an explicit retry, a later timer is not another attempt.
       if (!claimed)
          return;
       pushAgentTx(signupActions(*claimed), claimed->id);
@@ -1476,6 +1520,9 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
       return serveCreatorKeygen(request, socket);
    if (target == "/admin/signups")
       return serveFailedSignups(request, socket);
+   if (target.starts_with("/admin/signups/") && target.ends_with("/retry"))
+      return serveRetrySignup(request, socket,
+                              std::string_view{target}.substr(15, target.size() - 15 - 6));
    if (target == "/signup")
       return serveSignup(request, socket);
    if (target == "/stripe/webhook")
@@ -1483,11 +1530,11 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
    if (target.starts_with("/signup/"))
       return serveSignupStatus(request, std::string_view{target}.substr(8));
    if (target == "/auth/x/start")
-      return serveXStart(request);
+      return serveXStart(request, socket);
    if (target == "/auth/x/callback")
       return serveXCallback(request, socket);
    if (target == "/auth/logout")
-      return serveLogout(request);
+      return serveLogout(request, socket);
    if (target == "/me")
       return serveMe(request);
    return std::nullopt;

@@ -26,6 +26,7 @@ const zAdminConfig = z.object({
         client_id: z.string().nullish(),
         client_secret: z.string().nullish(),
     }),
+    x_callback_url: z.string(),
     stripe: z.object({ sandbox: zStripeKeys }),
 });
 
