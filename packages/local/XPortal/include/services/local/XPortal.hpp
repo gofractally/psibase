@@ -402,6 +402,14 @@ namespace LocalService
    /// and the signup is `pending`, it becomes `queued` and is provisioned.
    /// Every verified event gets 200.
    ///
+   /// Provisioning submits each signed push to this node's `transact` endpoint
+   /// over a unix-socket listener, or over plain `http` when no socket is
+   /// configured; see psinode's docs for listen syntax. The push prefers the
+   /// unix socket, otherwise the first `http` listener. Wildcard `http`
+   /// addresses are contacted on loopback; any other configured address is
+   /// contacted as written. The push never uses TLS and never selects an
+   /// `https` listener; an `https`-only listen list leaves no endpoint.
+   ///
    /// `provision` attempts each due queued signup once unless an administrator
    /// explicitly retries it after restart. It commits
    /// `attempts += 1` and `last_error = "signing aborted"`, then pushes as

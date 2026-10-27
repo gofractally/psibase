@@ -269,7 +269,7 @@ namespace
       return settings->producer;
    }
 
-   // Prefers the node's unix socket. A wildcard TCP address connects over loopback.
+   // Provisioning push listener selection: struct XPortal doc comment.
    SocketEndpoint nodeEndpoint()
    {
       auto settings = hostSettings();
