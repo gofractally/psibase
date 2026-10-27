@@ -15,6 +15,7 @@ import {
 import {
     formatChainTime,
     formatDuration,
+    formatMinutes,
     formatSecondsAgo,
     parseChainTime,
 } from "@/lib/format";
@@ -163,9 +164,11 @@ const UserActivityCard = ({
                 }
                 sub={
                     data
-                        ? `actions sent in last ${data.windowBlocks.toLocaleString()} blocks · ${formatDuration(data.windowSeconds)}`
+                        ? data.windowBlocks > 0
+                            ? `actions sent in the last ${formatMinutes(data.windowSeconds)}`
+                            : "actions sent recently"
                         : isError
-                          ? "couldn't load recent blocks"
+                          ? "couldn't load recent activity"
                           : "loading…"
                 }
                 spark={data?.spark}

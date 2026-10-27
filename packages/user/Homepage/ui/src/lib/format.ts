@@ -22,6 +22,12 @@ export const formatDuration = (totalSeconds: number) => {
     return parts.slice(0, 3).join(" ");
 };
 
+/** Whole minutes, never less than one: "1 minute", "12 minutes". */
+export const formatMinutes = (totalSeconds: number) => {
+    const m = Math.max(1, Math.round(totalSeconds / 60));
+    return `${m.toLocaleString()} minute${m === 1 ? "" : "s"}`;
+};
+
 export const formatSecondsAgo = (secs: number) =>
     secs < 1 ? "just now" : `${formatDuration(secs)} ago`;
 

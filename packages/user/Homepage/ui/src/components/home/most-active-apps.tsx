@@ -7,7 +7,7 @@ import { Panel } from "@/components/page-header";
 
 import { useServiceActivity } from "@/hooks/use-explorer-chain";
 import { colorFor } from "@/lib/colors";
-import { formatDuration } from "@/lib/format";
+import { formatMinutes } from "@/lib/format";
 
 import { Avatar } from "@shared/components/avatar";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -28,7 +28,7 @@ const RowSkeletons = () =>
         </div>
     ));
 
-const DEFAULT_DESCRIPTION = "Actions received in recent blocks";
+const DEFAULT_DESCRIPTION = "Actions received recently";
 
 export const MostActiveAppsSkeleton = () => (
     <Panel
@@ -51,7 +51,7 @@ export const MostActiveApps = () => {
             title="Most active apps"
             description={
                 data && data.windowBlocks > 0
-                    ? `Actions received in the last ${data.windowBlocks.toLocaleString()} blocks (${formatDuration(data.windowSeconds)}), excluding system actions`
+                    ? `Actions received in the last ${formatMinutes(data.windowSeconds)}, excluding system actions`
                     : DEFAULT_DESCRIPTION
             }
             bodyClassName="p-2"
@@ -64,8 +64,9 @@ export const MostActiveApps = () => {
                 </EmptyState>
             ) : top.length === 0 ? (
                 <EmptyState icon={Activity}>
-                    No app activity in the last{" "}
-                    {data.windowBlocks.toLocaleString()} blocks
+                    {data.windowBlocks > 0
+                        ? `No app activity in the last ${formatMinutes(data.windowSeconds)}`
+                        : "No recent app activity"}
                 </EmptyState>
             ) : (
                 <ol className="flex flex-col">
