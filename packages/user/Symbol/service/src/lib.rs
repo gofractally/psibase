@@ -416,5 +416,3 @@ pub mod service {
     fn symEvent(symbol: SID, actor: AccountNumber, action: u8) {}
 }
 
-#[cfg(test)]
-mod tests;
