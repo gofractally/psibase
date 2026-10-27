@@ -21,7 +21,7 @@ struct DataFiles {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct PsibaseMetadata {
     #[serde(rename = "package-name")]
     package_name: Option<String>,
@@ -674,6 +674,21 @@ pub async fn build_packages(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plugin_field_is_rejected() {
+        let Err(err) =
+            serde_json::from_value::<PsibaseMetadata>(json!({"plugin": "tokens-plugin"}))
+        else {
+            panic!("plugin field was accepted");
+        };
+        let err = err.to_string();
+        assert!(
+            err.contains("plugin") && err.contains("unknown field"),
+            "{err}"
+        );
+        serde_json::from_value::<PsibaseMetadata>(json!({"plugins": ["tokens-plugin"]})).unwrap();
+    }
 
     #[test]
     fn serve_path_uses_component_package_name() {
