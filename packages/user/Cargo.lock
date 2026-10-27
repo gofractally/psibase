@@ -1125,6 +1125,7 @@ dependencies = [
  "async-graphql",
  "average",
  "ecies",
+ "evaluations-pkg",
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_service",

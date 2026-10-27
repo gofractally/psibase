@@ -78,3 +78,6 @@ mod service {
         AuthDelegate::call_from(ROOT).setOwner(SYS_FRACTAL);
     }
 }
+
+#[cfg(test)]
+mod tests;

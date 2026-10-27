@@ -415,3 +415,6 @@ pub mod service {
     #[event(history)]
     fn symEvent(symbol: SID, actor: AccountNumber, action: u8) {}
 }
+
+#[cfg(test)]
+mod tests;

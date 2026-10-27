@@ -26,3 +26,4 @@ serde-aux.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
+evaluations-pkg = { path = "..", version = "0.29.0" }

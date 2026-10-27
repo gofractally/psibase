@@ -4149,6 +4149,7 @@ dependencies = [
  "psibase_service",
  "serde",
  "serde_json",
+ "wsauth-pkg",
 ]
 
 [[package]]
