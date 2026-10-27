@@ -893,27 +893,6 @@ const Dashboard = ({ user }: { user: string }) => {
                             </span>
                         </KeyValue>
                     )}
-                    <KeyValue label="Registered app">
-                        {app.data ? (
-                            <span className="flex flex-wrap items-center gap-2 text-xs">
-                                <Store className="text-muted-foreground size-3.5" />
-                                {app.data.name}
-                                {app.data.tags.map((t) => (
-                                    <Badge
-                                        key={t}
-                                        variant="outline"
-                                        className="text-[10px]"
-                                    >
-                                        {t}
-                                    </Badge>
-                                ))}
-                            </span>
-                        ) : (
-                            <span className="text-muted-foreground text-xs">
-                                Not registered in the app registry
-                            </span>
-                        )}
-                    </KeyValue>
                     <KeyValue label="Service code">
                         {code.isPending ? (
                             <Skeleton className="h-4 w-40" />
@@ -945,21 +924,6 @@ const Dashboard = ({ user }: { user: string }) => {
                             </span>
                         )}
                     </KeyValue>
-                    {isProducer && (
-                        <KeyValue label="Block production">
-                            <span className="text-xs">
-                                You are one of{" "}
-                                {producers.data?.producers.length ?? "—"} active
-                                providers ·{" "}
-                                <Link
-                                    to="/providers"
-                                    className="text-primary hover:underline"
-                                >
-                                    provider view
-                                </Link>
-                            </span>
-                        </KeyValue>
-                    )}
                 </Panel>
             </div>
 

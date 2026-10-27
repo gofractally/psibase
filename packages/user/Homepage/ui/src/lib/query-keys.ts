@@ -7,6 +7,11 @@ type QueryKeyGenerator<Prefix extends string = string> = (
 
 const QueryKey = {
     connectedAccounts: () => ["connectedAccounts"] as const,
+    explorerGenesisTime: () => ["explorerGenesisTime"] as const,
+    explorerHead: () => ["explorerHead"] as const,
+    explorerServiceActivity: () => ["explorerServiceActivity"] as const,
+    serviceCode: (account?: string | null) => ["serviceCode", account] as const,
+    siteConfig: (account?: string | null) => ["siteConfig", account] as const,
     mailbox: (mailbox: Mailbox, user: string) => [mailbox, user] as const,
     producers: () => ["producers"] as const,
     token: (tokenId: number | undefined) => ["token", tokenId] as const,

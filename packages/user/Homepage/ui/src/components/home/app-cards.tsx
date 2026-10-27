@@ -11,6 +11,8 @@ import {
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { DashboardSection } from "@/components/home/dashboard-section";
+
 import { useIsCurrentUserProducer } from "@/hooks/use-producers";
 
 import { useIsPackageInstalled } from "@shared/hooks/use-is-package-installed";
@@ -156,15 +158,22 @@ export const AppCards = ({ signedIn }: { signedIn: boolean }) => {
     ];
 
     return (
-        <section className="flex flex-col gap-3">
-            <h2 className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
-                Apps
-            </h2>
+        <DashboardSection title="Apps">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {apps.map((app) => (
                     <InstalledAppCard key={app.service} app={app} />
                 ))}
             </div>
-        </section>
+        </DashboardSection>
     );
 };
+
+export const AppCardsSkeleton = () => (
+    <DashboardSection title="Apps">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+                <AppCardSkeleton key={i} />
+            ))}
+        </div>
+    </DashboardSection>
+);
