@@ -1,0 +1,14 @@
+package homepage:explorer;
+
+/// Reads the explorer's block log with the logged-in user's credentials.
+///
+/// Explorer is not a dependency of Homepage, so only call this plugin when the
+/// Explorer package is installed. For the same reason, the `explorer` import is
+/// linked by Homepage's postinstall rather than by package dependencies.
+interface block-log {
+    use host:types/types.{error};
+    use explorer:plugin/types.{block-range};
+
+    /// Block summaries (without action payloads) as a JSON GraphQL connection.
+    get-blocks: func(range: block-range) -> result<string, error>;
+}

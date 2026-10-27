@@ -10,9 +10,60 @@ interface StatCardProps {
     sub?: ReactNode;
     icon?: LucideIcon;
     accent?: string;
+    spark?: number[];
     className?: string;
     children?: ReactNode;
 }
+
+const SPARK_HEIGHT = 40;
+const SPARK_TOP_MARGIN = 2;
+
+export const Sparkline = ({
+    data,
+    color = "var(--chart-2)",
+    className,
+}: {
+    data: number[];
+    color?: string;
+    className?: string;
+}) => {
+    const max = Math.max(1, ...data);
+    const step = 100 / Math.max(1, data.length - 1);
+    const points = data
+        .map(
+            (v, i) =>
+                `${i * step},${SPARK_HEIGHT - (v / max) * (SPARK_HEIGHT - SPARK_TOP_MARGIN)}`,
+        )
+        .join(" ");
+    const id = `spark-${color.replace(/[^a-z0-9]/gi, "")}`;
+    return (
+        <svg
+            aria-hidden
+            viewBox={`0 0 100 ${SPARK_HEIGHT}`}
+            preserveAspectRatio="none"
+            className={cn("h-10 w-full", className)}
+        >
+            <defs>
+                <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity={0.45} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0} />
+                </linearGradient>
+            </defs>
+            <polygon
+                points={`0,${SPARK_HEIGHT} ${points} 100,${SPARK_HEIGHT}`}
+                fill={`url(#${id})`}
+            />
+            <polyline
+                points={points}
+                fill="none"
+                stroke={color}
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+            />
+        </svg>
+    );
+};
 
 /** Smallest scale a headline value may shrink to before it is clipped instead. */
 const MIN_VALUE_SCALE = 0.5;
@@ -71,6 +122,7 @@ export const StatCard = ({
     sub,
     icon: Icon,
     accent = "var(--chart-2)",
+    spark,
     className,
     children,
 }: StatCardProps) => {
@@ -104,6 +156,9 @@ export const StatCard = ({
                 <div className="text-muted-foreground mt-0.5 text-xs">
                     {sub}
                 </div>
+            )}
+            {spark && spark.length > 1 && (
+                <Sparkline data={spark} color={accent} className="mt-2" />
             )}
             {children}
         </div>

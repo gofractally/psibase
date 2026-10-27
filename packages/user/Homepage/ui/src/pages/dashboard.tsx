@@ -55,7 +55,10 @@ const Dashboard = () => {
                     >
                         <div className="flex flex-col gap-4">
                             {showExplorer && (
-                                <NetworkStats isPending={explorerPending} />
+                                <NetworkStats
+                                    user={user}
+                                    isPending={explorerPending}
+                                />
                             )}
                             {user ? <OwnedOnNetwork user={user} /> : leaderboard}
                         </div>

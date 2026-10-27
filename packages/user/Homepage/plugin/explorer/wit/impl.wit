@@ -1,0 +1,9 @@
+package homepage:explorer;
+
+world impl {
+    include host:client/imports;
+    include host:types/imports;
+    import explorer:plugin/block-log;
+
+    export block-log;
+}

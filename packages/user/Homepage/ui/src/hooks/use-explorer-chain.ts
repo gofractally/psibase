@@ -6,6 +6,10 @@ import QueryKey from "@/lib/query-keys";
 
 import { useIsPackageInstalled } from "@shared/hooks/use-is-package-installed";
 import { graphql } from "@shared/lib/graphql";
+import {
+    type PluginCall,
+    callPluginFunction,
+} from "@shared/lib/plugins/lib/call-plugin-function";
 
 /** psibase numbers the genesis block 2; there is no block 1. */
 const GENESIS_BLOCK = 2;
@@ -14,6 +18,10 @@ const STALL_MS = 6000;
 /** Blocks counted by the most-active-apps leaderboard (about 10 minutes at 1 block/s). */
 const ACTIVITY_WINDOW = 600;
 const ACTIVITY_POLL_MS = 15_000;
+/** Matches the explorer's "My dashboard" seed window (about 5 minutes at 1 block/s). */
+const USER_ACTIVITY_WINDOW = 300;
+const USER_ACTIVITY_POLL_MS = 5000;
+const USER_ACTIVITY_SPARK_BLOCKS = 90;
 
 export type ExplorerFeedStatus = "connecting" | "live" | "stalled" | "error";
 
@@ -24,9 +32,8 @@ export const useExplorerInstalled = (): boolean | undefined => {
 };
 
 /**
- * The explorer plugin only serves the explorer app, so these read the explorer
- * service's block log directly. Block headers and per-block action counts are
- * public, so no auth is needed.
+ * Block headers and per-block action counts are public, so these read the
+ * explorer service's block log directly without auth.
  */
 const queryExplorer = async <T>(query: string, schema: z.ZodType<T>) =>
     schema.parse(await graphql(query, { service: "explorer" }));
@@ -195,3 +202,144 @@ export const useServiceActivity = (enabled = true) =>
         enabled,
         refetchInterval: ACTIVITY_POLL_MS,
     });
+
+interface BlockRange {
+    gt?: number;
+    lt?: number;
+    first?: number;
+    last?: number;
+}
+
+/**
+ * The service redacts transactions the viewer isn't a party to, so reading the
+ * user's own actions needs their credentials, which the explorer plugin attaches.
+ * Only call this when the Explorer package is installed.
+ */
+const getBlocks: PluginCall<[range: BlockRange], string> = {
+    service: "homepage",
+    plugin: "explorer",
+    intf: "block-log",
+    method: "getBlocks",
+};
+
+const zUserBlocksPage = z.object({
+    pageInfo: z.object({
+        hasPreviousPage: z.boolean(),
+        hasNextPage: z.boolean(),
+    }),
+    edges: z.array(
+        z.object({
+            node: z.object({
+                header: z.object({ blockNum: z.number(), time: z.string() }),
+                transactions: z
+                    .array(
+                        z.object({
+                            transaction: z
+                                .object({
+                                    actions: z.array(
+                                        z.object({ sender: z.string() }),
+                                    ),
+                                })
+                                .nullable(),
+                        }),
+                    )
+                    .nullable(),
+            }),
+        }),
+    ),
+});
+
+interface UserBlock {
+    blockNum: number;
+    time: string;
+    /** Top-level actions the user sent in this block. */
+    sent: number;
+}
+
+const fetchUserBlocksPage = async (user: string, range: BlockRange) => {
+    const page = zUserBlocksPage.parse(
+        JSON.parse(await callPluginFunction(getBlocks, [range])),
+    );
+    return {
+        pageInfo: page.pageInfo,
+        blocks: page.edges.map(({ node }): UserBlock => ({
+            blockNum: node.header.blockNum,
+            time: node.header.time,
+            sent: (node.transactions ?? []).reduce(
+                (n, trx) =>
+                    n +
+                    (trx.transaction?.actions.filter((a) => a.sender === user)
+                        .length ?? 0),
+                0,
+            ),
+        })),
+    };
+};
+
+/** Pages back from the head, since the service caps each page by stored block size. */
+const seedUserBlocks = async (user: string) => {
+    const blocks: UserBlock[] = [];
+    while (blocks.length < USER_ACTIVITY_WINDOW) {
+        const oldest = blocks[0]?.blockNum;
+        const page = await fetchUserBlocksPage(user, {
+            last: USER_ACTIVITY_WINDOW - blocks.length,
+            ...(oldest !== undefined && { lt: oldest }),
+        });
+        blocks.unshift(...page.blocks);
+        if (!page.pageInfo.hasPreviousPage || page.blocks.length === 0) break;
+    }
+    return blocks;
+};
+
+/** Appends blocks newer than the cached window, or reseeds if it fell too far behind. */
+const fetchUserBlocks = async (user: string, previous?: UserBlock[]) => {
+    const newest = previous?.[previous.length - 1]?.blockNum;
+    if (newest === undefined) return seedUserBlocks(user);
+    const page = await fetchUserBlocksPage(user, {
+        gt: newest,
+        first: USER_ACTIVITY_WINDOW,
+    });
+    if (page.pageInfo.hasNextPage) return seedUserBlocks(user);
+    return [...previous!, ...page.blocks].slice(-USER_ACTIVITY_WINDOW);
+};
+
+export interface UserActivity {
+    actionsSent: number;
+    /** Per-block actions sent across the most recent blocks, oldest first. */
+    spark: number[];
+    windowBlocks: number;
+    windowSeconds: number;
+}
+
+const summarizeUserActivity = (blocks: UserBlock[]): UserActivity => {
+    const first = blocks[0]?.time;
+    const last = blocks[blocks.length - 1]?.time;
+    return {
+        actionsSent: blocks.reduce((n, b) => n + b.sent, 0),
+        spark: blocks.slice(-USER_ACTIVITY_SPARK_BLOCKS).map((b) => b.sent),
+        windowBlocks: blocks.length,
+        windowSeconds:
+            first && last
+                ? (parseChainTime(last).getTime() -
+                      parseChainTime(first).getTime()) /
+                  1000
+                : 0,
+    };
+};
+
+/** Actions the user sent across the recent block window. */
+export const useUserActivity = (user: string | null | undefined) => {
+    const queryClient = useQueryClient();
+    const queryKey = QueryKey.explorerUserActivity(user);
+    return useQuery({
+        queryKey,
+        queryFn: () =>
+            fetchUserBlocks(
+                user!,
+                queryClient.getQueryData<UserBlock[]>(queryKey),
+            ),
+        enabled: !!user,
+        refetchInterval: USER_ACTIVITY_POLL_MS,
+        select: summarizeUserActivity,
+    });
+};

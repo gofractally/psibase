@@ -26,11 +26,23 @@ fn assert_caller_self() {
     );
 }
 
+/// Results carry the logged-in user's unredacted transactions, so only first-party
+/// apps may call these in addition to the explorer itself.
+fn assert_caller_self_or(allowed: &[&str], context: &str) {
+    let sender = host::client::api::get_sender();
+    assert!(
+        sender == host::client::api::get_receiver() || allowed.contains(&sender.as_str()),
+        "{} can only be called by the explorer or {:?}",
+        context,
+        allowed
+    );
+}
+
 struct ExplorerPlugin;
 
 impl BlockLog for ExplorerPlugin {
     fn get_blocks(range: BlockRange) -> Result<String, Error> {
-        assert_caller_self();
+        assert_caller_self_or(&["homepage"], "block-log::get-blocks");
         block_log::get_blocks(range)
     }
 

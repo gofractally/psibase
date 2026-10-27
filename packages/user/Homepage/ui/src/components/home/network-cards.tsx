@@ -10,6 +10,7 @@ import {
     type ExplorerFeedStatus,
     useExplorerFeed,
     useGenesisTime,
+    useUserActivity,
 } from "@/hooks/use-explorer-chain";
 import {
     formatChainTime,
@@ -56,14 +57,16 @@ const StatusDot = ({ status }: { status: ExplorerFeedStatus }) => {
 
 const ExplorerLink = ({
     path,
+    className,
     children,
 }: {
     path?: string;
+    className?: string;
     children: ReactNode;
 }) => (
     <a
         href={siblingUrl(null, "explorer", path)}
-        className="group block rounded-xl"
+        className={cn("group block rounded-xl", className)}
     >
         {children}
     </a>
@@ -131,10 +134,53 @@ const ExplorerFeedCard = () => {
     );
 };
 
-const StatCardSkeleton = () => (
+const UserActivityCard = ({
+    user,
+    className,
+}: {
+    user: string;
+    className?: string;
+}) => {
+    const { data, isPending, isError } = useUserActivity(user);
+
+    return (
+        <ExplorerLink path="/me" className={className}>
+            <StatCard
+                label="Your activity"
+                icon={ArrowUpRight}
+                accent="var(--chart-2)"
+                className={linkedCardClass}
+                value={
+                    data ? (
+                        data.actionsSent.toLocaleString()
+                    ) : isPending ? (
+                        <Skeleton className="h-7 w-16" />
+                    ) : (
+                        <span className="text-muted-foreground text-base">
+                            unavailable
+                        </span>
+                    )
+                }
+                sub={
+                    data
+                        ? `actions sent in last ${data.windowBlocks.toLocaleString()} blocks · ${formatDuration(data.windowSeconds)}`
+                        : isError
+                          ? "couldn't load recent blocks"
+                          : "loading…"
+                }
+                spark={data?.spark}
+            />
+        </ExplorerLink>
+    );
+};
+
+const StatCardSkeleton = ({ className }: { className?: string }) => (
     <div
         aria-busy
-        className="bg-card/70 flex flex-col gap-2 rounded-xl border p-4 shadow-sm"
+        className={cn(
+            "bg-card/70 flex flex-col gap-2 rounded-xl border p-4 shadow-sm",
+            className,
+        )}
     >
         <Skeleton className="h-3 w-1/3" />
         <Skeleton className="h-7 w-1/2" />
@@ -142,18 +188,31 @@ const StatCardSkeleton = () => (
     </div>
 );
 
-/** Explorer-backed chain stats; callers hide these when the Explorer package isn't installed. */
-export const NetworkStats = ({ isPending = false }: { isPending?: boolean }) => (
+/**
+ * Explorer-backed chain stats, plus the user's own activity when signed in;
+ * callers hide these when the Explorer package isn't installed.
+ */
+export const NetworkStats = ({
+    user,
+    isPending = false,
+}: {
+    user?: string | null;
+    isPending?: boolean;
+}) => (
     <div className="grid gap-4 sm:grid-cols-2">
         {isPending ? (
             <>
                 <StatCardSkeleton />
                 <StatCardSkeleton />
+                {user && <StatCardSkeleton className="sm:col-span-2" />}
             </>
         ) : (
             <>
                 <NetworkAgeCard />
                 <ExplorerFeedCard />
+                {user && (
+                    <UserActivityCard user={user} className="sm:col-span-2" />
+                )}
             </>
         )}
     </div>
