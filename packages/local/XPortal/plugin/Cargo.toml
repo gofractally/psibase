@@ -24,4 +24,4 @@ world = "impl"
 "auth-scope:plugin" = { path = "../../../system/AuthScope/plugin/wit/impl.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
 "tokens:plugin" = { path = "../../../user/Tokens/plugin/wit/world.wit" }
-"virtual-server:plugin" = { path = "../../../system/VirtualServer/plugin/wit/world.wit" }
+"vserver:plugin" = { path = "../../../system/VirtualServer/plugin/wit/world.wit" }

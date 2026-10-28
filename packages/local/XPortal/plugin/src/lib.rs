@@ -4,18 +4,12 @@ use bindings::*;
 
 use auth_scope::plugin::api::AllowedAction;
 use exports::x_portal::plugin::api::Guest as Api;
+use host::client::api::{get_receiver, get_sender};
 use host::types::types::{Error, PluginId};
 
 const AC_CREATOR: &str = "ac-creator";
 
 struct XPortalPlugin;
-
-fn assert_caller_self() {
-    assert_eq!(
-        host::client::api::get_sender(),
-        host::client::api::get_receiver()
-    );
-}
 
 fn plugin_error(message: &str) -> Error {
     Error {
@@ -34,7 +28,7 @@ impl Api for XPortalPlugin {
         owner: String,
         allowed: Vec<AllowedAction>,
     ) -> Result<(), Error> {
-        assert_caller_self();
+        assert_eq!(get_sender(), get_receiver());
         auth_scope::plugin::api::new_account(AC_CREATOR, &pubkey_pem, &owner, &allowed)?;
 
         transact::plugin::api::set_propose_latch(Some(AC_CREATOR))?;
@@ -44,7 +38,7 @@ impl Api for XPortalPlugin {
     }
 
     fn send_tokens(amount: String) -> Result<(), Error> {
-        assert_caller_self();
+        assert_eq!(get_sender(), get_receiver());
         let Some(token) = tokens::plugin::helpers::get_system_token()? else {
             return Err(plugin_error("system token is not set"));
         };
@@ -53,13 +47,13 @@ impl Api for XPortalPlugin {
     }
 
     fn send_resources(amount: String) -> Result<(), Error> {
-        assert_caller_self();
+        assert_eq!(get_sender(), get_receiver());
         virtual_server::plugin::billing::donate_gas(AC_CREATOR, &amount)?;
         Ok(())
     }
 
     fn set_creator_key(pubkey_pem: String) -> Result<(), Error> {
-        assert_caller_self();
+        assert_eq!(get_sender(), get_receiver());
         auth_scope::plugin::api::set_key(AC_CREATOR, &pubkey_pem)?;
         Ok(())
     }
