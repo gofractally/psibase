@@ -1147,3 +1147,16 @@ fn view_def_wont_change() {
     assert_eq!(v.field_v_u16().unpack(), value.field_v_u16);
     assert_eq!(v.field_i32().unpack(), value.field_i32);
 }
+
+#[derive(psibase::Pack, psibase::Unpack, psibase::View)]
+pub struct ViewWithLifetime<'a> {
+    x: &'a str,
+}
+
+#[test]
+fn view_view_with_lifetime() {
+    let value = ViewWithLifetime { x: "apple" };
+    let data = value.packed();
+    let v = <View<ViewWithLifetime>>::new(&data).unwrap();
+    assert_eq!(v.x().unpack(), value.x);
+}

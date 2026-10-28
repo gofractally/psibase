@@ -3,7 +3,10 @@ use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
-use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Field, Generics, Ident};
+use syn::{
+    parse_macro_input, Data, DataStruct, DeriveInput, Field, GenericParam, Generics, Ident,
+    Lifetime,
+};
 
 pub fn view_macro_impl(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -27,12 +30,31 @@ pub fn view_macro_impl(input: TokenStream) -> TokenStream {
     quote! { #def #accessors }.into()
 }
 
+// Returns a lifetime distinct from every lifetime in generics
+fn new_lifetime(generics: &Generics) -> Lifetime {
+    let maxlen = generics
+        .params
+        .iter()
+        .filter_map(|param| {
+            if let GenericParam::Lifetime(param) = param {
+                Some(param.lifetime.ident.to_string().len())
+            } else {
+                None
+            }
+        })
+        .max()
+        .unwrap_or(0);
+    Lifetime::new(&format!("'a{:a<maxlen$}", ""), Span::mixed_site())
+}
+
 fn view_def(fracpack_mod: &TokenStream2, input: &DeriveInput, _opts: &Options) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let ty = &input.ident;
     let impl_params = &input.generics.params;
     // TODO: Allow override
     let view_ty = Ident::new(&(input.ident.to_string() + "View"), Span::call_site());
+    let lifetime = new_lifetime(&input.generics);
+    let where_predicates = input.generics.where_clause.as_ref().map(|w| &w.predicates);
     quote! {
         pub struct #view_ty #impl_generics #where_clause (#fracpack_mod::GenericView<#ty #ty_generics>);
         impl #impl_generics #fracpack_mod::ViewData for #view_ty #ty_generics #where_clause {
@@ -43,11 +65,11 @@ fn view_def(fracpack_mod: &TokenStream2, input: &DeriveInput, _opts: &Options) -
                 #fracpack_mod::ViewData::get_data(&self.0)
             }
         }
-        impl <'a, #impl_params> #fracpack_mod::ViewExt<'a> for #view_ty #ty_generics #where_clause {
+        impl <#lifetime, #impl_params> #fracpack_mod::ViewExt<#lifetime> for #view_ty #ty_generics where #ty #ty_generics: #fracpack_mod::Unpack<#lifetime>, #where_predicates {
             type ValueType = #ty #ty_generics;
         }
         impl #impl_generics #fracpack_mod::MakeView for #ty #ty_generics #where_clause {
-            type ViewType = #view_ty;
+            type ViewType = #view_ty #ty_generics;
         }
     }
 }
@@ -112,8 +134,9 @@ fn generate_accessor(
     let impl_generics = &generics.params;
     let where_clause = generics.where_clause.as_ref().map(|w| &w.predicates);
     let (_, ty_generics, _) = generics.split_for_impl();
+    let lifetime = new_lifetime(generics);
     quote! {
-        impl <'a, #impl_generics> #view_ty #ty_generics where #field_ty: #fracpack_mod::MakeView + #fracpack_mod::Unpack<'a>, #where_clause {
+        impl <#lifetime, #impl_generics> #view_ty #ty_generics where #field_ty: #fracpack_mod::MakeView + #fracpack_mod::Unpack<#lifetime>, #where_clause {
             #vis fn #field_name(&self) -> &#fracpack_mod::View<#field_ty> {
                 #fracpack_mod::ViewFields::get_field::<#field_ty>(self, #field_num)
             }
