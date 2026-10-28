@@ -15,11 +15,12 @@ use exports::explorer::plugin::{
     setcode::Guest as Setcode, sites::Guest as Sites, tokens::Guest as Tokens,
     transact::Guest as Transact, virtual_server::Guest as VirtualServer,
 };
-use host::types::types::Error;
 use packages::plugin::types::InstalledPackage;
-use psibase::define_trust;
+use psibase_plugin::{
+    trust::{Capabilities, TrustConfig},
+    Error,
+};
 use tokens::plugin::types::{SystemTokenInfo, UserBalance};
-use trust::{assert_authorized_with_whitelist, FunctionName};
 
 fn assert_caller_self() {
     assert_eq!(
@@ -28,29 +29,24 @@ fn assert_caller_self() {
     );
 }
 
-define_trust! {
-    descriptions {
-        Low => "",
-        Medium => "",
-        High => "
-            - Reading your transactions in the block log
-            - Querying the explorer service with your credentials
-        ",
-    }
-    functions {
-        High => [get_blocks, graphql],
-    }
-}
-
-fn assert_authed(function: FunctionName) -> Result<(), Error> {
-    assert_authorized_with_whitelist(function, vec!["homepage".into()])
-}
-
 struct ExplorerPlugin;
 
+impl TrustConfig for ExplorerPlugin {
+    fn capabilities() -> Capabilities {
+        Capabilities {
+            low: &[],
+            medium: &[],
+            high: &[
+                "Reading your transactions in the block log",
+                "Querying the explorer service with your credentials",
+            ],
+        }
+    }
+}
+
 impl BlockLog for ExplorerPlugin {
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn get_blocks(range: BlockRange) -> Result<String, Error> {
-        assert_authed(FunctionName::get_blocks)?;
         block_log::get_blocks(range)
     }
 
@@ -81,8 +77,8 @@ impl BlockLog for ExplorerPlugin {
 }
 
 impl Authorized for ExplorerPlugin {
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn graphql(query: String) -> Result<String, Error> {
-        assert_authed(FunctionName::graphql)?;
         host::http::api::post_graphql_get_json(&query)
     }
 }
