@@ -3,6 +3,7 @@
 #include <optional>
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/Transact.hpp>
 #include <vector>
@@ -26,6 +27,8 @@ namespace SystemService
       AuthSig::SubjectPublicKeyInfo pubkey;
       psibase::AccountNumber        owner;
       std::vector<AllowedAction>    allowed;
+
+      friend bool operator==(const AuthScopeRow&, const AuthScopeRow&) = default;
    };
    PSIO_REFLECT(AuthScopeRow, account, pubkey, owner, allowed)
 
@@ -76,11 +79,21 @@ namespace SystemService
 
       /// Creates `name` on this auth service and stores its row.
       ///
-      /// Aborts if `owner` does not exist or `name` already exists.
-      void newAccount(psibase::AccountNumber        name,
+      /// The behavior if `name` already exists is determined by `mode`:
+      /// * `requireNew`: aborts.
+      /// * `matchExisting`: aborts unless `name` uses this auth service and its row already has
+      ///   this `key`, `owner`, and `allowed`. Changes nothing, so any sender may call it.
+      /// * `keepExisting`: replaces the row's `key`, `owner`, and `allowed`. The sender must be the
+      ///   row's current `owner`.
+      ///
+      /// Aborts if `owner` does not exist, or if `owner` is `name` or is owned by `name`.
+      ///
+      /// Returns true if an account was created.
+      bool newAccount(psibase::AccountNumber        name,
                       AuthSig::SubjectPublicKeyInfo key,
                       psibase::AccountNumber        owner,
-                      std::vector<AllowedAction>    allowed);
+                      std::vector<AllowedAction>    allowed,
+                      NewAccountMode                mode);
 
       /// Returns the stored row, if any.
       std::optional<AuthScopeRow> get(psibase::AccountNumber account);
@@ -103,7 +116,7 @@ namespace SystemService
                 method(getDlgsSys, sender, method),
                 method(isAuthSys, sender, authorizers, method),
                 method(isRejectSys, sender, rejecters, method),
-                method(newAccount, name, key, owner, allowed),
+                method(newAccount, name, key, owner, allowed, mode),
                 method(get, account),
                 method(setKey, account, key),
                 method(setAllowed, account, allowed)

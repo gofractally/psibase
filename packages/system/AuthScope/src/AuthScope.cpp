@@ -34,6 +34,19 @@ namespace SystemService
          return method && std::ranges::contains(accounts, sender) && actionAllowed(row, *method);
       }
 
+      AuthScopeRow& requireOwnedBySender(std::optional<AuthScopeRow>& row)
+      {
+         check(row.has_value(), "account does not have a public key");
+         check(getSender() == row->owner, "sender is not the owner");
+         return *row;
+      }
+
+      void replaceAuthRules(AuthScopeTable& table, const AuthScopeRow& row)
+      {
+         table.put(row);
+         to<Accounts>().incAuthSeq(row.account);
+      }
+
    }  // namespace
 
    bool AuthScope::checkAuthSys(uint32_t                    flags,
@@ -83,20 +96,40 @@ namespace SystemService
       return senderAuthorizedViaList(requireSenderRow(senderRow), sender, rejecters, method);
    }
 
-   void AuthScope::newAccount(AccountNumber                 name,
+   bool AuthScope::newAccount(AccountNumber                 name,
                               AuthSig::SubjectPublicKeyInfo key,
                               AccountNumber                 owner,
-                              std::vector<AllowedAction>    allowed)
+                              std::vector<AllowedAction>    allowed,
+                              NewAccountMode                mode)
    {
       check(to<Accounts>().exists(owner), "owner account does not exist");
 
-      open<AuthScopeTable>().put(AuthScopeRow{
+      auto table    = open<AuthScopeTable>();
+      auto ownerRow = table.getIndex<0>().get(owner);
+      if (name == owner || ownerRow && ownerRow->owner == name)
+         abortMessage("circular ownership");
+
+      auto row = AuthScopeRow{
           .account = name,
           .pubkey  = std::move(key),
           .owner   = owner,
           .allowed = std::move(allowed),
-      });
-      to<Accounts>().newAccount(name, AuthScope::service, NewAccountMode::requireNew);
+      };
+      if (to<Accounts>().newAccount(name, AuthScope::service, mode))
+      {
+         table.put(row);
+         return true;
+      }
+
+      auto existing = table.getIndex<0>().get(name);
+      if (mode == NewAccountMode::matchExisting)
+         check(existing == row, "account already exists");
+      else
+      {
+         requireOwnedBySender(existing);
+         replaceAuthRules(table, row);
+      }
+      return false;
    }
 
    std::optional<AuthScopeRow> AuthScope::get(AccountNumber account)
@@ -106,22 +139,20 @@ namespace SystemService
 
    void AuthScope::setKey(AccountNumber account, AuthSig::SubjectPublicKeyInfo key)
    {
-      auto table = open<AuthScopeTable>();
-      auto row   = table.getIndex<0>().get(account);
-      check(row.has_value(), "account does not have a public key");
-      check(getSender() == row->owner, "sender is not the owner");
-      row->pubkey = std::move(key);
-      table.put(*row);
+      auto  table  = open<AuthScopeTable>();
+      auto  stored = table.getIndex<0>().get(account);
+      auto& row    = requireOwnedBySender(stored);
+      row.pubkey   = std::move(key);
+      replaceAuthRules(table, row);
    }
 
    void AuthScope::setAllowed(AccountNumber account, std::vector<AllowedAction> allowed)
    {
-      auto table = open<AuthScopeTable>();
-      auto row   = table.getIndex<0>().get(account);
-      check(row.has_value(), "account does not have a public key");
-      check(getSender() == row->owner, "sender is not the owner");
-      row->allowed = std::move(allowed);
-      table.put(*row);
+      auto  table  = open<AuthScopeTable>();
+      auto  stored = table.getIndex<0>().get(account);
+      auto& row    = requireOwnedBySender(stored);
+      row.allowed  = std::move(allowed);
+      replaceAuthRules(table, row);
    }
 }  // namespace SystemService
 

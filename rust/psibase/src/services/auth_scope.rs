@@ -28,7 +28,9 @@ pub struct AuthScopeRow {
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use super::{AllowedAction, AuthScopeRow, SubjectPublicKeyInfo};
-    use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
+    use crate::{
+        services::accounts::NewAccountMode, services::transact::ServiceMethod, AccountNumber, Claim,
+    };
 
     /// Authenticate `sender` for `action`.
     ///
@@ -88,14 +90,24 @@ mod service {
 
     /// Creates `name` on this auth service and stores its row.
     ///
-    /// Aborts if `owner` does not exist or `name` already exists.
+    /// The behavior if `name` already exists is determined by `mode`:
+    /// * `requireNew`: aborts.
+    /// * `matchExisting`: aborts unless `name` uses this auth service and its row already has
+    ///   this `key`, `owner`, and `allowed`. Changes nothing, so any sender may call it.
+    /// * `keepExisting`: replaces the row's `key`, `owner`, and `allowed`. The sender must be the
+    ///   row's current `owner`.
+    ///
+    /// Aborts if `owner` does not exist, or if `owner` is `name` or is owned by `name`.
+    ///
+    /// Returns true if an account was created.
     #[action]
     fn newAccount(
         name: AccountNumber,
         key: SubjectPublicKeyInfo,
         owner: AccountNumber,
         allowed: Vec<AllowedAction>,
-    ) {
+        mode: NewAccountMode,
+    ) -> bool {
         unimplemented!()
     }
 

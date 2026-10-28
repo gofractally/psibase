@@ -59,12 +59,14 @@ TEST_CASE("auth-scope newAccount and whitelist")
                                       {AuthScope::service, "setAllowed"_m}};
 
    REQUIRE(owner.to<AuthScope>()
-               .newAccount(agent, agentPub, "missing1"_a, allowed)
+               .newAccount(agent, agentPub, "missing1"_a, allowed, NewAccountMode::requireNew)
                .failed("owner account does not exist"));
 
-   REQUIRE(owner.to<AuthScope>().newAccount(agent, agentPub, owner, allowed).succeeded());
    REQUIRE(owner.to<AuthScope>()
-               .newAccount(agent, agentPub, owner, allowed)
+               .newAccount(agent, agentPub, owner, allowed, NewAccountMode::requireNew)
+               .returnVal());
+   REQUIRE(owner.to<AuthScope>()
+               .newAccount(agent, agentPub, owner, allowed, NewAccountMode::requireNew)
                .failed("account already exists"));
 
    auto row = owner.to<AuthScope>().get(agent).returnVal();
@@ -158,7 +160,9 @@ TEST_CASE("auth-scope setKey and setAllowed")
    auto                       nop   = ServiceMethod{UserService::Nop::service, "nop"_m};
    std::vector<AllowedAction> allowed{{UserService::Nop::service, "nop"_m}};
 
-   REQUIRE(owner.to<AuthScope>().newAccount(agent, agentPub, owner, allowed).succeeded());
+   REQUIRE(owner.to<AuthScope>()
+               .newAccount(agent, agentPub, owner, allowed, NewAccountMode::requireNew)
+               .succeeded());
 
    CHECK(other.to<AuthScope>()
              .setKey(agent, otherPub)
@@ -186,4 +190,22 @@ TEST_CASE("auth-scope setKey and setAllowed")
    REQUIRE(row.has_value());
    CHECK(row->allowed == updated);
    CHECK(owner.to<AuthScope>().checkAuthSys(0, agent, nop, std::vector{otherClaim}).returnVal() == false);
+}
+
+TEST_CASE("auth-scope newAccount keepExisting requires the owner")
+{
+   DefaultTestChain t;
+   t.addService<AuthScope>("AuthScope.wasm");
+
+   auto                       owner = t.from(t.addAccount("alice"_a));
+   auto                       other = t.from(t.addAccount("bob"_a));
+   auto                       agent = "agentacct"_a;
+   std::vector<AllowedAction> allowed{{UserService::Nop::service, "nop"_m}};
+
+   REQUIRE(owner.to<AuthScope>()
+               .newAccount(agent, agentPub, owner, allowed, NewAccountMode::requireNew)
+               .succeeded());
+   CHECK(other.to<AuthScope>()
+             .newAccount(agent, otherPub, other, allowed, NewAccountMode::keepExisting)
+             .failed("sender is not the owner"));
 }
