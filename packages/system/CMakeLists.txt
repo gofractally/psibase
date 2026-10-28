@@ -60,6 +60,7 @@ function(add suffix)
         Transact/include
         VerifySig/include
         VirtualServer/service/cpp/include
+        WsAuth/service/cpp/include
     )
 endfunction(add)
 

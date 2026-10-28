@@ -4,6 +4,7 @@ interface types {
     record account {
         account-num: string,
         auth-service: string,
+        auth-sequence: u64,
     }
 }
 

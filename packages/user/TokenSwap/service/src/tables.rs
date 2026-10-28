@@ -247,7 +247,7 @@ pub mod tables {
             );
 
             let mint_and_send_back = |memo| {
-                let id = nft.mint();
+                let id = nft.mint(None);
                 nft.credit(id, sender, memo);
                 id
             };
