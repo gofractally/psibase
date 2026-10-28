@@ -58,12 +58,12 @@ mod service {
 
         let guilds = Guilds::call_from(*producer);
         guilds.create_guild(SYS_FRACTAL, SYS_GUILD, "Guild One".into());
-        Guilds::call_as(SYS_GUILD)
+        Guilds::call_from(SYS_GUILD)
             .set_g_desc("Coordinates community efforts in service of the fractal's mission".into());
 
         let map_sys_guild_to_role_occ = |role: FractalRole| {
-            Guilds::call_as(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);
-            Fractals::call_as(SYS_FRACTAL).set_r_occ(role.into(), GUILDS_SERVICE);
+            Guilds::call_from(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);
+            Fractals::call_from(SYS_FRACTAL).set_r_occ(role.into(), GUILDS_SERVICE);
         };
 
         map_sys_guild_to_role_occ(FractalRole::Legislature);
@@ -71,8 +71,8 @@ mod service {
         map_sys_guild_to_role_occ(FractalRole::Executive);
         map_sys_guild_to_role_occ(FractalRole::Recruitment);
 
-        Guilds::call_as(SYS_FRACTAL).set_rguilds(vec![SYS_GUILD]);
-        Guilds::call_as(SYS_FRACTAL).set_auto_join(true);
+        Guilds::call_from(SYS_FRACTAL).set_rguilds(vec![SYS_GUILD]);
+        Guilds::call_from(SYS_FRACTAL).set_auto_join(true);
 
         // Give the core fractal ownership of the network
         AuthDelegate::call_from(ROOT).setOwner(SYS_FRACTAL);
