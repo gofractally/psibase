@@ -34,6 +34,7 @@ world = "impl"
 "auth-dyn:plugin" = { path = "../../../system/AuthDyn/plugin/wit/world.wit" }
 "branding:plugin" = { path = "../../Branding/plugin/wit/world.wit" }
 "packages:plugin" = { path = "../../Packages/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 "producers:plugin" = { path = "../../../system/Producers/plugin/wit/world.wit" }
 "registry:plugin" = { path = "../../Registry/plugin/wit/world.wit" }
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }

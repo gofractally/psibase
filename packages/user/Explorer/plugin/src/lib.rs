@@ -17,7 +17,9 @@ use exports::explorer::plugin::{
 };
 use host::types::types::Error;
 use packages::plugin::types::InstalledPackage;
+use psibase::define_trust;
 use tokens::plugin::types::{SystemTokenInfo, UserBalance};
+use trust::{assert_authorized_with_whitelist, FunctionName};
 
 fn assert_caller_self() {
     assert_eq!(
@@ -26,23 +28,29 @@ fn assert_caller_self() {
     );
 }
 
-/// Results carry the logged-in user's unredacted transactions, so only first-party
-/// apps may call these in addition to the explorer itself.
-fn assert_caller_self_or(allowed: &[&str], context: &str) {
-    let sender = host::client::api::get_sender();
-    assert!(
-        sender == host::client::api::get_receiver() || allowed.contains(&sender.as_str()),
-        "{} can only be called by the explorer or {:?}",
-        context,
-        allowed
-    );
+define_trust! {
+    descriptions {
+        Low => "",
+        Medium => "",
+        High => "
+            - Reading your transactions in the block log
+            - Querying the explorer service with your credentials
+        ",
+    }
+    functions {
+        High => [get_blocks, graphql],
+    }
+}
+
+fn assert_authed(function: FunctionName) -> Result<(), Error> {
+    assert_authorized_with_whitelist(function, vec!["homepage".into()])
 }
 
 struct ExplorerPlugin;
 
 impl BlockLog for ExplorerPlugin {
     fn get_blocks(range: BlockRange) -> Result<String, Error> {
-        assert_caller_self_or(&["homepage"], "block-log::get-blocks");
+        assert_authed(FunctionName::get_blocks)?;
         block_log::get_blocks(range)
     }
 
@@ -74,7 +82,7 @@ impl BlockLog for ExplorerPlugin {
 
 impl Authorized for ExplorerPlugin {
     fn graphql(query: String) -> Result<String, Error> {
-        assert_caller_self_or(&["homepage"], "authorized::graphql");
+        assert_authed(FunctionName::graphql)?;
         host::http::api::post_graphql_get_json(&query)
     }
 }

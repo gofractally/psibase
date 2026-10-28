@@ -945,7 +945,7 @@ psibase_package(
     DEPENDS ${Explorer_js_DEP}
     DEPENDS ${Plugins_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "AuthDelegate(^${PSIBASE_VERSION}.0)" "AuthDyn(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Packages(^${PSIBASE_VERSION}.0)" "Producers(^${PSIBASE_VERSION}.0)" "Registry(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "AuthDelegate(^${PSIBASE_VERSION}.0)" "AuthDyn(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Packages(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Producers(^${PSIBASE_VERSION}.0)" "Registry(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
