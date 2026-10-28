@@ -20,44 +20,35 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Switch } from "@shared/shadcn/ui/switch";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@shared/shadcn/ui/table";
 
 import {
     type AdminConfig,
-    type FailedSignup,
     type StripeKeys,
     type PortalStatus,
-    createAdminAccounts,
+    adminConfigKey,
+    adminSignupsKey,
+    agentsKey,
     getAdminConfig,
-    getFailedSignups,
+    portalStatusKey,
+    getAgents,
     getPortalStatus,
     loadCreatorKey,
     putAdminConfig,
     putRequestsEnabled,
 } from "../lib/admin-api";
-import { PortalError, errorText } from "../lib/portal-api";
+import {
+    PortalError,
+    errorText,
+    getSystemToken,
+    systemTokenQueryKey,
+} from "../lib/portal-api";
 import { savedPricing } from "../lib/pricing";
+import { CreatorCard } from "./admin-creator";
 import { AdminSection } from "./admin-section";
 import { PricingSection } from "./admin-pricing";
+import { RequestLists } from "./admin-requests";
 
-const adminConfigKey = ["admin-config"];
-const portalStatusKey = ["portal-status"];
-const failedSignupsKey = ["admin-failed-signups"];
 const creatorKey = ["admin-creator-key"];
-
-const formatUtc = (iso: string) => {
-    const parsed = new Date(iso);
-    if (Number.isNaN(parsed.getTime())) return iso;
-    const pad = (value: number) => String(value).padStart(2, "0");
-    return `${parsed.getUTCFullYear()}-${pad(parsed.getUTCMonth() + 1)}-${pad(parsed.getUTCDate())} ${pad(parsed.getUTCHours())}:${pad(parsed.getUTCMinutes())}:${pad(parsed.getUTCSeconds())} UTC`;
-};
 
 const errorMessage = (error: unknown) =>
     error == null ? "Request failed" : errorText(error);
@@ -292,51 +283,6 @@ const StripeModeToggle = ({
     );
 };
 
-const FailedRequests = ({
-    rows,
-    error,
-}: {
-    rows: FailedSignup[] | undefined;
-    error: unknown;
-}) => (
-    <AdminSection title="Failed requests">
-        <div className="rounded-lg border">
-            {error ? (
-                <p className="text-destructive px-4 py-6 text-sm">
-                    {errorText(error)}
-                </p>
-            ) : !rows || rows.length === 0 ? (
-                <p className="text-muted-foreground px-4 py-6 text-center text-sm">
-                    No failed requests.
-                </p>
-            ) : (
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Time</TableHead>
-                            <TableHead>Tries</TableHead>
-                            <TableHead>Error</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {rows.map((row) => (
-                            <TableRow key={row.id}>
-                                <TableCell className="whitespace-nowrap">
-                                    {formatUtc(row.created)}
-                                </TableCell>
-                                <TableCell>{row.attempts}</TableCell>
-                                <TableCell className="whitespace-pre-wrap break-words">
-                                    {row.last_error}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            )}
-        </div>
-    </AdminSection>
-);
-
 const currentPagePath = () =>
     `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
@@ -416,32 +362,32 @@ export const AdminPage = () => {
         queryFn: getPortalStatus,
     });
     const adminConfigReady = config.isSuccess;
+    const agents = useQuery({
+        queryKey: agentsKey,
+        queryFn: getAgents,
+        enabled: adminConfigReady,
+        retry: false,
+    });
+    const accountMissing =
+        agents.error instanceof PortalError && agents.error.status === 404;
     const creator = useQuery({
         queryKey: creatorKey,
         queryFn: loadCreatorKey,
-        enabled: adminConfigReady,
+        enabled: adminConfigReady && accountMissing,
         retry: false,
         staleTime: Infinity,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
     });
-    const failed = useQuery({
-        queryKey: failedSignupsKey,
-        queryFn: getFailedSignups,
+    const token = useQuery({
+        queryKey: systemTokenQueryKey,
+        queryFn: getSystemToken,
         enabled: adminConfigReady,
         retry: false,
     });
     const requests = useMutation({
         mutationFn: putRequestsEnabled,
         onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: adminConfigKey });
-            void queryClient.invalidateQueries({ queryKey: portalStatusKey });
-        },
-    });
-    const create = useMutation({
-        mutationFn: createAdminAccounts,
-        onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: creatorKey });
             void queryClient.invalidateQueries({ queryKey: adminConfigKey });
             void queryClient.invalidateQueries({ queryKey: portalStatusKey });
         },
@@ -455,7 +401,8 @@ export const AdminPage = () => {
     if (
         config.isPending ||
         status.isPending ||
-        (adminConfigReady && creator.isPending)
+        (adminConfigReady && agents.isPending) ||
+        (accountMissing && creator.isPending)
     ) {
         return <AdminLoading />;
     }
@@ -467,7 +414,10 @@ export const AdminPage = () => {
             <AdminError message={errorMessage(config.error ?? status.error)} />
         );
     }
-    if (creator.error || !creator.data) {
+    if (agents.error && !accountMissing) {
+        return <AdminError message={errorMessage(agents.error)} />;
+    }
+    if (accountMissing && (creator.error || !creator.data)) {
         return <AdminError message={errorMessage(creator.error)} />;
     }
 
@@ -481,7 +431,11 @@ export const AdminPage = () => {
     );
     const conditions = status.data.conditions;
     const creatorReady = conditionOk(conditions, "creator_ready");
-    const pubkey = creator.data.pubkey ?? config.data.creator_pubkey ?? null;
+    const pubkey =
+        agents.data?.pubkey_pem ??
+        creator.data?.pubkey ??
+        config.data.creator_pubkey ??
+        null;
     const { x, stripe } = config.data;
     const pricing = savedPricing(config.data);
     const webhookUrl = `${window.location.origin}/stripe/webhook`;
@@ -601,7 +555,7 @@ export const AdminPage = () => {
                     onSave={async (mode) => {
                         await saveConfig({ mode });
                         await queryClient.invalidateQueries({
-                            queryKey: failedSignupsKey,
+                            queryKey: adminSignupsKey,
                         });
                     }}
                 />
@@ -638,53 +592,16 @@ export const AdminPage = () => {
                 ))}
             </AdminSection>
 
-            <AdminSection title="ac-creator">
-                <div className="flex flex-col gap-4 rounded-lg border px-4 py-3">
-                    {pubkey && (
-                        <div className="flex items-start gap-2">
-                            <div className="min-w-0 flex-1">
-                                <div className="text-muted-foreground text-xs">
-                                    Public key
-                                </div>
-                                <p className="whitespace-pre-wrap font-mono text-xs">
-                                    {pubkey}
-                                </p>
-                            </div>
-                            <CopyButton
-                                text={pubkey}
-                                ariaLabel="Copy ac-creator public key"
-                            />
-                        </div>
-                    )}
-                    {!creator.data.accountExists && (
-                        <Button
-                            type="button"
-                            className="self-start"
-                            disabled={
-                                !isProducer || create.isPending || !pubkey
-                            }
-                            onClick={() => {
-                                if (pubkey && config.data.producer) {
-                                    create.mutate({
-                                        pubkeyPem: pubkey,
-                                        owner: config.data.producer,
-                                        allowed: config.data.creator_allowed,
-                                    });
-                                }
-                            }}
-                        >
-                            Create admin accounts
-                        </Button>
-                    )}
-                    {create.error && (
-                        <p className="text-destructive text-sm">
-                            {errorText(create.error)}
-                        </p>
-                    )}
-                </div>
-            </AdminSection>
+            <CreatorCard
+                agents={agents.data ?? null}
+                pubkey={pubkey}
+                isProducer={isProducer}
+                producer={config.data.producer ?? null}
+                allowed={config.data.creator_allowed}
+                token={token.data ?? null}
+            />
 
-            <FailedRequests rows={failed.data} error={failed.error} />
+            <RequestLists tiers={config.data.tiers} mode={config.data.mode} />
         </PageContainer>
     );
 };

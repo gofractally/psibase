@@ -31,15 +31,15 @@ impl Guest for AuthScopePlugin {
         owner: String,
         allowed: Vec<WitAllowed>,
     ) -> Result<(), Error> {
-        let name = account(&name)?;
-        let owner = account(&owner)?;
+        let name = parse_account(&name)?;
+        let owner = parse_account(&owner)?;
         let key = SubjectPublicKeyInfo::deserialize(serde_json::Value::String(pubkey_pem))
             .map_err(|_| Error::from(ErrorType::InvalidPublicKey))?;
         let allowed = allowed
             .into_iter()
             .map(|action| {
                 Ok(AllowedAction {
-                    service: account(&action.service)?,
+                    service: parse_account(&action.service)?,
                     method: MethodNumber::from(action.method.as_str()),
                 })
             })
@@ -47,9 +47,18 @@ impl Guest for AuthScopePlugin {
         AuthScope::add_to_tx().newAccount(name, key, owner, allowed);
         Ok(())
     }
+
+    #[psibase_plugin::authorized(Medium)]
+    fn set_key(account: String, pubkey_pem: String) -> Result<(), Error> {
+        let account = parse_account(&account)?;
+        let key = SubjectPublicKeyInfo::deserialize(serde_json::Value::String(pubkey_pem))
+            .map_err(|_| Error::from(ErrorType::InvalidPublicKey))?;
+        AuthScope::add_to_tx().setKey(account, key);
+        Ok(())
+    }
 }
 
-fn account(name: &str) -> Result<AccountNumber, Error> {
+fn parse_account(name: &str) -> Result<AccountNumber, Error> {
     AccountNumber::from_exact(name)
         .map_err(|_| Error::from(ErrorType::InvalidAccount(name.to_string())))
 }

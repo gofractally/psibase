@@ -97,7 +97,8 @@ namespace LocalService
    /// effect when the signup was stored. A paid signup is `pending` until
    /// Stripe reports it paid; `stripe_session_id` is its Checkout Session and
    /// `stripe_event_ids` are the webhook events already applied. A repeated
-   /// event id is ignored.
+   /// event id is ignored. `account` is set when the signup becomes
+   /// `redeemed`, from the account `invite::getNewAccts` reports.
    struct Signup
    {
       psibase::Checksum256       id;
@@ -114,8 +115,9 @@ namespace LocalService
       std::optional<std::string> x_id;
       std::optional<uint32_t>    tier;
       std::optional<std::string> stripe_session_id;
-      std::vector<std::string>   stripe_event_ids;
-      std::string                mode = "sandbox";
+      std::vector<std::string>              stripe_event_ids;
+      std::string                           mode = "sandbox";
+      std::optional<psibase::AccountNumber> account;
       PSIO_REFLECT(Signup,
                    id,
                    invite_id,
@@ -132,7 +134,8 @@ namespace LocalService
                    tier,
                    stripe_session_id,
                    stripe_event_ids,
-                   mode)
+                   mode,
+                   account)
    };
    using SignupTable = psibase::Table<Signup, &Signup::id>;
    PSIO_REFLECT_TYPENAME(SignupTable)
@@ -378,14 +381,43 @@ namespace LocalService
       PSIO_REFLECT(SignupView, state, token)
    };
 
-   /// One row of `GET /admin/signups?state=failed`.
-   struct FailedSignup
+   /// One row of `GET /admin/signups?state=invited|redeemed|failed`.
+   /// `tier` is unset for the free tier. `handle` is that X user's name.
+   /// Rows are the active Stripe mode, newest first.
+   struct AdminSignup
    {
-      std::string            id;
-      psibase::TimePointUSec created;
-      uint32_t               attempts = 0;
-      std::string            last_error;
-      PSIO_REFLECT(FailedSignup, id, created, attempts, last_error)
+      std::string                           id;
+      std::string                           handle;
+      std::optional<psibase::AccountNumber> account;
+      std::optional<uint32_t>               tier;
+      std::string                           state;
+      uint32_t                              attempts = 0;
+      std::string                           last_error;
+      std::optional<std::string>            stripe_session_id;
+      psibase::TimePointUSec                created;
+      PSIO_REFLECT(AdminSignup,
+                   id,
+                   handle,
+                   account,
+                   tier,
+                   state,
+                   attempts,
+                   last_error,
+                   stripe_session_id,
+                   created)
+   };
+
+   /// `GET /admin/agents`. Balances are `ac-creator`'s. `resource_balance` is
+   /// zero until billing is enabled. `std_buffer_cost` is what one standard
+   /// resource buffer costs, so an admin can refill the buffer to 100 of them.
+   struct AgentView
+   {
+      psibase::AccountNumber account;
+      std::string            pubkey_pem;
+      UserService::Quantity  psi_balance;
+      UserService::Quantity  resource_balance;
+      UserService::Quantity  std_buffer_cost;
+      PSIO_REFLECT(AgentView, account, pubkey_pem, psi_balance, resource_balance, std_buffer_cost)
    };
 
    /// `GET /me`: the signed-in X user.
@@ -405,9 +437,16 @@ namespace LocalService
    /// carries, and `tiers` when present, and nothing else. It returns 400
    /// when `mode` is anything else, or when the result has the free tier
    /// disabled and no paid tiers.
-   /// `POST /admin/agents/creator/keygen` returns `AgentKey("creator")`,
-   /// creating it in `x-keys` when absent. It returns 409 when `ac-creator`
-   /// already exists. `GET /admin/config` includes that key as `creator_pubkey`
+   /// `POST /admin/agents/creator/keygen` returns `AgentKey("creator")`.
+   /// Before `ac-creator` exists, it creates the key in `x-keys` when absent.
+   /// Once the account exists, it returns `pending_pubkey` when one is stored
+   /// and otherwise creates that pending key with `x-keys::newKey()`.
+   /// `POST /admin/agents/creator/activate` requires the on-chain key to be
+   /// that pending key, then deletes the previous key from `x-keys` and
+   /// promotes the pending key. `x-keys::signTx` signs with whichever held
+   /// key satisfies `ac-creator`'s auth, so a push still works while both
+   /// keys are held. `GET /admin/agents` returns `AgentView`.
+   /// `GET /admin/config` includes the stored key as `creator_pubkey`
    /// and `creator_allowed`, the canonical whitelist applied when `ac-creator`
    /// is created.
    ///
@@ -459,10 +498,18 @@ namespace LocalService
    /// `signTx` abort leaves the signup `queued` with the placeholder error
    /// and that retry still scheduled.
    ///
+   /// An `invited` signup becomes `redeemed` when `invite::getNewAccts`
+   /// reports an account. The call is synchronous, with sender `ac-creator`.
+   /// The chain is the only source of that account: a lost check leaves the
+   /// signup `invited`. Every x-portal request checks outstanding `invited`
+   /// signups. `POST /signup/:id/redeemed` is the wizard's check when the
+   /// host login prompt returns; it returns `SignupView` to the owning X
+   /// session, with the same 401 and 404 as `GET /signup/:id`.
+   ///
    /// `GET /signup/:id` returns `SignupView` to the owning X session. No
    /// session is 401; anything else that is not that session's signup is 404.
-   /// `GET /admin/signups?state=failed` returns `FailedSignup` rows of the
-   /// active mode for an administrator.
+   /// `GET /admin/signups?state=invited|redeemed|failed` returns `AdminSignup`
+   /// rows of the active mode for an administrator, newest first.
    /// `POST /admin/signups/:id/retry` requeues an interrupted `queued` signup
    /// after a node restart, preserving its invite and attempt count, and
    /// reruns provisioning for a `failed` signup from attempt zero. A failed

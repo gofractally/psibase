@@ -36,6 +36,7 @@ namespace xportal
    inline constexpr std::string_view statePending   = "pending";
    inline constexpr std::string_view stateQueued    = "queued";
    inline constexpr std::string_view stateInvited   = "invited";
+   inline constexpr std::string_view stateRedeemed  = "redeemed";
    inline constexpr std::string_view stateFailed    = "failed";
    inline constexpr std::string_view modeSandbox    = "sandbox";
    inline constexpr std::string_view modeProduction = "production";
@@ -84,6 +85,7 @@ namespace xportal
 
    PortalConfig readConfig();
    std::optional<AgentKey> readCreatorAgentKey();
+   void writeCreatorAgentKey(const AgentKey& key);
    void writeConfig(const PortalConfig& config);
    uint64_t unitScale(uint8_t precision);
    PortalConfig ensurePriced(PortalConfig config);
@@ -144,6 +146,12 @@ namespace xportal
    std::optional<std::string> updateConfig(const HttpRequest& req, PortalConfig& config);
    HttpReply serveAdminConfig(const HttpRequest& req, std::optional<std::int32_t> socket);
    HttpReply serveCreatorKeygen(const HttpRequest& req, std::optional<std::int32_t> socket);
+   HttpReply serveActivateCreator(const HttpRequest& req, std::optional<std::int32_t> socket);
+   HttpReply serveAgents(const HttpRequest& req, std::optional<std::int32_t> socket);
+   void reconcileInvitedSignups();
+   SignupView signupView(const Signup& stored);
+   HttpReply  signupViewForSession(const HttpRequest& req, std::string_view idText);
+   HttpReply  serveRedeemed(const HttpRequest& req, std::string_view idText);
    std::optional<Checksum256> parseSignupId(std::string_view text);
    std::string signupId(const Checksum256& id);
    std::optional<XSession> currentSession(const HttpRequest& req);
@@ -167,7 +175,7 @@ namespace xportal
    HttpReply serveRetrySignup(const HttpRequest&          req,
                               std::optional<std::int32_t> socket,
                               std::string_view            idText);
-   HttpReply serveFailedSignups(const HttpRequest& req, std::optional<std::int32_t> socket);
+   HttpReply serveAdminSignups(const HttpRequest& req, std::optional<std::int32_t> socket);
    std::string randomToken();
    std::string codeChallenge(std::string_view verifier);
    HttpReply redirect(std::string location, std::vector<HttpHeader> headers = {});

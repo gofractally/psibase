@@ -79,6 +79,14 @@ namespace xportal
       return stored;
    }
 
+   void writeCreatorAgentKey(const AgentKey& key)
+   {
+      PSIBASE_SUBJECTIVE_TX
+      {
+         XPortal{}.open<AgentKeyTable>().put(key);
+      }
+   }
+
    void writeConfig(const PortalConfig& config)
    {
       PSIBASE_SUBJECTIVE_TX
@@ -190,7 +198,11 @@ namespace xportal
       if (!key)
          return false;
       auto row = to<AuthScope>().get(XPortal::creatorAccount);
-      return row.has_value() && row->pubkey == key->pubkey;
+      if (!row)
+         return false;
+      if (row->pubkey == key->pubkey)
+         return true;
+      return key->pending_pubkey && row->pubkey == *key->pending_pubkey;
    }
 
    // C++ compresses "get_resources" to a different number than the Rust service.
@@ -703,28 +715,6 @@ namespace xportal
       return HttpReply{.headers = cors(req)};
    }
 
-   HttpReply serveCreatorKeygen(const HttpRequest& req, std::optional<std::int32_t> socket)
-   {
-      if (req.method == "OPTIONS")
-         return HttpReply{.headers = cors(req)};
-      if (auto reply = to<XAdmin>().checkAuth(req, socket))
-         return *reply;
-      if (req.method != "POST")
-         return HttpReply::methodNotAllowed(req);
-      if (to<Accounts>().exists(XPortal::creatorAccount))
-         return textError(req, HttpStatus::conflict, "account already exists\n");
-
-      if (auto stored = readCreatorAgentKey())
-         return jsonBody(req, *stored);
-
-      AgentKey created{.name = std::string{XPortal::creatorAgent}, .pubkey = to<XKeys>().newKey()};
-      PSIBASE_SUBJECTIVE_TX
-      {
-         XPortal{}.open<AgentKeyTable>().put(created);
-      }
-      return jsonBody(req, created);
-   }
-
    // 32 bytes encode to 43 unpadded base64url characters. The final character's
    // low 2 bits are padding and must be zero, or decoding aborts.
    std::optional<Checksum256> parseSignupId(std::string_view text)
@@ -883,6 +873,7 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
                                            std::optional<AccountNumber> /*user*/)
 {
    check(getSender() == XHttp::service, "Wrong sender");
+   reconcileInvitedSignups();
    auto target = request.path();
    if (target == "/status")
       return serveStatus(request);
@@ -890,10 +881,14 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
       return serveTiers(request);
    if (target == "/admin/config")
       return serveAdminConfig(request, socket);
+   if (target == "/admin/agents")
+      return serveAgents(request, socket);
    if (target == "/admin/agents/creator/keygen")
       return serveCreatorKeygen(request, socket);
+   if (target == "/admin/agents/creator/activate")
+      return serveActivateCreator(request, socket);
    if (target == "/admin/signups")
-      return serveFailedSignups(request, socket);
+      return serveAdminSignups(request, socket);
    if (target.starts_with("/admin/signups/") && target.ends_with("/retry"))
       return serveRetrySignup(request, socket,
                               std::string_view{target}.substr(15, target.size() - 15 - 6));
@@ -901,6 +896,8 @@ std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
       return serveSignup(request, socket);
    if (target == "/stripe/webhook")
       return serveStripeWebhook(request);
+   if (target.starts_with("/signup/") && target.ends_with("/redeemed"))
+      return serveRedeemed(request, std::string_view{target}.substr(8, target.size() - 8 - 9));
    if (target.starts_with("/signup/"))
       return serveSignupStatus(request, std::string_view{target}.substr(8));
    if (target == "/auth/x/start")

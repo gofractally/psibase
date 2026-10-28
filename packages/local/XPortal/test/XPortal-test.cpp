@@ -285,9 +285,12 @@ TEST_CASE("producer funds ac-creator when billing is enabled")
    REQUIRE(sub.has_value());
    CHECK(sub->value == buffer.value);
 
-   auto conflict = t.http(keygenRequest(token));
-   CHECK(conflict.status == HttpStatus::conflict);
+   auto rotated = t.http<AgentKey>(keygenRequest(token));
+   CHECK(rotated.pubkey == key.pubkey);
+   REQUIRE(rotated.pending_pubkey.has_value());
+   CHECK(*rotated.pending_pubkey != key.pubkey);
    requireStoredKey(key.pubkey);
+   requireStoredKey(*rotated.pending_pubkey);
 }
 
 TEST_CASE("provision signs the billed invite actions as ac-creator")
@@ -407,7 +410,7 @@ TEST_CASE("provision commits one attempt before signing")
    REQUIRE(stillDue.has_value());
    CHECK(stillDue->retry_at.has_value());
    auto rows =
-       t.http<std::vector<FailedSignup>>(forwarded("GET", "/admin/signups?state=failed", token));
+       t.http<std::vector<AdminSignup>>(forwarded("GET", "/admin/signups?state=failed", token));
    CHECK(rows.empty());
 }
 

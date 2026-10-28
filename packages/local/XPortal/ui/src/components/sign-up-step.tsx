@@ -11,6 +11,7 @@ import {
     formatTokenAmount,
     formatUsdCents,
     getSystemToken,
+    systemTokenQueryKey,
     getTiers,
     PortalError,
     type SignupReceipt,
@@ -33,7 +34,7 @@ export const SignUpStep = ({
 }) => {
     const tiers = useQuery({ queryKey: ["tiers"], queryFn: getTiers });
     const systemToken = useQuery({
-        queryKey: ["system-token"],
+        queryKey: systemTokenQueryKey,
         queryFn: getSystemToken,
     });
     const [chosen, setChosen] = useState<string | null>(null);

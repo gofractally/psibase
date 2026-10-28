@@ -10,6 +10,10 @@ interface api {
 
     /// Adds `auth-scope::newAccount` to the current transaction.
     new-account: func(name: string, pubkey-pem: string, owner: string, allowed: list<allowed-action>) -> result<_, error>;
+
+    /// Adds `auth-scope::setKey` to the current transaction.
+    /// The signed-in user must own `account`.
+    set-key: func(account: string, pubkey-pem: string) -> result<_, error>;
 }
 
 world impl {

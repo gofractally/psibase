@@ -2,7 +2,13 @@ import { z } from "zod";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-import { parseReply, PortalError, zQuantity, zU64 } from "./portal-api";
+import {
+    formatUnits,
+    parseReply,
+    PortalError,
+    zQuantity,
+    zU64,
+} from "./portal-api";
 
 const zAllowedAction = z.object({
     service: z.string(),
@@ -68,15 +74,31 @@ const zPortalStatus = z.object({
     ),
 });
 
-const zFailedSignup = z.object({
+const zAdminSignup = z.object({
     id: z.string(),
-    created: z.string(),
+    handle: z.string(),
+    account: z.string().nullish(),
+    /** Unset for the free tier. */
+    tier: z.number().nullish(),
+    state: z.string(),
     attempts: z.number(),
     last_error: z.string(),
+    stripe_session_id: z.string().nullish(),
+    created: z.string(),
 });
 
 const zAgentKey = z.object({
     pubkey: z.string(),
+    pending_pubkey: z.string().nullish(),
+});
+
+const zAgent = z.object({
+    account: z.string(),
+    pubkey_pem: z.string(),
+    psi_balance: zQuantity,
+    resource_balance: zQuantity,
+    /** One standard resource buffer, in the system token's smallest units. */
+    std_buffer_cost: zQuantity,
 });
 
 export type AllowedAction = z.infer<typeof zAllowedAction>;
@@ -90,12 +112,11 @@ export type PricingPatch = {
     tiers: { label: string; usd_cents: number }[];
 };
 export type PortalStatus = z.infer<typeof zPortalStatus>;
-export type FailedSignup = z.infer<typeof zFailedSignup>;
+export type AdminSignup = z.infer<typeof zAdminSignup>;
+export type Agent = z.infer<typeof zAgent>;
 
 export type CreatorKey = {
-    /** `ac-creator` is already on chain. Keygen returns 409 in that case. */
-    accountExists: boolean;
-    pubkey: string | null;
+    pubkey: string;
 };
 
 export const getAdminConfig = () =>
@@ -129,27 +150,64 @@ export const putRequestsEnabled = (requestsEnabled: boolean) =>
 export const getPortalStatus = () =>
     parseReply(fetch("/status"), zPortalStatus);
 
-export const getFailedSignups = () =>
+export const adminSignupsKey = ["admin-signups"] as const;
+export const adminConfigKey = ["admin-config"] as const;
+export const portalStatusKey = ["portal-status"] as const;
+export const agentsKey = ["admin-agents"] as const;
+
+export type SignupListState = "invited" | "redeemed" | "failed";
+
+/** Active-mode signups in `state`, newest first. */
+export const getAdminSignups = (state: SignupListState) =>
     parseReply(
-        fetch("/admin/signups?state=failed"),
-        z.array(zFailedSignup),
+        fetch(`/admin/signups?state=${state}`),
+        z.array(zAdminSignup),
     );
 
-/** Returns the stored creator key, creating it when the account does not exist yet. */
-export const loadCreatorKey = async (): Promise<CreatorKey> => {
-    const res = await fetch("/admin/agents/creator/keygen", {
-        method: "POST",
-    });
-    if (res.status === 409) {
-        return { accountExists: true, pubkey: null };
-    }
+export const retrySignup = async (id: string) => {
+    const res = await fetch(
+        `/admin/signups/${encodeURIComponent(id)}/retry`,
+        { method: "POST" },
+    );
     if (!res.ok) {
         throw new PortalError(res.status, (await res.text()).trim());
     }
-    return {
-        accountExists: false,
-        pubkey: zAgentKey.parse(await res.json()).pubkey,
-    };
+};
+
+/** `ac-creator` on chain. 404 until the account exists. */
+export const getAgents = () => parseReply(fetch("/admin/agents"), zAgent);
+
+const postCreatorKeygen = async () => {
+    const res = await fetch("/admin/agents/creator/keygen", {
+        method: "POST",
+    });
+    if (!res.ok) {
+        throw new PortalError(res.status, (await res.text()).trim());
+    }
+    return zAgentKey.parse(await res.json());
+};
+
+/** Returns the stored creator key, creating it when the account does not exist yet. */
+export const loadCreatorKey = async (): Promise<CreatorKey> => ({
+    pubkey: (await postCreatorKeygen()).pubkey,
+});
+
+/** Stores a pending creator key once `ac-creator` exists, or returns the one already stored. */
+export const stageCreatorKey = async (): Promise<string> => {
+    const pending = (await postCreatorKeygen()).pending_pubkey;
+    if (!pending) {
+        throw new PortalError(500, "creator key has no pending key");
+    }
+    return pending;
+};
+
+export const activateCreatorKey = async () => {
+    const res = await fetch("/admin/agents/creator/activate", {
+        method: "POST",
+    });
+    if (!res.ok) {
+        throw new PortalError(res.status, (await res.text()).trim());
+    }
 };
 
 /** The signed-in producer creates `ac-creator`, owned by `owner`, for `pubkeyPem`, with auto-debit on. */
@@ -165,3 +223,45 @@ export const createAdminAccounts = (args: {
         method: "createAdminAccounts",
         params: [args.pubkeyPem, args.owner, args.allowed],
     });
+
+/** The signed-in admin credits `amount` of the system token to `ac-creator`. */
+export const sendCreatorTokens = (amount: string) =>
+    supervisor.functionCall({
+        service: "x-portal",
+        plugin: "plugin",
+        intf: "api",
+        method: "sendTokens",
+        params: [amount],
+    });
+
+/** The signed-in admin buys `amount` of resources for `ac-creator`. */
+export const sendCreatorResources = (amount: string) =>
+    supervisor.functionCall({
+        service: "x-portal",
+        plugin: "plugin",
+        intf: "api",
+        method: "sendResources",
+        params: [amount],
+    });
+
+/** The signed-in owner sets `ac-creator`'s key. `pubkeyPem` is the pending key. */
+export const setCreatorKey = (pubkeyPem: string) =>
+    supervisor.functionCall({
+        service: "x-portal",
+        plugin: "plugin",
+        intf: "api",
+        method: "setCreatorKey",
+        params: [pubkeyPem],
+    });
+
+/** Smallest-unit `raw` as a decimal the tokens plugin accepts. No grouping separators. */
+export const formatDecimal = (raw: bigint, precision: number) =>
+    formatUnits(raw.toString(), precision, false);
+
+/** System tokens still needed to bring a resource buffer up to `100 * cost`. */
+export const resourceTopUp = (balance: string, cost: string) => {
+    const target = BigInt(cost) * 100n;
+    const have = BigInt(balance);
+    if (have >= target) return null;
+    return target - have;
+};

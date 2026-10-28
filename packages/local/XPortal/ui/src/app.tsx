@@ -14,8 +14,8 @@ import { NotOpen } from "./components/not-open";
 import { RequestWizard } from "./components/request-wizard";
 import { XAccount } from "./components/x-account";
 import { hasReturnedFromImport } from "./lib/import-return";
-import { isRequestsOpen } from "./lib/portal-api";
-import { forgetSignup } from "./lib/signup-request";
+import { isRequestsOpen, markRedeemed } from "./lib/portal-api";
+import { forgetSignup, storedSignupId } from "./lib/signup-request";
 
 const STATUS_QUERY_KEY = ["status"];
 
@@ -56,8 +56,12 @@ const Visitor = () => {
     const account = returnedFromImport ? currentUser : null;
 
     useEffect(() => {
+        if (!returnedFromImport) return;
+        const id = storedSignupId();
+        // The node reads the account from the chain. A missed call only delays it.
+        if (id) void markRedeemed(id).catch(() => {});
         if (account) forgetSignup();
-    }, [account]);
+    }, [returnedFromImport, account]);
 
     if (returnedFromImport && isPending) return <Loader />;
     if (account) return <DoneStep account={account} />;

@@ -187,7 +187,7 @@ impl Billing for VirtualServerPlugin {
 
     fn donate_gas(user: String, amount: String) -> Result<(), Error> {
         assert_caller(
-            &["homepage", &host::client::get_receiver()],
+            &["homepage", "x-portal", &host::client::get_receiver()],
             "fill_gas_tank_for",
         );
 

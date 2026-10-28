@@ -185,24 +185,7 @@ namespace xportal
          return HttpReply{.headers = cors(req)};
       if (req.method != "GET")
          return HttpReply::methodNotAllowed(req);
-      HttpReply denied;
-      auto      session = requireSession(req, denied);
-      if (!session)
-         return denied;
-      auto id = parseSignupId(idText);
-      if (!id)
-         return textError(req, HttpStatus::badRequest, "invalid signup id\n");
-      std::optional<Signup> stored;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         stored = XPortal{}.open<SignupTable>().get(*id);
-      }
-      if (!stored || !stored->x_id || *stored->x_id != session->x_id)
-         return textError(req, HttpStatus::notFound, "signup not found\n");
-      SignupView view{.state = stored->state};
-      if (stored->state == stateInvited)
-         view.token = stored->token;
-      return jsonBody(req, view);
+      return signupViewForSession(req, idText);
    }
 
    HttpReply serveRetrySignup(const HttpRequest&          req,
@@ -253,41 +236,6 @@ namespace xportal
          to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
       }
       return jsonBody(req, SignupReceipt{.signup_id = signupId(*id)});
-   }
-
-   struct FailedQuery
-   {
-      std::string state;
-      PSIO_REFLECT(FailedQuery, state)
-   };
-
-   HttpReply serveFailedSignups(const HttpRequest& req, std::optional<std::int32_t> socket)
-   {
-      if (req.method == "OPTIONS")
-         return HttpReply{.headers = cors(req)};
-      if (auto reply = to<XAdmin>().checkAuth(req, socket))
-         return *reply;
-      if (req.method != "GET")
-         return HttpReply::methodNotAllowed(req);
-      if (req.query<FailedQuery>().state != stateFailed)
-         return textError(req, HttpStatus::badRequest, "state must be failed\n");
-
-      auto                      mode = readConfig().mode;
-      std::vector<FailedSignup> rows;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         rows.clear();
-         for (auto row : XPortal{}.open<SignupTable>().getIndex<0>())
-         {
-            if (row.state != stateFailed || row.mode != mode)
-               continue;
-            rows.push_back(FailedSignup{.id         = signupId(row.id),
-                                        .created    = row.created,
-                                        .attempts   = row.attempts,
-                                        .last_error = row.last_error});
-         }
-      }
-      return jsonBody(req, rows);
    }
 
    std::string randomToken()

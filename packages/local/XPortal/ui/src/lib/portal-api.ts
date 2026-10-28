@@ -60,6 +60,8 @@ const zSystemToken = z.object({
  * `null` when the chain has no system token. A token with no symbol
  * displays as `ID: {id}`, the same rule as `toSystemTokenInfo`.
  */
+export const systemTokenQueryKey = ["system-token"] as const;
+
 export const getSystemToken = async (): Promise<SystemTokenInfo | null> => {
     const raw: unknown = await supervisor.functionCall({
         service: "tokens",
@@ -77,13 +79,19 @@ export const getSystemToken = async (): Promise<SystemTokenInfo | null> => {
 };
 
 /** `raw` is an amount in smallest units of a token with `precision`. */
-export const formatUnits = (raw: string, precision: number) => {
+export const formatUnits = (
+    raw: string,
+    precision: number,
+    group = true,
+) => {
     const digits = precision === 0 ? raw : raw.padStart(precision + 1, "0");
     const cut = digits.length - precision;
     const whole = digits.slice(0, cut).replace(/^0+(?=\d)/, "");
     const frac = precision === 0 ? "" : digits.slice(cut).replace(/0+$/, "");
-    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    return frac ? `${grouped}.${frac}` : grouped;
+    const shown = group
+        ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+        : whole;
+    return frac ? `${shown}.${frac}` : shown;
 };
 
 /** e.g. `$1,250.00`. */
@@ -101,6 +109,7 @@ const zSignupView = z.discriminatedUnion("state", [
     z.object({ state: z.literal("pending") }),
     z.object({ state: z.literal("queued") }),
     z.object({ state: z.literal("invited"), token: z.string() }),
+    z.object({ state: z.literal("redeemed") }),
     z.object({ state: z.literal("failed") }),
 ]);
 
@@ -156,6 +165,15 @@ export const requestSignup = (
 
 export const getSignup = (signupId: string) =>
     parseReply(fetch(`/signup/${encodeURIComponent(signupId)}`), zSignupView);
+
+/** Asks the node to record the account that redeemed this invite, from the chain. */
+export const markRedeemed = (signupId: string) =>
+    parseReply(
+        fetch(`/signup/${encodeURIComponent(signupId)}/redeemed`, {
+            method: "POST",
+        }),
+        zSignupView,
+    );
 
 const zXIdentity = z.object({ x_id: z.string(), handle: z.string() });
 
