@@ -24,8 +24,6 @@ pub struct AuthScopeRow {
 }
 
 /// Auth service for an account whose key may authorize only whitelisted actions.
-///
-/// The key cannot authorize an action on `auth-scope`.
 #[crate::service(name = "auth-scope", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
@@ -34,11 +32,10 @@ mod service {
 
     /// Authenticate `sender` for `action`.
     ///
-    /// A `verify-sig` claim must carry `pubkey`. The action must match `allowed` and must not
-    /// target `auth-scope`.
+    /// A `verify-sig` claim must carry `pubkey`. The action must match `allowed`.
     ///
-    /// Returns false if the claim is missing, the action is not whitelisted, or the action
-    /// targets `auth-scope`. Aborts only when `sender` has no row.
+    /// Returns false if the claim is missing or the action is not whitelisted. Aborts only when
+    /// `sender` has no row.
     #[action]
     fn checkAuthSys(
         flags: u32,

@@ -15,8 +15,6 @@ namespace SystemService
    {
       bool actionAllowed(const AuthScopeRow& row, ServiceMethod action)
       {
-         if (action.service == AuthScope::service)
-            return false;
          return std::ranges::contains(row.allowed, AllowedAction{action.service, action.method});
       }
 
@@ -53,9 +51,7 @@ namespace SystemService
              return claim.service == VerifySig::service &&
                     compare_blob(claim.rawData, row.pubkey.data) == 0;
           });
-      if (!hasMatchingClaim || !actionAllowed(row, action))
-         return false;
-      return true;
+      return hasMatchingClaim && actionAllowed(row, action);
    }
 
    void AuthScope::canAuthUserSys(AccountNumber user)

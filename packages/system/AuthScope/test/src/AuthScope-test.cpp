@@ -97,7 +97,7 @@ TEST_CASE("auth-scope newAccount and whitelist")
              .returnVal() == false);
    CHECK(owner.to<AuthScope>()
              .checkAuthSys(0, agent, ServiceMethod{AuthScope::service, "setAllowed"_m}, agentClaims)
-             .returnVal() == false);
+             .returnVal());
    CHECK(owner.to<AuthScope>().checkAuthSys(0, agent, nop, bothClaims).returnVal());
    CHECK(owner.to<AuthScope>()
              .checkAuthSys(0, "noonehas"_a, nop, agentClaims)
@@ -136,10 +136,10 @@ TEST_CASE("auth-scope newAccount and whitelist")
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({Action{
                                            .sender  = agent,
                                            .service = AuthScope::service,
-                                           .method  = "setAllowed"_m,
+                                           .method  = "setKey"_m,
                                        }}),
                                        {{agentPub, agentPriv}}))
-             .failed("Authorization for agentacct -> auth-scope::setallowed failed"));
+             .failed("Authorization for agentacct -> auth-scope::setkey failed"));
 
    auto runAsNop = transactor<UserService::Nop>(agent, UserService::Nop::service).nop();
    CHECK(owner.to<Transact>()
