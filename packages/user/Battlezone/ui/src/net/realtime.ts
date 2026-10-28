@@ -75,9 +75,12 @@ export async function ensureLoggedIn(
     supervisor: Supervisor,
 ): Promise<string | null> {
     try {
+        // Session + connect live on host:accounts (same as shared useCurrentUser /
+        // useConnectAccount). Calling the accounts service never starts the login
+        // redirect prompt.
         const user = (await supervisor.functionCall({
-            service: "accounts",
-            plugin: "query",
+            service: "host",
+            plugin: "accounts",
             intf: "api",
             method: "getCurrentUser",
             params: [],
@@ -86,18 +89,21 @@ export async function ensureLoggedIn(
 
         await supervisor.functionCall(
             {
-                service: "accounts",
-                plugin: "plugin",
+                service: "host",
+                plugin: "accounts",
                 intf: "activeApp",
                 method: "connectAccount",
                 params: [],
             },
-            { enabled: true, returnPath: "/" },
+            {
+                enabled: true,
+                returnPath: `${window.location.pathname}${window.location.search}`,
+            },
         );
 
         return (await supervisor.functionCall({
-            service: "accounts",
-            plugin: "query",
+            service: "host",
+            plugin: "accounts",
             intf: "api",
             method: "getCurrentUser",
             params: [],

@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+    "Banx",
+    "Banx/service",
+    "Banx/query-service",
+    "Banx/plugin",
     "Battlezone",
     "Battlezone/service",
     "Branding",

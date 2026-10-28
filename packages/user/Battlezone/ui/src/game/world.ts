@@ -273,6 +273,22 @@ export function createInitialState(
         lobbyReady: false,
         viewTankId: null,
         netStatus: "CONNECTING…",
+        banxEnabled: false,
+        banxMyAssets: [],
+        banxAssetId: null,
+        banxSymbol: "",
+        banxUnits: 1,
+        banxStatus: "",
+        banxPeers: {},
+        banxPairs: {},
+        banxActiveOffer: null,
+        banxLocks: [],
+        pendingBanxHits: [],
+        nextBanxHitId: 1,
+        banxPaidHits: [],
+        banxFloaters: [],
+        nextBanxFloaterId: 1,
+        banxFlash: "",
     };
 }
 
@@ -280,6 +296,16 @@ export function missionMessage(enemyCount: number): string {
     return enemyCount === 1
         ? "DESTROY THE ENEMY TANK"
         : "DESTROY THE ENEMY TANKS";
+}
+
+export function ageBanxFloaters(state: GameState, dt: number): void {
+    if (!state.banxFloaters.length) return;
+    const next = [];
+    for (const f of state.banxFloaters) {
+        const age = f.age + dt;
+        if (age < f.duration) next.push({ ...f, age });
+    }
+    state.banxFloaters = next;
 }
 
 export function resetMatch(state: GameState): GameState {
@@ -298,6 +324,23 @@ export function resetMatch(state: GameState): GameState {
     next.viewTankId = state.viewTankId;
     next.phase = "playing";
     next.message = missionMessage(state.enemyCount);
+    // Carry Banx prefs + frozen locks into the match; clear title-only UI.
+    next.banxEnabled = state.banxEnabled;
+    next.banxMyAssets = state.banxMyAssets;
+    next.banxAssetId = state.banxAssetId;
+    next.banxSymbol = state.banxSymbol;
+    next.banxUnits = state.banxUnits;
+    next.banxStatus = state.banxStatus;
+    next.banxPeers = state.banxPeers;
+    next.banxPairs = state.banxPairs;
+    next.banxActiveOffer = null;
+    next.banxLocks = state.banxLocks;
+    next.pendingBanxHits = [];
+    next.nextBanxHitId = 1;
+    next.banxPaidHits = [];
+    next.banxFloaters = [];
+    next.nextBanxFloaterId = 1;
+    next.banxFlash = "";
     return next;
 }
 

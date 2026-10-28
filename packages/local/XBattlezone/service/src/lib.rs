@@ -8,8 +8,8 @@ use http::{
 };
 use protocol::{parse_client_frame, ClientFrame, PresenceStatus, ServerFrame, WEBSOCKET_TEXT};
 use psibase::services::transact::Wrapper as Transact;
-use psibase::services::x_http::Wrapper as XHttp;
 use psibase::services::ws_auth::{self, Wrapper as WsAuth};
+use psibase::services::x_http::Wrapper as XHttp;
 use psibase::{AccountNumber, HttpReply, HttpRequest, MethodNumber, ServiceWrapper};
 use state::{
     all_sockets_except_tx, cleanup_tx, clear_lobby_tx, clear_match_if_host_tx, connect_tx,
@@ -209,6 +209,83 @@ fn dispatch_frame(socket: i32, user: AccountNumber, frame: ClientFrame) {
             }
             let targets = all_sockets_except_tx(socket);
             let frame = ServerFrame::StateSnapshot { state };
+            fanout_frames(targets.into_iter().map(|s| (s, frame.clone())).collect());
+        }
+        ClientFrame::BanxStatus {
+            on,
+            asset_id,
+            units,
+            symbol,
+        } => {
+            let frame = ServerFrame::BanxStatus {
+                from: user.into(),
+                on,
+                asset_id,
+                units,
+                symbol,
+            };
+            let targets = all_sockets_except_tx(socket);
+            fanout_frames(targets.into_iter().map(|s| (s, frame.clone())).collect());
+        }
+        ClientFrame::BanxOffer {
+            to,
+            required_units,
+            required_asset,
+            required_symbol,
+            match_peer_units,
+            match_peer_asset,
+            match_peer_symbol,
+            lock,
+        } => {
+            let frame = ServerFrame::BanxOffer {
+                from: user.into(),
+                to,
+                required_units,
+                required_asset,
+                required_symbol,
+                match_peer_units,
+                match_peer_asset,
+                match_peer_symbol,
+                lock,
+            };
+            let targets = all_sockets_except_tx(socket);
+            fanout_frames(targets.into_iter().map(|s| (s, frame.clone())).collect());
+        }
+        ClientFrame::BanxOfferReply { to, accept, lock } => {
+            let frame = ServerFrame::BanxOfferReply {
+                from: user.into(),
+                to,
+                accept,
+                lock,
+            };
+            let targets = all_sockets_except_tx(socket);
+            fanout_frames(targets.into_iter().map(|s| (s, frame.clone())).collect());
+        }
+        ClientFrame::BanxLock { lock } => {
+            let frame = ServerFrame::BanxLock { lock };
+            let targets = all_sockets_except_tx(socket);
+            fanout_frames(targets.into_iter().map(|s| (s, frame.clone())).collect());
+        }
+        ClientFrame::BanxHit {
+            hit_id,
+            victim,
+            shooter,
+        } => {
+            if !is_host_socket_tx(user, socket) {
+                send_protocol_error(
+                    socket,
+                    protocol::ProtocolError::InvalidFrame(
+                        "only match host may send banxHit".into(),
+                    ),
+                );
+                return;
+            }
+            let frame = ServerFrame::BanxHit {
+                hit_id,
+                victim,
+                shooter,
+            };
+            let targets = all_sockets_except_tx(socket);
             fanout_frames(targets.into_iter().map(|s| (s, frame.clone())).collect());
         }
     }

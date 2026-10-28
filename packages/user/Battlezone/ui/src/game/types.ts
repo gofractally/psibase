@@ -36,6 +36,16 @@ export type Shot = {
     life: number;
 };
 
+/** Local-only world-space Banx transfer label (victim → shooter). */
+export type BanxFloater = {
+    id: number;
+    label: string;
+    from: Vec2;
+    to: Vec2;
+    age: number;
+    duration: number;
+};
+
 /** Footprint half-extent used for collision / placement */
 export type ObstacleShape =
     | "box"
@@ -77,6 +87,58 @@ export type LobbyPeer = {
 
 /** Per enemy tank slot on the title screen */
 export type EnemySlotMode = "ai" | "human";
+
+export type BanxAssetOption = {
+    id: number;
+    symbol: string;
+};
+
+/** Peer's advertised Banx proposal (title / lobby). */
+export type BanxPeerProposal = {
+    account: string;
+    on: boolean;
+    assetId: number;
+    symbol: string;
+    units: string;
+};
+
+export type BanxLockedStake = {
+    a: string;
+    b: string;
+    aPays: string;
+    aAsset: number;
+    aSymbol: string;
+    bPays: string;
+    bAsset: number;
+    bSymbol: string;
+    aMinReturn: string;
+    bMinReturn: string;
+};
+
+export type BanxPendingOffer = {
+    lowAccount: string;
+    peerAccount: string;
+    requiredUnits: string;
+    requiredAsset: number;
+    requiredSymbol: string;
+    matchPeerUnits: string;
+    matchPeerAsset: number;
+    matchPeerSymbol: string;
+    pendingLock: BanxLockedStake;
+};
+
+export type BanxPairStatus =
+    | { kind: "locked"; lock: BanxLockedStake }
+    | { kind: "offer"; offer: BanxPendingOffer }
+    | { kind: "rejected" }
+    | { kind: "noPath"; reason: string }
+    | { kind: "pending" };
+
+export type PendingBanxHit = {
+    hitId: number;
+    victimAccount: string;
+    shooterAccount: string;
+};
 
 export type GameState = {
     phase: GamePhase;
@@ -125,6 +187,37 @@ export type GameState = {
      */
     viewTankId: TankId | null;
     netStatus: string;
+
+    /** Local Banx stake toggle */
+    banxEnabled: boolean;
+    /** Assets from my Banx credit lines */
+    banxMyAssets: BanxAssetOption[];
+    banxAssetId: number | null;
+    banxSymbol: string;
+    /** Proposed units-per-hit (human decimal integer string) */
+    banxUnits: number;
+    banxStatus: string;
+    /** Other players' Banx proposals keyed by account */
+    banxPeers: Record<string, BanxPeerProposal>;
+    /** Pair key (`a|b` sorted) → reconcile status */
+    banxPairs: Record<string, BanxPairStatus>;
+    /** Active bump offer for the local player (if any) */
+    banxActiveOffer: BanxPendingOffer | null;
+    /** Settled locks carried into the match */
+    banxLocks: BanxLockedStake[];
+    /** Host queues hits for Banx settlement fanout */
+    pendingBanxHits: PendingBanxHit[];
+    nextBanxHitId: number;
+    /** Hit ids already paid (or attempted) on this client */
+    banxPaidHits: number[];
+    /**
+     * Local-only Banx transfer floaters (`2 USD` victim → shooter).
+     * Not synced in host snapshots.
+     */
+    banxFloaters: BanxFloater[];
+    nextBanxFloaterId: number;
+    /** Local-only settlement error flash (success uses floaters instead). */
+    banxFlash: string;
 };
 
 /** Player + enemies = 6 max */

@@ -377,6 +377,7 @@ pub fn set_ready(
         host: host.into(),
         enemy_count: lobby_row.enemy_count.clamp(1, 5),
         roster,
+        banx_locks: Vec::new(),
     };
     clear_lobby();
     let targets = all_sockets_except(-1);

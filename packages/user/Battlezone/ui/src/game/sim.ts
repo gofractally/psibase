@@ -17,7 +17,7 @@ import {
     type Tank,
     type Vec2,
 } from "./types";
-import { missionMessage, respawnTank } from "./world";
+import { ageBanxFloaters, missionMessage, respawnTank } from "./world";
 
 function clampArena(p: Vec2): void {
     const lim = ARENA * 0.5 - TANK_RADIUS;
@@ -124,11 +124,31 @@ function tryDeclareWinner(state: GameState): boolean {
     return true;
 }
 
+function queueBanxHit(
+    state: GameState,
+    victim: Tank,
+    attacker: Tank | undefined,
+): void {
+    if (state.netRole !== "host") return;
+    if (!state.banxLocks.length) return;
+    const victimAccount = victim.account;
+    const shooterAccount = attacker?.account ?? null;
+    if (!victimAccount || !shooterAccount) return;
+    if (victimAccount === shooterAccount) return;
+    const hitId = state.nextBanxHitId++;
+    state.pendingBanxHits.push({
+        hitId,
+        victimAccount,
+        shooterAccount,
+    });
+}
+
 function onTankHit(state: GameState, victim: Tank, attackerId: Tank["id"]): void {
     victim.alive = false;
     victim.lives -= 1;
     const attacker = state.tanks.find((t) => t.id === attackerId);
     if (attacker) attacker.score += 1;
+    queueBanxHit(state, victim, attacker);
 
     // Drop the victim's in-flight shots only — others keep fighting.
     state.shots = state.shots.filter((s) => s.owner !== victim.id);
@@ -191,6 +211,9 @@ export function stepGame(
     dt: number,
 ): void {
     if (state.phase === "title") return;
+
+    // Banx transfer labels keep flying during hit-stun / explosions.
+    ageBanxFloaters(state, dt);
 
     // Freeze gameplay while an explosion and/or cockpit hit-stun plays out.
     if (state.explosionIn > 0 || state.hitStunIn > 0) {

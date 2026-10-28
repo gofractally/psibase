@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use psibase::services::x_http::Wrapper as XHttp;
 use psibase::services::ws_auth;
+use psibase::services::x_http::Wrapper as XHttp;
 use psibase::{account, HttpHeader, HttpReply, HttpRequest, ServiceWrapper};
 use sha1::{Digest, Sha1};
 

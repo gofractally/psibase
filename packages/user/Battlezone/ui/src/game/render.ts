@@ -359,6 +359,48 @@ function drawShots(
     }
 }
 
+function easeInOut(t: number): number {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+/** World-space Banx transfer labels flying victim → shooter. */
+function drawBanxFloaters(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    cam: Cam,
+    state: GameState,
+): void {
+    for (const f of state.banxFloaters) {
+        const u = easeInOut(Math.min(1, f.age / f.duration));
+        const pos = {
+            x: f.from.x + (f.to.x - f.from.x) * u,
+            y: f.from.y + (f.to.y - f.from.y) * u,
+        };
+        const v = worldToView(cam, pos);
+        if (v.z < 0.35) continue;
+        const scale = (height * 0.55) / (v.z * 1.05);
+        const p = {
+            x: width * 0.5 + v.x * scale,
+            y: height * 0.55 - 1.6 * scale,
+        };
+        const fade =
+            u < 0.12 ? u / 0.12 : u > 0.85 ? Math.max(0, (1 - u) / 0.15) : 1;
+        const fontPx = Math.max(12, Math.min(28, 140 / Math.max(v.z, 0.5)));
+        ctx.save();
+        ctx.globalAlpha = fade;
+        ctx.fillStyle = COLOR;
+        ctx.strokeStyle = BG;
+        ctx.lineWidth = 3;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = `bold ${fontPx}px monospace`;
+        ctx.strokeText(f.label, p.x, p.y);
+        ctx.fillText(f.label, p.x, p.y);
+        ctx.restore();
+    }
+}
+
 function drawBoxEdges(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -761,11 +803,19 @@ function drawHud(
     ctx.stroke();
     ctx.lineWidth = 1;
 
-    if (state.message && state.phase !== "win") {
+    if (state.phase !== "win" && state.phase !== "title") {
         ctx.fillStyle = COLOR;
         ctx.textAlign = "center";
         ctx.font = "18px monospace";
-        ctx.fillText(state.message, width / 2, height * 0.18);
+        let y = height * 0.18;
+        if (state.message) {
+            ctx.fillText(state.message, width / 2, y);
+            y += 24;
+        }
+        // Settlement errors only — successful transfers use world floaters.
+        if (state.banxFlash) {
+            ctx.fillText(state.banxFlash, width / 2, y);
+        }
     }
 }
 
@@ -939,6 +989,40 @@ function drawExplosion(
     }
 }
 
+function banxPeerSuffix(state: GameState, account: string): string {
+    const prop = state.banxPeers[account];
+    if (!prop?.on) return "";
+    return `  ${prop.units} ${prop.symbol}`;
+}
+
+function banxPairNote(state: GameState, peer: string): string {
+    const me = state.localAccount;
+    if (!me) return "";
+    const key = me < peer ? `${me}|${peer}` : `${peer}|${me}`;
+    const st = state.banxPairs[key];
+    if (!st) return "";
+    switch (st.kind) {
+        case "locked": {
+            const lock = st.lock;
+            const mine = me === lock.a ? lock.aPays : lock.bPays;
+            const mySym = me === lock.a ? lock.aSymbol : lock.bSymbol;
+            const theirs = me === lock.a ? lock.bPays : lock.aPays;
+            const theirSym = me === lock.a ? lock.bSymbol : lock.aSymbol;
+            return `  LOCKED ${mine}${mySym}=${theirs}${theirSym}`;
+        }
+        case "offer":
+            return `  OFFER`;
+        case "rejected":
+            return `  NO BANX`;
+        case "noPath":
+            return `  NO PATH`;
+        case "pending":
+            return `  …`;
+        default:
+            return "";
+    }
+}
+
 /** Draws the centered ONLINE roster; returns the y just below the box. */
 function drawOnlineBox(
     ctx: CanvasRenderingContext2D,
@@ -946,21 +1030,25 @@ function drawOnlineBox(
     state: GameState,
     topY: number,
 ): number {
-    const boxW = Math.min(320, width * 0.42);
+    const boxW = Math.min(420, width * 0.55);
     const pad = 14;
     const lineH = 22;
     type Row = { label: string; ready: boolean };
     const rows: Row[] = [];
     if (state.localAccount) {
+        const meBanx =
+            state.banxEnabled && state.banxSymbol
+                ? `  ${state.banxUnits} ${state.banxSymbol}`
+                : "";
         rows.push({
-            label: `${state.localAccount} (YOU)`,
+            label: `${state.localAccount} (YOU)${meBanx}`,
             ready: state.lobbyReady,
         });
     }
     for (const p of state.livePeers.filter((peer) => peer.online)) {
         const lobby = state.lobbyPlayers.find((l) => l.account === p.account);
         rows.push({
-            label: p.account,
+            label: `${p.account}${banxPeerSuffix(state, p.account)}${banxPairNote(state, p.account)}`,
             ready: !!lobby?.ready,
         });
     }
@@ -1005,6 +1093,66 @@ function drawOnlineBox(
     return y + boxH;
 }
 
+function drawBanxControls(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    state: GameState,
+    topY: number,
+): number {
+    ctx.textAlign = "center";
+    ctx.font = "16px monospace";
+    const on = state.banxEnabled;
+    ctx.fillStyle = on ? COLOR : DIM;
+    ctx.fillText(`BANX STAKES  [B]  ${on ? "ON" : "OFF"}`, width / 2, topY);
+
+    if (!on) {
+        ctx.fillStyle = DIM;
+        ctx.font = "13px monospace";
+        const hint = state.banxMyAssets.length
+            ? "B TOGGLE  —  stake per hit via Banx paths"
+            : state.banxStatus || "NO CREDIT LINES — SET UP IN BANX";
+        ctx.fillText(hint, width / 2, topY + 22);
+        return topY + 36;
+    }
+
+    const assets = state.banxMyAssets;
+    const sym = state.banxSymbol || "—";
+    const left = assets.length > 1 ? "<" : " ";
+    const right = assets.length > 1 ? ">" : " ";
+    ctx.fillStyle = COLOR;
+    ctx.font = "16px monospace";
+    ctx.fillText(
+        `CURRENCY  ${left}  ${sym}  ${right}   UNITS  [ / ]  ${state.banxUnits}`,
+        width / 2,
+        topY + 24,
+    );
+    ctx.fillStyle = DIM;
+    ctx.font = "13px monospace";
+    ctx.fillText(
+        ", . CYCLE CURRENCY   [ ] ADJUST UNITS",
+        width / 2,
+        topY + 46,
+    );
+    if (state.banxActiveOffer) {
+        const o = state.banxActiveOffer;
+        ctx.fillStyle = COLOR;
+        ctx.font = "14px monospace";
+        ctx.fillText(
+            `RAISE TO ${o.requiredUnits} ${o.requiredSymbol} TO MATCH ${o.peerAccount}'S ${o.matchPeerUnits} ${o.matchPeerSymbol}?`,
+            width / 2,
+            topY + 70,
+        );
+        ctx.fillText("Y ACCEPT   N REJECT", width / 2, topY + 92);
+        return topY + 108;
+    }
+    if (state.banxStatus) {
+        ctx.fillStyle = DIM;
+        ctx.fillText(state.banxStatus, width / 2, topY + 68);
+        return topY + 82;
+    }
+    return topY + 60;
+}
+
 function drawTitleScreen(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -1035,8 +1183,15 @@ function drawTitleScreen(
         titleY + height * 0.08 + 22,
     );
 
-    // Half of prior 160px gap under ONLINE box
-    const tanksHeaderY = onlineBottom + 80;
+    const banxBottom = drawBanxControls(
+        ctx,
+        width,
+        state,
+        onlineBottom + 28,
+    );
+
+    // Gap under Banx controls before enemy tank config
+    const tanksHeaderY = banxBottom + 28;
     ctx.textAlign = "center";
     ctx.fillStyle = COLOR;
     ctx.font = "16px monospace";
@@ -1143,6 +1298,7 @@ export function renderFrame(
     }
 
     drawShots(ctx, width, height, cam, state);
+    drawBanxFloaters(ctx, width, height, cam, state);
     drawExplosion(ctx, width, height, cam, state);
     if (state.phase === "playing") {
         for (const other of others) {
