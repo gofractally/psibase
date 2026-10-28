@@ -1154,9 +1154,23 @@ pub struct ViewWithLifetime<'a> {
 }
 
 #[test]
-fn view_view_with_lifetime() {
+fn test_view_with_lifetime() {
     let value = ViewWithLifetime { x: "apple" };
     let data = value.packed();
     let v = <View<ViewWithLifetime>>::new(&data).unwrap();
+    assert_eq!(v.x().unpack(), value.x);
+}
+
+#[derive(Pack, Unpack, View)]
+#[fracpack(view_name = "NamedViewType")]
+pub struct NamedView {
+    x: u32,
+}
+
+#[test]
+fn test_named_view() {
+    let value = NamedView { x: 42 };
+    let data = value.packed();
+    let v = <NamedViewType>::new(&data).unwrap();
     assert_eq!(v.x().unpack(), value.x);
 }

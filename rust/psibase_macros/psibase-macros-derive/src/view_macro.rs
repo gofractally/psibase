@@ -11,13 +11,19 @@ use syn::{
 pub fn view_macro_impl(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    let opts = match Options::from_derive_input(&input) {
+    let mut opts = match Options::from_derive_input(&input) {
         Ok(val) => val,
         Err(err) => {
             return err.write_errors().into();
         }
     };
     let fracpack_mod: TokenStream2 = opts.fracpack_mod.parse().unwrap();
+    if opts.view_name.is_none() {
+        opts.view_name = Some(Ident::new(
+            &(input.ident.to_string() + "View"),
+            Span::call_site(),
+        ));
+    }
 
     let def = view_def(&fracpack_mod, &input, &opts);
 
@@ -47,12 +53,11 @@ fn new_lifetime(generics: &Generics) -> Lifetime {
     Lifetime::new(&format!("'a{:a<maxlen$}", ""), Span::mixed_site())
 }
 
-fn view_def(fracpack_mod: &TokenStream2, input: &DeriveInput, _opts: &Options) -> TokenStream2 {
+fn view_def(fracpack_mod: &TokenStream2, input: &DeriveInput, opts: &Options) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let ty = &input.ident;
     let impl_params = &input.generics.params;
-    // TODO: Allow override
-    let view_ty = Ident::new(&(input.ident.to_string() + "View"), Span::call_site());
+    let view_ty = opts.view_name.as_ref().unwrap();
     let lifetime = new_lifetime(&input.generics);
     let where_predicates = input.generics.where_clause.as_ref().map(|w| &w.predicates);
     quote! {
@@ -81,8 +86,7 @@ fn process_struct(
     opts: &Options,
 ) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    // TODO: Allow override
-    let view_ty = Ident::new(&(input.ident.to_string() + "View"), Span::call_site());
+    let view_ty = opts.view_name.as_ref().unwrap();
 
     let field_sizes = data.fields.iter().map(|field| {
         if skip_field(field) {
