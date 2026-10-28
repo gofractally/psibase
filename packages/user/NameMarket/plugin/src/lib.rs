@@ -323,17 +323,6 @@ struct PurchasedAccountFields {
 }
 
 #[derive(serde::Deserialize)]
-struct AutoDebitResponse {
-    data: AutoDebitData,
-}
-
-#[derive(serde::Deserialize)]
-struct AutoDebitData {
-    #[serde(rename = "autoDebit")]
-    auto_debit: bool,
-}
-
-#[derive(serde::Deserialize)]
 struct NftCreditResponse {
     data: NftCreditData,
 }
@@ -394,11 +383,8 @@ fn add_claim(account: &str) -> Result<(), Error> {
 
 fn buyer_auto_debit() -> Result<bool, Error> {
     let user = current_user()?;
-    let query = format!("query {{ autoDebit(account: \"{user}\") }}");
-    let body = CommonServer::post_graphql_get_json(&query)?;
-    let response = serde_json::from_str::<AutoDebitResponse>(&body)
-        .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-    Ok(response.data.auto_debit)
+    let config = bindings::nft::plugin::user_config::get_user_conf(&user)?;
+    Ok(config.settings.auto_debit)
 }
 
 fn can_take(nft_id: u32) -> Result<bool, Error> {

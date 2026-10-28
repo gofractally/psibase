@@ -4,14 +4,14 @@ mod bindings;
 use bindings::exports::nft::plugin::authorized::Guest as Authorized;
 use bindings::exports::nft::plugin::issuer::Guest as Issuer;
 use bindings::exports::nft::plugin::user::Guest as User;
-use bindings::exports::nft::plugin::user_config::Guest as UserConfig;
+use bindings::exports::nft::plugin::user_config::{Guest as UserConfig, Settings, UserConf};
 
 use bindings::host::http::api::post_graphql_get_json;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
-use psibase::{define_trust, FlagsType};
+use psibase::{define_trust, AccountNumber, FlagsType};
 
 use psibase::services::nft::{self as Nft, NftHolderFlags};
 
@@ -33,7 +33,7 @@ define_trust! {
         ",
     }
     functions {
-        None => [guess_id],
+        None => [guess_id, get_user_conf],
         Medium => [mint],
         High => [uncredit, debit, try_debit, enable_user_auto_debit, credit, burn, graphql],
     }
@@ -153,7 +153,51 @@ impl User for NftPlugin {
     }
 }
 
+#[derive(Deserialize)]
+struct UserConfResponse {
+    data: UserConfData,
+}
+
+#[derive(Deserialize)]
+struct UserConfData {
+    #[serde(rename = "userConf")]
+    user_conf: UserConfFields,
+}
+
+#[derive(Deserialize)]
+struct UserConfFields {
+    account: String,
+    config: u8,
+    settings: UserConfSettings,
+}
+
+#[derive(Deserialize)]
+struct UserConfSettings {
+    #[serde(rename = "autoDebit")]
+    auto_debit: bool,
+}
+
 impl UserConfig for NftPlugin {
+    fn get_user_conf(account: String) -> Result<UserConf, Error> {
+        trust::assert_authorized(trust::FunctionName::get_user_conf)?;
+
+        let account =
+            AccountNumber::from_exact(&account).map_err(|err| plugin_error(err.to_string()))?;
+        let query = format!(
+            "query {{ userConf(user: \"{account}\") {{ account config settings {{ autoDebit }} }} }}"
+        );
+        let body = post_graphql_get_json(&query)?;
+        let response = serde_json::from_str::<UserConfResponse>(&body)
+            .map_err(|err| plugin_error(err.to_string()))?;
+        Ok(UserConf {
+            account: response.data.user_conf.account,
+            config: response.data.user_conf.config,
+            settings: Settings {
+                auto_debit: response.data.user_conf.settings.auto_debit,
+            },
+        })
+    }
+
     fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::enable_user_auto_debit)?;
 

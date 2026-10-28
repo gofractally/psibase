@@ -62,6 +62,21 @@ interface user {
 interface user-config {
     use host:types/types.{error};
 
+    /// Decoded holder flags.
+    record settings {
+        auto-debit: bool,
+    }
+
+    /// Holder configuration. A missing row has config 0.
+    record user-conf {
+        account: string,
+        config: u8,
+        settings: settings,
+    }
+
+    /// Read holder configuration for `account`.
+    get-user-conf: func(account: string) -> result<user-conf, error>;
+
     /// Enable or disable auto debit globally for the caller.
     ///
     /// Arguments
