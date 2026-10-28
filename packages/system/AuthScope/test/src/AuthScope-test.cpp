@@ -98,13 +98,7 @@ TEST_CASE("auth-scope newAccount and whitelist")
    CHECK(owner.to<AuthScope>()
              .checkAuthSys(0, agent, ServiceMethod{AuthScope::service, "setAllowed"_m}, agentClaims)
              .returnVal() == false);
-   CHECK(owner.to<AuthScope>()
-             .checkAuthSys(AuthInterface::firstAuthFlag, agent, nop, bothClaims)
-             .returnVal() == false);
    CHECK(owner.to<AuthScope>().checkAuthSys(0, agent, nop, bothClaims).returnVal());
-   CHECK(owner.to<AuthScope>()
-             .checkAuthSys(AuthInterface::firstAuthFlag, agent, nop, agentClaims)
-             .returnVal());
    CHECK(owner.to<AuthScope>()
              .checkAuthSys(0, "noonehas"_a, nop, agentClaims)
              .failed("sender does not have a public key"));
@@ -128,7 +122,7 @@ TEST_CASE("auth-scope newAccount and whitelist")
              .failed("Authorization for agentacct -> nop::nop failed"));
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({nopAct}),
                                        {{otherPub, otherPriv}, {agentPub, agentPriv}}))
-             .failed("Authorization for agentacct -> nop::nop failed"));
+             .succeeded());
    CHECK(TraceResult(t.pushTransaction(
                          t.makeTransaction({Action{.sender  = agent,
                                                    .service = UserService::Nop::service,

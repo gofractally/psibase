@@ -44,8 +44,8 @@ namespace SystemService
 
       /// Authenticate `sender` for `action`.
       ///
-      /// A `verify-sig` claim must carry `pubkey`. When `firstAuthFlag` is set, that claim must be
-      /// first. The action must match `allowed` and must not target `auth-scope`.
+      /// A `verify-sig` claim must carry `pubkey`. The action must match `allowed` and must not
+      /// target `auth-scope`.
       ///
       /// Returns false if the claim is missing, the action is not whitelisted, or the action
       /// targets `auth-scope`. Aborts only when `sender` has no row.

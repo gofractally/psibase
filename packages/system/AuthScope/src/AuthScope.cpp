@@ -30,16 +30,14 @@ namespace SystemService
       auto row = get(sender);
       check(row.has_value(), "sender does not have a public key");
 
-      auto matched =
-          std::ranges::find_if(claims,
-                               [&](const Claim& claim)
-                               {
-                                  return claim.service == VerifySig::service &&
-                                         compare_blob(claim.rawData, row->pubkey.data) == 0;
-                               });
-      if (matched == claims.end() || !actionAllowed(*row, action))
-         return false;
-      if ((flags & AuthInterface::firstAuthFlag) && matched != claims.begin())
+      auto hasMatchingClaim = std::ranges::any_of(
+          claims,
+          [&](const Claim& claim)
+          {
+             return claim.service == VerifySig::service &&
+                    compare_blob(claim.rawData, row->pubkey.data) == 0;
+          });
+      if (!hasMatchingClaim || !actionAllowed(*row, action))
          return false;
       return true;
    }
