@@ -1148,7 +1148,7 @@ fn view_def_wont_change() {
     assert_eq!(v.field_i32().unpack(), value.field_i32);
 }
 
-#[derive(psibase::Pack, psibase::Unpack, psibase::View)]
+#[derive(Pack, Unpack, View)]
 pub struct ViewWithLifetime<'a> {
     x: &'a str,
 }

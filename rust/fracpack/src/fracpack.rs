@@ -48,7 +48,7 @@
 //! for the two types.
 
 use custom_error::custom_error;
-pub use psibase_macros::{Pack, ToSchema, Unpack};
+pub use psibase_macros::{Pack, ToSchema, Unpack, View};
 use std::{cell::RefCell, hash::Hash, mem, rc::Rc, sync::Arc};
 
 mod schema;
