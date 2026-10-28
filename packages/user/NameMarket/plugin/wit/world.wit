@@ -88,12 +88,12 @@ interface api {
     ///
     /// Guesses a redemption NFT id and buys the name with that id.
     /// * `account`: the account to purchase the name for
-    /// * `max-cost`: maximum payment in network token (Quantity string)
+    /// * `max-cost`: maximum payment in network token
     buy: func(account: string, max-cost: string) -> result<_, error>;
 
     /// Buy an account name and claim it in this transaction.
     /// * `account`: the account to purchase and claim
-    /// * `max-cost`: maximum payment in network token (Quantity string)
+    /// * `max-cost`: maximum payment in network token
     buy-and-claim: func(account: string, max-cost: string) -> result<_, error>;
 
     /// Claim an account name.
