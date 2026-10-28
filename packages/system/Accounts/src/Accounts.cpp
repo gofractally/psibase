@@ -207,8 +207,8 @@ namespace SystemService
          {
             frozen.put(FrozenAccount{.account = account, .authService = previous});
             assignAuth(account, authNoneService);
+            emit().history().froze(account, memo);
          }
-         emit().history().froze(account, memo);
       }
    }
 
@@ -222,8 +222,8 @@ namespace SystemService
          {
             assignAuth(account, saved->authService);
             frozen.remove(*saved);
+            emit().history().unfroze(account, memo);
          }
-         emit().history().unfroze(account, memo);
       }
    }
 
