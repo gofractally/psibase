@@ -75,6 +75,21 @@ impl TryParseGqlResponse for FixedDetailsResponse {
     }
 }
 
+#[derive(Deserialize)]
+pub struct InviterResponse {
+    pub inviter: String,
+}
+
+impl TryParseGqlResponse for InviterResponse {
+    fn from_gql(response: String) -> Result<Self, Error> {
+        let response_root: ResponseRoot<GetInviteResponse<InviterResponse>> =
+            serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
+        Ok(response_root.data.inviteById.ok_or_else(|| {
+            QueryError("Unable to extract inviter from query response".to_string())
+        })?)
+    }
+}
+
 impl TryParseGqlResponse for CurrentDetailsResponse {
     fn from_gql(response: String) -> Result<Self, Error> {
         let response_root: ResponseRoot<GetInviteResponse<CurrentDetailsResponse>> =

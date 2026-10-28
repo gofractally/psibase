@@ -162,8 +162,29 @@ impl InviteTokensTable {
             Self::delete_fixed_details(invite_id);
             return None;
         }
+        Self::invite_tokens().delete(&Self::election_key(&host::client::get_sender()));
         Self::invite_tokens().set(&host::client::get_sender(), token.as_bytes());
         Some(invite_id)
+    }
+
+    fn election_key(app: &str) -> String {
+        format!("elect:{app}")
+    }
+
+    pub fn set_recovery_election(elect: bool) {
+        Self::invite_tokens().set(
+            &Self::election_key(&host::client::get_sender()),
+            &[u8::from(elect)],
+        );
+    }
+
+    pub fn take_recovery_election() -> bool {
+        let key = Self::election_key(&host::client::get_active_app());
+        let elected = Self::invite_tokens()
+            .get(&key)
+            .is_some_and(|value| value.first() == Some(&1));
+        Self::invite_tokens().delete(&key);
+        elected
     }
 
     fn get_active_token() -> Option<(u32, Vec<u8>)> {

@@ -59,6 +59,7 @@ interface invite {
 
     generate-invite: func() -> result<string, error>;
     import-invite-token: func(token: string) -> result<u32, error>;
+    elect-inviter-recovery: func(elect: bool) -> result<_, error>;
     graphql: func(query: string) -> result<string, error>;
 }
 

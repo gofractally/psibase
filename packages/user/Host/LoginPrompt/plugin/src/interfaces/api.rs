@@ -93,6 +93,7 @@ impl Api for LoginPrompt {
         }
 
         if Invites::get_active_invite().is_some() {
+            Invites::set_inviter_recovery();
             Invites::accept();
         }
     }

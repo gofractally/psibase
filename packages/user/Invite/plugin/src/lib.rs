@@ -19,8 +19,9 @@ use bindings::exports::{
     transact_hook_actions_sender::Guest as HookActionsSender,
 };
 use bindings::{
-    aes::plugin as aes, base64::plugin as base64, credentials::plugin as credentials,
-    tokens::plugin as tokens, transact::plugin as transact,
+    aes::plugin as aes, auth_recover::plugin::actions as AuthRecoverActions,
+    base64::plugin as base64, credentials::plugin as credentials, tokens::plugin as tokens,
+    transact::plugin as transact,
 };
 use invite::plugin::{
     authorized::Guest as Authorized,
@@ -136,6 +137,11 @@ impl Invitee for InvitePlugin {
         Ok(imported.unwrap())
     }
 
+    #[psibase_plugin::authorized(None)]
+    fn elect_inviter_recovery(elect: bool) {
+        InviteTokensTable::set_recovery_election(elect);
+    }
+
     /// Returns whether or not an invite from someone is active for the caller
     /// application
     #[psibase_plugin::authorized(None)]
@@ -214,6 +220,28 @@ impl Redemption for InvitePlugin {
 
         InviteTokensTable::accepted();
     }
+
+    fn set_inviter_recovery() {
+        assert!(host::client::get_sender() == "host");
+        if !InviteTokensTable::take_recovery_election() {
+            return;
+        }
+        let Some(invite_id) = InviteTokensTable::active_invite_id() else {
+            return;
+        };
+        AuthRecoverActions::set_recovery(&inviter_of(invite_id).to_string())
+            .expect("set recovery partner");
+    }
+}
+
+fn inviter_of(invite_id: u32) -> AccountNumber {
+    let query = format!(
+        r#"query {{ inviteById(inviteId: "{id}") {{ inviter }} }}"#,
+        id = invite_id
+    );
+    let response = host::server::post_graphql_get_json(&query).expect("invite query failed");
+    let inviter = InviterResponse::from_gql(response).expect("invite has no inviter");
+    AccountNumber::from_exact(&inviter.inviter).expect("inviter account name")
 }
 
 fn get_invite_cost(num_accounts: u16) -> Result<String, Error> {

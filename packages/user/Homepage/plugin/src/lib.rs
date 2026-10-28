@@ -191,6 +191,12 @@ impl Invite for HomepagePlugin {
         invite::plugin::invitee::import_invite_token(&token)
     }
 
+    fn elect_inviter_recovery(elect: bool) -> Result<(), Error> {
+        assert_caller_self();
+        invite::plugin::invitee::elect_inviter_recovery(elect);
+        Ok(())
+    }
+
     fn graphql(query: String) -> Result<String, Error> {
         assert_caller_self();
         invite::plugin::authorized::graphql(&query)

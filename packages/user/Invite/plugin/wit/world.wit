@@ -82,6 +82,9 @@ interface invitee {
     ///   they don't yet have one.
     import-invite-token: func(token: string) -> result<u32, error>;
 
+    /// Saves the invite page's recovery-partner checkbox until accept runs.
+    elect-inviter-recovery: func(elect: bool);
+
     /// Returns whether or not an invite is available for the active application
     is-active-invite: func() -> bool;
 

@@ -19,4 +19,8 @@ interface redemption {
 
     /// Accepts an invite with an existing account (the currently logged-in account).
     accept: func();
+
+    /// If the invite page elected it, names that inviter as the logged-in
+    /// account's recovery partner.
+    set-inviter-recovery: func();
 }

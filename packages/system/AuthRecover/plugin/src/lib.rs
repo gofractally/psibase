@@ -98,7 +98,7 @@ impl Actions for AuthRecoverPlugin {
         Ok(())
     }
 
-    #[authorized(High, whitelist = ["homepage"])]
+    #[authorized(High, whitelist = ["homepage", "invite"])]
     fn set_recovery(account: String) -> Result<(), HostTypes::Error> {
         let name = psibase::AccountNumber::from_exact(&account)
             .map_err(|_| ErrorType::InvalidAccountName(&account))?;

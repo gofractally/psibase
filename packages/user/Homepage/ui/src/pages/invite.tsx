@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import {
@@ -14,6 +15,8 @@ import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { homepage } from "@shared/lib/plugins";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
+import { Checkbox } from "@shared/shadcn/ui/checkbox";
+import { Label } from "@shared/shadcn/ui/label";
 import {
     Card,
     CardContent,
@@ -72,6 +75,7 @@ const fetchInvite = async (token: string) => {
 export const Invite = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get("token");
+    const [makeInviterRecovery, setMakeInviterRecovery] = useState(true);
 
     const {
         data: invite,
@@ -165,10 +169,29 @@ export const Invite = () => {
                         <CardTitle>{`You're invited to ${chainName}`}</CardTitle>
                         <CardDescription>{description}</CardDescription>
                     </CardHeader>
-                    <CardContent></CardContent>
+                    <CardContent>
+                        <Label className="flex items-start gap-3 font-normal">
+                            <Checkbox
+                                id="inviter-recovery"
+                                checked={makeInviterRecovery}
+                                onCheckedChange={(checked) =>
+                                    setMakeInviterRecovery(checked === true)
+                                }
+                            />
+                            <span className="text-sm leading-snug">
+                                Make {inviter} your recovery partner
+                            </span>
+                        </Label>
+                    </CardContent>
                     <CardFooter className="flex justify-between">
                         <Button
                             onClick={async () => {
+                                await supervisor.functionCall({
+                                    service: "homepage",
+                                    intf: "invite",
+                                    method: "electInviterRecovery",
+                                    params: [makeInviterRecovery],
+                                });
                                 await supervisor.functionCall(
                                     {
                                         service: "host",

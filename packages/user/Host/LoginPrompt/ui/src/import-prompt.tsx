@@ -33,7 +33,7 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { useCanCreateAccount } from "./hooks/use-can-create-account";
 import { useConnectAccount } from "./hooks/use-connect-account";
-import { AuthServices } from "./types";
+import { AuthServices, authNeedsPrivateKey } from "./types";
 
 export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
     const navigate = useNavigate();
@@ -102,14 +102,13 @@ export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
                 }),
                 privateKey: z.string().refine(
                     (val) => {
-                        if (authService !== AuthServices.AUTH_SIG) return true;
+                        if (!authNeedsPrivateKey(authService)) return true;
                         return validateB64(val);
                     },
                     {
-                        message:
-                            authService === AuthServices.AUTH_SIG
-                                ? "Private key must be a valid base64 string"
-                                : "Invalid private key",
+                        message: authNeedsPrivateKey(authService)
+                            ? "Private key must be a valid base64 string"
+                            : "Invalid private key",
                     },
                 ),
             }),
@@ -171,7 +170,7 @@ export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
                                         }
                                     }}
                                 />
-                                {authService === AuthServices.AUTH_SIG && (
+                                {authNeedsPrivateKey(authService) && (
                                     <form.AppField
                                         name="privateKey"
                                         children={(field) => {

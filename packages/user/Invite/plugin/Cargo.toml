@@ -36,3 +36,4 @@ world = "impl"
 "base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
 "credentials:plugin" = { path = "../../../system/Credentials/plugin/wit/world.wit" }
 "tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }
+"auth-recover:plugin" = { path = "../../../system/AuthRecover/plugin/wit/world.wit" }
