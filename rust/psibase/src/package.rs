@@ -652,10 +652,10 @@ impl<R: Read + Seek> PackagedService<R> {
         let data_re = Regex::new(r"^data/([-a-zA-Z0-9]*)/.*$")?;
         for index in 0..archive.len() {
             let raw_file = archive.by_index_raw(index)?;
-            let filename = raw_file.name();
+            let filename = raw_file.name()?;
             if filename == "meta.json" {
                 meta_index = Some(index)
-            } else if let Some(captures) = service_re.captures(filename) {
+            } else if let Some(captures) = service_re.captures(&filename) {
                 match captures.extract() {
                     (_, [name, "wasm"]) => {
                         service_files.push((name.replace("/", "+").parse()?, index));
@@ -665,7 +665,7 @@ impl<R: Read + Seek> PackagedService<R> {
                     }
                     _ => {}
                 }
-            } else if let Some(captures) = data_re.captures(filename) {
+            } else if let Some(captures) = data_re.captures(&filename) {
                 if raw_file.is_file() {
                     let (_, [name]) = captures.extract();
                     data.push((AccountNumber::from_str(name)?, index));
@@ -776,7 +776,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
         for (sender, index) in &self.data {
             let mut file = self.archive.by_index(*index)?;
-            let file_name = file.name().to_string();
+            let file_name = file.name()?.to_string();
             let path = data_re
                 .captures(&file_name)
                 .unwrap()
@@ -827,7 +827,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 }
             } else {
                 Err(Error::UnknownFileType {
-                    path: file.name().to_string(),
+                    path: file.name()?.to_string(),
                 })?
             }
         }
@@ -883,8 +883,8 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut manifest = vec![];
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
         for (sender, index) in &self.data {
-            let file = self.archive.name_for_index(*index).unwrap();
-            let path = data_re.captures(file).unwrap().get(1).unwrap().as_str();
+            let file = self.archive.name_for_index(*index).unwrap().unwrap();
+            let path = data_re.captures(&file).unwrap().get(1).unwrap().as_str();
             manifest.push(PackageDataFile {
                 account: *sender,
                 filename: path.to_string(),
@@ -1212,7 +1212,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
         for (sender, index) in &self.data {
             let mut file = self.archive.by_index(*index)?;
-            let file_name = file.name().to_string();
+            let file_name = file.name()?.to_string();
             let path = data_re
                 .captures(&file_name)
                 .unwrap()
@@ -1236,7 +1236,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 crate::as_text(builder).await?;
             } else {
                 Err(Error::UnknownFileType {
-                    path: file.name().to_string(),
+                    path: file.name()?.to_string(),
                 })?
             }
         }
@@ -1257,7 +1257,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
         self.data.iter().map(move |(account, index)| {
             let mut file = archive.by_index(*index).unwrap();
-            let file_name = file.name().to_string();
+            let file_name = file.name().unwrap().to_string();
             let path = data_re
                 .captures(&file_name)
                 .unwrap()
