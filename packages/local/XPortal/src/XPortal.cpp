@@ -104,9 +104,9 @@ namespace xportal
       return scale;
    }
 
-   // $2.50 per standard buffer, stored as USD micros per whole token. An
-   // unset free tier amount becomes $2.50. When the price is first seeded and
-   // no paid tiers are set, they become Small $5, Medium $12.50, and Large $25.
+   // Billing on with missing pricing fields: fill defaults and persist. Unset
+   // free tier becomes $2.50; empty paid tiers become Small $5, Medium $12.50,
+   // and Large $25.
    PortalConfig ensurePriced(PortalConfig config)
    {
       if (!to<VirtualServer>().is_billing_enabled() ||
