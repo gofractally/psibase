@@ -17,7 +17,11 @@ use Exports::{
 use bindings::host::accounts as HostAccounts;
 use bindings::tokens::plugin as TokensPlugin;
 use psibase::AccountNumber;
-use psibase_plugin::*;
+use psibase_plugin::{
+    host,
+    trust::{Capabilities, TrustConfig},
+    Error,
+};
 
 use psibase::services::tokens::{Precision, Quantity};
 use virtual_server::tables::tables::{self as ServiceTables};
@@ -25,6 +29,16 @@ use virtual_server::Wrapper as VirtualServer;
 use virtual_server::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
 struct VirtualServerPlugin;
+
+impl TrustConfig for VirtualServerPlugin {
+    fn capabilities() -> Capabilities {
+        Capabilities {
+            low: &[],
+            medium: &[],
+            high: &["Purchase network resources for an account"],
+        }
+    }
+}
 
 fn assert_caller(allowed: &[&str], context: &str) {
     let sender = host::client::get_sender();
@@ -185,12 +199,8 @@ impl Billing for VirtualServerPlugin {
         refill_to_capacity(Some(capacity), true)
     }
 
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn donate_gas(user: String, amount: String) -> Result<(), Error> {
-        assert_caller(
-            &["homepage", "x-portal", &host::client::get_receiver()],
-            "fill_gas_tank_for",
-        );
-
         let sys_id = get_sys()?;
         let amount_u64 = TokensPlugin::helpers::decimal_to_u64(sys_id, &amount)?;
 
