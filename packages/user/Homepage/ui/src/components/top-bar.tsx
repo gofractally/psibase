@@ -67,6 +67,8 @@ const BalancePill = ({ user }: { user: string }) => {
         ? balances?.find((t) => t.id === Number(systemToken.id))
         : undefined;
     const loading = tokenPending || (!!systemToken && balancesPending);
+    // Only a successful fetch can tell us the balance is 0; a failed one is unknown.
+    const balanceUnavailable = !loading && !!systemToken && !balances;
 
     return (
         <Tooltip>
@@ -82,9 +84,15 @@ const BalancePill = ({ user }: { user: string }) => {
                         <Skeleton className="h-4 w-12" />
                     ) : systemToken ? (
                         <>
-                            <span className="font-semibold tabular-nums">
-                                {formatCompact(held?.balance?.amount ?? 0)}
-                            </span>
+                            {balanceUnavailable ? (
+                                <span className="text-muted-foreground font-semibold">
+                                    —
+                                </span>
+                            ) : (
+                                <span className="font-semibold tabular-nums">
+                                    {formatCompact(held?.balance?.amount ?? 0)}
+                                </span>
+                            )}
                             <span className="text-muted-foreground hidden font-mono text-[11px] sm:inline">
                                 {systemToken.symbol}
                             </span>
@@ -94,7 +102,11 @@ const BalancePill = ({ user }: { user: string }) => {
                     )}
                 </Link>
             </TooltipTrigger>
-            <TooltipContent>Open your wallet</TooltipContent>
+            <TooltipContent>
+                {balanceUnavailable
+                    ? "Balance unavailable. Open your wallet"
+                    : "Open your wallet"}
+            </TooltipContent>
         </Tooltip>
     );
 };
