@@ -1,0 +1,11 @@
+package auth-recover:plugin;
+
+world impl {
+    include host:crypto/imports;
+    include transact:plugin/imports;
+
+    include transact:plugin/hook-user-auth;
+
+    export keyvault;
+    export actions;
+}
