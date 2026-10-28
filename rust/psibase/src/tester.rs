@@ -1066,7 +1066,7 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
             || act.sender == transact::SERVICE && act.service == virtual_server::SERVICE
             || act.sender == transact::SERVICE
                 && act.service == accounts::SERVICE
-                && act.method == method!("getAuthOf")
+                && (act.method == method!("getAuthOf") || act.method == method!("isFrozen"))
             || act.service == events::SERVICE && act.method == method!("sync")
             || act.sender == AccountNumber::default())
     }
