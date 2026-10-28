@@ -472,7 +472,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "AuthRecover(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -962,7 +962,7 @@ psibase_package(
     NAME InviteService
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Create invite links to apps. An invite can facilitate the creation of one or more new accounts."
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "AuthRecover(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Invite-schema.json

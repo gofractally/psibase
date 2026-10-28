@@ -33,7 +33,15 @@ interface actions {
     create-account: func(new-account-name: string) -> result<string, error>;
 }
 
+interface api {
+    use host:types/types.{pem};
+
+    /// Checks whether this public key is the one stored for the account.
+    can-authorize: func(public-key: pem, account-name: string) -> bool;
+}
+
 world imports {
     import keyvault;
     import actions;
+    import api;
 }

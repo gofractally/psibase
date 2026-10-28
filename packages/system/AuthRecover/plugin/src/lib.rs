@@ -4,7 +4,7 @@ mod helpers;
 use helpers::*;
 
 use bindings::exports::auth_recover::plugin::{
-    actions::Guest as Actions, keyvault::Guest as KeyVault,
+    actions::Guest as Actions, api::Guest as Api, keyvault::Guest as KeyVault,
 };
 use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 
@@ -68,9 +68,22 @@ impl KeyVault for AuthRecoverPlugin {
         HostCrypto::sign(&hashed_message, &public_key)
     }
 
-    #[authorized(Low, whitelist = ["accounts", "x-admin", "invite", "namemarket", "homepage"])]
+    #[authorized(Low, whitelist = ["host", "accounts", "x-admin", "invite", "namemarket", "homepage"])]
     fn import_key(private_key: HostTypes::Pem) -> Result<HostTypes::Pem, HostTypes::Error> {
         HostCrypto::import_key(&private_key)
+    }
+}
+
+impl Api for AuthRecoverPlugin {
+    /// Login compares this public key to the account's stored public key.
+    /// Trust is None so the host can check a credential without prompting.
+    #[authorized(None)]
+    fn can_authorize(public_key: HostTypes::Pem, account_name: String) -> bool {
+        let Ok(actual_pubkey) = get_pubkey(&account_name) else {
+            println!("Failed to retrieve public key for specified account");
+            return false;
+        };
+        public_key == actual_pubkey
     }
 }
 

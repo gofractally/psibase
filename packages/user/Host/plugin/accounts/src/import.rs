@@ -1,4 +1,5 @@
 use crate::bindings::accounts::query::api as AccountsQuery;
+use crate::bindings::auth_recover::plugin as AuthRecover;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::host::accounts::admin::Credential;
 use crate::bindings::host::types::types::Error;
@@ -19,6 +20,15 @@ fn import_credential(credential: &Credential, known_accounts: &AppsTable) -> Res
                 return Err(AuthorizationFailed(account.clone()).into());
             }
             AuthSig::keyvault::import_key(&credential.key)?;
+        }
+        "auth-rcovr" => {
+            let Ok(public_key) = AuthSig::keyvault::pub_from_priv(&credential.key) else {
+                return Err(AuthorizationFailed(account.clone()).into());
+            };
+            if !AuthRecover::api::can_authorize(&public_key, account) {
+                return Err(AuthorizationFailed(account.clone()).into());
+            }
+            AuthRecover::keyvault::import_key(&credential.key)?;
         }
         service => return Err(UnsupportedAuthService(service.to_string()).into()),
     }

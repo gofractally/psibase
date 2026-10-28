@@ -25,3 +25,4 @@ world = "impl"
 "host:types" = { path = "../types/wit/world.wit" }
 "accounts:query" = { path = "../../../../system/Accounts/plugin/query/wit/world.wit" }
 "auth-sig:plugin" = { path = "../../../../system/AuthSig/plugin/wit/world.wit" }
+"auth-recover:plugin" = { path = "../../../../system/AuthRecover/plugin/wit/world.wit" }

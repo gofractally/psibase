@@ -9,6 +9,8 @@ world impl {
 
     import auth-sig:plugin/api;
     import auth-sig:plugin/keyvault;
+    import auth-recover:plugin/api;
+    import auth-recover:plugin/keyvault;
 
     export api;
     export admin;

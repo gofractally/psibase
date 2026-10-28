@@ -1,7 +1,6 @@
 #include <limits>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
-#include <services/system/AuthSig.hpp>
 #include <services/system/Credentials.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
@@ -42,6 +41,14 @@ namespace
          Actor<InviteHooks>{Invite::service, invite.inviter}.onInvAccept(invite.id, accepter);
       }
    }
+
+   struct AuthRecover
+   {
+      static constexpr auto service = AccountNumber("auth-rcovr");
+
+      void newAccount(AccountNumber account, Spki key);
+   };
+   PSIO_REFLECT(AuthRecover, method(newAccount, account, key))
 }  // namespace
 
 Invite::Invite(psio::shared_view_ptr<Action> action)
@@ -221,7 +228,7 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
    auto new_account_key = keyFingerprint(newAccountKey);
 
    check(credential_key != new_account_key, needUniquePubkey.data());
-   to<AuthSig::AuthSig>().newAccount(newAccount, newAccountKey);
+   to<AuthRecover>().newAccount(newAccount, newAccountKey);
 
    if (to<VirtualServer>().is_billing_enabled())
    {
