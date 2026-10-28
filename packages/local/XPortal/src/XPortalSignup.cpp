@@ -245,18 +245,6 @@ namespace xportal
       return signupId(id);
    }
 
-   std::string codeChallenge(std::string_view verifier)
-   {
-      auto hash = sha256(verifier.data(), verifier.size());
-      return toBase64Url({reinterpret_cast<const char*>(hash.data()), hash.size()});
-   }
-
-   HttpReply redirect(std::string location, std::vector<HttpHeader> headers)
-   {
-      headers.push_back({"Location", std::move(location)});
-      return HttpReply{.status = HttpStatus::found, .headers = std::move(headers)};
-   }
-
    HttpHeader sessionCookieHeader(std::string_view value, std::chrono::seconds maxAge, bool secure)
    {
       auto cookie = std::format("{}={}; Path=/; Max-Age={}; HttpOnly; SameSite=Lax", sessionCookie,
@@ -363,11 +351,6 @@ namespace xportal
          to<XHttp>().autoClose(client, true);
          to<XHttp>().sendReply(client, reply);
       }
-   }
-
-   HttpReply badGateway(std::string_view message)
-   {
-      return textError(std::vector<HttpHeader>{}, HttpStatus::badGateway, message);
    }
 
    struct XCallbackQuery
@@ -513,16 +496,6 @@ namespace xportal
                              signup.last_error = error;
                           });
       replyToBrowser(pending.client, badGateway("Stripe did not create a checkout session\n"));
-   }
-
-   bool sameBytes(std::span<const char> a, const Checksum256& b)
-   {
-      if (a.size() != b.size())
-         return false;
-      unsigned char diff = 0;
-      for (std::size_t i = 0; i < b.size(); ++i)
-         diff |= static_cast<unsigned char>(a[i]) ^ b[i];
-      return diff == 0;
    }
 
    // `Stripe-Signature` is `t=<unix seconds>,v1=<hex>,...`. Any `v1` may match;

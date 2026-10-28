@@ -1,21 +1,18 @@
 #pragma once
 
+#include "helpers.hpp"
+
 #include <services/local/XPortal.hpp>
 
 #include <chrono>
 #include <cstdint>
-#include <initializer_list>
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include <psibase/Rpc.hpp>
 #include <psio/json/any.hpp>
-#include <psio/stream.hpp>
-#include <psio/to_json.hpp>
 #include <services/local/XAdmin.hpp>
 
 using namespace psibase;
@@ -58,32 +55,15 @@ namespace xportal
       return allowCors(req, {XPortal::service, XAdmin::service});
    }
 
-   inline HttpReply jsonBody(std::vector<HttpHeader> headers, const auto& value)
-   {
-      HttpReply           reply{.contentType = "application/json", .headers = std::move(headers)};
-      psio::vector_stream stream{reply.body};
-      to_json(value, stream);
-      return reply;
-   }
-
    inline HttpReply jsonBody(const HttpRequest& req, const auto& value)
    {
       return jsonBody(cors(req), value);
-   }
-
-   inline HttpReply textError(std::vector<HttpHeader> headers, HttpStatus status, std::string_view message)
-   {
-      return HttpReply{.status      = status,
-                       .contentType = "text/html",
-                       .body        = std::vector<char>(message.begin(), message.end()),
-                       .headers     = std::move(headers)};
    }
 
    inline HttpReply textError(const HttpRequest& req, HttpStatus status, std::string_view message)
    {
       return textError(cors(req), status, message);
    }
-
 
    PortalConfig readConfig();
    std::optional<AgentKey> readCreatorAgentKey();
@@ -107,17 +87,11 @@ namespace xportal
    SocketEndpoint nodeEndpoint();
    void pushAgentTx(std::vector<Action> actions, Checksum256 signup);
    std::optional<std::string> pushError(const HttpReply& reply);
-   TimePointUSec wallNow();
-   inline MonotonicTimePointUSec monotonicNow()
-   {
-      return std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now());
-   }
    void applySignupResult(const Checksum256& id, const std::string* error);
    void finishPush(std::int32_t socket, std::optional<std::string> error);
    bool xConfigured(const XConfig& x);
    const StripeKeys& activeStripe(const PortalConfig& config);
    bool stripeConfigured(const StripeKeys& keys);
-   void maskSecret(std::optional<std::string>& secret);
    XConfig maskedX(XConfig x);
    StripeConfig maskedStripe(StripeConfig stripe);
    std::string xCallbackUrl(const HttpRequest& req, bool tls);
@@ -126,11 +100,6 @@ namespace xportal
    Status portalStatus(const PortalConfig& config);
    HttpReply serveStatus(const HttpRequest& req);
    HttpReply serveTiers(const HttpRequest& req);
-   const psio::json::any* objectField(const psio::json::any_object& object, std::string_view key);
-   std::optional<std::string> readStringField(const psio::json::any_object& object,
-                                              std::string_view              path,
-                                              std::string_view              key,
-                                              std::optional<std::string>&   out);
    std::optional<std::string> readApiBase(const psio::json::any_object& object,
                                           std::string_view              path,
                                           std::string&                  apiBase);
@@ -139,9 +108,6 @@ namespace xportal
                                                std::string_view       path,
                                                StripeKeys&            keys);
    std::optional<std::string> updateStripe(const psio::json::any& value, StripeConfig& stripe);
-   std::optional<std::string> readPositive(const psio::json::any& value,
-                                           std::string_view       name,
-                                           uint64_t&              out);
    std::optional<std::string> updateFreeTier(const psio::json::any& value, TierConfig& tier);
    std::optional<std::string> updateTiers(const psio::json::any& value,
                                           std::vector<PaidTier>& tiers);
@@ -158,8 +124,6 @@ namespace xportal
    std::string signupId(const Checksum256& id);
    std::optional<XSession> currentSession(const HttpRequest& req);
    std::optional<XSession> requireSession(const HttpRequest& req, HttpReply& denied);
-   std::string formEncode(
-       std::initializer_list<std::pair<std::string_view, std::string_view>> fields);
    std::int32_t sendToApi(std::string_view apiBase, HttpRequest request);
    HttpRequest checkoutSessionRequest(const StripeKeys& keys,
                                       const PaidTier&   tier,
@@ -179,8 +143,6 @@ namespace xportal
                               std::string_view            idText);
    HttpReply serveAdminSignups(const HttpRequest& req, std::optional<std::int32_t> socket);
    std::string randomToken();
-   std::string codeChallenge(std::string_view verifier);
-   HttpReply redirect(std::string location, std::vector<HttpHeader> headers = {});
    HttpHeader sessionCookieHeader(std::string_view value, std::chrono::seconds maxAge, bool secure);
    HttpReply serveXStart(const HttpRequest& req, std::optional<std::int32_t> socket);
    HttpRequest xTokenRequest(const XConfig& x, std::string_view code, const XAuthRequest& started);
@@ -190,13 +152,11 @@ namespace xportal
                      MethodNumber    callback,
                      PendingXRequest pending);
    void replyToBrowser(std::int32_t client, const HttpReply& reply);
-   HttpReply badGateway(std::string_view message);
    std::optional<HttpReply> serveXCallback(const HttpRequest&          req,
                                            std::optional<std::int32_t> socket);
    HttpReply serveMe(const HttpRequest& req);
    HttpReply serveLogout(const HttpRequest& req, std::optional<std::int32_t> socket);
    void failCheckout(const PendingStripeRequest& pending, const std::string& error);
-   bool sameBytes(std::span<const char> a, const Checksum256& b);
    bool verifyStripeSignature(const HttpRequest& req, std::string_view secret);
    HttpReply serveStripeWebhook(const HttpRequest& req);
    std::vector<Checksum256> dueSignupIds();

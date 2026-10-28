@@ -2,9 +2,7 @@
 
 #include "XPortalDetail.hpp"
 
-#include <algorithm>
 #include <array>
-#include <charconv>
 #include <chrono>
 #include <format>
 #include <limits>
@@ -327,11 +325,6 @@ namespace xportal
       return std::nullopt;
    }
 
-   TimePointUSec wallNow()
-   {
-      return std::chrono::time_point_cast<MicroSeconds>(std::chrono::system_clock::now());
-   }
-
    void finishPush(std::int32_t socket, std::optional<std::string> error)
    {
       std::optional<PendingPush> pending;
@@ -363,12 +356,6 @@ namespace xportal
    bool stripeConfigured(const StripeKeys& keys)
    {
       return keys.secret_key && keys.publishable_key && keys.webhook_secret;
-   }
-
-   void maskSecret(std::optional<std::string>& secret)
-   {
-      if (secret)
-         *secret = secret->substr(secret->size() - std::min<std::size_t>(secret->size(), 4));
    }
 
    XConfig maskedX(XConfig x)
@@ -492,32 +479,6 @@ namespace xportal
       return jsonBody(req, offers);
    }
 
-   const psio::json::any* objectField(const psio::json::any_object& object, std::string_view key)
-   {
-      const psio::json::any* found = nullptr;
-      for (const auto& entry : object)
-         if (entry.key == key)
-            found = &entry.value;
-      return found;
-   }
-
-   // Sets `out` when `key` is present. Returns the 400 message, naming the
-   // field `<path>.<key>`, when its value is not a non-empty string.
-   std::optional<std::string> readStringField(const psio::json::any_object& object,
-                                              std::string_view              path,
-                                              std::string_view              key,
-                                              std::optional<std::string>&   out)
-   {
-      auto value = objectField(object, key);
-      if (!value)
-         return std::nullopt;
-      auto text = value->get_if<std::string>();
-      if (!text || text->empty())
-         return std::format("{}.{} must be a non-empty string\n", path, key);
-      out = *text;
-      return std::nullopt;
-   }
-
    // Sets `apiBase` when `api_base` is present. Returns the 400 message when
    // it is not an http or https origin.
    std::optional<std::string> readApiBase(const psio::json::any_object& object,
@@ -577,27 +538,6 @@ namespace xportal
       if (auto production = objectField(*fields, "production"))
          return updateStripeKeys(*production, "stripe.production", stripe.production);
       return std::nullopt;
-   }
-
-   // Returns the 400 message, naming the field `name`, when `value` is not a
-   // positive integer.
-   std::optional<std::string> readPositive(const psio::json::any& value,
-                                           std::string_view       name,
-                                           uint64_t&              out)
-   {
-      // JSON numbers arrive as their source text, the same as strings.
-      uint64_t parsed = 0;
-      if (auto text = value.get_if<std::string>())
-      {
-         auto end    = text->data() + text->size();
-         auto result = std::from_chars(text->data(), end, parsed);
-         if (result.ec == std::errc{} && result.ptr == end && parsed != 0)
-         {
-            out = parsed;
-            return std::nullopt;
-         }
-      }
-      return std::format("{} must be a positive integer\n", name);
    }
 
    std::optional<std::string> updateFreeTier(const psio::json::any& value, TierConfig& tier)
@@ -770,41 +710,6 @@ namespace xportal
          return session;
       denied = textError(req, HttpStatus::unauthorized, "not signed in\n");
       return std::nullopt;
-   }
-
-   // `key=value&...` with every character outside RFC 3986's unreserved set
-   // percent-encoded. Serves both query strings and form bodies.
-   std::string formEncode(
-       std::initializer_list<std::pair<std::string_view, std::string_view>> fields)
-   {
-      constexpr std::string_view hex = "0123456789ABCDEF";
-      std::string                out;
-      auto                       append = [&](std::string_view text)
-      {
-         for (unsigned char c : text)
-         {
-            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-                c == '-' || c == '.' || c == '_' || c == '~')
-            {
-               out += c;
-            }
-            else
-            {
-               out += '%';
-               out += hex[c >> 4];
-               out += hex[c & 0xf];
-            }
-         }
-      };
-      for (const auto& [key, value] : fields)
-      {
-         if (!out.empty())
-            out += '&';
-         append(key);
-         out += '=';
-         append(value);
-      }
-      return out;
    }
 
    // Sends `request` to the host of `apiBase`, over TLS when it is https.
