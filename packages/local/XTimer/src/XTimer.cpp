@@ -55,25 +55,6 @@ bool XTimer::cancel(std::uint64_t id)
    return result;
 }
 
-namespace
-{
-   // A callback schedules its next timer with runAt. Dispatch would
-   // otherwise reject that call while runOne is still on the stack.
-   void invokeTimerCallback(const TimerQueueRow& row)
-   {
-      struct AllowCallback
-      {
-         bool prev = RecursionGuard<XTimer>::running;
-         AllowCallback() { RecursionGuard<XTimer>::running = false; }
-         ~AllowCallback() { RecursionGuard<XTimer>::running = prev; }
-      } allow;
-      call(Action{.sender  = XTimer::service,
-                  .service = row.service,
-                  .method  = row.method,
-                  .rawData = psio::convert_to_frac(std::tuple(row.id))});
-   }
-}  // namespace
-
 void XTimer::runOne()
 {
    check(getSender() == psibase::AccountNumber{}, "runOne should be called by the host");
@@ -107,7 +88,13 @@ void XTimer::runOne()
       }
    }
    if (row)
-      invokeTimerCallback(*row);
+   {
+      auto _ = recurse();
+      call(Action{.sender  = XTimer::service,
+                  .service = row->service,
+                  .method  = row->method,
+                  .rawData = psio::convert_to_frac(std::tuple(row->id))});
+   }
 }
 
 PSIBASE_DISPATCH(XTimer)
