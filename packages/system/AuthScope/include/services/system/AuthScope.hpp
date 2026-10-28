@@ -109,6 +109,12 @@ namespace SystemService
       /// Aborts if `account` has no row or the sender is not the row's `owner`.
       void setAllowed(psibase::AccountNumber     account,
                       std::vector<AllowedAction> allowed);
+
+      /// Replaces `account`'s owning account. The sender must be the row's `owner`.
+      ///
+      /// Aborts if `account` has no row, the sender is not the row's `owner`, `owner` does not
+      /// exist, or ownership would be circular.
+      void setOwner(psibase::AccountNumber account, psibase::AccountNumber owner);
    };
    PSIO_REFLECT(AuthScope,  //
                 method(checkAuthSys, flags, sender, action, claims),
@@ -119,7 +125,8 @@ namespace SystemService
                 method(newAccount, name, key, owner, allowed, mode),
                 method(get, account),
                 method(setKey, account, key),
-                method(setAllowed, account, allowed)
+                method(setAllowed, account, allowed),
+                method(setOwner, account, owner)
                 //
    )
    PSIBASE_REFLECT_TABLES(AuthScope, AuthScope::Tables)

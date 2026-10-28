@@ -132,6 +132,15 @@ mod service {
     fn setAllowed(account: AccountNumber, allowed: Vec<AllowedAction>) {
         unimplemented!()
     }
+
+    /// Replaces `account`'s owning account. The sender must be the row's `owner`.
+    ///
+    /// Aborts if `account` has no row, the sender is not the row's `owner`, `owner` does not
+    /// exist, or ownership would be circular.
+    #[action]
+    fn setOwner(account: AccountNumber, owner: AccountNumber) {
+        unimplemented!()
+    }
 }
 
 #[test]

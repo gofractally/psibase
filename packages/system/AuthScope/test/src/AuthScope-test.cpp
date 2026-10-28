@@ -190,6 +190,27 @@ TEST_CASE("auth-scope setKey and setAllowed")
    REQUIRE(row.has_value());
    CHECK(row->allowed == updated);
    CHECK(owner.to<AuthScope>().checkAuthSys(0, agent, nop, std::vector{otherClaim}).returnVal() == false);
+
+   SECTION("setOwner")
+   {
+      CHECK(owner.to<AuthScope>()
+                .setOwner(agent, "missing1"_a)
+                .failed("owner account does not exist"));
+      CHECK(owner.to<AuthScope>().setOwner(agent, agent).failed("circular ownership"));
+
+      REQUIRE(owner.to<AuthScope>()
+                  .newAccount("subagent"_a, otherPub, agent, allowed, NewAccountMode::requireNew)
+                  .succeeded());
+      CHECK(owner.to<AuthScope>().setOwner(agent, "subagent"_a).failed("circular ownership"));
+
+      REQUIRE(owner.to<AuthScope>().setOwner(agent, other).succeeded());
+      row = owner.to<AuthScope>().get(agent).returnVal();
+      REQUIRE(row.has_value());
+      CHECK(row->owner == other);
+
+      CHECK(other.to<AuthScope>().setKey(agent, otherPub).succeeded());
+      CHECK(owner.to<AuthScope>().setKey(agent, agentPub).failed("sender is not the owner"));
+   }
 }
 
 TEST_CASE("auth-scope newAccount keepExisting requires the owner")

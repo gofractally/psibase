@@ -47,6 +47,24 @@ namespace SystemService
          to<Accounts>().incAuthSeq(row.account);
       }
 
+      void requireValidOwner(AccountNumber account, AccountNumber owner, AuthScopeTable& table)
+      {
+         check(to<Accounts>().exists(owner), "owner account does not exist");
+         if (account == owner)
+            abortMessage("circular ownership");
+         if (auto ownerRow = table.getIndex<0>().get(owner); ownerRow && ownerRow->owner == account)
+            abortMessage("circular ownership");
+      }
+
+      template <typename Fn>
+      void mutateOwnedRow(AuthScopeTable& table, AccountNumber account, Fn&& mutate)
+      {
+         auto  stored = table.getIndex<0>().get(account);
+         auto& row    = requireOwnedBySender(stored);
+         mutate(table, row);
+         replaceAuthRules(table, row);
+      }
+
    }  // namespace
 
    bool AuthScope::checkAuthSys(uint32_t                    flags,
@@ -102,12 +120,8 @@ namespace SystemService
                               std::vector<AllowedAction>    allowed,
                               NewAccountMode                mode)
    {
-      check(to<Accounts>().exists(owner), "owner account does not exist");
-
-      auto table    = open<AuthScopeTable>();
-      auto ownerRow = table.getIndex<0>().get(owner);
-      if (name == owner || ownerRow && ownerRow->owner == name)
-         abortMessage("circular ownership");
+      auto table = open<AuthScopeTable>();
+      requireValidOwner(name, owner, table);
 
       auto row = AuthScopeRow{
           .account = name,
@@ -139,20 +153,25 @@ namespace SystemService
 
    void AuthScope::setKey(AccountNumber account, AuthSig::SubjectPublicKeyInfo key)
    {
-      auto  table  = open<AuthScopeTable>();
-      auto  stored = table.getIndex<0>().get(account);
-      auto& row    = requireOwnedBySender(stored);
-      row.pubkey   = std::move(key);
-      replaceAuthRules(table, row);
+      auto table = open<AuthScopeTable>();
+      mutateOwnedRow(table, account, [&](AuthScopeTable&, AuthScopeRow& row) { row.pubkey = std::move(key); });
    }
 
    void AuthScope::setAllowed(AccountNumber account, std::vector<AllowedAction> allowed)
    {
-      auto  table  = open<AuthScopeTable>();
-      auto  stored = table.getIndex<0>().get(account);
-      auto& row    = requireOwnedBySender(stored);
-      row.allowed  = std::move(allowed);
-      replaceAuthRules(table, row);
+      auto table = open<AuthScopeTable>();
+      mutateOwnedRow(table, account,
+                     [&](AuthScopeTable&, AuthScopeRow& row) { row.allowed = std::move(allowed); });
+   }
+
+   void AuthScope::setOwner(AccountNumber account, AccountNumber owner)
+   {
+      auto table = open<AuthScopeTable>();
+      mutateOwnedRow(table, account, [&](AuthScopeTable& t, AuthScopeRow& row)
+                     {
+                        requireValidOwner(account, owner, t);
+                        row.owner = owner;
+                     });
    }
 }  // namespace SystemService
 
