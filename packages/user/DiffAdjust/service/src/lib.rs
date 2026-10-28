@@ -187,6 +187,7 @@ pub mod tables {
                     );
                 }
             }
+            self.active_difficulty = self.active_difficulty.max(self.floor_difficulty);
             self.active_difficulty
         }
 
