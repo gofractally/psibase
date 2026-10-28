@@ -1,0 +1,252 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+
+import {
+    formatDuration,
+    formatNumber,
+    formatSeconds,
+    formatTime,
+    parseChainTime,
+} from "@/lib/format";
+import {
+    fetchBlockHeader,
+    fetchChainId,
+    fetchInstalledPackages,
+    fetchNetworkName,
+    fetchProducersInfo,
+    fetchSnapshotInfo,
+} from "@/lib/queries";
+import { GENESIS_BLOCK } from "@/lib/types";
+import { useLiveChain, useNow } from "@/store/use-live-chain";
+
+import { AccountLink } from "@/components/account-link";
+import { DocLabel } from "@/components/doc-link";
+import { Hash } from "@/components/hash";
+import { StatusDot } from "@/components/live-indicator";
+import { KeyValue, PageHeader, Panel } from "@/components/page-header";
+import { StatCard } from "@/components/stat-card";
+import { TimeAgo } from "@/components/time-ago";
+import { DOC_PATHS, consensusDocPath } from "@/lib/docs";
+
+import { Badge } from "@shared/shadcn/ui/badge";
+
+export const NetworkPage = () => {
+    const { head, stats, status, lastPollAt, error } = useLiveChain();
+    const now = useNow();
+
+    const networkName = useQuery({ queryKey: ["branding", "name"], queryFn: fetchNetworkName, staleTime: Infinity });
+    const chainId = useQuery({ queryKey: ["chain", "id"], queryFn: fetchChainId, staleTime: Infinity });
+    const producers = useQuery({ queryKey: ["producers", "info"], queryFn: fetchProducersInfo, refetchInterval: 15_000 });
+    const snapshot = useQuery({ queryKey: ["transact", "snapshot"], queryFn: fetchSnapshotInfo, staleTime: 60_000 });
+    const packages = useQuery({ queryKey: ["packages", "installed"], queryFn: fetchInstalledPackages, staleTime: 5 * 60_000 });
+    const genesis = useQuery({
+        queryKey: ["block", GENESIS_BLOCK, "header"],
+        queryFn: () => fetchBlockHeader(GENESIS_BLOCK),
+        staleTime: Infinity,
+    });
+
+    const genesisTime = genesis.data ? parseChainTime(genesis.data.time).getTime() : null;
+    const chainAge = genesisTime ? (now - genesisTime) / 1000 : null;
+    const totalBlocks = head ? head.blockNum - GENESIS_BLOCK + 1 : null;
+    const blocksPerDay = stats.avgInterval > 0 ? Math.round(86400 / stats.avgInterval) : null;
+
+    // Block interval histogram
+    const buckets = new Map<string, number>();
+    for (const p of stats.series) {
+        if (p.interval === null) continue;
+        const key =
+            p.interval < 0.75 ? "<0.75" :
+            p.interval < 1.25 ? "1s" :
+            p.interval < 1.75 ? "1.5s" :
+            p.interval < 2.5 ? "2s" :
+            p.interval < 5 ? "2–5s" : ">5s";
+        buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    }
+    const order = ["<0.75", "1s", "1.5s", "2s", "2–5s", ">5s"];
+    const histogram = order.filter((k) => buckets.has(k)).map((k) => ({ bucket: k, count: buckets.get(k)! }));
+
+    return (
+        <div className="flex flex-col gap-4">
+            <PageHeader
+                title={networkName.data ? `Network: ${networkName.data}` : "Network"}
+                description="Network identity, consensus configuration, and health"
+            />
+
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <StatCard
+                    label="Network age"
+                    accent="var(--chart-2)"
+                    value={chainAge !== null ? formatDuration(chainAge) : "—"}
+                    sub={genesis.data ? `since ${formatTime(genesis.data.time)}` : "loading…"}
+                />
+                <StatCard
+                    label="Blocks"
+                    accent="var(--chart-3)"
+                    value={totalBlocks !== null ? formatNumber(totalBlocks) : "—"}
+                    sub={blocksPerDay ? `≈ ${formatNumber(blocksPerDay)} per day at current pace` : ""}
+                />
+                <StatCard
+                    label="Block interval"
+                    accent="var(--chart-1)"
+                    value={formatSeconds(stats.avgInterval)}
+                    sub={`p50 ${formatSeconds(stats.medianInterval)} · max ${formatSeconds(stats.maxInterval, 1)}`}
+                />
+                <StatCard
+                    label="Explorer feed"
+                    accent={status === "live" ? "var(--chart-2)" : "var(--destructive)"}
+                    value={
+                        <span className="flex items-center gap-2 capitalize">
+                            <StatusDot /> {status}
+                        </span>
+                    }
+                    sub={lastPollAt ? <>polled <TimeAgo time={lastPollAt} tooltip={false} /></> : "…"}
+                />
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+                <Panel title="Identity">
+                    <KeyValue label="Network name">{networkName.data || <span className="text-muted-foreground">unset</span>}</KeyValue>
+                    <KeyValue label="Network ID">
+                        {chainId.data ? <Hash value={chainId.data} full /> : <span className="text-muted-foreground text-xs">unavailable</span>}
+                    </KeyValue>
+                    <KeyValue label="Head block">
+                        {head ? (
+                            <span className="flex items-center gap-2 font-mono text-xs">
+                                <span className="flex min-w-0 flex-wrap items-center gap-2">
+                                    #{formatNumber(head.blockNum)}
+                                    <span className="text-muted-foreground">by</span>
+                                    <AccountLink name={head.producer} />
+                                </span>
+                                <span className="text-muted-foreground ml-auto shrink-0">
+                                    <TimeAgo time={head.time} />
+                                </span>
+                            </span>
+                        ) : "—"}
+                    </KeyValue>
+                    <KeyValue label="Genesis block">
+                        {genesis.data ? (
+                            <span className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                                <Link to={`/blocks/${GENESIS_BLOCK}`} className="text-primary hover:underline">
+                                    #{GENESIS_BLOCK}
+                                </Link>
+                                <span>{formatTime(genesis.data.time)}</span>
+                            </span>
+                        ) : "—"}
+                    </KeyValue>
+                    <KeyValue label="Last snapshot">
+                        {snapshot.data ? (
+                            <span className="text-xs">
+                                {formatTime(snapshot.data.lastSnapshot)}
+                                <span className="text-muted-foreground">
+                                    {" "}· interval {snapshot.data.snapshotInterval ? formatDuration(snapshot.data.snapshotInterval) : "disabled"}
+                                </span>
+                            </span>
+                        ) : <span className="text-muted-foreground text-xs">unavailable</span>}
+                    </KeyValue>
+                    <KeyValue label="Installed packages">
+                        {packages.data ? formatNumber(packages.data.length) : "—"}
+                    </KeyValue>
+                </Panel>
+
+                <Panel
+                    title={
+                        <DocLabel path={DOC_PATHS.peerConsensus} topic="peer consensus">
+                            Consensus
+                        </DocLabel>
+                    }
+                >
+                    <KeyValue
+                        label={
+                            <DocLabel
+                                path={consensusDocPath(producers.data?.mode)}
+                                topic={producers.data?.mode ?? "consensus modes"}
+                            >
+                                Mode
+                            </DocLabel>
+                        }
+                    >
+                        {producers.data ? (
+                            <span className="flex items-center gap-2">
+                                <Badge variant="outline" className="font-mono">{producers.data.mode}</Badge>
+                                <span className="text-muted-foreground text-xs">
+                                    {producers.data.mode === "BFT" ? "Byzantine fault tolerant" : producers.data.mode === "CFT" ? "Crash fault tolerant" : ""}
+                                </span>
+                            </span>
+                        ) : "—"}
+                    </KeyValue>
+                    <KeyValue label="Providers">
+                        <div className="flex flex-wrap gap-2">
+                            {producers.data?.producers.map((p) => <AccountLink key={p.name} name={p.name} />)}
+                        </div>
+                    </KeyValue>
+                    {producers.data?.nextConsensus && (
+                        <KeyValue
+                            label={
+                                <DocLabel path={DOC_PATHS.jointConsensus} topic="joint consensus">
+                                    Pending change
+                                </DocLabel>
+                            }
+                        >
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant="outline" className="font-mono">{producers.data.nextMode}</Badge>
+                                {producers.data.nextProducers.map((p) => <AccountLink key={p.name} name={p.name} />)}
+                                {producers.data.jointStart && (
+                                    <span className="text-muted-foreground text-xs">from #{formatNumber(producers.data.jointStart)}</span>
+                                )}
+                            </div>
+                        </KeyValue>
+                    )}
+                    <KeyValue
+                        label={
+                            <DocLabel path={DOC_PATHS.peerConsensus} topic="consensus terms">
+                                Term
+                            </DocLabel>
+                        }
+                    >
+                        {head?.term ?? "—"}
+                    </KeyValue>
+                    <KeyValue
+                        label={
+                            <DocLabel path={DOC_PATHS.peerConsensus} topic="block finality">
+                                Commit
+                            </DocLabel>
+                        }
+                    >
+                        {head ? (
+                            <span className="font-mono text-xs">
+                                #{formatNumber(head.commitNum)}{" "}
+                                <span className={stats.commitLag === 0 ? "text-emerald-500" : "text-amber-500"}>
+                                    ({stats.commitLag === 0 ? "caught up" : `${stats.commitLag} behind head`})
+                                </span>
+                            </span>
+                        ) : "—"}
+                    </KeyValue>
+                    {error && (
+                        <KeyValue label="Feed error">
+                            <span className="text-destructive text-xs">{error}</span>
+                        </KeyValue>
+                    )}
+                </Panel>
+            </div>
+
+            <Panel title="Block interval distribution" description={`Last ${formatNumber(stats.windowBlocks)} blocks`} bodyClassName="p-3">
+                <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={histogram} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
+                            <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                            <Tooltip
+                                cursor={{ fill: "var(--muted)", opacity: 0.35 }}
+                                contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+                                itemStyle={{ color: "var(--foreground)" }}
+                            />
+                            <Bar dataKey="count" name="Blocks" fill="var(--chart-2)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </Panel>
+        </div>
+    );
+};

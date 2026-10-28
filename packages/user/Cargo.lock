@@ -2802,6 +2802,7 @@ version = "0.29.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
+ "indexmap",
  "proc-macro-error",
  "proc-macro2",
  "psibase-rust-workspace-hack",
