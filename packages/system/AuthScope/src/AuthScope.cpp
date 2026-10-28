@@ -18,10 +18,23 @@ namespace SystemService
          return std::ranges::contains(row.allowed, AllowedAction{action.service, action.method});
       }
 
-      const AuthScopeRow& requireSenderRow(const std::optional<AuthScopeRow>& row)
+      template <typename RowOpt>
+      auto& requireConfigured(RowOpt& row, const char* missingMessage)
       {
-         check(row.has_value(), "sender does not have a public key");
+         check(row.has_value(), missingMessage);
          return *row;
+      }
+
+      template <typename RowOpt>
+      auto& requireSenderRow(RowOpt& row)
+      {
+         return requireConfigured(row, "sender is not configured in AuthScope");
+      }
+
+      template <typename RowOpt>
+      auto& requireAccountRow(RowOpt& row)
+      {
+         return requireConfigured(row, "account is not configured in AuthScope");
       }
 
       bool senderAuthorizedViaList(const AuthScopeRow&                row,
@@ -36,9 +49,9 @@ namespace SystemService
 
       AuthScopeRow& requireOwnedBySender(std::optional<AuthScopeRow>& row)
       {
-         check(row.has_value(), "account does not have a public key");
-         check(getSender() == row->owner, "sender is not the owner");
-         return *row;
+         auto& configured = requireAccountRow(row);
+         check(getSender() == configured.owner, "sender is not the owner");
+         return configured;
       }
 
       void replaceAuthRules(AuthScopeTable& table, const AuthScopeRow& row)
@@ -87,8 +100,8 @@ namespace SystemService
 
    void AuthScope::canAuthUserSys(AccountNumber user)
    {
-      const auto senderRow = get(user);
-      requireSenderRow(senderRow);
+      const auto userRow = get(user);
+      requireAccountRow(userRow);
    }
 
    std::vector<AccountNumber> AuthScope::getDlgsSys(AccountNumber sender,

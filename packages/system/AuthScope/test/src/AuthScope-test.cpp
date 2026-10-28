@@ -103,17 +103,17 @@ TEST_CASE("auth-scope newAccount and whitelist")
    CHECK(owner.to<AuthScope>().checkAuthSys(0, agent, nop, bothClaims).returnVal());
    CHECK(owner.to<AuthScope>()
              .checkAuthSys(0, "noonehas"_a, nop, agentClaims)
-             .failed("sender does not have a public key"));
+             .failed("sender is not configured in AuthScope"));
 
    REQUIRE(owner.to<AuthScope>().canAuthUserSys(agent).succeeded());
    CHECK(owner.to<AuthScope>()
              .canAuthUserSys("noonehas"_a)
-             .failed("sender does not have a public key"));
+             .failed("account is not configured in AuthScope"));
    auto owners = std::vector<AccountNumber>{owner};
    CHECK(owner.to<AuthScope>().getDlgsSys(agent, std::nullopt).returnVal() == owners);
    CHECK(owner.to<AuthScope>()
              .getDlgsSys("noonehas"_a, nop)
-             .failed("sender does not have a public key"));
+             .failed("sender is not configured in AuthScope"));
    CHECK(owner.to<AuthScope>().isAuthSys(agent, owners, nop).returnVal());
    CHECK(owner.to<AuthScope>().isRejectSys(agent, owners, std::nullopt).returnVal());
 
@@ -172,7 +172,7 @@ TEST_CASE("auth-scope setKey and setAllowed")
              .failed("sender is not the owner"));
    CHECK(owner.to<AuthScope>()
              .setKey("noonehas"_a, otherPub)
-             .failed("account does not have a public key"));
+             .failed("account is not configured in AuthScope"));
 
    REQUIRE(owner.to<AuthScope>().setKey(agent, otherPub).succeeded());
    auto row = owner.to<AuthScope>().get(agent).returnVal();
