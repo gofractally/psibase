@@ -1,5 +1,5 @@
 function(add suffix)
-    add_local_service("${suffix}" XPortal src/XPortal.cpp)
+    add_local_service("${suffix}" XPortal src/XPortal.cpp src/XPortalSignup.cpp)
     target_link_libraries(XPortal${suffix} PUBLIC Spki${suffix})
 endfunction(add)
 

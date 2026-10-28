@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 import { uint8ArrayToHex } from "@psibase/common-lib";
+import {
+    toSystemTokenInfo,
+    type SystemTokenInfo,
+} from "@shared/hooks/use-system-token";
+import { supervisor } from "@shared/lib/supervisor";
 
 import type { InviteDetails } from "./signup-request";
 
@@ -21,8 +26,19 @@ const zSignupReceipt = z.union([
 /** A paid tier's receipt carries what Stripe Embedded Checkout needs. */
 export type SignupReceipt = z.infer<typeof zSignupReceipt>;
 
-// The node sends u64 as a JSON string.
-const zTierOffer = z.object({ usd_cents: z.coerce.number() });
+// The node sends u64 as a JSON string. A number is accepted so a small
+// value that arrives unquoted still parses.
+const zU64 = z
+    .union([z.string(), z.number()])
+    .transform((value): string => String(value));
+
+const zQuantity = z.object({ value: zU64 });
+
+const zTierOffer = z.object({
+    usd_cents: z.coerce.number(),
+    tokens: zQuantity,
+    buffer_multiple: z.coerce.number(),
+});
 
 const zTiers = z.object({
     free: zTierOffer.nullish(),
@@ -32,6 +48,46 @@ const zTiers = z.object({
 });
 
 export type Tiers = z.infer<typeof zTiers>;
+
+const zSystemToken = z.object({
+    id: z.coerce.number(),
+    symbol: z.string().nullish(),
+    precision: z.coerce.number().int().nonnegative(),
+});
+
+/**
+ * The chain's system token, used to format tier grants.
+ * `null` when the chain has no system token. A token with no symbol
+ * displays as `ID: {id}`, the same rule as `toSystemTokenInfo`.
+ */
+export const getSystemToken = async (): Promise<SystemTokenInfo | null> => {
+    const raw: unknown = await supervisor.functionCall({
+        service: "tokens",
+        intf: "helpers",
+        method: "getSystemToken",
+        params: [],
+    });
+    if (raw == null) return null;
+    const token = zSystemToken.parse(raw);
+    return toSystemTokenInfo({
+        id: token.id,
+        precision: token.precision,
+        symbol: token.symbol ?? undefined,
+    });
+};
+
+/** `raw` is the grant in the token's smallest units. */
+export const formatTokenAmount = (raw: string, token: SystemTokenInfo) => {
+    const digits =
+        token.precision === 0 ? raw : raw.padStart(token.precision + 1, "0");
+    const cut = digits.length - token.precision;
+    const whole = digits.slice(0, cut).replace(/^0+(?=\d)/, "");
+    const frac =
+        token.precision === 0 ? "" : digits.slice(cut).replace(/0+$/, "");
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const amount = frac ? `${grouped}.${frac}` : grouped;
+    return `${amount} ${token.symbol}`;
+};
 
 const zSignupView = z.discriminatedUnion("state", [
     z.object({ state: z.literal("pending") }),
@@ -52,7 +108,7 @@ export class PortalError extends Error {
 
 export const parseReply = async <T>(
     reply: Promise<Response>,
-    schema: z.ZodType<T>,
+    schema: z.ZodType<T, z.ZodTypeDef, unknown>,
 ): Promise<T> => {
     const res = await reply;
     if (!res.ok) {

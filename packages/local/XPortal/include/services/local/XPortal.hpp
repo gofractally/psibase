@@ -137,8 +137,8 @@ namespace LocalService
    /// `signup` is set when the push provisions a signup record.
    struct PendingPush
    {
-      std::int32_t           socket;
-      psibase::Checksum256   signup;
+      std::int32_t         socket;
+      psibase::Checksum256 signup;
       PSIO_REFLECT(PendingPush, socket, signup)
    };
    using PendingPushTable = psibase::Table<PendingPush, &PendingPush::socket>;
@@ -240,7 +240,7 @@ namespace LocalService
       /// Canonical whitelist applied when `ac-creator` is created. Not the on-chain row.
       std::vector<SystemService::AllowedAction> creator_allowed;
       /// `client_secret` shows only its last four characters.
-      XConfig     x;
+      XConfig x;
       /// OAuth redirect URI for this request; not stored.
       std::string x_callback_url;
       std::string mode;
@@ -273,9 +273,9 @@ namespace LocalService
    /// When billing is disabled, `creator_ready`, `x_configured`, and
    /// `stripe_configured` (the active mode's keys are set) are present.
    /// When billing is enabled, `creator_tokens` and `creator_resources` are added.
-   /// `creator_tokens` holds when the creator account's balance covers the
-   /// invite cost of the free-tier grant, or of the offered paid tier's grant
-   /// when that grant is larger.
+   /// `creator_tokens` holds when the creator account's balance covers
+   /// `invite::getInvCost(1, tokens)` for the largest `tokens` among the
+   /// enabled free tier and the paid tiers.
    /// `ready` requires every condition except `x_configured`, and requires
    /// `stripe_configured` only while paid tiers are offered.
    struct Status
@@ -288,8 +288,8 @@ namespace LocalService
    };
 
    /// `POST /signup` body. A missing `invite_id`, `payload`, or `token` is a
-   /// 400, not a default. Omitting `tier` requests the free tier; `0` requests
-   /// the first paid tier, and any other value is a 400.
+   /// 400, not a default. Omitting `tier` requests the free tier. A paid
+   /// tier's index selects that tier; any other index is a 400.
    struct SignupBody
    {
       std::optional<uint32_t>             invite_id;
@@ -316,12 +316,14 @@ namespace LocalService
       PSIO_REFLECT(CheckoutReceipt, signup_id, client_secret, publishable_key)
    };
 
-   /// What a signup for this tier is charged and granted.
+   /// What a signup for this tier is charged and granted. `buffer_multiple`
+   /// counts whole standard buffers in `tokens`.
    struct TierOffer
    {
       uint64_t              usd_cents = 0;
       UserService::Quantity tokens;
-      PSIO_REFLECT(TierOffer, usd_cents, tokens)
+      uint64_t              buffer_multiple = 0;
+      PSIO_REFLECT(TierOffer, usd_cents, tokens, buffer_multiple)
    };
 
    struct PaidTierOffer
@@ -330,11 +332,12 @@ namespace LocalService
       std::string           label;
       uint64_t              usd_cents = 0;
       UserService::Quantity tokens;
-      PSIO_REFLECT(PaidTierOffer, index, label, usd_cents, tokens)
+      uint64_t              buffer_multiple = 0;
+      PSIO_REFLECT(PaidTierOffer, index, label, usd_cents, tokens, buffer_multiple)
    };
 
    /// `GET /tiers`. `free` is unset when the free tier is disabled. `tiers`
-   /// holds the first paid tier while billing is enabled, and is otherwise empty.
+   /// lists each paid tier while billing is enabled, and is otherwise empty.
    struct TierOffers
    {
       std::optional<TierOffer>   free;
@@ -463,9 +466,10 @@ namespace LocalService
                                                    XAuthRequestTable,
                                                    XUserTable,
                                                    XSessionTable>;
-      using Session    = psibase::
-          SessionTables<PendingPushTable, PendingXRequestTable, PendingStripeRequestTable,
-                        ProvisionAttemptTable>;
+      using Session    = psibase::SessionTables<PendingPushTable,
+                                                PendingXRequestTable,
+                                                PendingStripeRequestTable,
+                                                ProvisionAttemptTable>;
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest                  request,
                                                  std::optional<std::int32_t>           socket,
