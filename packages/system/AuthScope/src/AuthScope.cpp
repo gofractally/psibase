@@ -20,6 +20,22 @@ namespace SystemService
          return std::ranges::contains(row.allowed, AllowedAction{action.service, action.method});
       }
 
+      const AuthScopeRow& requireSenderRow(const std::optional<AuthScopeRow>& row)
+      {
+         check(row.has_value(), "sender does not have a public key");
+         return *row;
+      }
+
+      bool senderAuthorizedViaList(const AuthScopeRow&                row,
+                                   AccountNumber                      sender,
+                                   const std::vector<AccountNumber>& accounts,
+                                   const std::optional<ServiceMethod>& method)
+      {
+         if (std::ranges::contains(accounts, row.owner))
+            return true;
+         return method && std::ranges::contains(accounts, sender) && actionAllowed(row, *method);
+      }
+
    }  // namespace
 
    bool AuthScope::checkAuthSys(uint32_t                    flags,
@@ -27,51 +43,48 @@ namespace SystemService
                                 ServiceMethod               action,
                                 std::vector<psibase::Claim> claims)
    {
-      auto row = get(sender);
-      check(row.has_value(), "sender does not have a public key");
+      const auto            senderRow = get(sender);
+      const AuthScopeRow&   row       = requireSenderRow(senderRow);
 
       auto hasMatchingClaim = std::ranges::any_of(
           claims,
           [&](const Claim& claim)
           {
              return claim.service == VerifySig::service &&
-                    compare_blob(claim.rawData, row->pubkey.data) == 0;
+                    compare_blob(claim.rawData, row.pubkey.data) == 0;
           });
-      if (!hasMatchingClaim || !actionAllowed(*row, action))
+      if (!hasMatchingClaim || !actionAllowed(row, action))
          return false;
       return true;
    }
 
    void AuthScope::canAuthUserSys(AccountNumber user)
    {
-      checkOwner(user);
-   }
-
-   AccountNumber AuthScope::checkOwner(AccountNumber sender)
-   {
-      auto row = get(sender);
-      check(row.has_value(), "sender does not have a public key");
-      return row->owner;
+      const auto senderRow = get(user);
+      requireSenderRow(senderRow);
    }
 
    std::vector<AccountNumber> AuthScope::getDlgsSys(AccountNumber sender,
                                                      std::optional<ServiceMethod>)
    {
-      return {checkOwner(sender)};
+      const auto senderRow = get(sender);
+      return {requireSenderRow(senderRow).owner};
    }
 
-   bool AuthScope::isAuthSys(AccountNumber              sender,
-                             std::vector<AccountNumber> authorizers,
-                             std::optional<ServiceMethod>)
+   bool AuthScope::isAuthSys(AccountNumber                sender,
+                             std::vector<AccountNumber>   authorizers,
+                             std::optional<ServiceMethod> method)
    {
-      return std::ranges::contains(authorizers, checkOwner(sender));
+      const auto senderRow = get(sender);
+      return senderAuthorizedViaList(requireSenderRow(senderRow), sender, authorizers, method);
    }
 
-   bool AuthScope::isRejectSys(AccountNumber              sender,
-                               std::vector<AccountNumber> rejecters,
-                               std::optional<ServiceMethod>)
+   bool AuthScope::isRejectSys(AccountNumber                sender,
+                               std::vector<AccountNumber>   rejecters,
+                               std::optional<ServiceMethod> method)
    {
-      return std::ranges::contains(rejecters, checkOwner(sender));
+      const auto senderRow = get(sender);
+      return senderAuthorizedViaList(requireSenderRow(senderRow), sender, rejecters, method);
    }
 
    void AuthScope::newAccount(AccountNumber                 name,

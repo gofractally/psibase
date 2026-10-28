@@ -61,14 +61,16 @@ namespace SystemService
       std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
                                                      std::optional<ServiceMethod> method);
 
-      /// Returns whether the sender's `owner` is among `authorizers`.
+      /// Returns whether the sender's `owner` is among `authorizers`, or the sender is among
+      /// `authorizers` and `method` is whitelisted for the sender.
       ///
       /// Aborts when `sender` has no row.
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers,
                      std::optional<ServiceMethod>        method);
 
-      /// Returns whether the sender's `owner` is among `rejecters`.
+      /// Returns whether the sender's `owner` is among `rejecters`, or the sender is among
+      /// `rejecters` and `method` is whitelisted for the sender.
       ///
       /// Aborts when `sender` has no row.
       bool isRejectSys(psibase::AccountNumber              sender,
@@ -97,9 +99,6 @@ namespace SystemService
       /// Aborts if `account` has no row or the sender is not the row's `owner`.
       void setAllowed(psibase::AccountNumber     account,
                       std::vector<AllowedAction> allowed);
-
-     private:
-      psibase::AccountNumber checkOwner(psibase::AccountNumber sender);
    };
    PSIO_REFLECT(AuthScope,  //
                 method(checkAuthSys, flags, sender, action, claims),

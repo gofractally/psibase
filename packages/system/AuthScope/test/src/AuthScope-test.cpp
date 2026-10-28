@@ -115,6 +115,9 @@ TEST_CASE("auth-scope newAccount and whitelist")
    CHECK(owner.to<AuthScope>().isAuthSys(agent, owners, nop).returnVal());
    CHECK(owner.to<AuthScope>().isRejectSys(agent, owners, std::nullopt).returnVal());
 
+   auto agents = std::vector<AccountNumber>{agent};
+   CHECK(owner.to<AuthScope>().isAuthSys(agent, agents, nop).returnVal());
+
    auto nopAct = Action{.sender = agent, .service = UserService::Nop::service, .method = "nop"_m};
    CHECK(TraceResult(t.pushTransaction(t.makeTransaction({nopAct}), {{agentPub, agentPriv}}))
              .succeeded());

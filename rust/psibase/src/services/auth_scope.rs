@@ -64,7 +64,8 @@ mod service {
     /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
     /// transaction from a specified sender.
     ///
-    /// Returns `true` if the sender's `owner` is among the authorizers. Aborts when `sender` has no row.
+    /// Returns `true` if the sender's `owner` is among the authorizers, or the sender is among
+    /// the authorizers and `method` is whitelisted for the sender. Aborts when `sender` has no row.
     #[action]
     fn isAuthSys(
         sender: AccountNumber,
@@ -77,7 +78,8 @@ mod service {
     /// Check whether a specified set of rejecter accounts are sufficient to reject a transaction
     /// from a specified sender.
     ///
-    /// Returns `true` if the sender's `owner` is among the rejecters. Aborts when `sender` has no row.
+    /// Returns `true` if the sender's `owner` is among the rejecters, or the sender is among
+    /// the rejecters and `method` is whitelisted for the sender. Aborts when `sender` has no row.
     #[action]
     fn isRejectSys(
         sender: AccountNumber,
