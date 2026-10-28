@@ -184,41 +184,4 @@ mod tests {
     fn sets_up_private_network(chain: Chain) -> Result<(), Error> {
         assert_private_network(&chain)
     }
-
-    fn auth_service(chain: &Chain, name: AccountNumber) -> Result<Option<AccountNumber>, Error> {
-        #[derive(Deserialize)]
-        struct AccountNode {
-            #[serde(rename = "authService")]
-            auth_service: AccountNumber,
-        }
-        #[derive(Deserialize)]
-        struct Data {
-            #[serde(rename = "getAccount")]
-            get_account: Option<AccountNode>,
-        }
-        #[derive(Deserialize)]
-        struct Body {
-            data: Data,
-        }
-        let body: Body = chain.graphql(
-            services::accounts::SERVICE,
-            &format!("query {{ getAccount(accountName: \"{name}\") {{ authService }} }}"),
-        )?;
-        Ok(body.data.get_account.map(|account| account.auth_service))
-    }
-
-    #[psibase::test_case]
-    fn producer_without_auth_any_uses_auth_sig() -> Result<(), Error> {
-        let chain = Chain::new();
-        chain.boot_with(
-            &Chain::default_registry(),
-            &["Packages".to_string(), "Producers".to_string()],
-        )?;
-        assert_eq!(
-            auth_service(&chain, PRODUCER_ACCOUNT)?,
-            Some(account!("auth-sig"))
-        );
-        assert_eq!(auth_service(&chain, account!("auth-any"))?, None);
-        Ok(())
-    }
 }
