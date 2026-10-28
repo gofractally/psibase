@@ -1,0 +1,131 @@
+package explorer:plugin;
+
+interface types {
+    /// Selects a range of blocks. Blocks before the first block that the explorer can
+    /// display are never returned.
+    record block-range {
+        gt: option<u32>,
+        ge: option<u32>,
+        lt: option<u32>,
+        le: option<u32>,
+        first: option<u32>,
+        last: option<u32>,
+        before: option<string>,
+        after: option<string>,
+    }
+
+    record block-header {
+        previous: string,
+        block-num: u32,
+        time: string,
+        producer: string,
+        term: u32,
+        commit-num: u32,
+    }
+}
+
+/// Reads the block log served by the explorer service.
+///
+/// Transactions the logged-in user is not a party to are redacted by the service.
+/// Block and transaction results are JSON-encoded because they embed action data
+/// decoded with each service's schema.
+interface block-log {
+    use host:types/types.{error};
+    use types.{block-range, block-header};
+
+    /// Block summaries (without action payloads) as a JSON GraphQL connection.
+    get-blocks: func(range: block-range) -> result<string, error>;
+
+    /// A full block, including action payloads decoded into `data` where possible.
+    get-block: func(block-num: u32) -> result<option<string>, error>;
+
+    /// A block summary (without action payloads).
+    get-block-summary: func(block-num: u32) -> result<option<string>, error>;
+
+    get-block-header: func(block-num: u32) -> result<option<block-header>, error>;
+
+    get-head: func() -> result<option<block-header>, error>;
+
+    /// Searches backwards from the head block for the transaction with the specified ID.
+    /// Action payloads are decoded into `data` where possible.
+    find-transaction: func(id: string, max-blocks: option<u32>) -> result<option<string>, error>;
+}
+
+interface accounts {
+    use host:types/types.{error};
+    use accounts:query/types.{account};
+    use auth-dyn:plugin/types.{dynamic-auth-policy};
+
+    get-account: func(name: string) -> result<option<account>, error>;
+    get-auth-sig-pubkey: func(account: string) -> result<option<string>, error>;
+    get-accounts-with-key: func(public-key: string) -> result<list<string>, error>;
+    get-delegate-owner: func(account: string) -> result<option<string>, error>;
+    get-dyn-manager: func(account: string) -> result<option<string>, error>;
+    get-dyn-policy: func(account: string) -> result<option<dynamic-auth-policy>, error>;
+}
+
+interface network {
+    use host:types/types.{error};
+    use packages:plugin/types.{installed-package};
+
+    get-network-name: func() -> result<string, error>;
+    get-installed-packages: func() -> result<list<installed-package>, error>;
+}
+
+interface tokens {
+    use host:types/types.{error};
+    use tokens:plugin/types.{system-token-info, user-balance};
+
+    get-system-token: func() -> result<option<system-token-info>, error>;
+    get-user-balances: func(user: string) -> result<list<user-balance>, error>;
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface virtual-server {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface producers {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface setcode {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface sites {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface registry {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface transact {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
+}
+
+world imports {
+    import block-log;
+    import accounts;
+    import network;
+    import tokens;
+    import virtual-server;
+    import producers;
+    import setcode;
+    import sites;
+    import registry;
+    import transact;
+}
