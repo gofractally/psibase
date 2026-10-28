@@ -320,30 +320,6 @@ namespace xportal
       return std::chrono::time_point_cast<MicroSeconds>(std::chrono::system_clock::now());
    }
 
-   MonotonicTimePointUSec monotonicNow()
-   {
-      return std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now());
-   }
-
-   void applySignupResult(const Checksum256& id, const std::string* error)
-   {
-      auto table = XPortal{}.open<SignupTable>();
-      auto row   = table.get(id);
-      check(row.has_value() && row->state == stateQueued, "signup is not queued");
-      if (error)
-      {
-         row->state      = std::string{stateFailed};
-         row->last_error = *error;
-      }
-      else
-      {
-         row->state      = std::string{stateInvited};
-         row->last_error = {};
-      }
-      row->updated = wallNow();
-      table.put(*row);
-   }
-
    void finishPush(std::int32_t socket, std::optional<std::string> error)
    {
       std::optional<PendingPush> pending;
@@ -356,7 +332,6 @@ namespace xportal
             table.remove(*pending);
          }
          applySignupResult(pending->signup, error ? &*error : nullptr);
-         XPortal{}.open<ProvisionAttemptTable>().erase(pending->signup);
       }
    }
 
@@ -892,7 +867,6 @@ namespace xportal
 }  // namespace xportal
 
 using namespace xportal;
-
 
 std::optional<HttpReply> XPortal::serveSys(HttpRequest                 request,
                                            std::optional<std::int32_t> socket,

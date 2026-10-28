@@ -95,7 +95,7 @@ namespace LocalService
    /// `x_id` is the X user who requested the account. `tier` is unset for the
    /// free tier. A paid signup is `pending` until Stripe reports it paid;
    /// `stripe_session_id` is its Checkout Session and `stripe_event_ids` are
-   /// the webhook events received for it.
+   /// the webhook events already applied. A repeated event id is ignored.
    struct Signup
    {
       psibase::Checksum256       id;
@@ -144,13 +144,16 @@ namespace LocalService
    using PendingPushTable = psibase::Table<PendingPush, &PendingPush::socket>;
    PSIO_REFLECT_TYPENAME(PendingPushTable)
 
-   /// Tracks scheduled retries and attempts in this node session. An aborted
-   /// attempt remains here until restart, so an admin cannot race its execution.
+   /// One provisioning attempt in this node session. `retry_at` is when the
+   /// next automatic retry is due. `retry_requested` marks an administrator
+   /// retry of an interrupted queued signup. The row remains until the push
+   /// finishes or the session ends.
    struct ProvisionAttempt
    {
-      psibase::Checksum256 signup;
-      bool                 retry_requested = false;
-      PSIO_REFLECT(ProvisionAttempt, signup, retry_requested)
+      psibase::Checksum256                           signup;
+      bool                                           retry_requested = false;
+      std::optional<psibase::MonotonicTimePointUSec> retry_at;
+      PSIO_REFLECT(ProvisionAttempt, signup, retry_requested, retry_at)
    };
    using ProvisionAttemptTable = psibase::Table<ProvisionAttempt, &ProvisionAttempt::signup>;
    PSIO_REFLECT_TYPENAME(ProvisionAttemptTable)
@@ -421,9 +424,10 @@ namespace LocalService
    /// `v1` HMAC-SHA256 of `"<t>.<body>"` under the active mode's
    /// `webhook_secret`, with `t` within 5 minutes. A verified
    /// `checkout.session.completed` or `checkout.session.async_payment_succeeded`
-   /// for a known signup records the event id; when the session is `paid`
-   /// and the signup is `pending`, it becomes `queued` and is provisioned.
-   /// Every verified event gets 200.
+   /// for a known signup records the event id. An id already recorded is
+   /// ignored, so redelivery does not queue or provision the signup again.
+   /// When the session is `paid` and the signup is `pending`, it becomes
+   /// `queued` and is provisioned. Every verified event gets 200.
    ///
    /// Provisioning submits each signed push to this node's `transact` endpoint
    /// over a unix-socket listener, or over plain `http` when no socket is
@@ -433,26 +437,30 @@ namespace LocalService
    /// contacted as written. The push never uses TLS and never selects an
    /// `https` listener; an `https`-only listen list leaves no endpoint.
    ///
-   /// `provision` attempts each due queued signup once unless an administrator
-   /// explicitly retries it after restart. It commits
-   /// `attempts += 1` and `last_error = "signing aborted"`, then pushes as
-   /// `ac-creator`. When billing is enabled, that is
+   /// `provision` claims each due queued signup. It commits `attempts += 1`,
+   /// `last_error = "signing aborted"`, and the next `x-timer` retry — 30s,
+   /// 2m, 10m, 30m, then 2h — before it pushes as `ac-creator`. When billing
+   /// is enabled, that is
    /// `tokens::credit(sys, invite, cost, "x-portal signup")` with
    /// `cost = invite::getInvCost(1, tokens)`, then
    /// `invite::createInvite(invite_id, payload, 1, false, cost, tokens)`. With
    /// billing disabled, it is `createInvite` alone with zero resources and no
-   /// subsidy. Success sets `invited`. A failed push sets `failed` and
-   /// `last_error`. A `signTx` abort leaves the signup `queued` with the
-   /// placeholder error.
+   /// subsidy. Success sets `invited`. A failed push stays `queued` until that
+   /// retry; the push after the 2h retry sets `failed` and `last_error`. A
+   /// `signTx` abort leaves the signup `queued` with the placeholder error
+   /// and that retry still scheduled.
    ///
    /// `GET /signup/:id` returns `SignupView` to the owning X session. No
    /// session is 401; anything else that is not that session's signup is 404.
    /// `GET /admin/signups?state=failed` returns `FailedSignup` rows for an
    /// administrator.
    /// `POST /admin/signups/:id/retry` requeues an interrupted `queued` signup
-   /// after a node restart, preserving its invite and attempt count. It requires
-   /// an administrator and rejects attempts active in this session, outstanding
-   /// pushes, and invite IDs already present on chain.
+   /// after a node restart, preserving its invite and attempt count, and
+   /// reruns provisioning for a `failed` signup from attempt zero. A failed
+   /// free signup returns 409 when that X user already has a free signup that
+   /// is not `failed`. The route requires an administrator and rejects
+   /// attempts active in this session, outstanding pushes, and invite IDs
+   /// already on chain.
    ///
    /// Sign in with X is OAuth 2.0 with PKCE. `GET /auth/x/start` redirects to
    /// X's authorize page; X returns the browser to `GET /auth/x/callback`,

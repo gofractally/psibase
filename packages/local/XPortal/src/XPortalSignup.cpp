@@ -38,6 +38,53 @@ using UserService::InviteNs::InvPayload;
 
 namespace xportal
 {
+   bool anotherFreeSignup(SignupTable&               table,
+                          std::string_view           xId,
+                          std::optional<Checksum256> except)
+   {
+      for (auto row : table.getIndex<0>())
+      {
+         if (except && row.id == *except)
+            continue;
+         if (row.x_id && *row.x_id == xId && !row.tier && row.state != stateFailed)
+            return true;
+      }
+      return false;
+   }
+
+   // The retry after attempts 1..5. Attempt 6 is the last push.
+   std::optional<MicroSeconds> nextProvisionDelay(uint32_t attempt)
+   {
+      static constexpr std::array<MicroSeconds, 5> delays{
+          std::chrono::seconds{30}, std::chrono::minutes{2}, std::chrono::minutes{10},
+          std::chrono::minutes{30}, std::chrono::hours{2},
+      };
+      if (attempt == 0 || attempt > delays.size())
+         return std::nullopt;
+      return delays[attempt - 1];
+   }
+
+   bool pushInFlight(const Checksum256& id)
+   {
+      for (const auto& push : XPortal{}.open<PendingPushTable>().getIndex<0>())
+         if (push.signup == id)
+            return true;
+      return false;
+   }
+
+   // Due on the first attempt, an administrator retry, or once `retry_at` has
+   // arrived. A future `retry_at` keeps an aborted signing from looping here.
+   bool signupDue(const Signup& row)
+   {
+      if (row.state != stateQueued || pushInFlight(row.id))
+         return false;
+      if (row.attempts == 0)
+         return true;
+      auto attempt = XPortal{}.open<ProvisionAttemptTable>().get(row.id);
+      return attempt && (attempt->retry_requested ||
+                         (attempt->retry_at && *attempt->retry_at <= monotonicNow()));
+   }
+
    // A paid signup waits `pending` for its payment; a free one is queued for
    // provisioning. Returns nullopt when `xId` already has a free signup.
    std::optional<Signup> storeSignup(const SignupBody&  body,
@@ -50,18 +97,7 @@ namespace xportal
       {
          stored.reset();
          auto table = XPortal{}.open<SignupTable>();
-         bool taken = false;
-         if (!paid)
-         {
-            for (auto row : table.getIndex<0>())
-            {
-               if (row.x_id && *row.x_id == xId && !row.tier && row.state != stateFailed)
-               {
-                  taken = true;
-                  break;
-               }
-            }
-         }
+         bool taken = !paid && anotherFreeSignup(table, xId, std::nullopt);
          if (!taken)
          {
             Checksum256 id;
@@ -183,21 +219,35 @@ namespace xportal
 
       PSIBASE_SUBJECTIVE_TX
       {
-         auto signup = XPortal{}.open<SignupTable>().get(*id);
+         auto table  = XPortal{}.open<SignupTable>();
+         auto signup = table.get(*id);
          if (!signup)
             return textError(req, HttpStatus::notFound, "signup not found\n");
-         if (signup->state != stateQueued)
+         if (signup->state != stateQueued && signup->state != stateFailed)
             return textError(req, HttpStatus::conflict, "signup is not queued\n");
          auto attempts = XPortal{}.open<ProvisionAttemptTable>();
          if (attempts.get(*id))
             return textError(req, HttpStatus::conflict,
                              "signup already scheduled or attempted in this node session\n");
-         for (const auto& push : XPortal{}.open<PendingPushTable>().getIndex<0>())
-            if (push.signup == *id)
-               return textError(req, HttpStatus::conflict, "signup push is still pending\n");
+         if (pushInFlight(*id))
+            return textError(req, HttpStatus::conflict, "signup push is still pending\n");
          if (to<Invite>().getInvite(signup->invite_id))
             return textError(req, HttpStatus::conflict, "signup invite already exists\n");
-         attempts.put(ProvisionAttempt{.signup = *id, .retry_requested = true});
+         if (signup->state == stateFailed)
+         {
+            if (!signup->tier && signup->x_id &&
+                anotherFreeSignup(table, *signup->x_id, signup->id))
+               return textError(req, HttpStatus::conflict, "free signup already exists\n");
+            signup->state      = std::string{stateQueued};
+            signup->attempts   = 0;
+            signup->last_error = {};
+            signup->updated    = wallNow();
+            table.put(*signup);
+         }
+         else
+         {
+            attempts.put(ProvisionAttempt{.signup = *id, .retry_requested = true});
+         }
          to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
       }
       return jsonBody(req, SignupReceipt{.signup_id = signupId(*id)});
@@ -614,10 +664,10 @@ namespace xportal
       PSIBASE_SUBJECTIVE_TX
       {
          auto table = XPortal{}.open<SignupTable>();
-         if (auto row = table.get(*id))
+         auto row   = table.get(*id);
+         if (row && !std::ranges::contains(row->stripe_event_ids, event.id))
          {
-            if (!std::ranges::contains(row->stripe_event_ids, event.id))
-               row->stripe_event_ids.push_back(event.id);
+            row->stripe_event_ids.push_back(event.id);
             if (session.payment_status == "paid" && row->state == statePending)
             {
                row->state = std::string{stateQueued};
@@ -648,8 +698,6 @@ namespace xportal
       return HttpReply{};
    }
 
-   // An admin can explicitly requeue an interrupted attempt after restart.
-   // Otherwise committing an attempt prevents an abort from causing a retry loop.
    std::vector<Checksum256> dueSignupIds()
    {
       std::vector<Checksum256> ids;
@@ -657,12 +705,8 @@ namespace xportal
       {
          ids.clear();
          for (auto row : XPortal{}.open<SignupTable>().getIndex<0>())
-         {
-            auto attempt = XPortal{}.open<ProvisionAttemptTable>().get(row.id);
-            if (row.state == stateQueued &&
-                (row.attempts == 0 || (attempt && attempt->retry_requested)))
+            if (signupDue(row))
                ids.push_back(row.id);
-         }
       }
       return ids;
    }
@@ -693,25 +737,58 @@ namespace xportal
       PSIBASE_SUBJECTIVE_TX
       {
          claimed.reset();
-         auto table    = XPortal{}.open<SignupTable>();
-         auto attempts = XPortal{}.open<ProvisionAttemptTable>();
-         auto attempt  = attempts.get(id);
-         if (auto row = table.get(id);
-             row && row->state == stateQueued &&
-             (row->attempts == 0 || (attempt && attempt->retry_requested)))
+         auto table = XPortal{}.open<SignupTable>();
+         auto row   = table.get(id);
+         if (row && signupDue(*row))
          {
-            attempts.put(ProvisionAttempt{.signup = id});
+            std::optional<MonotonicTimePointUSec> when;
+            if (auto delay = nextProvisionDelay(row->attempts + 1))
+               when = monotonicNow() + *delay;
+            // Committed before `push` so an aborted `signTx` leaves this retry.
+            XPortal{}.open<ProvisionAttemptTable>().put(
+                ProvisionAttempt{.signup = id, .retry_at = when});
             row->attempts += 1;
             row->last_error = std::string{signingAborted};
             row->updated    = wallNow();
             table.put(*row);
+            if (when)
+               to<XTimer>().runAt(*when, MethodNumber{"provision"});
             claimed = *row;
          }
       }
-      // Without an explicit retry, a later timer is not another attempt.
       if (!claimed)
          return;
       pushAgentTx(signupActions(*claimed), claimed->id);
+   }
+
+   void applySignupResult(const Checksum256& id, const std::string* error)
+   {
+      auto table = XPortal{}.open<SignupTable>();
+      auto row   = table.get(id);
+      check(row.has_value() && row->state == stateQueued, "signup is not queued");
+      auto attempts = XPortal{}.open<ProvisionAttemptTable>();
+      auto attempt  = attempts.get(id);
+      if (!error)
+      {
+         row->state      = std::string{stateInvited};
+         row->last_error = {};
+         attempts.erase(id);
+      }
+      else if (attempt && attempt->retry_at)
+      {
+         row->last_error = *error;
+         // The timer scheduled with this attempt may already have fired.
+         if (*attempt->retry_at <= monotonicNow())
+            to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
+      }
+      else
+      {
+         row->state      = std::string{stateFailed};
+         row->last_error = *error;
+         attempts.erase(id);
+      }
+      row->updated = wallNow();
+      table.put(*row);
    }
 }  // namespace xportal
 
@@ -790,4 +867,3 @@ void XPortal::onStripeError(std::int32_t socket)
    check(getSender() == XHttp::service, "Wrong sender");
    failCheckout(takePendingRequest<PendingStripeRequestTable>(socket), "Stripe did not respond");
 }
-

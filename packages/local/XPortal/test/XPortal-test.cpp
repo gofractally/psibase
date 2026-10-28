@@ -1,5 +1,59 @@
 #include "XPortalTest.hpp"
 
+#include "../src/XPortalDetail.hpp"
+
+#include <array>
+#include <chrono>
+
+namespace
+{
+   template <typename F>
+   void eachTimer(F&& use)
+   {
+      auto ids = XTimer{}.open<TimerIdTable>().get({});
+      if (!ids)
+         return;
+      auto table = XTimer{}.open<TimerQueueTable>();
+      for (std::uint64_t id = 0; id < ids->next; ++id)
+         if (auto row = table.get(id))
+            use(table, *row);
+   }
+
+   void releaseProvisionRetry(const Checksum256& signup)
+   {
+      auto attempts = XPortal{}.open<ProvisionAttemptTable>();
+      if (auto row = attempts.get(signup); row && row->retry_at)
+      {
+         row->retry_at = MonotonicTimePointUSec{};
+         attempts.put(*row);
+      }
+      eachTimer(
+          [](auto& table, TimerQueueRow row)
+          {
+             row.expiration = MonotonicTimePointUSec{};
+             table.put(row);
+          });
+   }
+
+   void requireRetryDelay(const Checksum256& id, std::chrono::microseconds delay)
+   {
+      auto attempt = XPortal{}.open<ProvisionAttemptTable>().get(id);
+      REQUIRE(attempt.has_value());
+      REQUIRE(attempt->retry_at.has_value());
+      auto delta = *attempt->retry_at - xportal::monotonicNow();
+      CHECK(delta > delay - std::chrono::seconds{5});
+      CHECK(delta < delay + std::chrono::seconds{5});
+      bool matched = false;
+      eachTimer(
+          [&](auto&, const TimerQueueRow& timer)
+          {
+             if (timer.expiration == *attempt->retry_at &&
+                 timer.method == MethodNumber{"provision"})
+                matched = true;
+          });
+      CHECK(matched);
+   }
+}  // namespace
 
 TEST_CASE("status, requests switch, and seeded pricing")
 {
@@ -280,6 +334,9 @@ TEST_CASE("provision commits one attempt before signing")
    CHECK(row->state == "queued");
    CHECK(row->attempts == 1);
    CHECK(row->last_error == "signing aborted");
+   auto attempt = XPortal{}.open<ProvisionAttemptTable>().get(row->id);
+   REQUIRE(attempt.has_value());
+   CHECK(attempt->retry_at.has_value());
    auto again =
        runAs(t, XTimer::service, XPortal::service, "provision", std::tuple{std::uint64_t{0}});
    CHECK(!again.error.has_value());
@@ -339,14 +396,18 @@ TEST_CASE("provision commits one attempt before signing")
    CHECK(replyText(hidden).find("invite id is taken") == std::string::npos);
    auto view =
        t.http<SignupView>(withSession(forwarded("GET", "/signup/" + second.signup_id), "other"));
-   CHECK(view.state == "failed");
+   CHECK(view.state == "queued");
    CHECK(!view.token.has_value());
+   auto retriedRow = signupRow(second.signup_id);
+   REQUIRE(retriedRow.has_value());
+   CHECK(retriedRow->attempts == 1);
+   CHECK(retriedRow->last_error == "invite id is taken");
+   auto stillDue = XPortal{}.open<ProvisionAttemptTable>().get(retriedRow->id);
+   REQUIRE(stillDue.has_value());
+   CHECK(stillDue->retry_at.has_value());
    auto rows =
        t.http<std::vector<FailedSignup>>(forwarded("GET", "/admin/signups?state=failed", token));
-   REQUIRE(rows.size() == 1);
-   CHECK(rows[0].id == second.signup_id);
-   CHECK(rows[0].attempts == 1);
-   CHECK(rows[0].last_error == "invite id is taken");
+   CHECK(rows.empty());
 }
 
 TEST_CASE("admin recovery cannot replay a completed invite or an unpaid signup")
@@ -570,13 +631,67 @@ TEST_CASE("the Stripe webhook queues a paid signup only when Stripe signed it")
    CHECK(XPortal{}.open<SignupTable>().get(id)->state == "queued");
 }
 
+TEST_CASE("a failed provisioning push retries until the budget is exhausted")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+   auto alice   = AccountNumber{"alice"};
+   auto creator = XPortal::creatorAccount;
+   storeCreatorKey();
+   transactor<AuthScope> scope{alice, AuthScope::service};
+   expect(t.pushTransaction(t.makeTransaction(
+       {scope.newAccount(creator, agentPub, alice,
+                         std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})})));
+   configureX(t);
+   t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
+   openSession("owner", "42");
+
+   auto created = t.http<SignupReceipt>(signupRequest(31, "owner"));
+   auto id      = signupRow(created.signup_id)->id;
+   constexpr std::array<std::chrono::microseconds, 5> delays{
+       std::chrono::seconds{30}, std::chrono::minutes{2}, std::chrono::minutes{10},
+       std::chrono::minutes{30}, std::chrono::hours{2}};
+
+   for (uint32_t attempt = 1; attempt <= 6; ++attempt)
+   {
+      if (attempt > 1)
+         releaseProvisionRetry(id);
+      auto fired = runAs(t, AccountNumber{}, XTimer::service, "runOne", std::tuple{});
+      REQUIRE(fired.error.has_value());
+      auto row = signupRow(created.signup_id);
+      REQUIRE(row.has_value());
+      CHECK(row->state == "queued");
+      CHECK(row->attempts == attempt);
+      if (attempt <= delays.size())
+         requireRetryDelay(id, delays[attempt - 1]);
+      else
+      {
+         auto pending = XPortal{}.open<ProvisionAttemptTable>().get(id);
+         REQUIRE(pending.has_value());
+         CHECK(!pending->retry_at.has_value());
+      }
+
+      XPortal{}.open<PendingPushTable>().put(PendingPush{.socket = 40, .signup = id});
+      auto reply = runAs(t, XHttp::service, XPortal::service, "onPushReply",
+                         std::tuple{std::int32_t{40},
+                                    HttpReply{.status = HttpStatus::ok,
+                                              .body   = psio::to_frac(TransactionTrace{
+                                                    .error = std::string{"invite id is taken"}})}});
+      CHECK(!reply.error.has_value());
+      row = signupRow(created.signup_id);
+      REQUIRE(row.has_value());
+      CHECK(row->last_error == "invite id is taken");
+      CHECK(row->state == (attempt == 6 ? "failed" : "queued"));
+   }
+}
+
 TEST_CASE("paid tier readiness covers the paid grant")
 {
    DefaultTestChain t{portalPackages};
    installPortal(t);
    auto alice   = AccountNumber{"alice"};
    auto creator = XPortal::creatorAccount;
-   auto billed = openBilledPortal(t);
+   auto billed  = openBilledPortal(t);
    t.put(XPortal::service, "/admin/config",
          RawBody{"application/json", R"({"tiers":[{"label":"Paid","usd_cents":5000}]})"});
 

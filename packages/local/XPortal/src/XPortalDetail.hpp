@@ -102,7 +102,10 @@ namespace xportal
    void pushAgentTx(std::vector<Action> actions, Checksum256 signup);
    std::optional<std::string> pushError(const HttpReply& reply);
    TimePointUSec wallNow();
-   MonotonicTimePointUSec monotonicNow();
+   inline MonotonicTimePointUSec monotonicNow()
+   {
+      return std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now());
+   }
    void applySignupResult(const Checksum256& id, const std::string* error);
    void finishPush(std::int32_t socket, std::optional<std::string> error);
    bool xConfigured(const XConfig& x);
