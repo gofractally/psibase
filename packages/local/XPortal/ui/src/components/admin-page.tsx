@@ -1,10 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import { CopyButton } from "@shared/components/copy-button";
 import { PageContainer } from "@shared/components/page-container";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
@@ -20,7 +30,9 @@ import {
 } from "@shared/shadcn/ui/table";
 
 import {
+    type AdminConfig,
     type FailedSignup,
+    type StripeKeys,
     type PortalStatus,
     createAdminAccounts,
     getAdminConfig,
@@ -109,9 +121,11 @@ const currentHint = ({ current, secret }: CredentialField) => {
 
 /** Saves only the fields the admin filled in; blank fields keep their value. */
 const CredentialsForm = ({
+    idPrefix = "",
     fields,
     onSave,
 }: {
+    idPrefix?: string;
     fields: CredentialField[];
     onSave: (values: Record<string, string>) => Promise<void>;
 }) => {
@@ -131,24 +145,27 @@ const CredentialsForm = ({
                 save.mutate(filled);
             }}
         >
-            {fields.map((field) => (
-                <div key={field.key} className="flex flex-col gap-1.5">
-                    <Label htmlFor={field.key}>{field.label}</Label>
-                    <Input
-                        id={field.key}
-                        type={field.secret ? "password" : "text"}
-                        autoComplete="off"
-                        placeholder={currentHint(field)}
-                        value={values[field.key] ?? ""}
-                        onChange={(event) =>
-                            setValues({
-                                ...values,
-                                [field.key]: event.target.value,
-                            })
-                        }
-                    />
-                </div>
-            ))}
+            {fields.map((field) => {
+                const inputId = `${idPrefix}${field.key}`;
+                return (
+                    <div key={field.key} className="flex flex-col gap-1.5">
+                        <Label htmlFor={inputId}>{field.label}</Label>
+                        <Input
+                            id={inputId}
+                            type={field.secret ? "password" : "text"}
+                            autoComplete="off"
+                            placeholder={currentHint(field)}
+                            value={values[field.key] ?? ""}
+                            onChange={(event) =>
+                                setValues((prev) => ({
+                                    ...prev,
+                                    [field.key]: event.target.value,
+                                }))
+                            }
+                        />
+                    </div>
+                );
+            })}
             {save.error && (
                 <p className="text-destructive text-sm">
                     {errorText(save.error)}
@@ -164,6 +181,114 @@ const CredentialsForm = ({
                 Save
             </Button>
         </form>
+    );
+};
+
+const stripeCredentialFields = (keys: StripeKeys): CredentialField[] => [
+    {
+        key: "publishable_key",
+        label: "Publishable key",
+        current: keys.publishable_key,
+    },
+    {
+        key: "secret_key",
+        label: "Secret key",
+        current: keys.secret_key,
+        secret: true,
+    },
+    {
+        key: "webhook_secret",
+        label: "Webhook signing secret",
+        current: keys.webhook_secret,
+        secret: true,
+    },
+];
+
+const StripeModeToggle = ({
+    mode,
+    onSave,
+}: {
+    mode: AdminConfig["mode"];
+    onSave: (mode: AdminConfig["mode"]) => Promise<void>;
+}) => {
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const save = useMutation({ mutationFn: onSave });
+    const displayed = save.isPending && save.variables ? save.variables : mode;
+    const choose = (next: AdminConfig["mode"]) => {
+        if (next === displayed || save.isPending) return;
+        if (next === "production") {
+            setConfirmOpen(true);
+            return;
+        }
+        save.mutate(next);
+    };
+    return (
+        <>
+            <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+                <div className="min-w-0">
+                    <p className="text-sm">Stripe mode</p>
+                    <p className="text-muted-foreground text-sm">
+                        Sandbox until you switch. Production charges real
+                        cards.
+                    </p>
+                    {save.error && (
+                        <p className="text-destructive mt-1 text-sm">
+                            {errorText(save.error)}
+                        </p>
+                    )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                    <span
+                        className={
+                            displayed === "sandbox"
+                                ? "text-sm"
+                                : "text-muted-foreground text-sm"
+                        }
+                    >
+                        Sandbox
+                    </span>
+                    <Switch
+                        checked={displayed === "production"}
+                        disabled={save.isPending}
+                        onCheckedChange={(on) =>
+                            choose(on ? "production" : "sandbox")
+                        }
+                        aria-label="Production Stripe mode"
+                    />
+                    <span
+                        className={
+                            displayed === "production"
+                                ? "text-sm"
+                                : "text-muted-foreground text-sm"
+                        }
+                    >
+                        Production
+                    </span>
+                </div>
+            </div>
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Switch to production?
+                        </AlertDialogTitle>
+                    </AlertDialogHeader>
+                    <AlertDialogDescription>
+                        New checkouts will use the production Stripe keys and
+                        charge real cards. A checkout started in sandbox still
+                        completes.
+                    </AlertDialogDescription>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => save.mutate("production")}
+                        >
+                            Switch to production
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 };
 
@@ -360,6 +485,9 @@ export const AdminPage = () => {
     const { x, stripe } = config.data;
     const pricing = savedPricing(config.data);
     const webhookUrl = `${window.location.origin}/stripe/webhook`;
+    const saveStripeKeys =
+        (mode: AdminConfig["mode"]) => (values: Record<string, string>) =>
+            saveConfig({ stripe: { [mode]: values } });
 
     return (
         <PageContainer className="space-y-6">
@@ -422,7 +550,7 @@ export const AdminPage = () => {
                     <ReadinessRow
                         label="Stripe keys"
                         ok={conditionOk(conditions, "stripe_configured")}
-                        unmet="Paid tiers can't be sold until the Stripe keys below are set."
+                        unmet="Paid tiers can't be sold until this mode's Stripe keys are set."
                     />
                 </div>
                 {!status.data.billing_enabled && (
@@ -467,12 +595,22 @@ export const AdminPage = () => {
                 />
             </AdminSection>
 
-            <AdminSection title="Stripe (sandbox)">
+            <AdminSection title="Stripe">
+                <StripeModeToggle
+                    mode={config.data.mode}
+                    onSave={async (mode) => {
+                        await saveConfig({ mode });
+                        await queryClient.invalidateQueries({
+                            queryKey: failedSignupsKey,
+                        });
+                    }}
+                />
                 <div className="flex items-start gap-2 rounded-lg border px-4 py-3">
                     <div className="min-w-0 flex-1">
                         <div className="text-muted-foreground text-xs">
-                            Webhook endpoint, for checkout.session.completed
-                            and checkout.session.async_payment_succeeded
+                            Webhook endpoint for both modes, for
+                            checkout.session.completed and
+                            checkout.session.async_payment_succeeded
                         </div>
                         <p className="break-all font-mono text-xs">
                             {webhookUrl}
@@ -483,30 +621,21 @@ export const AdminPage = () => {
                         ariaLabel="Copy Stripe webhook endpoint"
                     />
                 </div>
-                <CredentialsForm
-                    fields={[
-                        {
-                            key: "publishable_key",
-                            label: "Publishable key",
-                            current: stripe.sandbox.publishable_key,
-                        },
-                        {
-                            key: "secret_key",
-                            label: "Secret key",
-                            current: stripe.sandbox.secret_key,
-                            secret: true,
-                        },
-                        {
-                            key: "webhook_secret",
-                            label: "Webhook signing secret",
-                            current: stripe.sandbox.webhook_secret,
-                            secret: true,
-                        },
-                    ]}
-                    onSave={(values) =>
-                        saveConfig({ stripe: { sandbox: values } })
-                    }
-                />
+                {(
+                    [
+                        ["sandbox", "Sandbox keys"],
+                        ["production", "Production keys"],
+                    ] as const
+                ).map(([mode, label]) => (
+                    <Fragment key={mode}>
+                        <p className="text-sm font-medium">{label}</p>
+                        <CredentialsForm
+                            idPrefix={`${mode}-`}
+                            fields={stripeCredentialFields(stripe[mode])}
+                            onSave={saveStripeKeys(mode)}
+                        />
+                    </Fragment>
+                ))}
             </AdminSection>
 
             <AdminSection title="ac-creator">

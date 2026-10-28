@@ -37,6 +37,8 @@ namespace xportal
    inline constexpr std::string_view stateQueued    = "queued";
    inline constexpr std::string_view stateInvited   = "invited";
    inline constexpr std::string_view stateFailed    = "failed";
+   inline constexpr std::string_view modeSandbox    = "sandbox";
+   inline constexpr std::string_view modeProduction = "production";
    inline constexpr std::string_view signingAborted = "signing aborted";
    inline constexpr char             signupMemo[]   = "x-portal signup";
 
@@ -158,7 +160,8 @@ namespace xportal
                       std::int32_t      client);
    std::optional<Signup> storeSignup(const SignupBody&  body,
                                      const std::string& xId,
-                                     const TierOffer&   offer);
+                                     const TierOffer&   offer,
+                                     std::string_view   mode);
    std::optional<HttpReply> serveSignup(const HttpRequest& req, std::optional<std::int32_t> socket);
    HttpReply serveSignupStatus(const HttpRequest& req, std::string_view idText);
    HttpReply serveRetrySignup(const HttpRequest&          req,

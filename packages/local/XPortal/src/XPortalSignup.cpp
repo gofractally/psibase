@@ -89,7 +89,8 @@ namespace xportal
    // provisioning. Returns nullopt when `xId` already has a free signup.
    std::optional<Signup> storeSignup(const SignupBody&  body,
                                      const std::string& xId,
-                                     const TierOffer&   offer)
+                                     const TierOffer&   offer,
+                                     std::string_view   mode)
    {
       bool                  paid = body.tier.has_value();
       std::optional<Signup> stored;
@@ -113,7 +114,8 @@ namespace xportal
                               .created   = now,
                               .updated   = now,
                               .x_id      = xId,
-                              .tier      = body.tier};
+                              .tier      = body.tier,
+                              .mode      = std::string{mode}};
             table.put(*stored);
             if (!paid)
                to<XTimer>().runAt(monotonicNow(), MethodNumber{"provision"});
@@ -168,7 +170,7 @@ namespace xportal
          return textError(req, HttpStatus::conflict, "invite id is taken\n");
 
       auto offer  = paid ? paidOffer(config, *paid) : freeOffer(config, status.billing_enabled);
-      auto stored = storeSignup(body, session->x_id, offer);
+      auto stored = storeSignup(body, session->x_id, offer, config.mode);
       if (!stored)
          return textError(req, HttpStatus::conflict, "free signup already exists\n");
       if (!paid)
@@ -270,13 +272,14 @@ namespace xportal
       if (req.query<FailedQuery>().state != stateFailed)
          return textError(req, HttpStatus::badRequest, "state must be failed\n");
 
+      auto                      mode = readConfig().mode;
       std::vector<FailedSignup> rows;
       PSIBASE_SUBJECTIVE_TX
       {
          rows.clear();
          for (auto row : XPortal{}.open<SignupTable>().getIndex<0>())
          {
-            if (row.state != stateFailed)
+            if (row.state != stateFailed || row.mode != mode)
                continue;
             rows.push_back(FailedSignup{.id         = signupId(row.id),
                                         .created    = row.created,
@@ -651,9 +654,35 @@ namespace xportal
       PSIO_REFLECT(CheckoutEvent, id, data)
    };
 
-   // A verified event that names no known signup is ignored rather than
-   // rejected, so Stripe does not keep retrying it.
-   void applyCheckoutEvent(const CheckoutEvent& event)
+   struct StripeModeMatch
+   {
+      bool sandbox    = false;
+      bool production = false;
+   };
+
+   StripeModeMatch verifiedStripeModes(const HttpRequest& req, const StripeConfig& stripe)
+   {
+      StripeModeMatch match;
+      if (stripe.sandbox.webhook_secret)
+         match.sandbox = verifyStripeSignature(req, *stripe.sandbox.webhook_secret);
+      if (stripe.production.webhook_secret)
+         match.production = verifyStripeSignature(req, *stripe.production.webhook_secret);
+      return match;
+   }
+
+   bool modeSigned(const StripeModeMatch& match, std::string_view mode)
+   {
+      if (mode == modeSandbox)
+         return match.sandbox;
+      if (mode == modeProduction)
+         return match.production;
+      return false;
+   }
+
+   // A verified event that names no known signup, or a signup of a mode whose
+   // secret did not match, is ignored rather than rejected, so Stripe does not
+   // keep retrying it.
+   void applyCheckoutEvent(const CheckoutEvent& event, const StripeModeMatch& match)
    {
       const auto& session = event.data.object;
       if (!session.metadata.signup_id)
@@ -665,7 +694,8 @@ namespace xportal
       {
          auto table = XPortal{}.open<SignupTable>();
          auto row   = table.get(*id);
-         if (row && !std::ranges::contains(row->stripe_event_ids, event.id))
+         if (row && modeSigned(match, row->mode) &&
+             !std::ranges::contains(row->stripe_event_ids, event.id))
          {
             row->stripe_event_ids.push_back(event.id);
             if (session.payment_status == "paid" && row->state == statePending)
@@ -683,9 +713,8 @@ namespace xportal
    {
       if (req.method != "POST")
          return HttpReply::methodNotAllowed(req);
-      auto        config = readConfig();
-      const auto& keys   = activeStripe(config);
-      if (!keys.webhook_secret || !verifyStripeSignature(req, *keys.webhook_secret))
+      auto match = verifiedStripeModes(req, readConfig().stripe);
+      if (!match.sandbox && !match.production)
          return textError(std::vector<HttpHeader>{}, HttpStatus::badRequest,
                           "invalid Stripe signature\n");
       // Only checkout events are parsed as sessions: other event objects may
@@ -694,7 +723,7 @@ namespace xportal
       auto type = psio::convert_from_json<StripeEventType>(text).type;
       if (type == "checkout.session.completed" ||
           type == "checkout.session.async_payment_succeeded")
-         applyCheckoutEvent(psio::convert_from_json<CheckoutEvent>(text));
+         applyCheckoutEvent(psio::convert_from_json<CheckoutEvent>(text), match);
       return HttpReply{};
    }
 

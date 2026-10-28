@@ -53,6 +53,7 @@ namespace
           });
       CHECK(matched);
    }
+
 }  // namespace
 
 TEST_CASE("status, requests switch, and seeded pricing")
@@ -107,8 +108,8 @@ TEST_CASE("status, requests switch, and seeded pricing")
                                                   RawBody{"application/json", "{}"}));
    CHECK(missing.status == HttpStatus::badRequest);
    CHECK(std::string(missing.body.begin(), missing.body.end()) ==
-         "requests_enabled, price_per_token_usd_micros, free_tier, x, stripe, or tiers is "
-         "required\n");
+         "requests_enabled, price_per_token_usd_micros, free_tier, x, mode, stripe, or tiers "
+         "is required\n");
    auto badType =
        t.http(HttpRequestBuilder{}.put(XPortal::service, "/admin/config",
                                        RawBody{"application/json", R"({"requests_enabled":1})"}));
@@ -415,8 +416,7 @@ TEST_CASE("admin recovery cannot replay a completed invite or an unpaid signup")
    DefaultTestChain t{portalPackages};
    installPortal(t);
    auto id   = storePendingSignup(23, "42");
-   auto path = "/admin/signups/" +
-               toBase64Url({reinterpret_cast<const char*>(id.data()), id.size()}) + "/retry";
+   auto path = "/admin/signups/" + signupIdText(id) + "/retry";
    auto retry = [&]
    { return t.http(HttpRequestBuilder{}.post(XPortal::service, path, EmptyBody{})); };
    CHECK(retry().status == HttpStatus::conflict);
@@ -619,7 +619,7 @@ TEST_CASE("the Stripe webhook queues a paid signup only when Stripe signed it")
    installPortal(t);
    configureStripe(t);
    auto id     = storePendingSignup(7, "42");
-   auto idText = toBase64Url({reinterpret_cast<const char*>(id.data()), id.size()});
+   auto idText = signupIdText(id);
    auto paid   = paidCheckoutEvent(idText);
 
    CHECK(postWebhook(t, paid, stripeSignature("whsec_other", paid)).status ==
@@ -782,4 +782,22 @@ TEST_CASE("admin config refuses to leave no tier offered")
    auto after = t.get<AdminConfig>(XPortal::service, "/admin/config");
    CHECK(after.free_tier.enabled);
    CHECK(after.tiers.size() == before.tiers.size());
+}
+
+TEST_CASE("a sandbox webhook still completes its signup after the mode switches")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+   t.put(XPortal::service, "/admin/config",
+         BothStripeCredentials{.stripe = {.sandbox = testStripe, .production = testProduction}});
+   t.put(XPortal::service, "/admin/config", StripeModeBody{.mode = "production"});
+
+   auto sandboxId    = storePendingSignup(7, "42");
+   auto productionId = storePendingSignup(8, "99", "production");
+   auto paid         = paidCheckoutEvent(signupIdText(sandboxId));
+
+   CHECK(postWebhook(t, paid, stripeSignature(*testStripe.webhook_secret, paid)).status ==
+         HttpStatus::ok);
+   CHECK(XPortal{}.open<SignupTable>().get(sandboxId)->state == "queued");
+   CHECK(XPortal{}.open<SignupTable>().get(productionId)->state == "pending");
 }

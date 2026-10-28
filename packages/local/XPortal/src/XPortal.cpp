@@ -342,9 +342,9 @@ namespace xportal
 
    const StripeKeys& activeStripe(const PortalConfig& config)
    {
-      if (config.mode == "production")
+      if (config.mode == modeProduction)
          return config.stripe.production;
-      check(config.mode == "sandbox", "unknown Stripe mode " + config.mode);
+      check(config.mode == modeSandbox, "unknown Stripe mode " + config.mode);
       return config.stripe.sandbox;
    }
 
@@ -420,7 +420,9 @@ namespace xportal
    {
       auto   billing     = to<VirtualServer>().is_billing_enabled();
       auto   paidOffered = billing && !config.tiers.empty();
-      Status status{.requests_enabled = config.requests_enabled, .billing_enabled = billing};
+      Status status{.requests_enabled = config.requests_enabled,
+                    .billing_enabled  = billing,
+                    .mode             = config.mode};
       status.conditions.push_back({.id = "creator_ready", .ok = creatorReady()});
       if (billing)
       {
@@ -633,11 +635,12 @@ namespace xportal
       auto price    = objectField(object, "price_per_token_usd_micros");
       auto freeTier = objectField(object, "free_tier");
       auto x        = objectField(object, "x");
+      auto mode     = objectField(object, "mode");
       auto stripe   = objectField(object, "stripe");
       auto tiers    = objectField(object, "tiers");
-      if (!requests && !price && !freeTier && !x && !stripe && !tiers)
-         return "requests_enabled, price_per_token_usd_micros, free_tier, x, stripe, or tiers is "
-                "required\n";
+      if (!requests && !price && !freeTier && !x && !mode && !stripe && !tiers)
+         return "requests_enabled, price_per_token_usd_micros, free_tier, x, mode, stripe, or "
+                "tiers is required\n";
       if (requests)
       {
          auto flag = requests->get_if<bool>();
@@ -658,6 +661,13 @@ namespace xportal
       if (x)
          if (auto error = updateX(*x, config.x))
             return error;
+      if (mode)
+      {
+         auto text = mode->get_if<std::string>();
+         if (!text || (*text != modeSandbox && *text != modeProduction))
+            return "mode must be sandbox or production\n";
+         config.mode = *text;
+      }
       if (stripe)
          if (auto error = updateStripe(*stripe, config.stripe))
             return error;

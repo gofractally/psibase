@@ -93,9 +93,11 @@ namespace LocalService
    /// A signup record. Ids are 32 bytes. `invite_id`, `payload`, and `token`
    /// come from the visitor's Invite plugin `prepare-new-invite`.
    /// `x_id` is the X user who requested the account. `tier` is unset for the
-   /// free tier. A paid signup is `pending` until Stripe reports it paid;
-   /// `stripe_session_id` is its Checkout Session and `stripe_event_ids` are
-   /// the webhook events already applied. A repeated event id is ignored.
+   /// free tier. `mode` is `sandbox` or `production`, the Stripe mode in
+   /// effect when the signup was stored. A paid signup is `pending` until
+   /// Stripe reports it paid; `stripe_session_id` is its Checkout Session and
+   /// `stripe_event_ids` are the webhook events already applied. A repeated
+   /// event id is ignored.
    struct Signup
    {
       psibase::Checksum256       id;
@@ -113,6 +115,7 @@ namespace LocalService
       std::optional<uint32_t>    tier;
       std::optional<std::string> stripe_session_id;
       std::vector<std::string>   stripe_event_ids;
+      std::string                mode = "sandbox";
       PSIO_REFLECT(Signup,
                    id,
                    invite_id,
@@ -128,7 +131,8 @@ namespace LocalService
                    x_id,
                    tier,
                    stripe_session_id,
-                   stripe_event_ids)
+                   stripe_event_ids,
+                   mode)
    };
    using SignupTable = psibase::Table<Signup, &Signup::id>;
    PSIO_REFLECT_TYPENAME(SignupTable)
@@ -296,13 +300,15 @@ namespace LocalService
    /// enabled free tier and the paid tiers.
    /// `ready` requires every condition except `x_configured`, and requires
    /// `stripe_configured` only while paid tiers are offered.
+   /// `mode` is `sandbox` or `production`.
    struct Status
    {
       bool                   requests_enabled = false;
       bool                   billing_enabled  = false;
       bool                   ready            = false;
+      std::string            mode             = "sandbox";
       std::vector<Condition> conditions;
-      PSIO_REFLECT(Status, requests_enabled, billing_enabled, ready, conditions)
+      PSIO_REFLECT(Status, requests_enabled, billing_enabled, ready, mode, conditions)
    };
 
    /// `POST /signup` body. A missing `invite_id`, `payload`, or `token` is a
@@ -395,9 +401,10 @@ namespace LocalService
    /// `GET /status` and `GET /tiers` are anonymous. `GET` and
    /// `PUT /admin/config` require an x-admin administrator. `PUT` sets
    /// `requests_enabled`, `price_per_token_usd_micros`, each `free_tier`, `x`,
-   /// and `stripe.<mode>` field it carries, and `tiers` when present, and
-   /// nothing else. It returns 400 when the result has the free tier disabled
-   /// and no paid tiers.
+   /// `mode` (`sandbox` or `production`), and `stripe.<mode>` field it
+   /// carries, and `tiers` when present, and nothing else. It returns 400
+   /// when `mode` is anything else, or when the result has the free tier
+   /// disabled and no paid tiers.
    /// `POST /admin/agents/creator/keygen` returns `AgentKey("creator")`,
    /// creating it in `x-keys` when absent. It returns 409 when `ac-creator`
    /// already exists. `GET /admin/config` includes that key as `creator_pubkey`
@@ -408,26 +415,28 @@ namespace LocalService
    /// and returns 401 when there is none. `payload` is hex. It returns 403
    /// unless `requests_enabled` and `/status` `ready` hold, and 409 when
    /// `invite_id` already exists on chain. Each signup stores that session's
-   /// `x_id` and its tier's `usd_cents` and `tokens`.
+   /// `x_id`, its tier's `usd_cents` and `tokens`, and the active Stripe `mode`.
    ///
    /// A free signup also returns 403 unless `free_tier.enabled`, and 409 when
    /// this X user already has a free signup that is not `failed`. It is stored
    /// `queued` (both amounts 0 when billing is disabled), and an immediate
    /// `x-timer` callback provisions it.
    ///
-   /// A paid signup is stored `pending`, and x-portal creates a Stripe
-   /// Embedded Checkout Session for it with the active mode's keys. It returns
+   /// A paid signup is stored `pending` in the active mode, and x-portal creates
+   /// a Stripe Embedded Checkout Session for it with that mode's keys. It returns
    /// `CheckoutReceipt`, or 502 when Stripe does not create the session, which
    /// fails the signup with Stripe's reply as `last_error`.
    ///
    /// `POST /stripe/webhook` returns 400 unless `Stripe-Signature` carries a
-   /// `v1` HMAC-SHA256 of `"<t>.<body>"` under the active mode's
-   /// `webhook_secret`, with `t` within 5 minutes. A verified
+   /// `v1` HMAC-SHA256 of `"<t>.<body>"` under either mode's `webhook_secret`,
+   /// with `t` within 5 minutes. A verified
    /// `checkout.session.completed` or `checkout.session.async_payment_succeeded`
-   /// for a known signup records the event id. An id already recorded is
-   /// ignored, so redelivery does not queue or provision the signup again.
-   /// When the session is `paid` and the signup is `pending`, it becomes
-   /// `queued` and is provisioned. Every verified event gets 200.
+   /// records the event id only on a signup of a mode whose secret matched.
+   /// An id already recorded is ignored, so redelivery does not queue or
+   /// provision the signup again. When the session is `paid` and the signup is
+   /// `pending`, it becomes `queued` and is provisioned. Every verified event
+   /// gets 200. A session created before a mode switch still completes: its
+   /// record's mode, not the active mode, selects which secret applies.
    ///
    /// Provisioning submits each signed push to this node's `transact` endpoint
    /// over a unix-socket listener, or over plain `http` when no socket is
@@ -452,8 +461,8 @@ namespace LocalService
    ///
    /// `GET /signup/:id` returns `SignupView` to the owning X session. No
    /// session is 401; anything else that is not that session's signup is 404.
-   /// `GET /admin/signups?state=failed` returns `FailedSignup` rows for an
-   /// administrator.
+   /// `GET /admin/signups?state=failed` returns `FailedSignup` rows of the
+   /// active mode for an administrator.
    /// `POST /admin/signups/:id/retry` requeues an interrupted `queued` signup
    /// after a node restart, preserving its invite and attempt count, and
    /// reruns provisioning for a `failed` signup from attempt zero. A failed

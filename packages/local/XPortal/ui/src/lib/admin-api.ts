@@ -15,6 +15,10 @@ const zStripeKeys = z.object({
     webhook_secret: z.string().nullish(),
 });
 
+const zStripeMode = z.enum(["sandbox", "production"]);
+
+export type StripeKeys = z.infer<typeof zStripeKeys>;
+
 const zPricingBasis = z.object({
     precision: z.number().int().nonnegative(),
     /** The system token's issued minus burned supply. */
@@ -45,12 +49,17 @@ const zAdminConfig = z.object({
         client_secret: z.string().nullish(),
     }),
     x_callback_url: z.string(),
-    stripe: z.object({ sandbox: zStripeKeys }),
+    mode: zStripeMode,
+    stripe: z.object({
+        sandbox: zStripeKeys,
+        production: zStripeKeys,
+    }),
 });
 
 const zPortalStatus = z.object({
     requests_enabled: z.boolean(),
     billing_enabled: z.boolean(),
+    mode: zStripeMode,
     conditions: z.array(
         z.object({
             id: z.string(),
@@ -96,8 +105,12 @@ export const getAdminConfig = () =>
 export const putAdminConfig = async (
     patch: {
         requests_enabled?: boolean;
+        mode?: AdminConfig["mode"];
         x?: Record<string, string>;
-        stripe?: { sandbox: Record<string, string> };
+        stripe?: {
+            sandbox?: Record<string, string>;
+            production?: Record<string, string>;
+        };
     } & Partial<PricingPatch>,
 ) => {
     const res = await fetch("/admin/config", {

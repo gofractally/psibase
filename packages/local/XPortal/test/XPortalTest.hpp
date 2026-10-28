@@ -54,6 +54,18 @@ namespace
       PSIO_REFLECT(RequestsSwitch, requests_enabled)
    };
 
+   struct StripeModeBody
+   {
+      std::string mode;
+      PSIO_REFLECT(StripeModeBody, mode)
+   };
+
+   struct BothStripeCredentials
+   {
+      StripeConfig stripe;
+      PSIO_REFLECT(BothStripeCredentials, stripe)
+   };
+
    auto pubFromPem = [](std::string_view pem)
    { return SubjectPublicKeyInfo{parseSubjectPublicKeyInfo(pem)}; };
    auto privFromPem = [](std::string_view pem) { return PrivateKeyInfo{parsePrivateKeyInfo(pem)}; };
@@ -406,6 +418,10 @@ namespace
                                .publishable_key = "pk_test_public",
                                .webhook_secret  = "whsec_test-5678"};
 
+   const StripeKeys testProduction{.secret_key      = "sk_live_secret-wxyz",
+                                   .publishable_key = "pk_live_public",
+                                   .webhook_secret  = "whsec_live-5678"};
+
    void configureStripe(DefaultTestChain& t)
    {
       t.put(XPortal::service, "/admin/config",
@@ -414,7 +430,12 @@ namespace
 
    // A paid signup for tier 0 that Stripe has not reported paid. Its id's
    // first byte is `inviteId`.
-   Checksum256 storePendingSignup(uint8_t inviteId, std::string xId)
+   std::string signupIdText(const Checksum256& id)
+   {
+      return toBase64Url({reinterpret_cast<const char*>(id.data()), id.size()});
+   }
+
+   Checksum256 storePendingSignup(uint8_t inviteId, std::string xId, std::string mode = "sandbox")
    {
       Checksum256 id{};
       id[0]    = inviteId;
@@ -428,7 +449,8 @@ namespace
                                                .created   = now,
                                                .updated   = now,
                                                .x_id      = std::move(xId),
-                                               .tier      = 0});
+                                               .tier      = 0,
+                                               .mode      = std::move(mode)});
       return id;
    }
 
@@ -448,13 +470,13 @@ namespace
       return std::format("t={},v1={}", t, hex);
    }
 
-   std::string paidCheckoutEvent(std::string_view signupId)
+   std::string paidCheckoutEvent(std::string_view signupId, std::string_view eventId = "evt_1")
    {
       return std::format(
-          R"({{"id":"evt_1","object":"event","type":"checkout.session.completed",)"
+          R"({{"id":"{}","object":"event","type":"checkout.session.completed",)"
           R"("data":{{"object":{{"id":"cs_test_1","object":"checkout.session","amount_total":500,)"
           R"("customer":null,"payment_status":"paid","metadata":{{"signup_id":"{}"}}}}}}}})",
-          signupId);
+          eventId, signupId);
    }
 
    HttpReply postWebhook(DefaultTestChain& t, std::string_view body, std::string_view signature)
@@ -465,4 +487,3 @@ namespace
                               RawBody{"application/json", std::string{body}}));
    }
 }  // namespace
-
