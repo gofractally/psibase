@@ -49,6 +49,7 @@ fn lookup_account(name: String) -> Result<Option<Account>, Error> {
         Some(acct_val) => Ok(Some(Account {
             account_num: acct_val.accountNum.to_string(),
             auth_service: acct_val.authService.to_string(),
+            auth_sequence: acct_val.authSequence,
         })),
         None => Ok(None),
     }

@@ -287,6 +287,7 @@ add_rs_component_workspace(packages/:Plugins
     kvtests
     setcode
     clientdata
+    explorer
     invite
     packages
     permissions
@@ -494,6 +495,11 @@ cargo_psibase_package(
     TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthRecover.psi
+    PATH packages/system/AuthRecover
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
+)
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
@@ -626,6 +632,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/WsAuth.psi
+    PATH packages/system/WsAuth
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Subgroups.psi
     PATH packages/user/Subgroups
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -713,6 +725,7 @@ psibase_package(
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-delg
         DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
+        EXPORT auth-delegate
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "AuthDelegateService(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
@@ -947,10 +960,12 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Explorer-schema.json
         SERVER explorer
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/ui/dist /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_explorer} /plugin.wasm
     DEPENDS ${Explorer_js_DEP}
+    DEPENDS ${Plugins_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "AuthDelegate(^${PSIBASE_VERSION}.0)" "AuthDyn(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Packages(^${PSIBASE_VERSION}.0)" "Producers(^${PSIBASE_VERSION}.0)" "Registry(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1319,7 +1334,7 @@ psibase_package(
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthNone AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
 psibase_package(
@@ -1329,7 +1344,7 @@ psibase_package(
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthNone AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
 psibase_package(
@@ -1390,9 +1405,9 @@ function(write_package_index target dir reserve)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
-    Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
+    Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
@@ -1405,6 +1420,7 @@ install(
           ${SERVICE_DIR}/AuthDyn.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthDelegateService.psi
+          ${SERVICE_DIR}/AuthRecover.psi
           ${SERVICE_DIR}/AuthSig.psi
           ${SERVICE_DIR}/AuthSigService.psi
           ${SERVICE_DIR}/Base64.psi
@@ -1470,6 +1486,7 @@ install(
           ${SERVICE_DIR}/VirtualServer.psi
           ${SERVICE_DIR}/WebCrypto.psi
           ${SERVICE_DIR}/Workshop.psi
+          ${SERVICE_DIR}/WsAuth.psi
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
           ${SERVICE_DIR}/XBasic.psi
