@@ -30,7 +30,10 @@ import {
     putAdminConfig,
     putRequestsEnabled,
 } from "../lib/admin-api";
-import { PortalError } from "../lib/portal-api";
+import { PortalError, errorText } from "../lib/portal-api";
+import { savedPricing } from "../lib/pricing";
+import { AdminSection } from "./admin-section";
+import { PricingSection } from "./admin-pricing";
 
 const adminConfigKey = ["admin-config"];
 const portalStatusKey = ["portal-status"];
@@ -43,9 +46,6 @@ const formatUtc = (iso: string) => {
     const pad = (value: number) => String(value).padStart(2, "0");
     return `${parsed.getUTCFullYear()}-${pad(parsed.getUTCMonth() + 1)}-${pad(parsed.getUTCDate())} ${pad(parsed.getUTCHours())}:${pad(parsed.getUTCMinutes())}:${pad(parsed.getUTCSeconds())} UTC`;
 };
-
-const errorText = (error: unknown) =>
-    error instanceof Error ? error.message : String(error);
 
 const errorMessage = (error: unknown) =>
     error == null ? "Request failed" : errorText(error);
@@ -67,19 +67,6 @@ const billingReadinessRows = [
         unmet: "ac-creator needs resources bought for it. Sending tokens does not add resources.",
     },
 ] as const;
-
-const AdminSection = ({
-    title,
-    children,
-}: {
-    title: string;
-    children: React.ReactNode;
-}) => (
-    <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-medium">{title}</h2>
-        {children}
-    </section>
-);
 
 const ReadinessRow = ({
     label,
@@ -336,8 +323,8 @@ export const AdminPage = () => {
     });
     const saveConfig = async (patch: Parameters<typeof putAdminConfig>[0]) => {
         await putAdminConfig(patch);
-        void queryClient.invalidateQueries({ queryKey: adminConfigKey });
         void queryClient.invalidateQueries({ queryKey: portalStatusKey });
+        await queryClient.invalidateQueries({ queryKey: adminConfigKey });
     };
 
     if (
@@ -371,6 +358,7 @@ export const AdminPage = () => {
     const creatorReady = conditionOk(conditions, "creator_ready");
     const pubkey = creator.data.pubkey ?? config.data.creator_pubkey ?? null;
     const { x, stripe } = config.data;
+    const pricing = savedPricing(config.data);
     const webhookUrl = `${window.location.origin}/stripe/webhook`;
 
     return (
@@ -443,6 +431,8 @@ export const AdminPage = () => {
                     </p>
                 )}
             </AdminSection>
+
+            {pricing && <PricingSection saved={pricing} onSave={saveConfig} />}
 
             <AdminSection title="Sign in with X">
                 <div className="flex items-start gap-2 rounded-lg border px-4 py-3">

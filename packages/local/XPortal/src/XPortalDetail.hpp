@@ -112,6 +112,7 @@ namespace xportal
    XConfig maskedX(XConfig x);
    StripeConfig maskedStripe(StripeConfig stripe);
    std::string xCallbackUrl(const HttpRequest& req, bool tls);
+   std::optional<PricingBasis> pricingBasis();
    AdminConfig adminView(const HttpRequest& req, const PortalConfig& config, bool tls);
    Status portalStatus(const PortalConfig& config);
    HttpReply serveStatus(const HttpRequest& req);
@@ -129,6 +130,10 @@ namespace xportal
                                                std::string_view       path,
                                                StripeKeys&            keys);
    std::optional<std::string> updateStripe(const psio::json::any& value, StripeConfig& stripe);
+   std::optional<std::string> readPositive(const psio::json::any& value,
+                                           std::string_view       name,
+                                           uint64_t&              out);
+   std::optional<std::string> updateFreeTier(const psio::json::any& value, TierConfig& tier);
    std::optional<std::string> updateTiers(const psio::json::any& value,
                                           std::vector<PaidTier>& tiers);
    std::optional<std::string> updateConfig(const HttpRequest& req, PortalConfig& config);

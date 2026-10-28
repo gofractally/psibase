@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 import { Loader } from "./loader";
 import {
     formatTokenAmount,
+    formatUsdCents,
     getSystemToken,
     getTiers,
     PortalError,
@@ -17,12 +18,6 @@ import {
 import { startSignup } from "../lib/signup-request";
 
 const FREE = "free";
-
-const formatUsd = (cents: number) =>
-    (cents / 100).toLocaleString("en-US", {
-        style: "currency",
-        currency: "USD",
-    });
 
 export const SignUpStep = ({
     onRequested,
@@ -144,7 +139,7 @@ export const SignUpStep = ({
                                 </span>
                             </span>
                             <span className="text-muted-foreground">
-                                {formatUsd(option.usdCents)}
+                                {formatUsdCents(option.usdCents)}
                             </span>
                         </Label>
                     ))}

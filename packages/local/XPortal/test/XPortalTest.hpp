@@ -54,13 +54,6 @@ namespace
       PSIO_REFLECT(RequestsSwitch, requests_enabled)
    };
 
-   struct RequestsAndPrice
-   {
-      bool     requests_enabled           = false;
-      uint64_t price_per_token_usd_micros = 0;
-      PSIO_REFLECT(RequestsAndPrice, requests_enabled, price_per_token_usd_micros)
-   };
-
    auto pubFromPem = [](std::string_view pem)
    { return SubjectPublicKeyInfo{parseSubjectPublicKeyInfo(pem)}; };
    auto privFromPem = [](std::string_view pem) { return PrivateKeyInfo{parsePrivateKeyInfo(pem)}; };

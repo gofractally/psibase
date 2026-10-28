@@ -28,11 +28,11 @@ export type SignupReceipt = z.infer<typeof zSignupReceipt>;
 
 // The node sends u64 as a JSON string. A number is accepted so a small
 // value that arrives unquoted still parses.
-const zU64 = z
+export const zU64 = z
     .union([z.string(), z.number()])
     .transform((value): string => String(value));
 
-const zQuantity = z.object({ value: zU64 });
+export const zQuantity = z.object({ value: zU64 });
 
 const zTierOffer = z.object({
     usd_cents: z.coerce.number(),
@@ -76,18 +76,26 @@ export const getSystemToken = async (): Promise<SystemTokenInfo | null> => {
     });
 };
 
-/** `raw` is the grant in the token's smallest units. */
-export const formatTokenAmount = (raw: string, token: SystemTokenInfo) => {
-    const digits =
-        token.precision === 0 ? raw : raw.padStart(token.precision + 1, "0");
-    const cut = digits.length - token.precision;
+/** `raw` is an amount in smallest units of a token with `precision`. */
+export const formatUnits = (raw: string, precision: number) => {
+    const digits = precision === 0 ? raw : raw.padStart(precision + 1, "0");
+    const cut = digits.length - precision;
     const whole = digits.slice(0, cut).replace(/^0+(?=\d)/, "");
-    const frac =
-        token.precision === 0 ? "" : digits.slice(cut).replace(/0+$/, "");
+    const frac = precision === 0 ? "" : digits.slice(cut).replace(/0+$/, "");
     const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    const amount = frac ? `${grouped}.${frac}` : grouped;
-    return `${amount} ${token.symbol}`;
+    return frac ? `${grouped}.${frac}` : grouped;
 };
+
+/** e.g. `$1,250.00`. */
+export const formatUsdCents = (cents: number) =>
+    (cents / 100).toLocaleString("en-US", {
+        style: "currency",
+        currency: "USD",
+    });
+
+/** `raw` is the grant in the token's smallest units. */
+export const formatTokenAmount = (raw: string, token: SystemTokenInfo) =>
+    `${formatUnits(raw, token.precision)} ${token.symbol}`;
 
 const zSignupView = z.discriminatedUnion("state", [
     z.object({ state: z.literal("pending") }),
@@ -105,6 +113,9 @@ export class PortalError extends Error {
         super(message);
     }
 }
+
+export const errorText = (error: unknown) =>
+    error instanceof Error ? error.message : String(error);
 
 export const parseReply = async <T>(
     reply: Promise<Response>,

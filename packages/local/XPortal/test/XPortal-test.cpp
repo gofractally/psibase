@@ -53,7 +53,8 @@ TEST_CASE("status, requests switch, and seeded pricing")
                                                   RawBody{"application/json", "{}"}));
    CHECK(missing.status == HttpStatus::badRequest);
    CHECK(std::string(missing.body.begin(), missing.body.end()) ==
-         "requests_enabled, x, stripe, or tiers is required\n");
+         "requests_enabled, price_per_token_usd_micros, free_tier, x, stripe, or tiers is "
+         "required\n");
    auto badType =
        t.http(HttpRequestBuilder{}.put(XPortal::service, "/admin/config",
                                        RawBody{"application/json", R"({"requests_enabled":1})"}));
@@ -71,8 +72,7 @@ TEST_CASE("status, requests switch, and seeded pricing")
    status = t.get<Status>(XPortal::service, "/status");
    CHECK(status.requests_enabled);
 
-   t.put(XPortal::service, "/admin/config",
-         RequestsAndPrice{.requests_enabled = false, .price_per_token_usd_micros = 99});
+   t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = false});
    config = t.get<AdminConfig>(XPortal::service, "/admin/config");
    CHECK(config.requests_enabled == false);
    CHECK(!config.price_per_token_usd_micros.has_value());
@@ -651,4 +651,20 @@ TEST_CASE("paid tiers stay hidden until billing is enabled")
    CHECK(offers.tiers[0].usd_cents == 500);
    CHECK(offers.tiers[0].index == 0);
    CHECK(offers.tiers[0].buffer_multiple == 2);
+}
+
+TEST_CASE("admin config refuses to leave no tier offered")
+{
+   DefaultTestChain t{portalPackages};
+   installPortal(t);
+   enableBilling(t, AccountNumber{"alice"});
+   auto before = t.get<AdminConfig>(XPortal::service, "/admin/config");
+   REQUIRE(before.free_tier.enabled);
+   REQUIRE(!before.tiers.empty());
+
+   CHECK(putConfigExpectBadRequest(t, R"({"free_tier":{"enabled":false},"tiers":[]})") ==
+         "the free tier or a paid tier must be offered\n");
+   auto after = t.get<AdminConfig>(XPortal::service, "/admin/config");
+   CHECK(after.free_tier.enabled);
+   CHECK(after.tiers.size() == before.tiers.size());
 }

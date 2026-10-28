@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-import { parseReply, PortalError } from "./portal-api";
+import { parseReply, PortalError, zQuantity, zU64 } from "./portal-api";
 
 const zAllowedAction = z.object({
     service: z.string(),
@@ -15,8 +15,26 @@ const zStripeKeys = z.object({
     webhook_secret: z.string().nullish(),
 });
 
+const zPricingBasis = z.object({
+    precision: z.number().int().nonnegative(),
+    /** The system token's issued minus burned supply. */
+    supply: zQuantity,
+    std_buffer_cost: zQuantity,
+});
+
 const zAdminConfig = z.object({
     requests_enabled: z.boolean(),
+    /** USD micros per whole system token. */
+    price_per_token_usd_micros: zU64.nullish(),
+    free_tier: z.object({
+        enabled: z.boolean(),
+        usd_cents: z.coerce.number().nullish(),
+    }),
+    /** Set while billing is enabled. */
+    pricing_basis: zPricingBasis.nullish(),
+    tiers: z.array(
+        z.object({ label: z.string(), usd_cents: z.coerce.number() }),
+    ),
     producer: z.string().nullish(),
     account: z.string().nullish(),
     creator_pubkey: z.string().nullish(),
@@ -53,7 +71,15 @@ const zAgentKey = z.object({
 });
 
 export type AllowedAction = z.infer<typeof zAllowedAction>;
+export type PricingBasis = z.infer<typeof zPricingBasis>;
 export type AdminConfig = z.infer<typeof zAdminConfig>;
+
+/** Pricing as `PUT /admin/config` takes it. The price is a u64 string. */
+export type PricingPatch = {
+    price_per_token_usd_micros: string;
+    free_tier: { enabled: boolean; usd_cents: number };
+    tiers: { label: string; usd_cents: number }[];
+};
 export type PortalStatus = z.infer<typeof zPortalStatus>;
 export type FailedSignup = z.infer<typeof zFailedSignup>;
 
@@ -67,11 +93,13 @@ export const getAdminConfig = () =>
     parseReply(fetch("/admin/config"), zAdminConfig);
 
 /** Sets each field `patch` carries. */
-export const putAdminConfig = async (patch: {
-    requests_enabled?: boolean;
-    x?: Record<string, string>;
-    stripe?: { sandbox: Record<string, string> };
-}) => {
+export const putAdminConfig = async (
+    patch: {
+        requests_enabled?: boolean;
+        x?: Record<string, string>;
+        stripe?: { sandbox: Record<string, string> };
+    } & Partial<PricingPatch>,
+) => {
     const res = await fetch("/admin/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

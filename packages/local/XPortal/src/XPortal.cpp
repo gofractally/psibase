@@ -96,14 +96,15 @@ namespace xportal
       return scale;
    }
 
-   // $2.50 per standard buffer, stored as USD micros per whole token.
-   // Unset paid tiers become Small $5, Medium $12.50, and Large $25.
+   // $2.50 per standard buffer, stored as USD micros per whole token. An
+   // unset free tier amount becomes $2.50. When the price is first seeded and
+   // no paid tiers are set, they become Small $5, Medium $12.50, and Large $25.
    PortalConfig ensurePriced(PortalConfig config)
    {
-      if (!to<VirtualServer>().is_billing_enabled())
+      if (!to<VirtualServer>().is_billing_enabled() ||
+          (config.price_per_token_usd_micros && config.free_tier.usd_cents))
          return config;
 
-      bool changed = false;
       if (!config.price_per_token_usd_micros)
       {
          auto token = to<Tokens>().getSysToken();
@@ -116,19 +117,14 @@ namespace xportal
          auto price = (seedUsdMicros * scale) / cost;
          check(price != 0, "seeded token price is zero for buffer cost " + std::to_string(cost));
          config.price_per_token_usd_micros = price;
-         config.free_tier.enabled          = true;
-         config.free_tier.usd_cents        = freeTierUsdCents;
-         changed                           = true;
+         if (config.tiers.empty())
+            config.tiers = {{.label = "Small", .usd_cents = smallTierUsdCents},
+                            {.label = "Medium", .usd_cents = mediumTierUsdCents},
+                            {.label = "Large", .usd_cents = largeTierUsdCents}};
       }
-      if (config.tiers.empty())
-      {
-         config.tiers = {{.label = "Small", .usd_cents = smallTierUsdCents},
-                         {.label = "Medium", .usd_cents = mediumTierUsdCents},
-                         {.label = "Large", .usd_cents = largeTierUsdCents}};
-         changed      = true;
-      }
-      if (changed)
-         writeConfig(config);
+      if (!config.free_tier.usd_cents)
+         config.free_tier.usd_cents = freeTierUsdCents;
+      writeConfig(config);
       return config;
    }
 
@@ -411,6 +407,18 @@ namespace xportal
       return publicUrl(req, tls, host, "/auth/x/callback");
    }
 
+   std::optional<PricingBasis> pricingBasis()
+   {
+      if (!to<VirtualServer>().is_billing_enabled())
+         return std::nullopt;
+      auto token = to<Tokens>().getSysToken();
+      check(token.has_value(), "system token is not set");
+      return PricingBasis{
+          .precision       = token->precision.value,
+          .supply          = Quantity{token->issued_supply.value - token->burned_supply.value},
+          .std_buffer_cost = to<VirtualServer>().std_buffer_cost()};
+   }
+
    AdminConfig adminView(const HttpRequest& req, const PortalConfig& config, bool tls)
    {
       auto key = readCreatorAgentKey();
@@ -420,6 +428,7 @@ namespace xportal
           .free_tier                  = TierView{.enabled   = config.free_tier.enabled,
                                                  .usd_cents = config.free_tier.usd_cents,
                                                  .tokens    = freeTierTokens(config)},
+          .pricing_basis              = pricingBasis(),
           .producer                   = configuredProducer(),
           .account                    = to<RTransact>().getUser(req),
           .creator_pubkey =
@@ -581,6 +590,49 @@ namespace xportal
       return std::nullopt;
    }
 
+   // Returns the 400 message, naming the field `name`, when `value` is not a
+   // positive integer.
+   std::optional<std::string> readPositive(const psio::json::any& value,
+                                           std::string_view       name,
+                                           uint64_t&              out)
+   {
+      // JSON numbers arrive as their source text, the same as strings.
+      uint64_t parsed = 0;
+      if (auto text = value.get_if<std::string>())
+      {
+         auto end    = text->data() + text->size();
+         auto result = std::from_chars(text->data(), end, parsed);
+         if (result.ec == std::errc{} && result.ptr == end && parsed != 0)
+         {
+            out = parsed;
+            return std::nullopt;
+         }
+      }
+      return std::format("{} must be a positive integer\n", name);
+   }
+
+   std::optional<std::string> updateFreeTier(const psio::json::any& value, TierConfig& tier)
+   {
+      auto fields = value.get_if<psio::json::any_object>();
+      if (!fields)
+         return "free_tier must be an object\n";
+      if (auto enabled = objectField(*fields, "enabled"))
+      {
+         auto flag = enabled->get_if<bool>();
+         if (!flag)
+            return "free_tier.enabled must be a boolean\n";
+         tier.enabled = *flag;
+      }
+      if (auto cents = objectField(*fields, "usd_cents"))
+      {
+         uint64_t parsed = 0;
+         if (auto error = readPositive(*cents, "free_tier.usd_cents", parsed))
+            return error;
+         tier.usd_cents = parsed;
+      }
+      return std::nullopt;
+   }
+
    // A wrongly typed tier field aborts.
    std::optional<std::string> updateTiers(const psio::json::any& value,
                                           std::vector<PaidTier>& tiers)
@@ -596,17 +648,21 @@ namespace xportal
    }
 
    // Applies a `PUT /admin/config` body to `config`. Returns the 400 message
-   // when the body sets nothing or a field has the wrong type.
+   // when the body sets nothing, a field has the wrong type, or no tier is
+   // left offered.
    std::optional<std::string> updateConfig(const HttpRequest& req, PortalConfig& config)
    {
       auto object = psio::convert_from_json<psio::json::any_object>(
           std::string(req.body.begin(), req.body.end()));
       auto requests = objectField(object, "requests_enabled");
+      auto price    = objectField(object, "price_per_token_usd_micros");
+      auto freeTier = objectField(object, "free_tier");
       auto x        = objectField(object, "x");
       auto stripe   = objectField(object, "stripe");
       auto tiers    = objectField(object, "tiers");
-      if (!requests && !x && !stripe && !tiers)
-         return "requests_enabled, x, stripe, or tiers is required\n";
+      if (!requests && !price && !freeTier && !x && !stripe && !tiers)
+         return "requests_enabled, price_per_token_usd_micros, free_tier, x, stripe, or tiers is "
+                "required\n";
       if (requests)
       {
          auto flag = requests->get_if<bool>();
@@ -614,6 +670,16 @@ namespace xportal
             return "requests_enabled must be a boolean\n";
          config.requests_enabled = *flag;
       }
+      if (price)
+      {
+         uint64_t parsed = 0;
+         if (auto error = readPositive(*price, "price_per_token_usd_micros", parsed))
+            return error;
+         config.price_per_token_usd_micros = parsed;
+      }
+      if (freeTier)
+         if (auto error = updateFreeTier(*freeTier, config.free_tier))
+            return error;
       if (x)
          if (auto error = updateX(*x, config.x))
             return error;
@@ -621,7 +687,10 @@ namespace xportal
          if (auto error = updateStripe(*stripe, config.stripe))
             return error;
       if (tiers)
-         return updateTiers(*tiers, config.tiers);
+         if (auto error = updateTiers(*tiers, config.tiers))
+            return error;
+      if (!config.free_tier.enabled && config.tiers.empty())
+         return "the free tier or a paid tier must be offered\n";
       return std::nullopt;
    }
 

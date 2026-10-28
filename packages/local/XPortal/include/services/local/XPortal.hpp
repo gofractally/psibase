@@ -228,11 +228,25 @@ namespace LocalService
       PSIO_REFLECT(TierView, enabled, usd_cents, tokens)
    };
 
+   /// What tier grants are computed from. A tier's `tokens` is
+   /// `usd_cents * 10^4 * 10^precision / price_per_token_usd_micros`, and the
+   /// network market cap is that price times `supply`, the system token's
+   /// issued minus burned supply.
+   struct PricingBasis
+   {
+      uint8_t               precision = 0;
+      UserService::Quantity supply;
+      UserService::Quantity std_buffer_cost;
+      PSIO_REFLECT(PricingBasis, precision, supply, std_buffer_cost)
+   };
+
    struct AdminConfig
    {
-      bool                                  requests_enabled = false;
-      std::optional<uint64_t>               price_per_token_usd_micros;
-      TierView                              free_tier;
+      bool                    requests_enabled = false;
+      std::optional<uint64_t> price_per_token_usd_micros;
+      TierView                free_tier;
+      /// Set while billing is enabled.
+      std::optional<PricingBasis>           pricing_basis;
       std::optional<psibase::AccountNumber> producer;
       std::optional<psibase::AccountNumber> account;
       /// PEM public key once `POST /admin/agents/creator/keygen` has stored one.
@@ -251,6 +265,7 @@ namespace LocalService
                    requests_enabled,
                    price_per_token_usd_micros,
                    free_tier,
+                   pricing_basis,
                    producer,
                    account,
                    creator_pubkey,
@@ -376,8 +391,10 @@ namespace LocalService
    ///
    /// `GET /status` and `GET /tiers` are anonymous. `GET` and
    /// `PUT /admin/config` require an x-admin administrator. `PUT` sets
-   /// `requests_enabled`, each `x` and `stripe.<mode>` field it carries, and
-   /// `tiers` when present, and nothing else.
+   /// `requests_enabled`, `price_per_token_usd_micros`, each `free_tier`, `x`,
+   /// and `stripe.<mode>` field it carries, and `tiers` when present, and
+   /// nothing else. It returns 400 when the result has the free tier disabled
+   /// and no paid tiers.
    /// `POST /admin/agents/creator/keygen` returns `AgentKey("creator")`,
    /// creating it in `x-keys` when absent. It returns 409 when `ac-creator`
    /// already exists. `GET /admin/config` includes that key as `creator_pubkey`
