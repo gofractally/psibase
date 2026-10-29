@@ -1,3 +1,5 @@
+import type { AutoRedirectConfig } from "@psibase/common-lib";
+
 import { z } from "zod";
 
 import { supervisor } from "@shared/lib/supervisor";
@@ -210,49 +212,46 @@ export const activateCreatorKey = async () => {
     }
 };
 
+const redirectToAdmin: AutoRedirectConfig = {
+    enabled: true,
+    returnPath: "/admin",
+};
+
+const callAdminPlugin = (method: string, params: unknown[]) =>
+    supervisor.functionCall(
+        {
+            service: "x-portal",
+            plugin: "plugin",
+            intf: "api",
+            method,
+            params,
+        },
+        redirectToAdmin,
+    );
+
 /** The signed-in producer creates `ac-creator`, owned by `owner`, for `pubkeyPem`, with auto-debit on. */
 export const createAdminAccounts = (args: {
     pubkeyPem: string;
     owner: string;
     allowed: AllowedAction[];
 }) =>
-    supervisor.functionCall({
-        service: "x-portal",
-        plugin: "plugin",
-        intf: "api",
-        method: "createAdminAccounts",
-        params: [args.pubkeyPem, args.owner, args.allowed],
-    });
+    callAdminPlugin("createAdminAccounts", [
+        args.pubkeyPem,
+        args.owner,
+        args.allowed,
+    ]);
 
 /** The signed-in admin credits `amount` of the system token to `ac-creator`. */
 export const sendCreatorTokens = (amount: string) =>
-    supervisor.functionCall({
-        service: "x-portal",
-        plugin: "plugin",
-        intf: "api",
-        method: "sendTokens",
-        params: [amount],
-    });
+    callAdminPlugin("sendTokens", [amount]);
 
 /** The signed-in admin buys `amount` of resources for `ac-creator`. */
 export const sendCreatorResources = (amount: string) =>
-    supervisor.functionCall({
-        service: "x-portal",
-        plugin: "plugin",
-        intf: "api",
-        method: "sendResources",
-        params: [amount],
-    });
+    callAdminPlugin("sendResources", [amount]);
 
 /** The signed-in owner sets `ac-creator`'s key. `pubkeyPem` is the pending key. */
 export const setCreatorKey = (pubkeyPem: string) =>
-    supervisor.functionCall({
-        service: "x-portal",
-        plugin: "plugin",
-        intf: "api",
-        method: "setCreatorKey",
-        params: [pubkeyPem],
-    });
+    callAdminPlugin("setCreatorKey", [pubkeyPem]);
 
 /** Smallest-unit `raw` as a decimal the tokens plugin accepts. No grouping separators. */
 export const formatDecimal = (raw: bigint, precision: number) =>
