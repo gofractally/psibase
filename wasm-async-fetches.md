@@ -216,3 +216,70 @@ Psibase pins jco **1.35.0**. Any JSPI work that relies on correct async construc
 ```
 
 **Root constraint:** sync component-model lowering + sync WIT bridge + sync call stack through plugins. Sync XHR and LocalStorage are the browser APIs chosen to match that ABI. **Unlock for non-blocking / overlapping plugin fetches:** JSPI (or CM async) on bridge imports, async `entry`/tx boundaries, and a concurrency story beyond the current global serializer—after composition makes bridge-only leaves the remaining JS I/O on the hot path.
+
+---
+
+## Cloud agent clarification
+
+_Added 2026-10-29 by Michael's assistant. Expands the three unlock items above into concrete work. Line numbers are from this branch's base (`8663bc165`). Items marked **(unverified)** need a spike to confirm._
+
+### 1. JSPI on bridge imports
+
+- **WIT probably does not need to change for JSPI.** Under JSPI the guest still sees a *sync* import: the JS host returns a Promise, and `WebAssembly.Suspending` parks the Wasm stack until it resolves. So `send-request` in `Host/plugin/*/wit/deps/supervisor.wit` (6 copies: client, auth, db, prompt, crypto, http) can stay `func`. Changing it to CM `async func` is the *other* option (component-model async/WASIp3). That changes guest bindings and is a much larger change, so don't take it in this wave.
+- **Rust guest impact under JSPI: none expected.** `HttpRequest::send` → `Supervisor::send_request` stays blocking-style Rust. **(unverified):** whether the wit-bindgen version we use emits anything that breaks across a suspension, e.g. re-entrancy guards.
+- **jco:** bump `@bytecodealliance/jco` from 1.35.0 (`Supervisor/ui/package.json:13`) to a release that includes the JSPI codegen fixes, at least the one carrying jco #2308 (js-component-bindgen ≥ 2.17.0). Then extend `GenerateOptions` (`loader.ts:232-241`) with the async-mode / async-imports / async-exports equivalents of the CLI flags `--async-mode jspi --async-imports … --async-exports …`. The docs still call these flags EXPERIMENTAL. **(unverified):** the exact property names in the programmatic `generate()` API. Check them against the bumped version's types.
+- **Imports to mark async (first cut):** `supervisor:bridge/intf#send-request` and `supervisor:bridge/database#get|set|remove`. Later candidates: `sign`/`sign-explicit`/`import-key*`, for SubtleCrypto, which is async-only. Leave `prompt#request-prompt`, `service-stack`, `get-root-domain` and `get-chain-id` sync.
+- **Exports to mark async:** every plugin export that can transitively reach an async import. In practice that's all of them, because any plugin may call `host:http`/`host:db`. Each one becomes `WebAssembly.promising`-wrapped and returns a Promise to JS.
+- **Browser support:** JSPI is in Chrome/Edge 137+, Firefox 153+ and Safari/iOS 27+ (Baseline "newly available" since 2026-09-14). Older Safari/iOS (≤26) has none, so decide on a fallback, either keeping the sync path or refusing to run (see Open questions).
+
+### 2. Async entry and transaction boundaries
+
+| Site | Today | Change |
+|------|-------|--------|
+| `supervisor.ts:452-528` `entry` | sync `supervisorCall(start-tx)` → `this.call` → `supervisorCall(finish-tx)` | `await` all three; `start-tx`/`finish-tx` are plugin exports, so they become promising too |
+| `plugin/plugin.ts:170-190` `Plugin.call` | `return func(...params)` | `return await func(...params)` (async method) |
+| `loader.ts:114-122` interface proxies → `host.syncCall` | sync closure | Must become a **`WebAssembly.Suspending` import** that awaits the callee's promising export. Nested JSPI suspension across two instances is allowed, but the composition plan rejects async-`syncCall` between composites. So land **host fold / composition first** so this path mostly disappears; whatever remains must be Suspending |
+| `loader.ts:136-200` `addResourceProxy` | JS `constructor` calls `syncCallResource` | A constructor can't be async. Use a Suspending factory, or jco's #2308 pattern (`return (async () => …)()`). **(unverified)** how jco's generated import glue expects an async resource constructor |
+| `plugin-host.ts:269-280` `syncCall*` | thin sync wrappers | rename/convert to async |
+| `plugin-host.ts:125-…` `sendRequest` | sync XHR + `x-user-defined` byte hack | `fetch` + `arrayBuffer()`; drop the binary workaround |
+| `plugin-host.ts:219-237` `db*` | `localStorage`/`sessionStorage` + base64 | IndexedDB store keyed by `(duration, key)`, storing `Uint8Array` directly; one-time migration that copies existing localStorage keys over then deletes them; keep session-duration semantics (in-memory map or IDB cleared per session) |
+| `supervisor.ts:71`, `326-331` `PromptSignal` | thrown from a sync import, unwinds the Wasm stack synchronously | A throw from a Suspending import rejects the promise and unwinds through the promising export (this should behave like a trap). Verify that the `instanceof PromptSignal` checks in `entry` (`497-515`) still see the original object and not a wrapped `WebAssembly.Exception`/`RuntimeError` **(unverified)**. Note: the instance is poisoned after a trap, so `disposeAll()` in `finally` must stay |
+
+Also check `preload` (`supervisor.ts` ~`440-448`) and `getJson`-style handlers that call plugins: every caller of `Plugin.call` becomes async.
+
+### 3. Concurrency beyond the global serializer
+
+`window-messaging.ts:8-20` wraps every handler in `serialize()` (`serialize.ts:1-12`, a single module-level promise chain). `supervisor-concurrent-entry.test.ts` asserts that behavior. Even with async I/O, a single `entry` can't overlap with another one, because `Supervisor` keeps per-call mutable state on `this` (`context`, call stack, parent origination, `plugins.instantiateAll/disposeAll`, the tx context in `transact`).
+
+Options, in increasing difficulty:
+1. **Keep the global queue, async inside (recommended first).** The Supervisor thread is no longer blocked, the UI stays responsive, and one plugin can overlap its own fetches only if Rust guest code ever issues them concurrently (it can't under JSPI sync-style calls). Lowest risk.
+2. **Per-tx isolation and a queue per caller/app.** Move `context`/call stack/origination/tx state into a per-entry object passed down (or `AsyncLocalStorage`-like, which the browser doesn't have, so pass it explicitly). Separate component instances per entry, or proof that plugin instances are reentrancy-safe. `transact`'s tx context must be per-entry. Ordering: FIFO per origin, no ordering across origins.
+3. **Read-only parallelism.** Let entries that never call `add-action`/`finish-tx` submit run concurrently. That needs a way to know or enforce read-only (e.g. a query-only entry message type).
+4. **Overlapping fetches inside one call.** Needs CM async (`async func`, streams/futures) in the guest, not just JSPI. That's out of scope until WASIp3/jco CM-async support matures.
+
+Invariants to keep: prompts must still be exclusive (one prompt at a time); tx action order within an entry stays deterministic; `disposeAll` must not tear down instances used by another in-flight entry.
+
+### Phased migration
+
+| Phase | Scope | Files |
+|-------|-------|-------|
+| 0 Spike | jco bump; JSPI on `send-request` only; one test plugin; confirm PromptSignal and resource-proxy behavior | `Supervisor/ui/package.json`, `loader.ts:232-241`, `plugin-host.ts` |
+| 1 Composition | finish host fold so mid-call JS is bridge leaves only | per `scratch/plugin-composition-02-v1.md` |
+| 2 Async boundary | async `entry`/`Plugin.call`/start-tx/finish-tx; Suspending proxies; async resource proxies | `supervisor.ts`, `plugin/plugin.ts`, `loader.ts:114-200`, `plugin-host.ts:239-280`, `host-interface.ts`, tests |
+| 3 Async I/O | `fetch` in `sendRequest`; IndexedDB for `db*` + migration; update spec text | `plugin-host.ts:125-237`, `doc/src/specifications/app-architecture/plugins.md` |
+| 4 Concurrency (optional) | per-entry state, then per-origin queues | `window-messaging.ts`, `serialize.ts`, `supervisor.ts`, `call-context.ts`, `call-stack.ts`, `supervisor-concurrent-entry.test.ts` |
+
+### Risks
+
+- jco JSPI support is flagged experimental, so expect codegen bugs like #2308. Pin the version and add Supervisor-level tests.
+- Browsers without JSPI (Safari/iOS < 27) would fail at instantiate unless a sync fallback is kept. Keeping two paths doubles the test surface.
+- Error semantics: traps/rejections through promising exports may change how `getRecoverableError` and `PromptSignal` are detected.
+- localStorage → IndexedDB data migration: users lose plugin state if the migration fails, and private-mode IDB quirks are a concern.
+- Async adds interleaving points. Even with the global queue, UI-side events (e.g. logout) can now run mid-entry.
+
+### Open questions
+
+- Drop browsers without JSPI, or keep the sync XHR/localStorage path behind feature detection?
+- Is the long-term target JSPI (sync WIT) or CM async (`async func`)? Only CM async gives in-call parallel fetches.
+- Do we need any concurrency beyond option 1, and is there a concrete use case for it?
+- Should crypto imports move to async SubtleCrypto in the same wave?
