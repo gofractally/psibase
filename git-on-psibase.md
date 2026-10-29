@@ -1,12 +1,17 @@
 # Git on Psibase
 
-A git remote on Psibase is an on-chain service plus a small client program. The service is the repository: refs and loose objects in the consensus database, served over ordinary HTTP (Hypertext Transfer Protocol). Stock `git clone` and `git fetch` work against that HTTP URL. Stock `git push` does not. Push goes through a git remote helper that signs a normal Psibase transaction.
+Primary approach: **keep separate instantiations**. Two ways to run git, with no shared data path.
 
-No node-local service is on this path. Local services are the wrong place to keep a repo, and they cannot run git.
+1. **On-chain objects.** A `git` service stores refs and loose objects in the consensus database and serves them over ordinary HTTP (Hypertext Transfer Protocol). Stock `git clone` and `git fetch` work against that URL. Stock `git push` does not. Push goes through a git remote helper that signs a normal Psibase transaction. This is the instantiation to build. No node-local service is on this path. Local services cannot run git, and they are the wrong place to keep this repo.
+2. **Node-hosted repo.** A sidecar on one machine stores a bare repo and speaks smart HTTP. The chain, if that deployment uses it, records ref hashes and not the objects. Compared in [The other instantiation](#the-other-instantiation). It is a different deployment, not a cache or a front end for the on-chain service.
 
-Roughly 6–10 weeks for one person who already knows Psibase: the service first, then the helper, then tests that drive real `git`.
+**Full compose is deferred.** Compose would be one remote: the sidecar serves the bytes, the chain is the source of truth for the tip, and a push updates both. That needs a quarantine step, fork repair when the chain and the disk disagree, and a way to find which node has the objects. None of that is in this plan. Building either instantiation does not start it.
 
-An alternative that stores the repo on one node and commits only the ref hashes to the chain is compared in [Hashes on chain, repo on a node](#hashes-on-chain-repo-on-a-node). This document's design is the on-chain objects plan. Decided: the chain holds the full git objects as well as the refs. The ref-hashes-plus-sidecar alternative is not the chosen design. The install script covers the client for this plan and the host sidecar the alternative needs.
+Roughly 6–10 weeks for one person who already knows Psibase: the on-chain service first, then the helper, then tests that drive real `git`.
+
+Decided: the chain holds the full git objects as well as the refs. The node-hosted instantiation is kept separate for comparison and is not the chosen design. Full compose of the two stays deferred. The install script covers the client for this plan and, behind `--host`, the sidecar for the other instantiation.
+
+The rest of this document specifies instantiation 1, except the comparison and the `--host` half of the installer.
 
 ## What a user can do
 
@@ -46,9 +51,9 @@ Psibase has two kinds of service.
 
 `XDb::open` refuses `DbId::service`. A local service cannot read the git tables except by calling the on-chain service. It also cannot sign a user's transaction. A login token does not help: `POST /login` on `transact` returns a bearer token that `http-server` turns into the `user` argument of `serveSys`. That identifies the caller of a query. It is bound to the host that issued it, and it does not authorize a write. Writes are a fracpack-encoded signed transaction posted to `transact.<root>/push_transaction`.
 
-So a local `x-git` would not be the repository, would not be the pack builder, and would not be the signer. v1 does not include one. A node operator should not register a local server on the `git` subdomain: that registration is tried before `http-server` and would hide the on-chain HTTP interface on that node only.
+So a local `x-git` would not be the repository, would not be the pack builder, and would not be the signer. This instantiation does not include one. A node operator should not register a local server on the `git` subdomain: that registration is tried before `http-server` and would hide the on-chain HTTP interface on that node only.
 
-A later smart-HTTP front end, if it is worth building, is a native program beside the node, listening on its own port, using git or libgit2. It is neither an on-chain service nor a local service. It would read objects by calling the on-chain service and submit the same transactions the helper submits.
+A native program that reads these objects and speaks smart HTTP in front of them is the deferred compose, not a follow-up on this service. This instantiation's HTTP API stays the dumb layout below.
 
 ## The `git` service
 
@@ -218,7 +223,7 @@ Smart HTTP is what `git push https://…` and efficient `git clone` use. The ser
 
 That code already exists in git, libgit2, and gitoxide. Running it inside the `git` service, or inside a local service, means compiling it to the service target and finishing a pack inside a query or a transaction watchdog, then returning the whole pack as one `HttpReply`. A small repo might fit. The implementation cost and the failure mode (a clone that works until the repo grows) are a bad trade against dumb HTTP, which is already specified, already implemented in git, and maps onto a table read.
 
-The native front end sketched above is how unmodified `git push https://…` would be added later. It would still write through `putObjects` and `updateRefs`. The service API does not change.
+Unmodified `git push https://…` against this service would be the deferred compose: a native front end speaking smart HTTP and still writing `putObjects` and `updateRefs`. That is not a later phase of this instantiation. The service API stays the dumb layout.
 
 ## What is reused
 
@@ -238,11 +243,13 @@ Not used in v1: libgit2, gitoxide, `git-http-backend`, Radicle. Those matter for
 4. `git-remote-psibase` push, then fetch, against the same node.
 5. Tests: second clone sees the push; a fast-forward from a second writer lands; a non-fast-forward without the force flag fails; two updates with the same `old_oid` produce one success and one rejected transaction; an object whose bytes do not match its id is rejected; a ref that points at a missing blob is rejected.
 
-## Hashes on chain, repo on a node
+## The other instantiation
 
-The other shape is a split service. The on-chain `git` service stores the repo record, the writers, and each ref's object id. It does not store blobs, trees, or commit bodies. A node that wants to host the repo keeps a normal bare repository on its own disk and runs a native sidecar that speaks git's smart HTTP. After a push, the sidecar submits `updateRefs` so the chain's hash moves to the new tip.
+This is a second deployment, not a mode of the on-chain service. Nothing here reads `ObjectRow` or serves `git.<root>` from chain state. A chain can run one instantiation, the other, or both, and a repo lives in exactly one of them.
 
-The node-local service in that combo is `x-git`. It records, in the subjective database, which repos this node is hosting and where their directories are. That database is the right place for that bookkeeping: it is node-private, and the node may wipe it. It is the wrong place for the only copy of the objects, for the same reason. The object bytes belong on the sidecar's disk.
+The on-chain `git` account in this instantiation stores the repo record, the writers, and each ref's object id. It does not store blobs, trees, or commit bodies. A node that hosts the repo keeps a normal bare repository on its own disk and runs a native sidecar that speaks git's smart HTTP. After a push, the sidecar submits `updateRefs` so the chain's hash moves to the new tip.
+
+`x-git` belongs to this instantiation only. It records, in the subjective database, which repos this node is hosting and where their directories are. That database is the right place for that bookkeeping: it is node-private, and the node may wipe it. It is the wrong place for the only copy of the objects. The object bytes belong on the sidecar's disk.
 
 `x-git` still cannot be the program clients talk git to. Local services are WebAssembly, the mount API is `readFile` only, and they cannot start a process. `git http-backend` runs in the sidecar. `psinode` also has no hook that hands a subdomain to a host process, and an `x-http` registration only overrides the subdomain on that one node. Clients of this design use the sidecar's own URL.
 
@@ -315,11 +322,13 @@ Cons
 - Multi-host replication is extra: fetch from a peer, check the objects against the chain's id, then serve them. Until that exists, one host is a single point of failure.
 - Tests need `psinode`, the sidecar, and git.
 
-For a single host and no replication, the two are similar in calendar time. The on-chain service is most of plan A; the sidecar and its fork handling are most of plan B. Plan B grows by the replication and discovery work the moment more than one node should be able to serve a repo. Plan A pays that cost up front, inside the chain, and spends its effort on size limits instead.
+For a single host and no replication, the two instantiations are similar in calendar time. The on-chain service is most of the one this document builds. The sidecar and its fork handling are most of the other. The other grows by replication and discovery the moment more than one node should serve a repo. The on-chain instantiation pays for replication inside the chain and spends its effort on size limits instead.
+
+Wiring them so one push writes chain objects and a local bare repo, or so the sidecar is a smart-HTTP front for `ObjectRow`, is the deferred compose. Do not add that path while building either instantiation.
 
 ## Installing the client
 
-Users install the git client with one script. The script also carries the host sidecar for the hash-on-chain alternative. Default mode does not install or start the sidecar.
+Users install the client for the on-chain instantiation with one script. The same tarball carries the sidecar binary for the node-hosted instantiation. Default mode does not install or start the sidecar, and installing both binaries does not compose the two deployments.
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fsSL https://<release-host>/psibase-git/install.sh | sh
@@ -342,7 +351,7 @@ The script is the whole installer. It does not hand off to a package manager.
 - `--host` also installs `psibase-git-host` into the same `bin`. It does not start it, enable a service unit, or open a port. It prints the run command: `psibase-git-host --api http://<root> --repo-dir <prefix>/share/psibase-git/repos`.
 - Re-running the script replaces the binaries at the same paths.
 
-`--host` is unused by the on-chain-objects plan. That plan's users run the script with no flags and then use `psibase::` URLs. The sidecar binary is in the same tarball so the hash-on-chain alternative does not grow a second installer.
+The on-chain instantiation's users run the script with no flags and then use `psibase::` URLs. `--host` is the other instantiation's binary, present so that deployment does not grow a second installer. Running both on one machine still leaves two remotes.
 
 ## Most Likely Pragmatic Design
 
@@ -396,4 +405,6 @@ Signing reuses the existing `psibase` CLI path, which already signs with a key f
 
 ## Out of scope for this plan
 
-Browser UI beyond the POC pull-request page, and merge conflict resolution in the browser. For the on-chain-objects plan specifically: a node-local object cache, smart HTTP, packfiles, deleting history, private repos, Large File Storage, and shallow or partial clone. Those last items are available only in the host-sidecar alternative, and only from a node that is actually hosting the repo.
+Browser UI beyond the POC pull-request page, and merge conflict resolution in the browser. Full compose of the two instantiations: one remote whose bytes live on a host and whose tip is chain state, including quarantine, fork repair, and multi-host discovery. A smart-HTTP front end over the on-chain object table is that compose, not a phase of instantiation 1.
+
+For the on-chain instantiation specifically: a node-local object cache, smart HTTP, packfiles, deleting history, private repos, Large File Storage, and shallow or partial clone. Those last items exist only in the node-hosted instantiation, and only from a machine that is actually hosting that repo. Git LFS, in [Most Likely Pragmatic Design](#most-likely-pragmatic-design), is the user's own server, not a Psibase-hosted store.
