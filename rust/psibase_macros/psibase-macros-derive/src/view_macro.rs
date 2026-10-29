@@ -74,6 +74,11 @@ fn view_def(fracpack_mod: &TokenStream2, input: &DeriveInput, opts: &Options) ->
         impl <#lifetime, #impl_params> #fracpack_mod::ViewExt<#lifetime> for #view_ty #ty_generics where #ty #ty_generics: #fracpack_mod::Unpack<#lifetime>, #where_predicates {
             type ValueType = #ty #ty_generics;
         }
+        impl <#lifetime, #impl_params> std::fmt::Debug for &#lifetime #view_ty #ty_generics where &#lifetime #fracpack_mod::GenericView<#ty #ty_generics>: std::fmt::Debug, #where_predicates {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+                std::fmt::Debug::fmt(&&self.0, f)
+            }
+        }
         impl #impl_generics #fracpack_mod::MakeView for #ty #ty_generics #where_clause {
             type ViewType = #view_ty #ty_generics;
         }

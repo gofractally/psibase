@@ -965,6 +965,7 @@ fn test_view() {
         assert_eq!(v.var().unpack(), None);
         assert_eq!(v.inner_option_u32().unpack(), None);
         assert_eq!(v.inner_option_str().unpack(), Some(String::new()));
+        let _ = format!("{v:?}");
     }
 }
 
