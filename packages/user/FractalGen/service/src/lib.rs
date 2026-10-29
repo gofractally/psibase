@@ -74,9 +74,10 @@ mod service {
         Guilds::call_from(SYS_FRACTAL).set_rguilds(vec![SYS_GUILD]);
         Guilds::call_from(SYS_FRACTAL).set_auto_join(true);
 
-        // Give the core fractal ownership of the network. During boot, boot.rs
-        // temporarily assigns root to the producer for commit_install, then
-        // re-applies this transfer afterward.
+        // Give the core fractal ownership of the network
         AuthDelegate::call_from(ROOT).setOwner(SYS_FRACTAL);
     }
 }
+
+#[cfg(test)]
+mod tests;

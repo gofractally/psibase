@@ -236,10 +236,7 @@ pub fn get_initial_actions<
         builder.push(act)?;
     }
 
-    // FractalGen::create_frac assigns root → core-fract during postinstall, but
-    // that runs before root exists and is overwritten by the producer owner
-    // above (needed so commit_install can run as root). Re-apply the handoff
-    // after commits so fractal-governed boots leave root owned by core-fract.
+    // FractalGen: restore root → core-fract (producer owner above overwrites postinstall)
     if service_packages.iter().any(|s| s.name() == "FractalGen") {
         builder.push(
             auth_delegate::Wrapper::pack_from(producers::ROOT)
