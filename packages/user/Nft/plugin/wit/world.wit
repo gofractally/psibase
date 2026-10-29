@@ -4,8 +4,10 @@ interface issuer {
     use host:types/types.{error};
 
 
-    /// Mint new NFT into existence.
-    mint: func() -> result<_, error>;
+    /// Mint a new NFT.
+    ///
+    /// Returns the id of NFT.
+    mint: func() -> result<u32, error>;
 }
 
 

@@ -20,6 +20,7 @@ world impl {
     import virtual-server:plugin/authorized;
 
     export block-log;
+    export authorized;
     export accounts;
     export network;
     export tokens;

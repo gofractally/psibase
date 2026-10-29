@@ -177,7 +177,7 @@ export const AccountPage = () => {
                     >
                         <Avatar
                             account={name}
-                            className="size-10 shrink-0 rounded-lg border-2 bg-card object-cover"
+                            className="size-10 shrink-0 border-2 bg-card object-cover"
                             style={{ borderColor: colorFor(name) }}
                         />
                         <span className="flex min-w-0 flex-col gap-0.5 leading-tight">

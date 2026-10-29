@@ -172,8 +172,8 @@ SCENARIO("AuthSig")
       // Test atomic swaps
       WHEN("Alice and Bob have NFTs")
       {
-         auto aliceMint = alice.to<Nft>().mint();
-         auto bobMint   = bob.to<Nft>().mint();
+         auto aliceMint = alice.to<Nft>().mint(std::nullopt);
+         auto bobMint   = bob.to<Nft>().mint(std::nullopt);
          REQUIRE(aliceMint.succeeded());
          REQUIRE(bobMint.succeeded());
          auto aliceNfts = getNfts(t, alice.id);

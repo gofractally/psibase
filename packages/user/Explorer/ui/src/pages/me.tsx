@@ -181,7 +181,7 @@ const Dashboard = ({ user }: { user: string }) => {
                     <div className="flex min-w-0 flex-1 items-start gap-3">
                         <Avatar
                             account={user}
-                            className="bg-card size-12 shrink-0 rounded-xl border-2 object-cover"
+                            className="bg-card size-12 shrink-0 border-2 object-cover"
                             style={{ borderColor: colorFor(user) }}
                         />
                         <div className="min-w-0 flex-1">
@@ -893,27 +893,6 @@ const Dashboard = ({ user }: { user: string }) => {
                             </span>
                         </KeyValue>
                     )}
-                    <KeyValue label="Registered app">
-                        {app.data ? (
-                            <span className="flex flex-wrap items-center gap-2 text-xs">
-                                <Store className="text-muted-foreground size-3.5" />
-                                {app.data.name}
-                                {app.data.tags.map((t) => (
-                                    <Badge
-                                        key={t}
-                                        variant="outline"
-                                        className="text-[10px]"
-                                    >
-                                        {t}
-                                    </Badge>
-                                ))}
-                            </span>
-                        ) : (
-                            <span className="text-muted-foreground text-xs">
-                                Not registered in the app registry
-                            </span>
-                        )}
-                    </KeyValue>
                     <KeyValue label="Service code">
                         {code.isPending ? (
                             <Skeleton className="h-4 w-40" />
@@ -945,21 +924,6 @@ const Dashboard = ({ user }: { user: string }) => {
                             </span>
                         )}
                     </KeyValue>
-                    {isProducer && (
-                        <KeyValue label="Block production">
-                            <span className="text-xs">
-                                You are one of{" "}
-                                {producers.data?.producers.length ?? "—"} active
-                                providers ·{" "}
-                                <Link
-                                    to="/providers"
-                                    className="text-primary hover:underline"
-                                >
-                                    provider view
-                                </Link>
-                            </span>
-                        </KeyValue>
-                    )}
                 </Panel>
             </div>
 
@@ -981,7 +945,7 @@ const HeroSkeleton = () => (
     <div className="flex flex-col gap-4">
         <div className="grid-bg -mx-4 -mt-4 px-4 pb-2 pt-6 md:-mx-6 md:-mt-6 md:px-6">
             <div className="flex items-start gap-3">
-                <Skeleton className="size-12 rounded-xl" />
+                <Skeleton className="size-12 rounded-full" />
                 <div className="flex flex-col gap-2">
                     <Skeleton className="h-3 w-40" />
                     <Skeleton className="h-8 w-64" />

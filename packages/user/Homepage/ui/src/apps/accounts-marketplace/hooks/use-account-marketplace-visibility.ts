@@ -1,5 +1,3 @@
-import { type SidebarVisibility } from "@/app-config";
-
 import { useNameEvents } from "@/apps/accounts-marketplace/hooks/use-name-events";
 import { NAME_EVENTS_EXISTENCE_PAGE_SIZE } from "@/apps/accounts-marketplace/lib/graphql/namemarket-api";
 
@@ -8,7 +6,12 @@ import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { hasActiveAccountMarket } from "@shared/lib/schemas/account-markets";
 
-export function useAccountMarketplaceVisibility(): SidebarVisibility {
+export type AccountMarketplaceVisibility = {
+    visible: boolean;
+    isLoading: boolean;
+};
+
+export function useAccountMarketplaceVisibility(): AccountMarketplaceVisibility {
     const { data: systemToken, isPending: isPendingToken } = useSystemToken();
     const premiumBlocked = systemToken?.untransferable === true;
 
@@ -26,8 +29,7 @@ export function useAccountMarketplaceVisibility(): SidebarVisibility {
         currentUser,
         {
             first: NAME_EVENTS_EXISTENCE_PAGE_SIZE,
-            enabled:
-                !premiumBlocked && isSuccessMarkets && !isMarketEnabled,
+            enabled: !premiumBlocked && isSuccessMarkets && !isMarketEnabled,
         },
     );
 

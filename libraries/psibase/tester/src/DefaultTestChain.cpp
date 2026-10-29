@@ -226,7 +226,7 @@ void TestChain::boot(const std::vector<std::string>& names, bool installUI)
 
 std::vector<std::string> DefaultTestChain::defaultPackages()
 {
-   return {"Accounts", "AuthAny",     "AuthDelegate", "AuthSig",    "CommonApi",
+   return {"Accounts", "AuthAny",     "AuthDelegate", "AuthNone",   "AuthSig", "CommonApi",
            "CpuLimit", "Credentials", "Events",       "Explorer",   "Invite",
            "Nft",      "Packages",    "Producers",    "HttpServer", "Sites",
            "SetCode",  "StagedTx",    "Symbol",       "Tokens",     "Transact"};

@@ -18,3 +18,6 @@ serde.workspace = true
 serde_json.workspace = true
 hex = "0.4"
 psibase-system-workspace-hack.workspace = true
+
+[dev-dependencies]
+wsauth-pkg = { path = "..", version = "0.29.0" }

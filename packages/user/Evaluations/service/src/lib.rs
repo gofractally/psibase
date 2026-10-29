@@ -387,3 +387,6 @@ pub mod service {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests;
