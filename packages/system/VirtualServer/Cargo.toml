@@ -16,6 +16,7 @@ services = ["virtual-server"]
 Sites = "0.29.0"
 Accounts = "0.29.0"
 Host = "0.29.0"
+Permissions = "0.29.0"
 Nft = "0.29.0"
 Tokens = "0.29.0"
 Transact = "0.29.0"
