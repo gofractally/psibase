@@ -8,6 +8,7 @@ interface types {
         id: u32,
         symbol: option<string>,
         precision: u8,
+        untransferable: bool,
     }
 
     record user-balance {
