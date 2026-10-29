@@ -6,7 +6,7 @@ No node-local service is on this path. Local services are the wrong place to kee
 
 Roughly 6–10 weeks for one person who already knows Psibase: the service first, then the helper, then tests that drive real `git`.
 
-An alternative that stores the repo on one node and commits only the ref hashes to the chain is compared in [Hashes on chain, repo on a node](#hashes-on-chain-repo-on-a-node). This document's design is the on-chain objects plan. The install script covers the client for this plan and the host sidecar the alternative needs.
+An alternative that stores the repo on one node and commits only the ref hashes to the chain is compared in [Hashes on chain, repo on a node](#hashes-on-chain-repo-on-a-node). This document's design is the on-chain objects plan. Decided: the chain holds the full git objects as well as the refs. The ref-hashes-plus-sidecar alternative is not the chosen design. The install script covers the client for this plan and the host sidecar the alternative needs.
 
 ## What a user can do
 
@@ -33,7 +33,8 @@ For a local node that is `http://git.psibase.localhost:8080/alice/notes.git`. `<
 | Private repository | — | No. Every full node stores the objects. Hiding them from HTTP does not hide them from a node operator. |
 | Git Large File Storage, shallow clone, partial clone | — | No. Those need either a side store or the smart HTTP negotiation this design does not implement. |
 | Submodules | whatever URL the submodule uses | A submodule that points at another repo on this service is another dumb HTTP clone. Other URLs are git's problem. |
-| Pull requests, review, browsing files in a browser | — | Out of scope. Setup is actions, not a web user interface. |
+| Pull requests | POC web page on `git.<root>` | Minimal. A PR list (source branch, base branch, merge button). Merging happens in the browser and is refused when trees conflict. See [POC pull requests and merge](#poc-pull-requests-and-merge). |
+| Review, browsing files in a browser | — | Out of scope. Setup is actions, not a web user interface. |
 
 ## On-chain service and node-local service
 
@@ -57,7 +58,7 @@ One user package. One account, `git`, installed by `root`.
 
 On install the `git` account calls `http-server::registerServer`, so requests to `git.<root>` are dispatched to `git::serveSys`. Queries run in RPC (remote procedure call) mode: `serveSys` may read its tables and may not write them.
 
-The package has no plugin. There is no browser user interface.
+The package has no plugin. The only browser user interface is the POC pull-request page described in [POC pull requests and merge](#poc-pull-requests-and-merge).
 
 ### Tables
 
@@ -85,7 +86,7 @@ The owner is not stored as a writer. The owner has every flag.
 
 Objects are global and content-addressed, same pattern as `SitesDataRow`. Two repos that contain the same blob store it once. The first transaction to write an oid pays for those bytes when disk billing is on (`Transact` bills `trxSender`). A later put of the same oid writes nothing.
 
-v1 does not delete objects. A force-push leaves the old history on chain. Garbage collection is a chain-wide problem once objects are shared, and it is out of scope.
+The v1 proof of concept has no garbage collection. It never deletes objects, so a force-push leaves the old history on chain. GC that an admin can configure is deferred to later. Because the object table is shared across repos, that later design has to account for an object still being reachable from other repos.
 
 ### Actions
 
@@ -207,7 +208,7 @@ These are properties of the chain, not of git.
 - A packed block has a hard ceiling of 16 MiB in triedent. When resource monitoring is off, `RTransact` also stops adding transactions once the current block reaches a soft budget of 8 MiB.
 - One `HttpReply` is a single buffer. There is no streamed body. That is fine, because v1 never builds a pack.
 
-The helper should keep each `putObjects` transaction around 1 MiB of object bytes so a block can carry more than one push and so packing overhead stays inside the soft budget. A single blob larger than what one transaction can hold is rejected. That rules out large binaries. Source trees of small files are the intended contents.
+Each object is capped at 1 MiB (inflated size), and `putObjects` rejects anything larger. The cap applies to each object, not to a push or the transport. A push can carry an 800 KiB object plus many tiny ones. The helper spreads objects across as many `putObjects` transactions as it needs to stay inside the block budget. That rules out large binaries. Source trees of small files are the intended contents.
 
 The reachability walk in `updateRefs` has to finish inside the transaction's CPU budget. A first import of a repo with a long history is many `putObjects` transactions and one `updateRefs` that walks only the newly reachable set. If that walk is too expensive for one transaction, the import has to land as several ref moves (push an intermediate commit, then a later one), not as one jump from empty to a huge tip. The helper can do that when a single `updateRefs` fails for resource limits.
 
@@ -343,6 +344,56 @@ The script is the whole installer. It does not hand off to a package manager.
 
 `--host` is unused by the on-chain-objects plan. That plan's users run the script with no flags and then use `psibase::` URLs. The sidecar binary is in the same tarball so the hash-on-chain alternative does not grow a second installer.
 
+## Most Likely Pragmatic Design
+
+On-chain git as above, with large files moved to Git LFS on a server the user chooses.
+
+- Each repo row carries an optional LFS endpoint URL. The API key for that server never goes on chain. It lives in the user's local git config or credential helper, and `git-lfs` sends it to the LFS server directly.
+- The chain stores only small LFS pointer files (oid and size). The bytes live on the user's LFS server. Psibase does not host, bill, or replicate them.
+- `putObjects` rejects any object whose inflated size is over 1 MiB. This is a per-object cap, not a per-push limit. Anything larger has to be tracked by LFS. The helper checks this before signing. When a staged blob is over the limit and is not an LFS pointer, it fails with a message naming the file and the `git lfs track` command to fix it.
+- Clone and fetch still work with stock git plus `git-lfs`. Without LFS access, a clone gets the source tree and the pointer files, but not the large files.
+
+This keeps every on-chain object well inside the transaction budget in [Size limits](#size-limits). Media and binaries stay off the chain, and no node has to run storage infrastructure. The tradeoff is that large files are only as available as the user's LFS server. They are not covered by consensus.
+
+## Repo authorization with AuthDyn
+
+Each repo gets its own Psibase account (for example `admin-hash`). That account owns the repo row and is the account that signs `putObjects` and `updateRefs`. Group control then comes from the account's auth service, so the `git` service does not need its own writer model.
+
+- The repo account sets `auth-dyn` as its auth service and calls `set_mgmt` to name a policy manager service.
+- The policy manager returns a `DynamicAuthPolicy` for the account: a list of member accounts, each with a weight, plus a threshold. Any subset of members whose weights reach the threshold can authorize a push. Members at weight 1 with threshold 1 lets any one member push. Threshold 2 needs two members.
+- `get_policy` receives the service and method, so the policy can differ per action. For example, `updateRefs` with the force flag can need a higher threshold than a fast-forward.
+- When a push needs more than one signer, it goes through `staged-tx`. Members approve the staged transaction, and it executes once the approved weight reaches the threshold. Enough rejections cancel it.
+
+`auth-delegate` is not the right fit. It lets one owner account sign for another, and nothing more. It cannot express a group or a threshold.
+
+## POC pull requests and merge
+
+The POC adds a minimal web page on `git.<root>`.
+
+- A PR list per repo. Each entry has a source branch, a base branch, and a merge button.
+- Merging happens in the browser. The page fetches the objects over the same HTTP URLs that stock git uses. It computes the merge tree and commit client-side, then signs and submits one transaction. That transaction calls `putObjects` for the new tree and commit objects and `updateRefs` to move the base branch, with the base's current oid as `old_oid`.
+- No merge conflict handling. When both sides changed the same path, the merge button refuses and tells the user to resolve locally and push first. There is no rename detection and no conflict editor.
+
+## CLI
+
+To the user, the git CLI looks like a typical git CLI: `git clone`, `git fetch`, `git push` against a `psibase::` remote.
+
+One-time setup is editing `~/.psibase.toml`. For each host, it sets a default account and a default key. The key is a PEM or DER private key file path, or a PKCS #11 URI. The node comes from `-a` or `PSINODE_URL`, which defaults to the local node (`http://psibase.localhost:8080/`). Named hosts are saved in the same file (`psibase config set hosts.<name> <url>`).
+
+```toml
+[hosts]
+prod = "https://prod.example.com"
+
+# new: per-host defaults for the git helper
+[git.prod]
+account = "alice"
+key = "pkcs11:token=...;object=..."   # or a path to a PEM/DER key file
+```
+
+The remote URL lives in normal git config as a `psibase::` URL (`git remote add origin psibase::https://prod.example.com/alice/notes.git`), so git itself stores the host and repo. Git cannot pass extra flags to a remote helper, so `git-remote-psibase` picks up the account and key from `~/.psibase.toml` or the environment.
+
+Signing reuses the existing `psibase` CLI path, which already signs with a key file or a PKCS #11 token (`--sign`). Node-local keys in `x-keys` are out of scope for now.
+
 ## Out of scope for this plan
 
-Browser UI. For the on-chain-objects plan specifically: a node-local object cache, smart HTTP, packfiles, deleting history, private repos, Large File Storage, and shallow or partial clone. Those last items are available only in the host-sidecar alternative, and only from a node that is actually hosting the repo.
+Browser UI beyond the POC pull-request page, and merge conflict resolution in the browser. For the on-chain-objects plan specifically: a node-local object cache, smart HTTP, packfiles, deleting history, private repos, Large File Storage, and shallow or partial clone. Those last items are available only in the host-sidecar alternative, and only from a node that is actually hosting the repo.
