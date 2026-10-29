@@ -28,10 +28,10 @@ interface admin {
     preapprove-account: func(account: string);
 
     /// Schedule a freeze of these accounts.
-    freeze: func(accounts: list<string>, memo: string) -> result<_, error>;
+    freeze: func(accounts: list<string>, memo: option<string>) -> result<_, error>;
 
     /// Schedule an unfreeze of these accounts.
-    unfreeze: func(accounts: list<string>, memo: string) -> result<_, error>;
+    unfreeze: func(accounts: list<string>, memo: option<string>) -> result<_, error>;
 }
 
 world imports {

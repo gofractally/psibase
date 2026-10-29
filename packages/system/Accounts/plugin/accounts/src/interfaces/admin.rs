@@ -104,30 +104,22 @@ impl Admin for AccountsPlugin {
         .unwrap();
     }
 
-    fn freeze(accounts: Vec<String>, memo: String) -> Result<(), Error> {
+    fn freeze(accounts: Vec<String>, memo: Option<String>) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::freeze, vec!["config".into()])?;
         let accounts = parse_accounts(accounts)?;
         Transact::add_action_to_transaction(
             Accounts::action_structs::freeze::ACTION_NAME,
-            &Accounts::action_structs::freeze {
-                accounts,
-                memo: (!memo.is_empty()).then_some(memo),
-            }
-            .packed(),
+            &Accounts::action_structs::freeze { accounts, memo }.packed(),
         )?;
         Ok(())
     }
 
-    fn unfreeze(accounts: Vec<String>, memo: String) -> Result<(), Error> {
+    fn unfreeze(accounts: Vec<String>, memo: Option<String>) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::unfreeze, vec!["config".into()])?;
         let accounts = parse_accounts(accounts)?;
         Transact::add_action_to_transaction(
             Accounts::action_structs::unfreeze::ACTION_NAME,
-            &Accounts::action_structs::unfreeze {
-                accounts,
-                memo: (!memo.is_empty()).then_some(memo),
-            }
-            .packed(),
+            &Accounts::action_structs::unfreeze { accounts, memo }.packed(),
         )?;
         Ok(())
     }
