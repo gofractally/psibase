@@ -205,3 +205,6 @@ fn erase_expired(now: i64) {
         table.remove(&row);
     }
 }
+
+#[cfg(test)]
+mod tests;

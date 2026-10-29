@@ -106,3 +106,6 @@ mod service {
         Tokens::call().credit(tid, account, 100_000_0000.into(), "Faucet drip".into());
     }
 }
+
+#[cfg(test)]
+mod tests;
