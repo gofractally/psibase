@@ -33,8 +33,7 @@ namespace psibase
           action.service == SystemService::VirtualServer::service)
          return false;
       if (action.sender == SystemService::Transact::service &&
-          action.service == SystemService::Accounts::service &&
-          (action.method == "getAuthOf"_m || action.method == "isFrozen"_m))
+          action.service == SystemService::Accounts::service && action.method == "getAuthOf"_m)
       {
          return false;
       }

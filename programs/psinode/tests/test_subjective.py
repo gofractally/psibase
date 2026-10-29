@@ -16,7 +16,7 @@ def is_user_action(action):
         return False
     if action['sender'] == 'transact' and action['service'] == 'vserver':
         return False
-    if action['sender'] == 'transact' and action['service'] == 'accounts' and action['method'] in ('getauthof', 'isfrozen'):
+    if action['sender'] == 'transact' and action['service'] == 'accounts' and action['method'] == 'getauthof':
         return False
     if action['service'] == 'events' and action['method'] == 'sync':
         return False
