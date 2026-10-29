@@ -14,6 +14,11 @@ export const zPackageSchemaWithSha = PackageSchema.extend({
 
 export type PackageSchemaWithSha = z.infer<typeof zPackageSchemaWithSha>;
 
+// Package index and package file fetching stay in the UI (rather than the
+// packages plugin) because package sources may be repositories hosted on a
+// different chain or on a plain HTTP server, which plugins cannot reach.
+// Config's CSP allows these connections; see Config/postinstall.json.
+
 async function readPackageIndexGQL(url: string, account: string) {
     let cursorArg = "";
     let done = false;

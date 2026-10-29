@@ -1,24 +1,13 @@
 import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
 import type { AccountMarketOverviewRow } from "@shared/lib/schemas/account-markets";
 
-import { GlowingCard } from "@shared/components/glowing-card";
+import { EmptyState } from "@/components/empty-state";
+import { Panel } from "@/components/page-header";
+import { DataTable, THead, Table, Td, Th, Tr } from "@/components/table";
+
 import { LivePrice } from "@shared/components/live-price";
 import { Badge } from "@shared/shadcn/ui/badge";
-import {
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@shared/shadcn/ui/table";
 
 function PriceCell({
     row,
@@ -28,16 +17,25 @@ function PriceCell({
     systemToken: SystemTokenInfo;
 }) {
     if (!row.configured) {
-        return <Badge variant="outline">Not configured</Badge>;
+        return (
+            <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                Not configured
+            </Badge>
+        );
     }
     if (!row.enabled) {
-        return <Badge variant="secondary">Disabled</Badge>;
+        return (
+            <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                Disabled
+            </Badge>
+        );
     }
 
     return (
         <LivePrice
             price={row.price}
             systemToken={systemToken}
+            className="font-mono tabular-nums"
             emptyClassName="text-muted-foreground"
         />
     );
@@ -59,59 +57,62 @@ export function AccountMarketsCard({
     error,
 }: AccountMarketsCardProps) {
     return (
-        <GlowingCard>
-            <CardHeader>
-                <CardTitle>Account markets</CardTitle>
-                <CardDescription>Live prices by name length.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {isPending ? (
-                    <MarketsTableSkeleton />
-                ) : isError ? (
-                    <p className="text-destructive text-sm">
-                        {error?.message ?? "Failed to load markets."}
-                    </p>
-                ) : markets && systemToken ? (
+        <Panel
+            title="Market prices"
+            description="Live ask by name length"
+            className="self-start"
+        >
+            {isPending ? (
+                <div className="flex flex-col gap-2 p-4">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                        <Skeleton key={index} className="h-6 w-full" />
+                    ))}
+                </div>
+            ) : isError ? (
+                <EmptyState
+                    className="text-destructive min-h-24"
+                    detail={error?.message}
+                >
+                    Failed to load markets
+                </EmptyState>
+            ) : markets && systemToken ? (
+                <DataTable>
                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name length</TableHead>
-                                <TableHead className="text-right">
-                                    Current price
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                        <THead>
+                            <tr>
+                                <Th>Length</Th>
+                                <Th className="text-right">Price</Th>
+                            </tr>
+                        </THead>
+                        <tbody>
                             {markets.map((row) => (
-                                <TableRow key={row.length}>
-                                    <TableCell className="font-medium">
-                                        {row.length}{" "}
-                                        {row.length === 1
-                                            ? "character"
-                                            : "characters"}
-                                    </TableCell>
-                                    <TableCell className="text-right">
+                                <Tr key={row.length}>
+                                    <Td>
+                                        <span className="font-mono tabular-nums">
+                                            {row.length}
+                                        </span>{" "}
+                                        <span className="text-muted-foreground text-xs">
+                                            {row.length === 1
+                                                ? "character"
+                                                : "characters"}
+                                        </span>
+                                    </Td>
+                                    <Td className="text-right">
                                         <PriceCell
                                             row={row}
                                             systemToken={systemToken}
                                         />
-                                    </TableCell>
-                                </TableRow>
+                                    </Td>
+                                </Tr>
                             ))}
-                        </TableBody>
+                        </tbody>
                     </Table>
-                ) : null}
-            </CardContent>
-        </GlowingCard>
-    );
-}
-
-function MarketsTableSkeleton() {
-    return (
-        <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, index) => (
-                <Skeleton key={index} className="h-8 w-full" />
-            ))}
-        </div>
+                </DataTable>
+            ) : (
+                <EmptyState className="min-h-24">
+                    No system token configured
+                </EmptyState>
+            )}
+        </Panel>
     );
 }

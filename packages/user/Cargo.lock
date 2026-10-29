@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "branding"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "branding-pkg",
@@ -440,7 +440,7 @@ dependencies = [
 
 [[package]]
 name = "branding-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "branding",
  "branding-plugin",
@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "branding-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "branding",
  "branding-pkg",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "brotli-svc"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -497,7 +497,7 @@ dependencies = [
 
 [[package]]
 name = "brotli-svc-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "brotli-svc",
  "psibase-user-workspace-hack",
@@ -550,7 +550,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chainmail"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "chainmail_package",
@@ -562,7 +562,7 @@ dependencies = [
 
 [[package]]
 name = "chainmail-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "chainmail",
  "chainmail_package",
@@ -577,7 +577,7 @@ dependencies = [
 
 [[package]]
 name = "chainmail_package"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "chainmail",
  "chainmail-plugin",
@@ -917,7 +917,7 @@ dependencies = [
 
 [[package]]
 name = "de-facto"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "fractals",
@@ -955,7 +955,7 @@ dependencies = [
 
 [[package]]
 name = "diff-adjust"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "diff-adjust-pkg",
@@ -969,7 +969,7 @@ dependencies = [
 
 [[package]]
 name = "diff-adjust-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "diff-adjust",
  "psibase-user-workspace-hack",
@@ -1120,11 +1120,12 @@ dependencies = [
 
 [[package]]
 name = "evaluations"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "average",
  "ecies",
+ "evaluations-pkg",
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_service",
@@ -1136,7 +1137,7 @@ dependencies = [
 
 [[package]]
 name = "evaluations-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "evaluations",
  "evaluations-plugin",
@@ -1146,7 +1147,7 @@ dependencies = [
 
 [[package]]
 name = "evaluations-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "average",
  "ecies",
@@ -1177,7 +1178,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "faucet-tok"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "faucet-tok-pkg",
  "psibase",
@@ -1188,7 +1189,7 @@ dependencies = [
 
 [[package]]
 name = "faucet-tok-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "faucet-tok",
  "faucet-tok-plugin",
@@ -1197,7 +1198,7 @@ dependencies = [
 
 [[package]]
 name = "faucet-tok-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "faucet-tok",
  "psibase",
@@ -1255,7 +1256,7 @@ dependencies = [
 
 [[package]]
 name = "frac-tester"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "frac-tester-pkg",
  "psibase",
@@ -1266,7 +1267,7 @@ dependencies = [
 
 [[package]]
 name = "frac-tester-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "frac-tester",
  "psibase-user-workspace-hack",
@@ -1274,7 +1275,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1288,7 +1289,7 @@ dependencies = [
 
 [[package]]
 name = "fractal-gen"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "fractal-gen-pkg",
  "psibase",
@@ -1299,7 +1300,7 @@ dependencies = [
 
 [[package]]
 name = "fractal-gen-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "fractal-gen",
  "psibase-user-workspace-hack",
@@ -1307,7 +1308,7 @@ dependencies = [
 
 [[package]]
 name = "fractals"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "evaluations",
@@ -1322,7 +1323,7 @@ dependencies = [
 
 [[package]]
 name = "fractals-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "de-facto",
  "fractals",
@@ -1333,7 +1334,7 @@ dependencies = [
 
 [[package]]
 name = "fractals-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "fractals",
  "fractals-pkg",
@@ -1571,7 +1572,7 @@ dependencies = [
 
 [[package]]
 name = "guilds"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "guilds-pkg",
@@ -1585,7 +1586,7 @@ dependencies = [
 
 [[package]]
 name = "guilds-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "guilds",
  "guilds-plugin",
@@ -1594,7 +1595,7 @@ dependencies = [
 
 [[package]]
 name = "guilds-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "guilds",
  "psibase",
@@ -1889,7 +1890,7 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "identity"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "identity-pkg",
@@ -1903,7 +1904,7 @@ dependencies = [
 
 [[package]]
 name = "identity-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "identity",
  "identity-plugin",
@@ -1912,7 +1913,7 @@ dependencies = [
 
 [[package]]
 name = "identity-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "identity",
  "identity-pkg",
@@ -2128,9 +2129,9 @@ checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 
 [[package]]
 name = "libc"
-version = "0.2.177"
+version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
+checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "libloading"
@@ -2297,7 +2298,7 @@ dependencies = [
 
 [[package]]
 name = "name-market"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "name-market-pkg",
@@ -2312,7 +2313,7 @@ dependencies = [
 
 [[package]]
 name = "name-market-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "name-market",
  "name-market-plugin",
@@ -2322,7 +2323,7 @@ dependencies = [
 
 [[package]]
 name = "name-market-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "name-market",
  "pem",
@@ -2337,7 +2338,7 @@ dependencies = [
 
 [[package]]
 name = "nft"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "nft-pkg",
@@ -2351,7 +2352,7 @@ dependencies = [
 
 [[package]]
 name = "nft-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "nft",
  "nft-plugin",
@@ -2361,14 +2362,27 @@ dependencies = [
 
 [[package]]
 name = "nft-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "nft",
  "psibase",
  "psibase-user-workspace-hack",
+ "rand 0.9.2",
  "serde",
  "serde_json",
  "wit-bindgen-rt",
+]
+
+[[package]]
+name = "nix"
+version = "0.31.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
+dependencies = [
+ "bitflags 2.11.0",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
 ]
 
 [[package]]
@@ -2683,7 +2697,7 @@ dependencies = [
 
 [[package]]
 name = "profiles"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "profiles-pkg",
@@ -2697,7 +2711,7 @@ dependencies = [
 
 [[package]]
 name = "profiles-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "profiles",
  "profiles-plugin",
@@ -2707,7 +2721,7 @@ dependencies = [
 
 [[package]]
 name = "profiles-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "profiles",
  "profiles-pkg",
@@ -2720,7 +2734,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2782,7 +2796,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -2797,10 +2811,11 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
+ "indexmap",
  "proc-macro-error",
  "proc-macro2",
  "psibase-rust-workspace-hack",
@@ -2837,7 +2852,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase-macros-derive",
  "psibase-rust-workspace-hack",
@@ -2845,7 +2860,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
@@ -2853,7 +2868,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "graphql_client",
  "psibase",
@@ -2865,7 +2880,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_service"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -2938,7 +2953,7 @@ dependencies = [
 
 [[package]]
 name = "r-diff-adjust"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "diff-adjust",
@@ -2957,7 +2972,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "r-evaluations"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "average",
@@ -2973,7 +2988,7 @@ dependencies = [
 
 [[package]]
 name = "r-fractals"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "fractals",
@@ -2986,7 +3001,7 @@ dependencies = [
 
 [[package]]
 name = "r-guilds"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "guilds",
@@ -3000,7 +3015,7 @@ dependencies = [
 
 [[package]]
 name = "r-name-market"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "name-market",
@@ -3014,7 +3029,7 @@ dependencies = [
 
 [[package]]
 name = "r-nft"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "nft",
@@ -3022,12 +3037,13 @@ dependencies = [
  "psibase-user-workspace-hack",
  "psibase_service",
  "serde",
+ "serde-aux",
  "serde_json",
 ]
 
 [[package]]
 name = "r-profiles"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "profiles",
@@ -3040,7 +3056,7 @@ dependencies = [
 
 [[package]]
 name = "r-registry"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3054,7 +3070,7 @@ dependencies = [
 
 [[package]]
 name = "r-symbol"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3068,7 +3084,7 @@ dependencies = [
 
 [[package]]
 name = "r-token-stream"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3082,7 +3098,7 @@ dependencies = [
 
 [[package]]
 name = "r-token-swap"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3095,7 +3111,7 @@ dependencies = [
 
 [[package]]
 name = "r-tokens"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3194,7 +3210,7 @@ checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
 
 [[package]]
 name = "registry"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3208,7 +3224,7 @@ dependencies = [
 
 [[package]]
 name = "registry-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase-user-workspace-hack",
  "r-registry",
@@ -3218,7 +3234,7 @@ dependencies = [
 
 [[package]]
 name = "registry-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "chrono",
  "psibase",
@@ -3676,6 +3692,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
+name = "single-prod"
+version = "0.29.0"
+dependencies = [
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "single-prod-pkg",
+]
+
+[[package]]
+name = "single-prod-pkg"
+version = "0.29.0"
+dependencies = [
+ "psibase-user-workspace-hack",
+ "single-prod",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3770,7 +3806,7 @@ dependencies = [
 
 [[package]]
 name = "subgroups"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
@@ -3782,7 +3818,7 @@ dependencies = [
 
 [[package]]
 name = "subgroups-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase-user-workspace-hack",
  "subgroups",
@@ -3806,7 +3842,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "symbol"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3820,7 +3856,7 @@ dependencies = [
 
 [[package]]
 name = "symbol-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase-user-workspace-hack",
  "r-symbol",
@@ -3830,7 +3866,7 @@ dependencies = [
 
 [[package]]
 name = "symbol-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
@@ -3974,7 +4010,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "token-stream"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3988,7 +4024,7 @@ dependencies = [
 
 [[package]]
 name = "token-stream-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase-user-workspace-hack",
  "r-token-stream",
@@ -3998,7 +4034,7 @@ dependencies = [
 
 [[package]]
 name = "token-stream-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
@@ -4010,7 +4046,7 @@ dependencies = [
 
 [[package]]
 name = "token-swap"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -4024,7 +4060,7 @@ dependencies = [
 
 [[package]]
 name = "token-swap-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "r-token-swap",
  "token-swap",
@@ -4033,7 +4069,7 @@ dependencies = [
 
 [[package]]
 name = "token-swap-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
@@ -4045,7 +4081,7 @@ dependencies = [
 
 [[package]]
 name = "tokens"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -4059,7 +4095,7 @@ dependencies = [
 
 [[package]]
 name = "tokens-pkg"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase-user-workspace-hack",
  "r-tokens",
@@ -4069,7 +4105,7 @@ dependencies = [
 
 [[package]]
 name = "tokens-plugin"
-version = "0.25.0"
+version = "0.29.0"
 dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
@@ -5185,14 +5221,15 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "7.2.0"
+version = "9.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c42e33efc22a0650c311c2ef19115ce232583abbe80850bc8b66509ebef02de0"
+checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
 dependencies = [
  "crc32fast",
  "flate2",
  "indexmap",
  "memchr",
+ "nix",
  "typed-path",
  "zopfli",
 ]

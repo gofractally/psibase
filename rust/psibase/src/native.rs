@@ -143,6 +143,7 @@ pub struct KvHandle(native_raw::KvHandle);
 pub use native_raw::KvMode;
 
 // The tester needs a different implementation from services
+#[link(wasm_import_module = "env")]
 extern "C" {
     pub fn psibase_proxy_kv_open(
         db: DbId,
@@ -368,6 +369,31 @@ macro_rules! subjective_tx {
         };
         r
     }
+}
+
+/// Runs a statement once inside a subjective checkout and tries to commit it.
+///
+/// Returns `Some(result)` when the commit succeeds. When the commit fails,
+/// the checkout is aborted and this returns `None`.
+///
+/// Unstructured control flow that exits the statement, (e.g. break,
+/// return, panic), will discard any changes made to the
+/// subjective database.
+#[macro_export]
+macro_rules! try_subjective_tx {
+    {$($stmt:tt)*} => {{
+        $crate::native::checkout_subjective();
+        let guard = $crate::native::scopeguard::guard((), |_|{
+            $crate::native::abort_subjective();
+        });
+        let result = { $($stmt)* };
+        if $crate::native::commit_subjective() {
+            $crate::native::scopeguard::ScopeGuard::into_inner(guard);
+            Some(result)
+        } else {
+            None
+        }
+    }};
 }
 
 /// Starts a new HTTP request and returns the socket

@@ -23,6 +23,7 @@ use bindings::{
     tokens::plugin as tokens, transact::plugin as transact,
 };
 use invite::plugin::{
+    authorized::Guest as Authorized,
     invitee::Guest as Invitee,
     inviter::{Guest as Inviter, InviteDetails},
     redemption::Guest as Redemption,
@@ -162,18 +163,12 @@ impl Invitee for InvitePlugin {
 fn use_active_invite() {
     hook_actions_sender();
 
-    let cred_private_key = InviteTokensTable::active_credential_key().unwrap();
-    let cred_public_key = host::crypto::pub_from_priv(&cred_private_key).unwrap();
-
-    credentials::api::sign_latch(&credentials::types::Credential {
-        p256_pub: host::crypto::to_der(&cred_public_key).unwrap(),
-        p256_priv: host::crypto::to_der(&cred_private_key).unwrap(),
-    });
+    credentials::api::use_p256_credential(&InviteTokensTable::active_credential_key().unwrap());
 }
 
 impl Redemption for InvitePlugin {
     fn get_active_invite() -> Option<bool> {
-        assert!(host::client::get_sender() == psibase::services::accounts::SERVICE.to_string());
+        assert!(host::client::get_sender() == "host");
 
         let token = InviteTokensTable::active_invite_id();
         if token.is_none() {
@@ -184,7 +179,7 @@ impl Redemption for InvitePlugin {
     }
 
     fn create_new_account(account: String) -> String {
-        assert!(host::client::get_sender() == psibase::services::accounts::SERVICE.to_string());
+        assert!(host::client::get_sender() == "host");
 
         assert!(
             InviteTokensTable::active_can_create_account(),
@@ -206,7 +201,7 @@ impl Redemption for InvitePlugin {
     }
 
     fn accept() {
-        assert!(host::client::get_sender() == psibase::services::accounts::SERVICE.to_string());
+        assert!(host::client::get_sender() == "host");
 
         use_active_invite();
 
@@ -283,6 +278,13 @@ impl HookActionsSender for InvitePlugin {
         }
 
         Ok(None)
+    }
+}
+
+impl Authorized for InvitePlugin {
+    #[psibase_plugin::authorized(None)]
+    fn graphql(query: String) -> Result<String, Error> {
+        host::server::post_graphql_get_json(&query)
     }
 }
 

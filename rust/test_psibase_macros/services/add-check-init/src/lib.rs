@@ -1,9 +1,9 @@
 #[psibase::service_tables]
 mod service_tables {
-    use psibase::{Fracpack, ToSchema};
+    use psibase::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]

@@ -19,7 +19,7 @@ mod tests {
 
     #[derive(Deserialize)]
     struct Data {
-        userNfts: UserNfts,
+        nfts: UserNfts,
     }
 
     #[derive(Deserialize)]
@@ -38,8 +38,8 @@ mod tests {
             Nft::SERVICE,
             &format!(
                 r#"
-                query UserNfts {{
-                    userNfts(user: "{}") {{
+                query Nfts {{
+                    nfts(user: "{}") {{
                         edges {{
                             node {{
                                 id
@@ -54,7 +54,7 @@ mod tests {
         )?;
 
         let response_root: Response = serde_json::from_value(res)?;
-        Ok(response_root.data.userNfts.edges.len())
+        Ok(response_root.data.nfts.edges.len())
     }
 
     #[psibase::test_case(packages("StagedTx", "Nft", "AuthSig"))]
@@ -75,7 +75,7 @@ mod tests {
                     sender: bob,
                     service: Nft::SERVICE,
                     method: MethodNumber::from("mint"),
-                    rawData: Nft::action_structs::mint {}.packed().into(),
+                    rawData: Nft::action_structs::mint { nftId: None }.packed().into(),
                 }],
                 true,
             )
@@ -106,7 +106,7 @@ mod tests {
                 .propose(
                     accounts
                         .iter()
-                        .map(|account| Nft::Wrapper::pack_from(*account).mint())
+                        .map(|account| Nft::Wrapper::pack_from(*account).mint(None))
                         .collect(),
                     true,
                 )

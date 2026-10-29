@@ -9,6 +9,7 @@
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
 #include <services/test/AuthNone.hpp>
+#include <services/test/AuthTest.hpp>
 #include <services/test/RemoveCode.hpp>
 #include <services/user/Nop.hpp>
 
@@ -146,7 +147,7 @@ TEST_CASE("Test push_transaction")
    SECTION("No signature")
    {
       auto accounts = transactor<Accounts>{Accounts::service, Accounts::service};
-      auto act      = accounts.newAccount("alice"_a, AuthAny::service, true);
+      auto act      = accounts.newAccount("alice"_a, AuthAny::service, NewAccountMode::requireNew);
       auto trx      = t.signTransaction(t.makeTransaction({std::move(act)}));
       CHECK(httpPush(trx).succeeded());
       CHECK(t.from("alice"_a).to<Accounts>().exists("alice"_a).returnVal() == true);
@@ -206,7 +207,7 @@ TEST_CASE("Test push_transaction")
    SECTION("Not verify service")
    {
       auto accounts = transactor<Accounts>{Accounts::service, Accounts::service};
-      auto act      = accounts.newAccount("alice"_a, AuthAny::service, true);
+      auto act      = accounts.newAccount("alice"_a, AuthAny::service, NewAccountMode::requireNew);
       auto trx      = signTransaction(t.makeTransaction({std::move(act)}, 5),
                                       {{AccountNumber{"nop"}, aliceKeys}});
 
@@ -459,16 +460,191 @@ TEST_CASE("Test runAs")
 {
    DefaultTestChain t;
    auto             alice = t.addAccount("alice");
+   // define some accounts.
+   auto bob   = AccountNumber{"bob45678"};
+   auto carol = AccountNumber{"carol678"};
+   auto dave  = AccountNumber{"dave5678"};
+   auto eliza = AccountNumber{"eliza678"};
+   auto frank = AccountNumber{"frank678"};
+   auto grace = AccountNumber{"grace678"};
+   auto henry = AccountNumber{"henry678"};
+   t.addService<AuthTest>("AuthTest.wasm");
    SECTION("subaccount can be authorized by base account")
    {
       t.addService<AuthNone>("AuthNone.wasm");
       auto alice1 = AccountNumber("alice+1");
-      REQUIRE(t.from(alice).to<Accounts>().newAccount(alice1, AuthNone::service, true).succeeded());
+      REQUIRE(t.from(alice)
+                  .to<Accounts>()
+                  .newAccount(alice1, AuthNone::service, NewAccountMode::requireNew)
+                  .succeeded());
       auto act = transactor<Accounts>().from(alice1).setAuthServ(AuthAny::service);
       REQUIRE(t.from(alice)
                   .to<Transact>()
                   .runAs(std::move(act), std::vector<ServiceMethod>{})
                   .succeeded());
       CHECK(t.from(alice1).to<Nop>().nop().succeeded());
+   }
+   SECTION("multisig pass")
+   {
+      // dave is always the authorized account
+      SECTION("and 2")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 2).succeeded());
+      }
+      SECTION("or 2")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());
+      }
+      SECTION("or left")
+      {
+         t.addService<AuthNone>("AuthNone.wasm");
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{alice}, 1).succeeded());
+         t.addAccount(carol, AuthNone::service);
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());
+      }
+      SECTION("or right")
+      {
+         t.addService<AuthNone>("AuthNone.wasm");
+         t.addAccount(bob, AuthNone::service);
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());
+      }
+      SECTION("or loop right")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{carol, dave}, 1).succeeded());
+      }
+      SECTION("or loop left")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{dave, carol}, 1).succeeded());
+      }
+      SECTION("regression: refcount management")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(eliza, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{eliza, alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{eliza, bob}, 2).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{carol, bob}, 2).succeeded());
+      }
+      SECTION("regression: refcount tree")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(henry, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(grace, std::vector{alice}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(eliza, std::vector{alice, grace}, 2).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(frank, std::vector{eliza}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{henry, frank}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{frank}, 1).succeeded());
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{grace, carol, bob}, 3).succeeded());
+      }
+
+      auto act = transactor<Accounts>().from(dave).setAuthServ(AuthAny::service);
+      REQUIRE(t.from(alice)
+                  .to<Transact>()
+                  .runAs(std::move(act), std::vector<ServiceMethod>{})
+                  .succeeded());
+      CHECK(t.from(dave).to<Nop>().nop().succeeded());
+   }
+
+   SECTION("multisig fail")
+   {
+      SECTION("simple loop")
+      {
+         REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{dave}, 1).succeeded());
+      }
+
+      auto act = transactor<Accounts>().from(dave).setAuthServ(AuthAny::service);
+      REQUIRE(t.from(alice)
+                  .to<Transact>()
+                  .runAs(std::move(act), std::vector<ServiceMethod>{})
+                  .failed("caller is not authorized"));
+   }
+}
+
+TEST_CASE("Test isAuth")
+{
+   auto t     = DefaultTestChain{};
+   auto alice = t.addAccount("alice");
+   auto bob   = t.addAccount("bob");
+   auto carol = AccountNumber{"carol678"};
+   auto dave  = AccountNumber{"dave5678"};
+   t.addService<AuthTest>("AuthTest.wasm");
+   auto nop  = ServiceMethod{Nop::service, MethodNumber{"nop"}};
+   auto nop2 = ServiceMethod{Nop::service, MethodNumber{"nop2"}};
+   SECTION("simple method")
+   {
+      REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{bob}, 1).succeeded());
+      REQUIRE(t.to<AuthTest>().setAuth(carol, std::vector{alice}, 1, nop).succeeded());
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop}}, std::vector{alice})
+                .returnVal() == true);
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop}}, std::vector{bob})
+                .returnVal() == false);
+   }
+   SECTION("multiple")
+   {
+      REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{bob}, 1).succeeded());
+      REQUIRE(t.to<AuthTest>().setAuth(carol, std::vector{alice}, 1, nop).succeeded());
+      REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob}, 1).succeeded());
+      REQUIRE(t.to<AuthTest>().setAuth(dave, std::vector{alice}, 1, nop2).succeeded());
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop}, {dave, nop2}}, std::vector{alice})
+                .returnVal() == true);
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop}, {dave, nop}}, std::vector{alice})
+                .returnVal() == false);
+      CHECK(t.to<Transact>()
+                .isAuth(std::vector<AuthTarget>{{carol, nop2}, {dave, nop2}}, std::vector{alice})
+                .returnVal() == false);
+   }
+}
+
+TEST_CASE("Test work")
+{
+   DefaultTestChain t;
+
+   auto alice = t.addAccount("alice");
+   auto bob   = t.addAccount("bob");
+
+   SECTION("incomplete")
+   {
+      CHECK(t.to<Transact>().setWork(true).failed("Work not completed: transact"));
+   }
+
+   auto transact = transactor<Transact>();
+
+   SECTION("complete")
+   {
+      expect(t.pushTransaction(t.makeTransaction(
+          {transact.from(alice).setWork(true), transact.from(alice).setWork(false)})));
+   }
+   SECTION("double work")
+   {
+      expect(t.pushTransaction(
+          t.makeTransaction({transact.from(alice).setWork(true), transact.from(alice).setWork(true),
+                             transact.from(alice).setWork(false)})));
+   }
+   SECTION("wrong complete")
+   {
+      expect(t.pushTransaction(t.makeTransaction(
+                 {transact.from(alice).setWork(true), transact.from(bob).setWork(false)})),
+             "Work not completed: alice");
+   }
+   SECTION("complete + incomplete")
+   {
+      expect(t.pushTransaction(t.makeTransaction({transact.from(alice).setWork(true),
+                                                  transact.from(bob).setWork(true),
+                                                  transact.from(alice).setWork(false)})),
+             "Work not completed: bob");
+   }
+   SECTION("complete overlapping")
+   {
+      expect(t.pushTransaction(t.makeTransaction(
+          {transact.from(alice).setWork(true), transact.from(bob).setWork(true),
+           transact.from(alice).setWork(false), transact.from(bob).setWork(false)})));
    }
 }

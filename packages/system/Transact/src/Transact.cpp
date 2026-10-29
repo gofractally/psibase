@@ -346,6 +346,199 @@ namespace SystemService
    };
    boost::container::flat_map<RunAsKey, uint32_t> runAsMap;
 
+   struct AuthVertex;
+   using AuthItem = std::pair<const psibase::AccountNumber, AuthVertex>;
+   using AuthMap  = std::map<psibase::AccountNumber, AuthVertex>;
+   struct AuthVertex
+   {
+      psibase::AccountNumber authService = {};
+      std::vector<AuthItem*> parents;
+      std::vector<AuthItem*> children;
+      bool                   authorized = false;
+      bool                   queued     = false;
+      std::uint16_t          refs       = 0;
+      const ServiceMethod*   action     = nullptr;
+      // Returns true if the refcount becomes zero
+      bool decref() { return !authorized && --refs == 0; }
+      bool incref() { return !authorized && refs++ == 0; }
+      void getArgs(std::vector<AccountNumber>& out) const
+      {
+         out.clear();
+         for (AuthItem* child : children)
+         {
+            if (child->second.authorized)
+            {
+               out.push_back(child->first);
+            }
+         }
+      }
+      std::optional<ServiceMethod> getAction() const
+      {
+         if (action)
+            return *action;
+         else
+            return {};
+      }
+   };
+
+   struct AuthState
+   {
+      std::vector<psibase::AccountNumber> accounts;
+      std::vector<AuthItem*>              stack;
+      AuthMap                             authorized;
+
+      // Safe to call multiple times
+      AuthItem* addRoot(AccountNumber account)
+      {
+         auto [iter, _] = authorized.try_emplace(account);
+         ++iter->second.refs;
+         if (!iter->second.queued && !iter->second.authorized)
+         {
+            stack.push_back(&*iter);
+            iter->second.queued = true;
+         }
+         return &*iter;
+      }
+
+      // item must be an external item, and can only be added once
+      void addRoot(AuthItem* item)
+      {
+         stack.push_back(item);
+         ++item->second.refs;
+         item->second.queued = true;
+      }
+
+      void setAuthorized(psibase::AccountNumber account)
+      {
+         auto [iter, _] = authorized.try_emplace(account);
+         if (!iter->second.authorized)
+         {
+            // The queue isn't set up for removing arbitrary items
+            check(!iter->second.queued, "addRoot should be called after setAuthorized");
+            setAuthorized(*iter);
+         }
+      }
+
+      template <auto F>
+      void updateChildRefs(AuthItem& self)
+      {
+         auto handleChildren = [this](const AuthItem& item)
+         {
+            for (AuthItem* c : item.second.children)
+            {
+               if ((c->second.*F)())
+               {
+                  stack.push_back(c);
+               }
+            }
+         };
+         // reuse stack, making sure to leave it in the original state
+         auto initial = stack.size();
+         handleChildren(self);
+         while (stack.size() > initial)
+         {
+            auto item = stack.back();
+            stack.pop_back();
+            handleChildren(*item);
+         }
+      }
+
+      void setAuthorized(AuthItem& self)
+      {
+         check(!self.second.authorized, "Internal error: cannot set authorized again");
+         self.second.authorized = true;
+         // Add parents to the stack, as their results might have changed
+         for (AuthItem* p : self.second.parents)
+         {
+            if (!p->second.queued && !p->second.authorized && p->second.refs != 0)
+            {
+               p->second.queued = true;
+               stack.push_back(p);
+            }
+         }
+         updateChildRefs<&AuthVertex::decref>(self);
+      }
+      void getDelegates(AuthItem& self)
+      {
+         auto delegates = to<AuthInterface>(self.second.authService)
+                              .getDlgsSys(self.first, self.second.getAction());
+         for (auto child : delegates)
+         {
+            auto [iter, inserted] = authorized.try_emplace(child);
+            if (!iter->second.queued && !iter->second.authorized)
+            {
+               stack.push_back(&*iter);
+               iter->second.queued = true;
+            }
+            if (iter->second.incref())
+            {
+               updateChildRefs<&AuthVertex::incref>(*iter);
+            }
+            iter->second.parents.push_back(&self);
+            self.second.children.push_back(&*iter);
+         }
+      }
+      void checkAuth(AuthItem& self)
+      {
+         self.second.getArgs(accounts);
+         if (to<AuthInterface>(self.second.authService)
+                 .isAuthSys(self.first, accounts, self.second.getAction()))
+         {
+            setAuthorized(self);
+         }
+      }
+      void run()
+      {
+         while (!stack.empty())
+         {
+            auto item = stack.back();
+            stack.pop_back();
+            item->second.queued = false;
+            if (item->second.refs > 0)
+            {
+               if (item->second.authService == psibase::AccountNumber{})
+               {
+                  item->second.authService = to<Accounts>().getAuthOf(item->first);
+                  getDelegates(*item);
+               }
+               checkAuth(*item);
+            }
+         }
+      }
+   };
+
+   void checkRunAsAuth(psibase::AccountNumber     requester,
+                       psibase::AccountNumber     sender,
+                       ServiceMethod              action,
+                       std::vector<ServiceMethod> allowedActions,
+                       bool                       matched)
+   {
+      AuthState             state;
+      std::vector<AuthItem> roots;
+      roots.reserve(allowedActions.size() + 1);
+      if (!matched)
+      {
+         roots.emplace_back(sender, AuthVertex{});
+         roots.back().second.action = &action;
+         state.addRoot(&roots.back());
+      }
+      for (ServiceMethod& act : allowedActions)
+      {
+         roots.emplace_back(sender, AuthVertex{});
+         roots.back().second.action = &act;
+         state.addRoot(&roots.back());
+      }
+      state.setAuthorized(requester);
+      state.run();
+      for (const auto& item : roots)
+      {
+         if (!item.second.authorized)
+         {
+            abortMessage("runAs: caller is not authorized");
+         }
+      }
+   }
+
    std::vector<char> Transact::runAs(psibase::Action            action,
                                      std::vector<ServiceMethod> allowedActions)
    {
@@ -372,12 +565,10 @@ namespace SystemService
       {
          auto authService = to<Accounts>().getAuthOf(action.sender);
 
-         if (requester != authService && requester != action.sender.base())
+         if (requester != authService && requester != action.sender &&
+             requester != action.sender.base())
          {
-            uint32_t flags = 0;
-            if (requester == action.sender)
-               flags = AuthInterface::runAsRequesterReq;
-            else
+            bool matched = false;
             {
                auto it = runAsMap.lower_bound(RunAsKey{action.sender, requester, {}, {}});
                while (it != runAsMap.end() &&  //
@@ -387,45 +578,15 @@ namespace SystemService
                       (!it->first.receiver.value || it->first.receiver == action.service) &&
                       (!it->first.method.value || it->first.method == action.method))
                   {
-                     if (allowedActions.empty())
-                        flags = AuthInterface::runAsMatchedReq;
-                     else
-                        flags = AuthInterface::runAsMatchedExpandedReq;
+                     matched = true;
                      break;
                   }
                   ++it;
                }
-               if (!flags)
-                  flags = AuthInterface::runAsOtherReq;
             }
 
-            if constexpr (enable_print)
-            {
-               std::string flags_str = "";
-               auto        type      = flags & AuthInterface::requestMask;
-               if (type == AuthInterface::runAsRequesterReq)
-                  flags_str += " - runAsRequesterReq\n";
-               else if (type == AuthInterface::runAsMatchedReq)
-                  flags_str += " - runAsMatchedReq\n";
-               else if (type == AuthInterface::runAsMatchedExpandedReq)
-                  flags_str += " - runAsMatchedExpandedReq\n";
-               else if (type == AuthInterface::runAsOtherReq)
-                  flags_str += " - runAsOtherReq\n";
-
-               if (!flags_str.empty())
-               {
-                  psibase::writeConsole("Checking auth service " + authService.str() +
-                                        " with flags: \n" + flags_str + "\n");
-               }
-            }
-
-            Actor<AuthInterface> auth(Transact::service, authService);
-            if (!auth.checkAuthSys(flags, requester, action.sender,
-                                   ServiceMethod{action.service, action.method}, allowedActions,
-                                   std::vector<Claim>{}))
-            {
-               abortMessage("Not authorized");
-            }
+            checkRunAsAuth(requester, action.sender, ServiceMethod{action.service, action.method},
+                           allowedActions, matched);
          }  // if (requester != authService)
       }  // if(enforceAuth)
 
@@ -439,6 +600,50 @@ namespace SystemService
 
       return result;
    }  // Transact::runAs
+
+   bool Transact::isAuth(std::vector<AuthTarget>             actions,
+                         std::vector<psibase::AccountNumber> authorizers)
+   {
+      AuthState              state;
+      std::vector<AuthItem>  actionRoots;
+      std::vector<AuthItem*> roots;
+      roots.reserve(actions.size());
+      // reserve is required, because the address needs to be stable
+      actionRoots.reserve(actions.size());
+      for (auto account : authorizers)
+      {
+         state.setAuthorized(account);
+      }
+      for (auto& target : actions)
+      {
+         if (std::ranges::contains(authorizers, target.sender))
+         {
+            // If the sender is in the authorizers, it directly counts
+            // as authorization regardless of whether the target includes
+            // an action or not.
+         }
+         else if (target.action)
+         {
+            auto& item         = actionRoots.emplace_back(target.sender, AuthVertex{});
+            item.second.action = &*target.action;
+            state.addRoot(&item);
+            roots.push_back(&item);
+         }
+         else
+         {
+            roots.push_back(state.addRoot(target.sender));
+         }
+      }
+      state.run();
+      for (const auto& item : roots)
+      {
+         if (!item->second.authorized)
+         {
+            return false;
+         }
+      }
+      return true;
+   }
 
    static std::span<const char>  trxData;
    psio::view<const Transaction> Transact::getTransaction() const
@@ -462,14 +667,6 @@ namespace SystemService
       auto& stat = getStatus();
       check(stat.head.has_value(), "head does not exist yet");
       return stat.head->header;
-   }
-
-   psibase::BlockTime Transact::headBlockTime() const
-   {
-      auto& stat = getStatus();
-      if (stat.head)
-         return stat.head->header.time;
-      return {};
    }
 
    std::pair<uint8_t, uint32_t> Transact::headTapos()
@@ -585,7 +782,7 @@ namespace SystemService
             std::printf("call checkAuthSys on %s for sender account %s\n",
                         authService.str().c_str(), act.sender().unpack().str().c_str());
          Actor<AuthInterface> auth(Transact::service, authService);
-         uint32_t             flags = AuthInterface::topActionReq;
+         uint32_t             flags = 0;
          if (first && !readOnly)
          {
             flags |= AuthInterface::firstAuthFlag;
@@ -599,9 +796,8 @@ namespace SystemService
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;
          // This can execute user defined code, so we must set the timer first
-         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
-                                ServiceMethod{act.service(), act.method()},
-                                std::vector<ServiceMethod>{}, claims))
+         if (!auth.checkAuthSys(flags, act.sender(), ServiceMethod{act.service(), act.method()},
+                                claims))
          {
             abortMessage(std::format("Authorization for {} -> {}::{} failed",
                                      act.sender().unpack().str(), act.service().unpack().str(),
@@ -674,6 +870,25 @@ namespace SystemService
          check(systemWriteBudget == 0, "system write already active");
 
       systemWriteBudget = numBytes;
+   }
+
+   namespace
+   {
+      std::vector<AccountNumber> remainingWork;
+   }
+
+   void Transact::setWork(bool work)
+   {
+      auto sender = getSender();
+      if (work)
+      {
+         if (!std::ranges::contains(remainingWork, sender))
+            remainingWork.push_back(sender);
+      }
+      else
+      {
+         std::erase(remainingWork, sender);
+      }
    }
 
    static void processTransactionImpl(
@@ -784,6 +999,9 @@ namespace SystemService
 
       trxData = std::span<const char>{};
       trxSender.reset();
+
+      if (!remainingWork.empty())
+         abortMessage(std::format("Work not completed: {}", remainingWork[0].str()));
    }
 
    void Transact::execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
@@ -864,10 +1082,7 @@ namespace SystemService
       if constexpr (enable_print)
          std::printf("processTransaction\n");
 
-      // TODO: check max_net_usage_words, max_cpu_usage_ms
-      // TODO: resource billing
       // TODO: subjective mitigation hooks
-      // TODO: limit execution time
       // TODO: limit charged CPU & NET which can go into a block
       auto top_act                = getCurrentActionView();
       auto args                   = psio::view<const ProcessTransactionArgs>(top_act->rawData());

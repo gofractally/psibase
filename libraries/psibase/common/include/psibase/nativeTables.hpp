@@ -157,7 +157,6 @@ namespace psibase
       NotifyType          type;
       std::vector<Action> actions;
 
-      // TODO: we need a native subjective table
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> NotifyKeyType;
       PSIO_REFLECT(NotifyRow, type, actions)

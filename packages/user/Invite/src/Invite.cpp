@@ -14,7 +14,6 @@
 #include <services/user/Tokens.hpp>
 
 #include <psibase/Actor.hpp>
-#include <psibase/Bitset.hpp>
 #include "psibase/crypto.hpp"
 #include "psibase/db.hpp"
 #include "psibase/nativeTables.hpp"

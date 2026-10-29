@@ -29,7 +29,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, import_key_transient],
         Low => [import_key],
         High => [sign],
     }
@@ -73,7 +73,7 @@ impl KeyVault for HostCrypto {
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
         assert_authorized_with_whitelist(
             FunctionName::sign,
-            vec!["transact".into(), "auth-sig".into()],
+            vec!["transact".into(), "auth-sig".into(), "auth-rcovr".into()],
         )?;
 
         Supervisor::sign(&hashed_message, &public_key)
@@ -91,10 +91,15 @@ impl KeyVault for HostCrypto {
     fn import_key(private_key: Pem) -> Result<Pem, HostTypes::Error> {
         assert_authorized_with_whitelist(
             FunctionName::import_key,
-            vec!["x-admin".into(), "invite".into(), "auth-sig".into()],
+            vec!["x-admin".into(), "invite".into(), "auth-sig".into(), "auth-rcovr".into()],
         )?;
 
         Supervisor::import_key(&private_key)
+    }
+
+    fn import_key_transient(private_key: Pem) -> Result<Pem, HostTypes::Error> {
+        assert_authorized(FunctionName::import_key_transient)?;
+        Supervisor::import_key_transient(&private_key)
     }
 }
 

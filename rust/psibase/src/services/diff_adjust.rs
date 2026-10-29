@@ -86,6 +86,18 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Get RateLimit record
+    ///
+    /// # Arguments
+    /// * `nft_id` - RateLimit / NFT ID
+    ///
+    /// # Returns
+    /// The RateLimit if it exists
+    #[action]
+    fn get(nft_id: u32) -> Option<RateLimit> {
+        unimplemented!()
+    }
+
     /// Get RateLimit difficulty
     ///
     /// # Arguments

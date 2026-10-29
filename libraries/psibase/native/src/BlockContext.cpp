@@ -115,7 +115,6 @@ namespace psibase
       return *status;
    }
 
-   // TODO: (or elsewhere) check block signature
    void BlockContext::start(Block&& src)
    {
       auto status =
@@ -755,7 +754,6 @@ namespace psibase
 
       db.kvPut(StatusRow::db, status->key(), *status);
 
-      // TODO: store block proofs somewhere
       // TODO: avoid repacking
       db.kvPut(DbId::blockLog, current.header.blockNum, current);
       db.kvPut(DbId::blockProof, current.header.blockNum,

@@ -4,8 +4,8 @@
 
 #include <psibase/blob.hpp>
 #include <psio/fracpack.hpp>
-#include <psio/from_bin.hpp>
 #include <psio/to_key.hpp>
+#include <triedent/cow_ptr.hpp>
 #include <triedent/file_fwd.hpp>
 
 #include <array>
@@ -37,7 +37,7 @@ namespace psibase
    using Writer    = triedent::write_session;
    using WriterPtr = std::shared_ptr<Writer>;
 
-   using DbPtr = std::shared_ptr<triedent::root>;
+   using DbPtr = triedent::cow_ptr<triedent::root>;
 
    struct DbChangeSet
    {

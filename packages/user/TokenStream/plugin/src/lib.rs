@@ -4,7 +4,7 @@ mod bindings;
 use bindings::exports::token_stream::plugin::api::Guest as Api;
 use bindings::host::types::types::Error;
 use bindings::tokens::plugin::helpers::decimal_to_u64;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use bindings::transact::plugin::api::add_action_to_transaction;
 
 use psibase::define_trust;
 use psibase::fracpack::Pack;

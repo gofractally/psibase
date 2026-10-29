@@ -18,3 +18,9 @@ export const useStatuses = () =>
         },
         refetchInterval: 10000,
     });
+
+export const useChainReady = () => {
+    const { data: status, isSuccess } = useStatuses();
+    return isSuccess && !!status && !status.includes("needgenesis");
+};
+

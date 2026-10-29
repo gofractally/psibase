@@ -3,11 +3,11 @@
 
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::{Fracpack, Table, ToSchema};
+    use psibase::{Pack, Table, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct ConfigRow {}
     impl ConfigRow {
         #[primary_key]
@@ -28,15 +28,13 @@ pub mod tables {
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
-        auth_delegate::Wrapper as AuthDelegate, fractals::FractalRole,
-        fractals::Wrapper as Fractals, guilds::Wrapper as Guilds,
+        fractals::FractalRole, fractals::Wrapper as Fractals, guilds::Wrapper as Guilds,
         guilds::SERVICE as GUILDS_SERVICE, producers::Wrapper as Producers,
     };
     use psibase::*;
 
     const SYS_FRACTAL: AccountNumber = account!("core-fract");
     const SYS_GUILD: AccountNumber = account!("core-gld-1");
-    const ROOT: AccountNumber = account!("root");
 
     #[action]
     fn create_frac() {
@@ -50,33 +48,20 @@ mod service {
         let prods = Producers::call().getProducers();
         let producer = prods.first().unwrap();
 
-        let legislature = account!("legislatur");
-        let judiciary = account!("judiciar-a");
-        let executive = account!("executiv-a");
-        let recruitment = account!("recruitm-a");
-
         Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,
-            legislature,
-            judiciary,
-            executive,
-            recruitment,
-            "Network Governance".into(),
-            "To establish, maintain, and grow the network.".into(),
+            "Core".into(),
+            "To establish, sustain, and cultivate the network.".into(),
         );
 
         let guilds = Guilds::call_from(*producer);
-        guilds.create_guild(
-            SYS_FRACTAL,
-            SYS_GUILD,
-            "Genesis".into(),
-            account!("c-role-001"),
-            account!("r-role-001"),
-        );
+        guilds.create_guild(SYS_FRACTAL, SYS_GUILD, "Guild One".into());
+        Guilds::call_from(SYS_GUILD)
+            .set_g_desc("Coordinates community efforts in service of the fractal's mission".into());
 
         let map_sys_guild_to_role_occ = |role: FractalRole| {
-            Guilds::call_as(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);
-            Fractals::call_as(SYS_FRACTAL).set_r_occ(role.into(), GUILDS_SERVICE);
+            Guilds::call_from(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);
+            Fractals::call_from(SYS_FRACTAL).set_r_occ(role.into(), GUILDS_SERVICE);
         };
 
         map_sys_guild_to_role_occ(FractalRole::Legislature);
@@ -84,10 +69,11 @@ mod service {
         map_sys_guild_to_role_occ(FractalRole::Executive);
         map_sys_guild_to_role_occ(FractalRole::Recruitment);
 
-        Guilds::call_as(SYS_FRACTAL).set_rguilds(vec![SYS_GUILD]);
-        Guilds::call_as(SYS_FRACTAL).set_auto_join(true);
+        Guilds::call_from(SYS_FRACTAL).set_rguilds(vec![SYS_GUILD]);
+        Guilds::call_from(SYS_FRACTAL).set_auto_join(true);
 
-        // Give the core fractal ownership of the network
-        AuthDelegate::call_from(ROOT).setOwner(SYS_FRACTAL);
+        // Not setOwner(root → core-fract): that breaks later root package commits
+        // in the same install (Invite can sort after FractalGen). Boot assigns
+        // root ownership in boot.rs.
     }
 }

@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-name-market"
-plugin = "name-market-plugin"
+plugins = ["name-market-plugin"]
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "namemarket", service = "namemarket", method = "init", data = {} },
@@ -25,4 +25,4 @@ psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 pem = "3.0"
-name-market-pkg = { path = "..", version = "0.25.0" }
+name-market-pkg = { path = "..", version = "0.29.0" }

@@ -72,6 +72,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns the server registered for `service`, if any
+    #[action]
+    fn getServer(service: AccountNumber) -> Option<AccountNumber> {
+        unimplemented!()
+    }
+
     /// Entry point for messages
     #[action]
     fn recv(socket: i32, data: Hex<Vec<u8>>, flags: u32) {

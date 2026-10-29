@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use async_graphql::{scalar, InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use pem::{encode, parse, Pem};
@@ -7,6 +8,17 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SubjectPublicKeyInfo(pub Vec<u8>);
 scalar!(SubjectPublicKeyInfo);
+
+impl std::str::FromStr for SubjectPublicKeyInfo {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pem = parse(s)?;
+        if pem.tag() != "PUBLIC KEY" {
+            return Err(anyhow!("Expected public key"));
+        }
+        Ok(SubjectPublicKeyInfo(pem.contents().to_vec()))
+    }
+}
 
 impl Serialize for SubjectPublicKeyInfo {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -75,10 +87,8 @@ mod service {
     #[action]
     fn checkAuthSys(
         flags: u32,
-        requester: AccountNumber,
         sender: AccountNumber,
         action: ServiceMethod,
-        allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
     ) -> bool {
         unimplemented!()

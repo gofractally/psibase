@@ -1,9 +1,9 @@
 package branding:plugin;
 
 world impl {
-    include host:common/imports;
-    import transact:plugin/intf;
-    include staged-tx:plugin/imports;
+    include host:client/imports;
+    include host:http/imports;
+    import transact:plugin/api;
     include sites:plugin/imports;
 
     export api;

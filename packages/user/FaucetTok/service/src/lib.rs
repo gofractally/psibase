@@ -8,7 +8,7 @@ pub mod tables {
     use psibase::*;
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(ToSchema, Fracpack)]
+    #[derive(ToSchema, Pack, Unpack)]
     pub struct ConfigRow {
         pub token_id: TID,
     }
@@ -106,3 +106,6 @@ mod service {
         Tokens::call().credit(tid, account, 100_000_0000.into(), "Faucet drip".into());
     }
 }
+
+#[cfg(test)]
+mod tests;

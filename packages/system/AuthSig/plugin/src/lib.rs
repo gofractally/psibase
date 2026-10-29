@@ -12,11 +12,12 @@ use trust::*;
 use bindings::host::crypto::keyvault as HostCrypto;
 use bindings::host::types::types as HostTypes;
 use bindings::host::types::types::{Keypair, Pem};
-use bindings::transact::plugin::intf as Transact;
+use bindings::transact::plugin::api as Transact;
 
 // Exported interfaces
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, api::Guest as Api, keyvault::Guest as KeyVault,
+    queries::Guest as Queries,
 };
 use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 
@@ -43,7 +44,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, can_authorize],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, can_authorize, get_pubkey, get_accounts_with_key],
         Low => [import_key],
         Medium => [create_account],
         High => [set_key, sign],
@@ -111,7 +112,7 @@ impl KeyVault for AuthSig {
         assert_authorized_with_whitelist(
             FunctionName::import_key,
             vec![
-                "accounts".into(),
+                "host".into(),
                 "x-admin".into(),
                 "invite".into(),
                 "namemarket".into(),
@@ -126,7 +127,7 @@ impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(
             FunctionName::set_key,
-            vec!["accounts".into(), "namemarket".into(), "homepage".into()],
+            vec!["host".into(), "namemarket".into(), "homepage".into()],
         )?;
 
         Transact::add_action_to_transaction(
@@ -141,7 +142,7 @@ impl Actions for AuthSig {
     }
 
     fn create_account(new_account_name: String) -> Result<String, HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::create_account, vec!["accounts".into()])?;
+        assert_authorized_with_whitelist(FunctionName::create_account, vec!["host".into()])?;
 
         let name = psibase::AccountNumber::from_exact(&new_account_name)
             .map_err(|_| ErrorType::InvalidAccountName(&new_account_name))?;
@@ -178,6 +179,18 @@ impl Api for AuthSig {
         };
 
         specified_pubkey == actual_pubkey
+    }
+}
+
+impl Queries for AuthSig {
+    fn get_pubkey(account: String) -> Result<Option<Pem>, HostTypes::Error> {
+        assert_authorized(FunctionName::get_pubkey)?;
+        find_pubkey(&account)
+    }
+
+    fn get_accounts_with_key(public_key: Pem) -> Result<Vec<String>, HostTypes::Error> {
+        assert_authorized(FunctionName::get_accounts_with_key)?;
+        helpers::get_accounts_with_key(&public_key)
     }
 }
 

@@ -8,7 +8,7 @@ publish.workspace = true
 [package.metadata.psibase]
 flags = ["isPrivileged"]
 server = "virtual-server"
-plugin = "virtual-server-plugin"
+plugins = ["virtual-server-plugin"]
 postinstall = [{ sender = "vserver", service = "vserver", method = "init" }]
 
 [dependencies]
@@ -22,7 +22,7 @@ async-graphql.workspace = true
 psibase-system-workspace-hack.workspace = true
 
 [dev-dependencies]
-virtual-server-pkg = { path = "..", version = "0.25.0" }
+virtual-server-pkg = { path = "..", version = "0.29.0" }
 rand = "0.9.0"
 pem = "3"
 p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }

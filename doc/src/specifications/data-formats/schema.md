@@ -150,6 +150,8 @@ These custom types are used by psibase
 | AccountNumber | u64                                                             | String            |
 | TimePointSec  | Any integer type representing seconds since the UNIX epoch      | ISO 8601 Extended |
 | TimePointUSec | Any integer type representing microseconds since the UNIX epoch | ISO 8601 Extended |
+| ServiceMethod | Object containing two u64 fields                                |                   |
+| Action        | sender, service, method, rawData                                | Unpacked data     |
 
 ### Named Type
 
@@ -159,77 +161,11 @@ A String used where a type is expected will be treated as a named type. The actu
 
 A schema includes a map of named types. This is required to allow recursive type definitions. Type names that begin with "@" are internal to the schema and MAY be renamed any time the schema is processed.
 
-## TODO
-
-- tables
-
 ## Schema Schema
 
 The schema schema defines both the JSON format and the binary (fracpack) format of schemas.
 
 
 ```json
-{
-  "ServiceSchema": {
-    "Object": {
-      "service": "@AccountNumber",
-      "types": "@typemap",
-      "actions": "@actions",
-      "history": "@events",
-      "merkle": "@events"
-    }
-  },
-  "@typemap": {
-    "Custom": {
-      "id": "map",
-      "type": {"List":{"Object": {"name": "@string", "type": "@type"}}}
-    }
-  },
-  "@actions": {
-    "Custom": {
-      "id": "map",
-      "type": {"List": {"Object": {"name":"@string", "type": "@fn"}}}
-    }
-  },
-  "@events": {
-    "Custom": {
-      "id": "map",
-      "type": {"List": {"Object": {"name":"@string", "type": "@event"}}}
-    }
-  },
-  "@fn": {
-    "Object": {
-      "params": "@type",
-      "result": {"Option": "@type"}
-    }
-  },
-  "@event": {
-    "Object": {
-      "type": "@type",
-      "access": "@string"
-    }
-  },
-  "@type": {
-    "Variant": {
-      "Struct": "@typemap",
-      "Object": "@typemap",
-      "Array": {"Object": {"type": "@type", "len": "@u64"}},
-      "List": "@type",
-      "Option": "@type",
-      "Variant": "@typemap",
-      "Tuple": {"List": "@type"},
-      "Int": {"Object": {"bits": "@u32", "isSigned": "@bool"}},
-      "Float": {"Object": {"exp": "@u32", "mantissa": "@u32"}},
-      "FracPack": "@type",
-      "Custom": {"Object": {"type": "@type", "id": "@string"}},
-      "@Type": "@string"
-    }
-  },
-  "@u8": {"Int": {"bits": 8, "isSigned": false}},
-  "@u32": {"Int": {"bits": 32, "isSigned": false}},
-  "@u64": {"Int": {"bits": 64, "isSigned": false}},
-  "@bool": {"Custom": {"id": "bool", "type": {"Int": {"bits": 1, "isSigned": false}}}},
-  "@string": {"Custom": {"id": "string", "type": {"List": "@u8"}}},
-  "@AccountNumber": {"Custom": {"id": "AccountNumber", "type": "@u64"}}
-}
+{{#include schema-schema.json}}
 ```

@@ -73,6 +73,7 @@ interface app {
 
 interface mail {
     use host:types/types.{error};
+    use chainmail:plugin/types.{message};
 
     /// Send an email as the specified app
     send: func(app: string, receiver: string, subject: string, body: string) -> result<_, error>;
@@ -83,6 +84,9 @@ interface mail {
     /// Save one of the specified app's emails
     /// Saved emails cannot be pruned
     save: func(app: string, msg-id: u64) -> result<_, error>;
+
+    /// Read non-archived messages for the specified app mailbox
+    get-msgs: func(app: string) -> result<list<message>, error>;
 }
 
 interface development {

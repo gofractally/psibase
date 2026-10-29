@@ -51,29 +51,11 @@ pub mod service {
     #[allow(non_snake_case)]
     fn checkAuthSys(
         flags: u32,
-        requester: AccountNumber,
         sender: AccountNumber,
         action: ServiceMethod,
-        _allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
     ) -> bool {
         use psibase::services::transact::auth_interface::*;
-
-        let auth_type = flags & REQUEST_MASK;
-        match auth_type {
-            RUN_AS_REQUESTER_REQ | RUN_AS_MATCHED_REQ => return true,
-            RUN_AS_MATCHED_EXPANDED_REQ => panic!("runAs: caller attempted to expand powers"),
-            RUN_AS_OTHER_REQ => {
-                if requester == Wrapper::SERVICE {
-                    // This allows credentials service to call actions on behalf of any credential
-                    return true;
-                } else {
-                    panic!("runAs: caller is not authorized")
-                }
-            }
-            t if t != TOP_ACTION_REQ => panic!("unsupported auth type"),
-            _ => {}
-        }
 
         assert_eq!(sender, CRED_SYS, "sender must be {}", CRED_SYS);
 
@@ -87,7 +69,10 @@ pub mod service {
 
         // FIRST_AUTH_FLAG is set when this check is running for the top-level action and
         // we are NOT executing speculatively.
-        if (flags & FIRST_AUTH_FLAG) != 0 && VirtualServer::call().is_billing_enabled() {
+        if (flags & FIRST_AUTH_FLAG) != 0
+            && VirtualServer::call().is_billing_enabled()
+            && get_sender() == psibase::services::transact::SERVICE
+        {
             VirtualServer::call_as(CRED_SYS).bill_to_sub(credential.id.to_string());
         }
 
@@ -241,3 +226,6 @@ pub mod service {
         VirtualServer::call_as(CRED_SYS).del_res_sub(id.to_string());
     }
 }
+
+#[cfg(test)]
+mod tests;

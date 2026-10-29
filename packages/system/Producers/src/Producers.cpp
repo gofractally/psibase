@@ -221,28 +221,11 @@ namespace SystemService
    }
 
    bool Producers::checkAuthSys(uint32_t                    flags,
-                                AccountNumber               requester,
                                 AccountNumber               sender,
                                 ServiceMethod               action,
-                                std::vector<ServiceMethod>  allowedActions,
                                 std::vector<psibase::Claim> claims)
    {
       // verify that all claims are valid
-
-      // Standard verification for auth type
-      // TODO: refactor duplicated code
-      auto type = flags & AuthInterface::requestMask;
-      if (type == AuthInterface::runAsRequesterReq)
-         return true;  // Request is valid
-      else if (type == AuthInterface::runAsMatchedReq)
-         return true;  // Request is valid
-      else if (type == AuthInterface::runAsMatchedExpandedReq)
-         abortMessage("runAs: caller attempted to expand powers");
-      else if (type == AuthInterface::runAsOtherReq)
-         abortMessage("runAs: caller is not authorized");
-      else if (type != AuthInterface::topActionReq)
-         abortMessage("unsupported auth type");
-
       auto expectedClaims = ::getProducers()                          //
                             | std::views::transform(&Producer::auth)  //
                             | std::ranges::to<std::vector>();
@@ -267,8 +250,7 @@ namespace SystemService
       return getProducers();
    }
 
-   bool Producers::isAuthSys(AccountNumber                sender,
-                             std::vector<AccountNumber>   authorizers)
+   bool Producers::isAuthSys(AccountNumber sender, std::vector<AccountNumber> authorizers)
    {
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
@@ -278,8 +260,7 @@ namespace SystemService
       return countOverlapping(producers, authorizers) >= threshold;
    }
 
-   bool Producers::isRejectSys(AccountNumber                sender,
-                               std::vector<AccountNumber>   rejecters)
+   bool Producers::isRejectSys(AccountNumber sender, std::vector<AccountNumber> rejecters)
    {
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //

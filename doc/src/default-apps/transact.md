@@ -22,7 +22,6 @@ The trace can be returned either as JSON (`application/json`) or fracpack (`appl
 {
     "actionTraces": [...],  // Detailed execution information for debugging.
     "error": "..."          // Error message. Field will be empty or missing on success.
-    // TODO: events?
 }
 ```
 

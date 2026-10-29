@@ -1,14 +1,29 @@
-import { Command } from "lucide-react";
-
 import { useBranding } from "@shared/hooks/use-branding";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 interface Props extends React.ComponentProps<"div"> {
     producerName?: string;
+    enableBranding?: boolean;
 }
 
-export const NetworkLogo = ({ producerName, ...props }: Props) => {
-    const { data: branding, isLoading } = useBranding();
+/** Intentionally crude placeholder — encourages networks to upload their own logo. */
+const PlaceholderNetworkIcon = () => (
+    <span
+        aria-hidden
+        className="flex size-4 items-center justify-center border border-current font-mono text-[11px] font-bold leading-none"
+    >
+        ?
+    </span>
+);
+
+export const NetworkLogo = ({
+    producerName,
+    enableBranding = true,
+    ...props
+}: Props) => {
+    const { data: branding, isLoading } = useBranding({
+        enabled: enableBranding,
+    });
 
     let networkName = branding;
     if (producerName && networkName) {
@@ -24,7 +39,7 @@ export const NetworkLogo = ({ producerName, ...props }: Props) => {
             {...props}
         >
             <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                <Command className="size-4" />
+                <PlaceholderNetworkIcon />
             </div>
             <div className="grid flex-1 select-none text-left text-sm leading-tight">
                 {isLoading ? (

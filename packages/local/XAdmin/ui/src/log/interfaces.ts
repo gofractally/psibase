@@ -24,7 +24,7 @@ export type NewLogInputs = {
 };
 
 export type LogRecord = {
-    TimeStamp: string;
+    TimeStamp: Date;
     Severity: string;
     Message: string;
     RemoteEndpoint?: string;

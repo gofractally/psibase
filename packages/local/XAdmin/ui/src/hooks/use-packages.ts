@@ -5,7 +5,9 @@ import { getJson } from "@psibase/common-lib";
 import { queryKeys } from "@/lib/query-keys";
 import { PackageInfo } from "@/types";
 
-import { graphql } from "@shared/lib/graphql";
+import { adminGraphql } from "@/lib/admin-graphql";
+
+import { useChainReady } from "./use-statuses";
 
 export const usePackages = () =>
     useQuery<PackageInfo[]>({
@@ -26,11 +28,13 @@ export const useLocalPackages = () =>
 
 export type InstalledLocalPackage = { name: string; version: string };
 
-export const useInstalledLocalPackages = () =>
-    useQuery<InstalledLocalPackage[]>({
+export const useInstalledLocalPackages = () => {
+    const chainReady = useChainReady();
+
+    return useQuery<InstalledLocalPackage[]>({
         queryKey: queryKeys.installedLocalPackages,
         queryFn: async () => {
-            const res = (await graphql(
+            const res = (await adminGraphql(
                 "{ installed(first: 100) { edges { node { name version } } } }",
                 { service: "x-packages" },
             )) as {
@@ -39,4 +43,6 @@ export const useInstalledLocalPackages = () =>
             return res.installed.edges.map((e) => e.node);
         },
         initialData: [],
+        enabled: chainReady,
     });
+};

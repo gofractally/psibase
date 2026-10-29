@@ -3,20 +3,20 @@
         "build:all": "yarn workspaces foreach --all -ptv run build",
         "build:pkg": "yarn workspace @psibase/${1}-ui build",
         "clear-cache": "yarn cache clean --all && rm -rf ../.caches/yarn",
-        "install-dev-tools": "yarn add -D @yarnpkg/sdks && yarn sdks vscode && cd user/Explorer/ui && yarn prepare"
+        "install-dev-tools": "yarn add -D @yarnpkg/sdks && yarn sdks vscode"
     },
     "workspaces": {
         "packages": [
             "user/CommonApi/common/packages/common-lib",
             "user/CommonApi/common/packages/plugin-tester/ui",
             "local/XAdmin/ui/wasm",
-            "system/Accounts/ui",
+            "user/Host/LoginPrompt/ui",
             "system/Producers/ui",
             "user/Supervisor/ui",
             "user/Branding/ui",
-            "user/Explorer/ui",
             "user/Evaluations/ui",
             "user/Config/ui",
+            "user/Explorer/ui",
             "user/Fractals/ui",
             "user/FractalCore/ui",
             "user/TokenStream/ui",
@@ -30,7 +30,7 @@
         ]
     },
     "dependencies": {
-        "@bytecodealliance/jco": "^1.3.1",
+        "@bytecodealliance/jco": "1.35.0",
         "@dicebear/collection": "^9.2.2",
         "@dicebear/core": "^9.2.2",
         "@hookform/resolvers": "^5.1.1",
@@ -131,7 +131,7 @@
         "vite-tsconfig-paths": "^4.3.2"
     },
     "noHoist": [],
-    "packageManager": "yarn@4.9.1",
+    "packageManager": "yarn@4.18.0",
     "dependenciesMeta": {
         "@trivago/prettier-plugin-sort-imports@5.2.2": {
             "unplugged": true

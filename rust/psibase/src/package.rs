@@ -7,9 +7,9 @@ use crate::services::{
 use crate::{
     deserialize_pretty_action, new_account_owned_action, preapprove_action, reg_server,
     schema_types, set_code_action, solve_dependencies, version_match, AccountNumber, Action,
-    AnyPublicKey, Checksum256, CodeRow, CustomPrettyAction, GenesisService, Hex, MethodNumber,
-    MethodString, NullSchemaFetcher, PackageDisposition, PackageOp, PackagePreference, Schema,
-    SchemaFetcher, ServiceWrapper, ToSchema, TypeMatchExt, Version,
+    AnyPublicKey, Checksum256, CodeRow, CustomPrettyAction, ExactAccountNumber, GenesisService,
+    Hex, MethodNumber, MethodString, NullSchemaFetcher, PackageDisposition, PackageOp,
+    PackagePreference, Schema, SchemaFetcher, ServiceWrapper, ToSchema, TypeMatchExt, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -283,10 +283,10 @@ pub type SchemaMap = HashMap<AccountNumber, Schema>;
 #[serde(rename_all = "camelCase")]
 pub struct PrettyAction {
     /// Account sending the action
-    pub sender: AccountNumber,
+    pub sender: ExactAccountNumber,
 
     /// Service to execute the action
-    pub service: String,
+    pub service: ExactAccountNumber,
 
     /// Service method to execute
     pub method: MethodNumber,
@@ -324,28 +324,28 @@ impl PrettyAction {
         }
     }
     pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
-        let service = AccountNumber::from_exact(&self.service)?;
+        let service = self.service.into();
         let raw_data = if let Some(raw_data) = self.raw_data {
             raw_data
         } else {
             PrettyAction::pack_data(service, self.method, &self.data, schemas)?
         };
         Ok(Action {
-            sender: self.sender,
+            sender: self.sender.into(),
             service,
             method: self.method,
             rawData: raw_data,
         })
     }
     pub fn to_action(&self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
-        let service = AccountNumber::from_exact(&self.service)?;
+        let service = self.service.into();
         let raw_data = if let Some(raw_data) = &self.raw_data {
             raw_data.clone()
         } else {
             PrettyAction::pack_data(service, self.method, &self.data, schemas)?
         };
         Ok(Action {
-            sender: self.sender,
+            sender: self.sender.into(),
             service: service,
             method: self.method,
             rawData: raw_data,
@@ -368,8 +368,8 @@ impl PrettyAction {
         if !self.raw_data.is_some() {
             if let Some(data) = &self.data {
                 SharedPrettyAction {
-                    sender: self.sender,
-                    service: self.service.parse()?,
+                    sender: self.sender.into(),
+                    service: self.service.into(),
                     method: self.method,
                     data: data,
                 }
@@ -385,8 +385,8 @@ impl PrettyAction {
         services: &mut Vec<AccountNumber>,
         schemas: &SchemaMap,
     ) -> Result<(), anyhow::Error> {
-        let service = self.service.parse()?;
-        accounts.push(self.sender);
+        let service = self.service.into();
+        accounts.push(self.sender.into());
         services.push(service);
         if let Some(data) = &self.data {
             let schema = schemas
@@ -652,10 +652,10 @@ impl<R: Read + Seek> PackagedService<R> {
         let data_re = Regex::new(r"^data/([-a-zA-Z0-9]*)/.*$")?;
         for index in 0..archive.len() {
             let raw_file = archive.by_index_raw(index)?;
-            let filename = raw_file.name();
+            let filename = raw_file.name()?;
             if filename == "meta.json" {
                 meta_index = Some(index)
-            } else if let Some(captures) = service_re.captures(filename) {
+            } else if let Some(captures) = service_re.captures(&filename) {
                 match captures.extract() {
                     (_, [name, "wasm"]) => {
                         service_files.push((name.replace("/", "+").parse()?, index));
@@ -665,7 +665,7 @@ impl<R: Read + Seek> PackagedService<R> {
                     }
                     _ => {}
                 }
-            } else if let Some(captures) = data_re.captures(filename) {
+            } else if let Some(captures) = data_re.captures(&filename) {
                 if raw_file.is_file() {
                     let (_, [name]) = captures.extract();
                     data.push((AccountNumber::from_str(name)?, index));
@@ -776,7 +776,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
         for (sender, index) in &self.data {
             let mut file = self.archive.by_index(*index)?;
-            let file_name = file.name().to_string();
+            let file_name = file.name()?.to_string();
             let path = data_re
                 .captures(&file_name)
                 .unwrap()
@@ -827,7 +827,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 }
             } else {
                 Err(Error::UnknownFileType {
-                    path: file.name().to_string(),
+                    path: file.name()?.to_string(),
                 })?
             }
         }
@@ -868,7 +868,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn needs_ui(&mut self) -> bool {
         self.postinstall
             .iter()
-            .any(|act| act.service.parse().unwrap_or(AccountNumber::new(0)) == sites::SERVICE)
+            .any(|act| AccountNumber::from(act.service) == sites::SERVICE)
     }
 
     fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
@@ -883,8 +883,8 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut manifest = vec![];
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
         for (sender, index) in &self.data {
-            let file = self.archive.name_for_index(*index).unwrap();
-            let path = data_re.captures(file).unwrap().get(1).unwrap().as_str();
+            let file = self.archive.name_for_index(*index).unwrap().unwrap();
+            let path = data_re.captures(&file).unwrap().get(1).unwrap().as_str();
             manifest.push(PackageDataFile {
                 account: *sender,
                 filename: path.to_string(),
@@ -1088,7 +1088,7 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok(())
     }
 
-    pub fn get_all_schemas(&self, schemas: &mut SchemaMap) -> Result<(), anyhow::Error> {
+    pub fn get_all_schemas(&self, schemas: &mut SchemaMap) {
         for (account, _, info) in &self.services {
             if !schemas.contains_key(account) {
                 if let Some(schema) = info.schema.clone() {
@@ -1096,7 +1096,6 @@ impl<R: Read + Seek> PackagedService<R> {
                 }
             }
         }
-        Ok(())
     }
 
     pub async fn load_schemas<F: SchemaFetcher>(
@@ -1104,7 +1103,7 @@ impl<R: Read + Seek> PackagedService<R> {
         fetcher: &F,
         schemas: &mut SchemaMap,
     ) -> Result<(), anyhow::Error> {
-        self.get_all_schemas(schemas)?;
+        self.get_all_schemas(schemas);
         for act in &self.postinstall {
             act.load_schemas(fetcher, schemas).await?
         }
@@ -1213,7 +1212,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
         for (sender, index) in &self.data {
             let mut file = self.archive.by_index(*index)?;
-            let file_name = file.name().to_string();
+            let file_name = file.name()?.to_string();
             let path = data_re
                 .captures(&file_name)
                 .unwrap()
@@ -1237,7 +1236,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 crate::as_text(builder).await?;
             } else {
                 Err(Error::UnknownFileType {
-                    path: file.name().to_string(),
+                    path: file.name()?.to_string(),
                 })?
             }
         }
@@ -1258,7 +1257,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
         self.data.iter().map(move |(account, index)| {
             let mut file = archive.by_index(*index).unwrap();
-            let file_name = file.name().to_string();
+            let file_name = file.name().unwrap().to_string();
             let path = data_re
                 .captures(&file_name)
                 .unwrap()
@@ -1270,14 +1269,12 @@ impl<R: Read + Seek> PackagedService<R> {
     }
 }
 
-pub fn get_schemas<T: Read + Seek>(
-    packages: &[PackagedService<T>],
-) -> Result<SchemaMap, anyhow::Error> {
+pub fn get_schemas<T: Read + Seek>(packages: &[PackagedService<T>]) -> SchemaMap {
     let mut schemas = HashMap::new();
     for package in &packages[..] {
-        package.get_all_schemas(&mut schemas)?
+        package.get_all_schemas(&mut schemas)
     }
-    Ok(schemas)
+    schemas
 }
 
 pub trait ActionGroup {
@@ -1587,7 +1584,7 @@ pub async fn fetch_all_schemas<R: Read + Seek, F: SchemaFetcher>(
     for op in packages {
         match op {
             PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
-                package.get_all_schemas(schemas)?
+                package.get_all_schemas(schemas)
             }
             _ => {}
         }

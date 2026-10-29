@@ -8,24 +8,15 @@ namespace psibase
 {
    struct InnerTrace;
 
-   // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct ActionTrace
    {
       Action                     action;
-      std::vector<char>          rawRetval;  // TODO: Move to receipt?
+      std::vector<char>          rawRetval;
       std::vector<InnerTrace>    innerTraces;
       std::chrono::nanoseconds   totalTime;  // includes time in inner actions
       std::optional<std::string> error;
    };
    PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
-
-   // TODO: need event definitions in ABI
-   struct EventTrace
-   {
-      std::string       name;
-      std::vector<char> data;
-   };
-   PSIO_REFLECT(EventTrace, name, data)
 
    struct ConsoleTrace
    {
@@ -35,11 +26,10 @@ namespace psibase
 
    struct InnerTrace
    {
-      std::variant<ConsoleTrace, EventTrace, ActionTrace> inner;
+      std::variant<ConsoleTrace, ActionTrace> inner;
    };
    PSIO_REFLECT(InnerTrace, inner)
 
-   // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    struct TransactionTrace
    {
       std::vector<ActionTrace>   actionTraces;
@@ -62,10 +52,6 @@ namespace psibase
                            const ConsoleTrace& t,
                            const GetSchemaFn&  schemas = NoSchema{},
                            const std::string&  indent  = "");
-   void        prettyTrace(std::string&       dest,
-                           const EventTrace&  t,
-                           const GetSchemaFn& schemas = NoSchema{},
-                           const std::string& indent  = "");
    void        prettyTrace(std::string&       dest,
                            const ActionTrace& atrace,
                            const GetSchemaFn& schemas = NoSchema{},

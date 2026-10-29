@@ -3,14 +3,7 @@
 mod service {
     use async_graphql::{connection::Connection, *};
     use psibase::{services::tokens::TID, *};
-    use serde::Deserialize;
     use token_swap::tables::tables::{Pool, PoolTable, Reserve, ReserveTable};
-
-    #[derive(Deserialize, SimpleObject)]
-    struct CreatedPool {
-        token_a: String,
-        token_b: String,
-    }
 
     struct Query;
 

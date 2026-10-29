@@ -41,14 +41,6 @@ impl fmt::Display for ActionTrace {
 #[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
-pub struct EventTrace {
-    pub name: String,
-    pub data: Hex<Vec<u8>>,
-}
-
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[serde(rename_all = "camelCase")]
 pub struct ConsoleTrace {
     pub console: String,
 }
@@ -57,7 +49,6 @@ pub struct ConsoleTrace {
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum InnerTraceEnum {
     ConsoleTrace(ConsoleTrace),
-    EventTrace(EventTrace),
     ActionTrace(ActionTrace),
 }
 
@@ -165,7 +156,6 @@ fn write_action_console(atrace: &ActionTrace, f: &mut fmt::Formatter<'_>) -> fmt
     for inner in &atrace.inner_traces {
         match &inner.inner {
             InnerTraceEnum::ConsoleTrace(c) => write!(f, "{}", &c.console)?,
-            InnerTraceEnum::EventTrace(_) => {}
             InnerTraceEnum::ActionTrace(a) => write_action_console(a, f)?,
         }
     }
@@ -187,10 +177,6 @@ fn format_console(c: &ConsoleTrace, indent: usize, f: &mut fmt::Formatter<'_>) -
     write!(f, "{:indent$}console:    ", "")?;
     format_string(&c.console, indent + 12, f)?;
     writeln!(f)
-}
-
-fn format_event(_: &EventTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    writeln!(f, "{:indent$}event", "")
 }
 
 fn hide_action(action: &Action) -> bool {
@@ -270,7 +256,6 @@ fn format_action_trace(
     for inner in &atrace.inner_traces {
         match &inner.inner {
             InnerTraceEnum::ConsoleTrace(c) => format_console(c, indent + 4, f)?,
-            InnerTraceEnum::EventTrace(e) => format_event(e, indent + 4, f)?,
             InnerTraceEnum::ActionTrace(a) => format_action_trace(schemas, a, indent + 4, f)?,
         }
     }
@@ -481,7 +466,6 @@ fn format_error_stack<T: std::fmt::Write>(
         for inner in &atrace.inner_traces {
             match &inner.inner {
                 InnerTraceEnum::ConsoleTrace(_) => (),
-                InnerTraceEnum::EventTrace(_) => (),
                 InnerTraceEnum::ActionTrace(a) => format_error_stack(schemas, a, f)?,
             }
         }
@@ -608,9 +592,6 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         }
         Ok(())
     }
-    pub async fn prepare_event_trace(&self, _etrace: &EventTrace) -> Result<(), anyhow::Error> {
-        Ok(())
-    }
     pub async fn prepare_action_impl<'b>(
         &self,
         act: SharedAction<'b>,
@@ -660,6 +641,38 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
             let _ = self.add_service(service).await;
         }
     }
+    /// Converts an action to the JSON form of [PrettyAction](crate::PrettyAction), using
+    /// the schemas loaded by [Self::prepare_action]. When the service's schema describes
+    /// the method, `method` has its original spelling and `data`, which replaces
+    /// `rawData`, holds the arguments, with any actions nested in them also decoded.
+    pub fn action_to_json(&self, act: SharedAction) -> serde_json::Value {
+        let schemas = self.storage.schemas.borrow();
+        let mut method = MethodString(act.method.to_string());
+        let mut data = None;
+        if let Some(schema) = schemas.get(&act.service) {
+            if let Some((name, action_type)) = schema.actions.get_key_value(&method) {
+                method = name.clone();
+                let mut custom = schema_types();
+                let service_method = CustomResolvedServiceMethod::new(&*schemas, std::mem::drop);
+                custom.insert("ServiceMethod".to_string(), &service_method);
+                let custom_action = CustomPrettyAction::new(&*schemas);
+                custom.insert("Action".to_string(), &custom_action);
+                let mut cschema = CompiledSchema::new(&schema.types, &custom);
+                cschema.extend(&action_type.params);
+                data = cschema.to_value(&action_type.params, act.rawData.0).ok();
+            }
+        }
+        let mut result = serde_json::Map::with_capacity(4);
+        result.insert("sender".to_string(), act.sender.to_string().into());
+        result.insert("service".to_string(), act.service.to_string().into());
+        result.insert("method".to_string(), method.0.into());
+        if let Some(data) = data {
+            result.insert("data".to_string(), data);
+        } else {
+            result.insert("rawData".to_string(), act.rawData.to_string().into());
+        }
+        result.into()
+    }
     pub async fn prepare_action_trace(&self, atrace: &ActionTrace) -> Result<(), anyhow::Error> {
         let mut res = self.add_service(atrace.action.service).await;
         if res.is_ok() {
@@ -675,7 +688,6 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         }
         for inner in &atrace.inner_traces {
             match &inner.inner {
-                InnerTraceEnum::EventTrace(e) => res = res.and(self.prepare_event_trace(e).await),
                 InnerTraceEnum::ActionTrace(a) => {
                     res = res.and(Box::pin(self.prepare_action_trace(a)).await)
                 }
@@ -944,9 +956,6 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b InnerTraceEnum> {
         match self.value {
             InnerTraceEnum::ConsoleTrace(trace) => {
                 serializer.serialize_newtype_variant("InnerTraceEnum", 0, "ConsoleTrace", trace)
-            }
-            InnerTraceEnum::EventTrace(trace) => {
-                serializer.serialize_newtype_variant("InnerTraceEnum", 1, "EventTrace", trace)
             }
             InnerTraceEnum::ActionTrace(trace) => serializer.serialize_newtype_variant(
                 "InnerTraceEnum",

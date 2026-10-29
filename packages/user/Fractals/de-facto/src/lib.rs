@@ -1,16 +1,28 @@
 #[psibase::service(name = "fractals+2")]
 pub mod service {
     use psibase::{
-        services::auth_dyn::{self, policy::DynamicAuthPolicy},
+        services::{
+            auth_dyn::{self, policy::DynamicAuthPolicy},
+            fractals::constants::PPM,
+        },
         *,
     };
 
     #[action]
     fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
-        ::fractals::tables::tables::FractalMemberTable::read()
+        let members: Vec<_> = ::fractals::tables::tables::FractalMemberTable::read()
             .get_index_pk()
-            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
-            .map(|account| (account.account, 1))
+            .range((fractal, AccountNumber::MIN)..=(fractal, AccountNumber::MAX))
+            .collect();
+
+        if members.is_empty() {
+            return vec![];
+        }
+
+        let share = PPM / members.len() as u32;
+        members
+            .into_iter()
+            .map(|member| (member.account, share))
             .collect()
     }
 
@@ -30,8 +42,8 @@ pub mod service {
             .is_some()
     }
 
-    fn two_thirds_plus_one(count: u8) -> u8 {
-        ((count as u16 * 2 + 3) / 3) as u8
+    fn two_thirds_plus_one(count: usize) -> u8 {
+        u8::try_from((count * 2 + 3) / 3).unwrap()
     }
 
     #[action]
@@ -43,7 +55,7 @@ pub mod service {
                 .map(|account| (account.account, 1))
                 .collect();
 
-        let threshold = two_thirds_plus_one(accounts.len() as u8);
+        let threshold = two_thirds_plus_one(accounts.len());
         DynamicAuthPolicy::from_weighted_authorizers(accounts, threshold)
     }
 }

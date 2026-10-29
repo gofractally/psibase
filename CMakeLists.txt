@@ -277,6 +277,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(packages/:Plugins 
     accounts
+    accounts-query
     aes
     auth-any
     auth-delegate
@@ -287,22 +288,28 @@ add_rs_component_workspace(packages/:Plugins
     kvtests
     setcode
     clientdata
+    explorer
     invite
     packages
     permissions
     sites
-    host-common
+    host-accounts
+    host-client
+    host-http
     host-db
     host-prompt
     host-types
+    login-prompt
     host-auth
     host-crypto
     web-crypto
     transact
+    transact-admin
     workshop
     fractal-core
     config
     homepage
+    homepage-explorer
     producers
 )
 
@@ -313,7 +320,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION 0.25)
+set(PSIBASE_VERSION 0.29)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/TransactService.psi
@@ -341,6 +348,7 @@ psibase_package(
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
         DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_transact_admin} /admin.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "TransactService(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )
@@ -368,12 +376,10 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE accounts
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall-ui.json
-    DEPENDS ${Accounts_js_DEP}
+        DATA ${Plugins_OUTPUT_FILE_accounts_query} /query.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "NameMarket(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" 
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -459,14 +465,30 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
-        DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_accounts} /accounts.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_client} /client.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_http} /http.wasm
         DATA ${Plugins_OUTPUT_FILE_host_db} /db.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/HostLoginPrompt.psi
+    NAME HostLoginPrompt
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Login prompt served on the host subdomain"
+    SERVICE host
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Host/LoginPrompt/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_login_prompt} /login-prompt.wasm
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Host/LoginPrompt/postinstall.json
+    DEPENDS ${HostLoginPrompt_js_DEP}
+    DEPENDS ${Plugins_DEP}
+    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "NameMarket(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 cargo_psibase_package(
@@ -475,6 +497,11 @@ cargo_psibase_package(
     TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthRecover.psi
+    PATH packages/system/AuthRecover
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
+)
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
@@ -553,6 +580,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/SingleProd.psi
+    PATH packages/user/SingleProd
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Guilds.psi
     PATH packages/user/Guilds
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -598,6 +631,12 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/StagedTx.psi
     PATH packages/system/StagedTx
     TARGET_DIR  ${SYSTEM_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/WsAuth.psi
+    PATH packages/system/WsAuth
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
@@ -688,6 +727,7 @@ psibase_package(
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-delg
         DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
+        EXPORT auth-delegate
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "AuthDelegateService(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
@@ -735,6 +775,7 @@ psibase_package(
     NAME Docs
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Psibase documentation"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/doc/postinstall.json
     SERVICE docs
         DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
@@ -765,8 +806,9 @@ psibase_package(
     SERVICE homepage
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/ui/dist/*  /
         DATA ${Plugins_OUTPUT_FILE_homepage} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_homepage_explorer} /explorer.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/postinstall.json
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "NameMarket(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "DynLd(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "NameMarket(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Chainmail(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)" "TokenSwap(^${PSIBASE_VERSION}.0)"
     DEPENDS ${Homepage_js_DEP}
     DEPENDS ${Plugins_DEP}
 )
@@ -905,14 +947,17 @@ psibase_package(
     NAME Explorer
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Block explorer"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/postinstall.json
     SERVICE explorer
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Explorer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Explorer-schema.json
         SERVER explorer
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/ui/dist /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Explorer/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_explorer} /plugin.wasm
     DEPENDS ${Explorer_js_DEP}
+    DEPENDS ${Plugins_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "AuthDelegate(^${PSIBASE_VERSION}.0)" "AuthDyn(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Packages(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Producers(^${PSIBASE_VERSION}.0)" "Registry(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -948,6 +993,7 @@ psibase_package(
     NAME Supervisor
     VERSION ${PSIBASE_VERSION}.0
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "DynLd(^${PSIBASE_VERSION}.0)"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/postinstall.json
     SERVICE supervisor
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/ui/dist/* /
     DEPENDS ${Supervisor_js_DEP}
@@ -1101,9 +1147,8 @@ psibase_package(
         FLAGS isPrivileged
         SERVER x-admin
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist/* /
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
     DEPENDS wasm ${XAdmin_js_DEP}
-    PACKAGE_DEPENDS XHttp XSites XBasic
+    PACKAGE_DEPENDS XHttp XSites XBasic XCommonApi
 )
 
 psibase_package(
@@ -1117,6 +1162,28 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XBasic-schema.json
         FLAGS isPrivileged
     DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XCommonApi.psi
+    NAME XCommonApi
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Service that contains the common files and libraries used by apps on psibase"
+    LOCAL
+    SERVICE x-common
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/CommonApi-schema.json
+        SERVER x-common
+        DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
+        DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
+        DATA GLOB ${THIRD_FILES}                                              common
+        DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
+    DEPENDS CommonApiCommonLib_js
+    DEPENDS ${ComponentParser_DEP}
+    DEPENDS ${PluginTester_js_DEP}
+    DEPENDS wasm
+    PACKAGE_DEPENDS "XHttp(^${PSIBASE_VERSION}.0)" "XSites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1142,6 +1209,19 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XHttp-schema.json
         SERVER x-http
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XKeys.psi
+    NAME XKeys
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Allows services to manage keys and sign transactions"
+    LOCAL
+    SERVICE x-keys
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XKeys.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XKeys-schema.json
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -1245,8 +1325,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
 psibase_package(
@@ -1254,9 +1334,9 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+    PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
 psibase_package(
@@ -1290,7 +1370,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
     LOCAL
-    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTimer XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XKeys XPackages XPeers XRun XSites XTimer XTransact
 )
 
 function(write_package_index target dir reserve)
@@ -1317,10 +1397,10 @@ function(write_package_index target dir reserve)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
-    Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
+    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1331,6 +1411,7 @@ install(
           ${SERVICE_DIR}/AuthDyn.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthDelegateService.psi
+          ${SERVICE_DIR}/AuthRecover.psi
           ${SERVICE_DIR}/AuthSig.psi
           ${SERVICE_DIR}/AuthSigService.psi
           ${SERVICE_DIR}/Base64.psi
@@ -1360,6 +1441,7 @@ install(
           ${SERVICE_DIR}/FractalGen.psi
           ${SERVICE_DIR}/FractalTester.psi
           ${SERVICE_DIR}/Host.psi
+          ${SERVICE_DIR}/HostLoginPrompt.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
@@ -1379,6 +1461,7 @@ install(
           ${SERVICE_DIR}/Registry.psi
           ${SERVICE_DIR}/ReservedNames.psi
           ${SERVICE_DIR}/SetCode.psi
+          ${SERVICE_DIR}/SingleProd.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Subgroups.psi
@@ -1394,12 +1477,15 @@ install(
           ${SERVICE_DIR}/VirtualServer.psi
           ${SERVICE_DIR}/WebCrypto.psi
           ${SERVICE_DIR}/Workshop.psi
+          ${SERVICE_DIR}/WsAuth.psi
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
           ${SERVICE_DIR}/XBasic.psi
+          ${SERVICE_DIR}/XCommonApi.psi
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi
+          ${SERVICE_DIR}/XKeys.psi
           ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XPeers.psi
           ${SERVICE_DIR}/XProxy.psi

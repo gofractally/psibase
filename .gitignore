@@ -20,6 +20,7 @@
 build
 build-*
 psidk-book.tar.gz
+psidk-ubuntu-*.tar.gz
 CMakeCache.txt
 CMakeFiles
 compile_commands.json
@@ -27,7 +28,7 @@ Makefile
 node_modules
 temp
 dist
-vite.config.ts.timestamp-*.mjs
+vite.config.*.timestamp-*.mjs
 .pnpm-store
 .env
 .envrc

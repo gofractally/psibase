@@ -135,11 +135,11 @@ struct V1
    std::uint8_t v0;
 };
 PSIO_REFLECT_TYPENAME(V1)
-auto& clio_unwrap_packable(V1& v1)
+auto& psio_unwrap_packable(V1& v1)
 {
    return v1.v0;
 }
-auto& clio_unwrap_packable(const V1& v1)
+auto& psio_unwrap_packable(const V1& v1)
 {
    return v1.v0;
 }
@@ -261,11 +261,11 @@ struct Untagged
    std::string value;
 };
 PSIO_REFLECT_TYPENAME(Untagged)
-auto& clio_unwrap_packable(Untagged& obj)
+auto& psio_unwrap_packable(Untagged& obj)
 {
    return obj.value;
 }
-auto& clio_unwrap_packable(const Untagged& obj)
+auto& psio_unwrap_packable(const Untagged& obj)
 {
    return obj.value;
 }

@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [package.metadata.psibase]
-plugin = "identity-plugin"
+plugins = ["identity-plugin"]
 server = "identity"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [{ sender = "identity", service = "identity", method = "init" }]
@@ -21,4 +21,4 @@ serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-identity-pkg = { path = "..", version = "0.25.0" }
+identity-pkg = { path = "..", version = "0.29.0" }

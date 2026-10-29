@@ -1,7 +1,8 @@
 package clientdata:plugin;
 
 world impl {
-    include host:common/imports;
+    include host:client/imports;
+    include host:http/imports;
     include host:db/imports;
     
     export keyvalue;

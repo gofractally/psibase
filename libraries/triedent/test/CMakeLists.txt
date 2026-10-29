@@ -8,6 +8,7 @@ add_executable(triedent-tests
     test_ring_allocator.cpp
     test_region_allocator.cpp
     test_cache_allocator.cpp
+    test_cow_ptr.cpp
     temp_database.cpp
     temp_directory.cpp)
 target_link_libraries(triedent-tests PUBLIC Catch2::Catch2WithMain triedent)

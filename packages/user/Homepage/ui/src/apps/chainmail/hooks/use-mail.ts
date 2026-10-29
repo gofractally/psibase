@@ -1,14 +1,7 @@
-import type {
-    DraftMessage,
-    Message,
-    QueryableMailbox,
-    RawMessage,
-} from "../types";
+import type { Message, RawMessage } from "../types";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { atom, useAtom } from "jotai";
 import { useCallback } from "react";
-import { useLocalStorage } from "usehooks-ts";
 import { z } from "zod";
 
 import QueryKey from "@/lib/query-keys";
@@ -16,13 +9,10 @@ import QueryKey from "@/lib/query-keys";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { supervisor } from "@shared/lib/supervisor";
 
-import { zSendMessageSchema } from "../components/compose-dialog";
-import { zMailbox, zRawMessage } from "../types";
+import { zMailbox, zRawMessage, zSendMessageSchema } from "../types";
 
-const composeAtom = atom(false);
-export function useCompose() {
-    return useAtom(composeAtom);
-}
+/** How often mailboxes are re-read so new messages surface in the top bar. */
+const MAILBOX_REFETCH_MS = 15_000;
 
 const transformRawMessagesToMessages = (
     rawMessages: RawMessage[],
@@ -36,11 +26,7 @@ const transformRawMessagesToMessages = (
                 from: msg.sender,
                 to: msg.receiver,
                 datetime: new Date(msg.datetime).getTime(),
-                isDraft: false,
                 type: msg.sender === currentUser ? "outgoing" : "incoming",
-                read: false,
-                saved: msg.isSavedMsg,
-                inReplyTo: null,
                 subject: msg.subject,
                 body: msg.body,
             }) as Message,
@@ -50,192 +36,59 @@ const transformRawMessagesToMessages = (
 const getIncomingMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getMsgs",
             params: [undefined, account],
         }),
     );
     return transformRawMessagesToMessages(rawMessages, account);
 };
-
-const incomingMsgAtom = atom<Message["id"]>("");
-export function useIncomingMessages() {
-    const { data: user } = useCurrentUser();
-    const query = useQuery({
-        queryKey: QueryKey.mailbox("inbox", user!),
-        queryFn: () => getIncomingMessages(user!),
-        enabled: Boolean(user),
-    });
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(incomingMsgAtom);
-    const selectedMessage = query.data?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        query,
-        selectedMessage,
-        setSelectedMessageId,
-    };
-}
-
-const getArchivedMessages = async (account: string) => {
-    const rawMessages = zRawMessage.array().parse(
-        await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
-            method: "getArchivedMsgs",
-            params: [undefined, account],
-        }),
-    );
-    return transformRawMessagesToMessages(rawMessages, account);
-};
-
-const archivedMsgAtom = atom<Message["id"]>("");
-export function useArchivedMessages() {
-    const { data: user } = useCurrentUser();
-    const query = useQuery({
-        queryKey: QueryKey.mailbox("archived", user!),
-        queryFn: () => getArchivedMessages(user!),
-        enabled: Boolean(user),
-    });
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(archivedMsgAtom);
-    const selectedMessage = query.data?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        query,
-        selectedMessage,
-        setSelectedMessageId,
-    };
-}
-
-const getSavedMessages = async (account: string) => {
-    const rawMessages = zRawMessage.array().parse(
-        await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
-            method: "getSavedMsgs",
-            params: [account],
-        }),
-    );
-
-    return transformRawMessagesToMessages(rawMessages, account);
-};
-
-const savedMsgAtom = atom<Message["id"]>("");
-export function useSavedMessages() {
-    const { data: user } = useCurrentUser();
-    const query = useQuery({
-        queryKey: QueryKey.mailbox("saved", user!),
-        queryFn: () => getSavedMessages(user!),
-        enabled: Boolean(user),
-    });
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(savedMsgAtom);
-    const selectedMessage = query.data?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        query,
-        selectedMessage,
-        setSelectedMessageId,
-    };
-}
 
 const getSentMessages = async (account: string) => {
     const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
-            service: "chainmail",
-            intf: "queries",
+            service: "homepage",
+            intf: "chainmail",
             method: "getMsgs",
             params: [account],
         }),
     );
-
     return transformRawMessagesToMessages(rawMessages, account);
 };
 
-const sentMsgAtom = atom<Message["id"]>("");
+export function useIncomingMessages() {
+    const { data: user } = useCurrentUser();
+    return useQuery({
+        queryKey: QueryKey.mailbox("inbox", user!),
+        queryFn: () => getIncomingMessages(user!),
+        enabled: Boolean(user),
+        refetchInterval: MAILBOX_REFETCH_MS,
+    });
+}
+
 export function useSentMessages() {
     const { data: user } = useCurrentUser();
-    const query = useQuery({
+    return useQuery({
         queryKey: QueryKey.mailbox("sent", user!),
         queryFn: () => getSentMessages(user!),
         enabled: Boolean(user),
+        refetchInterval: MAILBOX_REFETCH_MS,
     });
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(sentMsgAtom);
-    const selectedMessage = query.data?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        query,
-        selectedMessage,
-        setSelectedMessageId,
-    };
-}
-
-const draftMsgAtom = atom<DraftMessage["id"]>("");
-export function useDraftMessages() {
-    const { data: user } = useCurrentUser();
-
-    const [allDrafts, setDrafts] = useLocalStorage<DraftMessage[]>(
-        "drafts",
-        [],
-    );
-
-    const deleteDraftById = (id: string) => {
-        const remainingDrafts = allDrafts.filter((d) => d.id !== id);
-        setDrafts(remainingDrafts);
-    };
-
-    const userDrafts = allDrafts?.filter((d) => d.from === user);
-
-    const [selectedMessageId, setSelectedMessageId] = useAtom(draftMsgAtom);
-    const selectedMessage = userDrafts?.find(
-        (msg) => msg.id === selectedMessageId,
-    );
-
-    return {
-        allDrafts,
-        userDrafts,
-        setDrafts,
-        deleteDraftById,
-        selectedMessage,
-        setSelectedMessageId,
-    };
 }
 
 export const useInvalidateMailboxQueries = () => {
     const queryClient = useQueryClient();
     const { data: user } = useCurrentUser();
 
-    const all = [
-        zMailbox.Values.inbox,
-        zMailbox.Values.archived,
-        zMailbox.Values.sent,
-        zMailbox.Values.saved,
-    ] as QueryableMailbox[];
-
-    const invalidate = useCallback(
-        (mailboxes = all) => {
-            if (!user) return;
-            mailboxes.forEach((mailbox) => {
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.mailbox(mailbox, user),
-                });
+    return useCallback(() => {
+        if (!user) return;
+        zMailbox.options.forEach((mailbox) => {
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.mailbox(mailbox, user),
             });
-        },
-        [queryClient, user],
-    );
-
-    return invalidate;
+        });
+    }, [queryClient, user]);
 };
 
 export const useSendMessage = () => {
@@ -243,38 +96,10 @@ export const useSendMessage = () => {
         mutationFn: async (vars) => {
             const { to, subject, message } = zSendMessageSchema.parse(vars);
             await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
+                service: "homepage",
+                intf: "chainmail",
                 method: "send",
                 params: [to, subject, message],
-            });
-        },
-    });
-};
-
-export const useArchiveMessage = () => {
-    return useMutation<void, Error, string | number | bigint>({
-        mutationFn: async (id) => {
-            const messageId = z.coerce.bigint().parse(id);
-            await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
-                method: "archive",
-                params: [messageId],
-            });
-        },
-    });
-};
-
-export const useSaveMessage = () => {
-    return useMutation<void, Error, string | number | bigint>({
-        mutationFn: async (id) => {
-            const messageId = z.coerce.bigint().parse(id);
-            await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
-                method: "save",
-                params: [messageId],
             });
         },
     });

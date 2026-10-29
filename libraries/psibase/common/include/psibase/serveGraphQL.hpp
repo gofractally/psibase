@@ -55,7 +55,7 @@ namespace psibase
       {
          auto result = psio::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
          return HttpReply{
-             .contentType = "text",                                          // TODO
+             .contentType = "text/plain",
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy,
              .headers     = allowCors(),
          };
@@ -222,6 +222,8 @@ namespace psibase
    /// - `last`: Stop after including this many items at the end of the range
    /// - `before`: Opaque cursor value. Resume paging; include keys before this point
    /// - `after`: Opaque cursor value. Resume paging; include keys after this point
+   /// - `maxBytes`: Stop before the serialized rows included would total more than
+   ///   this many bytes. At least one row is always included, even if it alone is larger.
    ///
    /// By default, `makeConnection` pages through the entire index's range.
    /// `gt`, `ge`, `lt`, and `le` restrict the range. They can be used in any
@@ -350,16 +352,17 @@ namespace psibase
    /// - Returned rows (`MyType`) include MyType's fields and the `someFn` method. Only `const` methods are exposed.
    /// - [serveGraphQL] automatically chooses GraphQL types which cover the range of numeric types. When no suitable match is found (e.g. no GraphQL type covers the range of `int64_t`), it falls back to `String`.
    template <typename Connection, typename T, typename Key, typename Proj = std::identity>
-   Connection makeConnection(const TableIndex<T, Key>&         index,
-                             const std::optional<Key>&         gt,
-                             const std::optional<Key>&         ge,
-                             const std::optional<Key>&         lt,
-                             const std::optional<Key>&         le,
-                             std::optional<uint32_t>           first,
-                             std::optional<uint32_t>           last,
-                             const std::optional<std::string>& before,
-                             const std::optional<std::string>& after,
-                             Proj&&                            proj = {})
+   Connection makeConnectionIter(const TableIndex<T, Key>&         index,
+                                 const std::optional<Key>&         gt,
+                                 const std::optional<Key>&         ge,
+                                 const std::optional<Key>&         lt,
+                                 const std::optional<Key>&         le,
+                                 std::optional<uint32_t>           first,
+                                 std::optional<uint32_t>           last,
+                                 const std::optional<std::string>& before,
+                                 const std::optional<std::string>& after,
+                                 Proj&&                            proj     = {},
+                                 std::optional<uint32_t>           maxBytes = std::nullopt)
    {
       auto keyFromHex = [&](const std::optional<std::string>& s) -> std::vector<char>
       {
@@ -396,21 +399,38 @@ namespace psibase
       auto       add_edge = [&](const auto& it)
       {
          auto cursor = psio::to_hex(it.keyWithoutPrefix());
-         result.edges.push_back(typename Connection::Edge{proj(*it), std::move(cursor)});
+         result.edges.push_back(typename Connection::Edge{proj(it), std::move(cursor)});
+      };
+      // Rows are sized before they're read, so a page only exceeds the budget
+      // when its first row alone does.
+      std::uint64_t totalBytes = 0;
+      auto          fits       = [&](const auto& it)
+      {
+         if (!maxBytes)
+            return true;
+         totalBytes += it.valueSize();
+         return result.edges.empty() || totalBytes <= *maxBytes;
       };
 
       if (last && !first)
       {
          result.pageInfo.hasNextPage = end != rangeEnd;
          while (it != end && (*last)-- > 0)
-            add_edge(--end);
+         {
+            if (!fits(--end))
+            {
+               ++end;
+               break;
+            }
+            add_edge(end);
+         }
          result.pageInfo.hasPreviousPage = end != rangeBegin;
          std::reverse(result.edges.begin(), result.edges.end());
       }
       else
       {
          result.pageInfo.hasPreviousPage = it != rangeBegin;
-         for (; it != end && (!first || (*first)-- > 0); ++it)
+         for (; it != end && (!first || (*first)-- > 0) && fits(it); ++it)
             add_edge(it);
          result.pageInfo.hasNextPage = it != rangeEnd;
          if (last && *last < result.edges.size())
@@ -428,6 +448,42 @@ namespace psibase
       }
       return result;
    }  // makeConnection
+
+   template <typename Connection, typename T, typename Key, typename Proj = std::identity>
+   Connection makeConnection(const TableIndex<T, Key>&         index,
+                             const std::optional<Key>&         gt,
+                             const std::optional<Key>&         ge,
+                             const std::optional<Key>&         lt,
+                             const std::optional<Key>&         le,
+                             std::optional<uint32_t>           first,
+                             std::optional<uint32_t>           last,
+                             const std::optional<std::string>& before,
+                             const std::optional<std::string>& after,
+                             Proj&&                            proj     = {},
+                             std::optional<uint32_t>           maxBytes = std::nullopt)
+   {
+      return makeConnectionIter<Connection>(
+          index, gt, ge, lt, le, first, last, before, after,
+          [&](const auto& iter) { return proj(*iter); }, maxBytes);
+   }
+
+   template <typename Connection, typename T, typename Key, typename Proj = std::identity>
+   Connection makeConnectionView(const TableIndex<T, Key>&         index,
+                                 const std::optional<Key>&         gt,
+                                 const std::optional<Key>&         ge,
+                                 const std::optional<Key>&         lt,
+                                 const std::optional<Key>&         le,
+                                 std::optional<uint32_t>           first,
+                                 std::optional<uint32_t>           last,
+                                 const std::optional<std::string>& before,
+                                 const std::optional<std::string>& after,
+                                 Proj&&                            proj     = {},
+                                 std::optional<uint32_t>           maxBytes = std::nullopt)
+   {
+      return makeConnectionIter<Connection>(
+          index, gt, ge, lt, le, first, last, before, after,
+          [&](const auto& iter) { return proj(iter.view()); }, maxBytes);
+   }
 
    /// Similar to makeConnection, except that it allows pagination through a virtual table index.
    ///
@@ -544,6 +600,19 @@ namespace psibase
    {
       Index index;
       F     f;
+      /// Limits the size of a page, which may then hold fewer rows than requested;
+      /// see [makeConnectionIter]
+      std::optional<uint32_t> maxBytes = std::nullopt;
+   };
+
+   template <typename Index, typename F>
+   struct TransformedConnectionView
+   {
+      Index index;
+      F     f;
+      /// Limits the size of a page, which may then hold fewer rows than requested;
+      /// see [makeConnectionIter]
+      std::optional<uint32_t> maxBytes = std::nullopt;
    };
 
    namespace detail
@@ -574,7 +643,22 @@ namespace psibase
                                            const std::optional<std::string>&      after)
       {
          return makeConnection<Connection>(index.index, gt, ge, lt, le, first, last, before, after,
-                                           index.f);
+                                           index.f, index.maxBytes);
+      }
+
+      template <typename Connection, typename Index, typename F, typename Key>
+      Connection makeTransformedConnectionView(const TransformedConnectionView<Index, F>& index,
+                                               const std::optional<Key>&                  gt,
+                                               const std::optional<Key>&                  ge,
+                                               const std::optional<Key>&                  lt,
+                                               const std::optional<Key>&                  le,
+                                               std::optional<uint32_t>                    first,
+                                               std::optional<uint32_t>                    last,
+                                               const std::optional<std::string>&          before,
+                                               const std::optional<std::string>&          after)
+      {
+         return makeConnectionView<Connection>(index.index, gt, ge, lt, le, first, last, before,
+                                               after, index.f, index.maxBytes);
       }
    }  // namespace detail
 
@@ -606,6 +690,22 @@ namespace psibase
       using Connection = psibase::Connection<  //
           R, psio::reflect<R>::name + "Connection", psio::reflect<R>::name + "Edge">;
       return &detail::makeTransformedConnection<Connection, TableIndex<T, Key>, F, Key>;
+   }  // gql_callable_fn
+
+   template <typename Index, typename F>
+   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
+       TransformedConnectionView<Index, F>*)
+   {
+      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
+   }
+
+   template <typename T, typename Key, typename F>
+   constexpr auto gql_callable_fn(const TransformedConnectionView<TableIndex<T, Key>, F>*)
+   {
+      using R          = decltype(std::declval<F>()(std::declval<T>()));
+      using Connection = psibase::Connection<  //
+          R, psio::reflect<R>::name + "Connection", psio::reflect<R>::name + "Edge">;
+      return &detail::makeTransformedConnectionView<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
    struct EventQueryInterface

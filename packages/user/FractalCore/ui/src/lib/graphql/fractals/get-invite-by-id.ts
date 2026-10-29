@@ -1,24 +1,22 @@
 import z from "zod";
 
-import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
-
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { invite } from "@shared/lib/plugins";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
 const zInviteDetailsResponse = z.object({
-    data: z.object({
-        inviteById: z
-            .object({
-                inviter: z.string(),
-                numAccounts: z.number(),
-                expiryDate: zDateTime.transform((date) => new Date(date)),
-            })
-            .nullable(),
-    }),
+    inviteById: z
+        .object({
+            inviter: z.string(),
+            numAccounts: z.number(),
+            expiryDate: zDateTime.transform((date) => new Date(date)),
+        })
+        .nullable(),
 });
 
 export const getInviteById = async (inviteId: number) => {
-    const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "invite", "graphql"),
+    const response = await graphqlAuth(
+        invite.authorized.graphql,
         `
             query InviteById {
                 inviteById(inviteId: ${inviteId}) {
@@ -29,5 +27,5 @@ export const getInviteById = async (inviteId: number) => {
             }
         `,
     );
-    return zInviteDetailsResponse.parse(response).data.inviteById;
+    return zInviteDetailsResponse.parse(response).inviteById;
 };

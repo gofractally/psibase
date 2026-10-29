@@ -1,9 +1,4 @@
-import {
-    ChevronFirst,
-    ChevronLast,
-    ChevronLeft,
-    ChevronRight,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@shared/shadcn/ui/button";
 
@@ -12,6 +7,7 @@ interface PrevNextProps {
     next: () => void;
     canPrev: boolean;
     canNext: boolean;
+    nextLabel?: string;
 }
 
 export const PrevNextButtons = ({
@@ -19,26 +15,22 @@ export const PrevNextButtons = ({
     canPrev,
     next,
     previous,
+    nextLabel = "Continue",
 }: PrevNextProps) => (
-    <div className="flex w-full justify-between">
+    <div className="flex w-full items-center justify-between gap-3">
         <Button
-            variant="ghost"
-            onClick={() => {
-                previous();
-            }}
+            type="button"
+            variant="outline"
+            onClick={previous}
             disabled={!canPrev}
         >
-            {canPrev ? <ChevronLeft /> : <ChevronFirst />}
+            <ChevronLeft />
+            Back
         </Button>
 
-        <Button
-            variant="ghost"
-            onClick={() => {
-                next();
-            }}
-            disabled={!canNext}
-        >
-            {canNext ? <ChevronRight /> : <ChevronLast />}
+        <Button type="button" onClick={next} disabled={!canNext}>
+            {nextLabel}
+            <ChevronRight />
         </Button>
     </div>
 );

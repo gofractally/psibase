@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@shared/lib/graphql";
-import { nameMarket } from "@shared/lib/plugins";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { config } from "@shared/lib/plugins";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
@@ -49,7 +49,10 @@ export const useConfiguredNameMarkets = () =>
                     }
                 }
             `;
-            const raw = await graphql(query, { service: nameMarket.service });
+            const raw = await graphqlAuth(
+                config.nameMarket.graphql,
+                query,
+            );
             const parsed = zData.parse(raw);
             return parsed.marketParams;
         },

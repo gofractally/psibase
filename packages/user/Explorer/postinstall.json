@@ -1,0 +1,8 @@
+[
+  {
+      "sender": "explorer",
+      "service": "sites",
+      "method": "enablespa",
+      "data": { "enable": true }
+  }
+]

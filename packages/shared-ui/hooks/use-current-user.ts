@@ -17,7 +17,8 @@ export const queryCurrentUser = queryOptions({
         const res = await supervisor.functionCall({
             method: "getCurrentUser",
             params: [],
-            service: "accounts",
+            service: "host",
+            plugin: "accounts",
             intf: "api",
         });
         return res ? zAccount.parse(res) : null;

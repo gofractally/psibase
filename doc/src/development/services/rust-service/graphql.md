@@ -89,11 +89,11 @@ We need some data to query. Let's build on the example from the
 #[psibase::service_tables]
 mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, ToKey};
+    use psibase::{AccountNumber, Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "MessageTable", index = 0)]
-    #[derive(Fracpack, Serialize, Deserialize, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct Message {
         #[primary_key]
         pub id: u64,
@@ -126,7 +126,7 @@ mod tables {
     }
 
     #[table(name = "LastUsedTable", index = 1)]
-    #[derive(Default, Fracpack, Serialize, Deserialize)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize)]
     pub struct LastUsed {
         pub lastMessageId: u64,
     }

@@ -28,7 +28,6 @@ Numeric types are in twos-complement little-endian format. They are unaligned. T
 - Unsigned integer sizes (bits): 8, 16, 32, 64
 - Signed integer sizes (bits): 8, 16, 32, 64
 - Floating point: 32 and 64 bits; Intel format
-- TODO: void; 0 bytes. This is for tagged-union alternatives which have no payload
 
 ## Non-Extensible Fixed-Size Structs
 
@@ -136,8 +135,6 @@ For optionals embedded within extensible structs and tuples:
 
 - If the last `n` optional fields are empty, then they must be omitted from `fixed_data`.
 
-TODO: Implement these rules in Rust. Verify them in C++.
-
 ## Tagged Unions
 
 Tagged Unions (`std::variant` in C++ or `enum` in Rust) have the following encoding:
@@ -166,8 +163,6 @@ The following is a non-exhaustive list of requirements to validate:
 - An offset pointer to an empty vector MUST be represented as 0
 - The size of a variant MUST be the same as the size of the inner object if the inner size is known
 - The last field of a tuple or extensible struct MUST NOT be an empty optional
-
-TODO: finish this list. Make sure both the C++ and Rust implementations' checkers enforce the rules.
 
 # Serialization Compatibility
 

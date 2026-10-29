@@ -4,8 +4,10 @@ interface issuer {
     use host:types/types.{error};
 
 
-    /// Mint new NFT into existence.
-    mint: func() -> result<_, error>;
+    /// Mint a new NFT.
+    ///
+    /// Returns the id of NFT.
+    mint: func() -> result<u32, error>;
 }
 
 
@@ -56,9 +58,22 @@ interface user-config {
     enable-user-auto-debit: func(enable: bool) -> result<_, error>;
 }
 
+/// Interface that makes authorized queries to this app's http server.
+interface authorized {
+    use host:types/types.{error};
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
+}
 
 world imports {
     import issuer;
     import user;
     import user-config;
+    import authorized;
 }

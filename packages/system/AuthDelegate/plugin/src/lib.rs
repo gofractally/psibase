@@ -6,12 +6,15 @@ use bindings::*;
 mod errors;
 use errors::ErrorType::*;
 use exports::auth_delegate::plugin::api::{Error, Guest as Api};
+use exports::auth_delegate::plugin::queries::Guest as Queries;
 use exports::transact_hook_user_auth::{Claim, Guest as HookUserAuth, Proof};
-use transact::plugin::intf::add_action_to_transaction;
+use host::http::api::post_graphql_get_json;
+use transact::plugin::api::add_action_to_transaction;
 
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::*;
+use serde::Deserialize;
 
 psibase::define_trust! {
     descriptions {
@@ -26,7 +29,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [],
+        None => [get_owner],
         Low => [],
         Medium => [new_account],
         High => [set_owner],
@@ -75,12 +78,42 @@ impl Api for AuthDelegate {
         let new_account = new_account_action {
             name: get_account_number(name.as_str())?,
             owner: get_account_number(owner.as_str())?,
-            require_match: true,
+            mode: psibase::services::accounts::NewAccountMode::REQUIRE_NEW,
         };
         Ok(add_action_to_transaction(
             new_account_action::ACTION_NAME,
             &new_account.packed(),
         )?)
+    }
+}
+
+#[derive(Deserialize)]
+struct OwnerRecord {
+    owner: AccountNumber,
+}
+
+#[derive(Deserialize)]
+struct OwnerData {
+    owner: Option<OwnerRecord>,
+}
+
+#[derive(Deserialize)]
+struct OwnerResponse {
+    data: OwnerData,
+}
+
+impl Queries for AuthDelegate {
+    fn get_owner(account: String) -> Result<Option<String>, Error> {
+        assert_authorized(FunctionName::get_owner)?;
+
+        let account = AccountNumber::from_exact(&account).map_err(|_| InvalidAccountName)?;
+        let json = post_graphql_get_json(&format!(
+            "query {{ owner(account: \"{}\") {{ owner }} }}",
+            account
+        ))?;
+        let response: OwnerResponse =
+            serde_json::from_str(&json).map_err(|e| QueryError(e.to_string()))?;
+        Ok(response.data.owner.map(|record| record.owner.to_string()))
     }
 }
 

@@ -1,19 +1,22 @@
 package fractal-core:plugin;
 
 world impl {
-    include host:common/imports;
+    include host:client/imports;
+    include host:http/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include fractals:plugin/imports;
     include guilds:plugin/imports;
 
-    include staged-tx:plugin/imports;
     include host:db/imports;
-
+    include invite:plugin/imports;
+    import profiles:plugin/api;
+    import profiles:plugin/contacts;
 
     export admin-guild;
     export admin-fractal;
     export user-guild;
     export user-fractal;
     export user-eval;
+    export embedded;
 }

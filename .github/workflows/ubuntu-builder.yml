@@ -7,20 +7,37 @@ on:
         type: boolean
         required: false
         default: true
+      ref:
+        description: "Ref to build; defaults to the ref that triggered the run"
+        type: string
+        required: false
+        default: ""
+    outputs:
+      ubuntu-versions:
+        description: Full list of Ubuntu versions for all-platforms builds
+        value: ${{ jobs.ubuntu-versions.outputs.ubuntu-versions }}
     secrets:
       publish-package-login:
         required: false
 
 jobs:
+  ubuntu-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      ubuntu-versions: '["2204","2404","2604"]'
+    steps:
+      - run: true
+
   build:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
+    needs: ubuntu-versions
     runs-on: ubuntu-latest
     env:
       can-publish: ${{ !! secrets.publish-package-login }}
     strategy:
       fail-fast: false
       matrix:
-        ubuntu-version: ${{ fromJSON(inputs.all-platforms && '["2204","2404","2604"]' || '["2204"]') }}
+        ubuntu-version: ${{ fromJSON(inputs.all-platforms && needs.ubuntu-versions.outputs.ubuntu-versions || '["2204"]') }}
     steps:
       - name: Timestamp
         id: ccache_cache_timestamp
@@ -34,6 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
+          ref: ${{ inputs.ref }}
           submodules: false
           fetch-depth: 0
       - name: Preserve ccache
@@ -45,9 +63,9 @@ jobs:
             $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
         env:
-          BUILDER_IMAGE_2204: 56cc3229bf80136970f4c925b5d3fc9d07ce3c35
-          BUILDER_IMAGE_2404: 56cc3229bf80136970f4c925b5d3fc9d07ce3c35
-          BUILDER_IMAGE_2604: 56cc3229bf80136970f4c925b5d3fc9d07ce3c35
+          BUILDER_IMAGE_2204: 983d7b62457785036f381163a2e50039f304e517
+          BUILDER_IMAGE_2404: 983d7b62457785036f381163a2e50039f304e517
+          BUILDER_IMAGE_2604: 983d7b62457785036f381163a2e50039f304e517
         run: |
           BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:$BUILDER_IMAGE_${{ matrix.ubuntu-version }}"
           echo $BUILDER_IMAGE

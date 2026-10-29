@@ -4,11 +4,13 @@ mod bindings;
 use bindings::exports::fractal_core::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::fractal_core::plugin::admin_guild::Guest as AdminGuild;
 
+use bindings::exports::fractal_core::plugin::embedded::Guest as Embedded;
 use bindings::exports::fractal_core::plugin::user_eval::Guest as UserEval;
 use bindings::exports::fractal_core::plugin::user_fractal::Guest as UserFractal;
 use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
 
 use bindings::host::types::types::Error;
+use bindings::profiles::plugin::types::Contact;
 
 use psibase::{define_trust, fracpack::Pack};
 mod errors;
@@ -20,7 +22,7 @@ use bindings::guilds::plugin as GuildsPlugin;
 use trust::{assert_authorized, FunctionName};
 
 use crate::bindings::host::{
-    common::client::get_receiver,
+    client::api::{get_receiver, get_sender},
     db::store::{Bucket, Database, DbMode::Transactional, StorageDuration::Persistent},
 };
 
@@ -46,10 +48,12 @@ define_trust! {
             - Attesting a finalized ranking proposal
             - Exiling a member from the fractal
             - Initialising the fractal token
+            - Donating tokens to the fractal
             - Setting the fractal token distribution interval
             - Creating a new guild
             - Mapping a governance role to a guild
             - Setting a role's occupation service
+            - Setting paid occupations for token distribution
             - Setting the guild evaluation schedule
             - Setting guild display name, bio, and description
             - Setting ranked guilds and rank ordering threshold
@@ -61,8 +65,12 @@ define_trust! {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
         Medium => [apply_guild, claim_rewards, join_fractal, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
-        High => [attest, set_role_mapping, create_guild, set_role_occupation, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
+        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, init_token, donate, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
     }
+}
+
+fn assert_caller_self() {
+    assert_eq!(get_sender(), get_receiver());
 }
 
 struct FractalCorePlugin;
@@ -101,6 +109,13 @@ impl AdminFractal for FractalCorePlugin {
         propose::fractal()?;
 
         FractalsPlugin::admin_fractal::set_role_occupation(role_id, &occupation)
+    }
+
+    fn set_paid_occupations(occupations: Vec<String>) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_paid_occupations)?;
+        propose::fractal()?;
+
+        FractalsPlugin::admin_fractal::set_paid_occupations(occupations.as_slice())
     }
 
     fn init_token() -> Result<(), Error> {
@@ -248,6 +263,11 @@ impl UserFractal for FractalCorePlugin {
         assert_authorized(FunctionName::join_fractal)?;
         GuildsPlugin::user_guild::join_fractal()
     }
+
+    fn donate(token_id: u32, amount: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::donate)?;
+        FractalsPlugin::user_fractal::donate(token_id, &amount)
+    }
 }
 
 impl UserGuild for FractalCorePlugin {
@@ -315,6 +335,23 @@ impl UserGuild for FractalCorePlugin {
             &comment,
             endorses,
         )
+    }
+}
+
+impl Embedded for FractalCorePlugin {
+    fn import_invite_token(token: String) -> Result<u32, Error> {
+        assert_caller_self();
+        bindings::invite::plugin::invitee::import_invite_token(&token)
+    }
+
+    fn get_contacts() -> Result<Vec<Contact>, Error> {
+        assert_caller_self();
+        bindings::profiles::plugin::contacts::get()
+    }
+
+    fn can_read_contacts() -> bool {
+        assert_caller_self();
+        bindings::profiles::plugin::api::has_read_permission()
     }
 }
 

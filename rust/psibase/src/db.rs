@@ -51,11 +51,13 @@ pub enum DbId {
     /// Not accessible to WASM. During joint consensus, this holds a
     /// subset of native as of the last irreversible block. Outside
     /// joint consensus, it is empty.
+    #[doc(hidden)]
     PrevAuthServices,
 
     /// Number of defined databases
     ///
     /// This number may grow in the future
+    #[doc(hidden)]
     NumChainDatabases,
 
     /// Data that is not part of consensus

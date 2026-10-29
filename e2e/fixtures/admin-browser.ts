@@ -1,6 +1,7 @@
 import {
     type Browser,
     type BrowserContext,
+    type ConsoleMessage,
     type Page,
 } from "@playwright/test";
 import { getRoutableIPv4 } from "../lib/routable-address";
@@ -23,12 +24,22 @@ export type CollectedPage = {
 
 export type AdminPage = CollectedPage;
 
+// x-admin requests a login token before the node has joined a network, and
+// XAdmin answers 503 until then. The UI treats that as "no token", but
+// Chromium still logs the failed load.
+function isPreJoinLoginRejection(msg: ConsoleMessage): boolean {
+    return (
+        msg.location().url.endsWith("/admin_login") &&
+        msg.text().includes("status of 503")
+    );
+}
+
 function attachCollector(context: BrowserContext): ConsoleErrorCollector {
     const entries: string[] = [];
 
     const onPage = (page: Page) => {
         page.on("console", (msg) => {
-            if (msg.type() === "error") {
+            if (msg.type() === "error" && !isPreJoinLoginRejection(msg)) {
                 entries.push(`console.error: ${msg.text()}`);
             }
         });

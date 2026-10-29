@@ -3,8 +3,8 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        abort_message, define_flags, get_sender, AccountNumber, FlagsType, Fracpack, Memo,
-        ServiceWrapper, Table, ToSchema,
+        abort_message, define_flags, get_sender, AccountNumber, Memo, Pack, ServiceWrapper, Table,
+        ToSchema, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
@@ -12,12 +12,18 @@ pub mod tables {
 
     pub type NID = u32;
 
+    pub const MINTED: u8 = 0;
+    pub const BURNED: u8 = 1;
+    pub const CREDITED: u8 = 2;
+    pub const DEBITED: u8 = 3;
+    pub const UNCREDITED: u8 = 4;
+
     define_flags!(NftHolderFlags, u8, {
         auto_debit,
     });
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct ConfigRow {
         pub next_id: NID,
     }
@@ -41,10 +47,7 @@ pub mod tables {
         }
 
         pub fn get_next_id(&mut self) -> NID {
-            let next_id = self
-                .next_id
-                .checked_add(1)
-                .expect("overflow in id generation");
+            let next_id = Nft::first_available_id(self.next_id.wrapping_add(1));
             self.next_id = next_id;
             self.save();
             next_id
@@ -56,7 +59,7 @@ pub mod tables {
     }
 
     #[table(name = "NftTable", index = 1)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, PartialEq, SimpleObject)]
     pub struct Nft {
         #[primary_key]
         pub id: NID,
@@ -64,27 +67,54 @@ pub mod tables {
         pub owner: AccountNumber,
     }
 
+    #[derive(PartialEq)]
+    pub enum NftStatus {
+        Available,
+        Burned,
+        Active(Nft),
+    }
+
     impl Nft {
         #[secondary_key(1)]
-        fn by_owner(&self) -> (AccountNumber, NID) {
-            (self.owner, self.id)
+        fn by_owner(&self) -> (AccountNumber, AccountNumber, NID) {
+            (self.owner, self.issuer, self.id)
         }
 
         #[secondary_key(2)]
-        fn by_issuer(&self) -> (AccountNumber, NID) {
-            (self.issuer, self.id)
-        }
-
-        pub fn new(owner_and_issuer: AccountNumber) -> Self {
-            Self {
-                id: ConfigRow::get_assert().get_next_id(),
-                issuer: owner_and_issuer,
-                owner: owner_and_issuer,
-            }
+        fn by_issuer(&self) -> (AccountNumber, AccountNumber, NID) {
+            (self.issuer, self.owner, self.id)
         }
 
         pub fn get(nft_id: NID) -> Option<Self> {
             NftTable::read().get_index_pk().get(&nft_id)
+        }
+
+        pub fn status(id: NID) -> NftStatus {
+            if let Some(nft) = Self::get(id) {
+                NftStatus::Active(nft)
+            } else if Burned::contains(id) {
+                NftStatus::Burned
+            } else {
+                NftStatus::Available
+            }
+        }
+
+        /// First id at or after `begin` that mint can create. Wraps, and never returns 0.
+        pub fn first_available_id(begin: NID) -> NID {
+            let mut id = if begin == 0 { 1 } else { begin };
+            let start = id;
+            loop {
+                if Self::status(id) == NftStatus::Available {
+                    return id;
+                }
+                id = id.wrapping_add(1);
+                if id == 0 {
+                    id = 1;
+                }
+                if id == start {
+                    abort_message("no NFT id available");
+                }
+            }
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
@@ -92,25 +122,45 @@ pub mod tables {
         }
 
         pub fn get_assert(nft_id: NID) -> Self {
-            Self::get(nft_id).unwrap_or_else(|| {
-                if nft_id <= ConfigRow::get_assert().next_id {
-                    abort_message("NFT was burned")
-                } else {
-                    abort_message("NFT does not exist")
-                }
-            })
+            match Self::status(nft_id) {
+                NftStatus::Active(nft) => nft,
+                NftStatus::Burned => abort_message("NFT was burned"),
+                NftStatus::Available => abort_message("NFT does not exist"),
+            }
         }
 
-        pub fn add() -> Self {
+        pub fn new(sender: AccountNumber, id: NID) -> Self {
+            Self {
+                id,
+                issuer: sender,
+                owner: sender,
+            }
+        }
+
+        pub fn add(id: Option<NID>) -> Self {
             let sender = get_sender();
-            let new_instance = Self::new(sender);
-            new_instance.save();
-
-            super::Wrapper::emit()
-                .history()
-                .minted(new_instance.id, sender);
-
-            new_instance
+            let id = match id {
+                Some(id) => {
+                    assert!(id != 0, "NFT ID invalid");
+                    match Self::status(id) {
+                        NftStatus::Available => id,
+                        NftStatus::Active(_) | NftStatus::Burned => {
+                            abort_message("NFT ID already taken")
+                        }
+                    }
+                }
+                None => ConfigRow::get_assert().get_next_id(),
+            };
+            let nft = Self::new(sender, id);
+            nft.save();
+            super::Wrapper::emit().history().ownerChange(
+                nft.id,
+                MINTED,
+                sender,
+                super::Wrapper::SERVICE,
+                "Minted".into(),
+            );
+            nft
         }
 
         pub fn burn(&self) {
@@ -118,7 +168,14 @@ pub mod tables {
                 CreditRecord::get(self.id).is_none(),
                 "cannot burn nft while credited"
             );
-            super::Wrapper::emit().history().burned(self.id, self.owner);
+            super::Wrapper::emit().history().ownerChange(
+                self.id,
+                BURNED,
+                self.owner,
+                super::Wrapper::SERVICE,
+                "Burned".into(),
+            );
+            Burned::add(self.id);
             self.erase();
         }
 
@@ -137,7 +194,7 @@ pub mod tables {
     }
 
     #[table(name = "NftHolderTable", index = 2)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone)]
     #[graphql(complex)]
     pub struct NftHolder {
         #[primary_key]
@@ -146,7 +203,7 @@ pub mod tables {
     }
 
     #[table(name = "CreditTable", index = 3)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
     #[allow(non_snake_case)]
     pub struct CreditRecord {
         #[primary_key]
@@ -178,10 +235,6 @@ pub mod tables {
             CreditTable::read().get_index_pk().get(&nft_id)
         }
 
-        pub fn get_assert(nft_id: NID) -> Self {
-            Self::get(nft_id).expect("Nothing to uncredit. Must first credit.")
-        }
-
         pub fn add(
             nft_id: NID,
             creditor: AccountNumber,
@@ -203,9 +256,15 @@ pub mod tables {
             let new_instance = Self::new(nft_id, creditor, debitor);
             new_instance.save();
 
-            super::Wrapper::emit()
-                .history()
-                .credited(nft_id, creditor, debitor, memo.to_string());
+            super::Wrapper::emit().history().ownerChange(
+                new_instance.nftId,
+                CREDITED,
+                creditor,
+                debitor,
+                memo,
+            );
+
+            UserPending::add(creditor, debitor, nft_id);
 
             new_instance
         }
@@ -213,12 +272,15 @@ pub mod tables {
         pub fn debit(&self, memo: Memo) {
             Nft::get_assert(self.nftId).set_owner(self.debitor);
 
-            super::Wrapper::emit().merkle().transferred(
+            super::Wrapper::emit().history().ownerChange(
                 self.nftId,
-                self.creditor,
+                DEBITED,
                 self.debitor,
-                memo.to_string(),
+                self.creditor,
+                memo,
             );
+
+            UserPending::remove(self.creditor, self.debitor, self.nftId);
             self.erase();
         }
 
@@ -228,12 +290,15 @@ pub mod tables {
                 "Only the creditor may perform this action",
             );
 
-            super::Wrapper::emit().history().uncredited(
+            super::Wrapper::emit().history().ownerChange(
                 self.nftId,
+                UNCREDITED,
                 self.creditor,
                 self.debitor,
-                memo.to_string(),
+                memo,
             );
+
+            UserPending::remove(self.creditor, self.debitor, self.nftId);
             self.erase();
         }
 
@@ -243,6 +308,72 @@ pub mod tables {
 
         fn erase(&self) {
             CreditTable::read_write().erase(&self.nftId);
+        }
+    }
+
+    #[table(name = "UserPendingTable", index = 4)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
+    #[allow(non_snake_case)]
+    #[graphql(complex)]
+    pub struct UserPending {
+        pub user: AccountNumber,
+        pub nft_id: NID,
+    }
+
+    impl UserPending {
+        #[primary_key]
+        fn by_pk(&self) -> (AccountNumber, NID) {
+            (self.user, self.nft_id)
+        }
+
+        fn new(user: AccountNumber, nft_id: NID) -> Self {
+            Self { user, nft_id }
+        }
+
+        fn add(creditor: AccountNumber, debitor: AccountNumber, nft_id: NID) {
+            Self::new(creditor, nft_id).save();
+            Self::new(debitor, nft_id).save();
+        }
+
+        fn save(&self) {
+            UserPendingTable::read_write().put(&self).unwrap();
+        }
+
+        fn remove(creditor: AccountNumber, debitor: AccountNumber, nft_id: NID) {
+            let table = UserPendingTable::read_write();
+            table.erase(&(creditor, nft_id));
+            table.erase(&(debitor, nft_id));
+        }
+    }
+
+    #[ComplexObject]
+    impl UserPending {
+        pub async fn credit(&self) -> CreditRecord {
+            CreditTable::with_service(crate::Wrapper::SERVICE)
+                .get_index_pk()
+                .get(&self.nft_id)
+                .unwrap()
+        }
+    }
+
+    #[table(name = "BurnedTable", index = 5)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct Burned {
+        #[primary_key]
+        pub id: NID,
+    }
+
+    impl Burned {
+        pub fn get(id: NID) -> Option<Self> {
+            BurnedTable::read().get_index_pk().get(&id)
+        }
+
+        pub fn contains(id: NID) -> bool {
+            Self::get(id).is_some()
+        }
+
+        fn add(id: NID) {
+            BurnedTable::read_write().put(&Self { id }).unwrap();
         }
     }
 
@@ -261,9 +392,6 @@ pub mod tables {
         pub fn set_flag(&mut self, flag: NftHolderFlags, enable: bool) {
             self.config = psibase::Flags::new(self.config).set(flag, enable).value();
             self.save();
-            super::Wrapper::emit()
-                .history()
-                .userConfSet(self.account, flag.index(), enable);
         }
 
         pub fn save(&self) {
@@ -288,35 +416,25 @@ pub mod service {
 
     pub type NID = u32;
 
+    pub use crate::tables::{BURNED, CREDITED, DEBITED, MINTED, UNCREDITED};
+
     #[action]
     fn init() {
         if ConfigRow::get().is_none() {
             ConfigRow::add();
 
-            let add_index = |method: &str, column: u8, db_id: EventDb| {
+            let add_index = |column: u8| {
                 events::Wrapper::call().addIndex(
-                    db_id,
+                    EventDb::HistoryEvent,
                     Wrapper::SERVICE,
-                    MethodNumber::from(method),
+                    MethodNumber::from("ownerChange"),
                     column,
                 );
             };
 
-            add_index("minted", 0, EventDb::HistoryEvent);
-            add_index("minted", 1, EventDb::HistoryEvent);
-            add_index("burned", 0, EventDb::HistoryEvent);
-            add_index("burned", 1, EventDb::HistoryEvent);
-            add_index("userConfSet", 0, EventDb::HistoryEvent);
-            add_index("credited", 0, EventDb::HistoryEvent);
-            add_index("credited", 1, EventDb::HistoryEvent);
-            add_index("credited", 2, EventDb::HistoryEvent);
-            add_index("uncredited", 0, EventDb::HistoryEvent);
-            add_index("uncredited", 1, EventDb::HistoryEvent);
-            add_index("uncredited", 2, EventDb::HistoryEvent);
-
-            add_index("transferred", 0, EventDb::MerkleEvent);
-            add_index("transferred", 1, EventDb::MerkleEvent);
-            add_index("transferred", 2, EventDb::MerkleEvent);
+            add_index(0); // nftId
+            add_index(2); // account
+            add_index(3); // counter_party
         }
     }
 
@@ -326,8 +444,8 @@ pub mod service {
     }
 
     #[action]
-    pub fn mint() -> NID {
-        Nft::add().id
+    pub fn mint(nftId: Option<NID>) -> NID {
+        Nft::add(nftId).id
     }
 
     #[action]
@@ -357,8 +475,8 @@ pub mod service {
     }
 
     #[action]
-    fn getCredRecord(nftId: NID) -> CreditRecord {
-        CreditRecord::get_assert(nftId)
+    fn getCredRecord(nftId: NID) -> Option<CreditRecord> {
+        CreditRecord::get(nftId)
     }
 
     #[action]
@@ -394,8 +512,8 @@ pub mod service {
     }
 
     #[action]
-    pub fn getNft(nftId: NID) -> Nft {
-        Nft::get_assert(nftId)
+    pub fn getNft(nftId: NID) -> Option<Nft> {
+        Nft::get(nftId)
     }
 
     #[action]
@@ -404,20 +522,13 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn minted(nftId: NID, issuer: AccountNumber) {}
-
-    #[event(history)]
-    pub fn burned(nftId: NID, owner: AccountNumber) {}
-
-    #[event(history)]
-    pub fn credited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
-
-    #[event(history)]
-    pub fn uncredited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
-
-    #[event(merkle)]
-    pub fn transferred(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {}
-
-    #[event(history)]
-    pub fn userConfSet(account: AccountNumber, index: u8, enable: bool) {}
+    pub fn ownerChange(
+        nftId: NID,
+        action: u8,
+        account: AccountNumber,
+        counter_party: AccountNumber,
+        memo: Memo,
+    ) {
+    }
 }
+

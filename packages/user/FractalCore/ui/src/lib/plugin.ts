@@ -33,24 +33,26 @@ class AdminFractal extends PluginInterface {
     protected override readonly _intf = "adminFractal" as const;
 
     get setRoleOccupation() {
-        return this._call<[roleId: number, occupation: string]>("setRoleOccupation")
+        return this._call<[roleId: number, occupation: string]>(
+            "setRoleOccupation",
+        );
     }
 
-
+    get setPaidOccupations() {
+        return this._call<[occupations: string[]]>("setPaidOccupations");
+    }
 
     get migrateGuilds() {
-        return this._call<[guild: string]>("migrateGuilds")
+        return this._call<[guild: string]>("migrateGuilds");
     }
 
-
     get setRoleMapping() {
-        return this._call<[roleId: number, guild: string]>("setRoleMapping")
+        return this._call<[roleId: number, guild: string]>("setRoleMapping");
     }
 
     get exileMember() {
         return this._call<[member: Account]>("exileMember");
     }
-
 
     get initToken() {
         return this._call<[]>("initToken");
@@ -157,7 +159,6 @@ class AdminGuild extends PluginInterface {
     get removeGuildRep() {
         return this._call<[guildAccount: Account]>("removeGuildRep");
     }
-
 }
 
 class UserGuild extends PluginInterface {
@@ -168,7 +169,9 @@ class UserGuild extends PluginInterface {
     }
 
     get createGuildInvite() {
-        return this._call<[guildAccount: Account, numSeats: number, preAttest: boolean]>("inviteMember");
+        return this._call<
+            [guildAccount: Account, numSeats: number, preAttest: boolean]
+        >("inviteMember");
     }
 
     get attestMembershipApp() {
@@ -189,11 +192,29 @@ class UserGuild extends PluginInterface {
     }
 
     get draftApplication() {
-        return this._call<[guildAccount: Account, description: string]>("draftApplication");
+        return this._call<[guildAccount: Account, description: string]>(
+            "draftApplication",
+        );
     }
 
     get pushApplication() {
         return this._call<[guildAccount: Account]>("pushApplication");
+    }
+}
+
+class Embedded extends PluginInterface {
+    protected override readonly _intf = "embedded" as const;
+
+    get getContacts() {
+        return this._call<[], unknown[]>("getContacts");
+    }
+
+    get canReadContacts() {
+        return this._call<[], boolean>("canReadContacts");
+    }
+
+    get importInviteToken() {
+        return this._call<[token: string], number>("importInviteToken");
     }
 }
 
@@ -203,6 +224,7 @@ export class Plugin {
     readonly userEval: UserEval;
     readonly adminGuild: AdminGuild;
     readonly userGuild: UserGuild;
+    readonly embedded: Embedded;
 
     constructor(readonly service: Account) {
         // Initialize all interfaces with the correct service
@@ -211,6 +233,7 @@ export class Plugin {
         this.userEval = new UserEval();
         this.adminGuild = new AdminGuild();
         this.userGuild = new UserGuild();
+        this.embedded = new Embedded();
 
         // Set the protected _service on each instance
         // This avoids the "used before initialization" error
@@ -220,6 +243,7 @@ export class Plugin {
             this.userEval,
             this.adminGuild,
             this.userGuild,
+            this.embedded,
         ] as PluginInterface[];
 
         for (const instance of instances) {
@@ -230,3 +254,8 @@ export class Plugin {
 
 // Global instances
 export const fractalCorePlugin = new Plugin(getSubDomain());
+
+export const embeddedContactCalls = {
+    canReadContacts: fractalCorePlugin.embedded.canReadContacts,
+    getContacts: fractalCorePlugin.embedded.getContacts,
+};
