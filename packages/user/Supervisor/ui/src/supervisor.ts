@@ -44,9 +44,11 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "query"),
     pluginId("host", "accounts"),
     pluginId("host", "auth"),
+    pluginId("host", "login"),
     pluginId("host", "prompt"),
     pluginId("transact", "plugin"),
     pluginId("transact", "admin"),
+    pluginId("transact", "query-auth"),
     pluginId("clientdata", "plugin"),
     pluginId("webcrypto", "plugin"),
 ];
@@ -147,7 +149,7 @@ export class Supervisor implements AppInterface {
                 return;
             }
 
-            // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., host:accounts, host:auth
+            // Phase 0: Loads systemPlugins, including those needed to get current user (host:accounts)
             this.loader.trackPlugins([...systemPlugins]);
             await this.loader.processPlugins();
             await this.loader.awaitReady();

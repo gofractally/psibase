@@ -13,13 +13,11 @@ use crate::bindings::{
     host::{
         client::api as CallContext,
         db::store::{Bucket, Database, DbMode, StorageDuration},
-        types::types::Error,
     },
     supervisor::bridge::{
         intf as Supervisor,
         types::{BodyTypes, Header, HttpRequest},
     },
-    transact::plugin::auth as Transact,
 };
 
 struct HostAuth;
@@ -29,8 +27,14 @@ const DB: Database = Database {
     duration: StorageDuration::Persistent,
 };
 
-fn bucket_id(user: &str) -> String {
-    format!("query_tokens-{}", user)
+fn query_tokens_table(user: &str) -> Bucket {
+    Bucket::new(DB, &format!("query_tokens-{}", user))
+}
+
+fn get_query_token(user: &str, app: &str) -> Option<String> {
+    query_tokens_table(user)
+        .get(app)
+        .map(|t| String::unpacked(&t).unwrap())
 }
 
 fn post_to_app(app: &str, endpoint: &str, body: String) -> HttpRequest {
@@ -49,41 +53,33 @@ fn post_to_app(app: &str, endpoint: &str, body: String) -> HttpRequest {
     }
 }
 
-fn set_active_query_token(query_token: &str, app: &str, user: &str) {
+fn set_auth_cookie(query_token: &str, app: &str) {
     let req = post_to_app(
         app,
         "/common/set-auth-cookie",
         format!("{{\"accessToken\": \"{}\"}}", query_token),
     );
     Supervisor::send_request(&req, true).unwrap();
-
-    Bucket::new(DB, &bucket_id(user)).set(&app, &query_token.to_string().packed());
 }
 
-fn remove_active_query_token(app: &str, user: &str) {
+fn remove_auth_cookie(app: &str) {
     let req = post_to_app(app, "/common/remove-auth-cookie", "{}".to_string());
     Supervisor::send_request(&req, true).unwrap();
-
-    Bucket::new(DB, &bucket_id(user)).delete(&&app);
 }
 
+/// Browser-session credentials: query tokens and auth cookies.
+/// Host-only (+ supervisor for `get-active-query-token`).
 impl Api for HostAuth {
-    fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
-        check_caller(&["host"], "set-logged-in-user@host:auth/api");
-
-        let query_token = Bucket::new(DB, &bucket_id(&user))
-            .get(&app)
-            .map(|t| String::unpacked(&t).unwrap())
-            .unwrap_or_else(|| Transact::get_query_token(&app, &user).unwrap());
-
-        set_active_query_token(&query_token, &app, &user);
-
-        Ok(())
+    fn set_session(user: String, app: String, token: String) {
+        check_caller(&["host"], "set-session@host:auth/api");
+        query_tokens_table(&user).set(&app, &token.packed());
+        set_auth_cookie(&token, &app);
     }
 
-    fn log_out_user(user: String, app: String) {
-        check_caller(&["host"], "log_out_user@host:auth/api");
-        remove_active_query_token(&app, &user);
+    fn clear_session(user: String, app: String) {
+        check_caller(&["host"], "clear-session@host:auth/api");
+        remove_auth_cookie(&app);
+        query_tokens_table(&user).delete(&app);
     }
 
     fn get_active_query_token(app: String, user: String) -> Option<String> {
@@ -91,10 +87,7 @@ impl Api for HostAuth {
             &["host", "supervisor"],
             "get-active-query-token@host:auth/api",
         );
-
-        Bucket::new(DB, &bucket_id(&user))
-            .get(&app)
-            .map(|t| String::unpacked(&t).unwrap())
+        get_query_token(&user, &app)
     }
 }
 

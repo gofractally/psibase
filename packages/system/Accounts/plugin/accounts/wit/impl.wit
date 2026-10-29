@@ -5,9 +5,8 @@ world impl {
     include host:http/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
-    include host:accounts/imports;
 
-    import host:accounts/admin;
+    import host:login/admin;
 
     export api;
     export admin;

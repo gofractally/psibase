@@ -300,10 +300,12 @@ add_rs_component_workspace(packages/:Plugins
     host-types
     login-prompt
     host-auth
+    host-login
     host-crypto
     web-crypto
     transact
     transact-admin
+    transact-query-auth
     workshop
     fractal-core
     config
@@ -347,6 +349,7 @@ psibase_package(
     SERVICE transact
         DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
         DATA ${Plugins_OUTPUT_FILE_transact_admin} /admin.wasm
+        DATA ${Plugins_OUTPUT_FILE_transact_query_auth} /query-auth.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "TransactService(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )
@@ -470,6 +473,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_login} /login.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"

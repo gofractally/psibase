@@ -40,12 +40,12 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
         try {
             if (currentUser) {
                 await supervisor.functionCall(
-                    withArgs("host", "accounts", "activeApp", "logout"),
+                    withArgs("host", "login", "api", "logout"),
                 );
                 setCurrentUser(null);
             } else {
                 await supervisor.functionCall(
-                    withArgs("host", "accounts", "activeApp", "connectAccount"),
+                    withArgs("host", "login", "api", "connectAccount"),
                     { enabled: true, returnPath: "/common/plugin-tester" },
                 );
             }

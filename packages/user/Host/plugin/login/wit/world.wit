@@ -1,0 +1,76 @@
+package host:login;
+
+/// This interface is only available to the top-level app, or its plugin.
+/// The "top-level" app is the app with which the user is directly interacting.
+interface api {
+    use host:types/types.{error};
+
+    /// Directly log in a user by their account name.
+    /// The user must have already been connected to the app.
+    login: func(user: string) -> result<_, error>;
+
+    /// Logs out the currently logged-in user.
+    logout: func() -> result<_, error>;
+
+    /// Disconnects a previously connected account from the active app
+    disconnect: func(account: string) -> result<_, error>;
+
+    /// Prompts the user to connect an account to the active app
+    connect-account: func() -> result<_, error>;
+}
+
+/// Callable by host (and accounts for selected inventory cleanup).
+interface admin {
+    use host:types/types.{error, pem};
+
+    record credential {
+        /// The name of the account
+        account: string,
+        /// The private key in PEM format used to authorize the account
+        key: pem,
+    }
+
+    /// Import a pre-existing account(s) to this device.
+    /// Callable only by host and homepage.
+    ///
+    /// Importing an account requires both the name of the account and its corresponding private
+    /// key in PEM format. The private key will be verified to ensure that it can be used to
+    /// authorize the account.
+    ///
+    /// Returns:
+    /// * On success, returns nothing,
+    /// * If any credentials fail validation, returns a list of tuples containing the account name
+    ///   and the error that caused the failure.
+    ///
+    /// Any credentials that fails validation will not be imported.
+    import-existing: func(credentials: list<credential>) -> result<_, list<tuple<string, error>>>;
+
+    /// Logs the user into the specified app and connects them to it.
+    /// Host-only; the caller is responsible for any connection policy.
+    login-to-app: func(user: string, app: string) -> result<_, error>;
+
+    /// Logs out the user logged into the specified app
+    logout: func(app: string);
+
+    /// Connects the account to the specified app
+    connect: func(account: string, app: string);
+
+    /// Disconnects the account from the specified app, logging it out if logged in
+    disconnect: func(account: string, app: string);
+
+    /// Gets the accounts connected to the specified app
+    get-connected-accounts: func(app: string) -> list<string>;
+
+    /// Adds the specified app to the user's connected apps
+    add-connected-app: func(user: string, app: string);
+
+    /// Removes the specified app from the user's connected apps
+    remove-connected-app: func(user: string, app: string);
+
+    /// Gets the names of all apps to which the user has connected
+    get-connected-apps: func(user: string) -> list<string>;
+}
+
+world imports {
+    import api;
+}

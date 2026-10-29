@@ -2,7 +2,7 @@ package host:login-prompt;
 
 interface api {
     use host:types/types.{error};
-    use host:accounts/admin.{credential};
+    use host:login/admin.{credential};
     use tokens:plugin/types.{system-token-info, user-balance};
     use name-market:plugin/types.{markets-overview};
 
@@ -15,7 +15,7 @@ interface api {
 
     /// Import a pre-existing account(s) to this device.
     ///
-    /// Full docs available at `host:accounts/admin.import-existing`.
+    /// Full docs available at `host:login/admin.import-existing`.
     import-existing: func(credentials: list<credential>) -> result<_, list<tuple<string, error>>>;
 
     /// Creates a new account, returns the private key used to authorize it.

@@ -2,8 +2,8 @@ package host:http;
 
 world impl {
     include supervisor:bridge/imports;
-    include host:accounts/imports;
     include host:client/imports;
+    include host:accounts/imports;
     include host:auth/imports;
 
     export api;

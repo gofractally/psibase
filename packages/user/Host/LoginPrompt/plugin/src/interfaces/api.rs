@@ -2,8 +2,8 @@ use crate::bindings::accounts::plugin::api as AccountsPlugin;
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::host::login_prompt::api::{Credential, Guest as Api};
 use crate::bindings::host::{
-    client::api as Client, crypto::keyvault as HostCrypto, accounts::admin as HostAccountsAdmin,
-    accounts::api as HostAccountsApi, types::types::Error,
+    accounts::api as HostAccounts, client::api as Client, crypto::keyvault as HostCrypto,
+    login::admin as HostLoginAdmin, types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::name_market::plugin::{api as NameMarket, types::MarketsOverview};
@@ -21,7 +21,7 @@ impl Api for LoginPrompt {
     fn can_create_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        if HostAccountsApi::is_logged_in() {
+        if HostAccounts::is_logged_in() {
             return true;
         }
 
@@ -34,7 +34,7 @@ impl Api for LoginPrompt {
 
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
-        HostAccountsAdmin::import_existing(&credentials)
+        HostLoginAdmin::import_existing(&credentials)
     }
 
     fn create_account(account_name: String) -> Result<String, Error> {
@@ -42,7 +42,7 @@ impl Api for LoginPrompt {
 
         let private_key;
 
-        if HostAccountsApi::is_logged_in() {
+        if HostAccounts::is_logged_in() {
             private_key = AuthSig::actions::create_account(&account_name)?;
         } else if Invites::get_active_invite().unwrap_or(false) {
             private_key = Invites::create_new_account(&account_name);
@@ -83,13 +83,13 @@ impl Api for LoginPrompt {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
         // The account must already have been imported
-        assert!(HostAccountsAdmin::get_connected_accounts(HOST_APP).contains(&account));
+        assert!(HostLoginAdmin::get_connected_accounts(HOST_APP).contains(&account));
 
         let app = Client::get_active_app();
-        HostAccountsAdmin::add_connected_app(&account, &app);
+        HostLoginAdmin::add_connected_app(&account, &app);
 
-        if HostAccountsAdmin::login(&account, &app).is_err() {
-            HostAccountsAdmin::remove_connected_app(&account, &app);
+        if HostLoginAdmin::login_to_app(&account, &app).is_err() {
+            HostLoginAdmin::remove_connected_app(&account, &app);
         }
 
         if Invites::get_active_invite().is_some() {
