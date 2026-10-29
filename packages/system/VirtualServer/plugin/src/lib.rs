@@ -20,7 +20,7 @@ use psibase::AccountNumber;
 use psibase_plugin::{
     host,
     trust::{Capabilities, TrustConfig},
-    Error,
+    Error, Transact,
 };
 
 use psibase::services::tokens::{Precision, Quantity};
