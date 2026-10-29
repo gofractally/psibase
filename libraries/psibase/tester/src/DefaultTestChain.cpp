@@ -115,13 +115,8 @@ namespace
       }
 
       auto producer = "firstprod"_a;
-      if (std::ranges::any_of(service_packages, [](const auto& package) {
-             return package.hasService(AuthAny::service);
-          }))
-      {
-         actions.push_back(transactor<Accounts>{producer, Accounts::service}.setAuthServ(
-             AuthAny::service));
-      }
+      actions.push_back(
+          transactor<Accounts>{producer, Accounts::service}.setAuthServ(AuthAny::service));
 
       auto root = AccountNumber{"root"};
       actions.push_back(asys.newAccount(root, AuthAny::service, NewAccountMode::requireNew));
