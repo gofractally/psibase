@@ -1010,8 +1010,10 @@ dependencies = [
  "futures",
  "psibase",
  "psibase-plugin-workspace-hack",
+ "psibase_plugin",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "wit-bindgen-rt",
 ]
 
@@ -1372,6 +1374,14 @@ dependencies = [
 
 [[package]]
 name = "homepage"
+version = "0.29.0"
+dependencies = [
+ "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "homepage-explorer"
 version = "0.29.0"
 dependencies = [
  "psibase-plugin-workspace-hack",

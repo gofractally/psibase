@@ -308,6 +308,7 @@ add_rs_component_workspace(packages/:Plugins
     fractal-core
     config
     homepage
+    homepage-explorer
     producers
 )
 
@@ -804,8 +805,9 @@ psibase_package(
     SERVICE homepage
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/ui/dist/*  /
         DATA ${Plugins_OUTPUT_FILE_homepage} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_homepage_explorer} /explorer.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/postinstall.json
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "NameMarket(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Chainmail(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)" "TokenSwap(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "DynLd(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "NameMarket(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Chainmail(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)" "TokenSwap(^${PSIBASE_VERSION}.0)"
     DEPENDS ${Homepage_js_DEP}
     DEPENDS ${Plugins_DEP}
 )
@@ -954,7 +956,7 @@ psibase_package(
     DEPENDS ${Explorer_js_DEP}
     DEPENDS ${Plugins_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "AuthDelegate(^${PSIBASE_VERSION}.0)" "AuthDyn(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Packages(^${PSIBASE_VERSION}.0)" "Producers(^${PSIBASE_VERSION}.0)" "Registry(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "AuthDelegate(^${PSIBASE_VERSION}.0)" "AuthDyn(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Packages(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Producers(^${PSIBASE_VERSION}.0)" "Registry(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
