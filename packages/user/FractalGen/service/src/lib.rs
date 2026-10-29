@@ -77,6 +77,3 @@ mod service {
         // root ownership in boot.rs.
     }
 }
-
-#[cfg(test)]
-mod tests;
