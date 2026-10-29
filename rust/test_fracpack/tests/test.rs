@@ -1185,3 +1185,16 @@ fn test_single() {
     let v = <View<Single>>::new(&data).unwrap();
     assert_eq!(v.get0().unpack(), value.0);
 }
+
+#[derive(Pack, Unpack, View)]
+struct Private {
+    x: u32,
+}
+
+#[test]
+fn test_private_view() {
+    let value = Private { x: 42 };
+    let data = value.packed();
+    let v = <View<Private>>::new(&data).unwrap();
+    assert_eq!(v.x().unpack(), value.x);
+}

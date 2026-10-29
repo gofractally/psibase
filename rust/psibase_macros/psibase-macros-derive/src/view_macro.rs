@@ -55,13 +55,14 @@ fn new_lifetime(generics: &Generics) -> Lifetime {
 
 fn view_def(fracpack_mod: &TokenStream2, input: &DeriveInput, opts: &Options) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let vis = &input.vis;
     let ty = &input.ident;
     let impl_params = &input.generics.params;
     let view_ty = opts.view_name.as_ref().unwrap();
     let lifetime = new_lifetime(&input.generics);
     let where_predicates = input.generics.where_clause.as_ref().map(|w| &w.predicates);
     quote! {
-        pub struct #view_ty #impl_generics #where_clause (#fracpack_mod::GenericView<#ty #ty_generics>);
+        #vis struct #view_ty #impl_generics #where_clause (#fracpack_mod::GenericView<#ty #ty_generics>);
         impl #impl_generics #fracpack_mod::ViewData for #view_ty #ty_generics #where_clause {
             fn new_unchecked(data: &[u8]) -> &Self {
                 unsafe { &*(data as *const [u8] as *const Self) }
