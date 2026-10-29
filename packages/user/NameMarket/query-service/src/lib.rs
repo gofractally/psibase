@@ -85,11 +85,10 @@ mod service {
 
         /// Current ask price (DiffAdjust difficulty), as a Decimal in the system token.
         async fn price(&self) -> Decimal {
-            let mut price_raw = DiffAdjust::call().get_diff(self.row.nft_id);
-            if price_raw == 0 {
-                price_raw = self.rate_limit().map(|r| r.floor_difficulty).unwrap_or(0);
-            }
-            Decimal::new(Quantity::from(price_raw), Self::sys_precision())
+            Decimal::new(
+                DiffAdjust::call().get_diff(self.row.nft_id).into(),
+                Self::sys_precision(),
+            )
         }
     }
 

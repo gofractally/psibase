@@ -32,18 +32,18 @@ export const NewContactDialog = ({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Create contact</DialogTitle>
-                    <DialogDescription className="mt-2">
+                    <DialogDescription>
                         These details are stored locally and not sent to the
                         network.
-                        <ContactForm
-                            onSubmit={async (data) => {
-                                await createContact(data);
-                                onOpenChange(false);
-                                onNewAccount(data.account);
-                            }}
-                        />
                     </DialogDescription>
                 </DialogHeader>
+                <ContactForm
+                    onSubmit={async (data) => {
+                        await createContact(data);
+                        onOpenChange(false);
+                        onNewAccount(data.account);
+                    }}
+                />
             </DialogContent>
         </Dialog>
     );

@@ -2,8 +2,7 @@
 #include <psibase/dispatch.hpp>
 #include <ranges>
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthAny.hpp>
-#include <services/system/AuthSig.hpp>
+#include <services/system/AuthDelegate.hpp>
 #include <services/system/Producers.hpp>
 #include "services/system/Transact.hpp"
 
@@ -93,15 +92,11 @@ namespace SystemService
       auto producers = ::getProducers();
       check(!producers.empty(), "no producers");
 
-      auto authService = AuthSig::AuthSig::service;
-      if (to<Accounts>().exists(AuthAny::service))
-         authService = AuthAny::service;
-
       for (const auto& prod : producers)
       {
          psibase::from(Accounts::service)
              .to<Accounts>()
-             .newAccount(prod.name, authService, NewAccountMode::requireNew);
+             .newAccount(prod.name, AuthDelegate::service, NewAccountMode::requireNew);
       }
    }
 

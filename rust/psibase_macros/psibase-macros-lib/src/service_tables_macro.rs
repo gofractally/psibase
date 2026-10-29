@@ -1,10 +1,11 @@
 mod tables;
 
 use darling::{ast::NestedMeta, Error, FromMeta};
+use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use proc_macro_error::{abort, emit_error};
 use quote::quote;
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 use syn::{Ident, Item, ItemMod, Type};
 use tables::{is_table_attr, process_service_tables, process_table_schema_root};
 
@@ -54,7 +55,7 @@ pub fn service_tables_macro_impl(attr: TokenStream, item: TokenStream) -> TokenS
 
 pub(crate) fn process_mod(psibase_mod: &proc_macro2::TokenStream, impl_mod: &mut ItemMod) {
     if let Some((_, items)) = &mut impl_mod.content {
-        let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
+        let mut table_structs: IndexMap<Ident, Vec<usize>> = IndexMap::new();
         let mut table_names = Vec::new();
 
         // collect all tables

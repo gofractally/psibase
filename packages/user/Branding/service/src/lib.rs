@@ -99,3 +99,6 @@ mod service {
         None.or_else(|| serve_graphql(&request, Query))
     }
 }
+
+#[cfg(test)]
+mod tests;

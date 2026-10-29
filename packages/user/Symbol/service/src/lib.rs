@@ -172,7 +172,7 @@ pub mod tables {
                 .history()
                 .symEvent(symbol, sender, CREATED);
 
-            let new_instance = Self::new(symbol, Nft::call().mint());
+            let new_instance = Self::new(symbol, Nft::call().mint(None));
             new_instance.save();
 
             Nft::call().credit(
@@ -415,3 +415,4 @@ pub mod service {
     #[event(history)]
     fn symEvent(symbol: SID, actor: AccountNumber, action: u8) {}
 }
+
