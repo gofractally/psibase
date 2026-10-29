@@ -3,7 +3,8 @@
     "private": true,
     "version": "0.0.1",
     "scripts": {
-        "test": "playwright test"
+        "test": "playwright test",
+        "typecheck": "tsc -p ."
     },
     "devDependencies": {
         "@eslint/js": "^9.9.0",
