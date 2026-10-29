@@ -1174,3 +1174,14 @@ fn test_named_view() {
     let v = <NamedViewType>::new(&data).unwrap();
     assert_eq!(v.x().unpack(), value.x);
 }
+
+#[derive(Pack, Unpack, View)]
+pub struct Single(u32);
+
+#[test]
+fn test_single() {
+    let value = Single(42);
+    let data = value.packed();
+    let v = <View<Single>>::new(&data).unwrap();
+    assert_eq!(v.get0().unpack(), value.0);
+}

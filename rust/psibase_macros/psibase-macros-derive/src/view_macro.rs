@@ -4,7 +4,7 @@ use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use syn::{
-    parse_macro_input, Data, DataStruct, DeriveInput, Field, GenericParam, Generics, Ident,
+    parse_macro_input, Data, DataStruct, DeriveInput, Field, Fields, GenericParam, Generics, Ident,
     Lifetime,
 };
 
@@ -85,8 +85,20 @@ fn process_struct(
     data: &DataStruct,
     opts: &Options,
 ) -> TokenStream2 {
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let view_ty = opts.view_name.as_ref().unwrap();
+
+    if let Fields::Unnamed(fields) = &data.fields {
+        if fields.unnamed.len() == 1 {
+            return generate_newtype_accessor(
+                fracpack_mod,
+                &view_ty,
+                fields.unnamed.first().unwrap(),
+                &input.generics,
+            );
+        }
+    }
+
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let field_sizes = data.fields.iter().map(|field| {
         if skip_field(field) {
@@ -119,6 +131,27 @@ fn process_struct(
     quote! {
         #view_impls
         #accessors
+    }
+}
+
+fn generate_newtype_accessor(
+    fracpack_mod: &TokenStream2,
+    view_ty: &Ident,
+    field: &Field,
+    generics: &Generics,
+) -> TokenStream2 {
+    let vis = &field.vis;
+    let field_ty = &field.ty;
+    let impl_generics = &generics.params;
+    let where_clause = generics.where_clause.as_ref().map(|w| &w.predicates);
+    let (_, ty_generics, _) = generics.split_for_impl();
+    let lifetime = new_lifetime(generics);
+    quote! {
+        impl <#lifetime, #impl_generics> #view_ty #ty_generics where #field_ty: #fracpack_mod::MakeView + #fracpack_mod::Unpack<#lifetime>, #where_clause {
+            #vis fn get0(&self) -> &#fracpack_mod::View<#field_ty> {
+                #fracpack_mod::ViewData::new_unchecked(#fracpack_mod::ViewData::get_data(self))
+            }
+        }
     }
 }
 
