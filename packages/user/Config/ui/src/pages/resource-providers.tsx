@@ -73,36 +73,43 @@ export const ResourceProviders = () => {
             ? "Register as a block-production candidate with a non-empty endpoint first (Block production)."
             : null;
 
+    const trimmedApp = app.trim();
+    const acceptedList = useMemo(() => parseAccepted(accepted), [accepted]);
+
     const paymentAppError = useMemo(() => {
-        const trimmed = app.trim();
-        if (!trimmed) {
+        if (!trimmedApp) {
             return null;
         }
-        const result = zLocalAccount.safeParse(trimmed);
+        const result = zLocalAccount.safeParse(trimmedApp);
         if (result.success) {
             return null;
         }
         return (
             result.error.issues[0]?.message ?? "Invalid payment app account."
         );
-    }, [app]);
+    }, [trimmedApp]);
+
+    const hasChanges = !existing
+        ? true
+        : trimmedApp !== existing.app ||
+          acceptedList.map((code) => code.toLowerCase()).join(",") !==
+              existing.accepted.map((code) => code.toLowerCase()).join(",");
 
     const canSubmit =
         !submitBlockReason &&
         !isRegistering &&
         !isUnregistering &&
         !paymentAppError &&
-        Boolean(app.trim()) &&
-        parseAccepted(accepted).length > 0;
+        Boolean(trimmedApp) &&
+        acceptedList.length > 0 &&
+        hasChanges;
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-        const trimmedApp = app.trim();
         const parsedApp = zLocalAccount.safeParse(trimmedApp);
         if (!parsedApp.success) {
             return;
         }
-        const acceptedList = parseAccepted(accepted);
         if (acceptedList.length === 0) {
             return;
         }
@@ -211,7 +218,7 @@ export const ResourceProviders = () => {
                                     type="button"
                                     variant="outline"
                                     disabled={
-                                        !currentUser ||
+                                        !existing ||
                                         isRegistering ||
                                         isUnregistering
                                     }

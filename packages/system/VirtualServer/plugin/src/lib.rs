@@ -114,10 +114,7 @@ impl Admin for VirtualServerPlugin {
     }
 
     fn reg_res_provider(app: String, accepted: Vec<String>) -> Result<(), Error> {
-        assert!(
-            host::client::get_sender() == "config",
-            "reg_res_provider can only be called by config"
-        );
+        assert_caller(&["config"], "reg_res_provider");
         let app = AccountNumber::from_exact(&app)
             .map_err(|e| ErrorType::ConversionError(e.to_string()))?;
         VirtualServer::add_to_tx().reg_res_provider(app, accepted);
@@ -125,10 +122,7 @@ impl Admin for VirtualServerPlugin {
     }
 
     fn unreg_res_provider() -> Result<(), Error> {
-        assert!(
-            host::client::get_sender() == "config",
-            "unreg_res_provider can only be called by config"
-        );
+        assert_caller(&["config"], "unreg_res_provider");
         VirtualServer::add_to_tx().unreg_res_provider();
         Ok(())
     }

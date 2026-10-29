@@ -55,7 +55,7 @@ export function NavUser() {
     const { data: user, isPending: isPendingUser } = useCurrentUser();
     const { data: profile } = useProfile(user, true);
     const {
-        systemTokenUntransferable,
+        restrictsSelfService,
         isLoading: isNetworkLoading,
         billingEnabled,
         isTransferable,
@@ -66,7 +66,7 @@ export function NavUser() {
     const showCreateInvite =
         !isNetworkLoading &&
         !(balanceGatesInvites && isBalanceLoading) &&
-        !systemTokenUntransferable;
+        !restrictsSelfService;
     const inviteNeedsBalance = balanceGatesInvites && !hasBalance;
 
     const { mutateAsync: logout } = useLogout();

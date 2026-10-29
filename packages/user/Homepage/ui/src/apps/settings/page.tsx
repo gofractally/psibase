@@ -13,14 +13,14 @@ export const SettingsPage = () => {
     const { data: currentUser } = useCurrentUser();
     const {
         billingEnabled,
-        systemTokenUntransferable,
+        restrictsSelfService,
         isLoading: isNetworkLoading,
     } = useSystemTokenPolicy();
     const { hasBalance, isLoading: isBalanceLoading } = useSystemTokenBalance();
 
     const zeroBalance = !!currentUser && !hasBalance;
     const waitingForBalance =
-        !!currentUser && !systemTokenUntransferable && isBalanceLoading;
+        !!currentUser && !restrictsSelfService && isBalanceLoading;
     const showSelfService =
         !!systemToken &&
         billingEnabled &&
@@ -34,9 +34,9 @@ export const SettingsPage = () => {
                 {showSelfService && (
                     <div className="border-t pt-8">
                         <UserSettingsSection
-                            readOnly={systemTokenUntransferable || zeroBalance}
+                            readOnly={restrictsSelfService || zeroBalance}
                             disabledMessage={
-                                !systemTokenUntransferable && zeroBalance
+                                !restrictsSelfService && zeroBalance
                                     ? "You need a system token balance before you can refill or resize your tank."
                                     : undefined
                             }
