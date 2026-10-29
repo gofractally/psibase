@@ -15,7 +15,7 @@ use psibase::services::{
 };
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions, fetch_packages,
-    get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
+    get_installed_manifest, get_local_manifest, get_manifest, get_package_sources, get_schemas,
     get_tapos_for_head, login_action, new_account_action, new_account_key_action,
     new_account_owned_action, preapprove_action, push_transaction, push_transaction_optimistic,
     push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
@@ -1243,10 +1243,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         args.compression_level,
     )?;
 
-    let mut schemas = SchemaMap::new();
-    for package in &packages {
-        package.get_all_schemas(&mut schemas)?;
-    }
+    let mut schemas = get_schemas(&packages);
     let mut afmt = ActionFormatter::with_schemas(schemas, NullSchemaFetcher);
 
     let num_transactions: usize = groups.iter().map(|group| group.1.len()).sum();

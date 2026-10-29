@@ -14,10 +14,11 @@ use events::{
     parse_event_attr, process_event_callers, process_event_name, process_event_schema, EventType,
 };
 use graphql::{process_gql_union, process_gql_union_member};
+use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::quote;
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 use syn::{parse_quote, AttrStyle, Attribute, Item, ItemMod, ReturnType};
 
 pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -95,7 +96,7 @@ fn process_mod(
     if let Some((_, items)) = &mut impl_mod.content {
         let mut action_fns: Vec<usize> = Vec::new();
         let mut non_action_fns: Vec<usize> = Vec::new();
-        let mut event_fns = HashMap::new();
+        let mut event_fns = IndexMap::new();
         let pa_ret = check_for_pre_action(&mut pre_action_info, items);
         if pa_ret.is_err() {
             return pa_ret.err().unwrap();

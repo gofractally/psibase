@@ -872,6 +872,25 @@ namespace SystemService
       systemWriteBudget = numBytes;
    }
 
+   namespace
+   {
+      std::vector<AccountNumber> remainingWork;
+   }
+
+   void Transact::setWork(bool work)
+   {
+      auto sender = getSender();
+      if (work)
+      {
+         if (!std::ranges::contains(remainingWork, sender))
+            remainingWork.push_back(sender);
+      }
+      else
+      {
+         std::erase(remainingWork, sender);
+      }
+   }
+
    static void processTransactionImpl(
        psio::view<const psio::shared_view_ptr<psibase::Transaction>> arg,
        bool                                                          speculative)
@@ -980,6 +999,9 @@ namespace SystemService
 
       trxData = std::span<const char>{};
       trxSender.reset();
+
+      if (!remainingWork.empty())
+         abortMessage(std::format("Work not completed: {}", remainingWork[0].str()));
    }
 
    void Transact::execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
