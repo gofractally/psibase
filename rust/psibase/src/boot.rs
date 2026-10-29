@@ -1,9 +1,10 @@
 use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
-    get_schemas, method_raw, new_account_action, set_key_action, validate_dependencies,
-    AccountNumber, Action, AnyPublicKey, Claim, EssentialServices, GenesisActionData, MethodNumber,
-    PackageList, PackageOrigin, PackagedService, Producer, SchemaMap, ServiceWrapper,
-    SignedTransaction, Tapos, TimePointSec, Transaction, TransactionBuilder,
+    account_raw, get_schemas, method_raw, new_account_action, set_key_action,
+    validate_dependencies, AccountNumber, Action, AnyPublicKey, Claim, EssentialServices,
+    GenesisActionData, MethodNumber, PackageList, PackageOrigin, PackagedService, Producer,
+    SchemaMap, ServiceWrapper, SignedTransaction, Tapos, TimePointSec, Transaction,
+    TransactionBuilder,
 };
 use fracpack::Pack;
 use sha2::{Digest, Sha256};
@@ -233,6 +234,17 @@ pub fn get_initial_actions<
     }
     for act in actions {
         builder.push(act)?;
+    }
+
+    // FractalGen::create_frac assigns root → core-fract during postinstall, but
+    // that runs before root exists and is overwritten by the producer owner
+    // above (needed so commit_install can run as root). Re-apply the handoff
+    // after commits so fractal-governed boots leave root owned by core-fract.
+    if service_packages.iter().any(|s| s.name() == "FractalGen") {
+        builder.push(
+            auth_delegate::Wrapper::pack_from(producers::ROOT)
+                .setOwner(AccountNumber::new(account_raw!("core-fract"))),
+        )?;
     }
 
     builder.push(transact::Wrapper::pack().finishBoot())?;
