@@ -194,10 +194,7 @@ pub fn get_initial_actions<
     if let Some(key) = tx_signing_key {
         builder.push(set_key_action(initial_producer, key))?;
         builder.push(set_auth_service_action(initial_producer, auth_sig::SERVICE))?;
-    } else if service_packages
-        .iter()
-        .any(|package| package.has_service(auth_any::SERVICE))
-    {
+    } else {
         builder.push(set_auth_service_action(initial_producer, auth_any::SERVICE))?;
     }
 
