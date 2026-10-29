@@ -200,22 +200,22 @@ impl Invite for HomepagePlugin {
 impl VirtualServer for HomepagePlugin {
     fn fill_gas_tank() -> Result<(), Error> {
         assert_caller_self();
-        virtual_server::plugin::billing::fill_gas_tank()
+        vserver::plugin::billing::fill_gas_tank()
     }
 
     fn resize_and_fill_gas_tank(new_capacity: String) -> Result<(), Error> {
         assert_caller_self();
-        virtual_server::plugin::billing::resize_and_fill_gas_tank(&new_capacity)
+        vserver::plugin::billing::resize_and_fill_gas_tank(&new_capacity)
     }
 
-    fn get_billing_config() -> Result<virtual_server::plugin::types::BillingConfig, Error> {
+    fn get_billing_config() -> Result<vserver::plugin::types::BillingConfig, Error> {
         assert_caller_self();
-        virtual_server::plugin::authorized::get_billing_config()
+        vserver::plugin::authorized::get_billing_config()
     }
 
     fn graphql(query: String) -> Result<String, Error> {
         assert_caller_self();
-        virtual_server::plugin::authorized::graphql(&query)
+        vserver::plugin::authorized::graphql(&query)
     }
 }
 

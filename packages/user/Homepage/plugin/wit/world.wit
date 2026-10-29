@@ -64,7 +64,7 @@ interface invite {
 
 interface virtual-server {
     use host:types/types.{error};
-    use virtual-server:plugin/types.{billing-config};
+    use vserver:plugin/types.{billing-config};
 
     fill-gas-tank: func() -> result<_, error>;
     resize-and-fill-gas-tank: func(new-capacity: string) -> result<_, error>;

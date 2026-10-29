@@ -3441,30 +3441,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
-name = "virtual-server"
-version = "0.29.0"
-dependencies = [
- "async-graphql",
- "p256",
- "pem",
- "psibase",
- "psibase-system-workspace-hack",
- "psibase_macros",
- "psibase_service",
- "rand",
- "serde",
- "serde-aux",
- "serde_json",
- "virtual-server-pkg",
-]
-
-[[package]]
 name = "virtual-server-pkg"
 version = "0.29.0"
 dependencies = [
  "psibase-system-workspace-hack",
- "virtual-server",
  "virtual-server-plugin",
+ "vserver",
 ]
 
 [[package]]
@@ -3479,8 +3461,26 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
- "virtual-server",
+ "vserver",
  "wit-bindgen-rt",
+]
+
+[[package]]
+name = "vserver"
+version = "0.29.0"
+dependencies = [
+ "async-graphql",
+ "p256",
+ "pem",
+ "psibase",
+ "psibase-system-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "rand",
+ "serde",
+ "serde-aux",
+ "serde_json",
+ "virtual-server-pkg",
 ]
 
 [[package]]

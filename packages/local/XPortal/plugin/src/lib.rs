@@ -48,7 +48,7 @@ impl Api for XPortalPlugin {
 
     fn send_resources(amount: String) -> Result<(), Error> {
         assert_eq!(get_sender(), get_receiver());
-        virtual_server::plugin::billing::donate_gas(AC_CREATOR, &amount)?;
+        vserver::plugin::billing::donate_gas(AC_CREATOR, &amount)?;
         Ok(())
     }
 

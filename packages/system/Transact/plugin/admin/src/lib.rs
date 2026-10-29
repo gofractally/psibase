@@ -13,7 +13,7 @@ mod types;
 
 use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
-use virtual_server::plugin::transact as VirtualServer;
+use vserver::plugin::transact as VirtualServer;
 
 use exports::transact::admin::admin::Guest as Admin;
 

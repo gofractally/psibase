@@ -29,6 +29,6 @@ world impl {
     import tokens:plugin/user-config;
     import tokens:plugin/helpers;
     import tokens:plugin/user;
-    import virtual-server:plugin/billing;
+    import vserver:plugin/billing;
     export api;
 }
