@@ -11,7 +11,6 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
-    AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
@@ -20,7 +19,6 @@ import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -66,7 +64,7 @@ export const NodeAdminsContent = () => {
                 formApi.reset();
                 toast({
                     title: "Node admin added",
-                    description: `${account} can now administer this node.`,
+                    description: `${account} is now a node admin`,
                 });
             } catch {
                 toast({
@@ -82,7 +80,7 @@ export const NodeAdminsContent = () => {
             await setAdminAccount({ account, admin: false });
             toast({
                 title: "Node admin removed",
-                description: `${account} can no longer administer this node.`,
+                description: `${account} is no longer a node admin`,
             });
         } catch {
             toast({
@@ -93,7 +91,6 @@ export const NodeAdminsContent = () => {
     };
 
     const admins = adminAccounts ?? [];
-    const isRemovingLastAdmin = admins.length === 1;
 
     return (
         <>
@@ -118,10 +115,6 @@ export const NodeAdminsContent = () => {
                     >
                         <DialogHeader>
                             <DialogTitle>Add node admin</DialogTitle>
-                            <DialogDescription>
-                                Allow an on-chain account to administer this
-                                node.
-                            </DialogDescription>
                         </DialogHeader>
                         <div className="py-4">
                             <FieldAccountExisting
@@ -158,18 +151,6 @@ export const NodeAdminsContent = () => {
                         <AlertDialogTitle>
                             Remove {pendingRemoval} as a node admin?
                         </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            If you are signed in as {pendingRemoval} from
-                            another machine, you will lose access to this node.
-                        </AlertDialogDescription>
-                        {isRemovingLastAdmin && (
-                            <AlertDialogDescription>
-                                This is the last node admin account. Afterward,
-                                this node can only be administered from an
-                                allowed admin IP address (such as localhost) or
-                                with HTTP basic auth credentials.
-                            </AlertDialogDescription>
-                        )}
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -192,9 +173,6 @@ export const NodeAdminsContent = () => {
                     <h3 className="text-lg font-semibold tracking-tight">
                         Node admins
                     </h3>
-                    <p className="text-muted-foreground text-sm">
-                        On-chain accounts allowed to administer this node.
-                    </p>
                 </div>
                 {admins.length !== 0 && (
                     <Button
@@ -222,7 +200,6 @@ export const NodeAdminsContent = () => {
                     buttonLabel="Add node admin"
                     onButtonClick={() => setShowAddAdmin(true)}
                     title="No node admins"
-                    description="Add an on-chain account to allow it to administer this node."
                 />
             ) : (
                 <Table>
