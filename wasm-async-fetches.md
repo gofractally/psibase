@@ -272,14 +272,53 @@ Invariants to keep: prompts must still be exclusive (one prompt at a time); tx a
 ### Risks
 
 - jco JSPI support is flagged experimental, so expect codegen bugs like #2308. Pin the version and add Supervisor-level tests.
-- Browsers without JSPI (Safari/iOS < 27) would fail at instantiate unless a sync fallback is kept. Keeping two paths doubles the test surface.
+- Browsers without JSPI (Safari/iOS < 27) run the retained sync XHR / localStorage fallback (decided above). Keeping two paths doubles the test surface, and both must stay behavior-compatible.
 - Error semantics: traps/rejections through promising exports may change how `getRecoverableError` and `PromptSignal` are detected.
-- localStorage → IndexedDB data migration: users lose plugin state if the migration fails, and private-mode IDB quirks are a concern.
+- localStorage → IndexedDB data migration (JSPI path only): users lose plugin state if the migration fails, and private-mode IDB quirks are a concern. Because the fallback stays on localStorage, the two backends must hold the same logical data, and a user who moves between a JSPI and a non-JSPI browser must not see diverging state.
 - Async adds interleaving points. Even with the global queue, UI-side events (e.g. logout) can now run mid-entry.
 
 ### Open questions
 
-- Drop browsers without JSPI, or keep the sync XHR/localStorage path behind feature detection?
-- Is the long-term target JSPI (sync WIT) or CM async (`async func`)? Only CM async gives in-call parallel fetches.
-- Do we need any concurrency beyond option 1, and is there a concrete use case for it?
-- Should crypto imports move to async SubtleCrypto in the same wave?
+**Resolved (2026-10-29):** JSPI is the primary path everywhere it is supported. The sync XHR / localStorage path is kept as the fallback for browsers without JSPI. No browser/UA sniffing: the Supervisor uses JSPI where it is available and the sync path where it is not.
+
+**Resolved (2026-10-29), concurrency beyond option 1:** the global one-at-a-time queue is fine for this round of work. **Deferred:** eventually allow multiple entries or separate instances to run concurrently, so one call paused on a fetch doesn't block the next. That is out of scope for the current three-step JSPI work.
+
+**Resolved (2026-10-29), long-term target:** component-model async (`async func`, WASI Preview 3) is the long-term target, since only it gives in-call parallel fetches. **Deferred** until the Wasm standard supports it; current work stays on the JSPI core-module path.
+
+**Resolved (2026-10-29), crypto imports:** **Deferred.** Moving crypto imports to async SubtleCrypto is not part of this round.
+
+
+## Playwright e2e harness plan
+
+### Open items
+1. **Measure devnet boot time (on a typical dev machine and in a CI-like environment) before committing to a pool of pre-warmed chains.** This is unprofiled; booting a chain per spec could add minutes per run.
+2. Deferred: open up the Supervisor's global queue to allow concurrent plugin entries / separate instances for multi-call parallelism.
+3. Deferred: move to component-model async (WASI Preview 3) when the Wasm standard supports it.
+4. Deferred: move crypto imports to async SubtleCrypto.
+
+### Plan
+- **Scope: local development only for now.** This harness is a facility for developers to run on their own machines. Do not add it to CI yet; CI integration is a future decision.
+- **Location:** a top-level `e2e/` directory, shared team-wide, not inside the Supervisor package.
+- **Browsers:** Chromium first (JSPI available), plus WebKit to cover current Safari. Pin browser versions.
+- **Parallelism:** Chromium and WebKit run in parallel as separate CI-style jobs, each with its own isolated chain / pool slot and no shared ports or endpoints. Per-job isolation is what makes parallel runs safe.
+- **Chain:** a fresh local devnet per run is problematic (test package install and chain state), so prefer a pool of pre-warmed chains, pending the boot-time measurement above.
+- **Keys:** no CI secrets. Each test uses throwaway keypairs: create, fund, use, discard.
+- **Layout:** shared root config and fixtures, with per-package spec subdirectories globbed in.
+- **Fixtures:**
+  - Boot the Supervisor in the page against the job's chain.
+  - Load any plugin by service/plugin id.
+  - Drive the bridge from the test side (issue `send-request` / database calls and observe results).
+  - A sleep-and-timestamp fixture plugin: each call sleeps for a given time and returns start/end timestamps, so fetch overlap can be proven without real network.
+- **One run command** for the whole suite.
+- **PR sequencing:** a harness PR first, including at least one smoke test proving the harness boots (chain up, Supervisor loaded, one plugin call succeeds), then stacked PRs, one per async piece. Develop both in one working tree and selectively stage into two commits.
+
+### Coverage split
+- **Vitest in happy-dom (existing tooling)** covers the async plumbing: ordering of entry / start-tx / call / finish-tx, the queue holding while a fetch is pending, prompt unwind through an async call, rejected fetches mapping to the right errors, and a fake async bridge including the localStorage → IndexedDB migration. It cannot exercise real JSPI.
+- **Playwright plus a jco-built test plugin** is needed for real JSPI suspension. Pair it with a mock HTTP server that delays each request by a different amount, so parallelism shows up in the order responses finish.
+- **Also:** add a CI step for the existing Vitest suite, which today is only run by hand.
+
+### Recommended new e2e tests
+- **Concurrent fetches:** overlapping fetches overlap in wall-clock time instead of serializing (total time close to the longest delay, not the sum).
+- **Correctness vs blocking:** responses match what the blocking fetch returns today, with no reordering surprises.
+- **Database ops:** get / set / remove go through the same async path and return the same results.
+- **JSPI-less fallback:** in an environment without JSPI, the suite still runs and passes on the retained sync XHR / localStorage fallback, with the same results as the JSPI path (overlap assertions are skipped there).
