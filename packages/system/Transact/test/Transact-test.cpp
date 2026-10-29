@@ -29,12 +29,6 @@ namespace
       return AuthSig::PrivateKeyInfo{AuthSig::parsePrivateKeyInfo(param)};
    };
 
-   void ensureAuthNone(DefaultTestChain& t)
-   {
-      if (!t.kvGet<CodeRow>(CodeRow::db, codeKey(AuthNone::service)))
-         t.addService<AuthNone>("AuthNone.wasm");
-   }
-
    auto aliceKeys =
        KeyPair{pubFromPem("-----BEGIN PUBLIC KEY-----\n"
                           "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWdALpn+cGuD1klsSRXTdapYlG5mu\n"
@@ -478,7 +472,6 @@ TEST_CASE("Test runAs")
    t.addService<AuthTest>("AuthTest.wasm");
    SECTION("subaccount can be authorized by base account")
    {
-      ensureAuthNone(t);
       auto alice1 = AccountNumber("alice+1");
       REQUIRE(t.from(alice)
                   .to<Accounts>()
@@ -508,14 +501,12 @@ TEST_CASE("Test runAs")
       }
       SECTION("or left")
       {
-         ensureAuthNone(t);
          REQUIRE(t.to<AuthTest>().newAccount(bob, std::vector{alice}, 1).succeeded());
          t.addAccount(carol, AuthNone::service);
          REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());
       }
       SECTION("or right")
       {
-         ensureAuthNone(t);
          t.addAccount(bob, AuthNone::service);
          REQUIRE(t.to<AuthTest>().newAccount(carol, std::vector{alice}, 1).succeeded());
          REQUIRE(t.to<AuthTest>().newAccount(dave, std::vector{bob, carol}, 1).succeeded());

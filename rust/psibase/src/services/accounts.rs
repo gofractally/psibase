@@ -82,11 +82,6 @@ mod service {
         unimplemented!()
     }
 
-    #[action]
-    fn isFrozen(accounts: Vec<AccountNumber>) -> bool {
-        unimplemented!()
-    }
-
     #[event(history)]
     fn froze(account: AccountNumber, memo: Option<String>) {}
 

@@ -111,7 +111,7 @@ impl Admin for AccountsPlugin {
             Accounts::action_structs::freeze::ACTION_NAME,
             &Accounts::action_structs::freeze {
                 accounts,
-                memo: Some(memo),
+                memo: (!memo.is_empty()).then_some(memo),
             }
             .packed(),
         )?;
@@ -125,7 +125,7 @@ impl Admin for AccountsPlugin {
             Accounts::action_structs::unfreeze::ACTION_NAME,
             &Accounts::action_structs::unfreeze {
                 accounts,
-                memo: Some(memo),
+                memo: (!memo.is_empty()).then_some(memo),
             }
             .packed(),
         )?;

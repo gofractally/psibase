@@ -227,17 +227,6 @@ namespace SystemService
       }
    }
 
-   bool Accounts::isFrozen(std::vector<AccountNumber> accounts)
-   {
-      auto frozen = open<FrozenTable>(KvMode::read);
-      for (auto account : accounts)
-      {
-         if (frozen.get(account))
-            return true;
-      }
-      return false;
-   }
-
 }  // namespace SystemService
 
 PSIBASE_DISPATCH(SystemService::Accounts)

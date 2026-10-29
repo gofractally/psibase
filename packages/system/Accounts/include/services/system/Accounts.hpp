@@ -152,9 +152,6 @@ namespace SystemService
       /// Sender must be the accounts service.
       void unfreeze(std::vector<psibase::AccountNumber> accounts, std::optional<std::string> memo);
 
-      /// True if any of these accounts is frozen
-      bool isFrozen(std::vector<psibase::AccountNumber> accounts);
-
       struct Events
       {
          struct History
@@ -179,7 +176,6 @@ namespace SystemService
                 method(incAuthSeq, name),
                 method(freeze, accounts, memo),
                 method(unfreeze, accounts, memo),
-                method(isFrozen, accounts),
                 //
    )
 

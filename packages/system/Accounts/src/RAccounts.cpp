@@ -86,18 +86,11 @@ namespace SystemService
                           std::optional<std::string> before,
                           std::optional<std::string> after) const
       {
-         using AccountConnection = Connection<Account, "AccountConnection", "AccountEdge">;
-         Accounts::Tables tables{Accounts::service};
-         auto             accounts = tables.open<AccountTable>();
-         auto             frozen   = tables.open<FrozenTable>().getIndex<0>();
-         return makeConnection<AccountConnection>(
-             frozen, {}, {}, {}, {}, first, last, before, after,
-             [&](const FrozenAccount& row)
-             {
-                auto account = accounts.get(row.account);
-                check(account.has_value(), "account " + row.account.str() + " does not exist");
-                return *account;
-             });
+         using FrozenConnection =
+             Connection<FrozenAccount, "FrozenAccountConnection", "FrozenAccountEdge">;
+         auto index = Accounts::Tables{Accounts::service}.open<FrozenTable>().getIndex<0>();
+         return makeConnection<FrozenConnection>(index, {}, {}, {}, {}, first, last, before,
+                                                 after);
       }
    };
    PSIO_REFLECT(AccountsQuery,
