@@ -107,7 +107,7 @@ export const formatTokenAmount = (raw: string, token: SystemTokenInfo) =>
 
 const zSignupView = z.discriminatedUnion("state", [
     z.object({ state: z.literal("pending") }),
-    z.object({ state: z.literal("queued") }),
+    z.object({ state: z.literal("queued"), retrying: z.boolean() }),
     z.object({ state: z.literal("invited"), token: z.string() }),
     z.object({ state: z.literal("redeemed") }),
     z.object({ state: z.literal("failed") }),

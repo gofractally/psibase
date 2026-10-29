@@ -85,6 +85,7 @@ namespace xportal
    SocketEndpoint nodeEndpoint();
    void pushAgentTx(std::vector<Action> actions, Checksum256 signup);
    std::optional<std::string> pushError(const HttpReply& reply);
+   bool pushInFlight(const Checksum256& id);
    void applySignupResult(const Checksum256& id, const std::string* error);
    void finishPush(std::int32_t socket, std::optional<std::string> error);
    bool xConfigured(const XConfig& x);

@@ -341,6 +341,24 @@ TEST_CASE("provision commits one attempt before signing")
    auto attempt = XPortal{}.open<ProvisionAttemptTable>().get(row->id);
    REQUIRE(attempt.has_value());
    CHECK(attempt->retry_at.has_value());
+   auto queued =
+       t.http<std::vector<AdminSignup>>(forwarded("GET", "/admin/signups?state=queued", token));
+   REQUIRE(queued.size() == 1);
+   CHECK(queued[0].id == created.signup_id);
+   CHECK(queued[0].attempts == 1);
+   CHECK(queued[0].last_error == "signing aborted");
+   CHECK(!queued[0].awaiting_reply);
+   REQUIRE(queued[0].next_retry.has_value());
+   auto until = *queued[0].next_retry -
+                std::chrono::time_point_cast<MicroSeconds>(std::chrono::system_clock::now());
+   CHECK(until > std::chrono::seconds{20});
+   CHECK(until < std::chrono::seconds{40});
+   auto waitingReply =
+       t.http(withSession(forwarded("GET", "/signup/" + created.signup_id), "owner"));
+   CHECK(replyText(waitingReply).find("signing aborted") == std::string::npos);
+   auto waiting = unpackReply<SignupView>(std::move(waitingReply));
+   CHECK(waiting.state == "queued");
+   CHECK(waiting.retrying);
    auto again =
        runAs(t, XTimer::service, XPortal::service, "provision", std::tuple{std::uint64_t{0}});
    CHECK(!again.error.has_value());

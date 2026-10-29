@@ -85,6 +85,10 @@ const zAdminSignup = z.object({
     state: z.string(),
     attempts: z.number(),
     last_error: z.string(),
+    /** Wall time of a scheduled provisioning retry. */
+    next_retry: z.string().nullish(),
+    /** A provisioning transaction has no final reply yet. */
+    awaiting_reply: z.boolean(),
     stripe_session_id: z.string().nullish(),
     created: z.string(),
 });
@@ -157,7 +161,7 @@ export const adminConfigKey = ["admin-config"] as const;
 export const portalStatusKey = ["portal-status"] as const;
 export const agentsKey = ["admin-agents"] as const;
 
-export type SignupListState = "invited" | "redeemed" | "failed";
+export type SignupListState = "invited" | "redeemed" | "failed" | "queued";
 
 /** Active-mode signups in `state`, newest first. */
 export const getAdminSignups = (state: SignupListState) =>

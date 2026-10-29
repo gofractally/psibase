@@ -31,9 +31,9 @@ const utcTime = new Intl.DateTimeFormat("sv-SE", {
     hourCycle: "h23",
 });
 
-const formatUtc = (iso: string) => {
-    const parsed = new Date(iso);
-    if (Number.isNaN(parsed.getTime())) return iso;
+const formatUtc = (iso: string | Date) => {
+    const parsed = typeof iso === "string" ? new Date(iso) : iso;
+    if (Number.isNaN(parsed.getTime())) return String(iso);
     return `${utcTime.format(parsed)} UTC`;
 };
 
@@ -61,6 +61,21 @@ const stripeSessionUrl = (
 
 const byNewest = (rows: AdminSignup[]) =>
     [...rows].sort((a, b) => b.created.localeCompare(a.created));
+
+/** Awaiting a push reply, a due retry, or the time the next retry runs. */
+const queueTiming = (row: AdminSignup) => {
+    if (row.awaiting_reply) return "Awaiting reply";
+    if (!row.next_retry) return "";
+    const at = new Date(row.next_retry);
+    if (Number.isNaN(at.getTime())) return row.next_retry;
+    // The scheduled time has passed and the attempt has not started.
+    if (at.getTime() <= Date.now()) return "Due";
+    return formatUtc(at);
+};
+
+/** Interrupted after a restart: nothing in this session will run it. */
+const retryWaiting = (row: AdminSignup) =>
+    !row.awaiting_reply && !row.next_retry && row.attempts > 0;
 
 const ListMessage = ({
     error,
@@ -120,6 +135,11 @@ export const RequestLists = ({
         queryFn: () => getAdminSignups("failed"),
         retry: false,
     });
+    const queued = useQuery({
+        queryKey: [...adminSignupsKey, "queued"],
+        queryFn: () => getAdminSignups("queued"),
+        retry: false,
+    });
     const retry = useMutation({
         mutationFn: retrySignup,
         onSuccess: () => {
@@ -167,6 +187,84 @@ export const RequestLists = ({
                                             {tierLabel(row.tier, tiers)}
                                         </TableCell>
                                         <TableCell>{row.state}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </div>
+            </AdminSection>
+
+            <AdminSection title="Queued requests">
+                <div className="rounded-lg border">
+                    <ListMessage
+                        error={queued.error}
+                        empty="No queued requests."
+                        rows={queued.data}
+                        pending={queued.isPending && !queued.error}
+                    />
+                    {queued.data && queued.data.length > 0 && (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Time</TableHead>
+                                    <TableHead>Handle</TableHead>
+                                    <TableHead>Signup</TableHead>
+                                    <TableHead>Tier</TableHead>
+                                    <TableHead>Tries</TableHead>
+                                    <TableHead>Error</TableHead>
+                                    <TableHead>Next</TableHead>
+                                    <TableHead />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {queued.data.map((row) => (
+                                    <TableRow key={row.id}>
+                                        <TableCell className="whitespace-nowrap">
+                                            {formatUtc(row.created)}
+                                        </TableCell>
+                                        <TableCell>{row.handle}</TableCell>
+                                        <TableCell className="max-w-56 break-all font-mono text-xs">
+                                            {row.id}
+                                        </TableCell>
+                                        <TableCell>
+                                            {tierLabel(row.tier, tiers)}
+                                        </TableCell>
+                                        <TableCell>{row.attempts}</TableCell>
+                                        <TableCell className="whitespace-pre-wrap break-words">
+                                            {row.last_error}
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            {queueTiming(row)}
+                                        </TableCell>
+                                        <TableCell className="space-x-3 whitespace-nowrap text-right">
+                                            {retryWaiting(row) && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={retry.isPending}
+                                                    onClick={() =>
+                                                        retry.mutate(row.id)
+                                                    }
+                                                >
+                                                    Retry
+                                                </Button>
+                                            )}
+                                            {row.stripe_session_id && (
+                                                <a
+                                                    className="text-sm underline"
+                                                    href={stripeSessionUrl(
+                                                        row.stripe_session_id,
+                                                        mode,
+                                                    )}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    Stripe
+                                                </a>
+                                            )}
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -238,13 +336,11 @@ export const RequestLists = ({
                             </TableBody>
                         </Table>
                     )}
-                    {retry.error && (
-                        <p className="text-destructive px-4 py-3 text-sm">
-                            {errorText(retry.error)}
-                        </p>
-                    )}
                 </div>
             </AdminSection>
+            {retry.error && (
+                <p className="text-destructive text-sm">{errorText(retry.error)}</p>
+            )}
         </>
     );
 };

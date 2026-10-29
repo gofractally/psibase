@@ -373,17 +373,21 @@ namespace LocalService
    };
 
    /// `GET /signup/:id`. `token` is set only once the invite is created.
-   /// A failed signup carries no error text.
+   /// A failed signup carries no error text. `retrying` is true once a
+   /// queued signup has finished a provisioning attempt without an invite.
    struct SignupView
    {
       std::string                state;
       std::optional<std::string> token;
-      PSIO_REFLECT(SignupView, state, token)
+      bool                       retrying = false;
+      PSIO_REFLECT(SignupView, state, token, retrying)
    };
 
-   /// One row of `GET /admin/signups?state=invited|redeemed|failed`.
+   /// One row of `GET /admin/signups?state=invited|redeemed|failed|queued`.
    /// `tier` is unset for the free tier. `handle` is that X user's name.
-   /// Rows are the active Stripe mode, newest first.
+   /// Rows are the active Stripe mode, newest first. `next_retry` is the
+   /// wall time of a scheduled provisioning retry, and is unset while
+   /// `awaiting_reply` or when no retry is scheduled.
    struct AdminSignup
    {
       std::string                           id;
@@ -393,6 +397,8 @@ namespace LocalService
       std::string                           state;
       uint32_t                              attempts = 0;
       std::string                           last_error;
+      std::optional<psibase::TimePointUSec> next_retry;
+      bool                                  awaiting_reply = false;
       std::optional<std::string>            stripe_session_id;
       psibase::TimePointUSec                created;
       PSIO_REFLECT(AdminSignup,
@@ -403,6 +409,8 @@ namespace LocalService
                    state,
                    attempts,
                    last_error,
+                   next_retry,
+                   awaiting_reply,
                    stripe_session_id,
                    created)
    };
@@ -508,8 +516,12 @@ namespace LocalService
    ///
    /// `GET /signup/:id` returns `SignupView` to the owning X session. No
    /// session is 401; anything else that is not that session's signup is 404.
-   /// `GET /admin/signups?state=invited|redeemed|failed` returns `AdminSignup`
-   /// rows of the active mode for an administrator, newest first.
+   /// `retrying` is true once a queued signup has finished a provisioning
+   /// attempt without an invite.
+   /// `GET /admin/signups?state=invited|redeemed|failed|queued` returns
+   /// `AdminSignup` rows of the active mode for an administrator, newest
+   /// first. On a queued row, `next_retry` is the scheduled retry's wall
+   /// time and is unset while `awaiting_reply`.
    /// `POST /admin/signups/:id/retry` requeues an interrupted `queued` signup
    /// after a node restart, preserving its invite and attempt count, and
    /// reruns provisioning for a `failed` signup from attempt zero. A failed

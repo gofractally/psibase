@@ -76,12 +76,20 @@ export const CreatingStep = ({
         onSignedOut,
     ]);
 
+    const retrying = signup?.state === "queued" && signup.retrying;
+
     return (
         <PageContainer className="space-y-6">
             <div>
-                <h2 className="text-lg font-medium">Getting things ready...</h2>
+                <h2 className="text-lg font-medium">
+                    {retrying
+                        ? "Still getting your account ready"
+                        : "Getting things ready..."}
+                </h2>
                 <p className="text-muted-foreground text-sm">
-                    This should only take a few seconds.
+                    {retrying
+                        ? "We'll keep trying automatically."
+                        : "This should only take a few seconds."}
                 </p>
             </div>
             <div className="bg-muted/40 flex items-center justify-center rounded-lg border px-6 py-10">

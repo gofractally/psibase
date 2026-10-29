@@ -3,6 +3,7 @@
 #include "XPortalDetail.hpp"
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <psibase/dispatch.hpp>
 #include <services/local/XAdmin.hpp>
@@ -27,8 +28,25 @@ namespace xportal
       SignupView view{.state = stored.state};
       if (stored.state == stateInvited)
          view.token = stored.token;
+      // The first push is still the initial attempt. A later push, or a
+      // finished attempt with no invite yet, is a retry.
+      view.retrying = stored.state == stateQueued &&
+                      (stored.attempts > 1 ||
+                       (stored.attempts == 1 && !pushInFlight(stored.id)));
       return view;
    }
+
+   namespace
+   {
+      // Wall time of a scheduled `retry_at`. Unset when none is scheduled.
+      std::optional<TimePointUSec> scheduledRetry(const Checksum256& id)
+      {
+         auto attempt = XPortal{}.open<ProvisionAttemptTable>().get(id);
+         if (!attempt || !attempt->retry_at)
+            return std::nullopt;
+         return wallNow() + (*attempt->retry_at - monotonicNow());
+      }
+   }  // namespace
 
    // Records the chain account for every invited signup that has one.
    // An invite that is gone, or that this agent did not create, stays invited.
@@ -75,14 +93,17 @@ namespace xportal
       auto id = parseSignupId(idText);
       if (!id)
          return textError(req, HttpStatus::badRequest, "invalid signup id\n");
-      std::optional<Signup> stored;
+      std::optional<SignupView> view;
       PSIBASE_SUBJECTIVE_TX
       {
-         stored = XPortal{}.open<SignupTable>().get(*id);
+         view.reset();
+         if (auto stored = XPortal{}.open<SignupTable>().get(*id);
+             stored && stored->x_id && *stored->x_id == session->x_id)
+            view = signupView(*stored);
       }
-      if (!stored || !stored->x_id || *stored->x_id != session->x_id)
+      if (!view)
          return textError(req, HttpStatus::notFound, "signup not found\n");
-      return jsonBody(req, signupView(*stored));
+      return jsonBody(req, *view);
    }
 
    HttpReply serveRedeemed(const HttpRequest& req, std::string_view idText)
@@ -192,9 +213,11 @@ namespace xportal
       if (req.method != "GET")
          return HttpReply::methodNotAllowed(req);
       auto state = req.query<SignupQuery>().state;
-      if (state != stateInvited && state != stateRedeemed && state != stateFailed)
+      static constexpr std::array<std::string_view, 4> signupStates{
+          stateInvited, stateRedeemed, stateFailed, stateQueued};
+      if (!std::ranges::contains(signupStates, std::string_view{state}))
          return textError(req, HttpStatus::badRequest,
-                          "state must be invited, redeemed, or failed\n");
+                          "state must be invited, redeemed, failed, or queued\n");
 
       auto                     mode = readConfig().mode;
       std::vector<AdminSignup> rows;
@@ -212,6 +235,14 @@ namespace xportal
                if (auto user = users.get(*row.x_id))
                   handle = user->handle;
             }
+            bool                          awaiting = false;
+            std::optional<TimePointUSec> next;
+            if (state == stateQueued)
+            {
+               awaiting = pushInFlight(row.id);
+               if (!awaiting)
+                  next = scheduledRetry(row.id);
+            }
             rows.push_back(AdminSignup{.id                = signupId(row.id),
                                        .handle            = std::move(handle),
                                        .account           = row.account,
@@ -219,6 +250,8 @@ namespace xportal
                                        .state             = row.state,
                                        .attempts          = row.attempts,
                                        .last_error        = row.last_error,
+                                       .next_retry        = next,
+                                       .awaiting_reply    = awaiting,
                                        .stripe_session_id = row.stripe_session_id,
                                        .created           = row.created});
          }
