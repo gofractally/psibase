@@ -45,6 +45,37 @@ Comment at the sync call site:
             const result = this.call(args);
 ```
 
+### Pipeline work for full async / parallel fetches
+
+Rows are app → server → app.
+
+- **Phase 1 (async):** JSPI + `fetch` + async `entry`, **entries stay serial** (global `serialize` kept). UI non-blocking; one in-flight plugin tree; fetches still one-at-a-time inside a call.
+- **Phase 2 (full parallelism):** only work that does **not** fall out of Phase 1 — multi-entry overlap and/or in-call overlapping fetches.
+
+NOTE on parllelism: parallism also introduces the spectre of a *few* compositions vying for memory at the same time, which puts us in nearly guaranteed danger of VAS OOM issues.
+
+| Point in the call flow | Phase 1 (async) | Phase 2 (full parallelism) |
+|------------------------|-----------------|----------------------------|
+| App UI: issue one or many `functionCall`s | ✅ already Promise/`postMessage` | ✅ — (UI can already fire many; Supervisor decides overlap) |
+| Supervisor iframe ingress (`addCallHandler`) | ✅ keep global `serialize` (one `entry` at a time) | drop/relax `serialize`; per-entry call stack / origination / prompt rules (**multi-entry**) |
+| `entry` + `start-tx` / `call` / `finish-tx` | `await` promising exports; still one open tx | per-entry tx construction (`OpenTx` / ephemeral DB isolation) (**multi-entry**) |
+| jco plugin export (`Plugin.call`) | JSPI `asyncExports` / `WebAssembly.promising` | ✅ — (promising already returns a Promise; overlap is an ingress/`entry` problem) |
+| Inter-plugin proxies (`syncCall*`) | compose full static plugin set to eliminate inter-plugin JS glue; `Suspending` on bridge (+ any leftover proxies)  ^[compose-vs-async-glue] | reentrancy-safe leftovers or separate instances if multi-entry shares a graph |
+| Guest `host:http` / `HttpRequest::send` | ✅ JSPI: keep sync-style Rust (blocks that stack until import resolves) | CM `async func` / WASIp3 so one call can await several fetches (**in-call**) |
+| Bridge WIT `send-request` | JSPI async import (WIT can stay `func`) | CM `async func` if WASIp3 guest path (**in-call**) |
+| `PluginHost.sendRequest` | sync XHR → `fetch` | ✅ — (`fetch` already concurrent once multiple requests are in flight) |
+| Network / server | ✅ — | ✅ — (already concurrent) |
+| Response → bridge → resume guest | ✅ JSPI resume of the single suspended stack | CM/WASIp3: complete whichever guest task the response belongs to (**in-call**) |
+| `finish-tx` → `replyToParent` → UI Promise | await async `finish-tx`; reply already async | multi-entry: each entry finishes/submits **its** tx, then its own reply |
+
+^[compose-vs-async-glue]: The real choices once the bridge can be async:
+
+1. **Compose** the static set → no JS between plugins; only bridge imports are async JS.
+2. **Keep separate instantiates** → every JS hop on a path to async I/O must go Suspending/async (async-`syncCall` across instances).
+3. **Keep sync JS glue** → bridge (and anything under it) must stay sync too.
+
+There isn’t a stable “async bridge + sync inter-plugin JS proxies” middle ground without blocking the thread or lying about the ABI.
+
 ---
 
 ## Constraints that keep us synchronous
@@ -295,6 +326,21 @@ Invariants to keep: prompts must still be exclusive (one prompt at a time); tx a
 2. Deferred: open up the Supervisor's global queue to allow concurrent plugin entries / separate instances for multi-call parallelism.
 3. Deferred: move to component-model async (WASI Preview 3) when the Wasm standard supports it.
 4. Deferred: move crypto imports to async SubtleCrypto.
+
+#### Why serial `entry` is a massive simplifier (re: open item 2)
+
+Keeping `entry` calls serial is not just a queue preference — it avoids inventing concurrent transaction construction.
+
+Today there is effectively **one open transaction** for the live plugin graph: `start-tx` → plugins append into `OpenTx` (a single ephemeral `host:db` bucket in `packages/system/Transact/plugin/shared/open_tx_table.rs`) → `finish-tx` takes/submits it. That ledger is process-global for the instance, not keyed by call. Supervisor also keeps one `CallContext` / call stack, one parent-origination slot, and prompt unwind that assumes a single in-flight tree.
+
+If two `entry`s ran at once without isolation, they would race the same action list, latches, sender hook, and stack. Parallel `entry`s therefore need a real multi-tx / multi-context design, not a small `serialize` tweak — at least:
+
+- **Per-entry tx construction** (separate `OpenTx`, tx-id’d storage, or separate component instances so ephemeral DB does not collide)
+- **Per-entry call stack / context** (and rules for which stack `get-sender` / bucket keys see)
+- **Prompt exclusivity** (still one UI prompt at a time, or a prompt queue)
+- **Lifecycle rules** so `disposeAll` / instantiate does not tear down another entry’s graph
+
+**Implication for phasing:** Phase 1 (JSPI / `fetch` / async `entry`) with the global queue kept gets non-blocking I/O without concurrent tx builders. Opening the queue (this deferred item) is the step that demands multi-tx and multi-context management — which is why it stays out of the current JSPI wave. (In-call overlapping fetches are a separate deferred track: open item 3 / WASIp3.)
 
 ### Plan
 - **Scope: local development only for now.** This harness is a facility for developers to run on their own machines. Do not add it to CI yet; CI integration is a future decision.
