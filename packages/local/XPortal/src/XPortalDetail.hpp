@@ -24,8 +24,6 @@ using UserService::InviteNs::InvPayload;
 
 namespace xportal
 {
-   // $2.50 as USD micros for a one-time token-price bootstrap when unset—not
-   // a configured per-buffer charge.
    inline constexpr uint64_t seedUsdMicros      = 2'500'000;
    inline constexpr uint64_t freeTierUsdCents   = 250;
    inline constexpr uint64_t smallTierUsdCents  = 500;
