@@ -181,15 +181,11 @@ uint32_t Invite::createInvite(uint32_t             inviteId,
    Checksum256 fingerprint_checksum;
    std::memcpy(fingerprint_checksum.data(), fingerprint.data(), 32);
 
-   auto cid = to<Credentials>().issue(fingerprint_checksum,  //
-                                      ONE_WEEK.count(),      //
-                                      std::vector<MethodNumber>{"createAccount"_m});
-
    auto resolved_subsidy = per_account_subsidy_for_invite(subsidy, isBilling);
 
+   uint64_t needed = 0;
    if (isBilling)
    {
-      auto sys = getSysToken();
       auto per_account = (get_create_action_reserve() + resolved_subsidy).value;
       if (numAccounts > 0)
       {
@@ -197,23 +193,28 @@ uint32_t Invite::createInvite(uint32_t             inviteId,
                                   static_cast<uint64_t>(numAccounts),
                tooManyAccounts.data());
       }
-      auto needed = per_account * static_cast<uint64_t>(numAccounts);
+      needed = per_account * static_cast<uint64_t>(numAccounts);
       check(resources >= needed, notEnoughResources.data());
+   }
 
-      if (needed > 0)
-      {
-         to<Tokens>().debit(sys, sender, resources, "");
+   auto cid = to<Credentials>().issue(fingerprint_checksum,  //
+                                      ONE_WEEK.count(),      //
+                                      std::vector<MethodNumber>{"createAccount"_m});
 
-         auto subsidy_reserve =
-             Quantity{resolved_subsidy.value * static_cast<uint64_t>(numAccounts)};
-         to<Tokens>().toSub(sys, std::to_string(inviteId), subsidy_reserve);
+   if (needed > 0)
+   {
+      auto sys = getSysToken();
+      to<Tokens>().debit(sys, sender, resources, "");
 
-         // The rest of the resources go to the credential, to subsidize the `create` action,
-         // which could (via hooks) require more resources than the simple default `createAccount` action.
-         auto credential_resources = resources - subsidy_reserve;
-         to<Tokens>().credit(sys, Credentials::service, credential_resources, "");
-         to<Credentials>().resource(cid, credential_resources);
-      }
+      auto subsidy_reserve =
+          Quantity{resolved_subsidy.value * static_cast<uint64_t>(numAccounts)};
+      to<Tokens>().toSub(sys, std::to_string(inviteId), subsidy_reserve);
+
+      // The rest of the resources go to the credential, to subsidize the `create` action,
+      // which could (via hooks) require more resources than the simple default `createAccount` action.
+      auto credential_resources = resources - subsidy_reserve;
+      to<Tokens>().credit(sys, Credentials::service, credential_resources, "");
+      to<Credentials>().resource(cid, credential_resources);
    }
 
    auto inviteTable = open<InviteTable>(KvMode::readWrite);
