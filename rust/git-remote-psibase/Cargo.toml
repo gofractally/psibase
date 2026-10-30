@@ -1,0 +1,22 @@
+[package]
+name = "git-remote-psibase"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+description = "git remote helper for repositories stored by the psibase `git` service"
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono = "0.4"
+flate2 = "1.0"
+fracpack.workspace = true
+psibase.workspace = true
+psibase-rust-workspace-hack.workspace = true
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+serde.workspace = true
+tokio = { version = "1", features = ["full"] }
+toml = "0.8.19"
+url.workspace = true

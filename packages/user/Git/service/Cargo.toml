@@ -1,0 +1,23 @@
+[package]
+name = "git"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+publish = false
+
+[package.metadata.psibase]
+server = "git"
+
+[dependencies]
+psibase.workspace = true
+psibase_macros.workspace = true
+psibase_service.workspace = true
+serde.workspace = true
+miniz_oxide = "0.8"
+sha1 = { version = "0.10", default-features = false }
+psibase-user-workspace-hack.workspace = true
+
+[dev-dependencies]
+git-pkg = { path = "..", version = "0.29.0" }

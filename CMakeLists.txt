@@ -602,6 +602,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Git.psi
+    PATH packages/user/Git
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/BrotliSvc.psi
     PATH packages/user/BrotliSvc
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1395,7 +1401,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Git Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1413,6 +1419,7 @@ install(
           ${SERVICE_DIR}/AuthSigService.psi
           ${SERVICE_DIR}/Base64.psi
           ${SERVICE_DIR}/Branding.psi
+          ${SERVICE_DIR}/Git.psi
           ${SERVICE_DIR}/BrotliCodec.psi
           ${SERVICE_DIR}/BrotliSvc.psi
           ${SERVICE_DIR}/Chainmail.psi

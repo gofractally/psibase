@@ -243,6 +243,14 @@ Not used in v1: libgit2, gitoxide, `git-http-backend`, Radicle. Those matter for
 4. `git-remote-psibase` push, then fetch, against the same node.
 5. Tests: second clone sees the push; a fast-forward from a second writer lands; a non-fast-forward without the force flag fails; two updates with the same `old_oid` produce one success and one rejected transaction; an object whose bytes do not match its id is rejected; a ref that points at a missing blob is rejected.
 
+> **Implementation notes (V1 POC, `packages/user/Git`, `rust/git-remote-psibase`).** Where the code differs from the text above:
+> - `putObjects(owner, name, objects)` and `updateRefs(owner, name, updates)` take the repo `owner` explicitly, so a writer can target someone else's repo. Each object is `{oid, data}`: the claimed id is checked against the computed hash, which is what makes "bytes do not match its id" rejectable.
+> - Oids are stored and passed as 40-char lowercase hex strings, not 20 raw bytes.
+> - The reachability walk in `updateRefs` stops at any oid that is already a ref tip in the same repo (its closure was checked when that ref was written), instead of computing the full set reachable from the old tips.
+> - The helper posts the final `updateRefs` transaction with `wait_for=final`, not `applied`, because HTTP queries read committed state and an immediate second push would otherwise see stale refs and lose the compare-and-swap. Earlier `putObjects` transactions use `applied`. Batches are capped at about 3 MiB of compressed objects per transaction.
+> - Helper account and key lookup order: `PSIBASE_GIT_ACCOUNT` / `PSIBASE_GIT_KEY`, then git config `psibase.account` / `psibase.key`, then `~/.psibase.toml` `[git.<name>]` where `<name>` is the `[hosts]` alias whose URL matches the remote root, or the remote's `host:port`. Account defaults to the repo owner. The node comes from the remote URL itself, not `-a`/`PSINODE_URL`.
+> - Tests are `packages/user/Git/test/git_e2e.py`, run against a live local psinode rather than the service tester.
+
 ## The other instantiation
 
 This is a second deployment, not a mode of the on-chain service. Nothing here reads `ObjectRow` or serves `git.<root>` from chain state. A chain can run one instantiation, the other, or both, and a repo lives in exactly one of them.
