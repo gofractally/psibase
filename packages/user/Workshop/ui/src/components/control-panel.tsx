@@ -1,20 +1,12 @@
 import { z } from "zod";
 
-import {
-    MetadataResponse,
-    Status,
-    appMetadataQueryKey,
-    useAppMetadata,
-} from "@/hooks/use-app-metadata";
 import { useCurrentApp } from "@/hooks/use-current-app";
 import { useDeleteCsp } from "@/hooks/use-delete-csps";
-import { usePublishApp } from "@/hooks/use-publish-app";
 import { useSetCacheMode } from "@/hooks/use-set-cache-mode";
 import { useSetCsp } from "@/hooks/use-set-csps";
 import { SiteConfigResponse, useSiteConfig } from "@/hooks/use-site-config";
 import { useSpa } from "@/hooks/use-spa";
 
-import { queryClient } from "@shared/lib/query-client";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import { Label } from "@shared/shadcn/ui/label";
@@ -23,28 +15,6 @@ import { toast } from "@shared/shadcn/ui/sonner";
 import { CheckCard } from "./check-card";
 import { CspForm } from "./csp-form";
 import { ServiceUpload } from "./service-upload";
-
-const setStatus = (
-    metadata: z.infer<typeof MetadataResponse>["appMetadata"],
-    published: boolean,
-): z.infer<typeof MetadataResponse>["appMetadata"] =>
-    metadata
-        ? {
-              ...metadata,
-              status: published
-                  ? Status.Enum.Published
-                  : Status.Enum.Unpublished,
-          }
-        : null;
-
-const setCacheData = (appName: string, checked: boolean) => {
-    queryClient.setQueryData(appMetadataQueryKey(appName), (data: unknown) => {
-        if (data) {
-            const metadata = MetadataResponse.shape.appMetadata.parse(data);
-            return setStatus(metadata, checked);
-        }
-    });
-};
 
 const NormalisedPolicy = z.object({
     path: z.string(),
@@ -76,47 +46,12 @@ const normalizePolicies = (
 
 export const ControlPanel = () => {
     const currentApp = useCurrentApp();
-    const { data: metadata } = useAppMetadata(currentApp);
 
     const { mutateAsync: setSpa, isPending: isSettingSpa } = useSpa();
     const { mutateAsync: setCacheMode, isPending: isSettingCacheMode } =
         useSetCacheMode();
 
     const { data: site } = useSiteConfig(currentApp);
-
-    const { mutateAsync: publishApp, isPending: isPublishingApp } =
-        usePublishApp();
-
-    const handleChecked = async (checked: boolean, appName: string) => {
-        try {
-            setCacheData(appName, checked);
-            toast(`Updating..`, {
-                description: `${checked ? "Publishing" : "Unpublishing"} ${appName}`,
-            });
-            void (await publishApp({ account: appName, publish: checked }));
-            toast(checked ? "Published" : "Unpublished", {
-                description: checked
-                    ? `${appName} is now published.`
-                    : `${appName} is no longer published.`,
-            });
-        } catch (e) {
-            toast("Failed to update", {
-                description:
-                    e instanceof Error
-                        ? e.message
-                        : "Unrecognised error, see logs.",
-            });
-
-            const isAppAlreadyPublishedError =
-                e instanceof Error &&
-                e.message.includes("App is already published");
-            setCacheData(appName, isAppAlreadyPublishedError || !checked);
-        }
-    };
-
-    const isAppPublished = metadata
-        ? metadata.status == Status.Enum.Published
-        : false;
 
     const { mutateAsync: setCsp } = useSetCsp();
     const { mutateAsync: removeCsp } = useDeleteCsp();
@@ -164,16 +99,6 @@ export const ControlPanel = () => {
     return (
         <div className="w-full">
             <div className="flex flex-col gap-2">
-                <CheckCard
-                    checked={isAppPublished}
-                    disabled={isPublishingApp}
-                    onChange={(checked) =>
-                        handleChecked(checked, zAccount.parse(currentApp))
-                    }
-                    title="Publish"
-                    description="Mark the app available for public use."
-                />
-
                 <CheckCard
                     checked={!!(site && site.getConfig && site.getConfig.spa)}
                     disabled={isSettingSpa}
