@@ -386,7 +386,7 @@ namespace
       auto billed = enableBilling(t, alice, 5);
 
       auto grant   = largestTierTokens(t);
-      auto cost    = t.from(alice).to<Invite>().getInvCost(1, grant).returnVal();
+      auto cost    = t.from(alice).to<Invite>().getInvQuote(1, grant).returnVal();
       auto allowed = XPortal::creatorAllowed();
       allowed.push_back({Tokens::service, MethodNumber{"debit"}});
       createCreator(t, alice, agentPub, Quantity{billed.cost}, cost, allowed);

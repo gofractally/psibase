@@ -230,7 +230,7 @@ namespace xportal
    {
       auto sys = to<Tokens>().getSysToken();
       check(sys.has_value(), "system token is not set");
-      auto cost    = to<Invite>().getInvCost(1, largestGrant(config));
+      auto cost    = to<Invite>().getInvQuote(1, largestGrant(config));
       auto balance = to<Tokens>().getBalance(sys->id, XPortal::creatorAccount);
       return balance.value >= cost.value;
    }

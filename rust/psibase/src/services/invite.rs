@@ -86,6 +86,13 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns [`getInvCost`](Self::getInvCost) plus a 50% buffer for resource cost increases between quote and
+    /// [`createInvite`](Self::createInvite).
+    #[action]
+    fn getInvQuote(numAccounts: u16, subsidy: Option<Quantity>) -> Quantity {
+        unimplemented!()
+    }
+
     /// Creates and stores a new invite object that can be used to create new accounts
     /// Returns the ID of the newly created invite
     ///

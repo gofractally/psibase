@@ -210,7 +210,7 @@ TEST_CASE("status, requests switch, and seeded pricing")
 
    auto grant = offers.tiers[2].tokens.value;
    REQUIRE(grant > 0);
-   auto inviteCost = t.from(alice).to<Invite>().getInvCost(1, Quantity{grant}).returnVal();
+   auto inviteCost = t.from(alice).to<Invite>().getInvQuote(1, Quantity{grant}).returnVal();
    REQUIRE(t.from(alice).to<Tokens>().credit(sys, VirtualServer::service, cost, "").succeeded());
    REQUIRE(t.from(alice).to<VirtualServer>().buy_res_for(cost, creator, "").succeeded());
    REQUIRE(t.from(alice).to<Tokens>().credit(sys, creator, inviteCost, "").succeeded());
@@ -727,7 +727,7 @@ TEST_CASE("paid tier readiness covers the paid grant")
    REQUIRE(paidTokens.value > offers.free->tokens.value);
 
    auto inviteCost = [&]
-   { return t.from(alice).to<Invite>().getInvCost(1, paidTokens).returnVal(); };
+   { return t.from(alice).to<Invite>().getInvQuote(1, paidTokens).returnVal(); };
    auto creatorBalance = [&]
    { return t.from(alice).to<Tokens>().getBalance(billed.id, creator).returnVal(); };
    REQUIRE(inviteCost().value > creatorBalance().value);

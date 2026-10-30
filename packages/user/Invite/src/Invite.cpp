@@ -156,6 +156,12 @@ Quantity Invite::getInvCost(uint16_t numAccounts, std::optional<Quantity> subsid
    return (get_create_action_reserve() + per_account_subsidy) * numAccounts;
 }
 
+Quantity Invite::getInvQuote(uint16_t numAccounts, std::optional<Quantity> subsidy)
+{
+   Quantity cost = getInvCost(numAccounts, subsidy);
+   return Quantity{cost.value + cost.value / 2};
+}
+
 TID getSysToken()
 {
    auto sys_record = to<Tokens>().getSysToken();

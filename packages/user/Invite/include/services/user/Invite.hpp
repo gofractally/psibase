@@ -50,6 +50,10 @@ namespace UserService
          /// accounts.
          Quantity getInvCost(uint16_t numAccounts, std::optional<Quantity> subsidy = std::nullopt);
 
+         /// Returns `getInvCost` plus a 50% buffer for resource cost increases between quote and
+         /// `createInvite`.
+         Quantity getInvQuote(uint16_t numAccounts, std::optional<Quantity> subsidy = std::nullopt);
+
          /// Creates and stores a new invite object that can be used to create new accounts
          /// Returns the ID of the newly created invite
          ///
@@ -116,6 +120,7 @@ namespace UserService
       PSIO_REFLECT(Invite,
          method(init),
          method(getInvCost, numAccounts, subsidy),
+         method(getInvQuote, numAccounts, subsidy),
          method(createInvite, inviteId, payload, numAccounts, useHooks, resources, subsidy),
          method(createAccount, account, accountKey),
          method(accept, inviteId),

@@ -299,7 +299,7 @@ namespace LocalService
    /// `stripe_configured` (the active mode's keys are set) are present.
    /// When billing is enabled, `creator_tokens` and `creator_resources` are added.
    /// `creator_tokens` holds when the creator account's balance covers
-   /// `invite::getInvCost(1, tokens)` for the largest `tokens` among the
+   /// `invite::getInvQuote(1, tokens)` for the largest `tokens` among the
    /// enabled free tier and the paid tiers.
    /// `ready` requires every condition except `x_configured`, and requires
    /// `stripe_configured` only while paid tiers are offered.
@@ -498,7 +498,7 @@ namespace LocalService
    /// 2m, 10m, 30m, then 2h — before it pushes as `ac-creator`. When billing
    /// is enabled, that is
    /// `tokens::credit(sys, invite, cost, "x-portal signup")` with
-   /// `cost = invite::getInvCost(1, tokens)`, then
+   /// `cost = invite::getInvQuote(1, tokens)`, then
    /// `invite::createInvite(invite_id, payload, 1, false, cost, tokens)`. With
    /// billing disabled, it is `createInvite` alone with zero resources and no
    /// subsidy. Success sets `invited`. A failed push stays `queued` until that

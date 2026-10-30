@@ -670,7 +670,7 @@ namespace xportal
       {
          auto sys = to<Tokens>().getSysToken();
          check(sys.has_value(), "system token is not set");
-         cost    = to<Invite>().getInvCost(1, signup.tokens);
+         cost    = to<Invite>().getInvQuote(1, signup.tokens);
          subsidy = signup.tokens;
          transactor<Tokens> tokens{XPortal::creatorAccount, Tokens::service};
          actions.push_back(tokens.credit(sys->id, Invite::service, cost, signupMemo));
