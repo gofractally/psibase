@@ -22,6 +22,11 @@ mod service {
     }
 
     #[action]
+    fn init() {
+        unimplemented!();
+    }
+
+    #[action]
     fn setConsensus(prods: ConsensusData) {
         unimplemented!();
     }

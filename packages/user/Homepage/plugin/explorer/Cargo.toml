@@ -1,0 +1,28 @@
+[package]
+name = "homepage-explorer"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+wit-bindgen-rt.workspace = true
+psibase-plugin-workspace-hack.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "homepage:explorer"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:client" = { path = "../../../Host/plugin/client/wit/world.wit" }
+"host:types" = { path = "../../../Host/plugin/types/wit/world.wit" }
+"explorer:plugin" = { path = "../../../Explorer/plugin/wit/world.wit" }
+"accounts:query" = { path = "../../../../system/Accounts/plugin/query/wit/world.wit" }
+"auth-dyn:plugin" = { path = "../../../../system/AuthDyn/plugin/wit/world.wit" }
+"packages:plugin" = { path = "../../../Packages/plugin/wit/world.wit" }
+"tokens:plugin" = { path = "../../../Tokens/plugin/wit/world.wit" }

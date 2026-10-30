@@ -17,6 +17,7 @@ members = [
     "test_contract_2",
     "test_fracpack",
     "test_fracpack_macros",
+    "test_package/admin",
     "test_package/plugin",
     "test_package/query",
     "test_package/service",
@@ -65,7 +66,7 @@ psibase_macros = { path = "./psibase_macros", version = "0.29.0" }
 psibase-macros-derive = { path = "./psibase_macros/psibase-macros-derive", version = "0.29.0" }
 psibase_service = { path = "./psibase_service", version = "0.29.0" }
 url = "2.5.4"
-zip = { version = "7.2", default-features = false, features = ["deflate"] }
+zip = { version = "9.0", default-features = false, features = ["deflate"] }
 psibase-rust-workspace-hack = "0.2.0"
 
 [patch.crates-io.psibase-rust-workspace-hack]

@@ -12,22 +12,8 @@ const HOST_COOKIE_MAX_AGE = 400 * 24 * 60 * 60;
 const IDB_NAME = "supervisor";
 const IDB_STORE = "device-storage";
 
-/**
- * Heuristically detect WebKit.
- *
- * Both WebKit and Blink browsers advertise "AppleWebKit". Exclude Blink
- * browsers using their Chrome/, Chromium/, or desktop Edge (Edg/) tokens.
- *
- * iOS browsers generally use different tokens (CriOS/, EdgiOS/, FxiOS/)
- * or Safari-like user agents, so they remain included. This detects
- * likely WebKit engines, not the Safari browser specifically.
- *
- * References:
- * - https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Browser_detection_using_the_user_agent#rendering_engine
- * - https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Browser_detection_using_the_user_agent#browser_name_and_version
- * - https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/User-Agent
- * - https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/User-Agent/Firefox#firefox_for_ios
- */
+// Blink also sends AppleWebKit. Exclude Chrome/, Chromium/, and desktop Edg/.
+// iOS tokens (CriOS/, EdgiOS/, FxiOS/) stay included.
 function isWebKit(userAgent: string): boolean {
     return (
         userAgent.includes("AppleWebKit") &&
