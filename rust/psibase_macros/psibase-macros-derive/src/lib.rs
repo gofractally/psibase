@@ -14,6 +14,7 @@ use psibase_macros_lib::service_tables_macro::service_tables_macro_impl;
 use schema_macro::schema_derive_macro;
 use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;
+use view_macro::view_macro_impl;
 
 mod authorized_macro;
 mod component_name_macro;
@@ -24,6 +25,7 @@ mod plugin_error_macro;
 mod schema_macro;
 mod test_case_macro;
 mod to_key_macro;
+mod view_macro;
 
 #[proc_macro_error]
 #[proc_macro]
@@ -39,6 +41,11 @@ pub fn derive_pack(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Unpack, attributes(fracpack))]
 pub fn derive_unpack(input: TokenStream) -> TokenStream {
     fracpack_macro_impl(input, false, true)
+}
+
+#[proc_macro_derive(View, attributes(fracpack))]
+pub fn derive_view(input: TokenStream) -> TokenStream {
+    view_macro_impl(input)
 }
 
 #[proc_macro_derive(ToKey, attributes(to_key))]

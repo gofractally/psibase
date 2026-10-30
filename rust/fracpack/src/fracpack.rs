@@ -48,7 +48,7 @@
 //! for the two types.
 
 use custom_error::custom_error;
-pub use psibase_macros::{Pack, ToSchema, Unpack};
+pub use psibase_macros::{Pack, ToSchema, Unpack, View};
 use std::{cell::RefCell, hash::Hash, mem, rc::Rc, sync::Arc};
 
 mod schema;
@@ -56,6 +56,9 @@ pub use schema::*;
 
 mod nested;
 pub use nested::*;
+
+mod view;
+pub use view::*;
 
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",

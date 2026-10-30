@@ -1,4 +1,4 @@
-use fracpack::{CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned};
+use fracpack::{CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned, View, ViewExt};
 use serde::Deserialize;
 use test_fracpack::*;
 
@@ -896,3 +896,306 @@ where
 test_fracpack_macros::include_tests!(
     "${CARGO_MANIFEST_DIR}/../../libraries/psio/tests/fracpack-tests.json"
 );
+
+#[test]
+fn test_view() {
+    {
+        let data = "asdf".to_string().packed();
+        let v = <View<String>>::new(&data).unwrap();
+        assert_eq!(v.find('d'), Some(2));
+    }
+    {
+        let data = "asdf".to_string().packed();
+        let v = <View<&str>>::new(&data).unwrap();
+        assert_eq!(v.find('d'), Some(2));
+    }
+    {
+        let data = vec![42u32, 7u32].packed();
+        let v = <View<Vec<u32>>>::new(&data).unwrap();
+        assert_eq!(v[0].unpack(), 42);
+        assert_eq!(v[1].unpack(), 7);
+        let mut values = Vec::new();
+        for i in v {
+            values.push(i.unpack());
+        }
+        assert_eq!(values, vec![42, 7]);
+        assert_eq!(v.iter().map(|i| i.unpack()).sum::<u32>(), 49);
+        assert_eq!(v.iter().unpacked().sum::<u32>(), 49);
+        assert!(!v.is_empty());
+        assert_eq!(v.len(), 2);
+    }
+    {
+        let data = vec!["asdf", ""].packed();
+        let v = <View<Vec<String>>>::new(&data).unwrap();
+        assert_eq!(v[0].find('d'), Some(2));
+        assert!(v[1].is_empty());
+    }
+    {
+        let data = vec![Some("asdf"), Some(""), None].packed();
+        let v = <View<Vec<Option<String>>>>::new(&data).unwrap();
+        assert_eq!(v[0].unwrap().find('d'), Some(2));
+        assert!(v[1].unwrap().is_empty());
+        assert!(v[2].is_none());
+    }
+    {
+        let data = "jkl;".packed();
+        let v = <View<Box<String>>>::new(&data).unwrap();
+        assert_eq!(v.find(';'), Some(3));
+    }
+    {
+        let data = ("asdf", 7u32, Some(42u32), Some("jkl;")).packed();
+        let v = <View<(String, u32, Option<u32>, Option<String>)>>::new(&data).unwrap();
+        assert_eq!(&v.get0().unpack(), "asdf");
+        assert_eq!(v.get1().unpack(), 7);
+        assert_eq!(v.get2().unpack(), Some(42));
+        assert_eq!(&v.get3().unpack().unwrap(), "jkl;");
+    }
+    {
+        let data = InnerStruct {
+            inner_u32: 1234,
+            var: None,
+            inner_option_u32: None,
+            inner_option_str: Some("".to_string()),
+            inner_option_vec_u16: None,
+            inner_o_vec_o_u16: None,
+        }
+        .packed();
+        let v = <View<InnerStruct>>::new(&data).unwrap();
+        assert_eq!(v.inner_u32().unpack(), 1234);
+        assert_eq!(v.var().unpack(), None);
+        assert_eq!(v.inner_option_u32().unpack(), None);
+        assert_eq!(v.inner_option_str().unpack(), Some(String::new()));
+        let _ = format!("{v:?}");
+    }
+}
+
+#[test]
+fn test_array_view() {
+    let data = [42u32, 7u32].packed();
+    let v = <View<[u32; 2]>>::new(&data).unwrap();
+    assert_eq!(v[0].unpack(), 42);
+    assert_eq!(v[1].unpack(), 7);
+    let mut values = Vec::new();
+    for i in v {
+        values.push(i.unpack());
+    }
+    assert_eq!(values, vec![42, 7]);
+    assert_eq!(v.iter().map(|i| i.unpack()).sum::<u32>(), 49);
+    assert_eq!(v.iter().unpacked().sum::<u32>(), 49);
+    assert_eq!(v.map(|i| i.unpack() + 1), [43, 8]);
+    assert_eq!(v.transpose().map(|i| i.unpack()), [42, 7]);
+}
+
+#[test]
+fn test_option_view() {
+    let data_none = Option::<u32>::None.packed();
+    let vnone = <View<Option<u32>>>::new(&data_none).unwrap();
+    assert!(matches!(vnone.transpose(), None));
+    assert!(vnone.is_none());
+    assert!(!vnone.is_some());
+    let data1 = Some(1u32).packed();
+    let v1 = <View<Option<u32>>>::new(&data1).unwrap();
+    let data2 = Some(2u32).packed();
+    let v2 = <View<Option<u32>>>::new(&data2).unwrap();
+    let datai = 5u32.packed();
+    let i5 = <View<u32>>::new(&datai).unwrap();
+    let datanested1 = Some(Some(3u32)).packed();
+    let nested1 = <View<Option<Option<u32>>>>::new(&datanested1).unwrap();
+    let datanested2 = Some(Option::<u32>::None).packed();
+    let nested2 = <View<Option<Option<u32>>>>::new(&datanested2).unwrap();
+    let datanested3 = Option::<Option<u32>>::None.packed();
+    let nested3 = <View<Option<Option<u32>>>>::new(&datanested3).unwrap();
+    if let Some(v) = v1.transpose() {
+        assert_eq!(v.unpack(), 1);
+    } else {
+        panic!("transpose() failed")
+    }
+    assert!(v1.is_some());
+    assert!(!v1.is_none());
+
+    assert_eq!(vnone.and(Some(5)), None);
+    assert_eq!(vnone.and(v2).unpack(), None);
+    assert_eq!(vnone.and(Option::<u32>::None), None);
+    assert_eq!(vnone.and(vnone).unpack(), None);
+    assert_eq!(v1.and(Some(5)), Some(5));
+    assert_eq!(v1.and(v2).unpack(), Some(2));
+    assert_eq!(v1.and(Option::<u32>::None), None);
+    assert_eq!(v1.and(vnone).unpack(), None);
+
+    assert_eq!(vnone.and_then(|_| Some(5)), None);
+    assert_eq!(vnone.and_then(|i| Some(i.unpack() + 10)), None);
+    assert_eq!(vnone.and_then(|_| v2).unpack(), None);
+    assert_eq!(vnone.and_then(|_| vnone).unpack(), None);
+    assert_eq!(v1.and_then(|_| Some(5)), Some(5));
+    assert_eq!(v1.and_then(|i| Some(i.unpack() + 10)), Some(11));
+    assert_eq!(v1.and_then(|_| v2).unpack(), Some(2));
+    assert_eq!(v1.and_then(|_| vnone).unpack(), None);
+
+    // testing expect properly requires panic to unwind
+    assert_eq!(v1.expect("asdf").unpack(), 1);
+
+    assert_eq!(v1.filter(|x| x.unpack() == 1).unpack(), Some(1));
+    assert_eq!(v2.filter(|x| x.unpack() == 1).unpack(), None);
+    assert_eq!(vnone.filter(|x| x.unpack() == 1).unpack(), None);
+
+    assert_eq!(nested1.flatten().unpack(), Some(3));
+    assert_eq!(nested2.flatten().unpack(), None);
+    assert_eq!(nested3.flatten().unpack(), None);
+
+    {
+        let mut out: u32 = 0;
+        v1.inspect(|x| out = x.unpack());
+        assert_eq!(out, 1);
+        vnone.inspect(|_| out = 42);
+        assert_eq!(out, 1);
+    }
+
+    assert!(v1.is_none_or(|x| x.unpack() == 1));
+    assert!(!v2.is_none_or(|x| x.unpack() == 1));
+    assert!(vnone.is_none_or(|x| x.unpack() == 1));
+
+    assert!(v1.is_some_and(|x| x.unpack() == 1));
+    assert!(!v2.is_some_and(|x| x.unpack() == 1));
+    assert!(!vnone.is_some_and(|x| x.unpack() == 1));
+
+    assert_eq!(v1.map(|x| x.unpack() + 10), Some(11));
+    assert_eq!(vnone.map(|x| x.unpack() + 10), None);
+
+    assert_eq!(v1.map_or(5, |x| x.unpack() + 10), 11);
+    assert_eq!(vnone.map_or(5, |x| x.unpack() + 10), 5);
+
+    assert_eq!(v1.map_or_default(|x| x.unpack() + 10), 11);
+    assert_eq!(vnone.map_or_default(|x| x.unpack() + 10), 0);
+
+    assert_eq!(v1.map_or_else(|| 5, |x| x.unpack() + 10), 11);
+    assert_eq!(vnone.map_or_else(|| 5, |x| x.unpack() + 10), 5);
+
+    assert_eq!(v1.ok_or(5).unwrap().unpack(), 1);
+    assert_eq!(vnone.ok_or(5).unwrap_err(), 5);
+
+    assert_eq!(v1.ok_or_else(|| 5).unwrap().unpack(), 1);
+    assert_eq!(vnone.ok_or_else(|| 5).unwrap_err(), 5);
+
+    assert_eq!(v1.or(v2).unpack(), Some(1));
+    assert_eq!(vnone.or(v2).unpack(), Some(2));
+    assert_eq!(v1.or(vnone).unpack(), Some(1));
+    assert_eq!(vnone.or(vnone).unpack(), None);
+    assert_eq!(v1.or(Some(i5)).map(|x| x.unpack()), Some(1));
+    assert_eq!(vnone.or(Some(i5)).map(|x| x.unpack()), Some(5));
+    assert_eq!(v1.or(None).map(|x| x.unpack()), Some(1));
+    assert_eq!(vnone.or(None).map(|x| x.unpack()), None);
+
+    assert_eq!(v1.or_else(|| v2).unpack(), Some(1));
+    assert_eq!(vnone.or_else(|| v2).unpack(), Some(2));
+    assert_eq!(v1.or_else(|| vnone).unpack(), Some(1));
+    assert_eq!(vnone.or_else(|| vnone).unpack(), None);
+    assert_eq!(v1.or_else(|| Some(i5)).map(|x| x.unpack()), Some(1));
+    assert_eq!(vnone.or_else(|| Some(i5)).map(|x| x.unpack()), Some(5));
+    assert_eq!(v1.or_else(|| None).map(|x| x.unpack()), Some(1));
+    assert_eq!(vnone.or_else(|| None).map(|x| x.unpack()), None);
+
+    assert_eq!(v1.unwrap().unpack(), 1);
+    //vnone.unwrap();
+
+    assert_eq!(v1.unwrap_or(i5).unpack(), 1);
+    assert_eq!(vnone.unwrap_or(i5).unpack(), 5);
+
+    assert_eq!(v1.unwrap_or_else(|| i5).unpack(), 1);
+    assert_eq!(vnone.unwrap_or_else(|| i5).unpack(), 5);
+
+    assert_eq!(v1.xor(v2).unpack(), None);
+    assert_eq!(v1.xor(vnone).unpack(), Some(1));
+    assert_eq!(vnone.xor(v1).unpack(), Some(1));
+    assert_eq!(vnone.xor(vnone).unpack(), None);
+    assert_eq!(v1.xor(Some(i5)).map(|v| v.unpack()), None);
+    assert_eq!(v1.xor(None).map(|v| v.unpack()), Some(1));
+    assert_eq!(vnone.xor(Some(i5)).map(|v| v.unpack()), Some(5));
+    assert_eq!(vnone.xor(None).map(|v| v.unpack()), None);
+}
+
+#[test]
+fn view_def_wont_change() {
+    let value = DefWontChangeInnerStruct {
+        field_bool: true,
+        field_u32: 44,
+        field_var: Variant::ItemStr("xyz".to_string()),
+        field_i16: 55,
+        field_o_var: Some(Variant::ItemU32(88)),
+        field_str: "byebye".to_string(),
+        field_a_i16_3: [77, 88, 99],
+        field_f32: 6.4,
+        field_o_v_i8: Some(vec![44, 55, 66]),
+        field_a_s_2: ["aa".to_string(), "bb".to_string()],
+        field_f64: 128.128,
+        field_o_str: Some("lo".to_string()),
+        field_v_u16: vec![3, 2, 1],
+        field_i32: -999,
+    };
+    let data = value.packed();
+    let v = <View<DefWontChangeInnerStruct>>::new(&data).unwrap();
+    assert_eq!(v.field_bool().unpack(), value.field_bool);
+    assert_eq!(v.field_u32().unpack(), value.field_u32);
+    assert_eq!(v.field_var().unpack(), value.field_var);
+    assert_eq!(v.field_i16().unpack(), value.field_i16);
+    assert_eq!(v.field_o_var().unpack(), value.field_o_var);
+    assert_eq!(v.field_str().unpack(), value.field_str);
+    assert_eq!(v.field_a_i16_3().unpack(), value.field_a_i16_3);
+    assert_eq!(v.field_f32().unpack(), value.field_f32);
+    assert_eq!(v.field_o_v_i8().unpack(), value.field_o_v_i8);
+    assert_eq!(v.field_a_s_2().unpack(), value.field_a_s_2);
+    assert_eq!(v.field_f64().unpack(), value.field_f64);
+    assert_eq!(v.field_o_str().unpack(), value.field_o_str);
+    assert_eq!(v.field_v_u16().unpack(), value.field_v_u16);
+    assert_eq!(v.field_i32().unpack(), value.field_i32);
+}
+
+#[derive(Pack, Unpack, View)]
+pub struct ViewWithLifetime<'a> {
+    x: &'a str,
+}
+
+#[test]
+fn test_view_with_lifetime() {
+    let value = ViewWithLifetime { x: "apple" };
+    let data = value.packed();
+    let v = <View<ViewWithLifetime>>::new(&data).unwrap();
+    assert_eq!(v.x().unpack(), value.x);
+}
+
+#[derive(Pack, Unpack, View)]
+#[fracpack(view_name = "NamedViewType")]
+pub struct NamedView {
+    x: u32,
+}
+
+#[test]
+fn test_named_view() {
+    let value = NamedView { x: 42 };
+    let data = value.packed();
+    let v = <NamedViewType>::new(&data).unwrap();
+    assert_eq!(v.x().unpack(), value.x);
+}
+
+#[derive(Pack, Unpack, View)]
+pub struct Single(u32);
+
+#[test]
+fn test_single() {
+    let value = Single(42);
+    let data = value.packed();
+    let v = <View<Single>>::new(&data).unwrap();
+    assert_eq!(v.get0().unpack(), value.0);
+}
+
+#[derive(Pack, Unpack, View)]
+struct Private {
+    x: u32,
+}
+
+#[test]
+fn test_private_view() {
+    let value = Private { x: 42 };
+    let data = value.packed();
+    let v = <View<Private>>::new(&data).unwrap();
+    assert_eq!(v.x().unpack(), value.x);
+}

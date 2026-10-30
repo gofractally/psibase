@@ -4,7 +4,7 @@ use quote::quote;
 use std::str::FromStr;
 use syn::{
     parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Field, Fields, FieldsNamed,
-    FieldsUnnamed, LitStr,
+    FieldsUnnamed, Ident, LitStr,
 };
 
 /// Fracpack struct level options
@@ -14,6 +14,7 @@ pub(crate) struct Options {
     pub(crate) definition_will_not_change: bool,
     pub(crate) fracpack_mod: String,
     pub(crate) custom: Option<LitStr>,
+    pub(crate) view_name: Option<Ident>,
 }
 
 impl Default for Options {
@@ -22,6 +23,7 @@ impl Default for Options {
             definition_will_not_change: false,
             fracpack_mod: "psibase::fracpack".into(),
             custom: None,
+            view_name: None,
         }
     }
 }
