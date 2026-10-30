@@ -1,41 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { hostingAppCall } from "@shared/lib/plugins/host-app";
+import { callPluginFunction } from "@shared/lib/plugins/lib/call-plugin-function";
+import { type BillingConfig as PluginBillingConfig } from "@shared/lib/plugins/virtual-server";
 import QueryKey from "@shared/lib/query-keys";
-import { vserver } from "@shared/lib/plugins";
 
-interface BillingConfigResponse {
-    getBillingConfig: {
-        feeReceiver: string;
-        enabled: boolean;
-    } | null;
-}
+export type BillingConfig = {
+    feeReceiver: string | null;
+    enabled: boolean;
+};
 
-export const useBillingConfig = () => {
-    return useQuery({
+export const useBillingConfig = () =>
+    useQuery({
         queryKey: QueryKey.billingConfig(),
-        queryFn: async () => {
-            const query = `
-                query {
-                    getBillingConfig {
-                        feeReceiver
-                        enabled
-                    }
-                }
-            `;
-            const res = await callGraphqlViaPlugin<BillingConfigResponse>(
-                vserver.authorized.graphql,
-                query,
+        queryFn: async (): Promise<BillingConfig> => {
+            const billing = await callPluginFunction(
+                hostingAppCall<[], PluginBillingConfig>(
+                    "virtual-server",
+                    "getBillingConfig",
+                ),
+                [],
             );
-
-            if (!res.getBillingConfig) {
-                return { feeReceiver: null, enabled: false };
-            }
-
             return {
-                feeReceiver: res.getBillingConfig.feeReceiver ?? null,
-                enabled: res.getBillingConfig.enabled,
+                feeReceiver: billing.feeReceiver ?? null,
+                enabled: billing.enabled,
             };
         },
     });
-};

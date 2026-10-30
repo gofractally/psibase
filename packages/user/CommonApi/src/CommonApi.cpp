@@ -87,15 +87,14 @@ namespace SystemService
          std::string cookieName = "__Host-" + name;
 
          std::string cookieAttribs;
-         cookieAttribs += "Path=/; ";
-         cookieAttribs += "SameSite=Strict; ";
-         cookieAttribs += "Secure; ";
-         cookieAttribs += "Max-Age=" + std::to_string(maxAge);
-         cookieAttribs += "; ";
+         cookieAttribs += "; Path=/";
+         cookieAttribs += "; SameSite=Strict";
+         cookieAttribs += "; Secure";
+         cookieAttribs += "; Max-Age=" + std::to_string(maxAge);
          if (httpOnly)
-            cookieAttribs += "HttpOnly; ";
+            cookieAttribs += "; HttpOnly";
 
-         std::string cookieValue = cookieName + "=" + value + "; " + cookieAttribs;
+         std::string cookieValue = cookieName + "=" + value + cookieAttribs;
          return HttpHeader{"Set-Cookie", cookieValue};
       }
 
@@ -123,6 +122,16 @@ namespace SystemService
       {
          bool hostIsSubdomain = to<XHttp>().rootHost(req.host) != req.host;
          return allowCors(req, subdomain, hostIsSubdomain);
+      }
+
+      // Empty unless the request's Origin is the subdomain.
+      std::vector<HttpHeader> allowCredentialedCorsFrom(const HttpRequest& req,
+                                                        AccountNumber      subdomain)
+      {
+         auto headers = allowCorsFrom(req, subdomain);
+         if (!headers.empty())
+            headers.push_back(allowCredentials());
+         return headers;
       }
    }  // namespace
 
@@ -176,8 +185,7 @@ namespace SystemService
       {
          if (request.target == "/common/set-host-cookie")
          {
-            auto headers = allowCorsFrom(request, "supervisor"_a);
-            headers.push_back(allowCredentials());
+            auto headers = allowCredentialedCorsFrom(request, "supervisor"_a);
             reflectRequestedHeaders(headers, request);
 
             return HttpReply{.headers = headers};
@@ -186,8 +194,26 @@ namespace SystemService
 
       if (request.method == "POST")
       {
+         auto requireJson = [&] -> std::optional<HttpReply>
+         {
+            if (request.contentType != "application/json")
+            {
+               auto headers = allowCors();
+               headers.push_back({"Allow", "application/json"});
+               auto msg = std::string_view("Content-Type must be application/json");
+               return HttpReply{
+                   .status      = HttpStatus::unsupportedMediaType,
+                   .contentType = "text/html",
+                   .body        = {msg.begin(), msg.end()},
+                   .headers     = std::move(headers),
+               };
+            }
+            return {};
+         };
          if (request.target == "/common/pack/Transaction")
          {
+            if (auto result = requireJson())
+               return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(extractData<Transaction>(request)),
@@ -196,6 +222,8 @@ namespace SystemService
          }
          if (request.target == "/common/pack/SignedTransaction")
          {
+            if (auto result = requireJson())
+               return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(extractData<SignedTransaction>(request)),
@@ -204,15 +232,10 @@ namespace SystemService
          }
          if (request.target == "/common/set-host-cookie")
          {
-            auto headers = allowCorsFrom(request, "supervisor"_a);
-            if (headers.empty())
-            {
-               return HttpReply{.status      = HttpStatus::forbidden,
-                                .contentType = "text/plain",
-                                .body        = {},
-                                .headers     = {}};
-            }
-            headers.push_back(allowCredentials());
+            if (auto result = requireJson())
+               return result;
+
+            auto headers = allowCredentialedCorsFrom(request, "supervisor"_a);
 
             auto badRequest = [&]() {
                return HttpReply{.status      = HttpStatus::badRequest,

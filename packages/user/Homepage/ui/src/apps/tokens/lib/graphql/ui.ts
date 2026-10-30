@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
-import { tokens } from "@shared/lib/plugins";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { homepage } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
 const qs = {
@@ -61,9 +61,9 @@ const zUserSettingsSchema = z.object({
 
 export const fetchUserSettings = async (username: string) => {
     const query = `{${qs.userSettings(username)}}`;
-    const res = await callGraphqlViaPlugin<
+    const res = await graphqlAuth<
         z.infer<typeof zUserSettingsSchema>
-    >(tokens.authorized.graphql, query);
+    >(homepage.tokens.graphql, query);
     const parsed = zUserSettingsSchema.parse(res);
     return parsed.userSettings.settings;
 };
@@ -90,9 +90,9 @@ export type TokenMetaNode = z.infer<typeof zTokenMetaNodeSchema>;
 
 export const fetchTokenMeta = async (tokenId: string) => {
     const query = `{${qs.tokenMeta(tokenId)}}`;
-    const res = await callGraphqlViaPlugin<
+    const res = await graphqlAuth<
         z.infer<typeof zTokenMetaSchema>
-    >(tokens.authorized.graphql, query);
+    >(homepage.tokens.graphql, query);
     const parsed = zTokenMetaSchema.parse(res);
     return parsed.token;
 };
@@ -123,9 +123,9 @@ export const fetchUserTokenBalanceChanges = async (
     tokenId: number,
 ) => {
     const query = `{${qs.userTokenBalanceChanges(username, tokenId)}}`;
-    const res = await callGraphqlViaPlugin<
+    const res = await graphqlAuth<
         z.infer<typeof zBalChangeResSchema>
-    >(tokens.authorized.graphql, query);
+    >(homepage.tokens.graphql, query);
     const parsed = zBalChangeResSchema.parse(res);
     return parsed.balChanges.nodes;
 };
@@ -166,9 +166,9 @@ export const fetchOpenLinesOfCredit = async (
         ${qs.userPending(username, tokenId)}
     }`;
 
-    const res = await callGraphqlViaPlugin<
+    const res = await graphqlAuth<
         z.infer<typeof zOpenLinesOfCreditResSchema>
-    >(tokens.authorized.graphql, query);
+    >(homepage.tokens.graphql, query);
     return zOpenLinesOfCreditResSchema
         .parse(res)
         .userPending.nodes.map((node: PendingBalanceNode) => node.sharedBal);

@@ -36,7 +36,7 @@ interface ConfirmKeyStepProps {
 
 /**
  * Step UI that asks the user to re-enter their new account name and private
- * key, then imports the credentials onto this device via the accounts plugin.
+ * key, then imports the credentials onto this device via the host login prompt.
  */
 export const ConfirmKeyStep = ({
     expectedAccount,
