@@ -3524,6 +3524,7 @@ dependencies = [
  "serde",
  "serde-aux",
  "serde_json",
+ "url",
  "virtual-server-pkg",
 ]
 
