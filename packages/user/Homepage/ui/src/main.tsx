@@ -7,6 +7,7 @@ import { queryClient } from "@shared/lib/query-client";
 import { Toaster } from "@shared/shadcn/ui/sonner";
 import "@shared/styles/globals.css";
 
+import "./homepage.css";
 import router from "./router";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

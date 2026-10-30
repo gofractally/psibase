@@ -93,7 +93,6 @@ export const bootChain = async ({
             i++;
         }
         onProgressUpdate(["push", labels.length, labels.length, labels]);
-
         onProgressUpdate({ type: "BootComplete", success: true });
     } catch (e) {
         onProgressUpdate({ type: "BootComplete", success: false });

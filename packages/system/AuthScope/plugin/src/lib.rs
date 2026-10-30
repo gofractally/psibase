@@ -5,6 +5,7 @@ mod errors;
 use errors::ErrorType;
 
 use bindings::exports::auth_scope::plugin::api::{AllowedAction as WitAllowed, Guest};
+use psibase::services::accounts::NewAccountMode;
 use psibase::services::auth_scope::{AllowedAction, Wrapper as AuthScope};
 use psibase::services::auth_sig::SubjectPublicKeyInfo;
 use psibase::{AccountNumber, MethodNumber};
@@ -44,7 +45,13 @@ impl Guest for AuthScopePlugin {
                 })
             })
             .collect::<Result<Vec<_>, Error>>()?;
-        AuthScope::add_to_tx().newAccount(name, key, owner, allowed);
+        AuthScope::add_to_tx().newAccount(
+            name,
+            key,
+            owner,
+            allowed,
+            NewAccountMode::REQUIRE_NEW,
+        );
         Ok(())
     }
 }

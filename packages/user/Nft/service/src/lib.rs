@@ -47,10 +47,7 @@ pub mod tables {
         }
 
         pub fn get_next_id(&mut self) -> NID {
-            let next_id = self
-                .next_id
-                .checked_add(1)
-                .expect("overflow in id generation");
+            let next_id = Nft::first_available_id(self.next_id.wrapping_add(1));
             self.next_id = next_id;
             self.save();
             next_id
@@ -62,12 +59,19 @@ pub mod tables {
     }
 
     #[table(name = "NftTable", index = 1)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, PartialEq, SimpleObject)]
     pub struct Nft {
         #[primary_key]
         pub id: NID,
         pub issuer: AccountNumber,
         pub owner: AccountNumber,
+    }
+
+    #[derive(PartialEq)]
+    pub enum NftStatus {
+        Available,
+        Burned,
+        Active(Nft),
     }
 
     impl Nft {
@@ -81,16 +85,36 @@ pub mod tables {
             (self.issuer, self.owner, self.id)
         }
 
-        pub fn new(owner_and_issuer: AccountNumber) -> Self {
-            Self {
-                id: ConfigRow::get_assert().get_next_id(),
-                issuer: owner_and_issuer,
-                owner: owner_and_issuer,
+        pub fn get(nft_id: NID) -> Option<Self> {
+            NftTable::read().get_index_pk().get(&nft_id)
+        }
+
+        pub fn status(id: NID) -> NftStatus {
+            if let Some(nft) = Self::get(id) {
+                NftStatus::Active(nft)
+            } else if Burned::contains(id) {
+                NftStatus::Burned
+            } else {
+                NftStatus::Available
             }
         }
 
-        pub fn get(nft_id: NID) -> Option<Self> {
-            NftTable::read().get_index_pk().get(&nft_id)
+        /// First id at or after `begin` that mint can create. Wraps, and never returns 0.
+        pub fn first_available_id(begin: NID) -> NID {
+            let mut id = if begin == 0 { 1 } else { begin };
+            let start = id;
+            loop {
+                if Self::status(id) == NftStatus::Available {
+                    return id;
+                }
+                id = id.wrapping_add(1);
+                if id == 0 {
+                    id = 1;
+                }
+                if id == start {
+                    abort_message("no NFT id available");
+                }
+            }
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
@@ -98,29 +122,45 @@ pub mod tables {
         }
 
         pub fn get_assert(nft_id: NID) -> Self {
-            Self::get(nft_id).unwrap_or_else(|| {
-                if nft_id <= ConfigRow::get_assert().next_id {
-                    abort_message("NFT was burned")
-                } else {
-                    abort_message("NFT does not exist")
-                }
-            })
+            match Self::status(nft_id) {
+                NftStatus::Active(nft) => nft,
+                NftStatus::Burned => abort_message("NFT was burned"),
+                NftStatus::Available => abort_message("NFT does not exist"),
+            }
         }
 
-        pub fn add() -> Self {
-            let sender = get_sender();
-            let new_instance = Self::new(sender);
-            new_instance.save();
+        pub fn new(sender: AccountNumber, id: NID) -> Self {
+            Self {
+                id,
+                issuer: sender,
+                owner: sender,
+            }
+        }
 
+        pub fn add(id: Option<NID>) -> Self {
+            let sender = get_sender();
+            let id = match id {
+                Some(id) => {
+                    assert!(id != 0, "NFT ID invalid");
+                    match Self::status(id) {
+                        NftStatus::Available => id,
+                        NftStatus::Active(_) | NftStatus::Burned => {
+                            abort_message("NFT ID already taken")
+                        }
+                    }
+                }
+                None => ConfigRow::get_assert().get_next_id(),
+            };
+            let nft = Self::new(sender, id);
+            nft.save();
             super::Wrapper::emit().history().ownerChange(
-                new_instance.id,
+                nft.id,
                 MINTED,
                 sender,
                 super::Wrapper::SERVICE,
                 "Minted".into(),
             );
-
-            new_instance
+            nft
         }
 
         pub fn burn(&self) {
@@ -135,6 +175,7 @@ pub mod tables {
                 super::Wrapper::SERVICE,
                 "Burned".into(),
             );
+            Burned::add(self.id);
             self.erase();
         }
 
@@ -315,6 +356,27 @@ pub mod tables {
         }
     }
 
+    #[table(name = "BurnedTable", index = 5)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct Burned {
+        #[primary_key]
+        pub id: NID,
+    }
+
+    impl Burned {
+        pub fn get(id: NID) -> Option<Self> {
+            BurnedTable::read().get_index_pk().get(&id)
+        }
+
+        pub fn contains(id: NID) -> bool {
+            Self::get(id).is_some()
+        }
+
+        fn add(id: NID) {
+            BurnedTable::read_write().put(&Self { id }).unwrap();
+        }
+    }
+
     impl NftHolder {
         pub fn get_or_default(account: AccountNumber) -> Self {
             NftHolderTable::read()
@@ -382,8 +444,8 @@ pub mod service {
     }
 
     #[action]
-    pub fn mint() -> NID {
-        Nft::add().id
+    pub fn mint(nftId: Option<NID>) -> NID {
+        Nft::add(nftId).id
     }
 
     #[action]
@@ -469,3 +531,4 @@ pub mod service {
     ) {
     }
 }
+

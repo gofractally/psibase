@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-name-market"
-plugin = "name-market-plugin"
+plugins = ["name-market-plugin"]
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "namemarket", service = "namemarket", method = "init", data = {} },

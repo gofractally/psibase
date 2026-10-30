@@ -22,6 +22,11 @@ mod service {
     }
 
     #[action]
+    fn init() {
+        unimplemented!();
+    }
+
+    #[action]
     fn setConsensus(prods: ConsensusData) {
         unimplemented!();
     }
@@ -38,6 +43,11 @@ mod service {
 
     #[action]
     fn unregCand() {
+        unimplemented!();
+    }
+
+    #[action]
+    fn getCandidate(account: AccountNumber) -> Option<CandidateInfo> {
         unimplemented!();
     }
 
