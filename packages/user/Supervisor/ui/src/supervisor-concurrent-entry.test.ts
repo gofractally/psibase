@@ -21,9 +21,7 @@ vi.mock("./plugin/plugin-loader", () => ({
 
 vi.mock("./utils", () => ({
     networkNamePromise: Promise.resolve("network"),
-    chainIdPromise: Promise.resolve("chain-id"),
     networkName: "network",
-    chainId: "chain-id",
     isEmbedded: false,
     setQueryToken: vi.fn(),
     serviceFromOrigin: () => "homepage",

@@ -475,7 +475,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Aes(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -643,6 +643,12 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Subgroups.psi
     PATH packages/user/Subgroups
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/HostDb.psi
+    PATH packages/user/HostDb
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
@@ -1017,7 +1023,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
     NAME Supervisor
     VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "DynLd(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "DynLd(^${PSIBASE_VERSION}.0)" "HostDb(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/postinstall.json
     SERVICE supervisor
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/ui/dist/* /
@@ -1367,7 +1373,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthNone AuthDyn AuthSig AuthDelegate AuthScope Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostDb HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
@@ -1377,7 +1383,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthNone AuthDyn AuthSig AuthDelegate AuthScope Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostDb HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
@@ -1450,7 +1456,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthScope AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostDb HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XPortal XProxy XRun XSites XTimer XTransact)
 
@@ -1496,6 +1502,7 @@ install(
           ${SERVICE_DIR}/FractalGen.psi
           ${SERVICE_DIR}/FractalTester.psi
           ${SERVICE_DIR}/Host.psi
+          ${SERVICE_DIR}/HostDb.psi
           ${SERVICE_DIR}/HostLoginPrompt.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
