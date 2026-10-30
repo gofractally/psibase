@@ -696,6 +696,10 @@ psibase_package(
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
+        DATA      ${COMMON_API}/common/default-pages/index.html               /common/default-pages/index.html
+        DATA      ${COMMON_API}/common/default-pages/style.css                /common/default-pages/style.css
+        DATA      ${COMMON_API}/common/default-pages/page.js                  /common/default-pages/page.js
+    POSTINSTALL ${COMMON_API}/postinstall.json
     DEPENDS CommonApiCommonLib_js
     DEPENDS ${ComponentParser_DEP}
     DEPENDS ${PluginTester_js_DEP}
@@ -779,21 +783,6 @@ psibase_package(
         DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
-)
-
-set(DefaultAccountPage_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/DefaultAccountPage)
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/DefaultAccountPage.psi
-    NAME DefaultAccountPage
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Page shown at the subdomain of accounts that haven't published a site"
-    POSTINSTALL ${DefaultAccountPage_DIR}/postinstall.json
-    SERVICE acct-404
-        DATA ${DefaultAccountPage_DIR}/site/index.html /index.html
-        DATA ${DefaultAccountPage_DIR}/site/404.html /404.html
-        DATA ${DefaultAccountPage_DIR}/site/style.css /style.css
-        DATA ${DefaultAccountPage_DIR}/site/page.js /page.js
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1339,7 +1328,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    DefaultAccountPage Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
@@ -1349,7 +1338,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    DefaultAccountPage Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
@@ -1412,7 +1401,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    DefaultAccountPage Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1442,7 +1431,6 @@ install(
           ${SERVICE_DIR}/ProdWithFG.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Db.psi
-          ${SERVICE_DIR}/DefaultAccountPage.psi
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/DynLd.psi
           ${SERVICE_DIR}/Events.psi

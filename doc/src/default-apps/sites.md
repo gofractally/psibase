@@ -10,12 +10,11 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 ## Default account page
 
-Every account has a subdomain, even if it never uploads any content. When a request doesn't match any of an account's content (including its proxy), the `sites` service falls back to the content uploaded by the `acct-404` account, which is installed by the `DefaultAccountPage` package:
+Every subdomain for valid account names is reachable, even for accounts that never upload any content or don't exist. When a page request (a path with no file extension, or ending in `.html`) matches none of an account's content, and the account has no `/index.html` and no proxy, the `sites` service serves a default page with a `404 Not Found` status. The page tells visitors there's nothing at that address yet, and links the account's owner to the Workshop app (when installed) and to the developer docs.
 
-- If the account exists but has no `/index.html` and no proxy, pages are served from `acct-404`'s `/index.html`. That page tells visitors the account hasn't published a site yet, and links its owner to the Workshop app (when installed) and to the developer docs.
-- If the account doesn't exist, pages are served from `acct-404`'s `/404.html` with a `404 Not Found` status.
+The default page is uploaded by the `common-api` service at `/common/default-pages/index.html`, along with the stylesheet and script it loads from the same directory. Since every `/common/` path is served by `common-api` on every subdomain, these files are always available and can't conflict with an account's own files.
 
-Any other static asset (e.g. `/style.css`) is served from `acct-404` at the same path. Uploading an `/index.html` (or setting a proxy) replaces the default page, and the account's own content always takes precedence. If the `DefaultAccountPage` package isn't installed, a plain `404 Not Found` is returned.
+The account's own content always takes precedence. Requests for other files (e.g. `/style.css` or a plugin's `.wasm`) that match nothing get a plain `404 Not Found`, as do all misses on an account that has an `/index.html` or a proxy, so a site's owner controls its own error pages.
 
 ## CSP header baseline
 

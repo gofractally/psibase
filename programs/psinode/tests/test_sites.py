@@ -6,61 +6,58 @@ import testutil
 import tempfile
 import unittest
 
+DEFAULT_PAGE_MARKER = '/common/default-pages/page.js'
+
 class TestSites(unittest.TestCase):
     @testutil.psinode_test
-    def test_default_site(self, cluster):
+    def test_default_page(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
-        default_page = TestPackage('DefaultPage', '1.0.0').depends('Sites').service('acct-404', data={'index.html': 'landing', '404.html': 'missing', 'style.css': 'css'})
         apps = TestPackage('Apps', '1.0.0').depends('Sites')
         apps.service('foo', data={'index.html': 'foo home'})
-        apps.service('bar', data={'file.txt': 'bar file'})
+        apps.service('bar', data={'about.html': 'bar about', 'style.css': 'bar css'})
         apps.service('baz')
         apps.service('qux')
 
         with tempfile.TemporaryDirectory() as dir:
-            make_package_repository(dir, [default_page, apps])
+            make_package_repository(dir, [apps])
             a.install(['Apps'], sources=[dir])
-            a.push_action('qux', 'sites', 'setProxy', {'proxy': 'bar'})
-            a.wait(new_block())
+        a.push_action('qux', 'sites', 'setProxy', {'proxy': 'bar'})
+        a.wait(new_block())
 
-            self.assertNotFound(a.get('/', 'baz'), "The resource '/' was not found")
+        # Page requests on accounts without an index get the default page
+        for (path, account) in [('/', 'baz'), ('/a/route', 'baz'), ('/page.html', 'baz'), ('/', 'bar'), ('/', 'nosuchacct')]:
+            self.assertDefaultPage(a.get(path, account))
 
-            a.install(['DefaultPage'], sources=[dir])
-            a.wait(new_block())
+        # Other files never get the default page
+        for (path, account) in [('/style.css', 'baz'), ('/plugin.wasm', 'baz'), ('/other.wasm', 'baz'), ('/x.wasm', 'nosuchacct'), ('/common/nope', 'baz')]:
+            self.assertPlainNotFound(a.get(path, account), path)
 
-        # Existing accounts without an index fall back to the default index
-        for path in ['/', '/a/route', '/page.html']:
-            self.assertResponse(a.get(path, 'baz'), 'landing')
-        self.assertResponse(a.get('/style.css', 'baz'), 'css')
-        self.assertEqual(a.get('/plugin.wasm', 'baz').status_code, 404)
-        self.assertEqual(a.get('/favicon.ico', 'baz').status_code, 404)
+        # An account's own content takes precedence, and the default page's assets can't conflict with it
+        self.assertResponse(a.get('/about.html', 'bar'), 'bar about')
+        self.assertResponse(a.get('/style.css', 'bar'), 'bar css')
+        with a.get('/common/default-pages/style.css', 'bar') as reply:
+            reply.raise_for_status()
+            self.assertNotEqual(reply.text, 'bar css')
 
-        # An account's own content takes precedence
-        self.assertResponse(a.get('/', 'bar'), 'landing')
-        self.assertResponse(a.get('/file.txt', 'bar'), 'bar file')
-
-        # Accounts with an index don't fall back
+        # Accounts with an index or a proxy handle their own misses
         self.assertResponse(a.get('/', 'foo'), 'foo home')
-        self.assertEqual(a.get('/style.css', 'foo').status_code, 404)
-
-        # Accounts with a proxy don't fall back
-        self.assertEqual(a.get('/', 'qux').status_code, 404)
-        self.assertResponse(a.get('/file.txt', 'qux'), 'bar file')
-
-        # Accounts that don't exist get the 404 page
-        self.assertNotFound(a.get('/', 'nosuchacct'), 'missing')
-        self.assertNotFound(a.get('/index.html', 'nosuchacct'), 'missing')
-        self.assertResponse(a.get('/style.css', 'nosuchacct'), 'css')
+        self.assertPlainNotFound(a.get('/missing', 'foo'), '/missing')
+        self.assertPlainNotFound(a.get('/', 'qux'), '/')
+        self.assertResponse(a.get('/about.html', 'qux'), 'bar about')
 
     def assertResponse(self, response, expected):
         response.raise_for_status()
         self.assertEqual(response.text, expected)
 
-    def assertNotFound(self, response, expected):
+    def assertDefaultPage(self, response):
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.text, expected)
+        self.assertIn(DEFAULT_PAGE_MARKER, response.text)
+
+    def assertPlainNotFound(self, response, path):
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.text, "The resource '%s' was not found" % path)
 
 if __name__ == '__main__':
     testutil.main()

@@ -420,14 +420,12 @@ namespace SystemService
          return !isStaticAsset(target) || target.ends_with(".html");
       }
 
-      // Looks up `target` on the default site for accounts that haven't published a site.
-      // `notFound` is set when the reply should carry a 404 status.
-      std::optional<SitesContentRow> getDefaultContentRow(const psibase::AccountNumber& account,
-                                                          const std::string&            target,
-                                                          bool&                         notFound)
+      // The page to serve, with a 404 status, when `target` matches none of `account`'s content
+      std::optional<SitesContentRow> getDefaultPage(const psibase::AccountNumber& account,
+                                                    const std::string&            target)
       {
-         if (account == Sites::service || account == Sites::defaultSite ||
-             target == "/plugin.wasm")
+         if (!isPage(target) || account == Sites::service ||
+             account == HttpServer::commonApiService || getProxy(account))
          {
             return std::nullopt;
          }
@@ -436,19 +434,13 @@ namespace SystemService
                           .open<SitesContentTable>()
                           .getIndex<0>();
 
-         bool exists = to<Accounts>().exists(account);
-         if (exists && (getProxy(account) || index.get(SitesContentKey{account, "/index.html"})))
+         if (index.get(SitesContentKey{account, "/index.html"}))
          {
             return std::nullopt;
          }
 
-         std::string path = target;
-         if (isPage(target))
-         {
-            path     = exists ? "/index.html" : "/404.html";
-            notFound = !exists;
-         }
-         return index.get(SitesContentKey{Sites::defaultSite, path});
+         return index.get(
+             SitesContentKey{HttpServer::commonApiService, std::string(Sites::defaultPage)});
       }
 
       std::vector<char> getRawData(const SitesContentRow& row)
@@ -498,7 +490,8 @@ namespace SystemService
          bool notFound = false;
          if (!content)
          {
-            content = getDefaultContentRow(account, target, notFound);
+            content  = getDefaultPage(account, target);
+            notFound = content.has_value();
          }
 
          if (content)

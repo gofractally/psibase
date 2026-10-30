@@ -1,4 +1,4 @@
-// Served for every account without a site, so the account and network are taken from the URL.
+// Served on any account subdomain without a page, so the account and network are taken from the URL.
 const [account, ...rootLabels] = location.hostname.split(".");
 const rootHost = rootLabels.join(".");
 const port = location.port ? `:${location.port}` : "";
