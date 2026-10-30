@@ -55,13 +55,14 @@ interface Props {
 const templateLabel: Record<BootTemplate, string> = {
     dev: "Developer",
     prod: "Production",
+    priv: "Private",
 };
 
-const devAccountTypeHint =
-    "Creating a network with the Development template creates your account in an insecure keyless mode. The account is automatically imported into the accounts app in the current device's web browser.";
-
-const secureAccountTypeHint = (templateName: string) =>
-    `Creating a network with the ${templateName} template automatically generates a keypair for your account. The account is automatically imported into the accounts app in the current device's web browser.`;
+const accountTypeHint: Record<BootTemplate, string> = {
+    dev: "Creating a network with the Development template creates your account in an insecure keyless mode. The account is automatically imported into the accounts app in the current device's web browser.",
+    prod: "Creating a network with the Production template automatically generates a keypair for your account. The account is automatically imported into the accounts app in the current device's web browser.",
+    priv: "Creating a network with the Private template automatically generates a keypair for your account. The account is automatically imported into the accounts app in the current device's web browser.",
+};
 
 export const InstallationSummary = ({
     template,
@@ -90,13 +91,7 @@ export const InstallationSummary = ({
                         <Chip
                             label="Account Type"
                             value={isDev ? "Insecure" : "Secure"}
-                            hint={
-                                isDev
-                                    ? devAccountTypeHint
-                                    : secureAccountTypeHint(
-                                          templateLabel[template],
-                                      )
-                            }
+                            hint={accountTypeHint[template]}
                         />
                         {isDev ? null : (
                             <Chip

@@ -1,27 +1,23 @@
 import { getRequiredPackages } from "@/lib/get-required-packages";
 import { PackageInfo } from "@/types";
 
-export const bootTemplates = ["dev", "prod"] as const;
+export const bootTemplates = ["dev", "prod", "priv"] as const;
 
 export type BootTemplate = (typeof bootTemplates)[number];
 
-export const bootTemplateSystemPackage: Record<BootTemplate, string> = {
+const bootPackageName: Record<BootTemplate, string> = {
     dev: "DevDefault",
     prod: "ProdWithFG",
+    priv: "PrivDefault",
 };
 
-export const bootPackageNames = Object.values(bootTemplateSystemPackage);
-
-export const bootTemplatesAvailable = (packages: PackageInfo[]): boolean =>
-    bootPackageNames.every((name) => packages.some((pack) => pack.name === name));
-
 export const getDefaultSelectedPackages = (
-    template: BootTemplate,
+    template: BootTemplate | undefined,
     packages: PackageInfo[],
 ): PackageInfo[] => {
-    if (packages.length == 0) return [];
+    if (!template || packages.length == 0) return [];
 
-    const relevantPackageName = bootTemplateSystemPackage[template];
+    const relevantPackageName = bootPackageName[template];
     const relevantPackage = packages.find(
         (pack) => pack.name === relevantPackageName,
     );

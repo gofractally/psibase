@@ -207,7 +207,8 @@ namespace
       transactor<Tokens>        tokens{producer, Tokens::service};
       transactor<VirtualServer> vserver{producer, VirtualServer::service};
       std::vector<Action>       actions{
-          scope.newAccount(XPortal::creatorAccount, pub, producer, XPortal::creatorAllowed())};
+          scope.newAccount(XPortal::creatorAccount, pub, producer, XPortal::creatorAllowed(),
+                           NewAccountMode::requireNew)};
       REQUIRE(buffer.has_value() == grant.has_value());
       if (buffer)
       {
@@ -340,7 +341,10 @@ TEST_CASE("status, requests switch, and seeded pricing")
    CHECK(!config.price_per_token_usd_micros.has_value());
 
    std::vector<AllowedAction> allowed{{Tokens::service, MethodNumber{"debit"}}};
-   REQUIRE(t.from(alice).to<AuthScope>().newAccount(creator, agentPub, alice, allowed).succeeded());
+   REQUIRE(t.from(alice)
+               .to<AuthScope>()
+               .newAccount(creator, agentPub, alice, allowed, NewAccountMode::requireNew)
+               .succeeded());
    status = t.get<Status>(XPortal::service, "/status");
    CHECK(status.conditions[0].ok == false);
 
@@ -500,7 +504,8 @@ TEST_CASE("provision commits one attempt before signing")
    // Debit-only whitelist: createInvite is outside it, so signTx aborts after the attempt commits.
    transactor<AuthScope> scope{alice, AuthScope::service};
    expect(t.pushTransaction(t.makeTransaction({scope.newAccount(
-       creator, agentPub, alice, std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})})));
+       creator, agentPub, alice, std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}},
+       NewAccountMode::requireNew)})));
    t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
 
    auto created = t.http<SignupReceipt>(signupRequest(21));

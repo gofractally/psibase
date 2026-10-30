@@ -3,6 +3,7 @@
 #include <optional>
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/Transact.hpp>
 #include <vector>
@@ -26,6 +27,8 @@ namespace SystemService
       AuthSig::SubjectPublicKeyInfo pubkey;
       psibase::AccountNumber        owner;
       std::vector<AllowedAction>    allowed;
+
+      friend bool operator==(const AuthScopeRow&, const AuthScopeRow&) = default;
    };
    PSIO_REFLECT(AuthScopeRow, account, pubkey, owner, allowed)
 
@@ -33,8 +36,6 @@ namespace SystemService
    PSIO_REFLECT_TYPENAME(AuthScopeTable)
 
    /// Auth service for an account whose key may authorize only whitelisted actions.
-   ///
-   /// The key cannot authorize an action on `auth-scope`.
    class AuthScope : public psibase::Service
    {
      public:
@@ -44,11 +45,10 @@ namespace SystemService
 
       /// Authenticate `sender` for `action`.
       ///
-      /// A `verify-sig` claim must carry `pubkey`. When `firstAuthFlag` is set, that claim must be
-      /// first. The action must match `allowed` and must not target `auth-scope`.
+      /// A `verify-sig` claim must carry `pubkey`. The action must match `allowed`.
       ///
-      /// Returns false if the claim is missing, the action is not whitelisted, or the action
-      /// targets `auth-scope`. Aborts only when `sender` has no row.
+      /// Returns false if the claim is missing or the action is not whitelisted. Aborts only when
+      /// `sender` has no row.
       bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
@@ -61,14 +61,16 @@ namespace SystemService
       std::vector<psibase::AccountNumber> getDlgsSys(psibase::AccountNumber       sender,
                                                      std::optional<ServiceMethod> method);
 
-      /// Returns whether the sender's `owner` is among `authorizers`.
+      /// Returns whether the sender's `owner` is among `authorizers`, or the sender is among
+      /// `authorizers` and `method` is whitelisted for the sender.
       ///
       /// Aborts when `sender` has no row.
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers,
                      std::optional<ServiceMethod>        method);
 
-      /// Returns whether the sender's `owner` is among `rejecters`.
+      /// Returns whether the sender's `owner` is among `rejecters`, or the sender is among
+      /// `rejecters` and `method` is whitelisted for the sender.
       ///
       /// Aborts when `sender` has no row.
       bool isRejectSys(psibase::AccountNumber              sender,
@@ -77,11 +79,21 @@ namespace SystemService
 
       /// Creates `name` on this auth service and stores its row.
       ///
-      /// Aborts if `owner` does not exist or `name` already exists.
-      void newAccount(psibase::AccountNumber        name,
+      /// The behavior if `name` already exists is determined by `mode`:
+      /// * `requireNew`: aborts.
+      /// * `matchExisting`: aborts unless `name` uses this auth service and its row already has
+      ///   this `key`, `owner`, and `allowed`. Changes nothing, so any sender may call it.
+      /// * `keepExisting`: replaces the row's `key`, `owner`, and `allowed`. The sender must be the
+      ///   row's current `owner`.
+      ///
+      /// Aborts if `owner` does not exist, or if `owner` is `name` or is owned by `name`.
+      ///
+      /// Returns true if an account was created.
+      bool newAccount(psibase::AccountNumber        name,
                       AuthSig::SubjectPublicKeyInfo key,
                       psibase::AccountNumber        owner,
-                      std::vector<AllowedAction>    allowed);
+                      std::vector<AllowedAction>    allowed,
+                      NewAccountMode                mode);
 
       /// Returns the stored row, if any.
       std::optional<AuthScopeRow> get(psibase::AccountNumber account);
@@ -98,8 +110,11 @@ namespace SystemService
       void setAllowed(psibase::AccountNumber     account,
                       std::vector<AllowedAction> allowed);
 
-     private:
-      psibase::AccountNumber checkOwner(psibase::AccountNumber sender);
+      /// Replaces `account`'s owning account. The sender must be the row's `owner`.
+      ///
+      /// Aborts if `account` has no row, the sender is not the row's `owner`, `owner` does not
+      /// exist, or ownership would be circular.
+      void setOwner(psibase::AccountNumber account, psibase::AccountNumber owner);
    };
    PSIO_REFLECT(AuthScope,  //
                 method(checkAuthSys, flags, sender, action, claims),
@@ -107,10 +122,11 @@ namespace SystemService
                 method(getDlgsSys, sender, method),
                 method(isAuthSys, sender, authorizers, method),
                 method(isRejectSys, sender, rejecters, method),
-                method(newAccount, name, key, owner, allowed),
+                method(newAccount, name, key, owner, allowed, mode),
                 method(get, account),
                 method(setKey, account, key),
-                method(setAllowed, account, allowed)
+                method(setAllowed, account, allowed),
+                method(setOwner, account, owner)
                 //
    )
    PSIBASE_REFLECT_TABLES(AuthScope, AuthScope::Tables)

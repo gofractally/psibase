@@ -24,21 +24,20 @@ pub struct AuthScopeRow {
 }
 
 /// Auth service for an account whose key may authorize only whitelisted actions.
-///
-/// The key cannot authorize an action on `auth-scope`.
 #[crate::service(name = "auth-scope", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use super::{AllowedAction, AuthScopeRow, SubjectPublicKeyInfo};
-    use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
+    use crate::{
+        services::accounts::NewAccountMode, services::transact::ServiceMethod, AccountNumber, Claim,
+    };
 
     /// Authenticate `sender` for `action`.
     ///
-    /// A `verify-sig` claim must carry `pubkey`. When `firstAuthFlag` is set, that claim must be
-    /// first. The action must match `allowed` and must not target `auth-scope`.
+    /// A `verify-sig` claim must carry `pubkey`. The action must match `allowed`.
     ///
-    /// Returns false if the claim is missing, the action is not whitelisted, or the action
-    /// targets `auth-scope`. Aborts only when `sender` has no row.
+    /// Returns false if the claim is missing or the action is not whitelisted. Aborts only when
+    /// `sender` has no row.
     #[action]
     fn checkAuthSys(
         flags: u32,
@@ -64,7 +63,8 @@ mod service {
     /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
     /// transaction from a specified sender.
     ///
-    /// Returns `true` if the sender's `owner` is among the authorizers. Aborts when `sender` has no row.
+    /// Returns `true` if the sender's `owner` is among the authorizers, or the sender is among
+    /// the authorizers and `method` is whitelisted for the sender. Aborts when `sender` has no row.
     #[action]
     fn isAuthSys(
         sender: AccountNumber,
@@ -77,7 +77,8 @@ mod service {
     /// Check whether a specified set of rejecter accounts are sufficient to reject a transaction
     /// from a specified sender.
     ///
-    /// Returns `true` if the sender's `owner` is among the rejecters. Aborts when `sender` has no row.
+    /// Returns `true` if the sender's `owner` is among the rejecters, or the sender is among
+    /// the rejecters and `method` is whitelisted for the sender. Aborts when `sender` has no row.
     #[action]
     fn isRejectSys(
         sender: AccountNumber,
@@ -89,14 +90,24 @@ mod service {
 
     /// Creates `name` on this auth service and stores its row.
     ///
-    /// Aborts if `owner` does not exist or `name` already exists.
+    /// The behavior if `name` already exists is determined by `mode`:
+    /// * `requireNew`: aborts.
+    /// * `matchExisting`: aborts unless `name` uses this auth service and its row already has
+    ///   this `key`, `owner`, and `allowed`. Changes nothing, so any sender may call it.
+    /// * `keepExisting`: replaces the row's `key`, `owner`, and `allowed`. The sender must be the
+    ///   row's current `owner`.
+    ///
+    /// Aborts if `owner` does not exist, or if `owner` is `name` or is owned by `name`.
+    ///
+    /// Returns true if an account was created.
     #[action]
     fn newAccount(
         name: AccountNumber,
         key: SubjectPublicKeyInfo,
         owner: AccountNumber,
         allowed: Vec<AllowedAction>,
-    ) {
+        mode: NewAccountMode,
+    ) -> bool {
         unimplemented!()
     }
 
@@ -119,6 +130,15 @@ mod service {
     /// Aborts if `account` has no row or the sender is not the row's `owner`.
     #[action]
     fn setAllowed(account: AccountNumber, allowed: Vec<AllowedAction>) {
+        unimplemented!()
+    }
+
+    /// Replaces `account`'s owning account. The sender must be the row's `owner`.
+    ///
+    /// Aborts if `account` has no row, the sender is not the row's `owner`, `owner` does not
+    /// exist, or ownership would be circular.
+    #[action]
+    fn setOwner(account: AccountNumber, owner: AccountNumber) {
         unimplemented!()
     }
 }
