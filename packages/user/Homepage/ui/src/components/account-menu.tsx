@@ -20,6 +20,7 @@ import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate
 
 import { useAccountSheet } from "@/hooks/use-account-sheet";
 import { useGenerateInvite } from "@/hooks/use-generate-invite";
+import { useSystemTokenBalance } from "@/hooks/use-system-token-balance";
 
 import { Avatar } from "@shared/components/avatar";
 import { useTheme } from "@shared/components/theme-provider";
@@ -27,6 +28,7 @@ import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useLogout } from "@shared/hooks/use-logout";
 import { useProfile } from "@shared/hooks/use-profile";
+import { useSystemTokenPolicy } from "@shared/hooks/use-system-token-policy";
 import { Dialog } from "@shared/shadcn/ui/dialog";
 import {
     DropdownMenu,
@@ -104,6 +106,20 @@ const AccountItems = ({
     const displayName = profile?.profile?.displayName?.trim();
     const { open: openAccount } = useAccountSheet();
     const marketplace = useAccountMarketplaceVisibility();
+    const {
+        restrictsSelfService,
+        isLoading: isNetworkLoading,
+        billingEnabled,
+        isTransferable,
+    } = useSystemTokenPolicy();
+    const { hasBalance, isLoading: isBalanceLoading } = useSystemTokenBalance();
+    const balanceGatesInvites =
+        !!user && billingEnabled && isTransferable === true;
+    const showCreateInvite =
+        !isNetworkLoading &&
+        !(balanceGatesInvites && isBalanceLoading) &&
+        !restrictsSelfService;
+    const inviteNeedsBalance = balanceGatesInvites && !hasBalance;
 
     return (
         <>
@@ -155,10 +171,23 @@ const AccountItems = ({
                         </Link>
                     </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={onInvite}>
-                    <UserPlus />
-                    Invite a friend
-                </DropdownMenuItem>
+                {showCreateInvite && (
+                    <>
+                        <DropdownMenuItem
+                            disabled={inviteNeedsBalance}
+                            onClick={onInvite}
+                        >
+                            <UserPlus />
+                            Invite a friend
+                        </DropdownMenuItem>
+                        {inviteNeedsBalance && (
+                            <p className="text-destructive px-2 pb-1 text-xs">
+                                You need a system token balance to create an
+                                invite.
+                            </p>
+                        )}
+                    </>
+                )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
         </>
