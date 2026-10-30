@@ -781,6 +781,21 @@ psibase_package(
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
 )
 
+set(DefaultAccountPage_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/DefaultAccountPage)
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/DefaultAccountPage.psi
+    NAME DefaultAccountPage
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Page shown at the subdomain of accounts that haven't published a site"
+    POSTINSTALL ${DefaultAccountPage_DIR}/postinstall.json
+    SERVICE acct-404
+        DATA ${DefaultAccountPage_DIR}/site/index.html /index.html
+        DATA ${DefaultAccountPage_DIR}/site/404.html /404.html
+        DATA ${DefaultAccountPage_DIR}/site/style.css /style.css
+        DATA ${DefaultAccountPage_DIR}/site/page.js /page.js
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/DynLd.psi
     NAME DynLd
@@ -1324,7 +1339,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    DefaultAccountPage Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
@@ -1334,7 +1349,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    DefaultAccountPage Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
@@ -1397,7 +1412,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
+    DefaultAccountPage Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1427,6 +1442,7 @@ install(
           ${SERVICE_DIR}/ProdWithFG.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Db.psi
+          ${SERVICE_DIR}/DefaultAccountPage.psi
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/DynLd.psi
           ${SERVICE_DIR}/Events.psi

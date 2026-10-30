@@ -8,6 +8,15 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 # Additional design notes
 
+## Default account page
+
+Every account has a subdomain, even if it never uploads any content. When a request doesn't match any of an account's content (including its proxy), the `sites` service falls back to the content uploaded by the `acct-404` account, which is installed by the `DefaultAccountPage` package:
+
+- If the account exists but has no `/index.html` and no proxy, pages are served from `acct-404`'s `/index.html`. That page tells visitors the account hasn't published a site yet, and links its owner to the Workshop app (when installed) and to the developer docs.
+- If the account doesn't exist, pages are served from `acct-404`'s `/404.html` with a `404 Not Found` status.
+
+Any other static asset (e.g. `/style.css`) is served from `acct-404` at the same path. Uploading an `/index.html` (or setting a proxy) replaces the default page, and the account's own content always takes precedence. If the `DefaultAccountPage` package isn't installed, a plain `404 Not Found` is returned.
+
 ## CSP header baseline
 
 The `Content-Security-Policy` header aids security efforts, as modern browsers restrict the capabilities of the document on the client-side according to the policy expressed in this header. The sites server uses a strict baseline CSP header; apps with additional requirements (e.g. the supervisor, prompt pages, or sites built with tooling that emits inline scripts) override it with the `setCsp` action.

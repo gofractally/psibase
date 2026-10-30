@@ -415,6 +415,42 @@ namespace SystemService
          return content;
       }
 
+      bool isPage(const std::string& target)
+      {
+         return !isStaticAsset(target) || target.ends_with(".html");
+      }
+
+      // Looks up `target` on the default site for accounts that haven't published a site.
+      // `notFound` is set when the reply should carry a 404 status.
+      std::optional<SitesContentRow> getDefaultContentRow(const psibase::AccountNumber& account,
+                                                          const std::string&            target,
+                                                          bool&                         notFound)
+      {
+         if (account == Sites::service || account == Sites::defaultSite ||
+             target == "/plugin.wasm")
+         {
+            return std::nullopt;
+         }
+
+         auto index = Sites::Tables{getReceiver(), KvMode::read}
+                          .open<SitesContentTable>()
+                          .getIndex<0>();
+
+         bool exists = to<Accounts>().exists(account);
+         if (exists && (getProxy(account) || index.get(SitesContentKey{account, "/index.html"})))
+         {
+            return std::nullopt;
+         }
+
+         std::string path = target;
+         if (isPage(target))
+         {
+            path     = exists ? "/index.html" : "/404.html";
+            notFound = !exists;
+         }
+         return index.get(SitesContentKey{Sites::defaultSite, path});
+      }
+
       std::vector<char> getRawData(const SitesContentRow& row)
       {
          auto table = Sites::Tables{Sites::service, KvMode::read}.open<SitesDataTable>();
@@ -458,7 +494,12 @@ namespace SystemService
          Tables tables{getReceiver(), KvMode::read};
          auto   target = request.path();
 
-         auto content = getContentRow(account, target);
+         auto content  = getContentRow(account, target);
+         bool notFound = false;
+         if (!content)
+         {
+            content = getDefaultContentRow(account, target, notFound);
+         }
 
          if (content)
          {
@@ -466,7 +507,7 @@ namespace SystemService
                 getCspHeader(content, content->account, cspRootDomain(rootHost, request));
             auto etag = psio::hex(content->contentHash.data(), content->contentHash.data() + 8);
 
-            if (useCache(content->account) && shouldCache(request, etag))
+            if (!notFound && useCache(content->account) && shouldCache(request, etag))
             {
                // https://issues.chromium.org/issues/40132719
                // Chrome bug - Devtools still shows 200 status code sometimes
@@ -480,6 +521,7 @@ namespace SystemService
             }
 
             auto reply = HttpReply{
+                .status      = notFound ? HttpStatus::notFound : HttpStatus::ok,
                 .contentType = content->contentType,
                 .headers     = {{"Content-Security-Policy", cspHeader},
                                 {"Cache-Control", "no-cache"},

@@ -1,0 +1,11 @@
+[
+  {
+    "sender": "acct-404",
+    "service": "sites",
+    "method": "setcsp",
+    "data": {
+      "path": "*",
+      "csp": "default-src 'self';script-src 'self';style-src 'self';img-src 'self';font-src 'self';connect-src 'self' branding.{{root}} packages.{{root}};frame-src 'none';frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';"
+    }
+  }
+]

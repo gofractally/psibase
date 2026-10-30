@@ -87,7 +87,19 @@ namespace SystemService
       using Tables                  = psibase::
           ServiceTables<SitesContentTable, SiteConfigTable, SitesDataTable, SitesDataRefTable>;
 
+      /// The site served on behalf of accounts that have not published their own site
+      static constexpr auto defaultSite = psibase::AccountNumber("acct-404");
+
       /// Serves a request by looking up the content uploaded to the specified subdomain
+      ///
+      /// If no content matches, the request falls back to the `defaultSite` content:
+      /// - For an existing account with no `/index.html` and no proxy, pages are served
+      ///   from the default site's `/index.html`.
+      /// - For an account that does not exist, pages are served from the default site's
+      ///   `/404.html` with a 404 status.
+      ///
+      /// In both cases, other static assets (e.g. `/style.css`) are served from the default
+      /// site at the same path.
       auto serveSys(psibase::HttpRequest        request,
                     std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 
