@@ -1,6 +1,6 @@
-use psibase::plugin_error;
-
-plugin_error! {
-    pub ErrorType
-    JsonError(msg: String) => "JSON error: {msg}",
+#[derive(Debug, psibase_plugin::ErrorEnum, thiserror::Error)]
+#[repr(u32)]
+pub enum ErrorType {
+    #[error("JSON error: {0}")]
+    JsonError(String),
 }

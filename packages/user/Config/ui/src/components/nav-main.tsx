@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import { cn } from "@shared/lib/utils";
 import {
     SidebarGroup,
@@ -70,11 +71,17 @@ export const appMenus: Menu[] = [
 ];
 
 export function NavMain() {
+    const { data: systemToken } = useSystemToken();
+    const menus =
+        systemToken?.untransferable === true
+            ? appMenus.filter((item) => item.path !== "account-marketplace")
+            : appMenus;
+
     return (
         <SidebarGroup>
             <SidebarGroupLabel>Network configuration</SidebarGroupLabel>
             <SidebarMenu>
-                {appMenus.map((item) => (
+                {menus.map((item) => (
                     <NavLink to={`/${item.path}`}>
                         {({ isActive }) => (
                             <SidebarMenuItem

@@ -2,6 +2,7 @@
 #include <psibase/dispatch.hpp>
 #include <ranges>
 #include <services/system/Accounts.hpp>
+#include <services/system/AuthDelegate.hpp>
 #include <services/system/Producers.hpp>
 #include "services/system/Transact.hpp"
 
@@ -84,6 +85,21 @@ namespace
 
 namespace SystemService
 {
+   void Producers::init()
+   {
+      check(getSender() == getReceiver(), "sender must match service account");
+
+      auto producers = ::getProducers();
+      check(!producers.empty(), "no producers");
+
+      for (const auto& prod : producers)
+      {
+         psibase::from(Accounts::service)
+             .to<Accounts>()
+             .newAccount(prod.name, AuthDelegate::service, NewAccountMode::requireNew);
+      }
+   }
+
    // Verifies that all the auth services have the correct flags set
    static void checkVerifyServices(const std::vector<psibase::Producer>& producers)
    {

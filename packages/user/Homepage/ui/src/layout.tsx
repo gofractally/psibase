@@ -1,98 +1,53 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 
-import { AppSidebar } from "@/components/app-sidebar";
+import { AccountSheet } from "@/components/account-sheet";
 import { AppSplashScreen } from "@/components/app-splash-screen";
 import { Loading } from "@/components/loading";
+import { TopBarActions } from "@/components/top-bar";
 
 import { useNavLocation } from "@/hooks/use-nav-location";
 
+import { NetworkLogo } from "@shared/components/network-logo";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
-} from "@shared/shadcn/ui/breadcrumb";
-import { Separator } from "@shared/shadcn/ui/separator";
-import {
-    SidebarInset,
-    SidebarProvider,
-    SidebarTrigger,
-} from "@shared/shadcn/ui/sidebar";
 
 export const Layout = () => {
-    const navigate = useNavigate();
-    const { currentApp, currentChild } = useNavLocation();
-
-    const primaryNavLabel = currentApp?.name ?? "Dashboard";
-    const secondaryNavLabel = currentChild?.name;
-
+    const { currentApp } = useNavLocation();
     const { data: currentUser, isPending: isPendingCurrentUser } =
         useCurrentUser();
 
-    const isAppRequiringLogin =
-        currentApp?.isLoginRequired || currentChild?.isLoginRequired;
-
-    const isNotLoggedIn = !currentUser && !isPendingCurrentUser;
-
-    const isLoginRequired = isAppRequiringLogin && isNotLoggedIn;
+    const isLoginRequired =
+        !!currentApp && !currentUser && !isPendingCurrentUser;
+    const isFill = currentApp?.fill === true && !isLoginRequired;
 
     return (
-        <SidebarProvider className="h-svh overflow-hidden">
-            <AppSidebar />
-            <SidebarInset className="min-h-0 overflow-hidden">
-                <header className="flex h-16 shrink-0 items-center gap-2">
-                    <div className="flex items-center gap-2 px-4">
-                        <SidebarTrigger className="-ml-1" />
-                        <Separator
-                            orientation="vertical"
-                            className="mr-2 h-4"
-                        />
-                        <Breadcrumb>
-                            <BreadcrumbList>
-                                <BreadcrumbItem
-                                    onClick={() =>
-                                        navigate(`/${currentApp?.service}`)
-                                    }
-                                    className="hidden md:block"
-                                >
-                                    <BreadcrumbLink>
-                                        {primaryNavLabel}
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                                {secondaryNavLabel && (
-                                    <BreadcrumbSeparator className="hidden md:block" />
-                                )}
-                                {secondaryNavLabel && (
-                                    <BreadcrumbItem>
-                                        <BreadcrumbPage>
-                                            {secondaryNavLabel}
-                                        </BreadcrumbPage>
-                                    </BreadcrumbItem>
-                                )}
-                            </BreadcrumbList>
-                        </Breadcrumb>
-                    </div>
-                </header>
-                {isLoginRequired ? (
-                    <div className="flex flex-1 items-center justify-center">
-                        <div className="w-full max-w-screen-sm px-4">
-                            <AppSplashScreen />
-                        </div>
-                    </div>
-                ) : isPendingCurrentUser &&
-                  currentApp?.showLoginLoadingSpinner ? (
-                    <div className="flex-1">
-                        <Loading />
-                    </div>
-                ) : (
-                    <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex h-svh flex-col overflow-hidden">
+            <header className="bg-background/80 supports-[backdrop-filter]:bg-background/60 z-20 flex h-14 shrink-0 items-center gap-1 border-b px-2 backdrop-blur md:px-4">
+                <Link to="/" aria-label="Home" className="shrink-0">
+                    <NetworkLogo role={undefined} />
+                </Link>
+                <div className="ml-auto shrink-0 pl-2">
+                    <TopBarActions />
+                </div>
+            </header>
+
+            {isLoginRequired ? (
+                <div className="grid-bg flex flex-1 items-center justify-center p-4">
+                    <AppSplashScreen />
+                </div>
+            ) : currentApp && isPendingCurrentUser ? (
+                <Loading className="flex-1" />
+            ) : isFill ? (
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                    <Outlet />
+                </div>
+            ) : (
+                <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+                    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-4 p-4 md:p-6">
                         <Outlet />
                     </div>
-                )}
-            </SidebarInset>
-        </SidebarProvider>
+                </div>
+            )}
+            <AccountSheet />
+        </div>
     );
 };

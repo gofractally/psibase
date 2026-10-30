@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-auth-recover"
-plugin = "auth-recover-plugin"
+plugins = ["auth-recover-plugin"]
 
 [dependencies]
 psibase.workspace = true

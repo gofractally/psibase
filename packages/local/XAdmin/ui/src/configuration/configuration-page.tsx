@@ -1,4 +1,5 @@
 import { Plus, Trash } from "lucide-react";
+import { useState } from "react";
 import {
     Controller,
     RegisterOptions,
@@ -31,6 +32,7 @@ import { useServerSpecs } from "../hooks/use-server-specs";
 import { useChainReady } from "../hooks/use-statuses";
 import { Logger } from "../log/logger";
 import { PsinodeConfigUI, PsinodeConfigUpdate } from "./interfaces";
+import { NodeAdminsContent } from "./node-admins";
 import { newId, writeConfig } from "./utils";
 
 const getHumanFriendlyNumber = (
@@ -161,6 +163,14 @@ export const ConfigurationForm = ({
     config: PsinodeConfigUI;
     onSubmit: (config: PsinodeConfigUpdate) => Promise<PsinodeConfigUpdate>;
 }) => {
+    const chainReady = useChainReady();
+    const [selectedTab, setSelectedTab] = useState("connections");
+    const activeTab =
+        !chainReady && selectedTab === "node-admins"
+            ? "connections"
+            : selectedTab;
+    const isConfigTab = activeTab === "connections" || activeTab === "logs";
+
     const configForm = useForm<PsinodeConfigUI>({
         defaultValues: config,
     });
@@ -251,7 +261,7 @@ export const ConfigurationForm = ({
                         title="Setup"
                         description="Node identity, listeners, and logging."
                     />
-                    <Tabs defaultValue="connections">
+                    <Tabs value={activeTab} onValueChange={setSelectedTab}>
                         <TabsList>
                             <TabsTrigger value="connections">
                                 Connections
@@ -260,6 +270,11 @@ export const ConfigurationForm = ({
                             <TabsTrigger value="node-specs">
                                 Node Specs
                             </TabsTrigger>
+                            {chainReady && (
+                                <TabsTrigger value="node-admins">
+                                    Node admins
+                                </TabsTrigger>
+                            )}
                         </TabsList>
                         <TabsContent value="connections" className="space-y-6">
                             <div className="grid w-full max-w-md items-center gap-1.5">
@@ -454,21 +469,29 @@ export const ConfigurationForm = ({
                         <TabsContent value="node-specs">
                             <NodeSpecsContent />
                         </TabsContent>
+
+                        {chainReady && (
+                            <TabsContent value="node-admins">
+                                <NodeAdminsContent />
+                            </TabsContent>
+                        )}
                     </Tabs>
 
-                    <Button
-                        className="my-4"
-                        size="lg"
-                        type="submit"
-                        disabled={
-                            !configForm.formState.isDirty ||
-                            configForm.formState.isLoading
-                        }
-                    >
-                        {configForm.formState.isLoading
-                            ? "Saving"
-                            : "Save changes"}
-                    </Button>
+                    {isConfigTab && (
+                        <Button
+                            className="my-4"
+                            size="lg"
+                            type="submit"
+                            disabled={
+                                !configForm.formState.isDirty ||
+                                configForm.formState.isLoading
+                            }
+                        >
+                            {configForm.formState.isLoading
+                                ? "Saving"
+                                : "Save changes"}
+                        </Button>
+                    )}
                 </form>
             )}
         </>

@@ -128,6 +128,7 @@ impl Helpers for TokensPlugin {
                 id: token.id,
                 symbol: token.symbol,
                 precision: token.precision,
+                untransferable: token.untransferable,
             }
         }))
     }
