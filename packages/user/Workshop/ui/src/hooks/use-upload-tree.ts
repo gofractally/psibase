@@ -54,7 +54,7 @@ export const useUploadTree = () =>
                                             path: file.path,
                                             contentType: file.contentType,
                                             account: account,
-                                            hash: "",
+                                            contentHash: "",
                                             contentEncoding: "",
                                             csp: "",
                                         },
