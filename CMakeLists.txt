@@ -696,6 +696,10 @@ psibase_package(
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
+        DATA      ${COMMON_API}/common/default-pages/index.html               /common/default-pages/index.html
+        DATA      ${COMMON_API}/common/default-pages/style.css                /common/default-pages/style.css
+        DATA      ${COMMON_API}/common/default-pages/page.js                  /common/default-pages/page.js
+    POSTINSTALL ${COMMON_API}/postinstall.json
     DEPENDS CommonApiCommonLib_js
     DEPENDS ${ComponentParser_DEP}
     DEPENDS ${PluginTester_js_DEP}

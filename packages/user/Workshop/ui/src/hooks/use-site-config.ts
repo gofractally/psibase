@@ -28,7 +28,7 @@ export const SiteConfigResponse = z.object({
                     account: zAccount,
                     path: z.string(),
                     contentType: z.string(),
-                    hash: z.string(),
+                    contentHash: z.string(),
                     contentEncoding: z.string().or(z.null()),
                     csp: CSPString,
                 }),
@@ -61,7 +61,7 @@ export const useSiteConfig = (
                 account
                 path
                 contentType
-                hash
+                contentHash
                 contentEncoding
                 csp
               }

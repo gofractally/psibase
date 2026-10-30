@@ -8,6 +8,14 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 # Additional design notes
 
+## Default account page
+
+Every subdomain for valid account names is reachable, even for accounts that never upload any content or don't exist. When a page request (a path with no file extension, or ending in `.html`) matches none of an account's content, and the account has no `/index.html` and no proxy, the `sites` service serves a default page with a `404 Not Found` status. The page tells visitors there's nothing at that address yet, and links the account's owner to the Workshop app (when installed) and to the developer docs.
+
+The default page is uploaded by the `common-api` service at `/common/default-pages/index.html`, along with the stylesheet and script it loads from the same directory. Since every `/common/` path is served by `common-api` on every subdomain, these files are always available and can't conflict with an account's own files.
+
+The account's own content always takes precedence. Requests for other files (e.g. `/style.css` or a plugin's `.wasm`) that match nothing get a plain `404 Not Found`, as do all misses on an account that has an `/index.html` or a proxy, so a site's owner controls its own error pages.
+
 ## CSP header baseline
 
 The `Content-Security-Policy` header aids security efforts, as modern browsers restrict the capabilities of the document on the client-side according to the policy expressed in this header. The sites server uses a strict baseline CSP header; apps with additional requirements (e.g. the supervisor, prompt pages, or sites built with tooling that emits inline scripts) override it with the `setCsp` action.
