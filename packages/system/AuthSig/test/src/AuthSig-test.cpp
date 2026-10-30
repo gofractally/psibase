@@ -98,7 +98,7 @@ SCENARIO("AuthSig")
       auto mint         = Action{.sender  = alice.id,
                                  .service = Nft::service,
                                  .method  = "mint"_m,
-                                 .rawData = psio::to_frac(std::tuple(std::optional<NID>{}))
+                                 .rawData = psio::to_frac(std::tuple())
 
       };
       auto proposedMint = std::vector<Action>{mint};

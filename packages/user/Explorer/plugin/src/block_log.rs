@@ -4,9 +4,9 @@ use serde_json::Value;
 
 use crate::bindings::explorer::plugin::types::{BlockHeader, BlockRange};
 use crate::bindings::host::http::api::post_graphql_get_json;
-use crate::bindings::host::types::types::Error;
 use crate::decode::ActionDecoder;
 use crate::errors::ErrorType;
+use psibase_plugin::Error;
 
 const DEFAULT_MAX_SEARCH_BLOCKS: u32 = 20000;
 

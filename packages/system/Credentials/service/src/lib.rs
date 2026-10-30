@@ -226,3 +226,6 @@ pub mod service {
         VirtualServer::call_as(CRED_SYS).del_res_sub(id.to_string());
     }
 }
+
+#[cfg(test)]
+mod tests;

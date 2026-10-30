@@ -19,7 +19,7 @@ psibase::define_trust! {
     functions {
         None => [],
         High => [set_auth_service],
-        Max => [get_auth_services, preapprove_account],
+        Max => [get_auth_services, preapprove_account, freeze, unfreeze],
     }
 }
 

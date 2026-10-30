@@ -22,6 +22,61 @@ namespace
 {
    constexpr auto autoDebit = Nft::autoDebit;
 
+   struct FirstIdData
+   {
+      NID firstAvailableId;
+   };
+   PSIO_REFLECT(FirstIdData, firstAvailableId);
+
+   struct FirstIdRoot
+   {
+      FirstIdData data;
+   };
+   PSIO_REFLECT(FirstIdRoot, data);
+
+   struct StatusNft
+   {
+      NID id;
+   };
+   PSIO_REFLECT(StatusNft, id);
+
+   struct StatusData
+   {
+      string                state;
+      optional<StatusNft>   nftDetail;
+   };
+   PSIO_REFLECT(StatusData, state, nftDetail);
+
+   struct StatusNode
+   {
+      StatusData nftStatus;
+   };
+   PSIO_REFLECT(StatusNode, nftStatus);
+
+   struct StatusRoot
+   {
+      StatusNode data;
+   };
+   PSIO_REFLECT(StatusRoot, data);
+
+   NID firstAvailable(DefaultTestChain& t, NID begin)
+   {
+      auto query = std::format("query {{ firstAvailableId(begin: {}) }}", begin);
+      auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
+      auto body  = std::string(res.body.begin(), res.body.end());
+      UNSCOPED_INFO(body);
+      return psio::convert_from_json<FirstIdRoot>(body).data.firstAvailableId;
+   }
+
+   StatusData nftStatus(DefaultTestChain& t, NID id)
+   {
+      auto query = std::format("query {{ nftStatus(nftId: {}) {{ state nftDetail {{ id }} }} }}", id);
+      auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
+      auto body  = std::string(res.body.begin(), res.body.end());
+      UNSCOPED_INFO(body);
+      return psio::convert_from_json<StatusRoot>(body).data.nftStatus;
+   }
+
    struct AvailableData
    {
       bool idAvailable;
@@ -312,6 +367,8 @@ SCENARIO("mint with an explicit id")
          CHECK(chooseQuery(t, 0) == next);
          CHECK(chooseQuery(t, sequential) == next);
          CHECK_FALSE(availableQuery(t, 0).idAvailable);
+         CHECK(firstAvailable(t, chosen) == chosen);
+         CHECK(firstAvailable(t, 0) == next);
 
          auto minted = a.mint(chosen);
          REQUIRE(minted.succeeded());
@@ -325,6 +382,12 @@ SCENARIO("mint with an explicit id")
          CHECK_FALSE(after.idAvailable);
          CHECK(after.nextId == next);
          CHECK(chooseQuery(t, chosen) == chosen + 1);
+         auto active = nftStatus(t, chosen);
+         CHECK(active.state == "active");
+         REQUIRE(active.nftDetail.has_value());
+         CHECK(active.nftDetail->id == chosen);
+         CHECK(firstAvailable(t, chosen) == chosen + 1);
+         CHECK(firstAvailable(t, 0) == next);
 
          AND_THEN("That id cannot be minted again")
          {
@@ -354,6 +417,13 @@ SCENARIO("mint with an explicit id")
          CHECK(a.exists(sequential).returnVal() == false);
          CHECK(a.mint(sequential).failed(nftIdTaken));
          CHECK_FALSE(availableQuery(t, sequential).idAvailable);
+         CHECK(firstAvailable(t, sequential) == next);
+         auto burned = nftStatus(t, sequential);
+         CHECK(burned.state == "burned");
+         CHECK_FALSE(burned.nftDetail.has_value());
+         auto missing = nftStatus(t, next + 50);
+         CHECK(missing.state == "available");
+         CHECK_FALSE(missing.nftDetail.has_value());
       }
       THEN("A taken guess above the counter walks forward")
       {
@@ -377,6 +447,17 @@ SCENARIO("mint with an explicit id")
          CHECK_FALSE(available.idAvailable);
          CHECK(available.nextId == next);
          CHECK(chooseQuery(t, chosen) == chosen + 1);
+         CHECK(firstAvailable(t, chosen) == chosen + 1);
+         CHECK(firstAvailable(t, 0) == next);
+      }
+      THEN("Search wraps past the last id and skips 0")
+      {
+         constexpr NID last = 0xffffffffu;
+         CHECK(firstAvailable(t, last) == last);
+         REQUIRE(a.mint(last).succeeded());
+         CHECK(firstAvailable(t, last) == firstAvailable(t, 0));
+         CHECK(firstAvailable(t, 0) != 0);
+         CHECK(firstAvailable(t, last) != last);
       }
    }
 }
