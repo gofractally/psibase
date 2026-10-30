@@ -32,8 +32,8 @@ const setStatus = (
         ? {
               ...metadata,
               status: published
-                  ? Status.Enum.published
-                  : Status.Enum.unpublished,
+                  ? Status.Enum.Published
+                  : Status.Enum.Unpublished,
           }
         : null;
 
@@ -115,7 +115,7 @@ export const ControlPanel = () => {
     };
 
     const isAppPublished = metadata
-        ? metadata.status == Status.Enum.published
+        ? metadata.status == Status.Enum.Published
         : false;
 
     const { mutateAsync: setCsp } = useSetCsp();

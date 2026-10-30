@@ -5,7 +5,7 @@ import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { registry } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
-export const Status = z.enum(["draft", "published", "unpublished"]);
+export const Status = z.enum(["Draft", "Published", "Unpublished"]);
 
 export const MetadataResponse = z.object({
     appMetadata: z
