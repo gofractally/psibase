@@ -25,6 +25,10 @@ flowchart LR
   mcp -->|"GraphQL and HTTP reads"| svcA
   mcp -->|"schema-side fracpack"| svcB
   mcp -.->|"returns construction data for propose"| staged
+  user[Parent_user_browser]
+  mcpobj[mcp_objective]
+  user -->|"needs-approval UI mcp.<root>/"| mcpobj
+  mcpobj -->|"accept / accept plus grant"| staged
 ```
 
 ## What already exists
@@ -200,6 +204,24 @@ For the POC, signing is done through a headless UI that the agent drives in a he
 4. The browser's Supervisor and auth-sig plugin already sign via the key vault, so driving them through a headless UI reuses existing auth machinery.
 5. **Tradeoff:** a browser runtime must be maintained for one step, but it is the only path that works for every agent.
 
+### POC approval flow (decided Oct 30, 2026)
+
+Every transaction the agent attempts follows one rule:
+
+1. **Covered:** if the agent's allowlist covers every action in the transaction, it is proposed in the agent's name and auto-approved. The AuthDyn manager returns the agent as authorizer, the agent proposes and accepts the StagedTx, and it executes at threshold.
+2. **Not covered:** if any action is outside the allowlist, the manager returns the parent (user) for those methods, so the transaction is proposed with the parent as an approver and waits in StagedTx.
+3. **Needs-approval UI:** served by the objective `mcp` service (see Architecture split below), it lists the user's pending transactions that lack sufficient agent permissions, with two buttons:
+   - **Approve:** the parent accepts the proposal manually.
+   - **Approve and Grant:** the parent accepts and, in the same transaction, a manager admin action adds all ungranted service/method pairs to the agent's allowlist, so a repeat transaction auto-executes.
+4. **Privacy:** the needs-approval query, hosted by `mcp`, is gated with the query token, so only the owning account can view it.
+
+Allowlist granularity is per service+method, never amounts.
+
+### Architecture split: `x-mcp` and `mcp` (decided Oct 30, 2026)
+
+- **`x-mcp`** (local service, dir `XMcp`): the agent-facing frontend. MCP endpoint, tools, `build_transaction`. Unchanged.
+- **`mcp`** (objective service, account/subdomain `mcp`; dir `Mcp` is a proposal): the frontend for the parent/managing human account. It serves the needs-approval UI (**Approve** / **Approve and Grant**) and hosts the query-token-gated needs-approval query.
+
 ### Session-token style agent keys
 
 Agent keys behave like session tokens rather than standing credentials: minted when the user approves a task, scoped to one service or action, destroyed/nulled after use, and expired by the chain-side auth infrastructure (the AuthDyn manager's policy), not by trusting the agent to discard them. Frequent rotation shrinks the blast radius of a leaked or injected agent.
@@ -253,6 +275,29 @@ This is design-only until you ask to implement.
 5. **Seed descriptors** — hand-enrich a few high-value services (Tokens, Accounts, Packages, StagedTx) so the first agent loop is actually good.
 6. **Browser host (follow-up)** — Supervisor MCP implementing `kind: plugin` against the same descriptors.
 
+## Testing plan
+
+Everything that benefits from a real browser or live chain uses Playwright. This work will be stacked as a PR on the upcoming Playwright PR from the JSPI work: branch `mm/wasm-async`, commit `26d35f43e` (local-dev Playwright harness in top-level `e2e/`).
+
+**Harness shape (as of `26d35f43e`):** its own yarn project in `e2e/` (`yarn install && yarn setup && yarn e2e`), `@playwright/test` 1.64.1, Chromium + WebKit projects in parallel with one worker each, local dev only (not CI). Each worker boots its own devnet (`psinode` + `psibase boot` with the default package set, about 8 s) behind a proxy that adds `/__e2e/*` test routes. Fixtures in `e2e/fixtures/index.ts`: `devnet` (`url(sub)`, `get(sub, path)`, `psibase([...])` CLI), `supervisor` (`call`, `loadPlugins`, `frame`), `throwawayAccount` (fresh P-256 keypair account, unfunded), `watchEventLoop`. Specs live under `e2e/specs/<package>/`; we would add `e2e/specs/x-mcp/` and `e2e/specs/mcp/`. Locally built `XMcp`/`Mcp` packages are picked up via `PSIBASE_PACKAGES`.
+
+| Area | Harness |
+|---|---|
+| Headless signing: `supervisor.call` into auth-sig with a `throwawayAccount` key | Playwright |
+| Full agent flow: `devnet.get("x-mcp", ...)` for `tools/list` → `build_transaction` → headless sign → covered tx auto-executes | Playwright |
+| Uncovered tx appears in the `mcp` needs-approval UI (`devnet.url("mcp")`); **Approve** executes it | Playwright |
+| **Approve and Grant** executes and grows the allowlist; a repeat tx auto-executes | Playwright |
+| Query-token gating on the `mcp` query: a second `throwawayAccount` cannot see the list | Playwright |
+| Both MCP protocol revisions against the live `x-mcp` endpoint | Playwright request API |
+| AuthDyn allowlist manager: covered/not-covered logic, grant action | Rust service tester (cf. `packages/system/StagedTx/service/src/tests.rs`, Fractals tests) |
+| StagedTx two paths (agent auto-approve; parent as approver) | Rust/C++ tester |
+| XMcp local-only rules | C++ tester with a caller service (cf. `packages/local/XKeys/test/`) |
+| `mcp` needs-approval query filtering (only covered-lacking txs, owner-scoped) | Rust service tester |
+| `x-mcp` JSON-RPC shapes; `build_transaction` JSON vs packed bytes match | Playwright request API against `devnet` (simpler than a separate Python harness once `e2e/` lands) |
+| `mcp` approval UI component logic | vitest |
+
+Harness gaps to fill in the stacked PR: `throwawayAccount` does not fund accounts yet (add a transfer if a spec needs tokens), and the default boot package set must include `XMcp` and `Mcp`.
+
 ## Open decisions (defaults above unless overridden)
 
 **Delegation model**
@@ -264,7 +309,7 @@ This is design-only until you ask to implement.
 
 **Autonomous signing without master keys**
 - ~~What the agent-side signer looks like.~~ **Resolved for the POC:** a headless UI the agent drives in a headless browser, using the existing Supervisor and auth-sig key vault (see POC signing path under Signing and delegation).
-- Whether out-of-scope actions automatically become StagedTx proposals for the user.
+- ~~Whether out-of-scope actions automatically become StagedTx proposals for the user.~~ **Resolved for the POC:** yes, with the parent as approver (see POC approval flow).
 - How to make the risky base case (raw user key) visibly discouraged in docs and tooling.
 
 **Installation, connection, and discovery** (decided Oct 30, 2026)
@@ -273,6 +318,11 @@ This is design-only until you ask to implement.
 - **Addressing (decided):** addressed locally by node URL. The earlier chain-level service name routing idea is dropped. Nothing in X-MCP needs to be an objective (on-chain) service: everything either reads live chain state or shapes a transaction, and both are subjective, so schema/discovery serving is not an on-chain objective service either. An on-chain request-to-build pattern (the user signs a public request transaction before the real one is built) was considered and rejected.
 - **Connection (decided for the POC):** no developer in the loop; this is a non-dev user feature. Bootstrap is three things given to the agent: a node URL, an account address, and a key for signing. Nothing else.
 - **Name and packaging (decided):** the component is called **X-MCP**. It is a node-local package included in the default local package set, so it ships with the standard local installation instead of being something a user adds separately.
+- **Filesystem and account names (decided):** the service directory/name on the filesystem is `XMcp` (exact caps, e.g. `packages/local/XMcp`); the account and subdomain is `x-mcp`.
+
+**Approval flow**
+- ~~How the needs-approval UI is served objectively.~~ **Resolved:** by the objective `mcp` service (see Architecture split).
+- Account name of the allowlist manager service.
 
 **Carried from V1**
 - WebSocket custom transport: build now for our clients, or later.
