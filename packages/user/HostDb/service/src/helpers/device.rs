@@ -1,7 +1,7 @@
 use psibase::Table;
 
-use super::constants::{DEVICE_IDLE_NS, GC_LIMIT};
-use super::ids::mint_id;
+use super::constants::{DEVICE_ID_LEN, DEVICE_IDLE_NS, GC_LIMIT, ID_LEN};
+use super::ids::mint_random;
 use crate::tables::tables::{DeviceRow, DeviceTable, KvTable};
 
 /// Returns `device`'s row prefix, refreshing `last_seen` and creating the
@@ -14,7 +14,7 @@ pub(crate) fn device_store(devices: &DeviceTable, device: &[u8], now: u64) -> Ve
             row.store
         }
         None => {
-            let store = mint_id();
+            let store = mint_random::<ID_LEN>();
             devices
                 .put(&DeviceRow {
                     device: device.to_vec(),
@@ -56,7 +56,7 @@ fn collect_one(
     let (erased, drained) = erase_store_rows(persistent, &row.store, budget);
     devices.erase(&row.device);
     if !drained {
-        devices.put(&replacement_device(row, mint_id())).unwrap();
+        devices.put(&replacement_device(row, mint_random::<DEVICE_ID_LEN>())).unwrap();
     }
     erased
 }

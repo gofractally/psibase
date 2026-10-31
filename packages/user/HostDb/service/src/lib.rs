@@ -10,9 +10,9 @@ mod tables;
 #[psibase::service(name = "hostdb", tables = "tables::tables")]
 mod service {
     use crate::helpers::{
-        check_precondition, collect_idle_devices, cookie_or_mint, decode_fixed_hex, device_store,
+        check_precondition, collect_idle_devices, decode_fixed_hex, device_id, device_store,
         hex_encode, parse_batch, reply, session_id, status_reply, wall_time_ns, Change, Duration,
-        Precondition, DEVICE_COOKIE, GC_LIMIT, KEY_LEN, SESSION_IDLE_NS,
+        Precondition, GC_LIMIT, KEY_LEN, SESSION_IDLE_NS,
     };
     use crate::tables::tables::{DeviceTable, KvRow, KvTable, SessionKvRow, SessionKvTable};
     use psibase::services::http_server::Wrapper as HttpServer;
@@ -38,7 +38,7 @@ mod service {
             return Some(status_reply(403));
         };
 
-        let device = cookie_or_mint(&request, DEVICE_COOKIE);
+        let device = device_id(&request);
         let (result, device_cookie, session_cookie) = match device {
             Some(device) => {
                 let (result, session_cookie) = route(&request, &device);

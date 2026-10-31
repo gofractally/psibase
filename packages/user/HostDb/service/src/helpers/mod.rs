@@ -10,7 +10,7 @@ mod ids;
 pub(crate) use batch::ReadExpect;
 pub(crate) use batch::{check_precondition, parse_batch, Change, Duration, Precondition};
 pub(crate) use constants::{wall_time_ns, DEVICE_COOKIE, GC_LIMIT, KEY_LEN, SESSION_IDLE_NS};
-pub(crate) use cookies::{cookie_or_mint, session_id};
+pub(crate) use cookies::{device_id, session_id};
 #[cfg(test)]
 pub(crate) use device::replacement_device;
 pub(crate) use device::{collect_idle_devices, device_store};
