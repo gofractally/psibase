@@ -208,7 +208,7 @@ mod service {
                 collect_idle_devices(&devices, &persistent, now);
             }
             if session_gc {
-                collect_expired_sessions(&sessions, now);
+                erase_expired_sessions(&sessions, now);
             }
             Ok(())
         }
@@ -243,16 +243,14 @@ mod service {
             || path.starts_with("/kv/session/")
     }
 
-    fn collect_expired_sessions(table: &SessionKvTable, now: u64) {
+    fn erase_expired_sessions(table: &SessionKvTable, now: u64) {
         let cutoff = now.saturating_sub(SESSION_IDLE_NS);
-        let stale: Vec<_> = table
-            .get_index_by_last_access()
+        let index = table.get_index_by_last_access();
+        for row in index
             .range(..(cutoff, Vec::new(), Vec::new(), Vec::new()))
             .take(GC_LIMIT)
-            .map(|row| (row.device, row.session, row.key))
-            .collect();
-        for key in stale {
-            table.erase(&key);
+        {
+            table.remove(&row);
         }
     }
 
