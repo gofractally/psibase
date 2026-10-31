@@ -9,6 +9,8 @@ publish = false
 
 [package.metadata.psibase]
 server = "git"
+# Filled by scripts/pack-install-dist.sh (CI); empty in plain dev builds.
+data = [{ src = "../install-dist", dst = "/install" }]
 
 [dependencies]
 psibase.workspace = true

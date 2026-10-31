@@ -394,6 +394,36 @@ pub mod service {
         out.into_bytes()
     }
 
+    const INSTALL_SH: &str = include_str!("install.sh");
+
+    /// `install.sh` with this chain's URLs baked in. The scheme comes from
+    /// `X-Forwarded-Proto` when a proxy sets it; otherwise `https`, except
+    /// for `localhost` hosts and hosts with an explicit port.
+    fn install_script(request: &HttpRequest) -> Vec<u8> {
+        // The Host header keeps a non-default port; `request.host` drops it.
+        let host = request
+            .get_header("host")
+            .filter(|h| h.split(':').next() == Some(request.host.as_str()))
+            .unwrap_or(request.host.as_str());
+        let scheme = match request.get_header("x-forwarded-proto") {
+            Some(p) if p == "http" || p == "https" => p,
+            _ => {
+                let name = host.split(':').next().unwrap_or(host);
+                if host.contains(':') || name == "localhost" || name.ends_with(".localhost") {
+                    "http"
+                } else {
+                    "https"
+                }
+            }
+        };
+        let root = host.strip_prefix("git.").unwrap_or(host);
+        INSTALL_SH
+            .replace("@BASE_URL@", &format!("{scheme}://{host}"))
+            .replace("@ROOT_URL@", &format!("{scheme}://{root}"))
+            .into_bytes()
+    }
+
+    /// Installer: `/install.sh` (generated) and `/install/*` (Sites files).
     /// Dumb HTTP: `/<owner>/<repo>[.git]/{HEAD,info/refs,objects/xx/yyyy}`.
     #[action]
     #[allow(non_snake_case)]
@@ -410,6 +440,28 @@ pub mod service {
             };
         }
         let path = request.path().into_owned();
+        // Installer paths come ahead of repo paths (`install` is a valid owner).
+        if path == "/install.sh" || path == "/install/install.sh" {
+            return reply(
+                200,
+                "text/x-shellscript; charset=utf-8",
+                install_script(&request),
+            );
+        }
+        if path == "/install/SHA256SUMS" || path == "/install/version" {
+            // Sites picks the MIME type from the extension, so these two are
+            // stored as `.txt`; keep the documented extensionless paths.
+            return Some(HttpReply {
+                status: 302,
+                contentType: "text/plain".into(),
+                body: Vec::new().into(),
+                headers: vec![HttpHeader::new("Location", &format!("{path}.txt"))],
+            });
+        }
+        if path == "/install" || path.starts_with("/install/") {
+            // Tarballs, SHA256SUMS.txt and version.txt are package files in Sites.
+            return None;
+        }
         let mut parts = path.trim_start_matches('/').splitn(3, '/');
         let (owner, repo, rest) = (parts.next()?, parts.next()?, parts.next()?);
         let owner = AccountNumber::from_exact(owner).ok()?;

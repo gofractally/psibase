@@ -2,7 +2,9 @@
 """End-to-end tests for the `git` service and `git-remote-psibase`.
 
 Needs: a running psinode with the Git package installed, `psibase` and
-`git-remote-psibase` on PATH, stock `git`, and `openssl`.
+`git-remote-psibase` on PATH, stock `git`, `openssl`, and `sh`. The installer
+tests expect the package built with packages/user/Git/install-dist filled by
+scripts/pack-install-dist.sh.
 
     PSINODE_URL=http://psibase.localhost:8080/ python3 git_e2e.py
 """
@@ -334,6 +336,57 @@ def _():
         raise AssertionError("POST")
     except urllib.error.HTTPError as e:
         assert e.code == 404, e.code
+
+
+@test("installer: install.sh has this chain's URL; SHA256SUMS and version from Sites")
+def _():
+    def get(path, identity=True):
+        req = urllib.request.Request(f"{GIT_HTTP}{path}")
+        if identity:
+            req.add_header("Accept-Encoding", "identity")
+        return urllib.request.urlopen(req).read()
+    for path in ("/install.sh", "/install/install.sh"):
+        sh = get(path).decode()
+        assert sh.startswith("#!/bin/sh"), sh[:40]
+        assert f'"${{PSIBASE_GIT_INSTALL_URL:-{GIT_HTTP}}}"' in sh, path
+        assert f'ROOT="{API}"' in sh, path
+    # Extensionless documented paths redirect to the .txt Sites files.
+    sums = get("/install/SHA256SUMS").decode()
+    version = get("/install/version").decode().strip()
+    assert version, "empty version"
+    published = {}
+    for line in sums.splitlines():
+        h, name = line.split()
+        published[name.lstrip("*")] = h
+    assert published, "SHA256SUMS lists no tarballs"
+    for name, h in published.items():
+        assert name.startswith("git-remote-psibase-linux-") and name.endswith(".tar.gz"), name
+        assert hashlib.sha256(get(f"/install/{name}")).hexdigest() == h, name
+
+
+@test("installer: curl | sh installs a working helper into --prefix")
+def _():
+    import platform
+    arch = {"x86_64": "x86_64", "amd64": "x86_64", "aarch64": "aarch64", "arm64": "aarch64"}.get(platform.machine())
+    sums = urllib.request.urlopen(urllib.request.Request(
+        f"{GIT_HTTP}/install/SHA256SUMS.txt", headers={"Accept-Encoding": "identity"})).read().decode()
+    if f"git-remote-psibase-linux-{arch}.tar.gz" not in sums:
+        print(f"  (skipped: no {arch} tarball published on this chain)")
+        return
+    prefix = os.path.join(WORK, "prefix")
+    script = urllib.request.urlopen(f"{GIT_HTTP}/install.sh").read().decode()
+    env = {"PATH": os.path.join(prefix, "bin") + os.pathsep + os.environ["PATH"]}
+    p = run("sh", "-s", "--", "--prefix", prefix, input=script, env=env)
+    helper = os.path.join(prefix, "bin", "git-remote-psibase")
+    assert os.access(helper, os.X_OK), p.stderr
+    # Not on PATH: installs, prints the export line, exits non-zero.
+    p = run("sh", "-s", "--", "--prefix", os.path.join(WORK, "prefix2"), input=script,
+            env={"PATH": "/usr/bin:/bin"}, check=False)
+    assert p.returncode != 0 and "export PATH=" in p.stderr, p.stderr
+    # The installed helper clones from this chain.
+    d = os.path.join(WORK, "via-installed")
+    run("git", "clone", "-q", HELPER_URL, d, env=env)
+    run("git", "fsck", "--full", cwd=d)
 
 
 failed = [r for r in results if not r[1]]

@@ -152,6 +152,9 @@ Dumb HTTP, as specified by `gitprotocol-http`. Git's smart discovery is `GET <re
 | `GET <repo>/info/refs` and the same path with `?service=git-upload-pack` or `?service=git-receive-pack` | `200`, `text/plain; charset=utf-8`. One line per ref, `oid TAB refname LF`, sorted by ref name in the C locale. Annotated tags also get a peeled line, `oid TAB refname^{} LF`. `HEAD` is not listed. `Cache-Control: no-cache`. |
 | `GET <repo>/objects/<2 hex>/<38 hex>` | `200`, body is `ObjectRow.data` unchanged. `404` if that oid is not stored. |
 | `GET <repo>/objects/info/packs` and `POST <repo>/git-upload-pack` and `POST <repo>/git-receive-pack` | `404`. No packs are stored. Push has no endpoint here. |
+| `GET /install.sh` and `GET /install/install.sh` | `200`, `text/x-shellscript`. The installer, generated per request with this chain's URL baked in. Matched ahead of repo paths, since `install` is a valid owner name. See [Installing the client](#installing-the-client). |
+| `GET /install/SHA256SUMS` and `GET /install/version` | `302` to the same path plus `.txt`. Sites picks the MIME type from the file extension and rejects files without one. |
+| any other `GET /install/...` | Not handled. The request falls through to Sites, which serves the `git` package's files. |
 
 Reads are not authenticated. `serveSys` receives the logged-in account when the request carries a bearer token or a `__Host-SESSION` cookie, and v1 ignores it. The bytes are on every full node anyway.
 
@@ -378,11 +381,15 @@ Decided: the chain serves the installer. The script and artifacts are files of t
 
 - `install.sh` (also at `git.<root>/install.sh`). The `git` service's `serveSys` generates it per request with the chain's own URL baked in, so the script downloads from the chain it was fetched from.
 - `git-remote-psibase-linux-x86_64.tar.gz` and `git-remote-psibase-linux-aarch64.tar.gz`, plus the `psibase-git-host` tarballs for `--host`.
-- `SHA256SUMS` and `version`.
+- `SHA256SUMS` and `version`. Sites requires a file extension to pick a MIME type, so the package stores `SHA256SUMS.txt` and `version.txt`, and `serveSys` redirects the extensionless paths to them.
 
-All but `install.sh` come straight from Sites. The checksums come from the same node as the tarballs, so they detect corruption only. Decided: detached signatures are not needed for the POC.
+All but `install.sh` come straight from Sites. Sites sends brotli to a client that sends no `Accept-Encoding`, and that includes plain `curl` and `wget`, so the script asks for `Accept-Encoding: identity`.
 
-Sites stores each file as one row, the default `maxValueSize` is 8 MiB, and there is no chunked upload. CI fails the build if any install tarball exceeds about 7 MiB. The package is installed through the `psibase` CLI path, not the browser, because the Sites plugin limits a browser upload to 3 MB per transaction.
+Implementation: `packages/user/Git/scripts/pack-install-dist.sh` packs the tarballs, `SHA256SUMS.txt` and `version.txt` into `packages/user/Git/install-dist/`. The `git` service's `data` entry uploads that directory to `/install`. The directory is not committed; it is empty in a plain dev build, so the package then serves `install.sh` with nothing to download. The `git-remote-psibase release tarballs` workflow builds the helper with the size-optimized `dist` profile for `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl`, packs the tarballs, fails if one exceeds 7 MiB, and attaches the tarballs, `install.sh` (the unrendered template, which needs `PSIBASE_GIT_INSTALL_URL`), `SHA256SUMS` and `version` to the GitHub release. The checksums come from the same node as the tarballs, so they detect corruption only. Decided: detached signatures are not needed for the POC.
+
+Sites stores each file as one row, the default `maxValueSize` is 8 MiB, and there is no chunked upload. CI fails the build if any install tarball exceeds about 7 MiB.
+
+Measured Oct 31, 2026 on a 0.29.0 dev chain with default config: the limit that binds is lower than 7 MiB per file. A single `psibase upload` of about 3.4 MB of incompressible content fails with `value is too big` (3.3 MB succeeds), so something in the transaction path stores the content more than once. Package installs are what matter here: a `Git.psi` of 4.37 MB (both size-optimized tarballs, about 2.2 MB and 2.1 MB) installs through both `psibase boot` and `psibase install`, and one of 6.5 MB (both tarballs from the plain `release` profile) fails. So the tarballs together, not each one, have to fit. `pack-install-dist.sh` and CI also fail if the tarballs total more than 4.25 MiB, a conservative bound just above the size that was measured to work. Open decision if the helper grows: raise `maxValueSize` on chains that serve the installer, split the tarballs into per-architecture packages, or upload them after install in their own transactions.
 
 The script is the whole installer. It does not hand off to a package manager.
 
