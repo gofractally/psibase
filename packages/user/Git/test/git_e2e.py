@@ -122,6 +122,38 @@ def _():
     assert remote_ref(REPO, "refs/heads/main") == run("git", "rev-parse", "HEAD", cwd=A).stdout.strip()
 
 
+@test("bootstrap: git init + first helper push creates the repo, default branch from the push")
+def _():
+    d = os.path.join(WORK, "boot")
+    run("git", "init", "-q", "-b", "trunk", d)
+    env = git_env(alice, AK)
+    commit(d, env, "README", "boot\n", "first")
+    run("git", "remote", "add", "origin", f"psibase::{API}/{alice}/boot", cwd=d)
+    run("git", "push", "-q", "-u", "origin", "trunk", cwd=d, env=env)
+    head = urllib.request.urlopen(f"{GIT_HTTP}/{alice}/boot.git/HEAD").read().decode()
+    assert head == "ref: refs/heads/trunk\n", head
+    assert remote_ref("boot", "refs/heads/trunk") == run("git", "rev-parse", "HEAD", cwd=d).stdout.strip()
+    c = os.path.join(WORK, "boot-clone")
+    run("git", "clone", "-q", f"{GIT_HTTP}/{alice}/boot.git", c)
+    assert run("git", "rev-parse", "HEAD", cwd=c).stdout == run("git", "rev-parse", "HEAD", cwd=d).stdout
+
+
+@test("bootstrap: first push into someone else's namespace is refused, nothing created")
+def _():
+    d = os.path.join(WORK, "boot-bob")
+    run("git", "init", "-q", "-b", "main", d)
+    env = git_env(bob, BK)
+    commit(d, env, "README", "x\n", "first")
+    run("git", "remote", "add", "origin", f"psibase::{API}/{alice}/bobs", cwd=d)
+    r = subprocess.run(["git", "push", "-q", "origin", "main"], cwd=d, env=env, capture_output=True, text=True)
+    assert r.returncode != 0, r
+    try:
+        urllib.request.urlopen(f"{GIT_HTTP}/{alice}/bobs.git/HEAD")
+        assert False, "repo should not exist"
+    except urllib.error.HTTPError as e:
+        assert e.code == 404, e.code
+
+
 @test("stock git clone over dumb HTTP sees the push")
 def _():
     d = os.path.join(WORK, "stock")

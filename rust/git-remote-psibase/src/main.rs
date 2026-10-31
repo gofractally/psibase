@@ -50,6 +50,13 @@ struct PutObjects {
 
 #[derive(Pack)]
 #[fracpack(fracpack_mod = "fracpack")]
+struct Create {
+    name: String,
+    default_branch: Option<String>,
+}
+
+#[derive(Pack)]
+#[fracpack(fracpack_mod = "fracpack")]
 struct RefUpdate {
     refname: String,
     old_oid: String,
@@ -106,12 +113,11 @@ impl Remote {
         Ok(Some(resp.bytes().await?.to_vec()))
     }
 
-    /// Returns (refs, head symref). Errors if the repo does not exist.
-    async fn list(&self) -> Result<(BTreeMap<String, String>, Option<String>)> {
-        let body = self
-            .get("info/refs")
-            .await?
-            .ok_or_else(|| anyhow!("repo {}/{} does not exist", self.owner, self.repo))?;
+    /// Returns (refs, head symref), or None if the repo does not exist.
+    async fn try_list(&self) -> Result<Option<(BTreeMap<String, String>, Option<String>)>> {
+        let Some(body) = self.get("info/refs").await? else {
+            return Ok(None);
+        };
         let mut refs = BTreeMap::new();
         for line in String::from_utf8(body)?.lines() {
             if let Some((oid, name)) = line.split_once('\t') {
@@ -125,7 +131,14 @@ impl Remote {
             .await?
             .and_then(|b| String::from_utf8(b).ok())
             .and_then(|s| s.trim().strip_prefix("ref: ").map(str::to_string));
-        Ok((refs, head))
+        Ok(Some((refs, head)))
+    }
+
+    /// Like `try_list`, but a missing repo is an error (fetch, clone).
+    async fn list(&self) -> Result<(BTreeMap<String, String>, Option<String>)> {
+        self.try_list()
+            .await?
+            .ok_or_else(|| anyhow!("repo {}/{} not found", self.owner, self.repo))
     }
 }
 
@@ -438,7 +451,20 @@ async fn push(remote: &Remote, specs: &[String]) -> Result<Vec<(String, Result<(
         anyhow!("no signing key: set PSIBASE_GIT_KEY, git config psibase.key, or [git.<host>] key in ~/.psibase.toml")
     })?;
     let keys = vec![AnyPrivateKey::from_str(&key)?];
-    let (remote_refs, _) = remote.list().await?;
+    // A repo that does not exist yet is created by the first push.
+    let (remote_refs, missing) = match remote.try_list().await? {
+        Some((refs, _)) => (refs, false),
+        None => (BTreeMap::new(), true),
+    };
+    if missing && s.account != remote.owner {
+        bail!(
+            "repo {}/{} does not exist, and only {} can create it (signing as {})",
+            remote.owner,
+            remote.repo,
+            remote.owner,
+            s.account
+        );
+    }
     let mut updates = Vec::new();
     let mut new_tips = Vec::new();
     let mut dsts = Vec::new();
@@ -463,6 +489,22 @@ async fn push(remote: &Remote, specs: &[String]) -> Result<Vec<(String, Result<(
             new_oid: new,
         });
     }
+    // The first branch pushed becomes the repo's default branch.
+    let mut create = missing.then(|| {
+        let default_branch = updates
+            .iter()
+            .find(|u| u.new_oid != ZERO_OID && u.refname.starts_with("refs/heads/"))
+            .map(|u| u.refname.clone());
+        action(
+            &s,
+            "create",
+            Create {
+                name: remote.repo.clone(),
+                default_branch,
+            }
+            .packed(),
+        )
+    });
     let outcome: Result<()> = async {
         let tips: Vec<String> = remote_refs.values().cloned().collect();
         let objs = if new_tips.is_empty() {
@@ -481,19 +523,15 @@ async fn push(remote: &Remote, specs: &[String]) -> Result<Vec<(String, Result<(
         for (oid, _, data) in objs {
             if size + data.len() > MAX_TX_BYTES && !batch.is_empty() {
                 let b = std::mem::take(&mut batch);
-                submit(
-                    remote,
-                    &keys,
-                    vec![action(&s, "putObjects", flush(b).packed())],
-                    "applied",
-                )
-                .await?;
+                let mut actions: Vec<Action> = create.take().into_iter().collect();
+                actions.push(action(&s, "putObjects", flush(b).packed()));
+                submit(remote, &keys, actions, "applied").await?;
                 size = 0;
             }
             size += data.len() + 64;
             batch.push(GitObject { oid, data });
         }
-        let mut actions = Vec::new();
+        let mut actions: Vec<Action> = create.take().into_iter().collect();
         if !batch.is_empty() {
             actions.push(action(&s, "putObjects", flush(batch).packed()));
         }
@@ -540,7 +578,16 @@ async fn main() -> Result<()> {
         } else if line.starts_with("option ") {
             writeln!(out, "unsupported")?;
         } else if line == "list" || line == "list for-push" {
-            let (refs, head) = match remote.list().await {
+            // For a push, a missing repo lists as empty; the push creates it.
+            let listed = if line == "list for-push" {
+                remote
+                    .try_list()
+                    .await
+                    .map(|r| r.unwrap_or_default())
+            } else {
+                remote.list().await
+            };
+            let (refs, head) = match listed {
                 Ok(r) => r,
                 Err(e) => {
                     eprintln!("git-remote-psibase: {e:#}");

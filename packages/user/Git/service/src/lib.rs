@@ -209,10 +209,16 @@ pub mod service {
             .collect()
     }
 
-    /// Create a repository owned by the sender.
+    /// Create a repository owned by the sender. `default_branch` (what `HEAD`
+    /// points at) defaults to `refs/heads/main`.
     #[action]
-    fn create(name: String) {
+    fn create(name: String, default_branch: Option<String>) {
         check_name(&name);
+        let default_branch = default_branch.unwrap_or_else(|| "refs/heads/main".into());
+        check_refname(&default_branch);
+        if !default_branch.starts_with("refs/heads/") {
+            fail("default branch must be under refs/heads/");
+        }
         let owner = get_sender();
         let table = RepoTable::new();
         if table.get_index_pk().get(&(owner, name.clone())).is_some() {
@@ -222,7 +228,7 @@ pub mod service {
             .put(&RepoRow {
                 owner,
                 name,
-                default_branch: "refs/heads/main".into(),
+                default_branch,
             })
             .unwrap();
     }
