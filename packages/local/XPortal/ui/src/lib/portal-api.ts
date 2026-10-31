@@ -5,6 +5,7 @@ import {
     toSystemTokenInfo,
     type SystemTokenInfo,
 } from "@shared/hooks/use-system-token";
+import type { SystemTokenInfo as PluginSystemTokenInfo } from "@shared/lib/plugins/tokens";
 import { supervisor } from "@shared/lib/supervisor";
 
 import type { InviteDetails } from "./signup-request";
@@ -53,6 +54,7 @@ const zSystemToken = z.object({
     id: z.coerce.number(),
     symbol: z.string().nullish(),
     precision: z.coerce.number().int().nonnegative(),
+    untransferable: z.boolean(),
 });
 
 /**
@@ -72,10 +74,9 @@ export const getSystemToken = async (): Promise<SystemTokenInfo | null> => {
     if (raw == null) return null;
     const token = zSystemToken.parse(raw);
     return toSystemTokenInfo({
-        id: token.id,
-        precision: token.precision,
+        ...token,
         symbol: token.symbol ?? undefined,
-    });
+    } satisfies PluginSystemTokenInfo);
 };
 
 /** `raw` is an amount in smallest units of a token with `precision`. */
