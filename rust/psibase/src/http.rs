@@ -105,11 +105,7 @@ impl HttpRequest {
             .map(|h| h.value.as_str())
     }
 
-    /// The first `Cookie` header value, split on `;` (RFC 6265 §5.4).
-    ///
-    /// Segments without `=` and empty segments (including from `;;`) yield
-    /// [`CookiePart::Malformed`]. Names and values are trimmed; values are not
-    /// URL-decoded.
+    /// Parses the first `Cookie` header into trimmed pairs or [`CookiePart::Malformed`].
     pub fn cookies(&self) -> impl Iterator<Item = CookiePart<'_>> + '_ {
         self.get_header("cookie")
             .into_iter()
