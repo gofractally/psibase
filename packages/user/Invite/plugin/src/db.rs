@@ -109,6 +109,7 @@ impl InviteTokensTable {
             base64::standard::decode(&response.secret)
                 .unwrap()
                 .as_slice(),
+            &[],
         )
         .unwrap();
 
