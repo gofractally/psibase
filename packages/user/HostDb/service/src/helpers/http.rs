@@ -40,14 +40,14 @@ pub(crate) fn reply(
         headers.push(HttpHeader::new(
             "Set-Cookie",
             &format!(
-                "{DEVICE_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; Max-Age={DEVICE_MAX_AGE_SECS}; HttpOnly;"
+                "{DEVICE_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; Max-Age={DEVICE_MAX_AGE_SECS}; HttpOnly"
             ),
         ));
     }
     if let Some(cookie) = session_cookie {
         headers.push(HttpHeader::new(
             "Set-Cookie",
-            &format!("{SESSION_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; HttpOnly;"),
+            &format!("{SESSION_COOKIE}={cookie}; Path=/; SameSite=Strict; Secure; HttpOnly"),
         ));
     }
     HttpReply {
