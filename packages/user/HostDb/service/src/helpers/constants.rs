@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 pub(crate) const DEVICE_COOKIE: &str = "__Host-HOSTDB-DEVICE";
 pub(crate) const SESSION_COOKIE: &str = "__Host-HOSTDB-SESSION";
 pub(crate) const DEVICE_ID_LEN: usize = 32;
@@ -10,19 +12,12 @@ pub(crate) const DAY_SECS: u64 = 24 * 60 * 60;
 /// Device cookie `Max-Age`.
 pub(crate) const DEVICE_MAX_AGE_SECS: u64 = 400 * DAY_SECS;
 pub(crate) const DEVICE_IDLE_NS: u64 = DEVICE_MAX_AGE_SECS * NS_PER_SEC;
-/// `__WASI_CLOCKID_REALTIME`: wall-clock nanoseconds since the unix epoch.
-pub(crate) const CLOCK_REALTIME: u32 = 0;
 pub(crate) const SESSION_IDLE_NS: u64 = 7 * DAY_SECS * NS_PER_SEC;
 pub(crate) const GC_LIMIT: usize = 16;
 
-use psibase::native_raw;
-use psibase::*;
-
 pub(crate) fn wall_time_ns() -> u64 {
-    let mut time = 0u64;
-    let err = unsafe { native_raw::clockTimeGet(CLOCK_REALTIME, &mut time) };
-    if err != 0 {
-        abort_message("clockTimeGet failed");
-    }
-    time
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time before Unix epoch")
+        .as_nanos() as u64
 }

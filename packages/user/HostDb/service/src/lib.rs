@@ -120,7 +120,6 @@ mod service {
 
     /// Persistent lookup for `GET /kv/persistent/<key>`.
     fn read_persistent(device: &[u8], key: &[u8]) -> Option<Vec<u8>> {
-        let now = wall_time_ns();
         let value = {
             subjective_tx! {
                 existing_device_store(&DeviceTable::new(), device)
@@ -128,6 +127,7 @@ mod service {
             }
         };
         subjective_tx! {
+            let now = wall_time_ns();
             let _ = device_store(&DeviceTable::new(), device, now);
         }
         value
