@@ -16,11 +16,10 @@ For example, for a local node being hosted at the default domain (`psibase.local
 
 ### Safari and local development
 
-Safari cannot do local development against a psibase node; HTTPS on `localhost`
-does not fix it.
-
-- Treats each `*.localhost` subdomain as a separate site, so the supervisor iframe cannot read or write cookies (including on HTTPS)
-- Rejects `__Host-`/`__Secure-` cookies over plain HTTP
+Safari cannot do local development against a psibase node. Safari treats each
+`*.localhost` subdomain as a separate site, so the supervisor iframe cannot
+read or write cookies. Safari rejects `__Host-`/`__Secure-` cookies over plain
+HTTP.
 
 Use another browser for local dev. For Safari, use **production HTTPS** on a
 registered domain that is not `localhost`.
