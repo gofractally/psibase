@@ -118,9 +118,12 @@ The psibase plugin host provides a key-value interface for plugins to use for re
 
 ### Host-dependent data backing
 
-It is up to the host platform to determine how to implement the key-value interface. For example, in the current implementation of the host:plugin for the web platform, the key-value implementation uses LocalStorage as its data backing, because it is a synchronous interface which is easiest to integrate with wasm.
+It is up to the host platform to determine how to implement the key-value interface. On the web platform, the browser stores plugin data on the node it is connected to, in the `hostdb` service, scoped by cookies. The client HMACs keys and encrypts values before they leave the browser.
 
-Note: This imposes a major restriction on the amount of local data storage available for psibase plugins: Currently there is [a hard limit](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria#web_storage) for the total amount of data stored in LocalStorage across all psibase apps in a given browser, since storage across all apps is managed by a single domain. This restriction will be lifted in a future implementation of plugin storage that uses a different data backing layer such as IndexedDB.
+- **Most browsers.** The encryption key stays in IndexedDB on the supervisor origin. Ciphertext at rest on the node is opaque to the node.
+- **WebKit** (desktop Safari and every iOS browser). Script-written storage is evicted after seven days without interaction, so the client key is kept in a server-set `__Host-HOSTDB-KEY` cookie on `supervisor.{root}`. The node receives that cookie on supervisor requests and can decrypt the stored data. For Safari and local development, see [front-end development](../../development/front-ends/README.md#safari-and-local-development).
+
+HMAC-SHA256 yields a fixed 32-byte digest. The digest is stored as binary on the node and hex-encoded for transport in HTTP requests. That keeps keys within the chain's `maxKeySize` limit (128 bytes) even though plugins may use plaintext keys up to 256 bytes.
 
 ### API
 

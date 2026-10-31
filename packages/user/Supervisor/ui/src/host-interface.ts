@@ -37,7 +37,6 @@ export interface BridgeImports {
         ) => HttpResponse;
         serviceStack: () => string[];
         getRootDomain: () => string;
-        getChainId: () => string;
         sign: (msg: Uint8Array, publicKey: string) => Uint8Array;
         signExplicit: (msg: Uint8Array, privateKey: string) => Uint8Array;
         importKey: (privateKey: string) => string;
@@ -45,7 +44,11 @@ export interface BridgeImports {
         getClientKey: () => Uint8Array;
     };
     "supervisor:bridge/database": {
-        get: (duration: number, key: string) => Uint8Array | null;
+        get: (
+            duration: number,
+            key: string,
+            debugKey: string,
+        ) => Uint8Array | null;
         set: (duration: number, key: string, value: Uint8Array) => void;
         remove: (duration: number, key: string) => void;
     };

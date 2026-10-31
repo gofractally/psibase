@@ -28,14 +28,20 @@ namespace SystemService
 
    namespace
    {
+      struct InsituJsonBody
+      {
+         HttpRequest& req;
+         explicit InsituJsonBody(HttpRequest& r) : req(r) { req.body.push_back(0); }
+         ~InsituJsonBody() { req.body.pop_back(); }
+         char* data() { return req.body.data(); }
+      };
+
       template <typename T>
       T extractData(HttpRequest& request)
       {
-         request.body.push_back(0);
-         psio::json_token_stream jstream{request.body.data()};
-         auto                    result = psio::from_json<T>(jstream);
-         request.body.pop_back();
-         return result;
+         InsituJsonBody          body{request};
+         psio::json_token_stream jstream{body.data()};
+         return psio::from_json<T>(jstream);
       }
 
       bool isAllowedChar(char ch, std::string_view excluded)
@@ -227,7 +233,8 @@ namespace SystemService
             auto data = extractData<CookieData>(request);
 
             // cookie-name and cookie-value per RFC 6265; maxAge must be non-negative.
-            if (!isValidCookieName(data.name) || !isValidCookieValue(data.value) || data.maxAge < 0)
+            if (!isValidCookieName(data.name) || !isValidCookieValue(data.value) ||
+                data.maxAge < 0)
             {
                return HttpReply{.status      = HttpStatus::badRequest,
                                 .contentType = "text/plain",
