@@ -51,8 +51,6 @@ pub mod tables {
     pub struct DeviceRow {
         pub device: Vec<u8>,
         pub last_seen: u64,
-        /// Prefix of this device's rows. Not the device id, so a prefix still
-        /// being deleted can move to a new id.
         pub store: Vec<u8>,
     }
 
