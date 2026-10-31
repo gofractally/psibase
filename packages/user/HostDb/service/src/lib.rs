@@ -10,11 +10,11 @@ mod tables;
 #[psibase::service(name = "hostdb", tables = "tables::tables")]
 mod service {
     use crate::helpers::{
-        check_precondition, cookie_or_mint, decode_fixed_hex, hex_encode, parse_batch,
-        reply, session_id, status_reply, wall_time_ns, Change, Duration, Precondition,
-        DEVICE_COOKIE, DEVICE_IDLE_NS, GC_LIMIT, KEY_LEN, SESSION_IDLE_NS,
+        check_precondition, collect_idle_devices, cookie_or_mint, decode_fixed_hex, device_store,
+        hex_encode, parse_batch, reply, session_id, status_reply, wall_time_ns, Change, Duration,
+        Precondition, DEVICE_COOKIE, GC_LIMIT, KEY_LEN, SESSION_IDLE_NS,
     };
-    use crate::tables::tables::{DeviceRow, DeviceTable, KvRow, KvTable, SessionKvRow, SessionKvTable};
+    use crate::tables::tables::{DeviceTable, KvRow, KvTable, SessionKvRow, SessionKvTable};
     use psibase::services::http_server::Wrapper as HttpServer;
     use psibase::*;
 
@@ -120,10 +120,10 @@ mod service {
     /// Persistent lookup for `GET /kv/persistent/<key>`.
     fn read_persistent(device: &[u8], key: &[u8]) -> Option<Vec<u8>> {
         subjective_tx! {
-            record_seen(&DeviceTable::new(), device, wall_time_ns());
+            let store = device_store(&DeviceTable::new(), device, wall_time_ns());
             KvTable::new()
-                .get_index_pk()
-                .get(&(device.to_vec(), key.to_vec()))
+                .get_index(0)
+                .get(&(&store[..], key))
                 .map(|row| row.value)
         }
     }
@@ -132,10 +132,9 @@ mod service {
     fn read_session(device: &[u8], session: &[u8], key: &[u8]) -> Option<Vec<u8>> {
         subjective_tx! {
             let now = wall_time_ns();
-            record_seen(&DeviceTable::new(), device, now);
+            let store = device_store(&DeviceTable::new(), device, now);
             let table = SessionKvTable::new();
-            let pk = (device.to_vec(), session.to_vec(), key.to_vec());
-            match table.get_index_pk().get(&pk) {
+            match table.get_index(0).get(&(&store[..], session, key)) {
                 Some(mut row) => {
                     row.last_access = now;
                     let value = row.value.clone();
@@ -164,30 +163,30 @@ mod service {
             let persistent = KvTable::new();
             let sessions = SessionKvTable::new();
             let devices = DeviceTable::new();
-            record_seen(&devices, device, now);
+            let store = device_store(&devices, device, now);
             for change in changes {
                 if let Precondition::Read(expected) = &change.expected {
                     let stored =
-                        current_value(&persistent, &sessions, device, session, change);
+                        current_value(&persistent, &sessions, &store, session, change);
                     check_precondition(stored.as_deref(), expected)?;
                 }
                 match (change.duration, change.value.as_deref()) {
                     (Duration::Persistent, Some(value)) => {
                         persistent
                             .put(&KvRow {
-                                device: device.to_vec(),
+                                store: store.clone(),
                                 key: change.key.clone(),
                                 value: value.to_vec(),
                             })
                             .unwrap();
                     }
                     (Duration::Persistent, None) => {
-                        persistent.erase(&(device.to_vec(), change.key.clone()));
+                        persistent.erase(&(&store[..], &change.key));
                     }
                     (Duration::Session, Some(value)) => {
                         sessions
                             .put(&SessionKvRow {
-                                device: device.to_vec(),
+                                store: store.clone(),
                                 session: session.unwrap().to_vec(),
                                 key: change.key.clone(),
                                 value: value.to_vec(),
@@ -196,11 +195,7 @@ mod service {
                             .unwrap();
                     }
                     (Duration::Session, None) => {
-                        sessions.erase(&(
-                            device.to_vec(),
-                            session.unwrap().to_vec(),
-                            change.key.clone(),
-                        ));
+                        sessions.erase(&(&store[..], session.unwrap(), &change.key));
                     }
                 }
             }
@@ -217,22 +212,18 @@ mod service {
     fn current_value(
         persistent: &KvTable,
         sessions: &SessionKvTable,
-        device: &[u8],
+        store: &[u8],
         session: Option<&[u8]>,
         change: &Change,
     ) -> Option<Vec<u8>> {
         match change.duration {
             Duration::Persistent => persistent
-                .get_index_pk()
-                .get(&(device.to_vec(), change.key.clone()))
+                .get_index(0)
+                .get(&(store, &change.key))
                 .map(|row| row.value),
             Duration::Session => sessions
-                .get_index_pk()
-                .get(&(
-                    device.to_vec(),
-                    session.unwrap().to_vec(),
-                    change.key.clone(),
-                ))
+                .get_index(0)
+                .get(&(store, session.unwrap(), &change.key))
                 .map(|row| row.value),
         }
     }
@@ -252,56 +243,6 @@ mod service {
         {
             table.remove(&row);
         }
-    }
-
-    fn record_seen(devices: &DeviceTable, device: &[u8], now: u64) {
-        devices
-            .put(&DeviceRow {
-                device: device.to_vec(),
-                last_seen: now,
-            })
-            .unwrap();
-    }
-
-    /// Deletes up to `GC_LIMIT` persistent rows of idle devices, oldest device
-    /// first, and forgets each idle device left with no rows.
-    fn collect_idle_devices(devices: &DeviceTable, persistent: &KvTable, now: u64) {
-        let cutoff = now.saturating_sub(DEVICE_IDLE_NS);
-        let idle: Vec<_> = devices
-            .get_index_by_last_seen()
-            .range(..(cutoff, Vec::new()))
-            .take(GC_LIMIT)
-            .map(|row| row.device)
-            .collect();
-        let mut budget = GC_LIMIT;
-        for device in idle {
-            let (erased, drained) = erase_device_rows(persistent, &device, budget);
-            if drained {
-                devices.erase(&device);
-            }
-            budget -= erased;
-            if budget == 0 {
-                break;
-            }
-        }
-    }
-
-    /// Erases up to `limit` of `device`'s persistent rows. Returns how many were
-    /// erased and whether none remain.
-    fn erase_device_rows(persistent: &KvTable, device: &[u8], limit: usize) -> (usize, bool) {
-        let mut keys: Vec<_> = persistent
-            .get_index_pk()
-            .range((device.to_vec(), Vec::new())..)
-            .take_while(|row| row.device == device)
-            .take(limit + 1)
-            .map(|row| row.key)
-            .collect();
-        let drained = keys.len() <= limit;
-        keys.truncate(limit);
-        for key in &keys {
-            persistent.erase(&(device, key));
-        }
-        (keys.len(), drained)
     }
 }
 

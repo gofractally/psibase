@@ -1,9 +1,10 @@
 #[cfg(test)]
 mod tests {
     use crate::helpers::{
-        check_precondition, decode_fixed_hex, hex_encode, parse_batch, ReadExpect, Precondition,
-        KEY_LEN,
+        check_precondition, decode_fixed_hex, hex_encode, parse_batch, replacement_device,
+        Precondition, ReadExpect, KEY_LEN,
     };
+    use crate::tables::tables::DeviceRow;
     use psibase::*;
 
     #[test]
@@ -71,5 +72,21 @@ mod tests {
             r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ","expected":"zz"}}]}}"#
         );
         assert!(parse_batch(bad.as_bytes()).is_none());
+    }
+
+    fn device(id: &[u8], store: &[u8]) -> DeviceRow {
+        DeviceRow {
+            device: id.to_vec(),
+            last_seen: 1,
+            store: store.to_vec(),
+        }
+    }
+
+    #[test]
+    fn unfinished_collection_moves_the_prefix_to_a_new_id() {
+        let next = replacement_device(device(b"old", b"store"), b"new".to_vec());
+        assert_eq!(next.device, b"new");
+        assert_eq!(next.store, b"store");
+        assert_eq!(next.last_seen, 1);
     }
 }

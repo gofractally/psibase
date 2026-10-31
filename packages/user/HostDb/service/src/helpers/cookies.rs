@@ -1,8 +1,8 @@
-use psibase::native_raw;
 use psibase::*;
 
 use super::constants::{ID_LEN, SESSION_COOKIE};
 use super::encoding::decode_fixed_hex;
+use super::ids::mint_id;
 
 enum CookieValue {
     Id(Vec<u8>),
@@ -50,10 +50,4 @@ pub(crate) fn cookie_or_mint(request: &HttpRequest, name: &str) -> Option<Vec<u8
 /// and malformed; a missing cookie starts an empty session.
 pub(crate) fn session_id(request: &HttpRequest) -> Option<Vec<u8>> {
     cookie_or_mint(request, SESSION_COOKIE)
-}
-
-fn mint_id() -> Vec<u8> {
-    let mut id = vec![0u8; ID_LEN];
-    unsafe { native_raw::getRandom(id.as_mut_ptr(), id.len()) };
-    id
 }
