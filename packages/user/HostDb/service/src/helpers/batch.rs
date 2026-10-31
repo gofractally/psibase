@@ -71,14 +71,32 @@ impl<'de> Deserialize<'de> for Base64 {
     }
 }
 
+// A present field is `Some`, so omission stays distinct from JSON null.
+fn deserialize_omitted_vs_null<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<Base64>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Some(Option::<Base64>::deserialize(deserializer)?))
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Change {
     pub(crate) duration: Duration,
     key: Hex<[u8; KEY_LEN]>,
-    value: Option<Base64>,
+    #[serde(default, deserialize_with = "deserialize_omitted_vs_null")]
+    value: Option<Option<Base64>>,
     #[serde(default)]
     pub(crate) expected: Precondition,
+}
+
+/// The write half of a batch op. Absent `value` is not a write.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Write<'a> {
+    Delete,
+    Put(&'a [u8]),
 }
 
 impl Change {
@@ -86,8 +104,21 @@ impl Change {
         self.key.as_slice()
     }
 
-    pub(crate) fn value(&self) -> Option<&[u8]> {
-        self.value.as_ref().map(|value| value.0.as_slice())
+    /// `None` checks `expected` and does not write.
+    pub(crate) fn write(&self) -> Option<Write<'_>> {
+        match &self.value {
+            None => None,
+            Some(None) => Some(Write::Delete),
+            Some(Some(value)) => Some(Write::Put(value.0.as_slice())),
+        }
+    }
+
+    /// 400 unless this check-only op names the read it checks.
+    pub(crate) fn require_read(&self) -> Result<(), u16> {
+        match &self.expected {
+            Precondition::Read(_) => Ok(()),
+            Precondition::Unconditional => Err(400),
+        }
     }
 }
 

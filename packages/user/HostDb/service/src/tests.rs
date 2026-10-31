@@ -2,7 +2,7 @@
 mod tests {
     use crate::helpers::{
         check_precondition, decode_fixed_hex, hex_encode, parse_batch, replacement_device,
-        Precondition, ReadExpect, KEY_LEN, MAX_VALUE_LEN,
+        Precondition, ReadExpect, Write, KEY_LEN, MAX_VALUE_LEN,
     };
     use crate::tables::tables::DeviceRow;
     use psibase::*;
@@ -59,7 +59,7 @@ mod tests {
             r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"{value}","expected":"{hash}"}}]}}"#
         );
         let changes = parse_batch(with_hash.as_bytes()).expect("hash");
-        assert_eq!(changes[0].value(), Some(&[0xfb][..]));
+        assert_eq!(changes[0].write(), Some(Write::Put(&[0xfb])));
         assert_eq!(
             changes[0].expected,
             Precondition::Read(ReadExpect::Hash(ciphertext_hash))
@@ -80,6 +80,17 @@ mod tests {
             r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"{value}","expected":"zz"}}]}}"#
         );
         assert!(parse_batch(bad.as_bytes()).is_none());
+    }
+
+    #[test]
+    fn omitted_value_is_a_check() {
+        let key = sample_key_hex();
+        let hash = hex_encode(&sha256(b"ciphertext").0);
+        let check =
+            format!(r#"{{"ops":[{{"duration":"persistent","key":"{key}","expected":"{hash}"}}]}}"#);
+        let changes = parse_batch(check.as_bytes()).expect("check");
+        assert_eq!(changes[0].write(), None);
+        assert_eq!(changes[0].require_read(), Ok(()));
     }
 
     #[test]

@@ -9,7 +9,8 @@ type Duration = (typeof DURATIONS)[number];
 interface BatchOp {
     duration: Duration;
     key: string;
-    value: string | null;
+    // Base64 ciphertext to store, null to delete, omitted to only check `expected`.
+    value?: string | null;
     // SHA-256 hex of the ciphertext from GET, or null when that GET was absent.
     // Omitted when this call has not read the key.
     expected?: string | null;
@@ -46,6 +47,18 @@ async function postBatch(body: string): Promise<void> {
     }
 }
 
+function storagePath(duration: Duration, key: string): string {
+    return `${duration}/${key}`;
+}
+
+function parseStoragePath(path: string): { duration: Duration; key: string } {
+    const separator = path.indexOf("/");
+    return {
+        duration: path.slice(0, separator) as Duration,
+        key: path.slice(separator + 1),
+    };
+}
+
 function durationName(duration: number): Duration {
     const name = DURATIONS[duration];
     if (name === undefined) {
@@ -71,9 +84,10 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
 
 // The `supervisor:bridge/database` store for one entry point, backed by the
 //   `hostdb` service. Reads are cached; writes update the cache and are queued
-//   until `flush`. Each read remembers the server ciphertext. Batch ops for a
-//   key that was read send the SHA-256 of that ciphertext (or null when the
-//   read was absent). The queue keeps the last op for each (duration, key).
+//   until `flush`. Each read remembers the server ciphertext. A write for a
+//   key that was read sends the SHA-256 of that ciphertext (or null when the
+//   read was absent). A read with no write sends that expectation and no
+//   `value`. The queue keeps the last op for each (duration, key).
 export class HostDb {
     private cache = new Map<string, Uint8Array | null>();
 
@@ -107,7 +121,7 @@ export class HostDb {
         debugKey: string,
         send: (req: HttpRequest) => HttpResponse,
     ): Uint8Array | null {
-        const path = `${durationName(duration)}/${key}`;
+        const path = storagePath(durationName(duration), key);
         const cached = this.cache.get(path);
         if (cached !== undefined) {
             return cached;
@@ -135,7 +149,7 @@ export class HostDb {
 
     set(duration: number, key: string, value: Uint8Array): void {
         const name = durationName(duration);
-        const path = `${name}/${key}`;
+        const path = storagePath(name, key);
         this.cache.set(path, value);
         this.enqueue({
             duration: name,
@@ -146,38 +160,56 @@ export class HostDb {
 
     remove(duration: number, key: string): void {
         const name = durationName(duration);
-        const path = `${name}/${key}`;
+        const path = storagePath(name, key);
         this.cache.set(path, null);
         this.enqueue({ duration: name, key, value: null });
     }
 
-    // Flushes queued writes to hostdb. A rejected POST is retried with
-    // increasing delay; throws after those attempts, or on a non-OK response.
+    // Sends queued writes, then a check for each read that was not written.
+    // A rejected POST is retried with increasing delay; throws after those
+    // attempts, or on a non-OK response.
     async flush(): Promise<void> {
-        if (this.queue.size === 0) {
-            return;
-        }
+        const written = new Set(this.queue.keys());
         const queued = [...this.queue.values()];
         this.queue.clear();
-        const ops = await Promise.all(
+        const writes = await Promise.all(
             queued.map((op) => this.withExpected(op)),
         );
+        const checks = await Promise.all(
+            [...this.observed.entries()]
+                .filter(([path]) => !written.has(path))
+                .map(async ([path, observed]) => {
+                    const { duration, key } = parseStoragePath(path);
+                    return {
+                        duration,
+                        key,
+                        expected: await this.expectation(observed),
+                    };
+                }),
+        );
+        const ops = [...writes, ...checks];
+        if (ops.length === 0) {
+            return;
+        }
         await postBatch(JSON.stringify({ ops }));
     }
 
     // Last write for a (duration, key) replaces any earlier op this call.
     private enqueue(op: BatchOp): void {
-        this.queue.set(`${op.duration}/${op.key}`, op);
+        this.queue.set(storagePath(op.duration, op.key), op);
     }
 
     private async withExpected(op: BatchOp): Promise<BatchOp> {
-        const observed = this.observed.get(`${op.duration}/${op.key}`);
+        const observed = this.observed.get(storagePath(op.duration, op.key));
         if (observed === undefined) {
             return op;
         }
-        return {
-            ...op,
-            expected: observed === null ? null : await sha256Hex(observed),
-        };
+        return { ...op, expected: await this.expectation(observed) };
+    }
+
+    private async expectation(
+        observed: Uint8Array | null,
+    ): Promise<string | null> {
+        return observed === null ? null : sha256Hex(observed);
     }
 }

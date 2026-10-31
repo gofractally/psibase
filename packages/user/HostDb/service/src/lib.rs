@@ -13,7 +13,7 @@ mod service {
         check_precondition, collect_idle_devices, decode_fixed_hex, device_id, device_store,
         existing_device_store,
         hex_encode, is_kv_item_path, is_storage_path, parse_batch, reply, session_id,
-        status_reply, wall_time_ns, Change, Duration, Precondition, GC_LIMIT, KEY_LEN,
+        status_reply, wall_time_ns, Change, Duration, Precondition, Write, GC_LIMIT, KEY_LEN,
         KV_BATCH_PATH, KV_PERSISTENT_PREFIX, KV_SESSION_PREFIX, SESSION_IDLE_NS,
     };
     use crate::tables::tables::{DeviceTable, KvRow, KvTable, SessionKvRow, SessionKvTable};
@@ -162,10 +162,12 @@ mod service {
         }
     }
 
-    /// Applies batch ops from `POST /kv/batch`. A null `value` deletes the key.
-    /// `expected` is the SHA-256 hex of the ciphertext from GET, or null when
-    /// that GET was absent. Omit it to write unconditionally. A mismatch
-    /// returns 409 and writes nothing.
+    /// Applies batch ops from `POST /kv/batch`.
+    /// Omit `value` to check `expected` and leave the key unchanged; omitting
+    /// `expected` on that op returns 400. A null `value` deletes the key. A
+    /// base64 string stores it. `expected` is the SHA-256 hex of the ciphertext
+    /// from GET, or null when that GET was absent. Omit `expected` to write
+    /// unconditionally. A mismatch returns 409 and writes nothing.
     fn apply_changes(device: &[u8], session: Option<&[u8]>, changes: Vec<Change>) -> Result<(), u16> {
         subjective_tx! {
             let now = wall_time_ns();
@@ -181,8 +183,12 @@ mod service {
                         current_value(&persistent, &sessions, &store, session, change);
                     check_precondition(stored.as_deref(), expected)?;
                 }
-                match (change.duration, change.value()) {
-                    (Duration::Persistent, Some(value)) => {
+                let Some(write) = change.write() else {
+                    change.require_read()?;
+                    continue;
+                };
+                match (change.duration, write) {
+                    (Duration::Persistent, Write::Put(value)) => {
                         persistent_gc = true;
                         persistent
                             .put(&KvRow {
@@ -192,10 +198,10 @@ mod service {
                             })
                             .unwrap();
                     }
-                    (Duration::Persistent, None) => {
+                    (Duration::Persistent, Write::Delete) => {
                         persistent.erase(&(&store[..], change.key()));
                     }
-                    (Duration::Session, Some(value)) => {
+                    (Duration::Session, Write::Put(value)) => {
                         session_gc = true;
                         sessions
                             .put(&SessionKvRow {
@@ -207,7 +213,7 @@ mod service {
                             })
                             .unwrap();
                     }
-                    (Duration::Session, None) => {
+                    (Duration::Session, Write::Delete) => {
                         sessions.erase(&(&store[..], session.unwrap(), change.key()));
                     }
                 }

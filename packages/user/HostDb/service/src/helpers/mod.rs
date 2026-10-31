@@ -9,7 +9,7 @@ mod paths;
 
 #[cfg(test)]
 pub(crate) use batch::ReadExpect;
-pub(crate) use batch::{check_precondition, parse_batch, Change, Duration, Precondition};
+pub(crate) use batch::{check_precondition, parse_batch, Change, Duration, Precondition, Write};
 #[cfg(test)]
 pub(crate) use constants::MAX_VALUE_LEN;
 pub(crate) use constants::{wall_time_ns, DEVICE_COOKIE, GC_LIMIT, KEY_LEN, SESSION_IDLE_NS};
