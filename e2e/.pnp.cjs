@@ -31,7 +31,9 @@ const RAW_RUNTIME_STATE =
           ["@eslint/js", "npm:9.39.5"],\
           ["@playwright/test", "npm:1.64.1"],\
           ["@psibase/e2e", "workspace:."],\
+          ["@types/bcryptjs", "npm:2.4.6"],\
           ["@types/node", "npm:22.20.1"],\
+          ["bcryptjs", "npm:2.4.3"],\
           ["eslint", "virtual:59c96521afb2010d771a41a339656fb3abc61eb5b121c85fbe49631651a30b8f82a2f2b93d81c2b9f4bc08757cd9cf6bf98f7d8f550bb88fbfe1f9b9916f0aeb#npm:9.39.5"],\
           ["globals", "npm:16.5.0"],\
           ["prettier", "npm:3.9.6"],\
@@ -218,7 +220,9 @@ const RAW_RUNTIME_STATE =
           ["@eslint/js", "npm:9.39.5"],\
           ["@playwright/test", "npm:1.64.1"],\
           ["@psibase/e2e", "workspace:."],\
+          ["@types/bcryptjs", "npm:2.4.6"],\
           ["@types/node", "npm:22.20.1"],\
+          ["bcryptjs", "npm:2.4.3"],\
           ["eslint", "virtual:59c96521afb2010d771a41a339656fb3abc61eb5b121c85fbe49631651a30b8f82a2f2b93d81c2b9f4bc08757cd9cf6bf98f7d8f550bb88fbfe1f9b9916f0aeb#npm:9.39.5"],\
           ["globals", "npm:16.5.0"],\
           ["prettier", "npm:3.9.6"],\
@@ -226,6 +230,15 @@ const RAW_RUNTIME_STATE =
           ["typescript-eslint", "virtual:59c96521afb2010d771a41a339656fb3abc61eb5b121c85fbe49631651a30b8f82a2f2b93d81c2b9f4bc08757cd9cf6bf98f7d8f550bb88fbfe1f9b9916f0aeb#npm:8.67.0"]\
         ],\
         "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@types/bcryptjs", [\
+      ["npm:2.4.6", {\
+        "packageLocation": "../.caches/yarn/@types-bcryptjs-npm-2.4.6-50588b8234-1182663f0c.zip/node_modules/@types/bcryptjs/",\
+        "packageDependencies": [\
+          ["@types/bcryptjs", "npm:2.4.6"]\
+        ],\
+        "linkType": "HARD"\
       }]\
     ]],\
     ["@types/estree", [\
@@ -570,6 +583,15 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/balanced-match-npm-4.0.4-fd666b3c7f-07e86102a3.zip/node_modules/balanced-match/",\
         "packageDependencies": [\
           ["balanced-match", "npm:4.0.4"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["bcryptjs", [\
+      ["npm:2.4.3", {\
+        "packageLocation": "../.caches/yarn/bcryptjs-npm-2.4.3-32de4957eb-b969467087.zip/node_modules/bcryptjs/",\
+        "packageDependencies": [\
+          ["bcryptjs", "npm:2.4.3"]\
         ],\
         "linkType": "HARD"\
       }]\
