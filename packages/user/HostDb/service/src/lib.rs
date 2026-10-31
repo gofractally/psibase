@@ -11,6 +11,7 @@ mod tables;
 mod service {
     use crate::helpers::{
         check_precondition, collect_idle_devices, decode_fixed_hex, device_id, device_store,
+        existing_device_store,
         hex_encode, parse_batch, reply, session_id, status_reply, wall_time_ns, Change, Duration,
         Precondition, GC_LIMIT, KEY_LEN, SESSION_IDLE_NS,
     };
@@ -119,13 +120,24 @@ mod service {
 
     /// Persistent lookup for `GET /kv/persistent/<key>`.
     fn read_persistent(device: &[u8], key: &[u8]) -> Option<Vec<u8>> {
+        let now = wall_time_ns();
+        let value = {
+            subjective_tx! {
+                existing_device_store(&DeviceTable::new(), device)
+                    .and_then(|store| persistent_value(&KvTable::new(), &store, key))
+            }
+        };
         subjective_tx! {
-            let store = device_store(&DeviceTable::new(), device, wall_time_ns());
-            KvTable::new()
-                .get_index(0)
-                .get(&(&store[..], key))
-                .map(|row| row.value)
+            let _ = device_store(&DeviceTable::new(), device, now);
         }
+        value
+    }
+
+    fn persistent_value(persistent: &KvTable, store: &[u8], key: &[u8]) -> Option<Vec<u8>> {
+        persistent
+            .get_index(0)
+            .get(&(store, key))
+            .map(|row| row.value)
     }
 
     /// Session lookup for `GET /kv/session/<key>`.
@@ -217,10 +229,7 @@ mod service {
         change: &Change,
     ) -> Option<Vec<u8>> {
         match change.duration {
-            Duration::Persistent => persistent
-                .get_index(0)
-                .get(&(store, change.key()))
-                .map(|row| row.value),
+            Duration::Persistent => persistent_value(persistent, store, change.key()),
             Duration::Session => sessions
                 .get_index(0)
                 .get(&(store, session.unwrap(), change.key()))

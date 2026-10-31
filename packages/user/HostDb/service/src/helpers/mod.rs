@@ -15,6 +15,6 @@ pub(crate) use constants::{wall_time_ns, DEVICE_COOKIE, GC_LIMIT, KEY_LEN, SESSI
 pub(crate) use cookies::{device_id, session_id};
 #[cfg(test)]
 pub(crate) use device::replacement_device;
-pub(crate) use device::{collect_idle_devices, device_store};
+pub(crate) use device::{collect_idle_devices, device_store, existing_device_store};
 pub(crate) use encoding::{decode_fixed_hex, hex_encode};
 pub(crate) use http::{reply, status_reply};

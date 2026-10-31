@@ -4,6 +4,11 @@ use super::constants::{DEVICE_ID_LEN, DEVICE_IDLE_NS, GC_LIMIT, ID_LEN};
 use super::ids::mint_random;
 use crate::tables::tables::{DeviceRow, DeviceTable, KvTable};
 
+/// Returns an existing device row's store prefix, if any.
+pub(crate) fn existing_device_store(devices: &DeviceTable, device: &[u8]) -> Option<Vec<u8>> {
+    devices.get_index(0).get(&device).map(|row| row.store)
+}
+
 /// Returns `device`'s row prefix, refreshing `last_seen` and creating the
 /// prefix on first sight.
 pub(crate) fn device_store(devices: &DeviceTable, device: &[u8], now: u64) -> Vec<u8> {
