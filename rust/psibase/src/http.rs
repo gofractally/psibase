@@ -107,13 +107,13 @@ impl HttpRequest {
 
     /// The first `Cookie` header value, split on `;` (RFC 6265 §5.4).
     ///
-    /// Segments without `=` yield [`CookiePart::Malformed`]. Empty segments
-    /// (including from `;;`) are skipped. Names and values are trimmed; values
-    /// are not URL-decoded.
+    /// Segments without `=` and empty segments (including from `;;`) yield
+    /// [`CookiePart::Malformed`]. Names and values are trimmed; values are not
+    /// URL-decoded.
     pub fn cookies(&self) -> impl Iterator<Item = CookiePart<'_>> + '_ {
         self.get_header("cookie")
             .into_iter()
-            .flat_map(|value| value.split(';').filter_map(parse_cookie_segment))
+            .flat_map(|value| value.split(';').map(parse_cookie_segment))
     }
 }
 
@@ -124,18 +124,14 @@ pub enum CookiePart<'a> {
     Malformed,
 }
 
-fn parse_cookie_segment(segment: &str) -> Option<CookiePart<'_>> {
-    let segment = segment.trim();
-    if segment.is_empty() {
-        return None;
-    }
-    let Some((name, value)) = segment.split_once('=') else {
-        return Some(CookiePart::Malformed);
-    };
-    Some(CookiePart::Pair {
-        name: name.trim(),
-        value: value.trim(),
-    })
+fn parse_cookie_segment(segment: &str) -> CookiePart<'_> {
+    segment
+        .trim()
+        .split_once('=')
+        .map_or(CookiePart::Malformed, |(name, value)| CookiePart::Pair {
+            name: name.trim(),
+            value: value.trim(),
+        })
 }
 
 pub struct HttpBody {
@@ -362,6 +358,7 @@ mod tests {
                         name: "foo",
                         value: "10",
                     },
+                    CookiePart::Malformed,
                     CookiePart::Pair {
                         name: "bar",
                         value: "27",
