@@ -1,0 +1,10 @@
+package mcp:plugin;
+
+world impl {
+    include host:client/imports;
+    include host:http/imports;
+    include transact:plugin/imports;
+    include staged-tx:plugin/imports;
+
+    export approvals;
+}

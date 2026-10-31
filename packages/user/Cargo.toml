@@ -70,6 +70,10 @@ members = [
     "NameMarket/service",
     "NameMarket/query-service",
     "NameMarket/plugin",
+    "Mcp",
+    "Mcp/service",
+    "Mcp/query-service",
+    "Mcp/plugin",
 ]
 
 exclude = [

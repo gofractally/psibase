@@ -574,6 +574,18 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Mcp.psi
+    PATH packages/user/Mcp
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+# X-MCP is a Rust local service (own cargo workspace; scope = "local").
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/XMcp.psi
+    PATH packages/local/XMcp
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/FractalGen.psi
     PATH packages/user/FractalGen
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1338,6 +1350,7 @@ psibase_package(
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthNone AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
+                    Mcp
 )
 
 psibase_package(
@@ -1391,7 +1404,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
     LOCAL
-    PACKAGE_DEPENDS XHttp XAdmin XDb XKeys XPackages XPeers XRun XSites XTimer XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XKeys XMcp XPackages XPeers XRun XSites XTimer XTransact
 )
 
 function(write_package_index target dir reserve)
@@ -1419,9 +1432,9 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Mcp Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
-    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XMcp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1459,6 +1472,7 @@ install(
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/FaucetTok.psi
           ${SERVICE_DIR}/Fractals.psi
+          ${SERVICE_DIR}/Mcp.psi
           ${SERVICE_DIR}/Guilds.psi
           ${SERVICE_DIR}/FractalCore.psi
           ${SERVICE_DIR}/FractalGen.psi
@@ -1516,6 +1530,7 @@ install(
           ${SERVICE_DIR}/XSites.psi
           ${SERVICE_DIR}/XTimer.psi
           ${SERVICE_DIR}/XTransact.psi
+          ${SERVICE_DIR}/XMcp.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 

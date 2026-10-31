@@ -4,7 +4,14 @@ import { assertE2ePrerequisites } from "./lib/psinode-bin";
 assertE2ePrerequisites();
 
 export default defineConfig({
-    testDir: "./tests",
+    testDir: "./specs",
+    testMatch: "**/*.spec.ts",
+    // One worker per browser project; each worker boots one devnet and runs
+    // its spec files serially on it, with the two browsers side by side.
+    fullyParallel: false,
+    workers: 2,
+    timeout: 60_000,
+    expect: { timeout: 15_000 },
     outputDir: "./test-results/artifacts",
     forbidOnly: true,
     retries: 0,
@@ -16,10 +23,12 @@ export default defineConfig({
     projects: [
         {
             name: "chromium",
+            workers: 1,
             use: { ...devices["Desktop Chrome"] },
         },
         {
             name: "webkit",
+            workers: 1,
             use: { ...devices["Desktop Safari"] },
         },
     ],

@@ -2237,6 +2237,42 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
+name = "mcp"
+version = "0.29.0"
+dependencies = [
+ "async-graphql",
+ "mcp-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "mcp-pkg"
+version = "0.29.0"
+dependencies = [
+ "mcp",
+ "mcp-plugin",
+ "psibase-user-workspace-hack",
+ "r-mcp",
+]
+
+[[package]]
+name = "mcp-plugin"
+version = "0.29.0"
+dependencies = [
+ "mcp",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3010,6 +3046,19 @@ dependencies = [
  "psibase_service",
  "serde",
  "serde-aux",
+ "serde_json",
+]
+
+[[package]]
+name = "r-mcp"
+version = "0.29.0"
+dependencies = [
+ "async-graphql",
+ "mcp",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
  "serde_json",
 ]
 

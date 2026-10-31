@@ -1,0 +1,13 @@
+{
+    "name": "@psibase/mcp-ui",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "test": "vitest run"
+    },
+    "devDependencies": {
+        "vitest": "2.1.9"
+    },
+    "packageManager": "yarn@4.18.0"
+}

@@ -103,7 +103,7 @@ The 2026-07-28 revision replaces the 2025 session model. There is no `initialize
 - **No streaming (decided).** The MCP spec requires Server-Sent Events (SSE) support, but X-MCP has no need to stream right now, so streaming will not be supported: no request-scoped SSE responses, no `subscriptions/listen` stream, no progress updates, and no `notifications/tools/list_changed`. Clients see the current tool list on their next `tools/list`.
 - **Must** validate `Origin` (403 on mismatch), require auth, and bind to localhost when running locally.
 
-**WebSocket** is an optional custom transport for our own clients; Streamable HTTP is required for interop.
+**WebSocket: later (decided Oct 31, 2026).** WebSocket is an optional custom transport for our own clients and is deferred; it is not built now. Streamable HTTP is the required transport for interop.
 
 **Host choice:** with no streaming, every response fits psibase's single-buffer `HttpReply`, so a local-service (WASM) X-MCP is viable; a native psinode (or thin sidecar) adapter remains an option.
 
@@ -325,7 +325,7 @@ Harness gaps to fill in the stacked PR: `throwawayAccount` does not fund account
 - Account name of the allowlist manager service.
 
 **Carried from V1**
-- WebSocket custom transport: build now for our clients, or later.
+- ~~WebSocket custom transport: build now for our clients, or later.~~ **Resolved:** later (see Transport).
 - Per-user state caps and expiry values within the 4–64 KB budget.
 - How aggressively to hide system actions on a public node.
 

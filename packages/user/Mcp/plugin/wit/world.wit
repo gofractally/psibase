@@ -1,0 +1,24 @@
+/// Parent/owner side of X-MCP agents: list the agent transactions that need
+/// your approval, and approve them (optionally granting the agent the
+/// missing service/method pairs so a repeat auto-executes).
+package mcp:plugin;
+
+interface approvals {
+    use host:types/types.{error};
+
+    /// JSON array of `{ pending: { account, id, txid, proposer, actions }, missing: [string] }`
+    /// for every managed account whose parent is the logged-in user.
+    /// Uses the logged-in user's query token, so only the owner can read it.
+    needs-approval: func() -> result<string, error>;
+
+    /// The logged-in parent accepts staged tx `id` of managed `account`.
+    approve: func(account: string, id: u32) -> result<_, error>;
+
+    /// In one transaction: grant every missing service/method pair of staged tx
+    /// `id` to the agent of `account`, then accept it.
+    approve-and-grant: func(account: string, id: u32) -> result<_, error>;
+}
+
+world imports {
+    import approvals;
+}
