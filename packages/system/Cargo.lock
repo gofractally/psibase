@@ -297,6 +297,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "auth-recover"
+version = "0.29.0"
+dependencies = [
+ "async-graphql",
+ "auth-recover-pkg",
+ "psibase",
+ "psibase-system-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "auth-recover-pkg"
+version = "0.29.0"
+dependencies = [
+ "auth-recover",
+ "auth-recover-plugin",
+ "r-auth-recover",
+]
+
+[[package]]
+name = "auth-recover-plugin"
+version = "0.29.0"
+dependencies = [
+ "auth-recover",
+ "psibase",
+ "psibase-system-workspace-hack",
+ "psibase_plugin",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -974,7 +1011,7 @@ name = "fracpack"
 version = "0.29.0"
 dependencies = [
  "custom_error",
- "hex",
+ "hex 0.3.2",
  "indexmap",
  "psibase-rust-workspace-hack",
  "psibase_macros",
@@ -1230,6 +1267,12 @@ name = "hex"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
+
+[[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hmac"
@@ -1645,9 +1688,9 @@ checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 
 [[package]]
 name = "libc"
-version = "0.2.177"
+version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
+checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "libloading"
@@ -1759,6 +1802,18 @@ dependencies = [
  "mime",
  "spin",
  "version_check",
+]
+
+[[package]]
+name = "nix"
+version = "0.31.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
+dependencies = [
+ "bitflags 2.11.0",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
 ]
 
 [[package]]
@@ -2122,6 +2177,7 @@ version = "0.29.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
+ "indexmap",
  "proc-macro-error",
  "proc-macro2",
  "psibase-rust-workspace-hack",
@@ -2258,6 +2314,19 @@ version = "0.29.0"
 dependencies = [
  "async-graphql",
  "auth-dyn",
+ "psibase",
+ "psibase-system-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "r-auth-recover"
+version = "0.29.0"
+dependencies = [
+ "async-graphql",
+ "auth-recover",
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_service",
@@ -3480,6 +3549,7 @@ dependencies = [
  "serde",
  "serde-aux",
  "serde_json",
+ "url",
  "virtual-server-pkg",
 ]
 
@@ -4084,6 +4154,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 
 [[package]]
+name = "wsauth"
+version = "0.29.0"
+dependencies = [
+ "hex 0.4.3",
+ "psibase",
+ "psibase-system-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "wsauth-pkg",
+]
+
+[[package]]
+name = "wsauth-pkg"
+version = "0.29.0"
+dependencies = [
+ "psibase-system-workspace-hack",
+ "wsauth",
+]
+
+[[package]]
 name = "yoke"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4188,14 +4279,15 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "7.2.0"
+version = "9.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c42e33efc22a0650c311c2ef19115ce232583abbe80850bc8b66509ebef02de0"
+checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
 dependencies = [
  "crc32fast",
  "flate2",
  "indexmap",
  "memchr",
+ "nix",
  "typed-path",
  "zopfli",
 ]

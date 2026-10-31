@@ -215,7 +215,7 @@ pub struct Seconds {
 }
 
 impl Seconds {
-    pub fn new(value: i64) -> Seconds {
+    pub const fn new(value: i64) -> Seconds {
         Seconds { value }
     }
 }

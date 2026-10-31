@@ -234,7 +234,8 @@ namespace
       transactor<Tokens>        tokens{producer, Tokens::service};
       transactor<VirtualServer> vserver{producer, VirtualServer::service};
       std::vector<Action>       actions{
-          scope.newAccount(XPortal::creatorAccount, pub, producer, allowed)};
+          scope.newAccount(XPortal::creatorAccount, pub, producer, allowed,
+                           NewAccountMode::requireNew)};
       REQUIRE(buffer.has_value() == grant.has_value());
       if (buffer)
       {

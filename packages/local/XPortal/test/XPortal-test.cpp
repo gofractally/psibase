@@ -137,7 +137,10 @@ TEST_CASE("status, requests switch, and seeded pricing")
    CHECK(status.conditions[1].ok);
 
    std::vector<AllowedAction> allowed{{Tokens::service, MethodNumber{"debit"}}};
-   REQUIRE(t.from(alice).to<AuthScope>().newAccount(creator, agentPub, alice, allowed).succeeded());
+   REQUIRE(t.from(alice)
+               .to<AuthScope>()
+               .newAccount(creator, agentPub, alice, allowed, NewAccountMode::requireNew)
+               .succeeded());
    status = t.get<Status>(XPortal::service, "/status");
    CHECK(status.conditions[0].ok == false);
 
@@ -323,7 +326,8 @@ TEST_CASE("provision commits one attempt before signing")
    transactor<AuthScope> scope{alice, AuthScope::service};
    expect(t.pushTransaction(t.makeTransaction(
        {scope.newAccount(creator, agentPub, alice,
-                         std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})})));
+                         std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}},
+                         NewAccountMode::requireNew)})));
    configureX(t);
    t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
    openSession("owner", "42");
@@ -620,7 +624,8 @@ TEST_CASE("one free signup per X user")
    REQUIRE(t.from(alice)
                .to<AuthScope>()
                .newAccount(XPortal::creatorAccount, agentPub, alice,
-                           std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})
+                           std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}},
+                           NewAccountMode::requireNew)
                .succeeded());
    XPortal{}.open<AgentKeyTable>().put(
        AgentKey{.name = std::string{XPortal::creatorAgent}, .pubkey = agentPub});
@@ -662,7 +667,8 @@ TEST_CASE("a failed provisioning push retries until the budget is exhausted")
    transactor<AuthScope> scope{alice, AuthScope::service};
    expect(t.pushTransaction(t.makeTransaction(
        {scope.newAccount(creator, agentPub, alice,
-                         std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}})})));
+                         std::vector<AllowedAction>{{Tokens::service, MethodNumber{"debit"}}},
+                         NewAccountMode::requireNew)})));
    configureX(t);
    t.put(XPortal::service, "/admin/config", RequestsSwitch{.requests_enabled = true});
    openSession("owner", "42");

@@ -1,6 +1,6 @@
-use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
+use crate::services::{accounts, auth_any, auth_delegate, auth_sig, producers, transact};
 use crate::{
-    get_schemas, method_raw, new_account_action, set_key_action, validate_dependencies,
+    get_schemas, method_raw, set_auth_service_action, set_key_action, validate_dependencies,
     AccountNumber, Action, AnyPublicKey, Claim, EssentialServices, GenesisActionData, MethodNumber,
     PackageList, PackageOrigin, PackagedService, Producer, SchemaMap, ServiceWrapper,
     SignedTransaction, Tapos, TimePointSec, Transaction, TransactionBuilder,
@@ -28,27 +28,6 @@ fn to_claim(key: &AnyPublicKey) -> Claim {
         service: key.key.service,
         rawData: key.key.rawData.clone(),
     }
-}
-
-fn create_producer_account<F>(
-    builder: &mut TransactionBuilder<SignedTransaction, F>,
-    tx_signing_key: &Option<AnyPublicKey>,
-    initial_producer: AccountNumber,
-) -> Result<(), anyhow::Error>
-where
-    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
-{
-    if let Some(key) = tx_signing_key {
-        builder.push(accounts::Wrapper::pack_from(accounts::SERVICE).newAccount(
-            initial_producer,
-            auth_sig::SERVICE,
-            accounts::NewAccountMode::REQUIRE_NEW,
-        ))?;
-        builder.push(set_key_action(initial_producer, key))?;
-    } else {
-        builder.push(new_account_action(accounts::SERVICE, initial_producer))?;
-    }
-    Ok(())
 }
 
 fn without_tapos(actions: Vec<Action>, expiration: TimePointSec) -> Transaction {
@@ -163,7 +142,6 @@ pub fn get_initial_actions<
     // If a package sets an auth service for an account, we should not override it
     let mut accounts_with_auth = HashSet::new();
     let mut installed_packages = PackageList::new();
-    let mut producer_created = false;
 
     for s in &mut service_packages[..] {
         let mut actions = Vec::new();
@@ -201,9 +179,6 @@ pub fn get_initial_actions<
         s.link(&installed_packages, &mut actions)?;
 
         s.postinstall(schemas, &mut actions)?;
-        let initializes_accounts = actions
-            .iter()
-            .any(|act| act.service == accounts::SERVICE && act.method == method!("init"));
         for act in &actions {
             if act.service == accounts::SERVICE && act.method == method!("setAuthServ") {
                 accounts_with_auth.insert(act.sender);
@@ -212,16 +187,15 @@ pub fn get_initial_actions<
         for act in actions {
             builder.push(act)?;
         }
-        if initializes_accounts && !producer_created {
-            create_producer_account(builder, tx_signing_key, initial_producer)?;
-            producer_created = true;
-        }
     }
 
     builder.set_label("Creating system accounts".to_string());
 
-    if !producer_created {
-        create_producer_account(builder, tx_signing_key, initial_producer)?;
+    if let Some(key) = tx_signing_key {
+        builder.push(set_key_action(initial_producer, key))?;
+        builder.push(set_auth_service_action(initial_producer, auth_sig::SERVICE))?;
+    } else {
+        builder.push(set_auth_service_action(initial_producer, auth_any::SERVICE))?;
     }
 
     builder.push(accounts::Wrapper::pack().newAccount(
@@ -293,7 +267,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     ),
     anyhow::Error,
 > {
-    let schemas = get_schemas(&mut service_packages[..])?;
+    let schemas = get_schemas(&mut service_packages[..]);
     validate_dependencies(service_packages, &schemas)?;
     let mut boot_transactions = vec![genesis_transaction(
         expiration,

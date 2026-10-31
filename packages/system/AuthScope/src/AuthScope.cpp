@@ -15,9 +15,67 @@ namespace SystemService
    {
       bool actionAllowed(const AuthScopeRow& row, ServiceMethod action)
       {
-         if (action.service == AuthScope::service)
-            return false;
          return std::ranges::contains(row.allowed, AllowedAction{action.service, action.method});
+      }
+
+      template <typename RowOpt>
+      auto& requireConfigured(RowOpt& row, const char* missingMessage)
+      {
+         check(row.has_value(), missingMessage);
+         return *row;
+      }
+
+      template <typename RowOpt>
+      auto& requireSenderRow(RowOpt& row)
+      {
+         return requireConfigured(row, "sender is not configured in AuthScope");
+      }
+
+      template <typename RowOpt>
+      auto& requireAccountRow(RowOpt& row)
+      {
+         return requireConfigured(row, "account is not configured in AuthScope");
+      }
+
+      bool senderAuthorizedViaList(const AuthScopeRow&                row,
+                                   AccountNumber                      sender,
+                                   const std::vector<AccountNumber>& accounts,
+                                   const std::optional<ServiceMethod>& method)
+      {
+         if (std::ranges::contains(accounts, row.owner))
+            return true;
+         return method && std::ranges::contains(accounts, sender) && actionAllowed(row, *method);
+      }
+
+      AuthScopeRow& requireOwnedBySender(std::optional<AuthScopeRow>& row)
+      {
+         auto& configured = requireAccountRow(row);
+         check(getSender() == configured.owner, "sender is not the owner");
+         return configured;
+      }
+
+      void replaceAuthRules(AuthScopeTable& table, const AuthScopeRow& row)
+      {
+         table.put(row);
+         to<Accounts>().incAuthSeq(row.account);
+      }
+
+      void requireValidOwner(AccountNumber account, AccountNumber owner, AuthScopeTable& table)
+      {
+         check(to<Accounts>().exists(owner), "owner account does not exist");
+         if (account == owner)
+            abortMessage("circular ownership");
+         if (auto ownerRow = table.getIndex<0>().get(owner); ownerRow && ownerRow->owner == account)
+            abortMessage("circular ownership");
+      }
+
+      template <typename Fn>
+      void mutateOwnedRow(AuthScopeTable& table, AccountNumber account, Fn&& mutate)
+      {
+         auto  stored = table.getIndex<0>().get(account);
+         auto& row    = requireOwnedBySender(stored);
+         mutate(table, row);
+         replaceAuthRules(table, row);
       }
 
    }  // namespace
@@ -27,69 +85,78 @@ namespace SystemService
                                 ServiceMethod               action,
                                 std::vector<psibase::Claim> claims)
    {
-      auto row = get(sender);
-      check(row.has_value(), "sender does not have a public key");
+      const auto            senderRow = get(sender);
+      const AuthScopeRow&   row       = requireSenderRow(senderRow);
 
-      auto matched =
-          std::ranges::find_if(claims,
-                               [&](const Claim& claim)
-                               {
-                                  return claim.service == VerifySig::service &&
-                                         compare_blob(claim.rawData, row->pubkey.data) == 0;
-                               });
-      if (matched == claims.end() || !actionAllowed(*row, action))
-         return false;
-      if ((flags & AuthInterface::firstAuthFlag) && matched != claims.begin())
-         return false;
-      return true;
+      auto hasMatchingClaim = std::ranges::any_of(
+          claims,
+          [&](const Claim& claim)
+          {
+             return claim.service == VerifySig::service &&
+                    compare_blob(claim.rawData, row.pubkey.data) == 0;
+          });
+      return hasMatchingClaim && actionAllowed(row, action);
    }
 
    void AuthScope::canAuthUserSys(AccountNumber user)
    {
-      checkOwner(user);
-   }
-
-   AccountNumber AuthScope::checkOwner(AccountNumber sender)
-   {
-      auto row = get(sender);
-      check(row.has_value(), "sender does not have a public key");
-      return row->owner;
+      const auto userRow = get(user);
+      requireAccountRow(userRow);
    }
 
    std::vector<AccountNumber> AuthScope::getDlgsSys(AccountNumber sender,
                                                      std::optional<ServiceMethod>)
    {
-      return {checkOwner(sender)};
+      const auto senderRow = get(sender);
+      return {requireSenderRow(senderRow).owner};
    }
 
-   bool AuthScope::isAuthSys(AccountNumber              sender,
-                             std::vector<AccountNumber> authorizers,
-                             std::optional<ServiceMethod>)
+   bool AuthScope::isAuthSys(AccountNumber                sender,
+                             std::vector<AccountNumber>   authorizers,
+                             std::optional<ServiceMethod> method)
    {
-      return std::ranges::contains(authorizers, checkOwner(sender));
+      const auto senderRow = get(sender);
+      return senderAuthorizedViaList(requireSenderRow(senderRow), sender, authorizers, method);
    }
 
-   bool AuthScope::isRejectSys(AccountNumber              sender,
-                               std::vector<AccountNumber> rejecters,
-                               std::optional<ServiceMethod>)
+   bool AuthScope::isRejectSys(AccountNumber                sender,
+                               std::vector<AccountNumber>   rejecters,
+                               std::optional<ServiceMethod> method)
    {
-      return std::ranges::contains(rejecters, checkOwner(sender));
+      const auto senderRow = get(sender);
+      return senderAuthorizedViaList(requireSenderRow(senderRow), sender, rejecters, method);
    }
 
-   void AuthScope::newAccount(AccountNumber                 name,
+   bool AuthScope::newAccount(AccountNumber                 name,
                               AuthSig::SubjectPublicKeyInfo key,
                               AccountNumber                 owner,
-                              std::vector<AllowedAction>    allowed)
+                              std::vector<AllowedAction>    allowed,
+                              NewAccountMode                mode)
    {
-      check(to<Accounts>().exists(owner), "owner account does not exist");
+      auto table = open<AuthScopeTable>();
+      requireValidOwner(name, owner, table);
 
-      open<AuthScopeTable>().put(AuthScopeRow{
+      auto row = AuthScopeRow{
           .account = name,
           .pubkey  = std::move(key),
           .owner   = owner,
           .allowed = std::move(allowed),
-      });
-      to<Accounts>().newAccount(name, AuthScope::service, NewAccountMode::requireNew);
+      };
+      if (to<Accounts>().newAccount(name, AuthScope::service, mode))
+      {
+         table.put(row);
+         return true;
+      }
+
+      auto existing = table.getIndex<0>().get(name);
+      if (mode == NewAccountMode::matchExisting)
+         check(existing == row, "account already exists");
+      else
+      {
+         requireOwnedBySender(existing);
+         replaceAuthRules(table, row);
+      }
+      return false;
    }
 
    std::optional<AuthScopeRow> AuthScope::get(AccountNumber account)
@@ -100,21 +167,24 @@ namespace SystemService
    void AuthScope::setKey(AccountNumber account, AuthSig::SubjectPublicKeyInfo key)
    {
       auto table = open<AuthScopeTable>();
-      auto row   = table.getIndex<0>().get(account);
-      check(row.has_value(), "account does not have a public key");
-      check(getSender() == row->owner, "sender is not the owner");
-      row->pubkey = std::move(key);
-      table.put(*row);
+      mutateOwnedRow(table, account, [&](AuthScopeTable&, AuthScopeRow& row) { row.pubkey = std::move(key); });
    }
 
    void AuthScope::setAllowed(AccountNumber account, std::vector<AllowedAction> allowed)
    {
       auto table = open<AuthScopeTable>();
-      auto row   = table.getIndex<0>().get(account);
-      check(row.has_value(), "account does not have a public key");
-      check(getSender() == row->owner, "sender is not the owner");
-      row->allowed = std::move(allowed);
-      table.put(*row);
+      mutateOwnedRow(table, account,
+                     [&](AuthScopeTable&, AuthScopeRow& row) { row.allowed = std::move(allowed); });
+   }
+
+   void AuthScope::setOwner(AccountNumber account, AccountNumber owner)
+   {
+      auto table = open<AuthScopeTable>();
+      mutateOwnedRow(table, account, [&](AuthScopeTable& t, AuthScopeRow& row)
+                     {
+                        requireValidOwner(account, owner, t);
+                        row.owner = owner;
+                     });
    }
 }  // namespace SystemService
 

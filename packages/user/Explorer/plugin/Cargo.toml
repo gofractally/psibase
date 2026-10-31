@@ -1,0 +1,48 @@
+[package]
+name = "explorer"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = "1.0"
+async-trait = "0.1.77"
+futures = "0.3"
+psibase.workspace = true
+psibase_plugin.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+wit-bindgen-rt.workspace = true
+psibase-plugin-workspace-hack.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "explorer:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.bindings.with]
+"host:types/types" = "psibase_plugin::types"
+
+[package.metadata.component.target.dependencies]
+"host:client" = { path = "../../Host/plugin/client/wit/world.wit" }
+"host:http" = { path = "../../Host/plugin/http/wit/world.wit" }
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
+"accounts:query" = { path = "../../../system/Accounts/plugin/query/wit/world.wit" }
+"auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
+"auth-delegate:plugin" = { path = "../../../system/AuthDelegate/plugin/wit/world.wit" }
+"auth-dyn:plugin" = { path = "../../../system/AuthDyn/plugin/wit/world.wit" }
+"branding:plugin" = { path = "../../Branding/plugin/wit/world.wit" }
+"packages:plugin" = { path = "../../Packages/plugin/wit/world.wit" }
+"producers:plugin" = { path = "../../../system/Producers/plugin/wit/world.wit" }
+"registry:plugin" = { path = "../../Registry/plugin/wit/world.wit" }
+"setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
+"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/transact/wit/world.wit" }
+"vserver:plugin" = { path = "../../../system/VirtualServer/plugin/wit/world.wit" }

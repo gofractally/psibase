@@ -121,7 +121,7 @@ pub mod tables {
         fn new(precision: Precision, max_issued_supply: Quantity) -> Self {
             Self {
                 id: InitRow::next_token_id(),
-                nft_id: Nfts::call().mint(),
+                nft_id: Nfts::call().mint(None),
                 issued_supply: 0.into(),
                 burned_supply: 0.into(),
                 max_issued_supply,

@@ -170,6 +170,7 @@ function(add suffix)
             ../../packages/system/AuthDelegate/include
             ../../packages/system/AuthSig/include
             ../../packages/system/AuthAny/include
+            ../../packages/system/AuthNone/include
             ../../packages/system/CpuLimit/include
             ../../packages/system/HttpServer/include
             ../../packages/system/SetCode/include
@@ -177,6 +178,7 @@ function(add suffix)
             ../../packages/system/Credentials/service/cpp/include
             ../../packages/system/Transact/include
             ../../packages/system/VirtualServer/service/cpp/include
+            ../../packages/system/WsAuth/service/cpp/include
             ../../packages/user/CommonApi/include
             ../../packages/user/Explorer/include
             ../../packages/user/Invite/include
