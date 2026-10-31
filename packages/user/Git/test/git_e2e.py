@@ -192,6 +192,37 @@ def _():
     assert remote_ref(REPO, "refs/heads/main") == new
 
 
+@test("key reference: relative path in ~/.psibase.toml, ~/ in git config psibase.key")
+def _():
+    import shutil
+    home = os.path.join(WORK, "home-keyref")
+    os.makedirs(os.path.join(home, "keys"))
+    shutil.copy(AK, os.path.join(home, "keys", "alice.pem"))
+    with open(os.path.join(home, ".psibase.toml"), "w") as fh:
+        fh.write(f'[hosts]\nlocal = "{API}/"\n\n[git.local]\naccount = "{alice}"\nkey = "keys/alice.pem"\n')
+    env = git_env(alice, AK, home)
+    env["PSIBASE_GIT_ACCOUNT"] = ""
+    env["PSIBASE_GIT_KEY"] = ""
+    new = commit(A, git_env(alice, AK), "k1.txt", "k1\n", "relative toml key")
+    run("git", "push", "-q", "origin", "main", cwd=A, env=env)
+    assert remote_ref(REPO, "refs/heads/main") == new
+    # git config wins over the toml; its value is read as a path (~ expanded).
+    run("git", "config", "psibase.key", "~/keys/alice.pem", cwd=A)
+    try:
+        with open(os.path.join(home, ".psibase.toml"), "w") as fh:
+            fh.write(f'[git.local]\naccount = "{alice}"\nkey = "keys/missing.pem"\n')
+        new = commit(A, git_env(alice, AK), "k2.txt", "k2\n", "git config key")
+        run("git", "push", "-q", "origin", "main", cwd=A, env=env)
+        assert remote_ref(REPO, "refs/heads/main") == new
+    finally:
+        run("git", "config", "--unset", "psibase.key", cwd=A)
+    # Key material in place of a reference is refused, naming the source.
+    bad = dict(env, PSIBASE_GIT_KEY=open(AK).read())
+    commit(A, git_env(alice, AK), "k3.txt", "k3\n", "bad key")
+    p = run("git", "push", "-q", "origin", "main", cwd=A, env=bad, check=False)
+    assert p.returncode != 0 and "PSIBASE_GIT_KEY" in p.stderr, p.stderr
+
+
 @test("annotated tag pushes and is peeled in info/refs")
 def _():
     env = git_env(alice, AK)

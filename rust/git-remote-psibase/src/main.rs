@@ -12,8 +12,12 @@
 //! 3. `~/.psibase.toml` section `[git.<name>]`, where `<name>` is the
 //!    `[hosts]` alias whose URL matches the remote's root URL, or the
 //!    remote's `host[:port]`
-//! The account defaults to the repo owner. The key is a PEM/DER private key
-//! file or a PKCS #11 URI, exactly as `psibase push --sign` accepts.
+//! The account defaults to the repo owner. The key is a key reference, not
+//! key material: a PEM/DER private key file path or a PKCS #11 URI, parsed by
+//! the same code as `psibase push --sign` (`AnyPrivateKey::from_str`, i.e.
+//! `psibase::load_private_key`). A leading `~/` is expanded; a relative path
+//! from `~/.psibase.toml` is relative to `$HOME`, and git config values are
+//! read with `--type=path`.
 
 use anyhow::{anyhow, bail, Context, Result};
 use fracpack::{Pack, Unpack};
@@ -146,14 +150,21 @@ impl Remote {
 
 struct Signer {
     account: AccountNumber,
-    key: Option<String>,
+    /// Key reference and where it came from (for error messages).
+    key: Option<(String, &'static str)>,
 }
 
 fn git_config(key: &str) -> Option<String> {
-    let out = Command::new("git")
-        .args(["config", "--get", key])
-        .output()
-        .ok()?;
+    git_config_typed(key, None)
+}
+
+fn git_config_typed(key: &str, ty: Option<&str>) -> Option<String> {
+    let mut args = vec!["config"];
+    if let Some(t) = ty {
+        args.push(t);
+    }
+    args.extend(["--get", key]);
+    let out = Command::new("git").args(args).output().ok()?;
     out.status
         .success()
         .then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
@@ -172,9 +183,12 @@ fn signer(remote: &Remote) -> Result<Signer> {
         .filter(|s| !s.is_empty());
     let mut key = std::env::var("PSIBASE_GIT_KEY")
         .ok()
-        .filter(|s| !s.is_empty());
+        .filter(|s| !s.is_empty())
+        .map(|k| (k, "PSIBASE_GIT_KEY"));
     account = account.or_else(|| git_config("psibase.account"));
-    key = key.or_else(|| git_config("psibase.key"));
+    key = key.or_else(|| {
+        git_config_typed("psibase.key", Some("--type=path")).map(|k| (k, "git config psibase.key"))
+    });
     if account.is_none() || key.is_none() {
         if let Some(cfg) = psibase_toml() {
             let root = remote.root.as_str().trim_end_matches('/');
@@ -200,7 +214,10 @@ fn signer(remote: &Remote) -> Result<Signer> {
                             .map(String::from);
                     }
                     if key.is_none() {
-                        key = sec.get("key").and_then(|v| v.as_str()).map(String::from);
+                        key = sec
+                            .get("key")
+                            .and_then(|v| v.as_str())
+                            .map(|k| (relative_to_home(k), "~/.psibase.toml [git.<host>] key"));
                     }
                     break;
                 }
@@ -444,13 +461,54 @@ fn action(s: &Signer, method: &str, raw: Vec<u8>) -> Action {
     }
 }
 
+fn home() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(PathBuf::from)
+}
+
+/// `~/x` -> `$HOME/x`. PKCS #11 URIs and other paths are returned unchanged.
+fn expand_tilde(k: &str) -> String {
+    match (k.strip_prefix("~/"), home()) {
+        (Some(rest), Some(h)) => h.join(rest).to_string_lossy().into_owned(),
+        _ => k.to_string(),
+    }
+}
+
+/// Paths in `~/.psibase.toml` are relative to `$HOME`, not the git cwd.
+fn relative_to_home(k: &str) -> String {
+    let k = expand_tilde(k);
+    if k.starts_with("pkcs11:") || k.starts_with('/') {
+        return k;
+    }
+    match home() {
+        Some(h) => h.join(&k).to_string_lossy().into_owned(),
+        None => k,
+    }
+}
+
+/// Loads a key reference with the `psibase push --sign` parser. That parser
+/// takes a file path (PEM `PRIVATE KEY`, else DER PKCS #8) or a `pkcs11:`
+/// URI; it never treats the string itself as key material.
+fn load_key(reference: &str, source: &str) -> Result<AnyPrivateKey> {
+    let reference = expand_tilde(reference.trim());
+    if reference.starts_with("pkcs11:") && cfg!(target_feature = "crt-static") {
+        // cryptoki loads the module with dlopen, which a static binary lacks.
+        bail!(
+            "{source} is a PKCS #11 URI, but this git-remote-psibase is a static build \
+             and cannot load PKCS #11 modules; use a key file, or build the helper \
+             without crt-static (cargo build -p git-remote-psibase)"
+        );
+    }
+    AnyPrivateKey::from_str(&reference)
+        .with_context(|| format!("loading signing key {reference} (from {source})"))
+}
+
 /// Returns per-dst result: Ok(()) or Err(message).
 async fn push(remote: &Remote, specs: &[String]) -> Result<Vec<(String, Result<(), String>)>> {
     let s = signer(remote)?;
-    let key = s.key.clone().ok_or_else(|| {
-        anyhow!("no signing key: set PSIBASE_GIT_KEY, git config psibase.key, or [git.<host>] key in ~/.psibase.toml")
+    let (key, source) = s.key.clone().ok_or_else(|| {
+        anyhow!("no signing key: set PSIBASE_GIT_KEY, git config psibase.key, or [git.<host>] key in ~/.psibase.toml (a PEM/DER key file or pkcs11: URI)")
     })?;
-    let keys = vec![AnyPrivateKey::from_str(&key)?];
+    let keys = vec![load_key(&key, source)?];
     // A repo that does not exist yet is created by the first push.
     let (remote_refs, missing) = match remote.try_list().await? {
         Some((refs, _)) => (refs, false),
@@ -580,10 +638,7 @@ async fn main() -> Result<()> {
         } else if line == "list" || line == "list for-push" {
             // For a push, a missing repo lists as empty; the push creates it.
             let listed = if line == "list for-push" {
-                remote
-                    .try_list()
-                    .await
-                    .map(|r| r.unwrap_or_default())
+                remote.try_list().await.map(|r| r.unwrap_or_default())
             } else {
                 remote.list().await
             };
@@ -647,4 +702,70 @@ async fn main() -> Result<()> {
         out.flush()?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn openssl(args: &[&str]) -> bool {
+        Command::new("openssl")
+            .args(args)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+
+    #[test]
+    fn key_reference_forms() {
+        let dir = std::env::temp_dir().join(format!("grp-keys-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let pem = dir.join("k.pem");
+        let der = dir.join("k.der");
+        let pem_s = pem.to_str().unwrap();
+        let der_s = der.to_str().unwrap();
+        if !openssl(&[
+            "genpkey",
+            "-algorithm",
+            "EC",
+            "-pkeyopt",
+            "ec_paramgen_curve:P-256",
+            "-out",
+            pem_s,
+        ]) {
+            eprintln!("openssl unavailable; skipping");
+            return;
+        }
+        assert!(openssl(&[
+            "pkcs8", "-topk8", "-nocrypt", "-in", pem_s, "-outform", "DER", "-out", der_s
+        ]));
+        // File paths, PEM and DER, load as with `psibase push --sign`.
+        load_key(pem_s, "test").unwrap();
+        load_key(der_s, "test").unwrap();
+        // The key material itself is not accepted: it is a reference.
+        let material = std::fs::read_to_string(&pem).unwrap();
+        assert!(load_key(&material, "test").is_err());
+        let err = format!(
+            "{:#}",
+            load_key("/nonexistent/key.pem", "git config psibase.key").unwrap_err()
+        );
+        assert!(err.contains("git config psibase.key"), "{err}");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn path_expansion() {
+        let h = home().unwrap();
+        assert_eq!(expand_tilde("~/k.pem"), h.join("k.pem").to_string_lossy());
+        assert_eq!(
+            relative_to_home("keys/k.pem"),
+            h.join("keys/k.pem").to_string_lossy()
+        );
+        assert_eq!(relative_to_home("/abs/k.pem"), "/abs/k.pem");
+        assert_eq!(
+            relative_to_home("pkcs11:token=t;object=o"),
+            "pkcs11:token=t;object=o"
+        );
+        assert_eq!(expand_tilde("pkcs11:object=o"), "pkcs11:object=o");
+    }
 }
