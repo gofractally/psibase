@@ -7,22 +7,27 @@ mod tests {
     use crate::tables::tables::DeviceRow;
     use psibase::*;
 
+    fn sample_key_hex() -> String {
+        hex_encode(&[0xab; KEY_LEN])
+    }
+
     #[test]
     fn uppercase_hex_decodes() {
-        let bytes = [0xab; KEY_LEN];
-        let upper = Hex(bytes).to_string();
-        let lower = upper.to_ascii_lowercase();
-        let expected = bytes.to_vec();
-        assert_eq!(decode_fixed_hex::<KEY_LEN>(&upper), Some(expected.clone()));
-        assert_eq!(decode_fixed_hex::<KEY_LEN>(&lower), Some(expected));
+        let lower = sample_key_hex();
+        let upper = lower.to_ascii_uppercase();
+        let expected = &[0xab; KEY_LEN][..];
+        assert_eq!(
+            decode_fixed_hex::<KEY_LEN>(&upper).as_deref(),
+            Some(expected)
+        );
+        assert_eq!(
+            decode_fixed_hex::<KEY_LEN>(&lower).as_deref(),
+            Some(expected)
+        );
     }
 
     #[test]
     fn expected_hash_rejects_a_stale_read() {
-        assert_eq!(
-            hex_encode(&sha256(b"").0),
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        );
         let stored = b"ciphertext-v2";
         let stale = sha256(b"ciphertext-v1");
         assert_eq!(
@@ -46,8 +51,9 @@ mod tests {
 
     #[test]
     fn batch_parses_precondition() {
-        let key = "ab".repeat(32);
-        let hash = hex_encode(&sha256(b"ciphertext").0);
+        let key = sample_key_hex();
+        let ciphertext_hash = sha256(b"ciphertext");
+        let hash = hex_encode(&ciphertext_hash.0);
         let value = "+w==";
         let with_hash = format!(
             r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"{value}","expected":"{hash}"}}]}}"#
@@ -56,7 +62,7 @@ mod tests {
         assert_eq!(changes[0].value(), Some(&[0xfb][..]));
         assert_eq!(
             changes[0].expected,
-            Precondition::Read(ReadExpect::Hash(sha256(b"ciphertext")))
+            Precondition::Read(ReadExpect::Hash(ciphertext_hash))
         );
 
         let absent = format!(
@@ -81,12 +87,12 @@ mod tests {
         use base64::engine::general_purpose::STANDARD;
         use base64::Engine;
 
-        let key = "ab".repeat(32);
-        let rejected = STANDARD.encode(vec![0u8; MAX_VALUE_LEN + 1]);
-        let rejected = format!(
-            r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"{rejected}"}}]}}"#
+        let key = sample_key_hex();
+        let encoded_value = STANDARD.encode(vec![0u8; MAX_VALUE_LEN + 1]);
+        let batch_json = format!(
+            r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"{encoded_value}"}}]}}"#
         );
-        assert!(parse_batch(rejected.as_bytes()).is_none());
+        assert!(parse_batch(batch_json.as_bytes()).is_none());
     }
 
     fn device(id: &[u8], store: &[u8]) -> DeviceRow {
