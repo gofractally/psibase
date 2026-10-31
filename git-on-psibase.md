@@ -97,11 +97,12 @@ The v1 proof of concept has no garbage collection. It never deletes objects, so 
 
 Every action's sender is the account that authorized the transaction. The service calls `get_sender()` and looks at its tables. It does not check signatures. The account's auth service already did that before the action ran.
 
-`create(name)`
+`create(name, default_branch)`
 
 - Sender becomes `owner`.
 - `name` matches `[A-Za-z0-9._-]`, is not `.` or `..`, and is stored without a `.git` suffix. The HTTP layer strips a trailing `.git`.
-- Default branch is `refs/heads/main`. No ref row yet.
+- `default_branch` is optional and defaults to `refs/heads/main`. It must be a valid ref name under `refs/heads/`. No ref row yet.
+- Fails if the sender already has a repo with that name. The helper's first push relies on this: a lost race to create the same repo fails the transaction instead of overwriting anything.
 
 `setWriter(name, account, flags)` and `removeWriter(name, account)`
 
@@ -195,19 +196,40 @@ git clone -c psibase.account=alice -c psibase.key=/path/to/key.pem \
 
 The key never leaves the client. The node receives a signed transaction.
 
-Decided: the CLI's scope is the git remote helper protocol: `capabilities`, `list` (refs), `fetch`, `push`, and signing. Clone is required for the POC.
+Decided: the CLI's scope is the git remote helper protocol: `capabilities`, `list` (refs), `fetch`, `push`, and signing. Clone is required for the POC. Repo bootstrapping is also required for the POC (decided Oct 31, 2026): `git init` locally, then a first push that creates the repo on chain when it does not exist yet. See [Bootstrapping a new repo](#bootstrapping-a-new-repo).
 
 Helper operations, the ones git actually calls:
 
 - `capabilities` — advertise `fetch`, `push`, and `option`.
 
-- `list` — `GET` the dumb `info/refs` and print `<oid> <ref>`.
+- `list` — `GET` the dumb `info/refs` and print `<oid> <ref>`. A repo that does not exist yet (`404`) lists as empty, not as an error, so `git push` to a new repo proceeds. `fetch` and clone of a missing repo still fail with a clear "repo not found" message.
 - `fetch` — download the loose objects reachable from the requested tips and feed them to local git (`git unpack-objects`, or write loose files under the git dir git passed in). Skip any oid `git cat-file -e` already has.
 - `push <src>:<dst>` — in the local repo, `git rev-list --objects <old>..<new>` and `git cat-file --batch` produce the new loose objects. Group them into `putObjects` transactions. The last transaction is `updateRefs` with the `old_oid` the helper just read. Post each one with `wait_for=applied`. If the compare-and-swap fails, print the trace and exit non-zero so git reports a rejected push.
 
 Signing and posting use the same path as `psibase push`: build the actions, sign with the `--sign` key, `POST` the packed bytes to `/push_transaction` as `application/octet-stream`. Decided: the helper links the `psibase` CLI's signing code in-process as a shared Rust crate. It does not spawn the `psibase` binary, for objects or for anything else. Spawning is a poor fit for objects anyway, because the CLI's JSON action file carries either schema-shaped JSON or hex `rawData`. The helper is one statically linked binary. PKCS #11 still loads the user's token module at runtime.
 
 Configuration actions (`create`, `setWriter`) can still be a user's own `psibase push` of a JSON file. No web UI.
+
+### Bootstrapping a new repo
+
+Decided (Oct 31, 2026): a user can start from nothing on their machine and end with a repo on chain, without running `psibase push` by hand.
+
+```text
+git init notes && cd notes
+git add . && git commit -m "first commit"
+git remote add origin psibase::http://psibase.localhost:8080/alice/notes
+git push -u origin main
+```
+
+- `git init`, `git add`, and `git commit` are stock git. Nothing on chain happens until the push. The helper is not involved.
+- `git remote add` only writes git config. No network request.
+- First push. `list` gets `404` for `alice/notes` and reports no refs. On `push`, the helper sees the repo is missing and puts `create(name, default_branch)` first in the first transaction, ahead of that transaction's `putObjects`. `default_branch` is the first branch being pushed (`refs/heads/main` above), so `HEAD` on chain points at a branch that will exist.
+- The remaining object batches and the final `updateRefs` follow as on any push. Every ref update uses `old_oid` all zeroes, which also guards against a concurrent first push from somewhere else.
+- The URL's owner segment must be the signing account. Pushing to `psibase::…/bob/notes` as `alice` when `bob/notes` does not exist is refused by the helper before anything is signed. A user cannot create a repo under another account's name; `create` always makes the sender the owner.
+- A first push that fails partway leaves the repo created, with some objects and no refs. That is the same state as an empty repo. Re-running `git push` finds the repo, skips `create`, and continues. Objects already stored are accepted again harmlessly, because objects are keyed by content.
+- Pushing an empty local repo (no commits) is an error from git itself, before the helper runs. The POC does not create empty repos through the helper. A user who wants one runs `create` with `psibase push`.
+- After the first push, `git clone` of the HTTP URL with stock git works, and `git fetch` and `git push` from the original checkout behave as for any existing repo.
+- Out of the POC: choosing a different default branch later (no `setDefaultBranch` action yet), and creating a repo under a different owner, such as a guild account.
 
 ## Size limits
 
@@ -407,7 +429,7 @@ The POC adds a minimal web page on `git.<root>`.
 
 ## CLI
 
-To the user, the git CLI looks like a typical git CLI: `git clone`, `git fetch`, `git push` against a `psibase::` remote.
+To the user, the git CLI looks like a typical git CLI: `git init`, `git clone`, `git fetch`, `git push` against a `psibase::` remote. The first `git push` to a repo that does not exist yet creates it on chain (see [Bootstrapping a new repo](#bootstrapping-a-new-repo)).
 
 One-time setup is editing `~/.psibase.toml`. For each host, it sets a default account and a default key. The key is a reference, a PEM or DER private key file path or a PKCS #11 URI. The file never holds raw key bytes. The node comes from `-a` or `PSINODE_URL`, which defaults to the local node (`http://psibase.localhost:8080/`). Named hosts are saved in the same file (`psibase config set hosts.<name> <url>`).
 
