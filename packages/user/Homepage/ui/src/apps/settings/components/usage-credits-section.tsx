@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { KeyValue, Panel } from "@/components/page-header";
 
+import { useSystemTokenBalance } from "@/hooks/use-system-token-balance";
+
 import { useBranding } from "@shared/hooks/use-branding";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useSystemTokenPolicy } from "@shared/hooks/use-system-token-policy";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
@@ -22,11 +26,26 @@ const formatAmount = (n: number) =>
 
 export const UsageCreditsSection = () => {
     const { data: networkName } = useBranding();
+    const { data: currentUser } = useCurrentUser();
     const { enabled, isLoading, resources, error, level, symbol } =
         useUsageCredits();
+    const {
+        restrictsSelfService,
+        isLoading: isNetworkLoading,
+    } = useSystemTokenPolicy();
+    const { hasBalance, isLoading: isBalanceLoading } = useSystemTokenBalance();
     const { mutateAsync: topUp, isPending: isToppingUp } = useTopUpCredits();
     const { mutateAsync: resizeAndTopUp, isPending: isResizing } =
         useResizeAndTopUpCredits();
+
+    const zeroBalance = !!currentUser && !hasBalance;
+    const waitingForBalance =
+        !!currentUser && !restrictsSelfService && isBalanceLoading;
+    const readOnly = restrictsSelfService || zeroBalance;
+    const disabledMessage =
+        !restrictsSelfService && zeroBalance
+            ? "You need a system token balance before you can refill or resize your tank."
+            : undefined;
 
     const originalCapacity = resources ? String(resources.bufferCapacity) : "0";
     const [capacity, setCapacity] = useState(originalCapacity);
@@ -34,7 +53,13 @@ export const UsageCreditsSection = () => {
 
     const capacityChanged = capacity !== originalCapacity && capacity !== "";
     const isPending = isToppingUp || isResizing;
-    const disabled = !enabled || isPending || isLoading;
+    const disabled =
+        readOnly ||
+        !enabled ||
+        isPending ||
+        isLoading ||
+        isNetworkLoading ||
+        waitingForBalance;
 
     const onTopUp = async () => {
         try {
@@ -73,6 +98,12 @@ export const UsageCreditsSection = () => {
 
     return (
         <div className="flex flex-col gap-4">
+            {readOnly && (
+                <p className="text-muted-foreground text-sm">
+                    {disabledMessage ??
+                        "Resource self-service isn't available on this network. Purchase resources from a provider (just below)."}
+                </p>
+            )}
             <Panel>
                 <div className="flex flex-col gap-3 p-4">
                     <div className="flex items-end justify-between gap-3">

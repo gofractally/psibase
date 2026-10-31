@@ -47,6 +47,11 @@ mod service {
     }
 
     #[action]
+    fn getCandidate(account: AccountNumber) -> Option<CandidateInfo> {
+        unimplemented!();
+    }
+
+    #[action]
     fn getProducers() -> Vec<AccountNumber> {
         unimplemented!();
     }

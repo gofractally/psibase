@@ -25,6 +25,7 @@ type Meta<T> = {
     mutationKey?: readonly unknown[];
 } & (
     | {
+          /** When false, skip staged-tx actor history; the call is not a propose-latch. */
           isStagable?: false | undefined;
           onSuccess?: (params: T) => void;
       }

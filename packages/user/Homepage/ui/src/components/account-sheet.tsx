@@ -1,5 +1,6 @@
 import { Monitor, Moon, Sparkles, Sun, UserRound, Zap } from "lucide-react";
 
+import { ResourceProvidersSection } from "@/apps/settings/components/resource-providers-section";
 import { UsageCreditsSection } from "@/apps/settings/components/usage-credits-section";
 import { UserProfileSection } from "@/apps/settings/components/user-profile-section";
 
@@ -90,7 +91,12 @@ export const AccountSheet = () => {
                 </SheetHeader>
                 <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
                     {tab === "profile" && <UserProfileSection />}
-                    {tab === "credits" && <UsageCreditsSection />}
+                    {tab === "credits" && (
+                        <>
+                            <UsageCreditsSection />
+                            <ResourceProvidersSection />
+                        </>
+                    )}
                     {tab === "preferences" && <PreferencesSection />}
                 </div>
             </SheetContent>

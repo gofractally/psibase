@@ -1,4 +1,4 @@
-use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey};
+use p256::ecdsa::{Signature, SigningKey, signature::hazmat::PrehashSigner};
 use p256::pkcs8::DecodePrivateKey;
 use psibase::{
     account,
@@ -16,15 +16,15 @@ use psibase::{
 use rand::Rng;
 use std::str::FromStr;
 
-use crate::tables::capacity_limit_pricing::Curve;
 use crate::Wrapper;
+use crate::tables::capacity_limit_pricing::Curve;
 
 use super::utils::{fmt_mb, fmt_num, fmt_sys};
 
 use super::helpers::{assert_error, check_balance, enable_billing as setup_enable_billing};
 use super::query::{
-    get_billing_config, get_disk_state, get_invite_cost, get_network_vars, get_server_specs,
-    get_total_consumed_disk, get_user_resources, DiskPricingState,
+    DiskPricingState, get_billing_config, get_disk_state, get_invite_cost, get_network_vars,
+    get_server_specs, get_total_consumed_disk, get_user_resources,
 };
 
 fn consumption_details(
