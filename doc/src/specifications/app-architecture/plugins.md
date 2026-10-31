@@ -121,7 +121,7 @@ The psibase plugin host provides a key-value interface for plugins to use for re
 It is up to the host platform to determine how to implement the key-value interface. On the web platform, the browser stores plugin data on the node it is connected to, in the `hostdb` service, scoped by cookies. The client HMACs keys and encrypts values before they leave the browser.
 
 - **Most browsers.** The encryption key stays in IndexedDB on the supervisor origin. Ciphertext at rest on the node is opaque to the node.
-- **WebKit** (desktop Safari and every iOS browser). Script-written storage is evicted after seven days without interaction, so the client key is kept in a server-set `__Host-HOSTDB-KEY` cookie on `supervisor.{root}`. The node receives that cookie on supervisor requests and can decrypt the stored data. For Safari limits on local HTTP development, see [front-end development](../../development/front-ends/README.md#safari-on-local-http-development).
+- **WebKit** (desktop Safari and every iOS browser). Script-written storage is evicted after seven days without interaction, so the client key is kept in a server-set `__Host-HOSTDB-KEY` cookie on `supervisor.{root}`. The node receives that cookie on supervisor requests and can decrypt the stored data. For Safari and local development, see [front-end development](../../development/front-ends/README.md#safari-and-local-development).
 
 HMAC-SHA256 yields a fixed 32-byte digest. The digest is stored as binary on the node and hex-encoded for transport in HTTP requests. That keeps keys within the chain's `maxKeySize` limit (128 bytes) even though plugins may use plaintext keys up to 256 bytes.
 
