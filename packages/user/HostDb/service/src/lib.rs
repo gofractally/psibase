@@ -12,8 +12,9 @@ mod service {
     use crate::helpers::{
         check_precondition, collect_idle_devices, decode_fixed_hex, device_id, device_store,
         existing_device_store,
-        hex_encode, parse_batch, reply, session_id, status_reply, wall_time_ns, Change, Duration,
-        Precondition, GC_LIMIT, KEY_LEN, SESSION_IDLE_NS,
+        hex_encode, is_kv_item_path, is_storage_path, parse_batch, reply, session_id,
+        status_reply, wall_time_ns, Change, Duration, Precondition, GC_LIMIT, KEY_LEN,
+        KV_BATCH_PATH, KV_PERSISTENT_PREFIX, KV_SESSION_PREFIX, SESSION_IDLE_NS,
     };
     use crate::tables::tables::{DeviceTable, KvRow, KvTable, SessionKvRow, SessionKvTable};
     use psibase::services::http_server::Wrapper as HttpServer;
@@ -39,10 +40,13 @@ mod service {
             return Some(status_reply(403));
         };
 
+        let path = request.path();
+        let path = path.as_ref();
+        let no_store = request.method == "GET" && is_kv_item_path(path);
         let device = device_id(&request);
         let (result, device_cookie, session_cookie) = match device {
             Some(device) => {
-                let (result, session_cookie) = route(&request, &device);
+                let (result, session_cookie) = route(&request, path, &device);
                 (result, Some(hex_encode(&device)), session_cookie)
             }
             None => (Err(400u16), None, None),
@@ -55,6 +59,7 @@ mod service {
             body,
             device_cookie,
             session_cookie,
+            no_store,
         ))
     }
 
@@ -65,28 +70,27 @@ mod service {
     /// accepted, including on error responses such as 400 and 409.
     fn route(
         request: &HttpRequest,
+        path: &str,
         device: &[u8],
     ) -> (Result<(u16, Option<Vec<u8>>), u16>, Option<String>) {
         let mut session_cookie = None;
         let result = (|| -> Result<(u16, Option<Vec<u8>>), u16> {
-            let path = request.path();
-            let path = path.as_ref();
             if request.method == "OPTIONS" && is_storage_path(path) {
                 return Ok((204, None));
             }
 
             if request.method == "GET" {
-                if let Some(key) = path.strip_prefix("/kv/persistent/") {
+                if let Some(key) = path.strip_prefix(KV_PERSISTENT_PREFIX) {
                     return read_stored(key, |key| read_persistent(device, key));
                 }
-                if let Some(key) = path.strip_prefix("/kv/session/") {
+                if let Some(key) = path.strip_prefix(KV_SESSION_PREFIX) {
                     let session = session_id(request).ok_or(400u16)?;
                     session_cookie = Some(hex_encode(&session));
                     return read_stored(key, |key| read_session(device, &session, key));
                 }
             }
 
-            if request.method == "POST" && path == "/kv/batch" {
+            if request.method == "POST" && path == KV_BATCH_PATH {
                 let changes = parse_batch(&request.body.0).ok_or(400u16)?;
                 let session = if changes
                     .iter()
@@ -232,12 +236,6 @@ mod service {
                 .get(&(store, session.unwrap(), change.key()))
                 .map(|row| row.value),
         }
-    }
-
-    fn is_storage_path(path: &str) -> bool {
-        path == "/kv/batch"
-            || path.starts_with("/kv/persistent/")
-            || path.starts_with("/kv/session/")
     }
 
     fn erase_expired_sessions(table: &SessionKvTable, now: u64) {

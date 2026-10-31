@@ -18,6 +18,7 @@ pub(crate) fn reply(
     body: Option<Vec<u8>>,
     device_cookie: Option<String>,
     session_cookie: Option<String>,
+    no_store: bool,
 ) -> HttpReply {
     let content_type = if body.is_some() {
         "application/octet-stream"
@@ -35,6 +36,9 @@ pub(crate) fn reply(
         if let Some(requested) = request.get_header("access-control-request-headers") {
             headers.push(HttpHeader::new("Access-Control-Allow-Headers", requested));
         }
+    }
+    if no_store {
+        headers.push(HttpHeader::new("Cache-Control", "no-store"));
     }
     if let Some(cookie) = device_cookie {
         headers.push(HttpHeader::new(
