@@ -78,7 +78,7 @@ namespace UserService
          }
 
          /// Returns `Invite::getInvQuote` as a decimal in the system token.
-         auto getInviteCost(uint16_t numAccounts,
+         auto getInviteQuote(uint16_t numAccounts,
                             std::optional<Quantity> subsidy = std::nullopt) const
          {
             auto sys = to<Tokens>().getSysToken();
@@ -108,7 +108,7 @@ namespace UserService
       PSIO_REFLECT(Query,
                    method(inviteById, inviteId),
                    method(invitesByInviter, inviter),
-                   method(getInviteCost, numAccounts, subsidy),
+                   method(getInviteQuote, numAccounts, subsidy),
                    method(history, inviteId, first, last, before, after))
 
       class RInvite : public Service

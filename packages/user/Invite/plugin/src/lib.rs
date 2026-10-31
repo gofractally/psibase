@@ -110,7 +110,7 @@ fn charge_invite(num_accounts: u16, service_name: &str) -> Result<u64, Error> {
         return Ok(0);
     };
 
-    let min_cost = get_invite_cost(num_accounts)?;
+    let min_cost = get_invite_quote(num_accounts)?;
     let min_cost_u64 = Decimal::from_str(&min_cost)
         .map_err(|e| QueryError(e.to_string()))?
         .quantity
@@ -212,14 +212,14 @@ impl Redemption for InvitePlugin {
     }
 }
 
-fn get_invite_cost(num_accounts: u16) -> Result<String, Error> {
+fn get_invite_quote(num_accounts: u16) -> Result<String, Error> {
     let query = format!(
-        r#"query {{ getInviteCost(numAccounts: {}) }}"#,
+        r#"query {{ getInviteQuote(numAccounts: {}) }}"#,
         num_accounts
     );
     let response = host::server::post_graphql_get_json(&query)?;
-    let cost = GetInviteCostResponse::from_gql(response)?;
-    Ok(cost.getInviteCost)
+    let cost = GetInviteQuoteResponse::from_gql(response)?;
+    Ok(cost.getInviteQuote)
 }
 
 impl Inviter for InvitePlugin {
