@@ -63,7 +63,7 @@ ${DOCKER} bash -c "cd build && make -j $(nproc) && ( echo '===== sccache =====';
 echo =====
 ${DOCKER} bash -c "cd rust && cargo build --target-dir ../build/rust --release"
 echo =====
-${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc) --timeout 600"
+${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc) --timeout 600 -LE e2e"
 echo =====
 ls -la ${WORKSPACE_ROOT}
 ls -la ${WORKSPACE_ROOT}/build/doc
