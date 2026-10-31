@@ -9,6 +9,12 @@ add_custom_target(YarnInstall
     BUILD_ALWAYS 1
 )
 
+add_custom_target(E2eYarnInstall
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/e2e && yarn --version && yarn
+    COMMENT "Installing e2e yarn dependencies"
+    BUILD_ALWAYS 1
+)
+
 # Common library that other UIs depend on
 ExternalProject_Add(CommonApiCommonLib_js
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib
