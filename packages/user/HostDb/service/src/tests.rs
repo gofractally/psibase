@@ -2,7 +2,7 @@
 mod tests {
     use crate::helpers::{
         check_precondition, decode_fixed_hex, hex_encode, parse_batch, replacement_device,
-        Precondition, ReadExpect, KEY_LEN,
+        Precondition, ReadExpect, KEY_LEN, MAX_VALUE_LEN,
     };
     use crate::tables::tables::DeviceRow;
     use psibase::*;
@@ -45,13 +45,15 @@ mod tests {
     }
 
     #[test]
-    fn batch_op_parses_expected_hash() {
+    fn batch_parses_precondition() {
         let key = "ab".repeat(32);
         let hash = hex_encode(&sha256(b"ciphertext").0);
+        let value = "+w==";
         let with_hash = format!(
-            r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ","expected":"{hash}"}}]}}"#
+            r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"{value}","expected":"{hash}"}}]}}"#
         );
         let changes = parse_batch(with_hash.as_bytes()).expect("hash");
+        assert_eq!(changes[0].value(), Some(&[0xfb][..]));
         assert_eq!(
             changes[0].expected,
             Precondition::Read(ReadExpect::Hash(sha256(b"ciphertext")))
@@ -64,14 +66,27 @@ mod tests {
         assert_eq!(changes[0].expected, Precondition::Read(ReadExpect::Absent));
 
         let unconditional =
-            format!(r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ"}}]}}"#);
+            format!(r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"{value}"}}]}}"#);
         let changes = parse_batch(unconditional.as_bytes()).expect("unconditional");
         assert_eq!(changes[0].expected, Precondition::Unconditional);
 
         let bad = format!(
-            r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"YQ","expected":"zz"}}]}}"#
+            r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"{value}","expected":"zz"}}]}}"#
         );
         assert!(parse_batch(bad.as_bytes()).is_none());
+    }
+
+    #[test]
+    fn batch_rejects_an_oversized_value() {
+        use base64::engine::general_purpose::STANDARD;
+        use base64::Engine;
+
+        let key = "ab".repeat(32);
+        let rejected = STANDARD.encode(vec![0u8; MAX_VALUE_LEN + 1]);
+        let rejected = format!(
+            r#"{{"ops":[{{"duration":"persistent","key":"{key}","value":"{rejected}"}}]}}"#
+        );
+        assert!(parse_batch(rejected.as_bytes()).is_none());
     }
 
     fn device(id: &[u8], store: &[u8]) -> DeviceRow {

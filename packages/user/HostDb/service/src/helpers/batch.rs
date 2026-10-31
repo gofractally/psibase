@@ -1,11 +1,9 @@
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use psibase::*;
 use serde::Deserialize;
-use std::str::FromStr;
 
 use super::constants::{KEY_LEN, MAX_VALUE_LEN};
-use super::encoding::decode_fixed_hex;
 
 #[derive(Clone, Copy, PartialEq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -17,7 +15,7 @@ pub(crate) enum Duration {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct BatchBody {
-    ops: Vec<BatchOp>,
+    ops: Vec<Change>,
 }
 
 /// Ciphertext observed by GET: absent, or the SHA-256 of the value returned.
@@ -37,60 +35,68 @@ pub(crate) enum Precondition {
     Read(ReadExpect),
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct BatchOp {
-    duration: Duration,
-    key: String,
-    value: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_precondition")]
-    expected: Precondition,
+impl<'de> Deserialize<'de> for Precondition {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(match Option::<Checksum256>::deserialize(deserializer)? {
+            None => Precondition::Read(ReadExpect::Absent),
+            Some(hash) => Precondition::Read(ReadExpect::Hash(hash)),
+        })
+    }
 }
 
+/// Standard base64 in JSON. Longer than `MAX_VALUE_LEN` is rejected.
+struct Base64(Vec<u8>);
+
+impl<'de> Deserialize<'de> for Base64 {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+
+        impl serde::de::Visitor<'_> for Visitor {
+            type Value = Base64;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("standard base64")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Base64, E> {
+                let bytes = STANDARD.decode(value).map_err(E::custom)?;
+                if bytes.len() > MAX_VALUE_LEN {
+                    return Err(E::custom("value exceeds maximum length"));
+                }
+                Ok(Base64(bytes))
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct Change {
     pub(crate) duration: Duration,
-    pub(crate) key: Vec<u8>,
-    pub(crate) value: Option<Vec<u8>>,
+    key: Hex<[u8; KEY_LEN]>,
+    value: Option<Base64>,
+    #[serde(default)]
     pub(crate) expected: Precondition,
+}
+
+impl Change {
+    pub(crate) fn key(&self) -> &[u8] {
+        self.key.as_slice()
+    }
+
+    pub(crate) fn value(&self) -> Option<&[u8]> {
+        self.value.as_ref().map(|value| value.0.as_slice())
+    }
 }
 
 /// Returns `None` when the body is not valid JSON, an op has a bad
 /// key/value/expected field, or a value exceeds `MAX_VALUE_LEN`.
 pub(crate) fn parse_batch(body: &[u8]) -> Option<Vec<Change>> {
-    let body: BatchBody = serde_json::from_slice(body).ok()?;
-    let mut changes = Vec::with_capacity(body.ops.len());
-    for op in body.ops {
-        let key = decode_fixed_hex::<KEY_LEN>(&op.key)?;
-        let value = match op.value {
-            None => None,
-            Some(value) => {
-                let value = URL_SAFE_NO_PAD.decode(value).ok()?;
-                if value.len() > MAX_VALUE_LEN {
-                    return None;
-                }
-                Some(value)
-            }
-        };
-        changes.push(Change {
-            duration: op.duration,
-            key,
-            value,
-            expected: op.expected,
-        });
-    }
-    Some(changes)
-}
-
-fn deserialize_precondition<'de, D>(deserializer: D) -> Result<Precondition, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    match Option::<String>::deserialize(deserializer)? {
-        None => Ok(Precondition::Read(ReadExpect::Absent)),
-        Some(hex) => Checksum256::from_str(&hex)
-            .map(|hash| Precondition::Read(ReadExpect::Hash(hash)))
-            .map_err(|_| serde::de::Error::custom("expected must be a SHA-256 hex digest")),
-    }
+    serde_json::from_slice::<BatchBody>(body)
+        .ok()
+        .map(|body| body.ops)
 }
 
 /// 409 when the read-time expectation does not describe `stored`.

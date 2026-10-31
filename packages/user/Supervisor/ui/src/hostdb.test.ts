@@ -10,8 +10,8 @@ function hexKey(n: number): string {
     return n.toString(16).padStart(64, "0");
 }
 
-function bytesToBase64Url(bytes: Uint8Array): string {
-    return bytes.toBase64({ alphabet: "base64url", omitPadding: true });
+function bytesToBase64(bytes: Uint8Array): string {
+    return bytes.toBase64({ alphabet: "base64" });
 }
 
 function makeValue(size: number): Uint8Array {
@@ -119,17 +119,17 @@ describe("HostDb flush", () => {
             {
                 duration: "persistent",
                 key: HEX_KEY,
-                value: bytesToBase64Url(last),
+                value: bytesToBase64(last),
             },
             {
                 duration: "persistent",
                 key: other,
-                value: bytesToBase64Url(otherValue),
+                value: bytesToBase64(otherValue),
             },
             {
                 duration: "session",
                 key: HEX_KEY,
-                value: bytesToBase64Url(sessionValue),
+                value: bytesToBase64(sessionValue),
             },
         ]);
     });
@@ -152,7 +152,7 @@ describe("HostDb flush", () => {
             {
                 duration: "persistent",
                 key: HEX_KEY,
-                value: bytesToBase64Url(written),
+                value: bytesToBase64(written),
                 expected: expectedHash,
             },
         ]);

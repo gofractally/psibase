@@ -154,7 +154,7 @@ mod service {
         let puts = |duration: Duration| {
             changes
                 .iter()
-                .any(|change| change.duration == duration && change.value.is_some())
+                .any(|change| change.duration == duration && change.value().is_some())
         };
         let persistent_gc = puts(Duration::Persistent);
         let session_gc = puts(Duration::Session);
@@ -170,32 +170,32 @@ mod service {
                         current_value(&persistent, &sessions, &store, session, change);
                     check_precondition(stored.as_deref(), expected)?;
                 }
-                match (change.duration, change.value.as_deref()) {
+                match (change.duration, change.value()) {
                     (Duration::Persistent, Some(value)) => {
                         persistent
                             .put(&KvRow {
                                 store: store.clone(),
-                                key: change.key.clone(),
+                                key: change.key().to_vec(),
                                 value: value.to_vec(),
                             })
                             .unwrap();
                     }
                     (Duration::Persistent, None) => {
-                        persistent.erase(&(&store[..], &change.key));
+                        persistent.erase(&(&store[..], change.key()));
                     }
                     (Duration::Session, Some(value)) => {
                         sessions
                             .put(&SessionKvRow {
                                 store: store.clone(),
                                 session: session.unwrap().to_vec(),
-                                key: change.key.clone(),
+                                key: change.key().to_vec(),
                                 value: value.to_vec(),
                                 last_access: now,
                             })
                             .unwrap();
                     }
                     (Duration::Session, None) => {
-                        sessions.erase(&(&store[..], session.unwrap(), &change.key));
+                        sessions.erase(&(&store[..], session.unwrap(), change.key()));
                     }
                 }
             }
@@ -219,11 +219,11 @@ mod service {
         match change.duration {
             Duration::Persistent => persistent
                 .get_index(0)
-                .get(&(store, &change.key))
+                .get(&(store, change.key()))
                 .map(|row| row.value),
             Duration::Session => sessions
                 .get_index(0)
-                .get(&(store, session.unwrap(), &change.key))
+                .get(&(store, session.unwrap(), change.key()))
                 .map(|row| row.value),
         }
     }

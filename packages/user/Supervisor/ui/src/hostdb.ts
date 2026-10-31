@@ -144,7 +144,7 @@ export class HostDb {
         this.enqueue({
             duration: name,
             key,
-            value: value.toBase64({ alphabet: "base64url", omitPadding: true }),
+            value: value.toBase64({ alphabet: "base64" }),
         });
     }
 
