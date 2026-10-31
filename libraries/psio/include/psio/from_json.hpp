@@ -108,10 +108,6 @@ namespace psio
 
       std::reference_wrapper<const json_token> peek_token();
 
-      bool try_peek_token();
-
-      bool try_skip_value();
-
       void eat_token();
 
       void get_end();
@@ -123,7 +119,6 @@ namespace psio
 
       std::string_view get_string();
 
-      bool get_start_object_pred();
       void get_start_object();
 
       std::string_view get_key();
@@ -545,10 +540,22 @@ namespace psio
       stream.get_end_object();
    }
 
-   inline void from_json_skip_value(json_token_stream& stream)
+   template <typename S>
+   void from_json_skip_value(S& stream)
    {
-      if (!stream.try_skip_value())
-         (void)stream.peek_token();
+      uint64_t depth = 0;
+      do
+      {
+         auto t    = stream.peek_token();
+         auto type = t.get().type;
+         if (type == json_token_type::type_start_object ||
+             type == json_token_type::type_start_array)
+            ++depth;
+         else if (type == json_token_type::type_end_object ||
+                  type == json_token_type::type_end_array)
+            --depth;
+         stream.eat_token();
+      } while (depth);
    }
 
    template <typename T>
@@ -607,35 +614,5 @@ namespace psio
    {
       json_token_stream stream(json.data());
       return from_json<T>(stream);
-   }
-
-   /// Parse JSON without aborting on syntax errors or a root kind that does not
-   /// match a reflected struct (object root). Field/type mismatches still abort.
-   template <typename T>
-   std::optional<T> try_convert_from_json(std::string json)
-   {
-      if (json.empty())
-         return std::nullopt;
-      std::string source(std::move(json));
-      std::string validate(source);
-      validate.push_back('\0');
-      json_token_stream vstream(validate.data());
-      if (!vstream.try_peek_token())
-         return std::nullopt;
-      if constexpr (reflect<T>::is_struct)
-      {
-         if (vstream.current_token.type != json_token_type::type_start_object)
-            return std::nullopt;
-      }
-      if (!vstream.try_skip_value())
-         return std::nullopt;
-      if (vstream.current_token.type != json_token_type::type_unread || !vstream.complete())
-         return std::nullopt;
-
-      // Insitu validation mutates `validate`; parse from the untouched `source` copy.
-      std::string parse(std::move(source));
-      parse.push_back('\0');
-      json_token_stream pstream(parse.data());
-      return from_json<T>(pstream);
    }
 }  // namespace psio

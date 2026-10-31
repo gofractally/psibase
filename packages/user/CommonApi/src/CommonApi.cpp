@@ -8,7 +8,6 @@
 #include <services/system/Transact.hpp>
 
 #include <algorithm>
-#include <optional>
 #include <string_view>
 
 static constexpr bool enable_print = false;
@@ -43,12 +42,6 @@ namespace SystemService
          InsituJsonBody          body{request};
          psio::json_token_stream jstream{body.data()};
          return psio::from_json<T>(jstream);
-      }
-
-      template <typename T>
-      std::optional<T> tryExtractData(HttpRequest& request)
-      {
-         return psio::try_convert_from_json<T>(std::string{request.body.begin(), request.body.end()});
       }
 
       bool isAllowedChar(char ch, std::string_view excluded)
@@ -237,24 +230,19 @@ namespace SystemService
 
             auto headers = allowCredentialedCorsFrom(request, "supervisor"_a);
 
-            auto badRequest = [&]() {
+            auto data = extractData<CookieData>(request);
+
+            // cookie-name and cookie-value per RFC 6265; maxAge must be non-negative.
+            if (!isValidCookieName(data.name) || !isValidCookieValue(data.value) ||
+                data.maxAge < 0)
+            {
                return HttpReply{.status      = HttpStatus::badRequest,
                                 .contentType = "text/plain",
                                 .body        = {},
                                 .headers     = headers};
-            };
+            }
 
-            auto data = tryExtractData<CookieData>(request);
-            if (!data)
-               return badRequest();
-
-            // cookie-name and cookie-value per RFC 6265; maxAge must be non-negative.
-            if (!isValidCookieName(data->name) || !isValidCookieValue(data->value) ||
-                data->maxAge < 0)
-               return badRequest();
-
-            headers.push_back(
-                setCookieHeader(data->name, data->value, data->maxAge, data->httpOnly));
+            headers.push_back(setCookieHeader(data.name, data.value, data.maxAge, data.httpOnly));
 
             return HttpReply{.status      = HttpStatus::ok,
                              .contentType = "text/plain",
