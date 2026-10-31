@@ -195,15 +195,19 @@ git clone -c psibase.account=alice -c psibase.key=/path/to/key.pem \
 
 The key never leaves the client. The node receives a signed transaction.
 
+Decided: the CLI's scope is the git remote helper protocol: `capabilities`, `list` (refs), `fetch`, `push`, and signing. Clone is required for the POC.
+
 Helper operations, the ones git actually calls:
+
+- `capabilities` — advertise `fetch`, `push`, and `option`.
 
 - `list` — `GET` the dumb `info/refs` and print `<oid> <ref>`.
 - `fetch` — download the loose objects reachable from the requested tips and feed them to local git (`git unpack-objects`, or write loose files under the git dir git passed in). Skip any oid `git cat-file -e` already has.
 - `push <src>:<dst>` — in the local repo, `git rev-list --objects <old>..<new>` and `git cat-file --batch` produce the new loose objects. Group them into `putObjects` transactions. The last transaction is `updateRefs` with the `old_oid` the helper just read. Post each one with `wait_for=applied`. If the compare-and-swap fails, print the trace and exit non-zero so git reports a rejected push.
 
-Signing and posting use the same path as `psibase push`: build the actions, sign with the `--sign` key, `POST` the packed bytes to `/push_transaction` as `application/octet-stream`. Shelling out to `psibase push -s` is fine for `create` and `setWriter`. It is a poor fit for objects, because the CLI's JSON action file carries either schema-shaped JSON or hex `rawData`.
+Signing and posting use the same path as `psibase push`: build the actions, sign with the `--sign` key, `POST` the packed bytes to `/push_transaction` as `application/octet-stream`. Decided: the helper links the `psibase` CLI's signing code in-process as a shared Rust crate. It does not spawn the `psibase` binary, for objects or for anything else. Spawning is a poor fit for objects anyway, because the CLI's JSON action file carries either schema-shaped JSON or hex `rawData`. The helper is one statically linked binary. PKCS #11 still loads the user's token module at runtime.
 
-Configuration actions (`create`, `setWriter`) are `psibase push` of a JSON file. No web UI.
+Configuration actions (`create`, `setWriter`) can still be a user's own `psibase push` of a JSON file. No web UI.
 
 ## Size limits
 
@@ -339,23 +343,33 @@ Wiring them so one push writes chain objects and a local bare repo, or so the si
 Users install the client for the on-chain instantiation with one script. The same tarball carries the sidecar binary for the node-hosted instantiation. Default mode does not install or start the sidecar, and installing both binaries does not compose the two deployments.
 
 ```sh
-curl --proto '=https' --tlsv1.2 -fsSL https://<release-host>/psibase-git/install.sh | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://git.<root>/install.sh | sh
 ```
 
 Node operators who are running the sidecar add `--host`:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -fsSL https://<release-host>/psibase-git/install.sh | sh -s -- --host
+curl --proto '=https' --tlsv1.2 -fsSL https://git.<root>/install.sh | sh -s -- --host
 ```
+
+Decided: the chain serves the installer. The script and artifacts are files of the `git` package, uploaded to Sites under the `git` account at package install and replaced at upgrade. There is no GitHub Releases download and no separate release host. Stable paths under `git.<root>/install/`:
+
+- `install.sh` (also at `git.<root>/install.sh`). The `git` service's `serveSys` generates it per request with the chain's own URL baked in, so the script downloads from the chain it was fetched from.
+- `git-remote-psibase-linux-x86_64.tar.gz` and `git-remote-psibase-linux-aarch64.tar.gz`, plus the `psibase-git-host` tarballs for `--host`.
+- `SHA256SUMS` and `version`.
+
+All but `install.sh` come straight from Sites. The checksums come from the same node as the tarballs, so they detect corruption only. Decided: detached signatures are not needed for the POC.
+
+Sites stores each file as one row, the default `maxValueSize` is 8 MiB, and there is no chunked upload. CI fails the build if any install tarball exceeds about 7 MiB. The package is installed through the `psibase` CLI path, not the browser, because the Sites plugin limits a browser upload to 3 MB per transaction.
 
 The script is the whole installer. It does not hand off to a package manager.
 
 - Default prefix is `$HOME/.local`. `--prefix <dir>` overrides it. If `bin` under that prefix is not writable, the script exits and tells the user what to pass. It does not call sudo.
 - It refuses to run as root unless `--prefix` was set explicitly, so a piped install does not drop binaries into a root home by accident.
 - It requires `git` on `PATH` and exits with that message if it is missing. It does not install git.
-- It selects a release tarball from the OS and architecture (`linux` `x86_64` and `linux` `aarch64` at first), downloads the tarball and its SHA-256 checksum, and checks the checksum before extracting.
+- It selects a release tarball from the OS and architecture (`linux` `x86_64` and `linux` `aarch64` only; macOS is not in the first release), downloads the tarball and its SHA-256 checksum, and checks the checksum before extracting.
 - It installs `git-remote-psibase` into `<prefix>/bin`. Git finds remote helpers by name on `PATH`, so if that directory is not on `PATH` the script prints the export line and stops short of claiming success.
-- The helper signs and posts transactions itself, with the same key formats as `psibase push --sign`. The script does not install the `psibase` CLI and does not need it.
+- The helper signs and posts transactions itself, with the in-process signing crate and the same key formats as `psibase push --sign`. The script does not install the `psibase` CLI and does not need it.
 - `--host` also installs `psibase-git-host` into the same `bin`. It does not start it, enable a service unit, or open a port. It prints the run command: `psibase-git-host --api http://<root> --repo-dir <prefix>/share/psibase-git/repos`.
 - Re-running the script replaces the binaries at the same paths.
 
@@ -395,7 +409,7 @@ The POC adds a minimal web page on `git.<root>`.
 
 To the user, the git CLI looks like a typical git CLI: `git clone`, `git fetch`, `git push` against a `psibase::` remote.
 
-One-time setup is editing `~/.psibase.toml`. For each host, it sets a default account and a default key. The key is a PEM or DER private key file path, or a PKCS #11 URI. The node comes from `-a` or `PSINODE_URL`, which defaults to the local node (`http://psibase.localhost:8080/`). Named hosts are saved in the same file (`psibase config set hosts.<name> <url>`).
+One-time setup is editing `~/.psibase.toml`. For each host, it sets a default account and a default key. The key is a reference, a PEM or DER private key file path or a PKCS #11 URI. The file never holds raw key bytes. The node comes from `-a` or `PSINODE_URL`, which defaults to the local node (`http://psibase.localhost:8080/`). Named hosts are saved in the same file (`psibase config set hosts.<name> <url>`).
 
 ```toml
 [hosts]
@@ -409,7 +423,7 @@ key = "pkcs11:token=...;object=..."   # or a path to a PEM/DER key file
 
 The remote URL lives in normal git config as a `psibase::` URL (`git remote add origin psibase::https://prod.example.com/alice/notes.git`), so git itself stores the host and repo. Git cannot pass extra flags to a remote helper, so `git-remote-psibase` picks up the account and key from `~/.psibase.toml` or the environment.
 
-Signing reuses the existing `psibase` CLI path, which already signs with a key file or a PKCS #11 token (`--sign`). Node-local keys in `x-keys` are out of scope for now.
+Signing reuses the existing `psibase` CLI signing code, linked into the helper as a shared Rust crate, which already signs with a key file or a PKCS #11 token (`--sign`). Node-local keys in `x-keys` are out of scope for now.
 
 ## Out of scope for this plan
 
