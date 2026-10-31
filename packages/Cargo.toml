@@ -35,6 +35,8 @@ members = [
     "user/Sites/plugin",
     "user/WebCrypto/plugin",
     "user/Workshop/plugin",
+    "system/AuthScope/plugin/",
+    "local/XPortal/plugin",
 ]
 resolver = "2"
 

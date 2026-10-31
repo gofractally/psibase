@@ -570,7 +570,7 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     .packed();
 
     invite::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-        .createInvite(invite_id, payload, 1, false, min_cost.into())
+        .createInvite(invite_id, payload, 1, false, min_cost.into(), None)
         .get()?;
 
     // Create an account using the invite

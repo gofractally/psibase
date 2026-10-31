@@ -14,4 +14,13 @@ Psibase infrastructure nodes provide virtual hosting. Every account has a subdom
 
 For example, for a local node being hosted at the default domain (`psibase.localhost`), `my-service.psibase.localhost` hosts user interfaces and RPC endpoints for `my-service`.
 
+### Safari on local HTTP development
+
+On plain HTTP for `*.localhost` subdomains, Safari does not support local development:
+
+- Rejects `__Host-`/`__Secure-` cookies over plain HTTP
+- Treats each `*.localhost` subdomain as a separate site, so the supervisor iframe cannot read or write cookies
+
+**Production HTTPS** on a registered domain is unaffected; Safari is fully supported there.
+
 Some javascript libraries are available at the [common files endpoints](../../default-apps/common-api.md#common-files) that can make it easier for your external scripts to interface with psibase networks.

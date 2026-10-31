@@ -85,39 +85,20 @@ namespace
                       std::string_view             rootHost,
                       std::optional<AccountNumber> subdomain = {})
    {
-      std::string              location;
       std::optional<SocketRow> socketRow;
       PSIBASE_SUBJECTIVE_TX
       {
          socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
       }
-      if (auto proto = forwardedProto(req))
-         location += *proto + "://";
-      else if (hasTls(socketRow.value().info))
-         location += "https://";
-      else
-         location += "http://";
+      std::string host;
       if (subdomain)
       {
-         location += subdomain->str();
-         location += '.';
+         host += subdomain->str();
+         host += '.';
       }
-      location += rootHost;
-      if (auto host = req.getHeader("host"))
-      {
-         if (auto pos = host->rfind(':'); pos != std::string::npos)
-         {
-            if (host->find(']', pos) == std::string::npos)
-            {
-               location.append(host->substr(pos));
-            }
-         }
-      }
-      if (subdomain)
-         location += '/';
-      else
-         location += req.target;
-      return location;
+      host += rootHost;
+      return publicUrl(req, hasTls(socketRow.value().info), host,
+                     subdomain ? std::string_view{"/"} : std::string_view{req.target});
    }
 
    void checkResponseHeaders(const TempPendingRequestRow& row, const HttpReply& reply)

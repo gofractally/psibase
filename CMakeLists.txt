@@ -135,7 +135,7 @@ if(DEFINED WASI_SDK_PREFIX)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
     # C++ packages
-    set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthNone CommonApi
+    set(SERVICES Accounts AuthDelegate AuthSig AuthAny AuthNone AuthScope CommonApi
         CpuLimit Db DynLd Events EventIndex Explorer Invite
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate RDynLd REvents RInvite RPackages RProducers
@@ -143,7 +143,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XPeers XProxy XSocketListService WSEcho XDelay ServerId)
+        XPackages XPeers XPortal XProxy XSocketListService WSEcho XDelay ServerId)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -310,6 +310,8 @@ add_rs_component_workspace(packages/:Plugins
     homepage
     homepage-explorer
     producers
+    auth-scope-plugin
+    x-portal-plugin
 )
 
 include(GNUInstallDirs)
@@ -473,7 +475,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Aes(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -644,6 +646,12 @@ cargo_psibase_package(
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/HostDb.psi
+    PATH packages/user/HostDb
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthSigService.psi
     NAME AuthSigService
@@ -754,6 +762,19 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthNone.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthNone-schema.json
     DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthScope.psi
+    NAME AuthScope
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Auth service that limits a key to a whitelist of actions"
+    SERVICE auth-scope
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthScope.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthScope-schema.json
+        DATA ${Plugins_OUTPUT_FILE_auth_scope_plugin} /plugin.wasm
+    DEPENDS wasm ${Plugins_DEP}
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1002,7 +1023,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
     NAME Supervisor
     VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "DynLd(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "DynLd(^${PSIBASE_VERSION}.0)" "HostDb(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/postinstall.json
     SERVICE supervisor
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Supervisor/ui/dist/* /
@@ -1265,6 +1286,23 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XPortal.psi
+    NAME XPortal
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Anonymous account requests for this node"
+    LOCAL
+    SERVICE x-portal
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XPortal.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPortal-schema.json
+        FLAGS isPrivileged
+        SERVER x-portal
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XPortal/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_x_portal_plugin} /plugin.wasm
+    DEPENDS wasm ${XPortal_js_DEP} ${Plugins_DEP}
+    PACKAGE_DEPENDS XKeys XTimer XHttp XSites XAdmin XCommonApi
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XProxy.psi
     NAME XProxy
     VERSION ${PSIBASE_VERSION}.0
@@ -1334,8 +1372,8 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthNone AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthNone AuthDyn AuthSig AuthDelegate AuthScope Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HostDb HostLoginPrompt HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
@@ -1344,8 +1382,8 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
-    PACKAGE_DEPENDS Accounts Aes AuthNone AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+    PACKAGE_DEPENDS Accounts Aes AuthNone AuthDyn AuthSig AuthDelegate AuthScope Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HostDb HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens NameMarket TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth
 )
 
@@ -1417,10 +1455,10 @@ function(write_package_index target dir reserve)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR} 1
-    Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
-    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
+    Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthScope AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
+    Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostDb HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
-    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XPortal XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1429,6 +1467,7 @@ install(
           ${SERVICE_DIR}/Aes.psi
           ${SERVICE_DIR}/AuthAny.psi
           ${SERVICE_DIR}/AuthNone.psi
+          ${SERVICE_DIR}/AuthScope.psi
           ${SERVICE_DIR}/AuthDyn.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthDelegateService.psi
@@ -1463,6 +1502,7 @@ install(
           ${SERVICE_DIR}/FractalGen.psi
           ${SERVICE_DIR}/FractalTester.psi
           ${SERVICE_DIR}/Host.psi
+          ${SERVICE_DIR}/HostDb.psi
           ${SERVICE_DIR}/HostLoginPrompt.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
@@ -1510,6 +1550,7 @@ install(
           ${SERVICE_DIR}/XKeys.psi
           ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XPeers.psi
+          ${SERVICE_DIR}/XPortal.psi
           ${SERVICE_DIR}/XProxy.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSites.psi

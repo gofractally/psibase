@@ -80,7 +80,7 @@ TEST_CASE("Steal resources")
    REQUIRE(t.from(bob)
                .to<Invite>()
                .createInvite(42, std::vector<std::uint8_t>{payloadData.begin(), payloadData.end()},
-                             1, false, invRes)
+                             1, false, invRes, std::nullopt)
                .succeeded());
 
    auto expensiveAction = transactor<CredResThief>().from(alice).useDisk(100'000);

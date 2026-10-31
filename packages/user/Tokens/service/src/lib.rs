@@ -245,7 +245,7 @@ pub mod service {
     /// Returns quantity of tokens in the shared balance
     #[action]
     fn getSharedBal(token_id: TID, creditor: AccountNumber, debitor: AccountNumber) -> Quantity {
-        SharedBalance::get_or_new(creditor, debitor, token_id).balance
+        SharedBalance::get(creditor, debitor, token_id).map_or(0.into(), |shared| shared.balance)
     }
 
     /// Recalls an amount of tokens from a user's primary or sub-account balance and burns them
@@ -557,21 +557,19 @@ pub mod service {
         assert_eq!(get_sender(), get_service(), "Unauthorized");
         Token::get(tokenId).expect("Token DNE");
 
-        let config_table = ConfigTable::new();
         assert!(
-            config_table.get_index_pk().get(&()).is_none(),
+            ConfigRow::get().is_none(),
             "Changing system token is not supported",
         );
-        config_table.put(&ConfigRow { sys_tid: tokenId }).unwrap();
+        ConfigTable::new()
+            .put(&ConfigRow { sys_tid: tokenId })
+            .unwrap();
     }
 
     /// Gets the system token details (if set), otherwise returns `None`
     #[action]
     fn getSysToken() -> Option<Token> {
-        ConfigTable::read()
-            .get_index_pk()
-            .get(&())
-            .map(|row| Token::get_assert(row.sys_tid))
+        ConfigRow::get().map(|row| Token::get_assert(row.sys_tid))
     }
 
     /// Get the token balance of the sender's specified sub-account

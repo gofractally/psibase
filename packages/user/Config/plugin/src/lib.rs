@@ -20,7 +20,7 @@ use exports::config::plugin::{
     },
 };
 
-use virtual_server::plugin::types::{
+use vserver::plugin::types::{
     CpuPricingParams as DestCpuPricingParams, NetPricingParams as DestNetPricingParams,
     NetworkVariables as DestNetworkVariables, ServerSpecs as DestServerSpecs,
 };
@@ -216,7 +216,7 @@ impl VirtualServer for ConfigPlugin {
     fn init_billing(fee_receiver: String) -> Result<(), Error> {
         set_propose_latch(Some(VIRTUAL_SERVER))?;
 
-        virtual_server::plugin::admin::init_billing(&fee_receiver)
+        vserver::plugin::admin::init_billing(&fee_receiver)
     }
 
     fn set_specs(specs: ServerSpecs) -> Result<(), Error> {
@@ -226,7 +226,7 @@ impl VirtualServer for ConfigPlugin {
             net_bps: specs.net_bps,
             storage_bytes: specs.storage_bytes,
         };
-        virtual_server::plugin::admin::set_specs(specs)
+        vserver::plugin::admin::set_specs(specs)
     }
 
     fn set_network_variables(variables: NetworkVariables) -> Result<(), Error> {
@@ -238,20 +238,20 @@ impl VirtualServer for ConfigPlugin {
             obj_storage_bytes: variables.obj_storage_bytes,
             subj_storage_bytes: variables.subj_storage_bytes,
         };
-        virtual_server::plugin::admin::set_network_variables(variables)
+        vserver::plugin::admin::set_network_variables(variables)
     }
 
     fn enable_billing() -> Result<(), Error> {
-        virtual_server::plugin::billing::fill_gas_tank()?;
+        vserver::plugin::billing::fill_gas_tank()?;
 
         set_propose_latch(Some(VIRTUAL_SERVER))?;
-        virtual_server::plugin::admin::enable_billing()
+        vserver::plugin::admin::enable_billing()
     }
 
     fn set_cpu_pricing_params(params: CpuPricingParams) -> Result<(), Error> {
         set_propose_latch(Some(VIRTUAL_SERVER))?;
 
-        virtual_server::plugin::admin::set_cpu_pricing_params(&DestCpuPricingParams {
+        vserver::plugin::admin::set_cpu_pricing_params(&DestCpuPricingParams {
             idle_pct: params.idle_pct,
             congested_pct: params.congested_pct,
             doubling_time_sec: params.doubling_time_sec,
@@ -264,7 +264,7 @@ impl VirtualServer for ConfigPlugin {
     fn set_net_pricing_params(params: NetPricingParams) -> Result<(), Error> {
         set_propose_latch(Some(VIRTUAL_SERVER))?;
 
-        virtual_server::plugin::admin::set_net_pricing_params(&DestNetPricingParams {
+        vserver::plugin::admin::set_net_pricing_params(&DestNetPricingParams {
             idle_pct: params.idle_pct,
             congested_pct: params.congested_pct,
             doubling_time_sec: params.doubling_time_sec,
@@ -274,24 +274,24 @@ impl VirtualServer for ConfigPlugin {
         })
     }
 
-    fn get_billing_config() -> Result<virtual_server::plugin::types::BillingConfig, Error> {
+    fn get_billing_config() -> Result<vserver::plugin::types::BillingConfig, Error> {
         assert_caller_self();
-        virtual_server::plugin::authorized::get_billing_config()
+        vserver::plugin::authorized::get_billing_config()
     }
 
     fn graphql(query: String) -> Result<String, Error> {
         assert_caller_self();
-        virtual_server::plugin::authorized::graphql(&query)
+        vserver::plugin::authorized::graphql(&query)
     }
 
     fn reg_res_provider(app: String, accepted: Vec<String>) -> Result<(), Error> {
         assert_caller_self();
-        virtual_server::plugin::admin::reg_res_provider(&app, &accepted)
+        vserver::plugin::admin::reg_res_provider(&app, &accepted)
     }
 
     fn unreg_res_provider() -> Result<(), Error> {
         assert_caller_self();
-        virtual_server::plugin::admin::unreg_res_provider()
+        vserver::plugin::admin::unreg_res_provider()
     }
 }
 

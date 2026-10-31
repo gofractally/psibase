@@ -7,6 +7,14 @@
 using namespace psibase;
 using namespace LocalService;
 
+namespace
+{
+   std::vector<HttpHeader> staticReadCors(const HttpRequest& req)
+   {
+      return allowCors(req, {XAdmin::service, AccountNumber{"supervisor"}});
+   }
+}  // namespace
+
 std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
@@ -19,9 +27,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
 
    auto table = open<ContentTable>();
    if (req.method == "OPTIONS")
-   {
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
-   }
+      return HttpReply{.headers = staticReadCors(req)};
    else if (req.method == "PUT")
    {
       if (auto reply = to<XAdmin>().checkAuth(req, socket))
@@ -78,7 +84,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
          auto reply = HttpReply{
              .contentType = std::move(row->contentType),
              .body        = std::move(row->content),
-             .headers     = allowCors(req, XAdmin::service),
+             .headers     = staticReadCors(req),
          };
          if (row->contentEncoding)
          {

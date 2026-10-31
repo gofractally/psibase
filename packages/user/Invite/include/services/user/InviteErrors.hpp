@@ -9,6 +9,8 @@ namespace UserService
       constexpr std::string_view inviteDNE        = "Invite does not exist";
       constexpr std::string_view needUniquePubkey = "Cannot use invite key as account key";
       constexpr std::string_view unauthDelete     = "Only the inviter can delete an invite";
+      constexpr std::string_view unauthInviter =
+          "Only the inviter can list accounts created from an invite";
       constexpr std::string_view secretDNE        = "Secret does not exist";
       constexpr std::string_view mustUseInviteCredential =
           "To create a new account, you must accept the invite using the invite credential";

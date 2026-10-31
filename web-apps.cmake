@@ -1,5 +1,13 @@
 include(ExternalProject)
 
+enable_testing()
+
+add_test(
+    NAME supervisor-ui-vitest
+    COMMAND yarn workspace @psibase/supervisor-ui test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/packages
+)
+
 # Static (not built) resource dependencies
 file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/*)
 
@@ -40,6 +48,7 @@ set(UI_PROJECTS
     user/Workshop/ui:Workshop_js
     user/Config/ui:Config_js
     local/XAdmin/ui:XAdmin_js
+    local/XPortal/ui:XPortal_js
     local/XProxy/ui:XProxy_js
 )
 

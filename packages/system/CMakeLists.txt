@@ -49,6 +49,7 @@ function(add suffix)
         AuthDelegate/include
         AuthAny/include
         AuthNone/include
+        AuthScope/include
         AuthSig/include
         CpuLimit/include
         Credentials/service/cpp/include
@@ -73,6 +74,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(AuthAny)
     add_subdirectory(AuthNone)
     add_subdirectory(AuthSig)
+    add_subdirectory(AuthScope)
     add_subdirectory(CpuLimit)
     add_subdirectory(Db)
     add_subdirectory(Producers)
