@@ -98,7 +98,7 @@ mod service {
                 } else {
                     None
                 };
-                apply_changes(device, session.as_deref(), &changes)?;
+                apply_changes(device, session.as_deref(), changes)?;
                 return Ok((204, None));
             }
 
@@ -162,21 +162,16 @@ mod service {
     /// `expected` is the SHA-256 hex of the ciphertext from GET, or null when
     /// that GET was absent. Omit it to write unconditionally. A mismatch
     /// returns 409 and writes nothing.
-    fn apply_changes(device: &[u8], session: Option<&[u8]>, changes: &[Change]) -> Result<(), u16> {
-        let puts = |duration: Duration| {
-            changes
-                .iter()
-                .any(|change| change.duration == duration && change.value().is_some())
-        };
-        let persistent_gc = puts(Duration::Persistent);
-        let session_gc = puts(Duration::Session);
+    fn apply_changes(device: &[u8], session: Option<&[u8]>, changes: Vec<Change>) -> Result<(), u16> {
         subjective_tx! {
             let now = wall_time_ns();
             let persistent = KvTable::new();
             let sessions = SessionKvTable::new();
             let devices = DeviceTable::new();
             let store = device_store(&devices, device, now);
-            for change in changes {
+            let mut persistent_gc = false;
+            let mut session_gc = false;
+            for change in &changes {
                 if let Precondition::Read(expected) = &change.expected {
                     let stored =
                         current_value(&persistent, &sessions, &store, session, change);
@@ -184,6 +179,7 @@ mod service {
                 }
                 match (change.duration, change.value()) {
                     (Duration::Persistent, Some(value)) => {
+                        persistent_gc = true;
                         persistent
                             .put(&KvRow {
                                 store: store.clone(),
@@ -196,6 +192,7 @@ mod service {
                         persistent.erase(&(&store[..], change.key()));
                     }
                     (Duration::Session, Some(value)) => {
+                        session_gc = true;
                         sessions
                             .put(&SessionKvRow {
                                 store: store.clone(),
