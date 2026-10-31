@@ -67,10 +67,3 @@ yarn test                      # all projects
 
 With no specs yet, runs pass with no tests. Artifacts (traces, videos, HTML
 report) are written to `test-results/`.
-
-## Known limitations (e2e-playwright-base)
-
-- Only partly verified so far: the machine this branch was prepared on lacks psibase's build toolchain (no CMake or C++/wasm toolchain), so there is no CMake build result and no normal `ctest -LE e2e` run from that environment yet.
-- `yarn install` in `e2e/` passed.
-- Both Playwright smoke specs (`boot-chain.spec.ts`, `psinode-node.spec.ts`) failed there only because psinode's `/native/admin/status` returned `["slow","needgenesis"]` instead of exactly `["needgenesis"]`. This looks environmental (slow disk/CPU); the assertions compare the whole status list and could instead check that it contains `needgenesis`.
-- The harness commits on this branch are authored by James (extracted from `e2e-multinode-peering`, without the peering spec and XPeers fix).
