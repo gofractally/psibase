@@ -72,3 +72,13 @@ psibase-rust-workspace-hack = "0.2.0"
 
 [patch.crates-io.psibase-rust-workspace-hack]
 path = "rust-workspace-hack"
+
+# Size-optimized build for the git-remote-psibase install tarballs, which are
+# stored on chain as Sites files (see packages/user/Git/scripts).
+[profile.dist]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
