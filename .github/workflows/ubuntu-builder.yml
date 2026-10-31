@@ -123,9 +123,9 @@ jobs:
       - name: Install E2E dependencies
         working-directory: e2e
         run: yarn install --immutable
-      - name: Install Chromium
+      - name: Install Playwright browsers
         working-directory: e2e
-        run: yarn exec playwright install chromium --with-deps
+        run: yarn exec playwright install chromium webkit --with-deps
       - name: Run E2E suite
         working-directory: e2e
         run: yarn test
