@@ -15,9 +15,6 @@ interface BatchOp {
     expected?: string | null;
 }
 
-// Browsers reject keepalive request bodies larger than 64 KiB.
-export const KEEPALIVE_BODY_LIMIT = 64 * 1024;
-
 const FLUSH_ATTEMPTS = 4;
 const FLUSH_RETRY_BASE_MS = 100;
 
@@ -25,7 +22,6 @@ async function postBatch(body: string): Promise<void> {
     const init: RequestInit = {
         method: "POST",
         credentials: "include",
-        ...(body.length <= KEEPALIVE_BODY_LIMIT ? { keepalive: true } : {}),
         headers: { "Content-Type": "application/json" },
         body,
     };
