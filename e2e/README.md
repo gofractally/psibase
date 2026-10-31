@@ -1,19 +1,21 @@
 # @psibase/e2e
 
-Playwright end-to-end tests for psibase. The suite runs against Chromium only.
+Playwright end-to-end harness for psibase. This base provides the Playwright
+setup only (config, browser projects, CTest and CI wiring, binary and package
+resolution). Fixtures and specs are added by branches stacked on top of it.
 
 ## Prerequisites
 
 Build psibase (or point the environment variables below at an unpacked psidk
-tree). Install Chromium for the Playwright version pinned in `package.json`
-(`@playwright/test`) once:
+tree). Install the browsers for the Playwright version pinned in
+`package.json` (`@playwright/test`) once:
 
 ```bash
-yarn exec playwright install chromium
+yarn exec playwright install chromium webkit
 ```
 
-Without Chromium, `ctest -R e2e` skips the suite (exit code 77) rather than
-failing the build.
+A browser that isn't installed makes its CTest skip (exit code 77) rather than
+fail the build.
 
 ## Environment variables
 
@@ -25,29 +27,36 @@ unset, `psinode` and `psibase` are resolved from `PATH` (direnv adds
 | --- | --- |
 | `PSINODE_BIN` | psinode binary |
 | `PSIBASE_BIN` | psibase CLI binary |
+| `PSIBASE_PACKAGES` | optional directory of `.psi` packages (e.g. locally built ones); defaults to `share/psibase/packages` next to the psinode install prefix |
 
 The config fails immediately when a configured path is missing, when neither
-variable is set and the command is absent from `PATH`, or when
-`share/psibase/packages` is missing next to the psinode install prefix.
+binary variable is set and the command is absent from `PATH`, or when no
+package directory can be found.
 
 ## CTest
 
 From the build directory:
 
 ```bash
-ctest -R e2e
+ctest -L e2e            # all e2e tests
+ctest -R e2e-chromium   # one browser
+ctest -R e2e-webkit
 ```
 
-Skips with exit code 77 when Chromium is not installed. Excluded from CI
-container builds via `ctest -LE e2e`; the GitHub Actions `e2e` job runs the
-suite on the runner instead.
+Each browser project is its own CTest entry, registered with
+`psibase_add_e2e_test(<name> <browser> [playwright args...])` in
+`CMakeLists.txt`; extra args can narrow a test to a spec folder. Excluded from
+CI container builds via `ctest -LE e2e`; the GitHub Actions `e2e` job installs
+Chromium and WebKit and runs the suite on the runner instead.
 
 ## Running the suite
 
 From this directory:
 
 ```bash
-yarn test
+yarn test                      # all projects
+./run-ctest.sh webkit [args]   # one browser, as CTest runs it
 ```
 
-Artifacts (traces, videos, HTML report) are written to `test-results/`.
+With no specs yet, runs pass with no tests. Artifacts (traces, videos, HTML
+report) are written to `test-results/`.

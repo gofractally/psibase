@@ -1,22 +1,31 @@
 #!/usr/bin/env bash
+# Usage: run-ctest.sh [browser] [extra playwright args...]
+# browser: chromium (default) or webkit. Runs that Playwright project only.
+# Exits 77 (CTest skip) when that browser isn't installed.
 set -euo pipefail
 cd "$(dirname "$0")"
 
+browser="${1:-chromium}"
+shift || true
+
 set +e
-yarn node --input-type=module -e "
-import { chromium } from '@playwright/test';
+E2E_BROWSER="$browser" yarn node --input-type=module -e "
+import * as pw from '@playwright/test';
 import { existsSync } from 'node:fs';
-if (!existsSync(chromium.executablePath())) process.exit(77);
+const b = pw[process.env.E2E_BROWSER];
+if (!b) process.exit(2);
+if (!existsSync(b.executablePath())) process.exit(77);
 "
 code=$?
 set -e
 
 if [ "$code" -eq 77 ]; then
-    echo "Playwright Chromium not installed; skipping (run: yarn exec playwright install chromium)" >&2
+    echo "Playwright $browser not installed; skipping (run: yarn exec playwright install $browser)" >&2
     exit 77
 fi
 if [ "$code" -ne 0 ]; then
+    echo "Unknown or broken Playwright browser: $browser" >&2
     exit "$code"
 fi
 
-exec env CI=1 yarn test
+exec env CI=1 yarn test --project="$browser" --pass-with-no-tests "$@"

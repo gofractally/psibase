@@ -34,7 +34,22 @@ export function resolveBin(envVar: string, command: string): string {
     );
 }
 
-export function resolvePsinodeBin(): string {
+/**
+ * Directory of .psi packages to boot from. PSIBASE_PACKAGES wins (e.g. a
+ * build dir with locally built packages); otherwise the install tree next to
+ * PSINODE_BIN (<prefix>/share/psibase/packages).
+ */
+export function resolvePackagesDir(): string {
+    const configured = process.env.PSIBASE_PACKAGES;
+    if (configured !== undefined && configured !== "") {
+        const abs = path.isAbsolute(configured)
+            ? configured
+            : path.resolve(repoRoot, configured);
+        if (!existsSync(abs)) {
+            throw new Error(`PSIBASE_PACKAGES does not exist: ${abs}`);
+        }
+        return abs;
+    }
     const psinodeBin = resolveBin("PSINODE_BIN", "psinode");
     const binDir = path.dirname(psinodeBin);
     const prefix =
@@ -42,9 +57,15 @@ export function resolvePsinodeBin(): string {
     const packagesDir = path.join(prefix, "share/psibase/packages");
     if (!existsSync(packagesDir)) {
         throw new Error(
-            `PSINODE_BIN install tree missing share/psibase/packages: ${packagesDir}`,
+            `PSINODE_BIN install tree missing share/psibase/packages: ${packagesDir} (set PSIBASE_PACKAGES to override)`,
         );
     }
+    return packagesDir;
+}
+
+export function resolvePsinodeBin(): string {
+    const psinodeBin = resolveBin("PSINODE_BIN", "psinode");
+    resolvePackagesDir();
     return psinodeBin;
 }
 
