@@ -378,7 +378,7 @@ namespace xportal
       std::string host = XPortal::service.str();
       host += '.';
       host += to<XHttp>().rootHost(req.host);
-      return publicUrl(req, tls, host, "/auth/x/callback");
+      return publicUrl(req, tls || !isLocalhost(req), host, "/auth/x/callback");
    }
 
    std::optional<PricingBasis> pricingBasis()

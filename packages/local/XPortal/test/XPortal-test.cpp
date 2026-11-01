@@ -506,18 +506,22 @@ TEST_CASE("X OAuth callback URL follows the browser-facing origin")
    installPortal(t);
 
    auto config = t.get<AdminConfig>(XPortal::service, "/admin/config");
-   CHECK(config.x_callback_url == "http://x-portal.psibase.io/auth/x/callback");
+   CHECK(config.x_callback_url == "https://x-portal.psibase.io/auth/x/callback");
 
    configureX(t);
    auto authorize = startXSignIn(t);
    CHECK(authorize.redirect_uri == config.x_callback_url);
 
    authorize = startXSignIn(t, {{"Host", "x-portal.psibase.io:9090"}});
-   CHECK(authorize.redirect_uri == "http://x-portal.psibase.io:9090/auth/x/callback");
+   CHECK(authorize.redirect_uri == "https://x-portal.psibase.io:9090/auth/x/callback");
 
    authorize =
        startXSignIn(t, {{"Host", "x-portal.psibase.io:9090"}, {"X-Forwarded-Proto", "https"}});
    CHECK(authorize.redirect_uri == "https://x-portal.psibase.io:9090/auth/x/callback");
+
+   authorize =
+       startXSignIn(t, {{"Host", "x-portal.psibase.io:9090"}, {"X-Forwarded-Proto", "http"}});
+   CHECK(authorize.redirect_uri == "http://x-portal.psibase.io:9090/auth/x/callback");
 }
 
 TEST_CASE("Sign in with X starts PKCE and consumes its state once")
@@ -533,7 +537,7 @@ TEST_CASE("Sign in with X starts PKCE and consumes its state once")
    auto authorize = startXSignIn(t);
    CHECK(authorize.response_type == "code");
    CHECK(authorize.client_id == "client-id");
-   CHECK(authorize.redirect_uri == "http://x-portal.psibase.io/auth/x/callback");
+   CHECK(authorize.redirect_uri == "https://x-portal.psibase.io/auth/x/callback");
    CHECK(authorize.scope == "users.read tweet.read");
    CHECK(authorize.code_challenge_method == "S256");
    CHECK(authorize.state.size() == 43);
