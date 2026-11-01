@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 
+import { ClaimSaleCompare } from "@/components/claim-sale-compare";
 import {
     AssetField,
     ExpiresField,
@@ -17,11 +18,7 @@ import {
     useSetGlobalSellClaimOffer,
     useSetSellClaimOffer,
 } from "@/hooks/use-banx-mutations";
-import {
-    amountPlaceholder,
-    displayAmount,
-    formatToPrecision,
-} from "@/lib/amount";
+import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import {
     MAX_HOP_FEE_PERCENT,
     MAX_HOP_FEE_PPM,
@@ -88,122 +85,6 @@ const buyClaimSpreadValidators = {
     onChange: signedPercentFieldValidator(MAX_HOP_FEE_PERCENT),
     onSubmit: signedPercentFieldValidator(MAX_HOP_FEE_PERCENT),
 };
-
-const SAMPLE_FACE = 15;
-
-function previewClaimProceeds(
-    face: number,
-    feeFixed: string,
-    feePct: string,
-    isSell: boolean,
-): number | null {
-    const fixed = Number(String(feeFixed).trim());
-    const pct = Number(String(feePct).trim());
-    if (!Number.isFinite(fixed) || !Number.isFinite(pct)) return null;
-    if (fixed < 0 || Math.abs(pct) >= 100) return null;
-    const spread = isSell ? -pct : pct;
-    const afterPct = face * (1 - spread / 100);
-    if (fixed >= afterPct) return null;
-    const out = afterPct - fixed;
-    return out > 0 ? out : null;
-}
-
-function ClaimSentence({
-    creditor,
-    debtor,
-    amount,
-}: {
-    creditor: string;
-    debtor: string;
-    amount: string;
-}) {
-    return (
-        <p className="text-sm leading-relaxed">
-            <span className="text-foreground font-medium">{debtor}</span>
-            <span className="text-muted-foreground"> owes </span>
-            <span className="text-foreground">{amount}</span>
-            <span className="text-muted-foreground"> to </span>
-            <span className="text-foreground font-medium">{creditor}</span>
-            .
-        </p>
-    );
-}
-
-function ClaimFeeExample({
-    feeFixed,
-    feePct,
-    precision,
-    isSell,
-    you,
-    other = "alice",
-    debtor = "carol",
-    sampleFace = SAMPLE_FACE,
-}: {
-    feeFixed: string;
-    feePct: string;
-    precision: number;
-    isSell: boolean;
-    you: string;
-    other?: string;
-    debtor?: string;
-    sampleFace?: number;
-}) {
-    const proceeds = previewClaimProceeds(
-        sampleFace,
-        feeFixed,
-        feePct,
-        isSell,
-    );
-    const faceStr =
-        formatToPrecision(String(sampleFace), precision) ??
-        String(sampleFace);
-    const proceedsStr =
-        proceeds === null
-            ? null
-            : (formatToPrecision(
-                  proceeds.toFixed(Math.max(precision, 6)),
-                  precision,
-              ) ?? proceeds.toFixed(precision));
-    const seller = isSell ? you : other;
-    const buyer = isSell ? other : you;
-
-    return (
-        <div className="space-y-3">
-            <div className="space-y-1">
-                <p className="text-muted-foreground font-sans text-[0.7rem] uppercase tracking-wide">
-                    Before, for an example of {faceStr}
-                </p>
-                <ClaimSentence
-                    creditor={seller}
-                    debtor={debtor}
-                    amount={faceStr}
-                />
-            </div>
-            <div className="space-y-1">
-                <p className="text-muted-foreground font-sans text-[0.7rem] uppercase tracking-wide">
-                    After
-                </p>
-                {proceedsStr ? (
-                    <ClaimSentence
-                        creditor={seller}
-                        debtor={buyer}
-                        amount={proceedsStr}
-                    />
-                ) : (
-                    <p className="text-sm leading-relaxed">
-                        The fee uses the whole example, so {seller} is paid
-                        nothing.
-                    </p>
-                )}
-                <ClaimSentence
-                    creditor={buyer}
-                    debtor={debtor}
-                    amount={faceStr}
-                />
-            </div>
-        </div>
-    );
-}
 
 export function BuyClaimOfferDialog({
     open,
@@ -425,12 +306,13 @@ export function BuyClaimOfferDialog({
                 : undefined;
         const locked = !enabled || assetId === undefined;
         return (
-            <div
-                className={cn(
-                    "grid gap-5 transition-opacity duration-200",
-                    locked && "opacity-40",
-                )}
-            >
+            <div className="grid gap-5">
+                <div
+                    className={cn(
+                        "grid gap-5 transition-opacity duration-200",
+                        locked && "opacity-40",
+                    )}
+                >
                 <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                     <form.AppField
                         name="feeFixed"
@@ -487,22 +369,30 @@ export function BuyClaimOfferDialog({
                         />
                     )}
                 />
+                </div>
                 <form.Subscribe
                     selector={(s) => ({
                         feeFixed: s.values.feeFixed,
                         feePct: s.values.feePct,
                     })}
                     children={({ feeFixed, feePct }) => (
-                        <ClaimFeeExample
+                        <ClaimSaleCompare
                             feeFixed={feeFixed}
                             feePct={feePct}
                             precision={precision}
+                            symbol={symbol}
                             isSell={isSell}
                             you={you}
                             debtor={debtor || "carol"}
                         />
                     )}
                 />
+                <div
+                    className={cn(
+                        "transition-opacity duration-200",
+                        locked && "opacity-40",
+                    )}
+                >
                 <form.Field
                     name="expiresAtSeconds"
                     children={(field) => (
@@ -513,6 +403,7 @@ export function BuyClaimOfferDialog({
                         />
                     )}
                 />
+                </div>
             </div>
         );
     };
@@ -521,7 +412,7 @@ export function BuyClaimOfferDialog({
         const pending = setSpecific.isPending || removeSpecific.isPending;
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>
                             {isSell ? "Sell-claim offer" : "Buy-claim offer"}
@@ -682,7 +573,7 @@ export function BuyClaimOfferDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
                         {isSell ? "Sell-claim offer" : "Buy-claim offer"}
