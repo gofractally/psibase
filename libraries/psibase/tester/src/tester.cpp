@@ -422,7 +422,7 @@ void psibase::TestChain::startBlock(BlockTime tp)
    if (producing)
       finishBlock();
 
-   auto producer = AccountNumber{"firstproducer"};
+   auto producer = AccountNumber{"firstprod"};
    if (status)
    {
       auto getFirstProducer = [&](const auto& c)

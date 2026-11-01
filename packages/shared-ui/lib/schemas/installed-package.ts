@@ -16,3 +16,10 @@ export const zInstalledPackageMeta = z.object({
 });
 
 export type InstalledPackageMeta = z.infer<typeof zInstalledPackageMeta>;
+
+export const zInstalledPackage = z.object({
+    meta: zInstalledPackageMeta,
+    owner: z.string(),
+});
+
+export type InstalledPackage = z.infer<typeof zInstalledPackage>;

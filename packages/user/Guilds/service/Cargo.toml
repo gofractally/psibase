@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-guilds"
-plugin = "guilds-plugin"
+plugins = ["guilds-plugin"]
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = []
 

@@ -91,6 +91,7 @@ pub fn db_name(db: DbId) -> String {
         DbId::Service => "service".to_string(),
         DbId::Subjective => "subjective".to_string(),
         DbId::WriteOnly => "writeOnly".to_string(),
+        DbId::Session => "session".to_string(),
         _ => panic!("Unsupported db"),
     }
 }

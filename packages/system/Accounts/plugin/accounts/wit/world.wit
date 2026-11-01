@@ -7,6 +7,14 @@ interface api {
     /// Sets the auth service used to authenticate the currently logged-in user
     /// Currently calling this is restricted.
     set-auth-service: func(service-name: string) -> result<_, error>;
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
 }
 
 /// This interface is only callable by the accounts app itself.
@@ -18,6 +26,12 @@ interface admin {
 
     /// preapprove an account for creation within this transaction
     preapprove-account: func(account: string);
+
+    /// Schedule a freeze of these accounts.
+    freeze: func(accounts: list<string>, memo: option<string>) -> result<_, error>;
+
+    /// Schedule an unfreeze of these accounts.
+    unfreeze: func(accounts: list<string>, memo: option<string>) -> result<_, error>;
 }
 
 world imports {

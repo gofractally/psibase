@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-profiles"
-plugin = "profiles-plugin"
+plugins = ["profiles-plugin"]
 
 [dependencies]
 psibase.workspace = true

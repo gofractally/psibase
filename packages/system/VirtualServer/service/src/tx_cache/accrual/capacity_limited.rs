@@ -8,11 +8,11 @@
 //! collateralized.
 
 use super::is_system_user;
+use crate::Wrapper;
 use crate::resource_type::ResourceType;
 use crate::tables::capacity_limit_pricing::relay_sub_account;
 use crate::tables::tables::CapacityPricing;
 use crate::tx_cache::{balance_cache, drain_cache, with_cache};
-use crate::Wrapper;
 use psibase::AccountNumber;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -39,12 +39,7 @@ pub fn get_collateral(resource: ResourceType) -> u64 {
     (actual + pending).max(0) as u64
 }
 
-pub fn consume(
-    resource: ResourceType,
-    user: AccountNumber,
-    sub: Option<String>,
-    cost: u64,
-) {
+pub fn consume(resource: ResourceType, user: AccountNumber, sub: Option<String>, cost: u64) {
     if is_system_user(user) || cost == 0 {
         return;
     }

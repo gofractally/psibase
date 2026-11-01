@@ -1,0 +1,33 @@
+package explorer:plugin;
+
+world impl {
+    include host:client/imports;
+    include host:http/imports;
+    include host:types/imports;
+    import accounts:query/api;
+    import auth-sig:plugin/queries;
+    import auth-delegate:plugin/queries;
+    import auth-dyn:plugin/queries;
+    import branding:plugin/queries;
+    import packages:plugin/queries;
+    import producers:plugin/authorized;
+    import registry:plugin/authorized;
+    import setcode:plugin/authorized;
+    import sites:plugin/authorized;
+    import tokens:plugin/helpers;
+    import tokens:plugin/authorized;
+    import transact:plugin/authorized;
+    import virtual-server:plugin/authorized;
+
+    export block-log;
+    export authorized;
+    export accounts;
+    export network;
+    export tokens;
+    export virtual-server;
+    export producers;
+    export setcode;
+    export sites;
+    export registry;
+    export transact;
+}

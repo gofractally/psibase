@@ -78,16 +78,15 @@ export const AcceptButton = ({
                 <TooltipContent>Accept</TooltipContent>
                 <TooltipTrigger asChild>
                     <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-6 w-6"
+                        variant="ghost"
+                        size="icon-xs"
                         disabled={isPending}
                         onClick={() => setIsDialogOpen(true)}
                     >
                         {isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="size-3.5 animate-spin" />
                         ) : (
-                            <ArrowDown className="h-4 w-4" />
+                            <ArrowDown className="size-3.5" />
                         )}
                     </Button>
                 </TooltipTrigger>

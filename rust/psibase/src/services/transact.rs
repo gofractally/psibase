@@ -323,6 +323,17 @@ mod service {
         unimplemented!()
     }
 
+    /// Indicates whether the caller has outstanding work
+    ///
+    /// All outstanding work must be completed by the end of the
+    /// transaction or the transaction will fail. This is useful
+    /// for implementing paired actions that need to run in
+    /// the same transaction.
+    #[action]
+    fn setWork(work: bool) {
+        unimplemented!()
+    }
+
     /// Get the currently executing transaction
     #[action]
     fn getTransaction() -> crate::Transaction {

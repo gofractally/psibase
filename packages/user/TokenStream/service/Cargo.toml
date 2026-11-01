@@ -13,7 +13,7 @@ postinstall = [
 ]
 
 server = "r-token-stream"
-plugin = "token-stream-plugin"
+plugins = ["token-stream-plugin"]
 data = [{ src = "../ui/dist", dst = "/" }]
 
 [dependencies]

@@ -15,6 +15,7 @@ export interface SystemTokenInfo {
     symbol: string;
     /** Decimal places for the system token. */
     precision: number;
+    untransferable: boolean;
 }
 
 export function toSystemTokenInfo(
@@ -28,6 +29,7 @@ export function toSystemTokenInfo(
         id: String(token.id),
         symbol: symbol ? symbol : `ID: ${token.id}`,
         precision: token.precision,
+        untransferable: token.untransferable,
     };
 }
 

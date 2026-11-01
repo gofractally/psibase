@@ -1,4 +1,4 @@
-use crate::tables::tables::{NetworkVariables, ServerSpecs, ServerSpecsTable, MIN_SERVER_SPECS};
+use crate::tables::tables::{MIN_SERVER_SPECS, NetworkVariables, ServerSpecs, ServerSpecsTable};
 use psibase::*;
 
 const MAX_SERVER_SPECS: ServerSpecs = ServerSpecs {

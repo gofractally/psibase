@@ -123,3 +123,6 @@ pub mod service {
         Sites::call().remove(format!("/avatar/{caller}"));
     }
 }
+
+#[cfg(test)]
+mod tests;

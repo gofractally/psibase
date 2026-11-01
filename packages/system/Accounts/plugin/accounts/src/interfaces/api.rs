@@ -1,4 +1,5 @@
 use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
+use crate::bindings::host::http::api::post_graphql_get_json;
 use crate::bindings::transact::plugin::api as Transact;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
@@ -25,5 +26,9 @@ impl API for AccountsPlugin {
             .packed(),
         )?;
         Ok(())
+    }
+
+    fn graphql(query: String) -> Result<String, Error> {
+        post_graphql_get_json(&query)
     }
 }

@@ -43,8 +43,10 @@ pub fn plugin_error_derive_impl(input: TokenStream) -> TokenStream {
         .into();
     }
 
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
     let expanded = quote! {
-        unsafe impl psibase_plugin::error_trait::PluginError for #name {}
+        unsafe impl #impl_generics psibase_plugin::error_trait::PluginError for #name #ty_generics #where_clause {}
     };
 
     TokenStream::from(expanded)

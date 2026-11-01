@@ -5,6 +5,7 @@ pub struct SystemTokenInfo {
     pub id: u32,
     pub symbol: Option<String>,
     pub precision: u8,
+    pub untransferable: bool,
 }
 
 pub fn get_system_token() -> Result<Option<SystemTokenInfo>, ErrorType> {
@@ -18,5 +19,6 @@ pub fn get_system_token() -> Result<Option<SystemTokenInfo>, ErrorType> {
         id: token.id,
         symbol: token.symbol.map(|s| s.to_string()),
         precision: token.precision.value(),
+        untransferable: token.settings.untransferable,
     }))
 }

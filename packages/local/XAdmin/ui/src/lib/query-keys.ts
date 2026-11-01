@@ -13,6 +13,8 @@ export const queryKeys = {
     setPeerUser: ["setPeerUser"] as const,
     producers: ["producers"] as const,
     statuses: ["statuses"] as const,
+    adminAccounts: ["adminAccounts"] as const,
+    setAdminAccount: ["setAdminAccount"] as const,
 
     // security devices
     addServerKey: ["addServerKey"] as const,

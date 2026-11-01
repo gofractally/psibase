@@ -50,8 +50,19 @@ interface api {
     can-authorize: func(private-key: pem, account-name: string) -> bool;
 }
 
+interface queries {
+    use host:types/types.{error, pem};
+
+    /// Gets the public key of the specified account, or none if it has no auth-sig key.
+    get-pubkey: func(account: string) -> result<option<pem>, error>;
+
+    /// Gets the accounts whose auth-sig key is the specified public key.
+    get-accounts-with-key: func(public-key: pem) -> result<list<string>, error>;
+}
+
 world imports {
     import keyvault;
     import actions;
     import api;
+    import queries;
 }

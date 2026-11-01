@@ -1,5 +1,18 @@
 package auth-dyn:plugin;
 
+interface types {
+    record weighted-authorizer {
+        account: string,
+        weight: u8,
+    }
+
+    /// An account-level dynamic auth policy
+    record dynamic-auth-policy {
+        threshold: u8,
+        authorizers: list<weighted-authorizer>,
+    }
+}
+
 interface api {
     use host:types/types.{error};
 
@@ -7,7 +20,18 @@ interface api {
     set-management: func(account: string, manager: string) -> result<_, error>;
 }
 
+interface queries {
+    use host:types/types.{error};
+    use types.{dynamic-auth-policy};
+
+    /// Gets the manager service of the specified account, or none if it is not managed.
+    get-manager: func(account: string) -> result<option<string>, error>;
+
+    /// Gets the account-level policy resolved from the account's manager, or none if it has none.
+    get-policy: func(account: string) -> result<option<dynamic-auth-policy>, error>;
+}
 
 world imports {
     import api;
+    import queries;
 }

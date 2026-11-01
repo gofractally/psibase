@@ -11,6 +11,7 @@ import { Packages } from "./pages/packages";
 import { PendingTransaction } from "./pages/pending-transaction";
 import { PendingTransactions } from "./pages/pending-transactions";
 import { ResourcePricing } from "./pages/resource-pricing";
+import { ResourceProviders } from "./pages/resource-providers";
 import { Resources } from "./pages/resources";
 import { Settings } from "./pages/settings";
 
@@ -76,6 +77,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <ResourcePricing />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "resource-providers",
+                element: (
+                    <ProtectedRoute>
+                        <ResourceProviders />
                     </ProtectedRoute>
                 ),
             },

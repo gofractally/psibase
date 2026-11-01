@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-registry"
-plugin = "registry-plugin"
+plugins = ["registry-plugin"]
 postinstall = [{ sender = "registry", service = "registry", method = "init" }]
 
 [package.metadata.psibase.dependencies]

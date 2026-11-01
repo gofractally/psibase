@@ -106,6 +106,17 @@ interface admin {
     /// Parameters:
     /// * `params` - The network pricing parameters
     set-net-pricing-params: func(params: net-pricing-params) -> result<_, error>;
+
+    /// Register or update the caller as a resource provider.
+    ///
+    /// Parameters:
+    /// * `app` - App subdomain local to this node (begins with `x-`)
+    /// * `accepted` - Currency codes (non-empty). Each is free-form, at most 6
+    ///   characters, and stored lowercase.
+    reg-res-provider: func(app: string, accepted: list<string>) -> result<_, error>;
+
+    /// Remove the caller's resource provider registration, if any.
+    unreg-res-provider: func() -> result<_, error>;
 }
 
 interface billing {

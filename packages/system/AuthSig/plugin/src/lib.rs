@@ -17,6 +17,7 @@ use bindings::transact::plugin::api as Transact;
 // Exported interfaces
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, api::Guest as Api, keyvault::Guest as KeyVault,
+    queries::Guest as Queries,
 };
 use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 
@@ -43,7 +44,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, can_authorize],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, can_authorize, get_pubkey, get_accounts_with_key],
         Low => [import_key],
         Medium => [create_account],
         High => [set_key, sign],
@@ -178,6 +179,18 @@ impl Api for AuthSig {
         };
 
         specified_pubkey == actual_pubkey
+    }
+}
+
+impl Queries for AuthSig {
+    fn get_pubkey(account: String) -> Result<Option<Pem>, HostTypes::Error> {
+        assert_authorized(FunctionName::get_pubkey)?;
+        find_pubkey(&account)
+    }
+
+    fn get_accounts_with_key(public_key: Pem) -> Result<Vec<String>, HostTypes::Error> {
+        assert_authorized(FunctionName::get_accounts_with_key)?;
+        helpers::get_accounts_with_key(&public_key)
     }
 }
 

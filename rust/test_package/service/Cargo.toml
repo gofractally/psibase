@@ -11,7 +11,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-tpack"
-plugin = "tpack-plugin"
+plugins = ["tpack-plugin", "tpack-admin"]
 postinstall = [{ sender = "tpack", service = "tpack", method = "init" }]
 
 [package.metadata.psibase.dependencies]

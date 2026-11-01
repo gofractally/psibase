@@ -54,7 +54,7 @@ mod service {
     }
 
     #[action]
-    fn mint() -> crate::services::nft::NID {
+    fn mint(nftId: Option<crate::services::nft::NID>) -> crate::services::nft::NID {
         unimplemented!()
     }
 

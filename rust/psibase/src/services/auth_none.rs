@@ -1,0 +1,40 @@
+#[crate::service(name = "auth-none", dispatch = false, psibase_mod = "crate")]
+#[allow(non_snake_case, unused_variables)]
+mod service {
+    use crate::{services::transact::ServiceMethod, AccountNumber, Claim};
+
+    #[action]
+    fn checkAuthSys(
+        flags: u32,
+        sender: AccountNumber,
+        action: ServiceMethod,
+        claims: Vec<Claim>,
+    ) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn canAuthUserSys(user: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
+        unimplemented!()
+    }
+
+    #[action]
+    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
+        unimplemented!()
+    }
+}
+
+#[test]
+fn verify_schema() {
+    crate::assert_schema_matches_package::<Wrapper>();
+}

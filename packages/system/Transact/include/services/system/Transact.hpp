@@ -359,6 +359,14 @@ namespace SystemService
       /// the override. Callable only by the VirtualServer service.
       void systemWrite(uint64_t numBytes);
 
+      /// Indicates whether the caller has outstanding work
+      ///
+      /// All outstanding work must be completed by the end of the
+      /// transaction or the transaction will fail. This is useful
+      /// for implementing paired actions that need to run in
+      /// the same transaction.
+      void setWork(bool work);
+
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
@@ -406,6 +414,7 @@ namespace SystemService
                 method(skipBilling, numWrites),
                 method(endSkipBilling),
                 method(systemWrite, numBytes),
+                method(setWork, work),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),

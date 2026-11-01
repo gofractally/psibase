@@ -5,6 +5,10 @@
 #include <psibase/nativeTables.hpp>
 #include <psio/chrono.hpp>
 
+#include <optional>
+#include <string>
+#include <vector>
+
 namespace SystemService
 {
    /// Shows statistics accross accounts
@@ -38,6 +42,17 @@ namespace SystemService
    PSIO_REFLECT(Account, accountNum, authService, authSequence)
    using AccountTable = psibase::Table<Account, &Account::accountNum>;
    PSIO_REFLECT_TYPENAME(AccountTable)
+
+   /// An account that is currently frozen.
+   /// `authService` is the auth service to restore on unfreeze.
+   struct FrozenAccount
+   {
+      psibase::AccountNumber account;
+      psibase::AccountNumber authService;
+   };
+   PSIO_REFLECT(FrozenAccount, account, authService)
+   using FrozenTable = psibase::Table<FrozenAccount, &FrozenAccount::account>;
+   PSIO_REFLECT_TYPENAME(FrozenTable)
 
    /// Determines the behavior of `newAccount` when the
    /// requested account already exists
@@ -79,10 +94,12 @@ namespace SystemService
       static constexpr auto service = psibase::AccountNumber("accounts");
       /// "invite"
       static constexpr auto inviteService = psibase::AccountNumber("invite");
+      /// "auth-none"
+      static constexpr auto authNoneService = psibase::AccountNumber("auth-none");
       /// AccountNumber 0 is reserved for the null account
       static constexpr psibase::AccountNumber nullAccount = psibase::AccountNumber(0);
 
-      using Tables = psibase::ServiceTables<AccountsStatusTable, AccountTable>;
+      using Tables = psibase::ServiceTables<AccountsStatusTable, AccountTable, FrozenTable>;
 
       /// Only called once during chain initialization
       ///
@@ -126,6 +143,26 @@ namespace SystemService
       /// auth rules change. Has no effect if the sender is not
       /// the account's auth service.
       void incAuthSeq(psibase::AccountNumber name);
+
+      /// Freeze each account. Records its auth service and switches it to `auth-none`.
+      /// Sender must be the accounts service.
+      void freeze(std::vector<psibase::AccountNumber> accounts, std::optional<std::string> memo);
+
+      /// Unfreeze each account. Restores the auth service recorded by `freeze`.
+      /// Sender must be the accounts service.
+      void unfreeze(std::vector<psibase::AccountNumber> accounts, std::optional<std::string> memo);
+
+      struct Events
+      {
+         struct History
+         {
+            void froze(psibase::AccountNumber account, std::optional<std::string> memo) {}
+            void unfroze(psibase::AccountNumber account, std::optional<std::string> memo) {}
+         };
+      };
+
+     private:
+      void assignAuth(psibase::AccountNumber name, psibase::AccountNumber authService);
    };
 
    PSIO_REFLECT(Accounts,
@@ -137,8 +174,13 @@ namespace SystemService
                 method(getAuthOf, account),
                 method(exists, name),
                 method(incAuthSeq, name),
+                method(freeze, accounts, memo),
+                method(unfreeze, accounts, memo),
                 //
    )
 
    PSIBASE_REFLECT_TABLES(Accounts, Accounts::Tables)
+   PSIBASE_REFLECT_HISTORY_EVENTS(Accounts,  //
+                                  method(froze, account, memo),
+                                  method(unfroze, account, memo))
 }  // namespace SystemService

@@ -70,6 +70,12 @@ interface types {
         old: option<meta>,
         new: option<list<u8>>,
     }
+
+    /// An installed package and the account that installed it
+    record installed-package {
+        meta: meta,
+        owner: string,
+    }
 }
 
 interface private-api {
@@ -100,9 +106,17 @@ interface private-api {
 
 interface queries {
     use host:types/types.{error};
-    use types.{meta, package-source};
+    use types.{meta, package-source, installed-package};
     get-installed-packages: func() -> result<list<meta>, error>;
     get-sources: func(owner: string) -> result<list<package-source>, error>;
+
+    /// Like `get-installed-packages`, but also includes each package's owner
+    get-installed: func() -> result<list<installed-package>, error>;
+
+    /// Gets the JSON-encoded schema of an installed service.
+    ///
+    /// Returns none if the service has no installed schema or it could not be retrieved.
+    get-schema: func(service: string) -> result<option<string>, error>;
 }
 
 world imports {

@@ -15,6 +15,12 @@ members = [
     "VirtualServer",
     "VirtualServer/service",
     "VirtualServer/plugin",
+    "AuthRecover",
+    "AuthRecover/service",
+    "AuthRecover/query-service",
+    "AuthRecover/plugin",
+    "WsAuth",
+    "WsAuth/service",
 ]
 
 exclude = [

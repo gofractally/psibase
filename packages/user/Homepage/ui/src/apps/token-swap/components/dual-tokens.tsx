@@ -2,7 +2,6 @@ import { ReactNode } from "react";
 
 import { Quantity } from "@shared/lib/quantity";
 import { Button } from "@shared/shadcn/ui/button";
-import { CardContent, CardFooter } from "@shared/shadcn/ui/card";
 import { Separator } from "@shared/shadcn/ui/separator";
 
 import { AmountField } from "../components/amount-field";
@@ -43,7 +42,7 @@ export const DualTokens = ({
 
     return (
         <>
-            <CardContent className="space-y-6">
+            <div className="flex flex-col gap-4 p-4">
                 {/* Token 1 */}
                 <AmountField
                     disabled={token1.disabled}
@@ -82,8 +81,8 @@ export const DualTokens = ({
                     <Button
                         variant="outline"
                         disabled={disableCenter}
-                        size="icon"
-                        className="bg-background hover:bg-muted relative z-10 rounded-full"
+                        size="icon-sm"
+                        className="bg-background hover:bg-muted relative z-10 rounded-full [&_svg]:size-4"
                         onClick={onCenterClick}
                     >
                         {center}
@@ -120,13 +119,17 @@ export const DualTokens = ({
                     symbol={token2.symbol?.toUpperCase()}
                 />
 
-                {footer}
-            </CardContent>
+                {footer && (
+                    <div className="bg-muted/30 rounded-lg border px-3 py-2 [&_.flex.justify-between>span:last-child]:font-mono [&_.flex.justify-between>span:last-child]:tabular-nums [&_.flex.justify-between]:text-xs">
+                        {footer}
+                    </div>
+                )}
+            </div>
 
-            <CardFooter className="pt-2">
+            <div className="border-t px-4 py-3">
                 <Button
                     size="lg"
-                    className="h-14 w-full text-lg font-semibold"
+                    className="h-10 w-full text-sm font-semibold"
                     disabled={disableTrigger || sameTokensSelected}
                     onClick={() => {
                         onTrigger();
@@ -134,7 +137,7 @@ export const DualTokens = ({
                 >
                     {sameTokensSelected ? "Select tokens" : triggerLabel}
                 </Button>
-            </CardFooter>
+            </div>
         </>
     );
 };

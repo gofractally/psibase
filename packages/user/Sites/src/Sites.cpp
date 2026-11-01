@@ -70,7 +70,7 @@ namespace SystemService
 
       /*
         Strict baseline. Apps with additional needs (supervisor, prompt pages,
-        Explorer, Docs) override it via setCsp; see doc/src/default-apps/sites.md.
+        Docs) override it via setCsp; see doc/src/default-apps/sites.md.
 
         CSP strings (default or user-defined via setCsp) may include the
         keyword `{{root}}`, which is replaced with the root domain including

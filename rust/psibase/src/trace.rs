@@ -641,6 +641,38 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
             let _ = self.add_service(service).await;
         }
     }
+    /// Converts an action to the JSON form of [PrettyAction](crate::PrettyAction), using
+    /// the schemas loaded by [Self::prepare_action]. When the service's schema describes
+    /// the method, `method` has its original spelling and `data`, which replaces
+    /// `rawData`, holds the arguments, with any actions nested in them also decoded.
+    pub fn action_to_json(&self, act: SharedAction) -> serde_json::Value {
+        let schemas = self.storage.schemas.borrow();
+        let mut method = MethodString(act.method.to_string());
+        let mut data = None;
+        if let Some(schema) = schemas.get(&act.service) {
+            if let Some((name, action_type)) = schema.actions.get_key_value(&method) {
+                method = name.clone();
+                let mut custom = schema_types();
+                let service_method = CustomResolvedServiceMethod::new(&*schemas, std::mem::drop);
+                custom.insert("ServiceMethod".to_string(), &service_method);
+                let custom_action = CustomPrettyAction::new(&*schemas);
+                custom.insert("Action".to_string(), &custom_action);
+                let mut cschema = CompiledSchema::new(&schema.types, &custom);
+                cschema.extend(&action_type.params);
+                data = cschema.to_value(&action_type.params, act.rawData.0).ok();
+            }
+        }
+        let mut result = serde_json::Map::with_capacity(4);
+        result.insert("sender".to_string(), act.sender.to_string().into());
+        result.insert("service".to_string(), act.service.to_string().into());
+        result.insert("method".to_string(), method.0.into());
+        if let Some(data) = data {
+            result.insert("data".to_string(), data);
+        } else {
+            result.insert("rawData".to_string(), act.rawData.to_string().into());
+        }
+        result.into()
+    }
     pub async fn prepare_action_trace(&self, atrace: &ActionTrace) -> Result<(), anyhow::Error> {
         let mut res = self.add_service(atrace.action.service).await;
         if res.is_ok() {

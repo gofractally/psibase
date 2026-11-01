@@ -20,7 +20,7 @@ jobs:
           version=${{ github.event.release.name }}
           gh workflow run cli.yml -f version=$version -R ${{ github.repository_owner }}/image-builders
       - name: Update dev-chat
-        uses: appleboy/telegram-action@master
+        uses: appleboy/telegram-action@214f06cfa3d3a588c1472116889437e7c6fd29b1 # v1.1.1
         with:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}

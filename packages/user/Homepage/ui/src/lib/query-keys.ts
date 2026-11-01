@@ -1,4 +1,4 @@
-import { QueryableMailbox } from "@/apps/chainmail/types";
+import { Mailbox } from "@/apps/chainmail/types";
 
 type QueryKeyGenerator<Prefix extends string = string> = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -7,8 +7,14 @@ type QueryKeyGenerator<Prefix extends string = string> = (
 
 const QueryKey = {
     connectedAccounts: () => ["connectedAccounts"] as const,
-    mailbox: (mailbox: QueryableMailbox, user: string) =>
-        [mailbox, user] as const,
+    explorerGenesisTime: () => ["explorerGenesisTime"] as const,
+    explorerHead: () => ["explorerHead"] as const,
+    explorerServiceActivity: () => ["explorerServiceActivity"] as const,
+    explorerUserActivity: (user?: string | null) =>
+        ["explorerUserActivity", user] as const,
+    serviceCode: (account?: string | null) => ["serviceCode", account] as const,
+    siteConfig: (account?: string | null) => ["siteConfig", account] as const,
+    mailbox: (mailbox: Mailbox, user: string) => [mailbox, user] as const,
     producers: () => ["producers"] as const,
     token: (tokenId: number | undefined) => ["token", tokenId] as const,
     userLinesOfCredit: (user?: string | null) =>

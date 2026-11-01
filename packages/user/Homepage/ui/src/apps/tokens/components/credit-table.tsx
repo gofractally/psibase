@@ -3,29 +3,17 @@ import type {
     Transaction,
 } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balance-changes";
 
-import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Undo2, X } from "lucide-react";
 
 import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balance-changes";
 
-import { Loading } from "@/components/loading";
+import { AccountCell } from "@/components/account-cell";
+import { EmptyState } from "@/components/empty-state";
+import { Panel } from "@/components/page-header";
+import { DataTable, THead, Table, Td, Th, Tr } from "@/components/table";
 
-import { ErrorCard } from "@shared/components/error-card";
-import { GlowingCard } from "@shared/components/glowing-card";
-import { TableContact } from "@shared/components/tables/table-contact";
 import { cn } from "@shared/lib/utils";
-import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
-import {
-    Table,
-    TableBody,
-    TableCaption,
-    TableCell,
-    TableRow,
-} from "@shared/shadcn/ui/table";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from "@shared/shadcn/ui/tooltip";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { Token } from "../hooks/tokens-plugin/use-user-token-balances";
 
@@ -33,6 +21,32 @@ interface Props {
     user: string;
     token: Token;
 }
+
+const ACTION_META: Record<
+    ActionType,
+    { label: string; icon: typeof ArrowUpRight; className: string }
+> = {
+    credited: {
+        label: "Sent",
+        icon: ArrowUpRight,
+        className: "text-foreground",
+    },
+    debited: {
+        label: "Received",
+        icon: ArrowDownLeft,
+        className: "text-emerald-600 dark:text-emerald-400",
+    },
+    uncredited: {
+        label: "Returned",
+        icon: Undo2,
+        className: "text-muted-foreground",
+    },
+    rejected: {
+        label: "Rejected",
+        icon: X,
+        className: "text-amber-600 dark:text-amber-400",
+    },
+};
 
 export function CreditTable({ user, token }: Props) {
     const {
@@ -42,137 +56,105 @@ export function CreditTable({ user, token }: Props) {
         error,
     } = useUserTokenBalanceChanges(user, token);
 
-    if (isPending) {
-        return (
-            <GlowingCard>
-                <Loading />
-            </GlowingCard>
-        );
-    }
-
-    if (isError) {
-        console.error("ERROR:", error);
-        const errorMessage =
-            "Failed to load recent transactions. See logs for more details.";
-        return (
-            <GlowingCard>
-                <ErrorCard error={new Error(errorMessage)} />
-            </GlowingCard>
-        );
-    }
-
-    if (transactions?.length === 0) {
-        return (
-            <GlowingCard>
-                <CardContent className="text-muted-foreground py-8 text-center">
-                    No transactions to display
-                </CardContent>
-            </GlowingCard>
-        );
-    }
+    if (isError) console.error("ERROR:", error);
 
     return (
-        <GlowingCard>
-            <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
-            </CardHeader>
-            <CardContent className="@container">
-                <Table>
-                    <TableCaption>
-                        A list of your credit and debits.
-                    </TableCaption>
-                    <TableBody>
-                        {transactions?.map((transaction, index) => {
-                            return (
-                                <TableRow
+        <Panel
+            title="Activity"
+            description={`Recent ${token.label} credits and debits`}
+        >
+            {isPending ? (
+                <div className="flex flex-col gap-2 p-4">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <Skeleton key={i} className="h-6 w-full" />
+                    ))}
+                </div>
+            ) : isError ? (
+                <EmptyState className="text-destructive min-h-24">
+                    Couldn't load recent activity.
+                </EmptyState>
+            ) : !transactions || transactions.length === 0 ? (
+                <EmptyState
+                    className="min-h-32"
+                    detail="Transfers you send or receive will show up here."
+                >
+                    No activity yet
+                </EmptyState>
+            ) : (
+                <DataTable>
+                    <Table>
+                        <THead>
+                            <tr>
+                                <Th className="w-28">Type</Th>
+                                <Th>Counterparty</Th>
+                                <Th className="text-right">Amount</Th>
+                                <Th className="hidden md:table-cell">Memo</Th>
+                            </tr>
+                        </THead>
+                        <tbody>
+                            {transactions.map((transaction, index) => (
+                                <TransactionRow
                                     key={`${transaction.counterParty}-${transaction.action}-${index}`}
-                                >
-                                    <TableCell
-                                        className="w-6 text-center"
-                                        title={transaction.action}
-                                    >
-                                        <CellAction
-                                            action={transaction.action}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <TableContact
-                                            account={transaction.counterParty}
-                                        />
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <CellAmount transaction={transaction} />
-                                    </TableCell>
-                                    <TableCell className="h-full w-6 text-center">
-                                        <CellMemo memo={transaction.memo} />
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </GlowingCard>
+                                    transaction={transaction}
+                                />
+                            ))}
+                        </tbody>
+                    </Table>
+                </DataTable>
+            )}
+        </Panel>
     );
 }
 
-const CellAction = ({ action }: { action: ActionType }) => {
+const TransactionRow = ({ transaction }: { transaction: Transaction }) => {
+    const meta = ACTION_META[transaction.action];
+    const Icon = meta.icon;
+    const outgoing = transaction.direction === "outgoing";
     return (
-        <Tooltip>
-            <TooltipContent>
-                {action.charAt(0).toUpperCase() + action.slice(1)}
-            </TooltipContent>
-            {action === "credited" ? (
-                <TooltipTrigger className="block">
-                    <ArrowUp className="h-4 w-4" />
-                </TooltipTrigger>
-            ) : action === "debited" ? (
-                <TooltipTrigger className="block">
-                    <ArrowDown className="h-4 w-4" />
-                </TooltipTrigger>
-            ) : action === "uncredited" ? (
-                <TooltipTrigger className="block">
-                    <Undo2 className="h-4 w-4" />
-                </TooltipTrigger>
-            ) : action === "rejected" ? (
-                <TooltipTrigger className="block">
-                    <X className="h-4 w-4" />
-                </TooltipTrigger>
-            ) : null}
-        </Tooltip>
-    );
-};
-
-const CellAmount = ({ transaction }: { transaction: Transaction }) => {
-    return (
-        <>
-            <span className="font-mono">
-                {transaction.direction === "outgoing" && "-"}
-                {transaction?.amount?.format({
-                    fullPrecision: true,
-                    includeLabel: false,
-                })}
-            </span>{" "}
-            <span
-                className={cn(
-                    "text-muted-foreground",
-                    !transaction?.amount?.hasTokenSymbol() && "italic",
-                )}
+        <Tr>
+            <Td>
+                <span
+                    className={cn(
+                        "inline-flex items-center gap-1.5 text-xs font-medium",
+                        meta.className,
+                    )}
+                >
+                    <Icon className="size-3.5" />
+                    {meta.label}
+                </span>
+            </Td>
+            <Td>
+                <AccountCell account={transaction.counterParty} />
+            </Td>
+            <Td className="whitespace-nowrap text-right">
+                <span
+                    className={cn(
+                        "font-mono tabular-nums",
+                        transaction.action === "debited" &&
+                            "text-emerald-600 dark:text-emerald-400",
+                    )}
+                >
+                    {outgoing ? "−" : "+"}
+                    {transaction.amount?.format({
+                        fullPrecision: true,
+                        includeLabel: false,
+                    })}
+                </span>{" "}
+                <span
+                    className={cn(
+                        "text-muted-foreground text-xs",
+                        !transaction.amount?.hasTokenSymbol() && "italic",
+                    )}
+                >
+                    {transaction.amount.getDisplayLabel()}
+                </span>
+            </Td>
+            <Td
+                className="text-muted-foreground hidden max-w-64 truncate text-xs md:table-cell"
+                title={transaction.memo || undefined}
             >
-                {transaction?.amount.getDisplayLabel()}
-            </span>
-        </>
-    );
-};
-
-const CellMemo = ({ memo }: { memo: string }) => {
-    if (!memo) return null;
-    return (
-        <Tooltip>
-            <TooltipContent>{memo}</TooltipContent>
-            <TooltipTrigger className="block">
-                <ReceiptText className="h-4 w-4" />
-            </TooltipTrigger>
-        </Tooltip>
+                {transaction.memo || <span className="opacity-40">—</span>}
+            </Td>
+        </Tr>
     );
 };

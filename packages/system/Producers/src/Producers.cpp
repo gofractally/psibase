@@ -2,6 +2,7 @@
 #include <psibase/dispatch.hpp>
 #include <ranges>
 #include <services/system/Accounts.hpp>
+#include <services/system/AuthDelegate.hpp>
 #include <services/system/Producers.hpp>
 #include "services/system/Transact.hpp"
 
@@ -84,6 +85,21 @@ namespace
 
 namespace SystemService
 {
+   void Producers::init()
+   {
+      check(getSender() == getReceiver(), "sender must match service account");
+
+      auto producers = ::getProducers();
+      check(!producers.empty(), "no producers");
+
+      for (const auto& prod : producers)
+      {
+         psibase::from(Accounts::service)
+             .to<Accounts>()
+             .newAccount(prod.name, AuthDelegate::service, NewAccountMode::requireNew);
+      }
+   }
+
    // Verifies that all the auth services have the correct flags set
    static void checkVerifyServices(const std::vector<psibase::Producer>& producers)
    {
@@ -181,6 +197,11 @@ namespace SystemService
             "Cannot unregister: account is scheduled to become a producer");
 
       Tables().open<CandidateInfoTable>().erase(sender);
+   }
+
+   std::optional<CandidateInfo> Producers::getCandidate(psibase::AccountNumber account)
+   {
+      return Tables{getReceiver(), KvMode::read}.open<CandidateInfoTable>().get(account);
    }
 
    std::vector<psibase::AccountNumber> Producers::getProducers()

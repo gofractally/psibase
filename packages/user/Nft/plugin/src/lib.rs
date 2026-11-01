@@ -15,6 +15,10 @@ use psibase::{define_trust, FlagsType};
 
 use psibase::services::nft::{self as Nft, NftHolderFlags};
 
+use bindings::host::types::types::PluginId;
+use rand::Rng;
+use serde::Deserialize;
+
 define_trust! {
     descriptions {
         Low => "",
@@ -34,15 +38,47 @@ define_trust! {
     }
 }
 
+#[derive(Deserialize)]
+struct MintChoiceResponse {
+    data: MintChoiceData,
+}
+
+#[derive(Deserialize)]
+#[allow(non_snake_case)]
+struct MintChoiceData {
+    firstAvailableId: u32,
+}
+
+fn plugin_error(message: impl Into<String>) -> Error {
+    Error {
+        code: 1,
+        producer: PluginId {
+            service: "nft".into(),
+            plugin: "plugin".into(),
+        },
+        message: message.into(),
+    }
+}
+
+fn first_available_id(begin: u32) -> Result<u32, Error> {
+    let query = format!("query {{ firstAvailableId(begin: {begin}) }}");
+    let body = post_graphql_get_json(&query)?;
+    serde_json::from_str::<MintChoiceResponse>(&body)
+        .map(|response| response.data.firstAvailableId)
+        .map_err(|err| plugin_error(err.to_string()))
+}
+
 struct NftPlugin;
 
 impl Issuer for NftPlugin {
-    fn mint() -> Result<(), Error> {
+    fn mint() -> Result<u32, Error> {
         trust::assert_authorized(trust::FunctionName::mint)?;
 
-        let packed_args = Nft::action_structs::mint {}.packed();
-
-        add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)
+        let guess: u32 = rand::rng().random();
+        let id = first_available_id(guess)?;
+        let packed_args = Nft::action_structs::mint { nftId: Some(id) }.packed();
+        add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)?;
+        Ok(id)
     }
 }
 

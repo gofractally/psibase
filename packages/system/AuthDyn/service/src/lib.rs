@@ -203,3 +203,6 @@ pub mod service {
         management.assert_has_policy();
     }
 }
+
+#[cfg(test)]
+mod tests;

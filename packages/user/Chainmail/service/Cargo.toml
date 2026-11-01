@@ -9,7 +9,7 @@ publish = false
 
 [package.metadata.psibase]
 server = "chainmail"
-plugin = "chainmail-plugin"
+plugins = ["chainmail-plugin"]
 data = [{ src = "../ui/dist/", dst = "/" }]
 postinstall = [{ sender = "chainmail", service = "chainmail", method = "init" }]
 

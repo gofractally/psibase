@@ -283,6 +283,16 @@ impl VirtualServer for ConfigPlugin {
         assert_caller_self();
         virtual_server::plugin::authorized::graphql(&query)
     }
+
+    fn reg_res_provider(app: String, accepted: Vec<String>) -> Result<(), Error> {
+        assert_caller_self();
+        virtual_server::plugin::admin::reg_res_provider(&app, &accepted)
+    }
+
+    fn unreg_res_provider() -> Result<(), Error> {
+        assert_caller_self();
+        virtual_server::plugin::admin::unreg_res_provider()
+    }
 }
 
 impl Tokens for ConfigPlugin {

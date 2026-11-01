@@ -222,6 +222,8 @@ namespace psibase
    /// - `last`: Stop after including this many items at the end of the range
    /// - `before`: Opaque cursor value. Resume paging; include keys before this point
    /// - `after`: Opaque cursor value. Resume paging; include keys after this point
+   /// - `maxBytes`: Stop before the serialized rows included would total more than
+   ///   this many bytes. At least one row is always included, even if it alone is larger.
    ///
    /// By default, `makeConnection` pages through the entire index's range.
    /// `gt`, `ge`, `lt`, and `le` restrict the range. They can be used in any
@@ -359,7 +361,8 @@ namespace psibase
                                  std::optional<uint32_t>           last,
                                  const std::optional<std::string>& before,
                                  const std::optional<std::string>& after,
-                                 Proj&&                            proj = {})
+                                 Proj&&                            proj     = {},
+                                 std::optional<uint32_t>           maxBytes = std::nullopt)
    {
       auto keyFromHex = [&](const std::optional<std::string>& s) -> std::vector<char>
       {
@@ -398,19 +401,36 @@ namespace psibase
          auto cursor = psio::to_hex(it.keyWithoutPrefix());
          result.edges.push_back(typename Connection::Edge{proj(it), std::move(cursor)});
       };
+      // Rows are sized before they're read, so a page only exceeds the budget
+      // when its first row alone does.
+      std::uint64_t totalBytes = 0;
+      auto          fits       = [&](const auto& it)
+      {
+         if (!maxBytes)
+            return true;
+         totalBytes += it.valueSize();
+         return result.edges.empty() || totalBytes <= *maxBytes;
+      };
 
       if (last && !first)
       {
          result.pageInfo.hasNextPage = end != rangeEnd;
          while (it != end && (*last)-- > 0)
-            add_edge(--end);
+         {
+            if (!fits(--end))
+            {
+               ++end;
+               break;
+            }
+            add_edge(end);
+         }
          result.pageInfo.hasPreviousPage = end != rangeBegin;
          std::reverse(result.edges.begin(), result.edges.end());
       }
       else
       {
          result.pageInfo.hasPreviousPage = it != rangeBegin;
-         for (; it != end && (!first || (*first)-- > 0); ++it)
+         for (; it != end && (!first || (*first)-- > 0) && fits(it); ++it)
             add_edge(it);
          result.pageInfo.hasNextPage = it != rangeEnd;
          if (last && *last < result.edges.size())
@@ -439,10 +459,12 @@ namespace psibase
                              std::optional<uint32_t>           last,
                              const std::optional<std::string>& before,
                              const std::optional<std::string>& after,
-                             Proj&&                            proj = {})
+                             Proj&&                            proj     = {},
+                             std::optional<uint32_t>           maxBytes = std::nullopt)
    {
-      return makeConnectionIter<Connection>(index, gt, ge, lt, le, first, last, before, after,
-                                            [&](const auto& iter) { return proj(*iter); });
+      return makeConnectionIter<Connection>(
+          index, gt, ge, lt, le, first, last, before, after,
+          [&](const auto& iter) { return proj(*iter); }, maxBytes);
    }
 
    template <typename Connection, typename T, typename Key, typename Proj = std::identity>
@@ -455,10 +477,12 @@ namespace psibase
                                  std::optional<uint32_t>           last,
                                  const std::optional<std::string>& before,
                                  const std::optional<std::string>& after,
-                                 Proj&&                            proj = {})
+                                 Proj&&                            proj     = {},
+                                 std::optional<uint32_t>           maxBytes = std::nullopt)
    {
-      return makeConnectionIter<Connection>(index, gt, ge, lt, le, first, last, before, after,
-                                            [&](const auto& iter) { return proj(iter.view()); });
+      return makeConnectionIter<Connection>(
+          index, gt, ge, lt, le, first, last, before, after,
+          [&](const auto& iter) { return proj(iter.view()); }, maxBytes);
    }
 
    /// Similar to makeConnection, except that it allows pagination through a virtual table index.
@@ -576,6 +600,9 @@ namespace psibase
    {
       Index index;
       F     f;
+      /// Limits the size of a page, which may then hold fewer rows than requested;
+      /// see [makeConnectionIter]
+      std::optional<uint32_t> maxBytes = std::nullopt;
    };
 
    template <typename Index, typename F>
@@ -583,6 +610,9 @@ namespace psibase
    {
       Index index;
       F     f;
+      /// Limits the size of a page, which may then hold fewer rows than requested;
+      /// see [makeConnectionIter]
+      std::optional<uint32_t> maxBytes = std::nullopt;
    };
 
    namespace detail
@@ -613,7 +643,7 @@ namespace psibase
                                            const std::optional<std::string>&      after)
       {
          return makeConnection<Connection>(index.index, gt, ge, lt, le, first, last, before, after,
-                                           index.f);
+                                           index.f, index.maxBytes);
       }
 
       template <typename Connection, typename Index, typename F, typename Key>
@@ -628,7 +658,7 @@ namespace psibase
                                                const std::optional<std::string>&          after)
       {
          return makeConnectionView<Connection>(index.index, gt, ge, lt, le, first, last, before,
-                                               after, index.f);
+                                               after, index.f, index.maxBytes);
       }
    }  // namespace detail
 

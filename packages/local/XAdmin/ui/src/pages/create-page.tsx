@@ -28,6 +28,7 @@ import { getRequiredPackages } from "@/lib/get-required-packages";
 import { ErrorCard } from "@shared/components/error-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { pemToB64 } from "@shared/lib/b64-key-utils";
+import { cn } from "@shared/lib/utils";
 import { zAccount } from "@shared/lib/schemas/account";
 import {
     Card,
@@ -42,7 +43,10 @@ import { useAddServerKey } from "../hooks/use-key-devices";
 import { usePackages } from "../hooks/use-packages";
 import { useSelectedRows } from "../hooks/use-selected-rows";
 import { useStepper } from "../hooks/use-stepper";
-import { getDefaultSelectedPackages } from "../hooks/use-templated-packages";
+import {
+    type BootTemplate,
+    getDefaultSelectedPackages,
+} from "../hooks/use-templated-packages";
 import {
     BootCompleteSchema,
     BootCompleteUpdate,
@@ -111,7 +115,8 @@ export const CreatePage = () => {
 
     const keyDeviceForm = useForm<z.infer<typeof KeyDeviceSchema>>();
 
-    const isDev = chainTypeForm.watch("type") == "dev";
+    const template = chainTypeForm.watch("type") as BootTemplate | undefined;
+    const isDev = template == "dev";
     const keyDevice = keyDeviceForm.watch("id");
 
     const importForm = useAppForm({
@@ -203,13 +208,8 @@ export const CreatePage = () => {
 
     const suggestedSelection = useMemo(
         () =>
-            getDefaultSelectedPackages(
-                {
-                    dev: isDev,
-                },
-                packages,
-            ),
-        [isDev, packages],
+            getDefaultSelectedPackages(template, packages),
+        [template, packages],
     );
     const devTemplate = packages.find((pack) => pack.name === "DevDefault");
     const prodTemplate = packages.find((pack) => pack.name === "ProdWithFG");
@@ -388,7 +388,14 @@ export const CreatePage = () => {
             )}
             <div className="relative flex min-h-0 flex-1 flex-col">
                 <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-8">
-                    <div className="mx-auto flex max-w-3xl flex-col pb-6">
+                    <div
+                        className={cn(
+                            "mx-auto flex flex-col pb-6",
+                            currentStep === Step.ChainType
+                                ? "max-w-6xl"
+                                : "max-w-3xl",
+                        )}
+                    >
                         <div className="mb-8">
                             <Steps
                                 currentStep={currentStepNum}
@@ -443,7 +450,7 @@ export const CreatePage = () => {
                         )}
                         {currentStep === Step.PreBootConfirmation && (
                             <InstallationSummary
-                                isDev={isDev}
+                                template={template ?? "prod"}
                                 bpName={blockProducerForm.getValues("name")}
                                 keyDevice={keyDevice}
                                 rows={rows}
