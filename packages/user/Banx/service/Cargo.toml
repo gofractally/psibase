@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-banx"
-plugin = "banx-plugin"
+plugins = ["banx-plugin"]
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "banx-app", service = "sites", method = "enablespa", rawData = "010001" },
