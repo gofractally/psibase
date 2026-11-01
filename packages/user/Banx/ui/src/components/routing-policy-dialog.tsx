@@ -6,6 +6,7 @@ import {
     UsingGlobalSettingsOverlay,
     amountUnit,
 } from "@/components/form-fields";
+import { PathForwardTrail } from "@/components/path-forward-trail";
 import { useForwardOffers } from "@/hooks/use-banx-data";
 import {
     useRemoveForwardOffer,
@@ -13,11 +14,7 @@ import {
     useSetForwardOffer,
     useSetGlobalForwardOffer,
 } from "@/hooks/use-banx-mutations";
-import {
-    amountPlaceholder,
-    displayAmount,
-    formatToPrecision,
-} from "@/lib/amount";
+import { amountPlaceholder, displayAmount } from "@/lib/amount";
 import {
     MAX_HOP_FEE_PERCENT,
     MAX_HOP_FEE_PPM,
@@ -104,77 +101,7 @@ const aprValidators = {
     onSubmit: percentFieldValidator(MAX_PERCENT),
 };
 
-const SAMPLE_HOP_IN = 15;
 
-function previewHopOut(
-    amountIn: number,
-    feeFixed: string,
-    feePct: string,
-): number | null {
-    const fixed = Number(String(feeFixed).trim());
-    const pct = Number(String(feePct).trim());
-    if (!Number.isFinite(fixed) || !Number.isFinite(pct)) return null;
-    if (fixed < 0 || pct < 0 || pct >= 100) return null;
-    const afterPct = amountIn * (1 - pct / 100);
-    if (fixed >= afterPct) return null;
-    return afterPct - fixed;
-}
-
-function HopFeeExample({
-    hopFeeFixed,
-    hopFeePct,
-    precision,
-    intermediate,
-    nextHop = "bob",
-    prior = "alice",
-    sampleIn = SAMPLE_HOP_IN,
-}: {
-    hopFeeFixed: string;
-    hopFeePct: string;
-    precision: number;
-    intermediate: string;
-    nextHop?: string;
-    prior?: string;
-    sampleIn?: number;
-}) {
-    const out = previewHopOut(sampleIn, hopFeeFixed, hopFeePct);
-    const inStr =
-        formatToPrecision(String(sampleIn), precision) ?? String(sampleIn);
-    const outStr =
-        out === null
-            ? "—"
-            : (formatToPrecision(
-                  out.toFixed(Math.max(precision, 6)),
-                  precision,
-              ) ?? out.toFixed(precision));
-
-    return (
-        <div className="text-muted-foreground space-y-1 text-sm leading-relaxed">
-            <p>Example payment of {inStr}.</p>
-            <p>
-                <span className="text-foreground">{prior}</span> sends {inStr}{" "}
-                to{" "}
-                <span className="text-foreground font-medium">
-                    {intermediate}
-                </span>
-                .
-            </p>
-            <p>
-                <span className="text-foreground font-medium">
-                    {intermediate}
-                </span>{" "}
-                forwards {out === null ? "nothing" : outStr} to{" "}
-                <span className="text-foreground">{nextHop}</span>.
-                {out === null
-                    ? " The fee uses the whole example payment."
-                    : null}
-            </p>
-            <p className="text-xs">
-                The fee is a percent of the amount, then a fixed amount.
-            </p>
-        </div>
-    );
-}
 
 /**
  * Path-forward offer. Global (header) or specific next hop (account row).
@@ -376,7 +303,7 @@ export function RoutingPolicyDialog({
         const pending = setSpecific.isPending || removeSpecific.isPending;
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Path-forward offer</DialogTitle>
                         <DialogDescription>
@@ -439,6 +366,12 @@ export function RoutingPolicyDialog({
                                     assetId !== undefined
                                         ? precisionOf(assetId)
                                         : 0;
+                                const symbol =
+                                    assetId !== undefined
+                                        ? assets
+                                              .find((a) => a.id === assetId)
+                                              ?.symbol.toUpperCase()
+                                        : undefined;
                                 const locked = !enabled;
                                 const globalOffer =
                                     assetId !== undefined
@@ -452,13 +385,13 @@ export function RoutingPolicyDialog({
                                     <UsingGlobalSettingsOverlay
                                         active={usingGlobal}
                                     >
-                                    <div
-                                        className={cn(
-                                            "grid gap-5 transition-opacity duration-200",
-                                            locked && "opacity-40",
-                                        )}
-                                    >
-                                        <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+                                    <div className="grid gap-5">
+                                        <div
+                                            className={cn(
+                                                "grid gap-2 transition-opacity duration-200 sm:grid-cols-2 sm:gap-3",
+                                                locked && "opacity-40",
+                                            )}
+                                        >
                                             <specificForm.AppField
                                                 name="hopFeeFixed"
                                                 validators={{
@@ -511,15 +444,22 @@ export function RoutingPolicyDialog({
                                                 hopFeeFixed,
                                                 hopFeePct,
                                             }) => (
-                                                <HopFeeExample
+                                                <PathForwardTrail
                                                     hopFeeFixed={hopFeeFixed}
                                                     hopFeePct={hopFeePct}
                                                     precision={precision}
+                                                    symbol={symbol}
                                                     intermediate={intermediate}
                                                     nextHop={nextHop}
                                                 />
                                             )}
                                         />
+                                        <div
+                                            className={cn(
+                                                "grid gap-5 transition-opacity duration-200",
+                                                locked && "opacity-40",
+                                            )}
+                                        >
                                         <specificForm.Field
                                             name="expiresAtSeconds"
                                             children={(field) => (
@@ -556,6 +496,7 @@ export function RoutingPolicyDialog({
                                                 />
                                             )}
                                         />
+                                        </div>
                                     </div>
                                     </UsingGlobalSettingsOverlay>
                                 );
@@ -640,7 +581,7 @@ export function RoutingPolicyDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Path-forward offer</DialogTitle>
                     <DialogDescription>
@@ -733,13 +674,13 @@ export function RoutingPolicyDialog({
                                     : undefined;
                             const locked = !enabled || assetId === undefined;
                             return (
-                                <div
-                                    className={cn(
-                                        "grid gap-5 transition-opacity duration-200",
-                                        locked && "opacity-40",
-                                    )}
-                                >
-                                    <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+                                <div className="grid gap-5">
+                                    <div
+                                        className={cn(
+                                            "grid gap-2 transition-opacity duration-200 sm:grid-cols-2 sm:gap-3",
+                                            locked && "opacity-40",
+                                        )}
+                                    >
                                         <globalForm.AppField
                                             name="hopFeeFixed"
                                             validators={{
@@ -790,15 +731,22 @@ export function RoutingPolicyDialog({
                                             hopFeeFixed,
                                             hopFeePct,
                                         }) => (
-                                            <HopFeeExample
+                                            <PathForwardTrail
                                                 hopFeeFixed={hopFeeFixed}
                                                 hopFeePct={hopFeePct}
                                                 precision={precision}
+                                                symbol={symbol}
                                                 intermediate={intermediate}
                                                 nextHop="bob"
                                             />
                                         )}
                                     />
+                                    <div
+                                        className={cn(
+                                            "grid gap-5 transition-opacity duration-200",
+                                            locked && "opacity-40",
+                                        )}
+                                    >
                                     <globalForm.Field
                                         name="expiresAtSeconds"
                                         children={(field) => (
@@ -835,6 +783,7 @@ export function RoutingPolicyDialog({
                                             />
                                         )}
                                     />
+                                    </div>
                                 </div>
                             );
                         }}
