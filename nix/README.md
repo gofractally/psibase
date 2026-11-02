@@ -12,6 +12,7 @@ The Nix configuration includes
 - **Rust**: 1.98.0 (pinned) with WASM targets (`wasm32-unknown-unknown`, `wasm32-wasip1`)
 - **WebAssembly**: WASI SDK 29, wasm-pack, wasm-tools, binaryen
 - **JavaScript**: Node.js 24.19.0, Yarn 4.18.0
+- **Playwright (e2e/)**: nixpkgs `playwright-driver` **1.64.1** browsers via `PLAYWRIGHT_BROWSERS_PATH` (matches `e2e/@playwright/test`; skips `playwright install --with-deps`, which needs apt/sudo and does not work on NixOS)
 - **Tools**: clangd, gdb, direnv, mkcert, SoftHSM2, gh, cursor-agent (cursor-cli)
 - **Docs**: mdbook with plugins
 
