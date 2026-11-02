@@ -151,6 +151,7 @@ __metadata:
   dependencies:
     "@eslint/js": "npm:^9.9.0"
     "@playwright/test": "npm:1.64.1"
+    "@psibase/xadmin-e2e": "portal:../packages/local/XAdmin/e2e"
     "@types/node": "npm:^22.15.0"
     eslint: "npm:^9.15.0"
     globals: "npm:^16.2.0"
@@ -158,6 +159,15 @@ __metadata:
     typescript: "npm:^5.7.3"
     typescript-eslint: "npm:^8.33.1"
   languageName: unknown
+  linkType: soft
+
+"@psibase/xadmin-e2e@portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "@psibase/xadmin-e2e@portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A."
+  dependencies:
+    "@playwright/test": "npm:1.64.1"
+    bcryptjs: "npm:^3.0.3"
+  languageName: node
   linkType: soft
 
 "@types/estree@npm:^1.0.6":
@@ -375,6 +385,15 @@ __metadata:
   version: 4.0.4
   resolution: "balanced-match@npm:4.0.4"
   checksum: 10c0/07e86102a3eb2ee2a6a1a89164f29d0dbaebd28f2ca3f5ca786f36b8b23d9e417eb3be45a4acf754f837be5ac0a2317de90d3fcb7f4f4dc95720a1f36b26a17b
+  languageName: node
+  linkType: hard
+
+"bcryptjs@npm:^3.0.3":
+  version: 3.0.3
+  resolution: "bcryptjs@npm:3.0.3"
+  bin:
+    bcrypt: bin/bcrypt
+  checksum: 10c0/127c94699f07eab5fbbb89d600c3f0e36ae6fd001e028139740b41fffb62a23a2743523fb88f442ae3308a27d4843b97ccb9e436d78f5c5899be187d0972c6d5
   languageName: node
   linkType: hard
 

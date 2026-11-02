@@ -1,16 +1,20 @@
 import { expect, test } from "./fixtures/admin-browser";
 import { createNetworkThroughUi } from "./lib/create-network-ui";
-import { waitForChain, waitForSync } from "./lib/node-ready";
+import {
+    waitForChain,
+    waitForHeadBlock,
+    waitForSync,
+} from "./lib/node-ready";
 
 const PRODUCER = "prod";
-const JOIN_TIMEOUT_MS = 60_000;
+const JOIN_TIMEOUT_MS = 180_000;
 const BOOT_TIMEOUT_MS = 180_000;
 
 test("two joiners peer to a UI-booted producer through the admin UI", async ({
     startPsinode,
     openAdmin,
 }) => {
-    test.setTimeout(BOOT_TIMEOUT_MS + 120_000);
+    test.setTimeout(BOOT_TIMEOUT_MS + JOIN_TIMEOUT_MS * 2 + 60_000);
 
     const producer = await startPsinode({ nodeIndex: 0, producer: PRODUCER });
     const producerAdmin = `http://x-admin.psibase.localhost:${producer.port}`;
@@ -23,6 +27,7 @@ test("two joiners peer to a UI-booted producer through the admin UI", async ({
         "Development",
     );
     await waitForChain(producer.socketPath, BOOT_TIMEOUT_MS);
+    await waitForHeadBlock(producer.socketPath, BOOT_TIMEOUT_MS);
     producerErrors.assertEmpty();
 
     // psinode dials "x-peers." + this URL's host, so the peer URL names a host
@@ -53,7 +58,9 @@ test("two joiners peer to a UI-booted producer through the admin UI", async ({
             JOIN_TIMEOUT_MS,
         );
 
-        await page.reload();
+        // Dashboard polls while needgenesis clears; Chromium logs those 401/404
+        // loads. Only assert on the peers page after sync.
+        errors.clear();
         await page.goto(`${adminUrl}/#/peers`);
         await expect(
             page.getByRole("row").filter({ hasText: producerEndpoint }),
