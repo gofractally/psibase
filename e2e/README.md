@@ -14,6 +14,13 @@ tree). Install the browsers for the Playwright version pinned in
 yarn exec playwright install chromium webkit
 ```
 
+> **NOTE (Nix / NixOS):** skip Playwright’s `install --with-deps` (it expects
+> apt/sudo). From the repo root, `nix develop` already sets
+> `PLAYWRIGHT_BROWSERS_PATH` to a matching `playwright-driver` and
+> `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`. Run tests from that shell; do not run
+> `yarn exec playwright install …` unless you intend to override the Nix
+> browsers. See `nix/README.md`.
+
 A browser that isn't installed makes its CTest skip (exit code 77) rather than
 fail the build.
 
