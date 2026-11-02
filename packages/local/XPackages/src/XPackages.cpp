@@ -1,5 +1,7 @@
 #include <services/local/XPackages.hpp>
 
+#include <algorithm>
+#include <array>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <services/local/XAdmin.hpp>
@@ -42,7 +44,7 @@ namespace
       return HttpReply{.status      = status,
                        .contentType = "application/html",
                        .body        = std::vector(msg.begin(), msg.end()),
-                       .headers     = allowCors(req, XAdmin::service)};
+                       .headers     = allowCorsCredentials(req, XAdmin::service)};
    }
 }  // namespace
 
@@ -51,14 +53,18 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
 {
    check(getSender() == XHttp::service, "Wrong sender");
 
-   if (auto reply = to<XAdmin>().checkAuth(req, socket))
-      return reply;
-
+   auto target = req.path();
    if (req.method == "OPTIONS")
    {
+      static constexpr std::array<std::string_view, 5> credentialedPaths{
+          "/graphql", "/preinstall", "/prerm", "/postinstall", "/postrm"};
+      if (std::ranges::contains(credentialedPaths, std::string_view{target}))
+         return HttpReply{.headers = allowCorsCredentials(req, XAdmin::service)};
       return HttpReply{.headers = allowCors(req, XAdmin::service)};
    }
-   auto target = req.path();
+
+   if (auto reply = to<XAdmin>().checkAuth(req, socket))
+      return reply;
    if (target == "/preinstall" || target == "/prerm")
    {
       if (req.method != "POST")
@@ -85,7 +91,7 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
              .removing    = target == "/prerm",
          });
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCorsCredentials(req, XAdmin::service)};
    }
    else if (target == "/postinstall" || target == "/postrm")
    {
@@ -110,10 +116,11 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
          else
             table.put(package);
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCorsCredentials(req, XAdmin::service)};
    }
    else if (auto result = serveGraphQL(req, Query{}))
    {
+      result->headers = allowCorsCredentials(req, XAdmin::service);
       return result;
    }
    return {};

@@ -12,6 +12,7 @@ export async function callPreinstall(meta: PackageMeta): Promise<void> {
         `${siblingUrl(null, "x-packages", "/preinstall")}`,
         {
             method: "POST",
+            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
                 ...(await adminBearerAuthHeaders()),
@@ -61,6 +62,7 @@ export async function callPostinstall(meta: PackageMeta): Promise<void> {
         `${siblingUrl(null, "x-packages", "/postinstall")}`,
         {
             method: "POST",
+            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
                 ...(await adminBearerAuthHeaders()),
