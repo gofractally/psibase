@@ -6,9 +6,17 @@ test("harness boots: chain up, Supervisor loaded, plugin call succeeds", async (
     const head = JSON.parse((await devnet.get("network", "/common/tapos/head")).body);
     expect(head.refBlockIndex).toBeGreaterThan(0);
 
-    // Throwaway account exists on this worker's chain.
-    const acct = await devnet.get("accounts", `/api/accounts/${throwawayAccount.name}`);
-    expect(acct.status, `account ${throwawayAccount.name}: ${acct.body}`).toBe(200);
+    // Throwaway account exists on this worker's chain (Accounts exposes GraphQL,
+    // not a REST /api/accounts/:name route).
+    const gql = await devnet.post(
+        "accounts",
+        "/graphql",
+        `query { getAccount(accountName: "${throwawayAccount.name}") { accountNum authService } }`,
+        { "Content-Type": "application/graphql" },
+    );
+    expect(gql.status, `account ${throwawayAccount.name}: ${gql.body}`).toBe(200);
+    const acct = JSON.parse(gql.body);
+    expect(acct.data?.getAccount?.accountNum).toBe(throwawayAccount.name);
 
     // Supervisor loaded (fixture waited for SUPERVISOR_INITIALIZED) and a
     // plugin can be loaded + called end to end.

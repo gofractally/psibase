@@ -22,6 +22,16 @@ export interface Devnet {
      * does not map *.localhost to loopback, so we never rely on DNS here.)
      */
     get: (subdomain: string, path: string) => Promise<{ status: number; body: string }>;
+    /**
+     * POST via the proxy with the right Host header. Optional extra headers
+     * (e.g. Content-Type for GraphQL).
+     */
+    post: (
+        subdomain: string,
+        path: string,
+        body: string,
+        headers?: Record<string, string>,
+    ) => Promise<{ status: number; body: string }>;
     /** Run the `psibase` CLI against this chain. */
     psibase: (args: string[]) => Promise<{ stdout: string; stderr: string }>;
     bootMs: number;
@@ -146,6 +156,35 @@ export async function startDevnet(psinodePort: number, proxyPort: number): Promi
                     },
                 );
                 req.on("error", reject);
+            }),
+        post: (sub, path, body, headers = {}) =>
+            new Promise((resolve, reject) => {
+                const payload = Buffer.from(body, "utf8");
+                const req = http.request(
+                    {
+                        host: "127.0.0.1",
+                        port: proxyPort,
+                        path,
+                        method: "POST",
+                        headers: {
+                            Host: `${sub}.${rootHost}`,
+                            Accept: "application/json",
+                            "Content-Length": payload.length,
+                            ...headers,
+                        },
+                    },
+                    (res) => {
+                        let resBody = "";
+                        res.setEncoding("utf8");
+                        res.on("data", (c) => (resBody += c));
+                        res.on("end", () =>
+                            resolve({ status: res.statusCode ?? 0, body: resBody }),
+                        );
+                    },
+                );
+                req.on("error", reject);
+                req.write(payload);
+                req.end();
             }),
         stop: async () => {
             await proxy.close();
