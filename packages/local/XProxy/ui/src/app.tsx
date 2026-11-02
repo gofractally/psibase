@@ -21,6 +21,12 @@ import { Toaster, toast } from "@shared/shadcn/ui/sonner";
 
 const DEFAULT_BYPASS_PREFIXES = ["/common", "/plugin.wasm"];
 
+const jsonFetchOpts = { headers: { "Content-Type": "application/json" } };
+const xHttpRegistryFetchOpts = {
+    ...jsonFetchOpts,
+    credentials: "include" as const,
+};
+
 type Scheme = "http" | "https";
 type ProxyRow = {
     appName: string;
@@ -75,17 +81,16 @@ async function fetchOriginServers(): Promise<ProxyRow[]> {
 }
 
 async function removeOrigin(subdomain: string): Promise<void> {
-    const opts = { headers: { "Content-Type": "application/json" } };
     const body = JSON.stringify(subdomain);
 
     const [rm, unreg] = await Promise.all([
         fetch(siblingUrl(null, "x-proxy", "/remove_origin_server"), {
-            ...opts,
+            ...jsonFetchOpts,
             method: "POST",
             body,
         }),
         fetch(siblingUrl(null, "x-http", "/unregister_server"), {
-            ...opts,
+            ...xHttpRegistryFetchOpts,
             method: "POST",
             body,
         }),
@@ -99,11 +104,10 @@ async function removeOrigin(subdomain: string): Promise<void> {
 async function saveRows(rows: ProxyRow[]): Promise<void> {
     const registerUrl = siblingUrl(null, "x-http", "/register_server");
     const setOriginUrl = siblingUrl(null, "x-proxy", "/set_origin_server");
-    const opts = { headers: { "Content-Type": "application/json" } };
 
     for (const row of rows) {
         const regRes = await fetch(registerUrl, {
-            ...opts,
+            ...xHttpRegistryFetchOpts,
             method: "POST",
             body: JSON.stringify({ service: row.appName, server: "x-proxy" }),
         });
@@ -111,7 +115,7 @@ async function saveRows(rows: ProxyRow[]): Promise<void> {
             throw new Error(`register_server: ${await regRes.text()}`);
 
         const originRes = await fetch(setOriginUrl, {
-            ...opts,
+            ...jsonFetchOpts,
             method: "POST",
             body: (() => {
                 let host = row.host.trim();
