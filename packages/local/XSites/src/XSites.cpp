@@ -9,9 +9,16 @@ using namespace LocalService;
 
 namespace
 {
+   bool isWrite(std::string_view method)
+   {
+      return method == "PUT" || method == "DELETE";
+   }
+
    std::vector<HttpHeader> staticReadCors(const HttpRequest& req)
    {
-      return allowCors(req, {XAdmin::service, AccountNumber{"supervisor"}});
+      static const std::vector<AccountNumber> readers{XAdmin::service,
+                                                      AccountNumber{"supervisor"}};
+      return allowCors(req, readers);
    }
 }  // namespace
 
@@ -27,7 +34,13 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
 
    auto table = open<ContentTable>();
    if (req.method == "OPTIONS")
-      return HttpReply{.headers = staticReadCors(req)};
+   {
+      auto requestedMethod = req.getHeader("Access-Control-Request-Method");
+      auto headers = requestedMethod && isWrite(*requestedMethod)
+                         ? allowCorsCredentials(req, XAdmin::service)
+                         : staticReadCors(req);
+      return HttpReply{.headers = std::move(headers)};
+   }
    else if (req.method == "PUT")
    {
       if (auto reply = to<XAdmin>().checkAuth(req, socket))
@@ -47,7 +60,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
       {
          table.put(row);
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCorsCredentials(req, XAdmin::service)};
    }
    else if (req.method == "DELETE")
    {
@@ -57,7 +70,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
       {
          table.erase(std::tuple(service, target));
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCorsCredentials(req, XAdmin::service)};
    }
    else
    {

@@ -48,19 +48,9 @@ namespace
       PSIO_REFLECT(AuthorizationRequest, url, token)
    };
 
-   std::vector<HttpHeader> allowCorsCredentials(const HttpRequest& req, AccountNumber account)
+   std::vector<HttpHeader> adminCorsHeaders(const HttpRequest& req)
    {
-      auto result = allowCors(req, account);
-      result.push_back({"Access-Control-Allow-Credentials", "true"});
-      for (auto& h : result)
-      {
-         if (h.matches("Access-Control-Allow-Headers"))
-         {
-            h.value = "Content-Type, Authorization";
-            break;
-         }
-      }
-      return result;
+      return allowCorsCredentials(req, XAdmin::service);
    }
 
    HttpReply error(HttpStatus status, std::string_view msg)
@@ -204,7 +194,7 @@ namespace
             auto connectionRequests = XPeers{}.open<ConnectionRequestTable>();
             check(originalRequest != nullptr, "request is required if requestSocket is provided");
             connectionRequests.put(
-                {socket, *requestSocket, allowCorsCredentials(*originalRequest, XAdmin::service)});
+                {socket, *requestSocket, adminCorsHeaders(*originalRequest)});
             to<XHttp>().autoClose(*requestSocket, false);
          }
 
@@ -604,7 +594,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
 
    if (request.method == "OPTIONS")
    {
-      HttpReply result{.headers = allowCorsCredentials(request, XAdmin::service)};
+      HttpReply result{.headers = adminCorsHeaders(request)};
       result.headers.push_back({"Allow", "GET, POST, PUT, OPTIONS, DELETE"});
       return result;
    }
@@ -656,7 +646,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       }
       if (row)
       {
-         return HttpReply{.headers = allowCorsCredentials(request, XAdmin::service)};
+         return HttpReply{.headers = adminCorsHeaders(request)};
       }
       else
       {
@@ -664,7 +654,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
          return HttpReply{.status      = HttpStatus::notFound,
                           .contentType = "text/html",
                           .body{msg.begin(), msg.end()},
-                          .headers = allowCorsCredentials(request, XAdmin::service)};
+                          .headers = adminCorsHeaders(request)};
       }
    }
    else if (target == "/users")
@@ -689,7 +679,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
             table.erase(body.account);
          }
       }
-      return HttpReply{.headers = allowCorsCredentials(request, XAdmin::service)};
+      return HttpReply{.headers = adminCorsHeaders(request)};
    }
    else if (target == "/authorization")
    {
@@ -713,7 +703,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
             table.erase(body.url);
          }
       }
-      return HttpReply{.headers = allowCorsCredentials(request, XAdmin::service)};
+      return HttpReply{.headers = adminCorsHeaders(request)};
    }
    else if (target == "/peers")
    {
@@ -753,7 +743,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       {
          auto result = serveGraphQL(request, Query{});
          if (result)
-            result->headers = allowCorsCredentials(request, XAdmin::service);
+            result->headers = adminCorsHeaders(request);
          return result;
       }
    }

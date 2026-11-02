@@ -1,5 +1,6 @@
 #include <services/local/XHttp.hpp>
 
+#include <array>
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/WebSocket.hpp>
 #include <psibase/dispatch.hpp>
@@ -121,6 +122,17 @@ namespace
       return {.status      = status,
               .contentType = "text/html",
               .body        = std::vector(msg.begin(), msg.end())};
+   }
+
+   const std::vector<AccountNumber>& serverRegistryCorsAccounts()
+   {
+      static const std::vector<AccountNumber> accounts{XAdmin::service, AccountNumber{"x-proxy"}};
+      return accounts;
+   }
+
+   std::vector<HttpHeader> serverRegistryCorsHeaders(const HttpRequest& req)
+   {
+      return allowCorsCredentials(req, serverRegistryCorsAccounts());
    }
 
    HttpReply redirect(HttpStatus status, std::format_string<std::string> fmt, std::string location)
@@ -595,13 +607,20 @@ auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
 
+   auto target = req.path();
+   if (req.method == "OPTIONS")
+   {
+      static constexpr std::array<std::string_view, 2> credentialedPaths{"/register_server",
+                                                                         "/unregister_server"};
+      auto headers = std::ranges::contains(credentialedPaths, std::string_view{target})
+                         ? serverRegistryCorsHeaders(req)
+                         : allowCors(req, serverRegistryCorsAccounts());
+      return HttpReply{.headers = std::move(headers)};
+   }
+
    if (auto reply = to<XAdmin>().checkAuth(req, socket))
       return reply;
 
-   if (req.method == "OPTIONS")
-      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
-
-   auto target = req.path();
    if (target == "/register_server")
    {
       if (req.method != "POST")
@@ -616,7 +635,7 @@ auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
       {
          open<RegServTable>().put(body);
       }
-      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
+      return HttpReply{.headers = serverRegistryCorsHeaders(req)};
    }
 
    if (target == "/unregister_server")
@@ -636,7 +655,7 @@ auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
             return error(HttpStatus::notFound, "Service is not registered");
          serverTable.erase(service);
       }
-      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
+      return HttpReply{.headers = serverRegistryCorsHeaders(req)};
    }
 
    return {};
