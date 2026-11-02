@@ -39,6 +39,7 @@ export async function installManifest(
         `${siblingUrl(null, "x-packages", "/manifest")}/${sha256.toUpperCase()}`,
         {
             method: "PUT",
+            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
                 ...(await adminBearerAuthHeaders()),

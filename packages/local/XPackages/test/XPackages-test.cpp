@@ -26,3 +26,16 @@ TEST_CASE("XPackages preflight allows x-admin credentials")
    CHECK(reply.getHeader("Access-Control-Allow-Credentials") == "true");
    CHECK(reply.getHeader("Access-Control-Allow-Headers") == "Content-Type, Authorization");
 }
+
+TEST_CASE("XPackages manifest preflight allows x-admin credentials")
+{
+   DefaultTestChain t;
+   auto             reply = t.http(nonAdminClient()
+                                       .header("Origin", adminOrigin)
+                                       .header("Access-Control-Request-Method", "PUT")
+                                       .request("OPTIONS", "/manifest/ABCD"));
+   CHECK(reply.status == HttpStatus::ok);
+   CHECK(reply.getHeader("Access-Control-Allow-Origin") == adminOrigin);
+   CHECK(reply.getHeader("Access-Control-Allow-Credentials") == "true");
+   CHECK(reply.getHeader("Access-Control-Allow-Headers") == "Content-Type, Authorization");
+}

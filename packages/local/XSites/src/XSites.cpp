@@ -7,6 +7,21 @@
 using namespace psibase;
 using namespace LocalService;
 
+namespace
+{
+   bool isWrite(std::string_view method)
+   {
+      return method == "PUT" || method == "DELETE";
+   }
+
+   std::vector<HttpHeader> staticReadCors(const HttpRequest& req)
+   {
+      static const std::vector<AccountNumber> readers{XAdmin::service,
+                                                      AccountNumber{"supervisor"}};
+      return allowCors(req, readers);
+   }
+}  // namespace
+
 std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
@@ -20,7 +35,11 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
    auto table = open<ContentTable>();
    if (req.method == "OPTIONS")
    {
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      auto requestedMethod = req.getHeader("Access-Control-Request-Method");
+      auto headers = requestedMethod && isWrite(*requestedMethod)
+                         ? allowCorsCredentials(req, XAdmin::service)
+                         : staticReadCors(req);
+      return HttpReply{.headers = std::move(headers)};
    }
    else if (req.method == "PUT")
    {
@@ -41,7 +60,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
       {
          table.put(row);
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCorsCredentials(req, XAdmin::service)};
    }
    else if (req.method == "DELETE")
    {
@@ -51,7 +70,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
       {
          table.erase(std::tuple(service, target));
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCorsCredentials(req, XAdmin::service)};
    }
    else
    {
@@ -78,7 +97,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
          auto reply = HttpReply{
              .contentType = std::move(row->contentType),
              .body        = std::move(row->content),
-             .headers     = allowCors(req, XAdmin::service),
+             .headers     = staticReadCors(req),
          };
          if (row->contentEncoding)
          {

@@ -60,7 +60,8 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
           "/graphql", "/preinstall", "/prerm", "/postinstall", "/postrm"};
       if (std::ranges::contains(credentialedPaths, std::string_view{target}))
          return HttpReply{.headers = allowCorsCredentials(req, XAdmin::service)};
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      // Other paths are x-sites content and get its CORS policy
+      return {};
    }
 
    if (auto reply = to<XAdmin>().checkAuth(req, socket))
