@@ -13,6 +13,7 @@ import {
 
 export type ConsoleErrorCollector = {
     readonly entries: string[];
+    clear: () => void;
     assertEmpty: () => void;
 };
 
@@ -68,6 +69,9 @@ function attachCollector(context: BrowserContext): ConsoleErrorCollector {
     return {
         get entries() {
             return entries;
+        },
+        clear() {
+            entries.length = 0;
         },
         assertEmpty() {
             expect(entries, entries.join("\n")).toEqual([]);

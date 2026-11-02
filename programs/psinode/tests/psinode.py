@@ -617,9 +617,9 @@ class Node(API):
     def install_local(self, packages=[], sources=[]):
         '''installs a local package'''
         self.run_psibase(['install', '--local', '-y'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
-    def run_psibase(self, args, *, check=True, **kw):
+    def run_psibase(self, args, *, check=True, timeout=100, **kw):
         self._find_psibase()
-        result = subprocess.run([self.psibase] + args, check=check, timeout=100, **kw)
+        result = subprocess.run([self.psibase] + args, check=check, timeout=timeout, **kw)
         return result
     def unlock_softhsm(self):
         with self.get('/native/admin/keys/devices', service='x-admin') as reply:

@@ -31,9 +31,8 @@ const RAW_RUNTIME_STATE =
           ["@eslint/js", "npm:9.39.5"],\
           ["@playwright/test", "npm:1.64.1"],\
           ["@psibase/e2e", "workspace:."],\
-          ["@types/bcryptjs", "npm:2.4.6"],\
+          ["@psibase/xadmin-e2e", "portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A."],\
           ["@types/node", "npm:22.20.1"],\
-          ["bcryptjs", "npm:2.4.3"],\
           ["eslint", "virtual:59c96521afb2010d771a41a339656fb3abc61eb5b121c85fbe49631651a30b8f82a2f2b93d81c2b9f4bc08757cd9cf6bf98f7d8f550bb88fbfe1f9b9916f0aeb#npm:9.39.5"],\
           ["globals", "npm:16.5.0"],\
           ["prettier", "npm:3.9.6"],\
@@ -220,9 +219,8 @@ const RAW_RUNTIME_STATE =
           ["@eslint/js", "npm:9.39.5"],\
           ["@playwright/test", "npm:1.64.1"],\
           ["@psibase/e2e", "workspace:."],\
-          ["@types/bcryptjs", "npm:2.4.6"],\
+          ["@psibase/xadmin-e2e", "portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A."],\
           ["@types/node", "npm:22.20.1"],\
-          ["bcryptjs", "npm:2.4.3"],\
           ["eslint", "virtual:59c96521afb2010d771a41a339656fb3abc61eb5b121c85fbe49631651a30b8f82a2f2b93d81c2b9f4bc08757cd9cf6bf98f7d8f550bb88fbfe1f9b9916f0aeb#npm:9.39.5"],\
           ["globals", "npm:16.5.0"],\
           ["prettier", "npm:3.9.6"],\
@@ -232,13 +230,15 @@ const RAW_RUNTIME_STATE =
         "linkType": "SOFT"\
       }]\
     ]],\
-    ["@types/bcryptjs", [\
-      ["npm:2.4.6", {\
-        "packageLocation": "../.caches/yarn/@types-bcryptjs-npm-2.4.6-50588b8234-1182663f0c.zip/node_modules/@types/bcryptjs/",\
+    ["@psibase/xadmin-e2e", [\
+      ["portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A.", {\
+        "packageLocation": "../packages/local/XAdmin/e2e/",\
         "packageDependencies": [\
-          ["@types/bcryptjs", "npm:2.4.6"]\
+          ["@playwright/test", "npm:1.64.1"],\
+          ["@psibase/xadmin-e2e", "portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A."],\
+          ["bcryptjs", "npm:3.0.3"]\
         ],\
-        "linkType": "HARD"\
+        "linkType": "SOFT"\
       }]\
     ]],\
     ["@types/estree", [\
@@ -588,10 +588,10 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["bcryptjs", [\
-      ["npm:2.4.3", {\
-        "packageLocation": "../.caches/yarn/bcryptjs-npm-2.4.3-32de4957eb-b969467087.zip/node_modules/bcryptjs/",\
+      ["npm:3.0.3", {\
+        "packageLocation": "../.caches/yarn/bcryptjs-npm-3.0.3-834b97d2ce-127c94699f.zip/node_modules/bcryptjs/",\
         "packageDependencies": [\
-          ["bcryptjs", "npm:2.4.3"]\
+          ["bcryptjs", "npm:3.0.3"]\
         ],\
         "linkType": "HARD"\
       }]\
