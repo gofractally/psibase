@@ -151,9 +151,7 @@ __metadata:
   dependencies:
     "@eslint/js": "npm:^9.9.0"
     "@playwright/test": "npm:1.64.1"
-    "@types/bcryptjs": "npm:^2.4.6"
     "@types/node": "npm:^22.15.0"
-    bcryptjs: "npm:^2.4.3"
     eslint: "npm:^9.15.0"
     globals: "npm:^16.2.0"
     prettier: "npm:^3.2.5"
@@ -161,13 +159,6 @@ __metadata:
     typescript-eslint: "npm:^8.33.1"
   languageName: unknown
   linkType: soft
-
-"@types/bcryptjs@npm:^2.4.6":
-  version: 2.4.6
-  resolution: "@types/bcryptjs@npm:2.4.6"
-  checksum: 10c0/1182663f0c081c5c58760019459cd309335e9b5fc6552780b0fd21b6c5f25661a844709e46218796f4bdbebe6736e11cfc5af0729bc2cdb0160943650aceb3da
-  languageName: node
-  linkType: hard
 
 "@types/estree@npm:^1.0.6":
   version: 1.0.9
@@ -384,13 +375,6 @@ __metadata:
   version: 4.0.4
   resolution: "balanced-match@npm:4.0.4"
   checksum: 10c0/07e86102a3eb2ee2a6a1a89164f29d0dbaebd28f2ca3f5ca786f36b8b23d9e417eb3be45a4acf754f837be5ac0a2317de90d3fcb7f4f4dc95720a1f36b26a17b
-  languageName: node
-  linkType: hard
-
-"bcryptjs@npm:^2.4.3":
-  version: 2.4.3
-  resolution: "bcryptjs@npm:2.4.3"
-  checksum: 10c0/b969467087ed7a01ff905a1c6a0c45014ec586248a448ea08370c8ed8bb314bda16a870ca23e0961d7d23bdce1a04c76fa70a9d680be814fa9ac7d8fc61870a3
   languageName: node
   linkType: hard
 
