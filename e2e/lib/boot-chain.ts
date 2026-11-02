@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { generateKeyPairSync } from "node:crypto";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
 import { resolveBin, resolvePackagesDir } from "./psinode-bin";
 import { waitForChain } from "./node-ready";
 
@@ -11,15 +14,35 @@ export type BootChainOptions = {
     packages?: string[];
 };
 
+async function writeAccountPublicKey(dir: string): Promise<string> {
+    const { publicKey } = generateKeyPairSync("ec", {
+        namedCurve: "P-256",
+        publicKeyEncoding: { type: "spki", format: "pem" },
+        privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    });
+    const publicKeyPath = path.join(dir, "account.pub");
+    await writeFile(publicKeyPath, publicKey, "utf8");
+    return publicKeyPath;
+}
+
+/**
+ * Boots with an account key so the producer uses auth-sig, matching a
+ * production UI boot of ProdDefault (or `packages`).
+ */
 export async function bootChain(options: BootChainOptions): Promise<void> {
     const psibaseBin = resolveBin("PSIBASE_BIN", "psibase");
     const packages = options.packages ?? ["ProdDefault"];
+    const accountKeyPath = await writeAccountPublicKey(
+        path.dirname(options.socketPath),
+    );
 
     await new Promise<void>((resolve, reject) => {
         const args = [
             "boot",
             "-p",
             options.producer,
+            "--account-key",
+            accountKeyPath,
             ...packages,
             ...(process.env.PSIBASE_PACKAGES
                 ? ["--package-source", resolvePackagesDir()]
@@ -43,7 +66,11 @@ export async function bootChain(options: BootChainOptions): Promise<void> {
                 resolve();
                 return;
             }
-            reject(new Error(`psibase boot failed (exit ${code}): ${stderr.trim()}`));
+            reject(
+                new Error(
+                    `psibase boot failed (exit ${code}): ${stderr.trim()}`,
+                ),
+            );
         });
     });
 
