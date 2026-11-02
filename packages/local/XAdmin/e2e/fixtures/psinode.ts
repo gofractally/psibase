@@ -1,19 +1,28 @@
 import { expect, test as base, type TestInfo } from "@playwright/test";
 import bcrypt from "bcryptjs";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+    execFile,
+    spawn,
+    type ChildProcessWithoutNullStreams,
+} from "node:child_process";
 import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { resolvePsinodeBin } from "../lib/psinode-bin";
 import { socketRequest } from "../lib/socket-request";
+
+const execFileAsync = promisify(execFile);
 
 const ADMIN_HOST = "x-admin.psibase.localhost";
 const READINESS_TIMEOUT_MS = 30_000;
 const READINESS_POLL_MS = 100;
+const SOFTHSM_PIN = process.env.E2E_SOFTHSM_PIN ?? "Ch4ng#Me!";
 
 export type StartPsinodeOptions = {
     nodeIndex: number;
     producer?: string;
+    softhsm?: boolean;
 };
 
 export type PsinodeNode = {
@@ -43,11 +52,13 @@ async function writeCredentials(
     return { authDir, path: credentialsPath, username, password };
 }
 
-function buildConfig(authDir: string): string {
+function buildConfig(authDir: string, pkcs11Module?: string): string {
+    const pkcs11 =
+        pkcs11Module === undefined ? "" : `pkcs11-module = ${pkcs11Module}\n`;
     return `# psinode config
 mount = $PSIBASE_DATADIR/packages
 mount = ${authDir}
-
+${pkcs11}
 database-cache-size = 256MiB
 service-threads = 2
 http-timeout = 10s
@@ -57,6 +68,54 @@ type = console
 filter = Severity >= info
 format = [{TimeStamp}] [{Severity}]: {Message}
 `;
+}
+
+async function resolveLibSofthsm2(): Promise<string> {
+    const fromEnv = process.env.LIBSOFTHSM2 ?? process.env.E2E_LIBSOFTHSM2;
+    if (fromEnv !== undefined) {
+        await access(fromEnv);
+        return fromEnv;
+    }
+    const { stdout } = await execFileAsync("sh", [
+        "-c",
+        "command -v softhsm2-util",
+    ]);
+    const util = stdout.trim();
+    if (util === "") {
+        throw new Error(
+            "softhsm2-util not found; install SoftHSM or set LIBSOFTHSM2",
+        );
+    }
+    const lib = path.resolve(
+        path.dirname(util),
+        "../lib/softhsm/libsofthsm2.so",
+    );
+    await access(lib);
+    return lib;
+}
+
+async function initSofthsm(dir: string, pin: string): Promise<string> {
+    const softhsmDir = path.join(dir, "softhsm");
+    const tokens = path.join(softhsmDir, "tokens");
+    const conf = path.join(softhsmDir, "softhsm.conf");
+    await mkdir(tokens, { recursive: true });
+    await writeFile(conf, `directories.tokendir = ${tokens}\n`, "utf8");
+    await execFileAsync(
+        "softhsm2-util",
+        [
+            "--init-token",
+            "--slot",
+            "0",
+            "--label",
+            "psibase",
+            "--pin",
+            pin,
+            "--so-pin",
+            pin,
+        ],
+        { env: { ...process.env, SOFTHSM2_CONF: conf } },
+    );
+    return conf;
 }
 
 function childExited(child: ChildProcessWithoutNullStreams): boolean {
@@ -132,7 +191,21 @@ async function startPsinode(
     const port = nodePort(workerIndex, options.nodeIndex);
     const credentials = await writeCredentials(dir);
 
-    await writeFile(path.join(dir, "config"), buildConfig(credentials.authDir), "utf8");
+    const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        PSIBASE_PASSWD_FILE: credentials.path,
+    };
+    let pkcs11Module: string | undefined;
+    if (options.softhsm) {
+        pkcs11Module = await resolveLibSofthsm2();
+        env.SOFTHSM2_CONF = await initSofthsm(dir, SOFTHSM_PIN);
+    }
+
+    await writeFile(
+        path.join(dir, "config"),
+        buildConfig(credentials.authDir, pkcs11Module),
+        "utf8",
+    );
 
     const args = [
         dir,
@@ -149,10 +222,7 @@ async function startPsinode(
     }
 
     const child = spawn(psinodeBin, args, {
-        env: {
-            ...process.env,
-            PSIBASE_PASSWD_FILE: credentials.path,
-        },
+        env,
         stdio: ["ignore", "ignore", "pipe"],
     });
 

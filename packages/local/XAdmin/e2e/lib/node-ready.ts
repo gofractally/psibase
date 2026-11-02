@@ -53,17 +53,45 @@ export function waitForChain(
     socketPath: string,
     timeoutMs: number,
 ): Promise<void> {
+    let last = "no response";
     return poll(`${socketPath} to report a chain`, timeoutMs, async () => {
-        const response = await socketRequest({
-            socketPath,
-            host: ADMIN_HOST,
-            path: "/native/admin/status",
-        });
-        if (response.statusCode !== 200) {
+        try {
+            const response = await socketRequest({
+                socketPath,
+                host: ADMIN_HOST,
+                path: "/native/admin/status",
+            });
+            last = `${response.statusCode} ${response.body}`;
+            if (response.statusCode !== 200) {
+                return false;
+            }
+            const status = JSON.parse(response.body) as string[];
+            return !status.includes("needgenesis");
+        } catch (error) {
+            last = error instanceof Error ? error.message : String(error);
             return false;
         }
-        const status = JSON.parse(response.body) as string[];
-        return !status.includes("needgenesis");
+    }).catch((error) => {
+        throw new Error(`${error instanceof Error ? error.message : error} (last status: ${last})`);
+    });
+}
+
+/**
+ * Resolves once the node reports a head block number.
+ */
+export function waitForHeadBlock(
+    socketPath: string,
+    timeoutMs: number,
+): Promise<number> {
+    let found: number | null = null;
+    return poll(`${socketPath} to report a head block`, timeoutMs, async () => {
+        found = await headBlock(socketPath);
+        return found !== null;
+    }).then(() => {
+        if (found === null) {
+            throw new Error(`No head block on ${socketPath}`);
+        }
+        return found;
     });
 }
 

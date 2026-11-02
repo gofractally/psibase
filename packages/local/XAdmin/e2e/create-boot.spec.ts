@@ -29,21 +29,16 @@ test("create network boots Private through the admin UI", async ({
     openAdmin,
 }) => {
     test.setTimeout(BOOT_TIMEOUT_MS);
-    test.skip(
-        true,
-        "Needs SoftHSM on the psinode fixture before enabling",
-    );
 
-    const node = await startPsinode({ nodeIndex: 0, producer: PRODUCER });
+    const node = await startPsinode({
+        nodeIndex: 0,
+        producer: PRODUCER,
+        softhsm: true,
+    });
     const adminUrl = `http://x-admin.psibase.localhost:${node.port}`;
     const { page, errors } = await openAdmin(node);
 
     await createNetworkThroughUi(page, adminUrl, PRODUCER, "Private");
     await waitForChain(node.socketPath, BOOT_TIMEOUT_MS);
-
-    await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByLabel(/private key/i).fill("");
-    await page.getByRole("button", { name: "Continue" }).click();
-
     errors.assertEmpty();
 });
