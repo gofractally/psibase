@@ -4,7 +4,6 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { bootChain, type BootChainOptions } from "../lib/boot-chain";
 import { resolvePsinodeBin } from "../lib/psinode-bin";
 import { socketRequest } from "../lib/socket-request";
 
@@ -232,14 +231,10 @@ async function stopPsinode(node: Pick<PsinodeNode, "dir" | "child">): Promise<vo
 
 type PsinodeFixture = {
     startPsinode: (options: StartPsinodeOptions) => Promise<PsinodeNode>;
-    bootChain: (options: BootChainOptions) => Promise<void>;
     socketRequest: typeof socketRequest;
 };
 
 export const test = base.extend<PsinodeFixture>({
-    bootChain: async ({}, use) => {
-        await use(bootChain);
-    },
     socketRequest: async ({}, use) => {
         await use(socketRequest);
     },
@@ -257,5 +252,4 @@ export const test = base.extend<PsinodeFixture>({
 });
 
 export { expect } from "@playwright/test";
-export { bootChain, type BootChainOptions } from "../lib/boot-chain";
 export { socketRequest } from "../lib/socket-request";

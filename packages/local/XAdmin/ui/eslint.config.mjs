@@ -1,3 +1,6 @@
 import rootConfig from "../../../eslint.config.mjs";
 
-export default rootConfig;
+export default [
+    { ignores: ["e2e/**"] },
+    ...rootConfig,
+];
