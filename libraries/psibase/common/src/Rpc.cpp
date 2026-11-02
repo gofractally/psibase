@@ -76,6 +76,20 @@ namespace
          return isSecure() && host == rootHost || host.ends_with('.' + std::string(rootHost));
       }
    };
+
+   std::vector<psibase::HttpHeader> withCorsCredentials(std::vector<psibase::HttpHeader> headers)
+   {
+      headers.push_back({"Access-Control-Allow-Credentials", "true"});
+      for (auto& h : headers)
+      {
+         if (h.matches("Access-Control-Allow-Headers"))
+         {
+            h.value = "Content-Type, Authorization";
+            break;
+         }
+      }
+      return headers;
+   }
 }  // namespace
 
 namespace psibase
@@ -326,6 +340,26 @@ namespace psibase
          return allowCors(*origin);
       }
       return {};
+   }
+
+   std::vector<HttpHeader> allowCorsCredentials(const HttpRequest& req,
+                                                AccountNumber      account,
+                                                bool               hostIsSubdomain)
+   {
+      auto headers = allowCors(req, account, hostIsSubdomain);
+      if (headers.empty())
+         return {};
+      return withCorsCredentials(std::move(headers));
+   }
+
+   std::vector<HttpHeader> allowCorsCredentials(const HttpRequest&                req,
+                                                const std::vector<AccountNumber>& accounts,
+                                                bool                              hostIsSubdomain)
+   {
+      auto headers = allowCors(req, accounts, hostIsSubdomain);
+      if (headers.empty())
+         return {};
+      return withCorsCredentials(std::move(headers));
    }
 
    template <typename T>

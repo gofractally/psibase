@@ -253,6 +253,12 @@ namespace psibase
                                      const std::vector<AccountNumber>& accounts,
                                      bool                              hostIsSubdomain = true);
    std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req, bool hostIsSubdomain = true);
+   std::vector<HttpHeader> allowCorsCredentials(const HttpRequest& req,
+                                                AccountNumber      account,
+                                                bool               hostIsSubdomain = true);
+   std::vector<HttpHeader> allowCorsCredentials(const HttpRequest&                req,
+                                                const std::vector<AccountNumber>& accounts,
+                                                bool hostIsSubdomain = true);
 
    using HttpReply = BasicHttpReply<std::vector<char>>;
 
