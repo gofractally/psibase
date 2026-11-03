@@ -31,6 +31,7 @@ const RAW_RUNTIME_STATE =
           ["@eslint/js", "npm:9.39.5"],\
           ["@playwright/test", "npm:1.64.1"],\
           ["@psibase/e2e", "workspace:."],\
+          ["@psibase/xadmin-e2e", "portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A."],\
           ["@types/node", "npm:22.20.1"],\
           ["eslint", "virtual:59c96521afb2010d771a41a339656fb3abc61eb5b121c85fbe49631651a30b8f82a2f2b93d81c2b9f4bc08757cd9cf6bf98f7d8f550bb88fbfe1f9b9916f0aeb#npm:9.39.5"],\
           ["globals", "npm:16.5.0"],\
@@ -218,12 +219,24 @@ const RAW_RUNTIME_STATE =
           ["@eslint/js", "npm:9.39.5"],\
           ["@playwright/test", "npm:1.64.1"],\
           ["@psibase/e2e", "workspace:."],\
+          ["@psibase/xadmin-e2e", "portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A."],\
           ["@types/node", "npm:22.20.1"],\
           ["eslint", "virtual:59c96521afb2010d771a41a339656fb3abc61eb5b121c85fbe49631651a30b8f82a2f2b93d81c2b9f4bc08757cd9cf6bf98f7d8f550bb88fbfe1f9b9916f0aeb#npm:9.39.5"],\
           ["globals", "npm:16.5.0"],\
           ["prettier", "npm:3.9.6"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["typescript-eslint", "virtual:59c96521afb2010d771a41a339656fb3abc61eb5b121c85fbe49631651a30b8f82a2f2b93d81c2b9f4bc08757cd9cf6bf98f7d8f550bb88fbfe1f9b9916f0aeb#npm:8.67.0"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@psibase/xadmin-e2e", [\
+      ["portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A.", {\
+        "packageLocation": "../packages/local/XAdmin/e2e/",\
+        "packageDependencies": [\
+          ["@playwright/test", "npm:1.64.1"],\
+          ["@psibase/xadmin-e2e", "portal:../packages/local/XAdmin/e2e::locator=%40psibase%2Fe2e%40workspace%3A."],\
+          ["bcryptjs", "npm:3.0.3"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -570,6 +583,15 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../.caches/yarn/balanced-match-npm-4.0.4-fd666b3c7f-07e86102a3.zip/node_modules/balanced-match/",\
         "packageDependencies": [\
           ["balanced-match", "npm:4.0.4"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["bcryptjs", [\
+      ["npm:3.0.3", {\
+        "packageLocation": "../.caches/yarn/bcryptjs-npm-3.0.3-834b97d2ce-127c94699f.zip/node_modules/bcryptjs/",\
+        "packageDependencies": [\
+          ["bcryptjs", "npm:3.0.3"]\
         ],\
         "linkType": "HARD"\
       }]\

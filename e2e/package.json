@@ -5,6 +5,9 @@
     "scripts": {
         "test": "playwright test"
     },
+    "dependencies": {
+        "@psibase/xadmin-e2e": "portal:../packages/local/XAdmin/e2e"
+    },
     "devDependencies": {
         "@eslint/js": "^9.9.0",
         "@playwright/test": "1.64.1",
