@@ -281,11 +281,17 @@
             export BOOST_LIBRARYDIR="${boost}/lib"
             export BOOST_INCLUDEDIR="${boost.dev}/include"
             # fenix rustc is unwrapped; cargo-psibase's build.rs links wasm-opt/binaryen
-            # (libstdc++) with no RPATH. Keep Nix GCC libs only — not host /usr/lib.
-            export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib"
-            export NIX_LDFLAGS="-L${pkgs.stdenv.cc.cc.lib}/lib -L${pkgs.icu}/lib -L${pkgs.openssl.out}/lib"
-            export LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.icu}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
-            export CMAKE_LIBRARY_PATH="${pkgs.icu}/lib''${CMAKE_LIBRARY_PATH:+:$CMAKE_LIBRARY_PATH}"
+            # (libstdc++) with no RPATH. Keep Nix GCC + libc only — not host /usr/lib
+            # (nix/linker-env.sh re-scrubs FHS -L/usr/lib pollution at the end of this hook).
+            _psibase_nix_libc="${pkgs.stdenv.cc.libc}/lib"
+            _psibase_nix_cc_lib="${pkgs.stdenv.cc.cc.lib}/lib"
+            _psibase_nix_icu="${pkgs.icu}/lib"
+            _psibase_nix_ssl="${pkgs.openssl.out}/lib"
+            export LD_LIBRARY_PATH="$_psibase_nix_cc_lib"
+            export NIX_CFLAGS_LINK=""
+            export NIX_LDFLAGS="-L$_psibase_nix_libc -L$_psibase_nix_cc_lib -L$_psibase_nix_icu -L$_psibase_nix_ssl"
+            export LIBRARY_PATH="$_psibase_nix_libc:$_psibase_nix_cc_lib:$_psibase_nix_icu''${LIBRARY_PATH:+:$LIBRARY_PATH}"
+            export CMAKE_LIBRARY_PATH="$_psibase_nix_icu''${CMAKE_LIBRARY_PATH:+:$CMAKE_LIBRARY_PATH}"
 
             # Discover psibase repo root and add built binaries to PATH so
             # tools like psinode / psibase are runnable from anywhere.
@@ -342,6 +348,11 @@
               echo "  cargo-edit:      0.13.7 (cargo-set-version)"
               echo "  cursor-agent:    $(cursor-agent --version 2>/dev/null | head -1)"
               echo ""
+            fi
+
+            # Re-scrub after direnv/FHS may have re-prepended -L/usr/lib.
+            if [ -f "$PSIBASE_ROOT/nix/linker-env.sh" ]; then
+              . "$PSIBASE_ROOT/nix/linker-env.sh"
             fi
           '';
         };

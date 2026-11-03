@@ -5,6 +5,11 @@ PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 export RUSTC_WRAPPER=sccache
 
+if [ -n "${IN_NIX_SHELL:-}" ] || [ -n "${NIX_CC:-}" ]; then
+  # shellcheck source=../../nix/linker-env.sh
+  . "$PROJECT_ROOT/nix/linker-env.sh"
+fi
+
 mkdir -p "$PROJECT_ROOT/build"
 cd "$PROJECT_ROOT/build"
 cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
