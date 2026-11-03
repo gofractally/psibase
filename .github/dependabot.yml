@@ -1,0 +1,58 @@
+# Dependabot policy
+#
+# - Routine version-update PRs are OFF: every entry sets
+#   open-pull-requests-limit: 0. We upgrade manually, on our own schedule.
+# - The cooldown below only takes effect if a limit is ever raised. It holds
+#   back releases until they have been public long enough for problems
+#   (malicious publishes, fresh security bugs) to surface:
+#   patch 14 days, minor 30 days, major 60 days.
+# - Security-fix PRs are enabled in repo settings, bypass cooldown, and are
+#   limited to critical/high severity by a repository auto-triage rule.
+# - Manual upgrades should respect the same cooldown: don't adopt a release
+#   younger than 14/30/60 days (patch/minor/major) unless it fixes a
+#   vulnerability that affects us.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directories:
+      - "/packages"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 30
+      semver-patch-days: 14
+      semver-minor-days: 30
+      semver-major-days: 60
+
+  - package-ecosystem: "cargo"
+    directories:
+      - "/rust"
+      - "/rust/cargo-psibase/service_wasi_polyfill"
+      - "/packages"
+      - "/packages/system"
+      - "/packages/user"
+      - "/packages/user/CommonApi/common/packages/component-parser"
+      - "/packages/local/XAdmin/ui/wasm"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 30
+      semver-patch-days: 14
+      semver-minor-days: 30
+      semver-major-days: 60
+
+  - package-ecosystem: "github-actions"
+    directories:
+      - "/"
+      - "/.github/actions/*"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 30
+      semver-patch-days: 14
+      semver-minor-days: 30
+      semver-major-days: 60
