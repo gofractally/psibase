@@ -42,29 +42,39 @@ pub struct Resp {
 }
 
 fn resp(status: u16, body: Value) -> Resp {
-    Resp { status, body: Some(body), headers: vec![] }
+    Resp {
+        status,
+        body: Some(body),
+        headers: vec![],
+    }
 }
 
 fn rpc_err(id: &Value, code: i64, msg: &str) -> Value {
     json!({"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": msg}})
 }
 
-/// Origin rule: absent (non-browser agent), localhost, or the node's own root
-/// domain and its subdomains. Anything else is a 403.
-pub fn origin_ok(origin: Option<&str>, root_host: &str) -> bool {
-    let Some(o) = origin else { return true };
-    let host = o.split("://").nth(1).unwrap_or(o);
-    let host = host.split('/').next().unwrap_or(host);
-    let bare = host.split(':').next().unwrap_or(host);
-    let root = root_host.split(':').next().unwrap_or(root_host);
-    bare == "localhost" || bare == "127.0.0.1" || bare == root || bare.ends_with(&format!(".{root}"))
+/// Origin check. PoC: allow any Origin (cloud MCP / Grok Bot); use auth later.
+pub fn origin_ok(_origin: Option<&str>, _root_host: &str) -> bool {
+    true
 }
 
 pub fn handle(req: &Req, chain: &dyn ChainView) -> Resp {
     match req.method {
         "POST" => {}
-        "GET" => return Resp { status: 405, body: None, headers: vec![("Allow".into(), "POST".into())] },
-        _ => return Resp { status: 405, body: None, headers: vec![("Allow".into(), "POST".into())] },
+        "GET" => {
+            return Resp {
+                status: 405,
+                body: None,
+                headers: vec![("Allow".into(), "POST".into())],
+            }
+        }
+        _ => {
+            return Resp {
+                status: 405,
+                body: None,
+                headers: vec![("Allow".into(), "POST".into())],
+            }
+        }
     }
     if !origin_ok(req.origin, req.root_host) {
         return resp(403, rpc_err(&Value::Null, -32600, "origin not allowed"));
@@ -75,52 +85,107 @@ pub fn handle(req: &Req, chain: &dyn ChainView) -> Resp {
     };
     let Some(method) = msg.get("method").and_then(Value::as_str) else {
         // A response or garbage; we never send requests, so nothing to match.
-        return Resp { status: 202, body: None, headers: vec![] };
+        return Resp {
+            status: 202,
+            body: None,
+            headers: vec![],
+        };
     };
     let id = msg.get("id").cloned();
     let params = msg.get("params").cloned().unwrap_or(json!({}));
 
     // Revision: header, else params._meta.protocolVersion, else 2025 (initialize).
-    let meta_ver = params.pointer("/_meta/protocolVersion").and_then(Value::as_str);
+    let meta_ver = params
+        .pointer("/_meta/protocolVersion")
+        .and_then(Value::as_str);
     let version = req.protocol_version.or(meta_ver);
     if version == Some(V2026) {
         if let (Some(h), Some(m)) = (req.protocol_version, meta_ver) {
             if h != m {
-                return resp(400, rpc_err(id.as_ref().unwrap_or(&Value::Null), -32600, "MCP-Protocol-Version does not match _meta"));
+                return resp(
+                    400,
+                    rpc_err(
+                        id.as_ref().unwrap_or(&Value::Null),
+                        -32600,
+                        "MCP-Protocol-Version does not match _meta",
+                    ),
+                );
             }
         }
         if req.mcp_method != Some(method) {
-            return resp(400, rpc_err(id.as_ref().unwrap_or(&Value::Null), -32600, "Mcp-Method header missing or does not match body"));
+            return resp(
+                400,
+                rpc_err(
+                    id.as_ref().unwrap_or(&Value::Null),
+                    -32600,
+                    "Mcp-Method header missing or does not match body",
+                ),
+            );
         }
         if matches!(method, "tools/call" | "resources/read" | "prompts/get") {
-            let name = params.get("name").or(params.get("uri")).and_then(Value::as_str);
+            let name = params
+                .get("name")
+                .or(params.get("uri"))
+                .and_then(Value::as_str);
             if req.mcp_name.is_none() || req.mcp_name != name {
-                return resp(400, rpc_err(id.as_ref().unwrap_or(&Value::Null), -32600, "Mcp-Name header missing or does not match body"));
+                return resp(
+                    400,
+                    rpc_err(
+                        id.as_ref().unwrap_or(&Value::Null),
+                        -32600,
+                        "Mcp-Name header missing or does not match body",
+                    ),
+                );
             }
         }
     } else if let Some(v) = version {
         if !V2025.contains(&v) {
-            return resp(400, rpc_err(id.as_ref().unwrap_or(&Value::Null), -32600, &format!("unsupported protocol version {v}")));
+            return resp(
+                400,
+                rpc_err(
+                    id.as_ref().unwrap_or(&Value::Null),
+                    -32600,
+                    &format!("unsupported protocol version {v}"),
+                ),
+            );
         }
     }
 
     let Some(id) = id else {
         // Notification (e.g. notifications/initialized)
-        return Resp { status: 202, body: None, headers: vec![] };
+        return Resp {
+            status: 202,
+            body: None,
+            headers: vec![],
+        };
     };
 
     let result = match method {
         "initialize" => {
-            let asked = params.get("protocolVersion").and_then(Value::as_str).unwrap_or(LATEST_2025);
-            let v = if V2025.contains(&asked) { asked } else { LATEST_2025 };
-            let mut r = resp(200, ok(&id, json!({
-                "protocolVersion": v,
-                "capabilities": {"tools": {"listChanged": false}},
-                "serverInfo": server_info(),
-                "instructions": INSTRUCTIONS,
-            })));
+            let asked = params
+                .get("protocolVersion")
+                .and_then(Value::as_str)
+                .unwrap_or(LATEST_2025);
+            let v = if V2025.contains(&asked) {
+                asked
+            } else {
+                LATEST_2025
+            };
+            let mut r = resp(
+                200,
+                ok(
+                    &id,
+                    json!({
+                        "protocolVersion": v,
+                        "capabilities": {"tools": {"listChanged": false}},
+                        "serverInfo": server_info(),
+                        "instructions": INSTRUCTIONS,
+                    }),
+                ),
+            );
             // Thin 2025 compatibility shim: stateless, so the id carries no state.
-            r.headers.push(("Mcp-Session-Id".into(), "x-mcp-stateless".into()));
+            r.headers
+                .push(("Mcp-Session-Id".into(), "x-mcp-stateless".into()));
             return r;
         }
         "server/discover" => Ok(json!({
@@ -159,7 +224,8 @@ fn server_info() -> Value {
     json!({"name": "x-mcp", "title": "X-MCP (psibase)", "version": env!("CARGO_PKG_VERSION")})
 }
 
-const INSTRUCTIONS: &str = "X-MCP describes on-chain psibase services and builds unsigned transactions. \
+const INSTRUCTIONS: &str =
+    "X-MCP describes on-chain psibase services and builds unsigned transactions. \
 It never signs or pushes. Use list_services, then describe_service, then build_transaction. \
 Sign the returned transaction outside X-MCP (POC: the headless signing UI).";
 
@@ -183,7 +249,10 @@ pub fn meta_tools() -> Value {
 }
 
 fn acct(v: &Value, field: &str) -> Result<AccountNumber, String> {
-    let s = v.get(field).and_then(Value::as_str).ok_or(format!("missing {field}"))?;
+    let s = v
+        .get(field)
+        .and_then(Value::as_str)
+        .ok_or(format!("missing {field}"))?;
     AccountNumber::from_exact(s).map_err(|e| format!("bad {field} '{s}': {e}"))
 }
 
@@ -200,19 +269,23 @@ pub fn call_tool(name: &str, args: &Value, chain: &dyn ChainView) -> Result<Valu
         })).collect::<Vec<_>>()})),
         "describe_service" => {
             let service = acct(args, "service")?;
-            let schema = chain.schema(service).ok_or(format!("no schema for {service}"))?;
+            let schema = chain
+                .schema(service)
+                .ok_or(format!("no schema for {service}"))?;
             let tools: Vec<Value> = schema
                 .actions
                 .iter()
                 .filter(|(m, _)| is_tool_method(&m.0))
-                .map(|(m, f)| json!({
-                    "name": format!("{service}.{}", m.0),
-                    "service": service.to_string(),
-                    "method": m.0,
-                    "kind": "action",
-                    "sideEffect": "write",
-                    "inputSchema": to_json_schema(&schema.types, &f.params, 0),
-                }))
+                .map(|(m, f)| {
+                    json!({
+                        "name": format!("{service}.{}", m.0),
+                        "service": service.to_string(),
+                        "method": m.0,
+                        "kind": "action",
+                        "sideEffect": "write",
+                        "inputSchema": to_json_schema(&schema.types, &f.params, 0),
+                    })
+                })
                 .collect();
             Ok(json!({"service": service.to_string(), "tools": tools}))
         }
@@ -224,9 +297,14 @@ pub fn call_tool(name: &str, args: &Value, chain: &dyn ChainView) -> Result<Valu
 fn pack_action(a: &Value, chain: &dyn ChainView) -> Result<(Action, Value), String> {
     let sender = acct(a, "sender")?;
     let service = acct(a, "service")?;
-    let method_s = a.get("method").and_then(Value::as_str).ok_or("missing method")?;
+    let method_s = a
+        .get("method")
+        .and_then(Value::as_str)
+        .ok_or("missing method")?;
     let data = a.get("data").cloned().unwrap_or(json!({}));
-    let schema = chain.schema(service).ok_or(format!("no schema for {service}"))?;
+    let schema = chain
+        .schema(service)
+        .ok_or(format!("no schema for {service}"))?;
     let f = schema
         .actions
         .get(&MethodString(method_s.to_string()))
@@ -237,9 +315,16 @@ fn pack_action(a: &Value, chain: &dyn ChainView) -> Result<(Action, Value), Stri
     let custom = schema_types();
     let mut cs = CompiledSchema::new(&schema.types, &custom);
     cs.extend(&f.params);
-    let raw = cs.from_value(&f.params, &data).map_err(|e| format!("{service}.{method_s}: {e}"))?;
+    let raw = cs
+        .from_value(&f.params, &data)
+        .map_err(|e| format!("{service}.{method_s}: {e}"))?;
     let decoded = cs.to_value(&f.params, &raw).map_err(|e| format!("{e:?}"))?;
-    let action = Action { sender, service, method: MethodNumber::from(method_s), rawData: Hex(raw) };
+    let action = Action {
+        sender,
+        service,
+        method: MethodNumber::from(method_s),
+        rawData: Hex(raw),
+    };
     let j = json!({
         "sender": sender.to_string(), "service": service.to_string(), "method": method_s,
         "data": decoded, "rawData": action.rawData.to_string()
@@ -248,7 +333,10 @@ fn pack_action(a: &Value, chain: &dyn ChainView) -> Result<(Action, Value), Stri
 }
 
 pub fn build_transaction(args: &Value, chain: &dyn ChainView) -> Result<Value, String> {
-    let list = args.get("actions").and_then(Value::as_array).ok_or("actions must be an array")?;
+    let list = args
+        .get("actions")
+        .and_then(Value::as_array)
+        .ok_or("actions must be an array")?;
     if list.is_empty() {
         return Err("actions is empty".into());
     }
@@ -272,7 +360,9 @@ pub fn build_transaction(args: &Value, chain: &dyn ChainView) -> Result<Value, S
                 t[k] = v.clone();
             }
         }
-        None => notes.push("tapos not supplied: fill it from GET /common/tapos/head before signing"),
+        None => {
+            notes.push("tapos not supplied: fill it from GET /common/tapos/head before signing")
+        }
     }
     let tapos: Tapos = serde_json::from_value(t).map_err(|e| format!("bad tapos: {e}"))?;
     let (tx_actions, propose_json) = if let Some(p) = args.get("propose") {
@@ -292,7 +382,11 @@ pub fn build_transaction(args: &Value, chain: &dyn ChainView) -> Result<Value, S
     } else {
         (actions, None)
     };
-    let tx = Transaction { tapos: tapos.clone(), actions: tx_actions, claims: vec![] };
+    let tx = Transaction {
+        tapos: tapos.clone(),
+        actions: tx_actions,
+        claims: vec![],
+    };
     Ok(json!({
         "transaction": {
             "tapos": serde_json::to_value(&tapos).unwrap(),

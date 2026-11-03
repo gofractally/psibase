@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-mcp"
-plugin = "mcp-plugin"
+plugins = ["mcp-plugin"]
 data = [{ src = "../ui/static/", dst = "/" }]
 
 [dependencies]
