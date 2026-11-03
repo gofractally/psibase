@@ -521,7 +521,6 @@ namespace SystemService
                 .contentType = content->contentType,
                 .headers     = {{"Content-Security-Policy", cspHeader},
                                 {"Cache-Control", "no-cache"},
-                                {"ETag", etag},
                                 {"Access-Control-Allow-Origin", "*"},
                                 {"Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"},
                                 {"Access-Control-Allow-Headers", "*"}},
@@ -530,6 +529,10 @@ namespace SystemService
             if (notFound)
             {
                reply.headers.push_back({"Vary", "Accept"});
+            }
+            else
+            {
+               reply.headers.push_back({"ETag", etag});
             }
 
             if (request.method != "HEAD")

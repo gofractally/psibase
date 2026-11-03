@@ -61,6 +61,7 @@ class TestSites(unittest.TestCase):
     def assertDefaultPage(self, response):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.headers.get('Vary'), 'Accept')
+        self.assertNotIn('ETag', response.headers)
         self.assertIn(DEFAULT_PAGE_MARKER, response.text)
 
     def assertPlainNotFound(self, response, path):
