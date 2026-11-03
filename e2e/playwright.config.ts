@@ -8,6 +8,8 @@ export default defineConfig({
     // harness for Yarn PnP. One config discovers all of them.
     testDir: "../packages",
     testMatch: "**/e2e/**/*.spec.ts",
+    fullyParallel: true,
+    workers: 3,
     outputDir: "./test-results/artifacts",
     forbidOnly: true,
     retries: 0,

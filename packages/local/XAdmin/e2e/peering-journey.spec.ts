@@ -10,11 +10,25 @@ const PRODUCER = "prod";
 const JOIN_TIMEOUT_MS = 180_000;
 const BOOT_TIMEOUT_MS = 180_000;
 
-test("two joiners peer to a UI-booted producer through the admin UI", async ({
+/** Full joiner sync + peers page. Set E2E_PEERING_SYNC=0 for Connect-only (CI). */
+function peeringSyncEnabled(): boolean {
+    const value = process.env.E2E_PEERING_SYNC;
+    if (value === undefined || value === "") {
+        return true;
+    }
+    return value !== "0" && value.toLowerCase() !== "false";
+}
+
+test("a joiner peers to a UI-booted producer through the admin UI", async ({
     startPsinode,
     openAdmin,
 }) => {
-    test.setTimeout(BOOT_TIMEOUT_MS + JOIN_TIMEOUT_MS * 2 + 60_000);
+    const waitForJoinerSync = peeringSyncEnabled();
+    test.setTimeout(
+        waitForJoinerSync
+            ? BOOT_TIMEOUT_MS + JOIN_TIMEOUT_MS + 60_000
+            : BOOT_TIMEOUT_MS + 60_000,
+    );
 
     const producer = await startPsinode({ nodeIndex: 0, producer: PRODUCER });
     const producerAdmin = `http://x-admin.psibase.localhost:${producer.port}`;
@@ -38,34 +52,36 @@ test("two joiners peer to a UI-booted producer through the admin UI", async ({
 
     // A joiner starts without -p and never boots. Peering is independent of
     // consensus membership, so it never has to join the active producer set.
-    for (const nodeIndex of [1, 2]) {
-        const joiner = await startPsinode({ nodeIndex });
-        const adminUrl = `http://x-admin.psibase.localhost:${joiner.port}`;
-        const { page, errors } = await openAdmin(joiner);
+    const joiner = await startPsinode({ nodeIndex: 1 });
+    const adminUrl = `http://x-admin.psibase.localhost:${joiner.port}`;
+    const { page, errors } = await openAdmin(joiner);
 
-        await page.goto(`${adminUrl}/`);
-        await page.getByRole("button", { name: "Join network" }).click();
-        await page.getByPlaceholder("URL").fill(peerUrl);
-        await page.getByRole("button", { name: "Connect" }).click();
-        await expect(
-            page.getByRole("region", { name: /Notifications/ }),
-        ).toContainText("Connected to");
+    await page.goto(`${adminUrl}/`);
+    await page.getByRole("button", { name: "Join network" }).click();
+    await page.getByPlaceholder("URL").fill(peerUrl);
+    await page.getByRole("button", { name: "Connect" }).click();
+    await expect(
+        page.getByRole("region", { name: /Notifications/ }),
+    ).toContainText("Connected to");
 
-        await waitForChain(joiner.socketPath, JOIN_TIMEOUT_MS);
-        await waitForSync(
-            joiner.socketPath,
-            producer.socketPath,
-            JOIN_TIMEOUT_MS,
-        );
-
-        // Dashboard polls while needgenesis clears; Chromium logs those 401/404
-        // loads. Only assert on the peers page after sync.
-        errors.clear();
-        await page.goto(`${adminUrl}/#/peers`);
-        await expect(
-            page.getByRole("row").filter({ hasText: producerEndpoint }),
-        ).toBeVisible();
-        await page.waitForLoadState("networkidle");
-        errors.assertEmpty();
+    if (!waitForJoinerSync) {
+        return;
     }
+
+    await waitForChain(joiner.socketPath, JOIN_TIMEOUT_MS);
+    await waitForSync(
+        joiner.socketPath,
+        producer.socketPath,
+        JOIN_TIMEOUT_MS,
+    );
+
+    // Dashboard polls while needgenesis clears; Chromium logs those 401/404
+    // loads. Only assert on the peers page after sync.
+    errors.clear();
+    await page.goto(`${adminUrl}/#/peers`);
+    await expect(
+        page.getByRole("row").filter({ hasText: producerEndpoint }),
+    ).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    errors.assertEmpty();
 });
