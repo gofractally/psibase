@@ -61,6 +61,7 @@ unset, `psinode` and `psibase` are resolved from `PATH` (direnv adds
 | `PSINODE_BIN` | psinode binary |
 | `PSIBASE_BIN` | psibase CLI binary |
 | `PSIBASE_PACKAGES` | optional directory of `.psi` packages (e.g. locally built ones); defaults to `share/psibase/packages` next to the psinode install prefix |
+| `E2E_PEERING_SYNC` | XAdmin peering: unset/`1` waits for joiner sync + peers page; `0` stops after Connect (CI quick path) |
 
 The config fails immediately when a configured path is missing, when neither
 binary variable is set and the command is absent from `PATH`, or when no
