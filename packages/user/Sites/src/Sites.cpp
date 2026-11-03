@@ -415,16 +415,19 @@ namespace SystemService
          return content;
       }
 
-      bool isPage(const std::string& target)
+      // Browser navigations list text/html explicitly. Subresource loads, fetch(), and CLI
+      // clients send */* or nothing, and should get a plain error instead.
+      bool acceptsHtml(const HttpRequest& request)
       {
-         return !isStaticAsset(target) || target.ends_with(".html");
+         auto accept = get_header_value(request, "Accept");
+         return accept && accept->find("text/html") != std::string::npos;
       }
 
-      // The page to serve, with a 404 status, when `target` matches none of `account`'s content
+      // The page to serve, with a 404 status, when a request matches none of `account`'s content
       std::optional<SitesContentRow> getDefaultPage(const psibase::AccountNumber& account,
-                                                    const std::string&            target)
+                                                    const HttpRequest&            request)
       {
-         if (!isPage(target) || account == Sites::service ||
+         if (!acceptsHtml(request) || account == Sites::service ||
              account == HttpServer::commonApiService || getProxy(account))
          {
             return std::nullopt;
@@ -490,7 +493,7 @@ namespace SystemService
          bool notFound = false;
          if (!content)
          {
-            content  = getDefaultPage(account, target);
+            content  = getDefaultPage(account, request);
             notFound = content.has_value();
          }
 
@@ -523,6 +526,11 @@ namespace SystemService
                                 {"Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"},
                                 {"Access-Control-Allow-Headers", "*"}},
             };
+
+            if (notFound)
+            {
+               reply.headers.push_back({"Vary", "Accept"});
+            }
 
             if (request.method != "HEAD")
             {

@@ -7,6 +7,8 @@ import tempfile
 import unittest
 
 DEFAULT_PAGE_MARKER = '/common/default-pages/page.js'
+NAVIGATE = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'}
+STYLESHEET = {'Accept': 'text/css,*/*;q=0.1'}
 
 class TestSites(unittest.TestCase):
     @testutil.psinode_test
@@ -26,26 +28,28 @@ class TestSites(unittest.TestCase):
         a.push_action('qux', 'sites', 'setProxy', {'proxy': 'bar'})
         a.wait(new_block())
 
-        # Page requests on accounts without an index get the default page
-        for (path, account) in [('/', 'baz'), ('/a/route', 'baz'), ('/page.html', 'baz'), ('/', 'bar'), ('/', 'nosuchacct')]:
-            self.assertDefaultPage(a.get(path, account))
+        # Browser navigations on accounts without an index get the default page
+        for (path, account) in [('/', 'baz'), ('/a/route', 'baz'), ('/page.html', 'baz'), ('/notes.txt', 'baz'), ('/', 'bar'), ('/', 'nosuchacct')]:
+            self.assertDefaultPage(a.get(path, account, headers=NAVIGATE))
 
-        # Other files never get the default page
-        for (path, account) in [('/style.css', 'baz'), ('/plugin.wasm', 'baz'), ('/other.wasm', 'baz'), ('/x.wasm', 'nosuchacct'), ('/common/nope', 'baz')]:
+        # Subresources, fetch(), and CLI clients never get the default page
+        for (path, account) in [('/', 'baz'), ('/a/route', 'baz'), ('/plugin.wasm', 'baz'), ('/', 'nosuchacct'), ('/x.wasm', 'nosuchacct')]:
             self.assertPlainNotFound(a.get(path, account), path)
+        self.assertPlainNotFound(a.get('/style.css', 'baz', headers=STYLESHEET), '/style.css')
+        self.assertPlainNotFound(a.get('/common/nope', 'baz', headers=NAVIGATE), '/common/nope')
 
         # An account's own content takes precedence, and the default page's assets can't conflict with it
-        self.assertResponse(a.get('/about.html', 'bar'), 'bar about')
+        self.assertResponse(a.get('/about.html', 'bar', headers=NAVIGATE), 'bar about')
         self.assertResponse(a.get('/style.css', 'bar'), 'bar css')
         with a.get('/common/default-pages/style.css', 'bar') as reply:
             reply.raise_for_status()
             self.assertNotEqual(reply.text, 'bar css')
 
         # Accounts with an index or a proxy handle their own misses
-        self.assertResponse(a.get('/', 'foo'), 'foo home')
-        self.assertPlainNotFound(a.get('/missing', 'foo'), '/missing')
-        self.assertPlainNotFound(a.get('/', 'qux'), '/')
-        self.assertResponse(a.get('/about.html', 'qux'), 'bar about')
+        self.assertResponse(a.get('/', 'foo', headers=NAVIGATE), 'foo home')
+        self.assertPlainNotFound(a.get('/missing', 'foo', headers=NAVIGATE), '/missing')
+        self.assertPlainNotFound(a.get('/', 'qux', headers=NAVIGATE), '/')
+        self.assertResponse(a.get('/about.html', 'qux', headers=NAVIGATE), 'bar about')
 
     def assertResponse(self, response, expected):
         response.raise_for_status()
@@ -53,6 +57,7 @@ class TestSites(unittest.TestCase):
 
     def assertDefaultPage(self, response):
         self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.headers.get('Vary'), 'Accept')
         self.assertIn(DEFAULT_PAGE_MARKER, response.text)
 
     def assertPlainNotFound(self, response, path):

@@ -10,11 +10,11 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 ## Default account page
 
-Every subdomain for valid account names is reachable, even for accounts that never upload any content or don't exist. When a page request (a path with no file extension, or ending in `.html`) matches none of an account's content, and the account has no `/index.html` and no proxy, the `sites` service serves a default page with a `404 Not Found` status. The page tells visitors there's nothing at that address yet, and links the account's owner to the Workshop app (when installed) and to the developer docs.
+Every subdomain for valid account names is reachable, even for accounts that never upload any content or don't exist. When a browser navigation (a request whose `Accept` header includes `text/html`) matches none of an account's content, and the account has no `/index.html` and no proxy, the `sites` service serves a default page with a `404 Not Found` status and `Vary: Accept`. The page tells visitors there's nothing at that address yet, and links the account's owner to the Workshop app (when installed) and to the developer docs.
 
 The default page is uploaded by the `common-api` service at `/common/default-pages/index.html`, along with the stylesheet and script it loads from the same directory. Since every `/common/` path is served by `common-api` on every subdomain, these files are always available and can't conflict with an account's own files.
 
-The account's own content always takes precedence. Requests for other files (e.g. `/style.css` or a plugin's `.wasm`) that match nothing get a plain `404 Not Found`, as do all misses on an account that has an `/index.html` or a proxy, so a site's owner controls its own error pages.
+The account's own content always takes precedence. Other requests that match nothing get a plain `404 Not Found`. These include subresource loads (e.g. `/style.css` or a plugin's `.wasm`), `fetch()` calls, and CLI clients, which send `*/*` or no `Accept` header, so they see a readable error instead of an HTML document. An account that has an `/index.html` or a proxy never gets the default page; its misses are looked up in its proxy's content, if it has one, and otherwise get a plain `404 Not Found`. Sites in SPA mode are the exception: they serve their own `/index.html` for every path without a file extension, so they can render their own not-found view.
 
 ## CSP header baseline
 
