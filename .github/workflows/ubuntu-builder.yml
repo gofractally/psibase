@@ -98,6 +98,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: psidk-ubuntu-2204
+          # v4 drops files in the workspace root unless path is set; extract
+          # below expects the artifact name as a directory.
+          path: psidk-ubuntu-2204
       - name: Extract psidk
         run: |
           mkdir psidk-root
