@@ -3,6 +3,7 @@
 from predicates import *
 from test_psibase import TestPackage, make_package_repository
 import testutil
+import json
 import tempfile
 import unittest
 
@@ -21,11 +22,13 @@ class TestSites(unittest.TestCase):
         apps.service('bar', data={'about.html': 'bar about', 'style.css': 'bar css'})
         apps.service('baz')
         apps.service('qux')
+        apps.add_file('script/postinstall.json', json.dumps([
+            {'sender': 'qux', 'service': 'sites', 'method': 'setProxy', 'data': {'proxy': 'bar'}},
+        ]))
 
         with tempfile.TemporaryDirectory() as dir:
             make_package_repository(dir, [apps])
             a.install(['Apps'], sources=[dir])
-        a.push_action('qux', 'sites', 'setProxy', {'proxy': 'bar'})
         a.wait(new_block())
 
         # Browser navigations on accounts without an index get the default page
