@@ -191,6 +191,24 @@ interface tokens {
     get-system-token: func() -> result<option<system-token-info>, error>;
 }
 
+interface accounts {
+    use host:types/types.{error};
+
+    /// Propose freezing these accounts. The staged action is sent as accounts.
+    freeze: func(accounts: list<string>, memo: option<string>) -> result<_, error>;
+
+    /// Propose unfreezing these accounts. The staged action is sent as accounts.
+    unfreeze: func(accounts: list<string>, memo: option<string>) -> result<_, error>;
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
+}
+
 world imports {
     import name-market;
     import producers;
@@ -203,4 +221,5 @@ world imports {
     import sites;
     import transact;
     import tokens;
+    import accounts;
 }
