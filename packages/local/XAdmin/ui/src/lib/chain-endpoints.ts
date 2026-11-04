@@ -170,6 +170,20 @@ class Chain {
         });
     }
 
+    public async getAdminAccounts(): Promise<string[]> {
+        return z
+            .string()
+            .array()
+            .parse(await getJson("/admin_accounts"));
+    }
+
+    public async setAdminAccount(
+        account: string,
+        admin: boolean,
+    ): Promise<void> {
+        await postJson("/admin_accounts", { account, admin });
+    }
+
     public async getStatus(): Promise<string[]> {
         return getJson("/native/admin/status");
     }

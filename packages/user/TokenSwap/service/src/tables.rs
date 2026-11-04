@@ -199,6 +199,7 @@ pub mod tables {
         pub fn administration_nft_owner(&self) -> AccountNumber {
             psibase::services::nft::Wrapper::call()
                 .getNft(self.admin_nft)
+                .expect("NFT was burned")
                 .owner
         }
 
@@ -246,7 +247,7 @@ pub mod tables {
             );
 
             let mint_and_send_back = |memo| {
-                let id = nft.mint();
+                let id = nft.mint(None);
                 nft.credit(id, sender, memo);
                 id
             };

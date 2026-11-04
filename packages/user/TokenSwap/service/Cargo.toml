@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-token-swap"
-plugin = "token-swap-plugin"
+plugins = ["token-swap-plugin"]
 postinstall = [
     { sender = "token-swap", service = "token-swap", method = "init", data = {} },
 ]

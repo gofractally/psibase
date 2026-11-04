@@ -11,14 +11,13 @@ bool is_empty(const std::vector<std::string>& contents,
    return std::ranges::find_if(contents, [&](const auto& item)
                                { return item >= lower && (upper.empty() || item < upper); }) ==
           contents.end();
-   ;
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size)
 {
    static auto              db      = createDb();
    auto                     session = db->start_write_session();
-   auto                     r       = std::shared_ptr<root>{};
+   auto                     r       = shared_root{};
    std::vector<std::string> contents;
    std::string              key;
    bool                     escape = false;

@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-symbol"
-plugin = "symbol-plugin"
+plugins = ["symbol-plugin"]
 postinstall = [{ sender = "symbol", service = "symbol", method = "init" }]
 
 

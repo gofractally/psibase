@@ -10,14 +10,11 @@ export const contactsConfig = defineAppConfig({
     name: "Contacts",
     description: "Manage your contacts.",
     icon: <BookUser className="h-6 w-6" />,
-    isMore: false,
-    isLoginRequired: true,
-    showLoginLoadingSpinner: true,
+    fill: true,
     children: [
         {
             path: "",
             element: <ContactsPage />,
-            name: "Home",
         },
     ],
 });

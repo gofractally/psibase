@@ -109,6 +109,51 @@ namespace TestService
       check(result[1] == S2{3, 1, 4}, "iter val1");
    }
 
+   void TestTable::iterMulti()
+   {
+      auto t1   = open<MultiKeyTable>();
+      auto idx0 = t1.getIndex<0>();
+      auto idx1 = t1.getIndex<1>();
+      t1.put(S1{0, 3, 2});
+      t1.put(S1{4, 1, 5});
+      {
+         std::vector<S1> items;
+         for (auto x : idx0)
+         {
+            items.push_back(x);
+         }
+         check(items == std::vector<S1>{{0, 3, 2}, {4, 1, 5}}, "wrong items");
+      }
+      {
+         std::vector<S1> items;
+         for (auto x : idx1)
+         {
+            items.push_back(x);
+         }
+         check(items == std::vector<S1>{{4, 1, 5}, {0, 3, 2}}, "wrong items");
+      }
+      {
+         auto iter = idx0.begin(), end = idx0.end();
+         check(iter != end, "missing item 0");
+         check(iter.view()->unpack() == S1{0, 3, 2}, "iter view0");
+         ++iter;
+         check(iter != end, "missing item 1");
+         check(iter.view()->unpack() == S1{4, 1, 5}, "iter view1");
+         ++iter;
+         check(iter == end, "expected end");
+      }
+      {
+         auto iter = idx1.begin(), end = idx1.end();
+         check(iter != end, "missing item 0");
+         check(iter.view()->unpack() == S1{4, 1, 5}, "iter view0");
+         ++iter;
+         check(iter != end, "missing item 1");
+         check(iter.view()->unpack() == S1{0, 3, 2}, "iter view1");
+         ++iter;
+         check(iter == end, "expected end");
+      }
+   }
+
 }  // namespace TestService
 
 PSIBASE_DISPATCH(TestService::TestTable)

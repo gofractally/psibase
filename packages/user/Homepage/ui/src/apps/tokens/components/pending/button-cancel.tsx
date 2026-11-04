@@ -78,16 +78,15 @@ export const CancelButton = ({
                 <TooltipContent>Cancel</TooltipContent>
                 <TooltipTrigger asChild>
                     <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-6 w-6"
+                        variant="ghost"
+                        size="icon-xs"
                         disabled={isPending}
                         onClick={() => setIsDialogOpen(true)}
                     >
                         {isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="size-3.5 animate-spin" />
                         ) : (
-                            <Undo2 className="h-4 w-4" />
+                            <Undo2 className="size-3.5" />
                         )}
                     </Button>
                 </TooltipTrigger>

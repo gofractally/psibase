@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <psibase/Memo.hpp>
 #include <psibase/psibase.hpp>
 
@@ -13,7 +14,12 @@ namespace UserService
    class Nft : public psibase::Service
    {
      public:
-      using Tables = psibase::ServiceTables<NftConfigTable, NftTable, NftHolderTable, CreditTable>;
+      using Tables = psibase::ServiceTables<NftConfigTable,
+                                            NftTable,
+                                            NftHolderTable,
+                                            CreditTable,
+                                            UserPendingTable,
+                                            BurnedTable>;
 
       static constexpr auto         service   = psibase::AccountNumber("nft");
       static constexpr std::uint8_t autoDebit = 0;
@@ -21,7 +27,7 @@ namespace UserService
       Nft(psio::shared_view_ptr<psibase::Action> action);
 
       void init();
-      NID  mint();
+      NID  mint(std::optional<NID> nftId);
       void burn(NID nftId);
       void credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
       void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
@@ -29,11 +35,11 @@ namespace UserService
       void setUserConf(std::uint8_t flag, bool enable);
 
       // Read-only:
-      NftRecord       getNft(NID nftId);
-      NftHolderRecord getNftHolder(psibase::AccountNumber account);
-      CreditRecord    getCredRecord(NID nftId);
-      bool            exists(NID nftId);
-      bool            getUserConf(psibase::AccountNumber account, std::uint8_t flag);
+      std::optional<NftRecord> getNft(NID nftId);
+      NftHolderRecord          getNftHolder(psibase::AccountNumber account);
+      std::optional<CreditRecord> getCredRecord(NID nftId);
+      bool                     exists(NID nftId);
+      bool                     getUserConf(psibase::AccountNumber account, std::uint8_t flag);
 
      public:
       struct Events
@@ -43,25 +49,16 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void minted(NID nftId, Account issuer) {}
-            void burned(NID nftId, Account owner) {}
-            void userConfSet(Account account, std::uint8_t flag, bool enable) {}
-            void credited(NID nftId, Account sender, Account receiver, MemoView memo) {}
-            void uncredited(NID nftId, Account sender, Account receiver, MemoView memo) {}
+            void ownerChange(NID nftId, std::uint8_t action, Account account, Account counter_party, MemoView memo) {}
          };
          // clang-format on
-
-         struct Merkle
-         {
-            void transferred(NID nftId, Account creditor, Account debitor, MemoView memo) {}
-         };
       };
    };
 
    // clang-format off
    PSIO_REFLECT(Nft,
       method(init),
-      method(mint),
+      method(mint, nftId),
       method(burn, nftId),
       method(credit, nftId, receiver, memo),
       method(uncredit, nftId, memo),
@@ -75,14 +72,7 @@ namespace UserService
       method(getUserConf, account, flag)
    );
    PSIBASE_REFLECT_HISTORY_EVENTS(Nft,
-      method(minted, nftId, issuer),
-      method(burned, nftId, owner),
-      method(userConfSet, account, flag, enable),
-      method(credited, nftId, sender, receiver, memo),
-      method(uncredited, nftId, sender, receiver, memo)
-   );
-   PSIBASE_REFLECT_MERKLE_EVENTS(Nft,
-      method(transferred, nftId, creditor, debitor, memo)
+      method(ownerChange, nftId, action, account, counter_party, memo),
    );
 
    PSIBASE_REFLECT_TABLES(Nft, Nft::Tables)

@@ -18,6 +18,11 @@ interface user-fractal {
 
     dist-token: func() -> result<_, error>;
     claim-rewards: func(member: string) -> result<_, error>;
+
+    /// Debit the caller and hold `amount` of `token-id` until dist-token.
+    donate: func(token-id: u32, amount: string) -> result<_, error>;
+    /// Debit the caller and deposit `amount` of `token-id` into the fractal stream.
+    income: func(token-id: u32, amount: string) -> result<_, error>;
 }
 
 interface types {

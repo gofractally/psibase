@@ -1,11 +1,17 @@
 package auth-delegate:plugin;
 
 interface session {
-    use host:types/types.{error};
+    use host:types/types.{error, pem};
+
+    /// Adds `account-name` to the accounts known on this device after verifying that
+    /// `private-key` can authorize it.
+    ///
+    /// Can only be called by `host`.
+    add-account: func(account-name: string, private-key: pem) -> result<_, error>;
 
     /// Log `account-name` into the currently active app.
     ///
-    /// Can only be called by the `accounts` app.
+    /// Can only be called by `host`.
     login: func(account-name: string) -> result<_, error>;
 }
 
@@ -18,4 +24,5 @@ world impl {
 
     export session;
     export api;
+    export queries;
 }

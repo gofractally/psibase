@@ -1,17 +1,23 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::exports::nft::plugin::authorized::Guest as Authorized;
 use bindings::exports::nft::plugin::issuer::Guest as Issuer;
 use bindings::exports::nft::plugin::user::Guest as User;
 use bindings::exports::nft::plugin::user_config::Guest as UserConfig;
 
+use bindings::host::http::api::post_graphql_get_json;
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use bindings::transact::plugin::api::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
 use psibase::{define_trust, FlagsType};
 
 use psibase::services::nft::{self as Nft, NftHolderFlags};
+
+use bindings::host::types::types::PluginId;
+use rand::Rng;
+use serde::Deserialize;
 
 define_trust! {
     descriptions {
@@ -23,23 +29,56 @@ define_trust! {
             - Credit, Debit and uncredit.
             - Auto debit toggle
             - Burning
+            - Read your NFT transfer history and pending transfers
         ",
     }
     functions {
         Medium => [mint],
-        High => [uncredit, debit, enable_user_auto_debit, credit, burn],
+        High => [uncredit, debit, enable_user_auto_debit, credit, burn, graphql],
     }
+}
+
+#[derive(Deserialize)]
+struct MintChoiceResponse {
+    data: MintChoiceData,
+}
+
+#[derive(Deserialize)]
+#[allow(non_snake_case)]
+struct MintChoiceData {
+    firstAvailableId: u32,
+}
+
+fn plugin_error(message: impl Into<String>) -> Error {
+    Error {
+        code: 1,
+        producer: PluginId {
+            service: "nft".into(),
+            plugin: "plugin".into(),
+        },
+        message: message.into(),
+    }
+}
+
+fn first_available_id(begin: u32) -> Result<u32, Error> {
+    let query = format!("query {{ firstAvailableId(begin: {begin}) }}");
+    let body = post_graphql_get_json(&query)?;
+    serde_json::from_str::<MintChoiceResponse>(&body)
+        .map(|response| response.data.firstAvailableId)
+        .map_err(|err| plugin_error(err.to_string()))
 }
 
 struct NftPlugin;
 
 impl Issuer for NftPlugin {
-    fn mint() -> Result<(), Error> {
+    fn mint() -> Result<u32, Error> {
         trust::assert_authorized(trust::FunctionName::mint)?;
 
-        let packed_args = Nft::action_structs::mint {}.packed();
-
-        add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)
+        let guess: u32 = rand::rng().random();
+        let id = first_available_id(guess)?;
+        let packed_args = Nft::action_structs::mint { nftId: Some(id) }.packed();
+        add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)?;
+        Ok(id)
     }
 }
 
@@ -101,6 +140,17 @@ impl UserConfig for NftPlugin {
         .packed();
 
         add_action_to_transaction(Nft::action_structs::setUserConf::ACTION_NAME, &packed_args)
+    }
+}
+
+impl Authorized for NftPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::graphql,
+            vec!["homepage".into(), "accounts".into()],
+        )?;
+
+        post_graphql_get_json(&query)
     }
 }
 

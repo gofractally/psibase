@@ -14,7 +14,7 @@ use Exports::{
     transact::Guest as TransactInterface,
 };
 
-use bindings::accounts::query as AccountsQuery;
+use bindings::host::accounts as HostAccounts;
 use bindings::tokens::plugin as TokensPlugin;
 use psibase::AccountNumber;
 use psibase_plugin::*;
@@ -112,6 +112,20 @@ impl Admin for VirtualServerPlugin {
 
         Ok(())
     }
+
+    fn reg_res_provider(app: String, accepted: Vec<String>) -> Result<(), Error> {
+        assert_caller(&["config"], "reg_res_provider");
+        let app = AccountNumber::from_exact(&app)
+            .map_err(|e| ErrorType::ConversionError(e.to_string()))?;
+        VirtualServer::add_to_tx().reg_res_provider(app, accepted);
+        Ok(())
+    }
+
+    fn unreg_res_provider() -> Result<(), Error> {
+        assert_caller(&["config"], "unreg_res_provider");
+        VirtualServer::add_to_tx().unreg_res_provider();
+        Ok(())
+    }
 }
 
 // Refills to the specified capacity, or if not specified, to the user's current
@@ -123,7 +137,7 @@ fn refill_to_capacity(capacity: Option<u64>, force: bool) -> Result<(), Error> {
     let sys_id = get_sys()?;
 
     // Calculate amount to refill
-    let user = AccountsQuery::api::get_current_user()
+    let user = HostAccounts::api::get_current_user()
         .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
     let (balance, current_capacity, auto_fill_threshold) = query::get_user_resources(&user)?;
     let capacity = capacity.unwrap_or(current_capacity);
@@ -215,8 +229,12 @@ impl TransactInterface for VirtualServerPlugin {
     fn auto_fill_gas_tank(account: String) -> Result<(), Error> {
         assert_caller(&["transact"], "auto_fill_gas_tank");
 
-        let user = AccountsQuery::api::get_current_user();
+        let user = HostAccounts::api::get_current_user();
         if !query::billing_enabled()? || user.is_none() || user.unwrap() != account {
+            return Ok(());
+        }
+
+        if !query::should_auto_refill_gas_tank(&account)? {
             return Ok(());
         }
 
@@ -227,11 +245,24 @@ impl TransactInterface for VirtualServerPlugin {
 impl Authorized for VirtualServerPlugin {
     fn graphql(query: String) -> Result<String, Error> {
         assert_caller(
-            &["homepage", "config", &virtual_server::SERVICE.to_string()],
+            &["homepage", "config", "explorer", &virtual_server::SERVICE.to_string()],
             "authorized::graphql",
         );
 
         host::server::post_graphql_get_json(&query)
+    }
+
+    fn get_billing_config() -> Result<Exports::types::BillingConfig, Error> {
+        assert_caller(
+            &["homepage", "config", &virtual_server::SERVICE.to_string()],
+            "authorized::get_billing_config",
+        );
+
+        let config = query::get_billing_config()?;
+        Ok(Exports::types::BillingConfig {
+            fee_receiver: config.fee_receiver,
+            enabled: config.enabled,
+        })
     }
 }
 

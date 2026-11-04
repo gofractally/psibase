@@ -8,6 +8,7 @@ import { UnrankedAccountChip } from "@/components/evaluations/deliberation/unran
 
 import { useRanking } from "@/hooks/fractals/use-ranking";
 import { paths } from "@/lib/paths";
+import { embeddedContactCalls } from "@/lib/plugin";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
@@ -43,10 +44,12 @@ export const EvaluationDeliberation = () => {
 
     const { data: hasProfilesReadPermission } = useHasProfilesReadPermission({
         enabled: !!currentUser,
+        call: embeddedContactCalls.canReadContacts,
     });
 
     const { data: contacts } = useContacts(currentUser, {
         enabled: !!hasProfilesReadPermission,
+        call: embeddedContactCalls.getContacts,
     });
 
     const {
@@ -75,6 +78,7 @@ export const EvaluationDeliberation = () => {
                                     guildAccount!,
                                     groupNumber,
                                 )}
+                                {...embeddedContactCalls}
                             />
                         </div>
                     </CardAction>

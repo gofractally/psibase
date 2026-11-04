@@ -1,9 +1,8 @@
 use crate::Wrapper;
 use psibase::{
-    account,
+    AccountNumber, ChainEmptyResult, Push, account,
     services::{http_server, tokens},
     tester::PRODUCER_ACCOUNT,
-    AccountNumber, ChainEmptyResult, Push,
 };
 
 use super::query::get_user_resources;
@@ -40,10 +39,6 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
     let tokens = tokens::Wrapper::SERVICE;
     let auth_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
 
-    // This is still needed even though the package config specifies the server...
-    http_server::Wrapper::push_from(&chain, vserver)
-        .registerServer(vserver)
-        .get()?;
     chain.finish_block();
 
     chain

@@ -15,18 +15,24 @@ members = [
     "VirtualServer",
     "VirtualServer/service",
     "VirtualServer/plugin",
+    "AuthRecover",
+    "AuthRecover/service",
+    "AuthRecover/query-service",
+    "AuthRecover/plugin",
+    "WsAuth",
+    "WsAuth/service",
 ]
 
 exclude = [
     "Accounts/plugin/accounts",
-    "Accounts/plugin/prompt",
     "AuthAny/plugin/",
     "AuthDelegate/plugin/",
     "AuthSig/plugin/",
     "HttpServer/plugin/",
     "Producers/plugin/",
     "SetCode/plugin/",
-    "Transact/plugin/",
+    "Transact/plugin/transact/",
+    "Transact/plugin/admin/",
 ]
 
 [workspace.package]

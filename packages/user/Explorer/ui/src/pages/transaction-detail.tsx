@@ -1,0 +1,288 @@
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, Lock } from "lucide-react";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+
+import {
+    formatBytes,
+    formatNumber,
+    formatTime,
+    hexByteLength,
+    hexToPrintable,
+    isHash,
+} from "@/lib/format";
+import { findTransaction } from "@/lib/queries";
+import type { Action } from "@/lib/types";
+import { isSystemTransaction } from "@/store/live-chain";
+
+import { AccountLink } from "@/components/account-link";
+import { MethodChip } from "@/components/action-chips";
+import { DocLabel } from "@/components/doc-link";
+import { CopyIcon, Hash } from "@/components/hash";
+import { JsonView } from "@/components/json-view";
+import { KeyValue, PageHeader, Panel } from "@/components/page-header";
+import {
+    PRIVATE_TRANSACTION_HINT,
+    PrivateMarker,
+} from "@/components/private-marker";
+import { TimeAgo } from "@/components/time-ago";
+import { DOC_PATHS } from "@/lib/docs";
+
+import { cn } from "@shared/lib/utils";
+import { Badge } from "@shared/shadcn/ui/badge";
+import { Button } from "@shared/shadcn/ui/button";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
+
+export const TransactionDetailPage = () => {
+    const { id: raw = "" } = useParams();
+    const id = raw.replace(/^0x/i, "").toUpperCase();
+    const valid = isHash(id);
+
+    const { data, isPending, isFetching, error, refetch } = useQuery({
+        queryKey: ["transaction", id],
+        queryFn: () => findTransaction(id, 50_000),
+        enabled: valid,
+        staleTime: (q) => (q.state.data ? Infinity : 0),
+    });
+
+    if (!valid) {
+        return <Notice title="Invalid transaction ID">Expected a 64-character hex string.</Notice>;
+    }
+
+    if (isPending) {
+        return (
+            <div className="flex flex-col gap-4">
+                <PageHeader title="Transaction" description={<Hash value={id} full />} />
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full" />
+            </div>
+        );
+    }
+
+    if (error) {
+        return <Notice title="Lookup failed">{(error as Error).message}</Notice>;
+    }
+
+    if (!data) {
+        return (
+            <div className="flex flex-col gap-4">
+                <PageHeader
+                    title="Transaction"
+                    description={<Hash value={id} full />}
+                    actions={
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            disabled={isFetching}
+                            onClick={() => void refetch()}
+                        >
+                            {isFetching ? "Searching…" : "Search again"}
+                        </Button>
+                    }
+                />
+                <Notice title="Transaction not found">
+                    No transaction with this ID was found in the most recent 50,000 blocks.
+                    It may not be included yet, may be older than the search window, or the ID
+                    may be incorrect.
+                </Notice>
+            </div>
+        );
+    }
+
+    const { transaction: trx, numActions, proofs } = data.transaction;
+    const senders = [...new Set((trx?.actions ?? []).map((a) => a.sender).filter(Boolean))];
+    const payload = (trx?.actions ?? []).reduce((a, act) => a + hexByteLength(act.rawData), 0);
+
+    return (
+        <div className="flex flex-col gap-4">
+            <PageHeader
+                title={
+                    <span className="flex items-center gap-3">
+                        Transaction
+                        {isSystemTransaction(data.index) && (
+                            <Badge variant="outline" className="text-muted-foreground">
+                                System
+                            </Badge>
+                        )}
+                        {!trx && (
+                            <Badge variant="outline" className="text-muted-foreground gap-1">
+                                <Lock className="size-3" /> Private
+                            </Badge>
+                        )}
+                    </span>
+                }
+                description={<Hash value={data.transaction.id} full />}
+                actions={
+                    <Button asChild variant="outline" size="sm" className="h-8">
+                        <Link to={`/blocks/${data.blockNum}`}>
+                            Block #{formatNumber(data.blockNum)}
+                            <ArrowRight className="size-3.5" />
+                        </Link>
+                    </Button>
+                }
+            />
+
+            <Panel title="Summary">
+                <KeyValue label="Block">
+                    <span className="flex flex-wrap items-center gap-2">
+                        <Link to={`/blocks/${data.blockNum}`} className="text-primary font-mono hover:underline">
+                            #{formatNumber(data.blockNum)}
+                        </Link>
+                        <Hash value={data.blockId} head={8} tail={8} />
+                        <span className="text-muted-foreground text-xs">
+                            position {data.index}
+                        </span>
+                    </span>
+                </KeyValue>
+                <KeyValue label="Timestamp">
+                    <span className="flex flex-wrap items-center gap-2">
+                        <span>{formatTime(data.blockTime)}</span>
+                        <span className="text-muted-foreground text-xs">
+                            (<TimeAgo time={data.blockTime} tooltip={false} />)
+                        </span>
+                    </span>
+                </KeyValue>
+                <KeyValue label="Provider">
+                    <AccountLink name={data.producer} />
+                </KeyValue>
+                <KeyValue label="Sender">
+                    {!trx ? (
+                        <PrivateMarker />
+                    ) : senders.length === 0 ? (
+                        <AccountLink name="" />
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {senders.map((s) => (
+                                <AccountLink key={s} name={s} />
+                            ))}
+                        </div>
+                    )}
+                </KeyValue>
+                <KeyValue label="Actions">
+                    <span className="tabular-nums">
+                        {numActions}
+                        {trx && (
+                            <span className="text-muted-foreground"> · {formatBytes(payload)} payload</span>
+                        )}
+                    </span>
+                </KeyValue>
+                <KeyValue
+                    label={
+                        <DocLabel path={DOC_PATHS.smartAuthorization} topic="proofs">
+                            Proofs
+                        </DocLabel>
+                    }
+                >
+                    {proofs ? (
+                        <span className="tabular-nums">{proofs.length}</span>
+                    ) : (
+                        <PrivateMarker />
+                    )}
+                </KeyValue>
+            </Panel>
+
+            {trx ? (
+                <Panel title={`Actions (${trx.actions.length})`} bodyClassName="flex flex-col divide-y">
+                    {trx.actions.map((a, i) => (
+                        <ActionCard key={i} index={i} action={a} />
+                    ))}
+                </Panel>
+            ) : (
+                <Notice title={`${numActions} private ${numActions === 1 ? "action" : "actions"}`}>
+                    {PRIVATE_TRANSACTION_HINT}
+                </Notice>
+            )}
+
+            <JsonView value={data} title="Raw transaction JSON" />
+        </div>
+    );
+};
+
+const ActionCard = ({ index, action }: { index: number; action: Action }) => {
+    const bytes = hexByteLength(action.rawData);
+    const text = action.rawData ? hexToPrintable(action.rawData) : null;
+    const hex = action.rawData ?? "";
+    const decoded =
+        action.data !== undefined && action.data !== null
+            ? JSON.stringify(action.data, null, 2)
+            : null;
+    type Mode = "json" | "hex" | "text";
+    const [mode, setMode] = useState<Mode>(decoded ? "json" : "hex");
+    const body =
+        mode === "json" && decoded
+            ? decoded
+            : mode === "text" && text
+              ? text
+              : hex.length > 4096
+                ? `${hex.slice(0, 4096)}… (${formatBytes(bytes)} total, copy for full payload)`
+                : hex;
+    const copyValue =
+        mode === "json" && decoded ? decoded : mode === "text" && text ? text : hex;
+    return (
+        <div className="flex flex-col gap-2 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground w-5 font-mono text-xs">{index}</span>
+                <AccountLink name={action.sender} />
+                <ArrowRight className="text-muted-foreground size-3.5" />
+                <MethodChip service={action.service} method={action.method} className="text-xs" />
+                <span className="text-muted-foreground ml-auto text-xs">{formatBytes(bytes)}</span>
+            </div>
+            {(bytes > 0 || decoded) && (
+                <div className="bg-muted/30 overflow-hidden rounded-lg border">
+                    <div className="flex items-center justify-between border-b px-3 py-1">
+                        <div className="flex gap-1">
+                            {decoded && (
+                                <button
+                                    type="button"
+                                    onClick={() => setMode("json")}
+                                    className={cn(
+                                        "rounded px-2 py-0.5 text-[11px]",
+                                        mode === "json" ? "bg-accent" : "text-muted-foreground",
+                                    )}
+                                >
+                                    json
+                                </button>
+                            )}
+                            {bytes > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setMode("hex")}
+                                    className={cn(
+                                        "rounded px-2 py-0.5 text-[11px]",
+                                        mode === "hex" ? "bg-accent" : "text-muted-foreground",
+                                    )}
+                                >
+                                    hex
+                                </button>
+                            )}
+                            {text && (
+                                <button
+                                    type="button"
+                                    onClick={() => setMode("text")}
+                                    className={cn(
+                                        "rounded px-2 py-0.5 text-[11px]",
+                                        mode === "text" ? "bg-accent" : "text-muted-foreground",
+                                    )}
+                                >
+                                    text
+                                </button>
+                            )}
+                        </div>
+                        <CopyIcon value={copyValue} />
+                    </div>
+                    <pre className="scrollbar-thin max-h-56 overflow-auto p-3 font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap">
+                        {body}
+                    </pre>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const Notice = ({ title, children }: { title: string; children?: React.ReactNode }) => (
+    <div className="bg-card/70 rounded-xl border p-8 text-center">
+        <div className="text-lg font-semibold">{title}</div>
+        {children && <p className="text-muted-foreground mt-2 text-sm">{children}</p>}
+    </div>
+);

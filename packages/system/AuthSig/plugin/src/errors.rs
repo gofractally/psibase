@@ -9,4 +9,5 @@ plugin_error! {
     KeyNotFound(msg: &'a str) => "Key not found: {msg}",
     InsufficientPermissions(privileged_action: String) => "Insufficient access for {privileged_action}",
     InvalidAccountName(msg: &'a str) => "Invalid account name: {msg}",
+    AuthorizationFailed(account: String) => "Key cannot authorize account: {account}",
 }

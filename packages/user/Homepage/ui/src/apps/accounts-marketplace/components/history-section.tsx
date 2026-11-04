@@ -1,22 +1,16 @@
-import { type ColumnDef } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { useMemo } from "react";
+import { ChevronLeft, ChevronRight, History, Loader2 } from "lucide-react";
 
 import { NameEvent } from "@/apps/accounts-marketplace/lib/graphql/namemarket.schemas";
 
-import { Loading } from "@/components/loading";
+import { EmptyState } from "@/components/empty-state";
+import { Panel } from "@/components/page-header";
+import { DataTable, THead, Table, Td, Th, Tr } from "@/components/table";
 
-import { DataTable } from "@shared/components/data-table";
-import { ErrorCard } from "@shared/components/error-card";
-import { GlowingCard } from "@shared/components/glowing-card";
-import { Badge } from "@shared/shadcn/ui/badge";
-import {
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
+import { cn } from "@shared/lib/utils";
+import { Button } from "@shared/shadcn/ui/button";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 dayjs.extend(relativeTime);
 
@@ -37,35 +31,31 @@ function formatEventTime(blockTime?: string): string {
     return date.format("MMM D, YYYY h:mm A");
 }
 
-function EventBadge({ action }: { action: string }) {
+function EventLabel({ action }: { action: string }) {
     const normalized = action.toLowerCase();
-
-    if (normalized === "bought") {
-        return (
-            <Badge
-                variant="outline"
-                className="border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-            >
-                Bought
-            </Badge>
-        );
-    }
-
-    if (normalized === "claimed") {
-        return (
-            <Badge
-                variant="outline"
-                className="border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800/40 dark:bg-sky-950/40 dark:text-sky-300"
-            >
-                Claimed
-            </Badge>
-        );
-    }
-
+    const styles: Record<string, string> = {
+        bought: "text-emerald-600 dark:text-emerald-400",
+        claimed: "text-foreground",
+    };
     return (
-        <Badge variant="secondary" className="capitalize">
+        <span
+            className={cn(
+                "inline-flex items-center gap-1.5 text-xs font-medium capitalize",
+                styles[normalized] ?? "text-muted-foreground",
+            )}
+        >
+            <span
+                className={cn(
+                    "size-1.5 rounded-full",
+                    normalized === "bought"
+                        ? "bg-emerald-500"
+                        : normalized === "claimed"
+                          ? "bg-[var(--chart-2)]"
+                          : "bg-muted-foreground/50",
+                )}
+            />
             {action}
-        </Badge>
+        </span>
     );
 }
 
@@ -96,124 +86,127 @@ export function HistorySection({
     error,
     isLoggedIn,
 }: Props) {
-    const columns = useMemo<ColumnDef<NameEvent>[]>(
-        () => [
-            {
-                accessorKey: "action",
-                header: "Event",
-                meta: { className: "w-32 whitespace-nowrap pr-3" },
-                cell: ({ row }) => <EventBadge action={row.original.action} />,
-            },
-            {
-                accessorKey: "account",
-                header: "Account",
-                cell: ({ row }) => (
-                    <span className="font-mono text-sm font-medium">
-                        {row.original.account}
-                    </span>
-                ),
-            },
-            {
-                accessorKey: "blockTime",
-                header: () => <div className="text-right">Date</div>,
-                cell: ({ row }) => {
-                    const { blockTime } = row.original;
-                    const formatted = formatEventTime(blockTime);
-
-                    return (
-                        <div className="text-right">
-                            <time
-                                dateTime={blockTime}
-                                title={
-                                    blockTime
-                                        ? dayjs(blockTime).format(
-                                              "MMMM D, YYYY h:mm:ss A",
-                                          )
-                                        : undefined
-                                }
-                                className="text-muted-foreground text-sm"
-                            >
-                                {formatted}
-                            </time>
-                        </div>
-                    );
-                },
-            },
-        ],
-        [],
-    );
-
-    if (!isLoggedIn) {
-        return (
-            <GlowingCard>
-                <CardContent className="text-muted-foreground py-8 text-center">
-                    Log in to see your account marketplace history.
-                </CardContent>
-            </GlowingCard>
-        );
-    }
-
-    if (isPending) {
-        return (
-            <GlowingCard>
-                <Loading />
-            </GlowingCard>
-        );
-    }
-
-    if (isError) {
-        return (
-            <GlowingCard>
-                <ErrorCard
-                    error={
-                        error ??
-                        new Error("Failed to load account marketplace history.")
-                    }
-                />
-            </GlowingCard>
-        );
-    }
-
-    if (events.length === 0 && pageIndex === 0) {
-        return (
-            <GlowingCard>
-                <CardHeader>
-                    <CardTitle>History</CardTitle>
-                    <CardDescription>
-                        Purchases and claims appear here.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="text-muted-foreground py-8 text-center">
-                    You don&apos;t have any history yet.
-                </CardContent>
-            </GlowingCard>
-        );
-    }
+    const showPagination =
+        isLoggedIn &&
+        !isPending &&
+        !isError &&
+        (hasNextPage || hasPreviousPage || pageIndex > 0);
 
     return (
-        <GlowingCard>
-            <CardHeader>
-                <CardTitle>History</CardTitle>
-                <CardDescription>
-                    Purchases and claims for your account.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <DataTable
-                    columns={columns}
-                    data={events}
-                    caption="Your account marketplace activity."
-                    emptyMessage="You don't have any history yet."
-                    serverPagination={{
-                        pageIndex,
-                        hasNextPage,
-                        hasPreviousPage,
-                        onNextPage,
-                        onPreviousPage,
-                        isLoading: isFetching,
-                    }}
-                />
-            </CardContent>
-        </GlowingCard>
+        <Panel
+            title="History"
+            description="Purchases and claims for your account"
+            className="max-w-4xl"
+            actions={
+                isFetching && !isPending ? (
+                    <Loader2 className="text-muted-foreground size-3.5 animate-spin" />
+                ) : undefined
+            }
+        >
+            {!isLoggedIn ? (
+                <EmptyState className="min-h-32">
+                    Log in to see your account marketplace history.
+                </EmptyState>
+            ) : isPending ? (
+                <div className="flex flex-col gap-2 p-4">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <Skeleton key={i} className="h-6 w-full" />
+                    ))}
+                </div>
+            ) : isError ? (
+                <EmptyState
+                    className="text-destructive min-h-24"
+                    detail={error?.message}
+                >
+                    Failed to load history
+                </EmptyState>
+            ) : events.length === 0 ? (
+                <EmptyState
+                    icon={History}
+                    className="min-h-40"
+                    detail={
+                        pageIndex === 0
+                            ? "Names you buy or claim will be listed here."
+                            : "No more events."
+                    }
+                >
+                    {pageIndex === 0 ? "No history yet" : "End of history"}
+                </EmptyState>
+            ) : (
+                <DataTable>
+                    <Table>
+                        <THead>
+                            <tr>
+                                <Th className="w-28">Event</Th>
+                                <Th>Account</Th>
+                                <Th className="text-right">When</Th>
+                            </tr>
+                        </THead>
+                        <tbody>
+                            {events.map((event, index) => (
+                                <Tr
+                                    key={`${event.account}-${event.action}-${event.blockTime ?? index}`}
+                                >
+                                    <Td>
+                                        <EventLabel action={event.action} />
+                                    </Td>
+                                    <Td>
+                                        <span className="font-mono font-medium">
+                                            {event.account}
+                                        </span>
+                                    </Td>
+                                    <Td className="text-right">
+                                        <time
+                                            dateTime={event.blockTime}
+                                            title={
+                                                event.blockTime
+                                                    ? dayjs(
+                                                          event.blockTime,
+                                                      ).format(
+                                                          "MMMM D, YYYY h:mm:ss A",
+                                                      )
+                                                    : undefined
+                                            }
+                                            className="text-muted-foreground text-xs tabular-nums"
+                                        >
+                                            {formatEventTime(event.blockTime)}
+                                        </time>
+                                    </Td>
+                                </Tr>
+                            ))}
+                        </tbody>
+                    </Table>
+                </DataTable>
+            )}
+            {showPagination && (
+                <div className="bg-muted/30 flex items-center justify-between border-t px-4 py-2">
+                    <span className="text-muted-foreground text-xs tabular-nums">
+                        Page {pageIndex + 1}
+                    </span>
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={onPreviousPage}
+                            disabled={!hasPreviousPage || isFetching}
+                        >
+                            <ChevronLeft className="size-3.5" />
+                            Previous
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={onNextPage}
+                            disabled={!hasNextPage || isFetching}
+                        >
+                            Next
+                            <ChevronRight className="size-3.5" />
+                        </Button>
+                    </div>
+                </div>
+            )}
+        </Panel>
     );
 }

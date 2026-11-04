@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import QueryKey from "@/lib/query-keys";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
-import { producers } from "@shared/lib/plugins";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
+import { config } from "@shared/lib/plugins";
 
 interface CandidateInfo {
     account: string;
@@ -45,8 +45,8 @@ export const useCandidates = () => {
                 }
             `;
 
-            const res = await callGraphqlViaPlugin<CandidatesResponse>(
-                producers.authorized.graphql,
+            const res = await graphqlAuth<CandidatesResponse>(
+                config.producers.graphql,
                 query,
             );
 

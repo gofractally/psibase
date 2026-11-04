@@ -6,6 +6,7 @@ import dayjs from "dayjs";
 import { useScores } from "@/hooks/fractals/use-scores";
 import { useGuild } from "@/hooks/use-guild";
 import { paths } from "@/lib/paths";
+import { embeddedContactCalls } from "@/lib/plugin";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { ShowContactsButton } from "@shared/components/show-contacts-button";
@@ -55,6 +56,7 @@ export const GuildMembers = () => {
                         returnPath={paths.guild.membership.members(
                             guild?.account ?? "",
                         )}
+                        {...embeddedContactCalls}
                     />
                 </CardAction>
             </CardHeader>
@@ -81,6 +83,7 @@ export const GuildMembers = () => {
                                         <div className="flex flex-row gap-2">
                                             <TableContact
                                                 account={member.member}
+                                                {...embeddedContactCalls}
                                             />
                                             {roleLabel != null && (
                                                 <Badge variant="default">

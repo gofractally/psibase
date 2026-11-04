@@ -75,7 +75,7 @@ fn remove_active_query_token(app: &str, user: &str) {
 
 impl Api for HostAuth {
     fn set_logged_in_user(user: String, app: String, claim: Option<Claim>) -> Result<(), Error> {
-        check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
+        check_caller(&["host"], "set-logged-in-user@host:auth/api");
 
         let token = match cached_token(&app, &user) {
             Some(t) => t,
@@ -86,7 +86,7 @@ impl Api for HostAuth {
     }
 
     fn log_out_user(user: String, app: String) {
-        check_caller(&["accounts"], "log-out-user@host:auth/api");
+        check_caller(&["host"], "log-out-user@host:auth/api");
         remove_active_query_token(&app, &user);
     }
 

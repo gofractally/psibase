@@ -1,7 +1,6 @@
 import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plugin-function-mutation";
 import { usePluginFunctionQuery } from "@shared/hooks/plugin-function/use-plugin-function-query";
 
-import { Plugin as Accounts } from "./accounts";
 import { AuthorizedGraphqlPlugin } from "./authorized-graphql-plugin";
 import { Plugin as Config } from "./config";
 import { Plugin as Homepage } from "./homepage";
@@ -12,7 +11,6 @@ import { Plugin as Profiles } from "./profiles";
 import { Plugin as TokenSwap } from "./token-swap";
 import { Plugin as Tokens } from "./tokens";
 
-const accounts = new Accounts("accounts");
 const config = new Config("config");
 const homepage = new Homepage("homepage");
 const packages = new Packages("packages");
@@ -34,7 +32,6 @@ const transact = new AuthorizedGraphqlPlugin("transact");
 const vserver = new AuthorizedGraphqlPlugin("vserver");
 
 export {
-    accounts,
     config,
     homepage,
     packages,

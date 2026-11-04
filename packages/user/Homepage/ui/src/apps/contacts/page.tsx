@@ -1,7 +1,10 @@
-import { Search, UserPlus } from "lucide-react";
+import { Search, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMediaQuery } from "usehooks-ts";
 
+import { EmptyState } from "@/components/empty-state";
+import { Loading } from "@/components/loading";
 import { TwoColumnSelect } from "@/components/two-column-select";
 
 import { useContacts } from "@shared/hooks/use-contacts";
@@ -10,9 +13,6 @@ import { Button } from "@shared/shadcn/ui/button";
 import { DialogTrigger } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
-import { toast } from "@shared/shadcn/ui/sonner";
-import { TooltipContent, TooltipTrigger } from "@shared/shadcn/ui/tooltip";
-import { Tooltip } from "@shared/shadcn/ui/tooltip";
 
 import { ContactDetails } from "./components/contact-details";
 import { ContactListSection } from "./components/contact-list-section";
@@ -31,19 +31,23 @@ export const ContactsPage = () => {
         useCreateContact();
 
     useEffect(() => {
-        console.log({ isSuccessContacts, currentUser, isCreatingContact });
         if (isSuccessContacts && currentUser && !isCreatingContact) {
             const isSelfIncluded = contactsData.some(
                 (contact) => contact.account === currentUser,
             );
-            console.log({ isSelfIncluded });
             if (!isSelfIncluded) {
                 createContact({
                     account: currentUser,
                 });
             }
         }
-    }, [contactsData, currentUser, createContact, isCreatingContact]);
+    }, [
+        contactsData,
+        currentUser,
+        createContact,
+        isCreatingContact,
+        isSuccessContacts,
+    ]);
 
     const [search, setSearch] = useState("");
 
@@ -62,10 +66,6 @@ export const ContactsPage = () => {
 
     const isDesktop = useMediaQuery("(min-width: 1024px)");
 
-    const updateSearch = (value: string) => {
-        setSearch(value);
-    };
-
     useEffect(() => {
         if (isDesktop) {
             const misMatch =
@@ -83,12 +83,14 @@ export const ContactsPage = () => {
         }
     }, [isDesktop, search, contacts, selectedContactAccount]);
 
-    const handleTransferFunds = () => {
-        toast.error("Not implemented: Transfer funds");
+    const navigate = useNavigate();
+
+    const handleTransferFunds = (account: string) => {
+        navigate(`/tokens?to=${encodeURIComponent(account)}`);
     };
 
-    const chainMailUser = () => {
-        toast.error("Not implemented: Chain mail user");
+    const chainMailUser = (account: string) => {
+        navigate(`/chainmail?with=${encodeURIComponent(account)}`);
     };
 
     const selectedContact = contacts.find(
@@ -120,47 +122,73 @@ export const ContactsPage = () => {
             ),
         },
         ...contactsSections,
-    ];
+    ].filter((section) => section.contacts.length > 0);
 
     if (isLoadingContacts) {
-        return <div>Loading...</div>;
+        return <Loading className="flex-1" label="Loading contacts…" />;
     }
 
     const display = isDesktop ? "both" : selectedContact ? "right" : "left";
+    const otherCount =
+        contactsData?.filter((c) => c.account !== currentUser).length ?? 0;
+    const hasNoContacts = !contactsData || contactsData.length === 0;
 
     return (
         <TwoColumnSelect
             left={
-                <ScrollArea className="bg-sidebar/60 h-full w-full">
-                    <div className="relative flex items-center px-4 py-2">
+                <div className="bg-sidebar/40 relative flex h-full min-h-0 flex-col overflow-hidden">
+                    <div className="border-border relative z-10 shrink-0 border-b px-3 py-2">
+                        <Search className="text-muted-foreground left-5.5 pointer-events-none absolute top-1/2 size-3.5 -translate-y-1/2" />
                         <Input
-                            placeholder="Search contacts..."
+                            placeholder="Search contacts…"
                             value={search}
-                            onChange={(e) => updateSearch(e.target.value)}
-                            className="pl-10"
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="bg-background h-8 pl-8 text-[13px]"
+                            aria-label="Search contacts"
                         />
-                        <Search className="text-muted-foreground absolute left-8 top-1/2 h-4 w-4 -translate-y-1/2" />
                     </div>
-                    {!contactsData || contactsData.length === 0 ? (
-                        <div className="flex h-full items-center justify-center">
-                            <p className="text-muted-foreground">
-                                No contacts. Create one!
-                            </p>
-                        </div>
+                    {hasNoContacts ? (
+                        <EmptyState
+                            icon={Users}
+                            detail="Contacts are stored locally on this device."
+                            action={
+                                <Button
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={() => setNewContactModal(true)}
+                                >
+                                    <UserPlus className="size-3.5" />
+                                    New contact
+                                </Button>
+                            }
+                        >
+                            No contacts yet
+                        </EmptyState>
+                    ) : contacts.length === 0 ? (
+                        <EmptyState
+                            icon={Search}
+                            detail="Try a different search term."
+                        >
+                            No matches
+                        </EmptyState>
                     ) : (
-                        <div className="flex h-full flex-col gap-2 pb-16">
-                            {sections.map((section) => (
-                                <ContactListSection
-                                    key={section.title}
-                                    title={section.title}
-                                    setSelectedContact={setSelectedAccount}
-                                    selectedContactId={selectedContactAccount}
-                                    contacts={section.contacts}
-                                />
-                            ))}
-                        </div>
+                        <ScrollArea className="min-h-0 flex-1">
+                            <div className="flex flex-col pb-16">
+                                {sections.map((section) => (
+                                    <ContactListSection
+                                        key={section.title}
+                                        title={section.title}
+                                        setSelectedContact={setSelectedAccount}
+                                        selectedContactId={
+                                            selectedContactAccount
+                                        }
+                                        contacts={section.contacts}
+                                    />
+                                ))}
+                            </div>
+                        </ScrollArea>
                     )}
-                </ScrollArea>
+                </div>
             }
             right={
                 <ContactDetails
@@ -175,9 +203,15 @@ export const ContactsPage = () => {
                 />
             }
             header={
-                <header className="flex items-center justify-between border-b px-4 py-2.5">
-                    <div className="flex-1">
-                        <h1 className="text-xl font-bold">Contacts</h1>
+                <header className="bg-card/40 flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2.5">
+                    <div className="flex min-w-0 items-baseline gap-2">
+                        <h1 className="text-sm font-semibold">Contacts</h1>
+                        <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
+                            {otherCount}
+                        </span>
+                        <span className="text-muted-foreground hidden truncate text-xs sm:inline">
+                            · stored locally on this device
+                        </span>
                     </div>
                     <NewContactDialog
                         open={newContactModal}
@@ -186,16 +220,12 @@ export const ContactsPage = () => {
                             setSelectedAccount(newAccount);
                         }}
                         trigger={
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="icon">
-                                            <UserPlus className="h-5 w-5" />
-                                        </Button>
-                                    </DialogTrigger>
-                                </TooltipTrigger>
-                                <TooltipContent>Create contact</TooltipContent>
-                            </Tooltip>
+                            <DialogTrigger asChild>
+                                <Button size="sm" className="h-7 text-xs">
+                                    <UserPlus className="size-3.5" />
+                                    New contact
+                                </Button>
+                            </DialogTrigger>
                         }
                     />
                 </header>

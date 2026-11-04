@@ -6,6 +6,7 @@ import { useParams } from "react-router-dom";
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
+import { embeddedContactCalls } from "@/lib/plugin";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
@@ -76,7 +77,10 @@ export const ApplicationDetail = () => {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-3">
                         {applicant ? (
-                            <TableContact account={applicant} />
+                            <TableContact
+                                account={applicant}
+                                {...embeddedContactCalls}
+                            />
                         ) : (
                             "Loading..."
                         )}
@@ -156,6 +160,7 @@ export const ApplicationDetail = () => {
                                             <TableCell className="font-medium">
                                                 <TableContact
                                                     account={attest.attester}
+                                                    {...embeddedContactCalls}
                                                 />
                                             </TableCell>
                                             <TableCell>

@@ -3,6 +3,7 @@
 mod service {
     use async_graphql::{connection::Connection, *};
     use auth_dyn::tables::{Management, ManagementTable};
+    use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
     use psibase::*;
 
     struct Query;
@@ -11,6 +12,15 @@ mod service {
     impl Query {
         async fn get_management(&self, account: AccountNumber) -> Option<Management> {
             Management::get(account)
+        }
+
+        /// Resolve the account-level dynamic auth policy from the account's manager.
+        async fn get_policy(&self, account: AccountNumber) -> Option<DynamicAuthPolicy> {
+            let management = Management::get(account)?;
+            if !management.has_policy() {
+                return None;
+            }
+            Some(management.dynamic_policy(None))
         }
 
         async fn get_managed(

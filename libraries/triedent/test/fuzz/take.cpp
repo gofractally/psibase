@@ -26,7 +26,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
    if (!upper.empty() && upper < lower)
       return -1;
 
-   auto r = std::shared_ptr<root>{};
+   auto r = shared_root{};
 
    for (std::string_view row : contents)
    {

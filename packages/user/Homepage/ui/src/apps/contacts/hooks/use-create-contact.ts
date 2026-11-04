@@ -1,6 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 
-import { upsertUserToCache } from "@shared/hooks/use-contacts";
+import {
+    contactsQueryKey,
+    upsertUserToCache,
+} from "@shared/hooks/use-contacts";
 import SharedQueryKey from "@shared/lib/query-keys";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
@@ -13,7 +16,7 @@ export const useCreateContact = () => {
         mutationFn: async (newContact: LocalContact) => {
             const parsed = zLocalContact.parse(newContact);
             void (await supervisor.functionCall({
-                service: zAccount.parse("profiles"),
+                service: zAccount.parse("homepage"),
                 method: "set",
                 intf: "contacts",
                 params: [parsed, false],
@@ -27,7 +30,7 @@ export const useCreateContact = () => {
             );
             upsertUserToCache(username, newContact);
             context.client.invalidateQueries({
-                queryKey: SharedQueryKey.contacts(username),
+                queryKey: contactsQueryKey(username),
             });
         },
         onError: (error, _, onMutateResult) => {

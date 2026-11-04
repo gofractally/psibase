@@ -9,6 +9,15 @@
     },
     {
         "sender": "homepage",
+        "service": "dyn-ld",
+        "method": "link",
+        "data": {
+            "group": "Explorer",
+            "deps": [{ "name": "explorer", "service": "explorer" }]
+        }
+    },
+    {
+        "sender": "homepage",
         "service": "http",
         "method": "setRedirect",
         "data": {

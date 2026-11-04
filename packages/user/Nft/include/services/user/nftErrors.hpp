@@ -8,6 +8,7 @@ namespace UserService
    {
       constexpr std::string_view nftDNE                 = "NFT does not exist";
       constexpr std::string_view invalidNftId           = "NFT ID invalid";
+      constexpr std::string_view nftIdTaken             = "NFT ID already taken";
       constexpr std::string_view nothingToDebit         = "has no pending nft";
       constexpr std::string_view uncreditRequiresCredit = "Nothing to uncredit. Must first credit.";
       constexpr std::string_view creditorIsDebitor      = "Creditor and debitor cannot be the same";
