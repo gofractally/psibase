@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { guilds } from "@shared/lib/plugins";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
@@ -23,7 +23,7 @@ export const zGuild = z.object({
 export type Guild = z.infer<typeof zGuild>;
 
 export const getGuild = async (guildAccount: Account) => {
-    const res = await callGraphqlViaPlugin(
+    const res = await graphqlAuth(
         guilds.authorized.graphql,
         `
         {

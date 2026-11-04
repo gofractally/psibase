@@ -47,14 +47,10 @@ namespace SystemService
 
       /// See header
       ///
-      /// Transaction's first authorizer. This flag is only
-      /// used for `topActionReq`.
+      /// Transaction's first authorizer.
       ///
-      /// Auth services should be aware that if this flag
-      /// is set, then only the first proof has been verified.
-      /// If they rely on other proofs when this flag is set,
-      /// they'll open up the accounts they're trying to
-      /// protect to resource billing attacks.
+      /// This flag is set when checking the authorization of the
+      /// sender of the first action of a transaction.
       static constexpr uint32_t firstAuthFlag = 0x4000'0000;
 
       /// Authenticate a top-level action or a `runAs` action
@@ -143,6 +139,13 @@ namespace SystemService
                      std::vector<char>    proof);
    };
    PSIO_REFLECT(VerifyInterface, method(verifySys, transactionHash, claim, proof))
+
+   struct AuthTarget
+   {
+      psibase::AccountNumber                sender;
+      std::optional<psibase::ServiceMethod> action;
+      PSIO_REFLECT(AuthTarget, sender, action)
+   };
 
    struct TransactStatus
    {
@@ -323,6 +326,10 @@ namespace SystemService
       ///   `allowedActions` from that same earlier call.
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
+      /// Returns true if all the actions can be authorized by authorizers.
+      /// This does not include any of the special rules of `runAs`.
+      bool isAuth(std::vector<AuthTarget> actions, std::vector<psibase::AccountNumber> authorizers);
+
       /// Checks authorization for the sender of the first action
       bool checkFirstAuth(psibase::Checksum256                   id,
                           psio::view<const psibase::Transaction> transaction);
@@ -351,6 +358,14 @@ namespace SystemService
       /// bytes have been written or the transaction ends. `numBytes = 0` clears
       /// the override. Callable only by the VirtualServer service.
       void systemWrite(uint64_t numBytes);
+
+      /// Indicates whether the caller has outstanding work
+      ///
+      /// All outstanding work must be completed by the end of the
+      /// transaction or the transaction will fail. This is useful
+      /// for implementing paired actions that need to run in
+      /// the same transaction.
+      void setWork(bool work);
 
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
@@ -392,12 +407,14 @@ namespace SystemService
                 method(removeCallback, type, objective, action),
                 method(regEvIdx, service),
                 method(runAs, action, allowedActions),
+                method(isAuth, actions, authorizers),
                 method(checkFirstAuth, id, transaction),
                 method(resMonitoring, enable),
                 method(isResMonitoring),
                 method(skipBilling, numWrites),
                 method(endSkipBilling),
                 method(systemWrite, numBytes),
+                method(setWork, work),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),

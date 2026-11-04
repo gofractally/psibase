@@ -21,13 +21,13 @@ struct DataFiles {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct PsibaseMetadata {
     #[serde(rename = "package-name")]
     package_name: Option<String>,
     scope: Option<String>,
     server: Option<String>,
-    plugin: Option<String>,
+    plugins: Vec<String>,
     flags: Vec<String>,
     dependencies: HashMap<String, String>,
     services: Option<Vec<String>>,
@@ -198,6 +198,72 @@ fn add_files<'a>(
     Ok(())
 }
 
+fn normalize_data_dest(dst: &str) -> String {
+    let mut dest = if dst.starts_with('/') {
+        dst.to_string()
+    } else {
+        format!("/{dst}")
+    };
+    if dest.ends_with('/') {
+        dest.pop();
+    }
+    dest
+}
+
+fn component_package_id(package: &Package) -> Result<&str, anyhow::Error> {
+    package
+        .metadata
+        .get("component")
+        .and_then(|component| component.get("package"))
+        .and_then(|package_id| package_id.as_str())
+        .filter(|package_id| !package_id.is_empty())
+        .ok_or_else(|| anyhow!("{} has no component package name", package.name))
+}
+
+fn plugin_serve_path(plugin_crate: &str, component_package: &str) -> Result<String, anyhow::Error> {
+    match component_package.split_once(':') {
+        Some((namespace, name))
+            if !namespace.is_empty() && !name.is_empty() && !name.contains([':', '/', '@']) =>
+        {
+            Ok(format!("/{name}.wasm"))
+        }
+        _ => Err(anyhow!(
+            "{plugin_crate} component package `{component_package}` must be <namespace>:<name>"
+        )),
+    }
+}
+
+fn claim_plugin_path(
+    service: &str,
+    plugin_crate: &str,
+    path: &str,
+    plugin_paths: &mut HashMap<String, String>,
+) -> Result<(), anyhow::Error> {
+    if let Some(other) = plugin_paths.get(path) {
+        return Err(anyhow!(
+            "{service} plugins {other} and {plugin_crate} both serve {path}"
+        ));
+    }
+    plugin_paths.insert(path.to_string(), plugin_crate.to_string());
+    Ok(())
+}
+
+fn reject_duplicate_data_paths(
+    files: &[(AccountNumber, String, PathBuf)],
+) -> Result<(), anyhow::Error> {
+    let mut seen: HashMap<(AccountNumber, &str), &Path> = HashMap::new();
+    for (account, dest, src) in files {
+        if let Some(other) = seen.insert((*account, dest.as_str()), src.as_path()) {
+            return Err(anyhow!(
+                "duplicate data path {dest} for {account} ({} and {})",
+                other.display(),
+                src.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub struct PackageBuilder<'a> {
     service_crates: Vec<&'a Package>,
     plugin_crates: Vec<&'a Package>,
@@ -288,27 +354,24 @@ impl<'a> PackageBuilder<'a> {
                         queue.push(&server_package);
                     }
                 }
-                if let Some(plugin) = pmeta.plugin {
+                for data in &pmeta.data {
+                    let src = package.manifest_path.parent().unwrap().join(&data.src);
+                    let dest = normalize_data_dest(&data.dst);
+                    data_sources.push((package.name.as_str(), src.into_std_path_buf(), dest));
+                }
+                let mut served_plugins = HashMap::new();
+                for plugin in &pmeta.plugins {
                     let Some(p) = find_dep(
                         &metadata.packages,
                         &metadata.metadata.workspace_members,
-                        &plugin,
+                        plugin,
                     ) else {
-                        return Err(anyhow!("{} is not a workspace member", plugin,));
+                        return Err(anyhow!("{} is not a workspace member", plugin));
                     };
+                    let path = plugin_serve_path(&p.name, component_package_id(p)?)?;
+                    claim_plugin_path(&package.name, &p.name, &path, &mut served_plugins)?;
                     plugin_crates.push(p);
-                    plugin_targets.push((package.name.as_str(), "/plugin.wasm".to_string()));
-                }
-                for data in &pmeta.data {
-                    let src = package.manifest_path.parent().unwrap().join(&data.src);
-                    let mut dest = data.dst.clone();
-                    if !dest.starts_with('/') {
-                        dest = "/".to_string() + &dest;
-                    }
-                    if dest.ends_with('/') {
-                        dest.pop();
-                    }
-                    data_sources.push((package.name.as_str(), src.into_std_path_buf(), dest));
+                    plugin_targets.push((package.name.as_str(), path));
                 }
                 service_crates.push(*package);
                 if let Some(actions) = &pmeta.postinstall {
@@ -406,6 +469,7 @@ impl<'a> PackageBuilder<'a> {
         for (service, src, dest) in data_sources {
             add_files(crate_to_account[service], &src, &dest, &mut data_files)?;
         }
+        reject_duplicate_data_paths(&data_files)?;
 
         let meta = Meta {
             name: package_name.to_string(),
@@ -605,4 +669,108 @@ pub async fn build_packages(
         result.push(builder.finish(service_wasms, args, metadata, root)?)
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plugin_field_is_rejected() {
+        let Err(err) =
+            serde_json::from_value::<PsibaseMetadata>(json!({"plugin": "tokens-plugin"}))
+        else {
+            panic!("plugin field was accepted");
+        };
+        let err = err.to_string();
+        assert!(
+            err.contains("plugin") && err.contains("unknown field"),
+            "{err}"
+        );
+        serde_json::from_value::<PsibaseMetadata>(json!({"plugins": ["tokens-plugin"]})).unwrap();
+    }
+
+    #[test]
+    fn serve_path_uses_component_package_name() {
+        let cases = [
+            ("transact", "transact:plugin", "/plugin.wasm"),
+            ("transact-admin", "transact:admin", "/admin.wasm"),
+            ("web-crypto", "webcrypto:plugin", "/plugin.wasm"),
+            ("login-prompt", "host:login-prompt", "/login-prompt.wasm"),
+        ];
+        for (crate_name, component_package, served) in cases {
+            let path = plugin_serve_path(crate_name, component_package).unwrap();
+            assert_eq!(path, served, "{crate_name} ({component_package})");
+        }
+    }
+
+    #[test]
+    fn component_package_must_be_namespace_and_name() {
+        let rejected = [
+            "plugin",
+            ":plugin",
+            "transact:",
+            "transact:admin:extra",
+            "host:login/prompt",
+            "foo:bar@1.0.0",
+            "",
+        ];
+        for component_package in rejected {
+            assert!(
+                plugin_serve_path("example", component_package).is_err(),
+                "{component_package}"
+            );
+        }
+    }
+
+    #[test]
+    fn two_plugins_cannot_serve_the_same_path() {
+        let mut plugin_paths = HashMap::new();
+        claim_plugin_path("transact", "transact", "/plugin.wasm", &mut plugin_paths).unwrap();
+        let error = claim_plugin_path(
+            "transact",
+            "other-plugin",
+            "/plugin.wasm",
+            &mut plugin_paths,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("transact"));
+        assert!(error.contains("other-plugin"));
+        assert!(error.contains("/plugin.wasm"));
+    }
+
+    #[test]
+    fn duplicate_data_paths_include_directory_contents() {
+        let root = tempfile::tempdir().unwrap();
+        let ui = root.path().join("ui");
+        std::fs::create_dir(&ui).unwrap();
+        std::fs::write(ui.join("plugin.wasm"), b"from-dir").unwrap();
+        std::fs::write(ui.join("index.html"), b"html").unwrap();
+        let plugin = root.path().join("plugin.wasm");
+        std::fs::write(&plugin, b"plugin").unwrap();
+
+        let service = AccountNumber::new(1);
+        let mut files = Vec::new();
+        add_files(service, &ui, &normalize_data_dest("/"), &mut files).unwrap();
+        add_files(service, &plugin, "/plugin.wasm", &mut files).unwrap();
+        let error = reject_duplicate_data_paths(&files).unwrap_err().to_string();
+        assert!(error.contains("/plugin.wasm"), "{error}");
+
+        let admin = root.path().join("admin");
+        std::fs::create_dir(&admin).unwrap();
+        std::fs::write(admin.join("index.html"), b"html").unwrap();
+        let admin_wasm = root.path().join("admin.wasm");
+        std::fs::write(&admin_wasm, b"wasm").unwrap();
+        let mut nested = Vec::new();
+        add_files(
+            service,
+            &admin,
+            &normalize_data_dest("/admin.wasm/"),
+            &mut nested,
+        )
+        .unwrap();
+        add_files(service, &admin_wasm, "/admin.wasm", &mut nested).unwrap();
+        reject_duplicate_data_paths(&nested).unwrap();
+    }
 }

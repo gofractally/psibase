@@ -1,0 +1,145 @@
+package transact:plugin;
+
+interface types {
+    use host:types/types.{claim};
+
+    /// The verify-service specified in the claim is the service that knows how to verify that
+    /// a proof actually proves the claim.
+    record proof {
+        signature: list<u8>,
+    }
+
+    /// Action data from a transaction
+    record action {
+        /// The sender of this action
+        sender: string,
+        /// The service that will execute this action
+        service: string,
+        /// The name of the action to execute
+        method: string,
+        /// The data passed to the action, packed in fracpack format
+        raw-data: list<u8>,
+    }
+}
+
+interface hooks {
+    /// Allows the caller plugin to manage the sender of any subsequent actions added to this
+    /// transaction.
+    hook-actions-sender: func();
+
+    /// Allows the caller plugin to opt-out of managing the sender of any subsequent actions added
+    /// to this transaction.
+    unhook-actions-sender: func();
+}
+
+interface api {
+    use host:types/types.{error};
+    use types.{action, claim};
+
+    /// Adds the specified service action to the current transaction.
+    ///
+    /// No service is specified, as it is only possible for a plugin to call an
+    /// action on its own service. To call actions on another service, it must use
+    /// that service's plugin.
+    ///
+    /// Parameters
+    /// * `method-name`: The method name of the action being called
+    /// * `packed-args`: The arguments for the action, packed into fracpack format
+    add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
+
+    /// Append a `claim` to the current transaction. At finish-tx, the transact
+    /// admin driver produces the matching proof by calling `host:crypto/keyvault.sign`
+    /// with `claim.raw-data` (typically a DER-encoded public key); the host
+    /// keystore (persistent or transient — see
+    /// `host:crypto/keyvault.import-key-transient`) must contain the matching
+    /// private key.
+    ///
+    /// May be called any number of times during transaction construction.
+    add-signature: func(claim: claim) -> result<_, error>;
+
+    /// Set or clear the propose-latch.
+    ///
+    /// While a latch is set, actions added via add-action-to-transaction are routed
+    /// into a staged transaction proposed by the currently logged-in user on behalf
+    /// of `account`, and use `account` as their sender. Clearing the latch (or
+    /// finishing the transaction) wraps the collected actions into a single
+    /// `staged-tx::propose` action and appends it to the transaction.
+    ///
+    /// Setting the latch to a different account while one is already set flushes the
+    /// current latch (producing a proposal) and starts a new latch for the new account.
+    /// Setting it to the same account is a no-op.
+    ///
+    /// Only callable by the active app.
+    ///
+    /// `account` - The account on behalf of which the currently logged-in user is
+    ///             proposing transactions. Pass `none` to flush the current latch
+    ///             without starting a new one.
+    set-propose-latch: func(account: option<string>) -> result<_, error>;
+
+    /// Submit the given actions as a single staged transaction proposed by the
+    /// logged-in user. Only callable by the `packages` plugin.
+    ///
+    /// * `actions`: The actions to propose.
+    /// * `auto-exec`: If true, the staged transaction will execute as soon as it
+    ///                has enough approvals.
+    propose: func(actions: list<action>, auto-exec: bool) -> result<_, error>;
+}
+
+interface auth {
+    use host:types/types.{error};
+    use types.{claim};
+
+    /// Builds, signs, and POSTs a `loginSys` transaction to `/login` for
+    /// `user` against `app`, returning the bearer token used for
+    /// authenticated queries.
+    ///
+    /// `claim` is appended to the login transaction's claim list and
+    /// the matching proof is produced via `host:crypto/keyvault.sign`
+    /// (the keystore must contain the matching private key). `claim`
+    /// is `none` for accounts whose auth-service does not require a
+    /// signed login (e.g. `auth-any`); in that case the login
+    /// transaction has zero claims and zero proofs.
+    ///
+    /// Only callable by `host`.
+    get-query-token: func(
+        app: string,
+        user: string,
+        claim: option<claim>,
+    ) -> result<string, error>;
+}
+
+/// Interface that makes authorized queries to this app's http server.
+interface authorized {
+    use host:types/types.{error};
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
+}
+
+interface network {
+    use host:types/types.{error};
+
+    /// Set snapshot interval period network wide
+    set-snapshot-time: func(seconds: u32) -> result<_, error>;
+}
+
+// Include this world to import the most common transact:plugin imports
+world imports {
+    import api;
+}
+
+world hook-actions-sender {
+    import hooks;
+    export transact-hook-actions-sender: interface {
+        use host:types/types.{error};
+
+        /// Sets the sender of the specified action when added to this transaction.
+        /// Return `None` if the default sender should be used.
+        on-actions-sender: func(service: string, method: string) -> result<option<string>, error>;
+    }
+}

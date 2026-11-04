@@ -23,31 +23,43 @@ export const ContactItem = ({
     );
 
     return (
-        <div
-            onClick={onSelect}
-            className={cn(
-                "flex w-full cursor-pointer justify-between rounded-sm border p-4",
-                {
-                    "bg-muted": isSelected,
-                },
-            )}
-        >
-            <div className="flex items-center gap-2">
-                <Avatar account={contact.account} className="w-8" />
-                <div className="flex flex-col">
-                    <p className="text-md font-medium">{primaryName}</p>
-                </div>
-            </div>
-
-            {secondaryName && (
-                <div className="flex flex-col justify-center">
-                    <div>
-                        <p className="text-muted-foreground text-right text-sm">
+        <li>
+            <button
+                type="button"
+                onClick={onSelect}
+                aria-pressed={isSelected}
+                className={cn(
+                    "hover:bg-accent/40 focus-visible:ring-ring relative flex w-full items-center gap-3 px-4 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset",
+                    isSelected && "bg-accent/60",
+                )}
+            >
+                {isSelected && (
+                    <span
+                        aria-hidden
+                        className="bg-primary absolute inset-y-1.5 left-0 w-0.5 rounded-r"
+                    />
+                )}
+                <Avatar
+                    account={contact.account}
+                    className="size-8 shrink-0"
+                    alt=""
+                />
+                <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                    <span
+                        className={cn(
+                            "truncate text-[13px] font-medium",
+                            !secondaryName && "font-mono",
+                        )}
+                    >
+                        {primaryName}
+                    </span>
+                    {secondaryName && (
+                        <span className="text-muted-foreground truncate font-mono text-[11px]">
                             {secondaryName}
-                        </p>
-                    </div>
-                </div>
-            )}
-        </div>
+                        </span>
+                    )}
+                </span>
+            </button>
+        </li>
     );
 };

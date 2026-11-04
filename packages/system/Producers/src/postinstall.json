@@ -1,4 +1,5 @@
 [
+    {"sender":"producers","service":"producers","method":"init","data":{}},
     {"sender":"producers","service":"accounts","method":"newAccount","data":{"name":"producers+2","authService":"producers","mode":1}},
     {"sender":"producers","service":"accounts","method":"newAccount","data":{"name":"producers+3","authService":"producers","mode":1}}
 ]

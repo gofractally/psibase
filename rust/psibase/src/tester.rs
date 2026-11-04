@@ -531,7 +531,7 @@ impl Chain {
         TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
     }
 
-    pub fn run_action(&mut self, mode: RunMode, head: bool, action: Action) -> TransactionTrace {
+    pub fn run_action(&self, mode: RunMode, head: bool, action: Action) -> TransactionTrace {
         let packed = action.packed();
         let size = unsafe {
             tester_raw::runAction(self.chain_handle, mode, head, packed.as_ptr(), packed.len())

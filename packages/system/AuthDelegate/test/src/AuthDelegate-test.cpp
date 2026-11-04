@@ -54,9 +54,9 @@ namespace
 
    struct Data
    {
-      UserNfts userNfts;
+      UserNfts nfts;
    };
-   PSIO_REFLECT(Data, userNfts);
+   PSIO_REFLECT(Data, nfts);
 
    struct QueryRoot
    {
@@ -97,7 +97,7 @@ SCENARIO("AuthDelegate")
       auto aliceNfts = [&]()
       {
          auto query = GraphQLBody{
-             "query UserNfts { userNfts( user: \"alice\" ) { edges { node { id issuer owner } } } "
+             "query Nfts { nfts( user: \"alice\" ) { edges { node { id issuer owner } } } "
              "}"};
 
          auto res = t.post(Nft::service, "/graphql", query);
@@ -105,7 +105,7 @@ SCENARIO("AuthDelegate")
          auto body          = std::string(res.body.begin(), res.body.end());
          auto response_root = psio::convert_from_json<QueryRoot>(body);
 
-         return response_root.data.userNfts.edges.size();
+         return response_root.data.nfts.edges.size();
       };
 
       THEN("Alice has not minted any NFTs")

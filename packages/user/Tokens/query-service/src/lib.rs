@@ -183,8 +183,9 @@ mod service {
             tokens
                 .into_iter()
                 .filter(|token| {
-                    let nft = Nfts::call_from(Wrapper::SERVICE).getNft(token.nft_id);
-                    nft.owner == user
+                    Nfts::call_from(Wrapper::SERVICE)
+                        .getNft(token.nft_id)
+                        .is_some_and(|nft| nft.owner == user)
                 })
                 .collect()
         }

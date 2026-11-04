@@ -1,16 +1,16 @@
 import type { TokensOutletContext } from "./layout";
 
 import { useCallback, useEffect, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 
 import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import { TransferModal } from "@/apps/tokens/components/transfer-modal";
 
+import { Panel } from "@/components/page-header";
+
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
-import { GlowingCard } from "@shared/components/glowing-card";
 import { supervisor } from "@shared/lib/supervisor";
-import { CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useCreateContact } from "../contacts/hooks/use-create-contact";
@@ -94,8 +94,13 @@ const TransferPageContents = () => {
         }
     };
 
+    const [searchParams] = useSearchParams();
+    const prefillTo = searchParams.get("to");
+
     const form = useAppForm({
-        defaultValues: defaultTransferValues,
+        defaultValues: prefillTo
+            ? { ...defaultTransferValues, to: { account: prefillTo } }
+            : defaultTransferValues,
         onSubmitMeta: {
             addToContacts: false,
             closeConfirmationModal: () => {},
@@ -167,7 +172,7 @@ const TransferPageContents = () => {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
             <TransferModal
                 form={form}
                 onClose={() => setTransferModal(false)}
@@ -186,63 +191,67 @@ const TransferPageContents = () => {
                     });
                 }}
             />
-            <GlowingCard>
+            <Panel
+                title={`Send ${selectedToken.label}`}
+                description={
+                    selectedToken.isTransferable === false
+                        ? "This token cannot be transferred."
+                        : "Transfers to accounts with auto debit off will appear in their pending list."
+                }
+                bodyClassName="@container p-4"
+            >
                 <form.AppForm>
-                    <form>
-                        <CardContent className="@container space-y-4">
-                            <div className="@xl:flex-row flex w-full flex-col gap-4">
-                                <div className="flex-1">
-                                    <FieldAccount
-                                        form={form}
-                                        fields="to"
-                                        label="Recipient"
-                                        placeholder="Account"
-                                        disabled={disableForm}
-                                        supervisor={supervisor}
-                                    />
-                                </div>
-                                <div className="min-w-56">
-                                    <FieldTokenAmount
-                                        form={form}
-                                        fields="amount"
-                                        precision={
-                                            selectedToken?.precision ?? 0
-                                        }
-                                        balance={
-                                            selectedToken?.balance?.amount ?? 0
-                                        }
-                                        disabled={disableForm}
-                                        description={null}
-                                        onMaxAmountClick={handleSetMaxAmount}
-                                    />
-                                </div>
+                    <form className="flex flex-col gap-4">
+                        <div className="@xl:flex-row flex w-full flex-col gap-4">
+                            <div className="flex-1">
+                                <FieldAccount
+                                    form={form}
+                                    fields="to"
+                                    label="Recipient"
+                                    placeholder="Account"
+                                    disabled={disableForm}
+                                    supervisor={supervisor}
+                                />
                             </div>
-                            <form.AppField
-                                name="memo"
-                                children={(field) => (
-                                    <field.TextField
-                                        disabled={disableForm}
-                                        label="Memo (optional)"
-                                        placeholder="Add a note about this transfer"
-                                    />
-                                )}
-                                validators={{
-                                    onChange: zTransferFormMemo,
-                                }}
-                            />
-                            {!isTransferModalOpen && (
-                                <div className="flex justify-end">
-                                    <form.SubmitButton
-                                        labels={["Send", "Sending..."]}
-                                        onClick={onSubmitPreflight}
-                                        disabled={disableForm}
-                                    />
-                                </div>
+                            <div className="@xl:w-64 min-w-56">
+                                <FieldTokenAmount
+                                    form={form}
+                                    fields="amount"
+                                    precision={selectedToken?.precision ?? 0}
+                                    balance={
+                                        selectedToken?.balance?.amount ?? 0
+                                    }
+                                    disabled={disableForm}
+                                    description={null}
+                                    onMaxAmountClick={handleSetMaxAmount}
+                                />
+                            </div>
+                        </div>
+                        <form.AppField
+                            name="memo"
+                            children={(field) => (
+                                <field.TextField
+                                    disabled={disableForm}
+                                    label="Memo (optional)"
+                                    placeholder="Add a note about this transfer"
+                                />
                             )}
-                        </CardContent>
+                            validators={{
+                                onChange: zTransferFormMemo,
+                            }}
+                        />
+                        {!isTransferModalOpen && (
+                            <div className="flex justify-end">
+                                <form.SubmitButton
+                                    labels={["Send", "Sending..."]}
+                                    onClick={onSubmitPreflight}
+                                    disabled={disableForm}
+                                />
+                            </div>
+                        )}
                     </form>
                 </form.AppForm>
-            </GlowingCard>
+            </Panel>
             {currentUser && selectedToken && (
                 <CreditTable user={currentUser} token={selectedToken} />
             )}

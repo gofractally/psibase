@@ -6,12 +6,15 @@ use bindings::*;
 mod errors;
 use errors::ErrorType::*;
 use exports::auth_delegate::plugin::api::{Error, Guest as Api};
-use exports::auth_delegate::plugin::session::Guest as Session;
-use transact::plugin::intf::add_action_to_transaction;
+use exports::auth_delegate::plugin::queries::Guest as Queries;
+use exports::auth_delegate::plugin::session::{Guest as Session, Pem};
+use host::http::api::post_graphql_get_json;
+use transact::plugin::api::add_action_to_transaction;
 
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::*;
+use serde::Deserialize;
 
 psibase::define_trust! {
     descriptions {
@@ -26,7 +29,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [],
+        None => [get_owner],
         Low => [],
         Medium => [new_account],
         High => [set_owner],
@@ -40,6 +43,10 @@ fn get_account_number(name: &str) -> Result<AccountNumber, Error> {
 }
 
 impl Session for AuthDelegate {
+    fn add_account(_account_name: String, _private_key: Pem) -> Result<(), Error> {
+        Err(NotYetImplemented("session::add_account"))?
+    }
+
     fn authorize(_account_name: String) -> Result<(), Error> {
         Err(NotYetImplemented("session::authorize"))?
     }
@@ -78,6 +85,36 @@ impl Api for AuthDelegate {
             new_account_action::ACTION_NAME,
             &new_account.packed(),
         )?)
+    }
+}
+
+#[derive(Deserialize)]
+struct OwnerRecord {
+    owner: AccountNumber,
+}
+
+#[derive(Deserialize)]
+struct OwnerData {
+    owner: Option<OwnerRecord>,
+}
+
+#[derive(Deserialize)]
+struct OwnerResponse {
+    data: OwnerData,
+}
+
+impl Queries for AuthDelegate {
+    fn get_owner(account: String) -> Result<Option<String>, Error> {
+        assert_authorized(FunctionName::get_owner)?;
+
+        let account = AccountNumber::from_exact(&account).map_err(|_| InvalidAccountName)?;
+        let json = post_graphql_get_json(&format!(
+            "query {{ owner(account: \"{}\") {{ owner }} }}",
+            account
+        ))?;
+        let response: OwnerResponse =
+            serde_json::from_str(&json).map_err(|e| QueryError(e.to_string()))?;
+        Ok(response.data.owner.map(|record| record.owner.to_string()))
     }
 }
 

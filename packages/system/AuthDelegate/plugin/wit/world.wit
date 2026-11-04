@@ -13,6 +13,14 @@ interface api {
     new-account: func(name: string, owner: string) -> result<_, error>;
 }
 
+interface queries {
+    use host:types/types.{error};
+
+    /// Gets the owner of the specified account, or none if it has no owner.
+    get-owner: func(account: string) -> result<option<string>, error>;
+}
+
 world imports {
     import api;
+    import queries;
 }

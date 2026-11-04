@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { registry } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -31,7 +31,7 @@ export const appMetadataQueryKey = (appName: string | undefined | null) => [
 export const fetchMetadata = async (account: string) => {
     const appName = zAccount.parse(account);
     try {
-        const res = await callGraphqlViaPlugin(
+        const res = await graphqlAuth(
             registry.authorized.graphql,
             `
         {

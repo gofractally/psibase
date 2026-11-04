@@ -77,3 +77,14 @@ export function createTransactPlugin(id: QualifiedPluginId): TestPlugin {
         },
     });
 }
+
+export function createHostAccountsPlugin(id: QualifiedPluginId): TestPlugin {
+    return new TestPlugin(id, {
+        call: (intf, method) => {
+            if (intf === "api" && method === "get-current-user") {
+                return undefined;
+            }
+            throw new Error(`Unexpected host:accounts call ${intf ?? ""}->${method}`);
+        },
+    });
+}

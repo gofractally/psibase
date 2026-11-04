@@ -7,12 +7,14 @@ import { Supervisor } from "@/supervisor";
 
 import {
     createAppPlugin,
+    createHostAccountsPlugin,
     createTransactPlugin,
     TestPlugin,
 } from "./test-plugin";
 
 const MOCK_APP: QualifiedPluginId = { service: "mock", plugin: "plugin" };
-const TRANSACT: QualifiedPluginId = { service: "transact", plugin: "plugin" };
+const TRANSACT: QualifiedPluginId = { service: "transact", plugin: "admin" };
+const HOST_ACCOUNTS: QualifiedPluginId = { service: "host", plugin: "accounts" };
 
 export const TEST_ORIGIN = "http://network.psibase.localhost:8080";
 
@@ -36,6 +38,7 @@ function injectPlugin(plugins: Plugins, plugin: TestPlugin): void {
 function seedTestPlugins(plugins: Plugins): void {
     injectPlugin(plugins, createAppPlugin(MOCK_APP));
     injectPlugin(plugins, createTransactPlugin(TRANSACT));
+    injectPlugin(plugins, createHostAccountsPlugin(HOST_ACCOUNTS));
 }
 
 export function createTestSupervisor(): Supervisor {

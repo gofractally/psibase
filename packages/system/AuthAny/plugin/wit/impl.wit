@@ -3,7 +3,7 @@ package auth-any:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
-    import accounts:plugin/auth-svc;
+    import host:accounts/auth-svc;
 
     export session;
 }

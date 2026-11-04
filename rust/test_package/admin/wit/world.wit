@@ -1,0 +1,12 @@
+package test-package:admin;
+
+interface test {
+    use host:types/types.{error};
+
+    bar: func() -> result<_, error>;
+}
+
+world psibase-plugin {
+    import host:http/api;
+    export test;
+}

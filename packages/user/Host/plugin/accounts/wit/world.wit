@@ -1,0 +1,75 @@
+package host:accounts;
+
+interface api {
+    /// Returns true if there is a user logged in to the currently active top-level application.
+    is-logged-in: func() -> bool;
+
+    /// Gets the account name of the user logged into the active application.
+    /// May also return None if no user is logged in.
+    get-current-user: func() -> option<string>;
+}
+
+/// This interface is only available to the top-level app, or its plugin.
+/// The "top-level" app is the app with which the user is directly interacting.
+interface active-app {
+    use host:types/types.{error};
+
+    /// Directly log in a user by their account name.
+    /// The user must have already been connected to the app.
+    login: func(user: string) -> result<_, error>;
+
+    /// Logs out the currently logged-in user.
+    logout: func() -> result<_, error>;
+
+    /// Disconnects a previously connected account from the active app
+    disconnect: func(account: string) -> result<_, error>;
+
+    /// Retrieves a list of accounts that the user has connected to this app.
+    /// The user may only log in to accounts that have been connected.
+    get-connected-accounts: func() -> result<list<string>, error>;
+
+    /// Prompts the user to connect an account to the active app
+    connect-account: func() -> result<_, error>;
+}
+
+/// Only callable by the account's auth service plugin.
+interface auth-svc {
+    use host:types/types.{claim, error};
+
+    /// Adds `account` to the accounts known on this device.
+    add-account: func(account: string) -> result<_, error>;
+
+    /// Logs `account` into the active app.
+    ///
+    /// `claim` authorizes minting a query token when none is cached for
+    /// `(account, app)`; `none` for auth services that do not sign logins.
+    login: func(account: string, claim: option<claim>) -> result<_, error>;
+}
+
+/// Callable by the accounts plugin and by host.
+interface admin {
+    /// Logs out the user logged into the specified app
+    logout: func(app: string);
+
+    /// Connects the account to the specified app
+    connect: func(account: string, app: string);
+
+    /// Disconnects the account from the specified app, logging it out if logged in
+    disconnect: func(account: string, app: string);
+
+    /// Gets the accounts connected to the specified app
+    get-connected-accounts: func(app: string) -> list<string>;
+
+    /// Adds the specified app to the user's connected apps
+    add-connected-app: func(user: string, app: string);
+
+    /// Removes the specified app from the user's connected apps
+    remove-connected-app: func(user: string, app: string);
+
+    /// Gets the names of all apps to which the user has connected
+    get-connected-apps: func(user: string) -> list<string>;
+}
+
+world imports {
+    import api;
+}

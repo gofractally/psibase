@@ -78,6 +78,7 @@ function(add suffix)
             service/src/wasi-polyfill/__wasi_path_filestat_get.cpp
             service/src/wasi-polyfill/__wasi_path_open.cpp
             service/src/wasi-polyfill/__wasi_proc_exit.cpp
+            service/src/wasi-polyfill/__wasi_random_get.cpp
         )
 
         add_library(psibase-service-base${suffix})
@@ -169,6 +170,7 @@ function(add suffix)
             ../../packages/system/AuthDelegate/include
             ../../packages/system/AuthSig/include
             ../../packages/system/AuthAny/include
+            ../../packages/system/AuthNone/include
             ../../packages/system/CpuLimit/include
             ../../packages/system/HttpServer/include
             ../../packages/system/SetCode/include
@@ -176,6 +178,7 @@ function(add suffix)
             ../../packages/system/Credentials/service/cpp/include
             ../../packages/system/Transact/include
             ../../packages/system/VirtualServer/service/cpp/include
+            ../../packages/system/WsAuth/service/cpp/include
             ../../packages/user/CommonApi/include
             ../../packages/user/Explorer/include
             ../../packages/user/Invite/include

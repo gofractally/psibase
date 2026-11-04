@@ -2,8 +2,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::Wrapper;
     use crate::helpers::to_fixed;
+    use crate::Wrapper;
     use psibase::services::http_server;
     use psibase::services::tokens::{Decimal, Precision, Quantity, TokensError};
     use psibase::*;
@@ -376,10 +376,6 @@ mod tests {
 
     #[psibase::test_case(packages("Tokens"))]
     fn test_subaccounts(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        Wrapper::push(&chain).init();
-        http_server::Wrapper::push_from(&chain, Wrapper::SERVICE)
-            .registerServer(account!("tokens+1"))
-            .get()?;
         chain.finish_block();
 
         let alice = account!("alice");

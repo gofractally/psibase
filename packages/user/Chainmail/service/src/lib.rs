@@ -165,3 +165,6 @@ mod service {
             .or_else(|| serve_rest_api(&request))
     }
 }
+
+#[cfg(test)]
+mod tests;

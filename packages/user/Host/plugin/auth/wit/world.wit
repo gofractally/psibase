@@ -10,7 +10,7 @@ interface api {
     /// pass `none` when the auth service does not require a signed
     /// login (e.g. `auth-any`).
     ///
-    /// Only callable by `accounts`.
+    /// Only callable by `host`.
     set-logged-in-user: func(
         user: string,
         app: string,

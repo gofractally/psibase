@@ -325,7 +325,7 @@ struct GQLError {
 #[derive(Deserialize)]
 struct QueryRoot<T> {
     data: Option<T>,
-    errors: Option<GQLError>,
+    errors: Option<Vec<GQLError>>,
 }
 
 pub trait ChainUrl {
@@ -359,7 +359,7 @@ pub async fn gql_query<T: DeserializeOwned>(
     .await?;
     if let Some(error) = result.errors {
         Err(Error::GraphQLError {
-            message: error.message,
+            message: error.into_iter().next().unwrap().message,
         })?
     }
     let Some(data) = result.data else {

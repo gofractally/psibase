@@ -1,5 +1,5 @@
-import { configuredApps } from "@/configured-apps";
 import { getAppPath } from "@/app-config";
+import { configuredApps } from "@/configured-apps";
 import { useLocation } from "react-router-dom";
 
 export const useNavLocation = () => {
@@ -11,12 +11,5 @@ export const useNavLocation = () => {
     const currentApp = configuredApps.find((app) =>
         normalizedPath.startsWith(`/${getAppPath(app)}`),
     );
-    const currentChild = currentApp?.children.find((child) => {
-        const appPath = getAppPath(currentApp);
-        return child.path === ""
-            ? normalizedPath === `/${appPath}`
-            : normalizedPath.endsWith(child.path);
-    });
-
-    return { currentApp, currentChild };
+    return { currentApp };
 };
