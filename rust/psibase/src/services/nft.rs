@@ -69,11 +69,6 @@ mod service {
     }
 
     #[action]
-    fn try_credit(nftId: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
-        unimplemented!()
-    }
-
-    #[action]
     fn uncredit(nftId: crate::services::nft::NID, memo: Memo) {
         unimplemented!()
     }

@@ -229,7 +229,8 @@ impl Api for NameMarketPlugin {
     #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn buy_and_claim(account: String, max_cost: String) -> Result<(), Error> {
         let nft_id = schedule_buy(&account, &max_cost)?;
-        bindings::nft::plugin::user::try_credit(nft_id, &name_market::SERVICE.to_string(), "")?;
+        bindings::nft::plugin::user::try_debit(nft_id, "")?;
+        bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
         add_claim(&account)
     }
 
@@ -342,12 +343,10 @@ fn schedule_buy(account: &str, max_cost: &String) -> Result<u32, Error> {
     Ok(nft_id)
 }
 
-/// Ensures a credit between the caller and namemarket, then claims.
-///
-/// `try_credit` creates that credit when the caller owns the NFT, and leaves
-/// one that already runs between them.
+/// Takes a pending credit to the caller, credits the NFT to namemarket, then claims.
 fn schedule_claim(account: &str, nft_id: u32) -> Result<(), Error> {
-    bindings::nft::plugin::user::try_credit(nft_id, &name_market::SERVICE.to_string(), "")?;
+    bindings::nft::plugin::user::try_debit(nft_id, "")?;
+    bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
     add_claim(account)
 }
 
