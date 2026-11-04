@@ -1,4 +1,4 @@
-import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
+import { generate } from "@bytecodealliance/jco/component";
 import * as cliNs from "@bytecodealliance/preview2-shim/cli";
 import * as clocksNs from "@bytecodealliance/preview2-shim/clocks";
 import * as filesystemNs from "@bytecodealliance/preview2-shim/filesystem";
@@ -9,6 +9,8 @@ import { kebabToCamel, kebabToPascal } from "../case.js";
 import { HostInterface } from "../host-interface.js";
 import { assert } from "../utils.js";
 import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
+
+type GenerateOptions = Parameters<typeof generate>[1];
 
 type PluginImports = Record<string, Record<string, unknown>>;
 
@@ -90,7 +92,14 @@ function buildInterfaceProxy(
     const proxy: Record<string, unknown> = {};
     for (const func of intf.funcs) {
         if (isResourceMethod(func.name)) {
-            addResourceProxy(proxy, intf, func.name, func.dynamicLink, host, services);
+            addResourceProxy(
+                proxy,
+                intf,
+                func.name,
+                func.dynamicLink,
+                host,
+                services,
+            );
         } else if (func.dynamicLink) {
             proxy[kebabToCamel(func.name)] = (
                 pluginRef: { handle: number },

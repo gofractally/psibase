@@ -1835,8 +1835,9 @@ void run(const std::string&              db_path,
       auto& service =
           boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
       node.chain().onSocketOpen(service.get_connector());
-      node.chain().onSocketP2P([&node](const std::shared_ptr<psibase::net::connection_base>& conn)
-                               { node.add_connection(conn); });
+      node.chain().onSocketP2P(
+          [&node, &chainContext](const std::shared_ptr<psibase::net::connection_base>& conn)
+          { boost::asio::post(chainContext, [&node, conn] { node.add_connection(conn); }); });
 
       // startSession should run after all callbacks are set up
       // so that it can safely call anything, but before any other

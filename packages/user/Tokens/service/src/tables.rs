@@ -113,7 +113,7 @@ pub mod tables {
         fn new(precision: Precision, max_issued_supply: Quantity) -> Self {
             Self {
                 id: InitRow::next_token_id(),
-                nft_id: Nfts::call().mint(),
+                nft_id: Nfts::call().mint(None),
                 issued_supply: 0.into(),
                 burned_supply: 0.into(),
                 max_issued_supply,
@@ -161,7 +161,10 @@ pub mod tables {
         }
 
         pub fn nft_holder(&self) -> AccountNumber {
-            Nfts::call().getNft(self.nft_id).owner
+            Nfts::call()
+                .getNft(self.nft_id)
+                .expect("NFT was burned")
+                .owner
         }
 
         fn save(&self) {
@@ -249,8 +252,8 @@ pub mod tables {
 
     #[ComplexObject]
     impl Token {
-        pub async fn owner(&self) -> AccountNumber {
-            self.nft_holder()
+        pub async fn owner(&self) -> Option<AccountNumber> {
+            Nfts::call().getNft(self.nft_id).map(|nft| nft.owner)
         }
 
         pub async fn current_supply(&self) -> Decimal {

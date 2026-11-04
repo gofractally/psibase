@@ -8,6 +8,16 @@ function(add_user_service suffix name)
     psibase_schema(${name}${suffix} OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add_user_service)
 
+function(add_user_service_full_malloc suffix name)
+    add_executable(${name}${suffix} ${ARGN})
+    target_include_directories(${name}${suffix} PUBLIC
+        include
+    )
+    target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} services_user${suffix} psibase-service${suffix})
+    set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+    psibase_schema(${name}${suffix} OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+endfunction(add_user_service_full_malloc)
+
 function(add_user_test_impl suffix name)
     set(TARGET ${name}-test${suffix})
     add_executable(${TARGET} ${ARGN})
@@ -42,6 +52,7 @@ function(add suffix)
         CommonApi/include
         DynLd/include
         Events/include
+        Explorer/include
         Invite/include
         Nft/include
         Nop/include

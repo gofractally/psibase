@@ -38,16 +38,6 @@ namespace SystemService
          {
             if (claim.service == VerifySig::service && equalByteVector(claim.rawData, expected))
             {
-               // Billing rule: if first proof passes, and auth for first sender passes,
-               // then then first sender will be charged even if the transaction fails,
-               // including time for executing failed proofs and auths. We require the
-               // first auth to be verified by the first signature here to prevent a
-               // resource-billing attack against innocent accounts.
-               //
-               // We do this check after passing the other checks so we can produce the
-               // other errors when appropriate.
-               if ((flags & AuthInterface::firstAuthFlag) && &claim != &claims[0])
-                  abortMessage("first sender is not verified by first signature");
                return true;
             }
          }

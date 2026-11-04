@@ -17,6 +17,12 @@ pub struct Data {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TokenSettings {
+    pub untransferable: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Token {
     pub precision: Precision,
     pub id: u32,
@@ -25,6 +31,7 @@ pub struct Token {
     pub max_issued_supply: Decimal,
     pub owner: AccountNumber,
     pub symbol: Option<AccountNumber>,
+    pub settings: TokenSettings,
 }
 
 pub fn fetch_token(token_number: u32) -> Result<Token, ErrorType> {
@@ -38,6 +45,9 @@ pub fn fetch_token(token_number: u32) -> Result<Token, ErrorType> {
         		maxIssuedSupply
                 symbol
                 owner
+                settings {{
+                    untransferable
+                }}
         	}}
         }}"#,
         token_id = token_number

@@ -43,6 +43,7 @@ export const EmptyBlock = ({
                 )}
                 {onButtonClick && (
                     <Button
+                        type="button"
                         disabled={disabled}
                         size="lg"
                         className="mt-4"

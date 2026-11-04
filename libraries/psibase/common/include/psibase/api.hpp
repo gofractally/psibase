@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/AccountNumber.hpp>
+#include <psibase/RpcFwd.hpp>
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
@@ -701,7 +702,6 @@ namespace psibase
 #define PSIBASE_SUBJECTIVE_TX \
    for (::psibase::SubjectiveTransaction _psibase_s_tx; !_psibase_s_tx.done; _psibase_s_tx.commit())
 
-   struct HttpRequest;
    struct IPV4Endpoint;
    struct IPV6Endpoint;
    struct LocalEndpoint;

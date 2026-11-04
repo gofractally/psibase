@@ -88,7 +88,7 @@ pub mod tables {
             Self::check_window_seconds(window_seconds);
             Self::check_decrease_ppm(decrease_ppm);
 
-            let nft_id = Nft::call().mint();
+            let nft_id = Nft::call().mint(None);
             let sender = get_sender();
             Nft::call().credit(nft_id, sender, "RateLimit administration NFT".into());
 
@@ -160,7 +160,10 @@ pub mod tables {
                     !diff_as_f64.is_nan(),
                     "diffadjust decrease computation resulted in NaN",
                 );
-                difficulty = (diff_as_f64 as u64).max(floor);
+                difficulty = diff_as_f64 as u64;
+                if difficulty <= floor {
+                    return floor;
+                }
             }
             difficulty
         }
@@ -184,6 +187,7 @@ pub mod tables {
                     );
                 }
             }
+            self.active_difficulty = self.active_difficulty.max(self.floor_difficulty);
             self.active_difficulty
         }
 
@@ -222,7 +226,10 @@ pub mod tables {
 
         fn check_sender_has_nft(&self) {
             assert_eq!(
-                Nft::call().getNft(self.nft_id).owner,
+                Nft::call()
+                    .getNft(self.nft_id)
+                    .expect("NFT was burned")
+                    .owner,
                 get_sender(),
                 "must be owner of rate limiter",
             );
@@ -299,8 +306,8 @@ pub mod tables {
 
     #[ComplexObject]
     impl RateLimit {
-        pub async fn admin(&self) -> AccountNumber {
-            Nft::call().getNft(self.nft_id).owner
+        pub async fn admin(&self) -> Option<AccountNumber> {
+            Nft::call().getNft(self.nft_id).map(|nft| nft.owner)
         }
     }
 }

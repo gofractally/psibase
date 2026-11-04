@@ -32,6 +32,7 @@ pub mod service {
     use psibase::services::transact::ServiceMethod;
     use psibase::services::{events::Wrapper as Events, transact::Wrapper as Transact};
     use psibase::*;
+    use std::collections::HashSet;
 
     const ENABLE_PRINT: bool = false;
 
@@ -67,6 +68,29 @@ pub mod service {
         Events::call().addIndex(EventDb::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter
     }
 
+    fn ensure_not_rejected(actions: &[Action]) {
+        let mut seen = HashSet::new();
+        for action in actions {
+            let key = (
+                action.sender.value,
+                action.service.value,
+                action.method.value,
+            );
+            if !seen.insert(key) {
+                continue;
+            }
+            let Some(policy) = StagedTxPolicy::new(action.sender) else {
+                continue;
+            };
+            if policy.does_reject(
+                Vec::new(),
+                ServiceMethod::new(action.service, action.method),
+            ) {
+                abort_message(&format!("sender {} rejects the action", action.sender));
+            }
+        }
+    }
+
     /// Proposes a new staged transaction containing the specified actions.
     /// Returns the ID of the database record containing the staged transaction.
     ///
@@ -74,6 +98,7 @@ pub mod service {
     /// * `auto_exec`: Enables automatic execution as soon as the transaction has enough approvals
     #[action]
     fn propose(actions: Vec<Action>, auto_exec: bool) -> u32 {
+        ensure_not_rejected(&actions);
         let new_tx = StagedTx::add(actions, auto_exec);
 
         emit_update(new_tx.txid.clone(), StagedTxEvent::PROPOSED);

@@ -10,7 +10,7 @@ publish = false
 [package.metadata.psibase]
 flags = ["isPrivileged"]
 server = "r-staged-tx"
-plugin = "staged-tx-plugin"
+plugins = ["staged-tx-plugin"]
 postinstall = [{ sender = "staged-tx", service = "staged-tx", method = "init" }]
 
 [dependencies]

@@ -31,9 +31,9 @@ export const useDebit = (user: string | null, counterParty: string) =>
             );
 
             return supervisor.functionCall({
-                service: "tokens",
+                service: "homepage",
                 plugin: "plugin",
-                intf: "user",
+                intf: "tokens",
                 method: "debit",
                 params: [tokenId, sender, amount, memo],
             });

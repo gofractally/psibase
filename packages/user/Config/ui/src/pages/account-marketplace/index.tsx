@@ -62,7 +62,7 @@ const isMarketRowDirty = (
         const meta = fieldMeta[`markets[${index}].${field}`];
         return meta != null && meta.isDefaultValue === false;
     });
-}
+};
 
 export const NameMarketConfig = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
@@ -163,6 +163,24 @@ export const NameMarketConfig = () => {
         form.reset(defaultValues);
     }, [defaultValues, form, isLoading, isSaving, isDirty]);
 
+    if (systemToken?.untransferable) {
+        return (
+            <PageContainer className="space-y-6">
+                <Card className="gap-4 py-4 shadow-sm">
+                    <CardHeader className="gap-1.5 px-4">
+                        <CardTitle className="text-lg font-medium">
+                            Account Marketplace
+                        </CardTitle>
+                        <CardDescription>
+                            Premium account names are not available by
+                            self-service.
+                        </CardDescription>
+                    </CardHeader>
+                </Card>
+            </PageContainer>
+        );
+    }
+
     return (
         <PageContainer className="space-y-6">
             <Card className="gap-4 py-4 shadow-sm">
@@ -244,7 +262,7 @@ export const NameMarketConfig = () => {
                                         className={cn(
                                             "gap-0 py-0 shadow-sm",
                                             !market.configured &&
-                                            "border-dashed",
+                                                "border-dashed",
                                         )}
                                     >
                                         <form.Subscribe
@@ -264,7 +282,7 @@ export const NameMarketConfig = () => {
                                                         className={cn(
                                                             "flex items-center gap-4 px-4 py-3",
                                                             enabled &&
-                                                            "[.border-b]:pb-3 border-b",
+                                                                "[.border-b]:pb-3 border-b",
                                                         )}
                                                     >
                                                         <div className="flex flex-1 flex-wrap items-center justify-between gap-2">
@@ -276,8 +294,8 @@ export const NameMarketConfig = () => {
                                                                     }
                                                                 </CardTitle>
                                                                 {market.configured &&
-                                                                    enabled &&
-                                                                    systemToken ? (
+                                                                enabled &&
+                                                                systemToken ? (
                                                                     <LivePrice
                                                                         price={livePriceByLength.get(
                                                                             market.length,
@@ -293,7 +311,7 @@ export const NameMarketConfig = () => {
                                                                 className={cn(
                                                                     "flex items-center gap-1.5",
                                                                     !isRowDirty &&
-                                                                    "invisible",
+                                                                        "invisible",
                                                                 )}
                                                                 aria-hidden={
                                                                     !isRowDirty

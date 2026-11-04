@@ -4,4 +4,5 @@ mod chain;
 mod curve_math;
 mod helpers;
 mod query;
+mod resource_providers;
 mod utils;

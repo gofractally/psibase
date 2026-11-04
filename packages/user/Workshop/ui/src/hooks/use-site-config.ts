@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { callGraphqlViaPlugin } from "@shared/lib/graphql/call-graphql-via-plugin";
+import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { sites } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -45,7 +45,7 @@ export const useSiteConfig = (
         enabled: !!account,
         queryFn: async () => {
             try {
-                const res = await callGraphqlViaPlugin(
+                const res = await graphqlAuth(
                     sites.authorized.graphql,
                     `
           {

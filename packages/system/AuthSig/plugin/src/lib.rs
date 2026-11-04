@@ -9,20 +9,16 @@ mod types;
 use trust::*;
 
 // Other plugins
-use bindings::{
-    accounts::plugin as AccountsPlugin,
-    host::{
-        client::api as Client,
-        crypto::keyvault as HostCrypto,
-        types::types::{self as HostTypes, Claim, Error, Keypair, Pem},
-    },
-    transact::plugin::intf as Transact,
-};
+use bindings::host::accounts::auth_svc as HostAccounts;
+use bindings::host::crypto::keyvault as HostCrypto;
+use bindings::host::types::types as HostTypes;
+use bindings::host::types::types::{Claim, Error, Keypair, Pem};
+use bindings::transact::plugin::api as Transact;
 
 // Exported interfaces
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, api::Guest as Api, keyvault::Guest as KeyVault,
-    session::Guest as Session,
+    queries::Guest as Queries, session::Guest as Session,
 };
 use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, Proof};
 
@@ -49,7 +45,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, can_authorize],
+        None => [generate_unmanaged_keypair, pub_from_priv, to_der, sign_explicit, can_authorize, get_pubkey, get_accounts_with_key],
         Low => [import_key],
         Medium => [create_account],
         High => [set_key, sign],
@@ -90,15 +86,27 @@ impl HookUserAuth for AuthSig {
 }
 
 impl Session for AuthSig {
+    fn add_account(account_name: String, private_key: Pem) -> Result<(), Error> {
+        if !from_host() {
+            return Err(Unauthorized("session::add_account".to_string()).into());
+        }
+
+        if !Self::can_authorize(private_key.clone(), account_name.clone()) {
+            return Err(AuthorizationFailed(account_name).into());
+        }
+        HostCrypto::import_key(&private_key)?;
+        HostAccounts::add_account(&account_name)
+    }
+
     fn login(account_name: String) -> Result<(), Error> {
-        if Client::get_sender() != "accounts" {
+        if !from_host() {
             return Err(Unauthorized("session::login".to_string()).into());
         }
 
         // Pass the claim through for query-token minting only. User-tx
         // claims still come from hook-user-auth at finish-tx.
         let claim = resolve_credential(&account_name)?;
-        AccountsPlugin::auth_svc::login(&account_name, Some(&claim))
+        HostAccounts::login(&account_name, Some(&claim))
     }
 }
 
@@ -135,7 +143,7 @@ impl KeyVault for AuthSig {
         assert_authorized_with_whitelist(
             FunctionName::import_key,
             vec![
-                "accounts".into(),
+                "host".into(),
                 "x-admin".into(),
                 "invite".into(),
                 "namemarket".into(),
@@ -150,7 +158,7 @@ impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(
             FunctionName::set_key,
-            vec!["accounts".into(), "namemarket".into(), "homepage".into()],
+            vec!["host".into(), "namemarket".into(), "homepage".into()],
         )?;
 
         Transact::add_action_to_transaction(
@@ -165,7 +173,7 @@ impl Actions for AuthSig {
     }
 
     fn create_account(new_account_name: String) -> Result<String, HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::create_account, vec!["accounts".into()])?;
+        assert_authorized_with_whitelist(FunctionName::create_account, vec!["host".into()])?;
 
         let name = psibase::AccountNumber::from_exact(&new_account_name)
             .map_err(|_| ErrorType::InvalidAccountName(&new_account_name))?;
@@ -202,6 +210,18 @@ impl Api for AuthSig {
         };
 
         specified_pubkey == actual_pubkey
+    }
+}
+
+impl Queries for AuthSig {
+    fn get_pubkey(account: String) -> Result<Option<Pem>, HostTypes::Error> {
+        assert_authorized(FunctionName::get_pubkey)?;
+        find_pubkey(&account)
+    }
+
+    fn get_accounts_with_key(public_key: Pem) -> Result<Vec<String>, HostTypes::Error> {
+        assert_authorized(FunctionName::get_accounts_with_key)?;
+        helpers::get_accounts_with_key(&public_key)
     }
 }
 

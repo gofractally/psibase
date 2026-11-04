@@ -2,6 +2,7 @@
 
 #include <psibase/dispatch.hpp>
 #include <services/system/Transact.hpp>
+#include <services/user/Explorer.hpp>
 
 using namespace psibase;
 using namespace SystemService;
@@ -90,9 +91,16 @@ UniqueKvHandle Db::open(DbId db, psio::view<const std::vector<char>> prefixView,
    }
    else if (db == DbId::blockLog)
    {
-      if (isWrite(mode))
+      if (sender == Explorer::service || isPrivileged(sender))
       {
-         dbError(sender, db, "write");
+         if (isWrite(mode))
+         {
+            dbError(sender, db, "write");
+         }
+      }
+      else
+      {
+         dbError(sender, db, "open");
       }
    }
    else

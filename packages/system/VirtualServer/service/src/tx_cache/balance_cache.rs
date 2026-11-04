@@ -5,7 +5,7 @@
 use crate::tables::tables::UserSettings;
 use crate::tx_cache::{drain_cache, with_cache};
 use psibase::services::tokens::Quantity;
-use psibase::{abort_message, AccountNumber};
+use psibase::{AccountNumber, abort_message};
 use std::cell::RefCell;
 use std::collections::HashMap;
 

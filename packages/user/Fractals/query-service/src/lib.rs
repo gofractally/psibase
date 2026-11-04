@@ -16,6 +16,12 @@ mod service {
                 .get(&fractal)
         }
 
+        async fn fractalByToken(&self, tokenId: u32) -> Option<Fractal> {
+            FractalTable::with_service(fractals::SERVICE)
+                .get_index_by_token()
+                .get(&tokenId)
+        }
+
         async fn fractals(
             &self,
             first: Option<i32>,
