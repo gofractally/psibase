@@ -1,32 +1,34 @@
+import { useStore } from "@tanstack/react-form";
 import { TriangleAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { z } from "zod";
 
+import { FreezeRootWarning } from "@/components/freeze-root-warning";
 import { useAccountsByPrefix } from "@/hooks/use-accounts-by-prefix";
 import {
     useFreezeAccounts,
     useUnfreezeAccounts,
 } from "@/hooks/use-freeze-accounts";
 import { useFrozenAccounts } from "@/hooks/use-frozen-accounts";
+import { rootFreezeGaps, type RootFreezeGap } from "@/lib/freeze-root-gap";
 
+import { useAppForm } from "@shared/components/form/app-form";
 import { PageContainer } from "@shared/components/page-container";
-import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
+import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
-import { Input } from "@shared/shadcn/ui/input";
-import { Label } from "@shared/shadcn/ui/label";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
-import { Textarea } from "@shared/shadcn/ui/textarea";
 
 type AccountRow = {
     account: string;
     detail: string;
 };
 
-const memoOrUndefined = (memo: string): string | undefined => {
-    const trimmed = memo.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-};
+const zOptionalMemo = z
+    .string()
+    .trim()
+    .transform((value) => (value.length > 0 ? value : undefined));
 
 const AccountList = ({
     rows,
@@ -122,65 +124,59 @@ const AccountList = ({
     );
 };
 
-const ProposeFields = ({
-    memoId,
-    memo,
-    onMemo,
-    selectedCount,
-    pending,
-    submitLabel,
-    pendingLabel,
-}: {
-    memoId: string;
-    memo: string;
-    onMemo: (memo: string) => void;
-    selectedCount: number;
-    pending: boolean;
-    submitLabel: string;
-    pendingLabel: string;
-}) => (
-    <div className="space-y-3">
-        <div className="space-y-1.5">
-            <Label htmlFor={memoId}>Memo</Label>
-            <Textarea
-                id={memoId}
-                value={memo}
-                onChange={(event) => onMemo(event.target.value)}
-                placeholder="Optional. Recorded on each account in this proposal."
-            />
-        </div>
-        <div className="flex justify-end">
-            <Button type="submit" disabled={selectedCount === 0 || pending}>
-                {pending ? (
-                    <>
-                        <Spinner data-icon="inline-start" />
-                        {pendingLabel}
-                    </>
-                ) : (
-                    submitLabel
-                )}
-            </Button>
-        </div>
-    </div>
-);
-
 export const FreezeAccounts = () => {
-    const [search, setSearch] = useState("");
-    const [freezeMemo, setFreezeMemo] = useState("");
-    const [unfreezeMemo, setUnfreezeMemo] = useState("");
     const [freezeSelected, setFreezeSelected] = useState<Set<string>>(
         () => new Set(),
     );
     const [unfreezeSelected, setUnfreezeSelected] = useState<Set<string>>(
         () => new Set(),
     );
+    const [rootGaps, setRootGaps] = useState<RootFreezeGap[] | null>(null);
+    const allowRootGap = useRef(false);
 
-    const accountsQuery = useAccountsByPrefix(search);
-    const frozenQuery = useFrozenAccounts();
     const { mutateAsync: proposeFreeze, isPending: isFreezing } =
         useFreezeAccounts();
     const { mutateAsync: proposeUnfreeze, isPending: isUnfreezing } =
         useUnfreezeAccounts();
+
+    const freezeForm = useAppForm({
+        defaultValues: { search: "", memo: "" },
+        onSubmit: async ({ value }) => {
+            if (freezeSelected.size === 0) return;
+            const bypassWarning = allowRootGap.current;
+            allowRootGap.current = false;
+            if (!bypassWarning) {
+                const gaps = rootFreezeGaps(freezeSelected);
+                if (gaps.length > 0) {
+                    setRootGaps(gaps);
+                    return;
+                }
+            }
+            await proposeFreeze([
+                [...freezeSelected],
+                zOptionalMemo.parse(value.memo),
+            ]);
+            setFreezeSelected(new Set());
+            setRootGaps(null);
+            freezeForm.setFieldValue("memo", "");
+        },
+    });
+    const unfreezeForm = useAppForm({
+        defaultValues: { memo: "" },
+        onSubmit: async ({ value }) => {
+            if (unfreezeSelected.size === 0) return;
+            await proposeUnfreeze([
+                [...unfreezeSelected],
+                zOptionalMemo.parse(value.memo),
+            ]);
+            setUnfreezeSelected(new Set());
+            unfreezeForm.setFieldValue("memo", "");
+        },
+    });
+
+    const search = useStore(freezeForm.store, (state) => state.values.search);
+    const accountsQuery = useAccountsByPrefix(search);
+    const frozenQuery = useFrozenAccounts();
 
     const freezeRows = useMemo<AccountRow[]>(
         () =>
@@ -231,6 +227,11 @@ export const FreezeAccounts = () => {
           ? "Search for an account name."
           : "No accounts match that prefix.";
 
+    const confirmFreeze = () => {
+        allowRootGap.current = true;
+        void freezeForm.handleSubmit();
+    };
+
     return (
         <PageContainer className="space-y-6">
             <div>
@@ -250,15 +251,10 @@ export const FreezeAccounts = () => {
                 <TabsContent value="freeze" className="space-y-4">
                     <Alert variant="warning">
                         <TriangleAlert />
-                        <AlertTitle variant="warning">
-                            Freezing can break the network
-                        </AlertTitle>
                         <AlertDescription variant="warning">
                             Freezing sets the account's auth service to
                             auth-none, so it can no longer authorize
-                            transactions. Freezing a system account such as
-                            accounts, root, or producers can make it impossible
-                            to unfreeze.
+                            transactions.
                         </AlertDescription>
                     </Alert>
 
@@ -266,29 +262,21 @@ export const FreezeAccounts = () => {
                         className="space-y-4 rounded-lg border p-4"
                         onSubmit={(event) => {
                             event.preventDefault();
-                            if (freezeSelected.size === 0) return;
-                            void proposeFreeze([
-                                [...freezeSelected],
-                                memoOrUndefined(freezeMemo),
-                            ])
-                                .then(() => {
-                                    setFreezeSelected(new Set());
-                                    setFreezeMemo("");
-                                })
-                                .catch(() => undefined);
+                            event.stopPropagation();
+                            void freezeForm.handleSubmit();
                         }}
                     >
-                        <div className="space-y-1.5">
-                            <Label htmlFor="account-search">Search</Label>
-                            <Input
-                                id="account-search"
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Account name prefix"
-                                autoComplete="off"
-                                spellCheck={false}
-                            />
-                        </div>
+                        <freezeForm.AppField name="search">
+                            {(field) => (
+                                <field.TextField
+                                    id="account-search"
+                                    label="Search"
+                                    placeholder="Account name prefix"
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                />
+                            )}
+                        </freezeForm.AppField>
                         <div className="rounded-md border">
                             <AccountList
                                 rows={freezeRows}
@@ -321,20 +309,38 @@ export const FreezeAccounts = () => {
                                 }}
                             />
                         </div>
-                        <ProposeFields
-                            memoId="freeze-memo"
-                            memo={freezeMemo}
-                            onMemo={setFreezeMemo}
-                            selectedCount={freezeSelected.size}
-                            pending={isFreezing}
-                            submitLabel={
-                                freezeSelected.size > 0
-                                    ? `Propose freeze (${freezeSelected.size})`
-                                    : "Propose freeze"
-                            }
-                            pendingLabel="Proposing..."
-                        />
+                        <freezeForm.AppField name="memo">
+                            {(field) => (
+                                <field.TextArea
+                                    id="freeze-memo"
+                                    label="Memo"
+                                    placeholder="Optional. Recorded on each account in this proposal."
+                                />
+                            )}
+                        </freezeForm.AppField>
+                        <div className="flex justify-end">
+                            <freezeForm.AppForm>
+                                <freezeForm.SubmitButton
+                                    disabled={freezeSelected.size === 0}
+                                    loading={isFreezing}
+                                    labels={[
+                                        freezeSelected.size > 0
+                                            ? `Propose freeze (${freezeSelected.size})`
+                                            : "Propose freeze",
+                                        "Proposing...",
+                                    ]}
+                                />
+                            </freezeForm.AppForm>
+                        </div>
                     </form>
+                    <FreezeRootWarning
+                        gaps={rootGaps}
+                        pending={isFreezing}
+                        onOpenChange={(open) => {
+                            if (!open && !isFreezing) setRootGaps(null);
+                        }}
+                        onUnderstand={confirmFreeze}
+                    />
                 </TabsContent>
 
                 <TabsContent value="unfreeze">
@@ -342,16 +348,8 @@ export const FreezeAccounts = () => {
                         className="space-y-4 rounded-lg border p-4"
                         onSubmit={(event) => {
                             event.preventDefault();
-                            if (unfreezeSelected.size === 0) return;
-                            void proposeUnfreeze([
-                                [...unfreezeSelected],
-                                memoOrUndefined(unfreezeMemo),
-                            ])
-                                .then(() => {
-                                    setUnfreezeSelected(new Set());
-                                    setUnfreezeMemo("");
-                                })
-                                .catch(() => undefined);
+                            event.stopPropagation();
+                            void unfreezeForm.handleSubmit();
                         }}
                     >
                         <div className="rounded-md border">
@@ -384,19 +382,29 @@ export const FreezeAccounts = () => {
                                 }}
                             />
                         </div>
-                        <ProposeFields
-                            memoId="unfreeze-memo"
-                            memo={unfreezeMemo}
-                            onMemo={setUnfreezeMemo}
-                            selectedCount={unfreezeSelected.size}
-                            pending={isUnfreezing}
-                            submitLabel={
-                                unfreezeSelected.size > 0
-                                    ? `Propose unfreeze (${unfreezeSelected.size})`
-                                    : "Propose unfreeze"
-                            }
-                            pendingLabel="Proposing..."
-                        />
+                        <unfreezeForm.AppField name="memo">
+                            {(field) => (
+                                <field.TextArea
+                                    id="unfreeze-memo"
+                                    label="Memo"
+                                    placeholder="Optional. Recorded on each account in this proposal."
+                                />
+                            )}
+                        </unfreezeForm.AppField>
+                        <div className="flex justify-end">
+                            <unfreezeForm.AppForm>
+                                <unfreezeForm.SubmitButton
+                                    disabled={unfreezeSelected.size === 0}
+                                    loading={isUnfreezing}
+                                    labels={[
+                                        unfreezeSelected.size > 0
+                                            ? `Propose unfreeze (${unfreezeSelected.size})`
+                                            : "Propose unfreeze",
+                                        "Proposing...",
+                                    ]}
+                                />
+                            </unfreezeForm.AppForm>
+                        </div>
                     </form>
                 </TabsContent>
             </Tabs>
