@@ -8,23 +8,28 @@ let clientKey: Uint8Array | undefined;
 
 /**
  * Loads the client key from `storage`, generating one only when none exists,
- * and stores it back so backends whose entries expire renew it.
+ * and writes it back so backends whose entries expire renew it. An existing
+ * key is written back without waiting, and a failed renewal does not fail
+ * this call. A new key is stored before this call resolves.
  */
 export async function loadClientKey(storage: DeviceStorage): Promise<void> {
     const stored = await storage.get(CLIENT_KEY_NAME);
-    let key: string;
     if (stored !== undefined) {
-        key = stored;
-        clientKey = Uint8Array.fromBase64(key, CLIENT_KEY_BASE64URL);
-    } else {
-        const bytes = new Uint8Array(32);
-        crypto.getRandomValues(bytes);
-        clientKey = bytes;
-        key = bytes.toBase64({
-            ...CLIENT_KEY_BASE64URL,
-            omitPadding: true,
+        clientKey = Uint8Array.fromBase64(stored, CLIENT_KEY_BASE64URL);
+        // A failed background rewrite leaves the previously stored key in place.
+        void storage.set(CLIENT_KEY_NAME, stored).catch((err) => {
+            console.error("Failed to renew client key:", err);
         });
+        return;
     }
+
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    clientKey = bytes;
+    const key = bytes.toBase64({
+        ...CLIENT_KEY_BASE64URL,
+        omitPadding: true,
+    });
     await storage.set(CLIENT_KEY_NAME, key);
 }
 

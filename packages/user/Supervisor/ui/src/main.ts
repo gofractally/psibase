@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import {
     QualifiedFunctionCallArgs,
     buildMessageSupervisorInitialized,
+    buildMessageSupervisorStartupFailed,
     isFunctionCallRequest,
     isGetJsonRequest,
     isPreLoadPluginsRequest,
@@ -75,12 +76,18 @@ addCallHandler(callHandlers, isGetJsonRequest, (msg) =>
     supervisor.getJson(msg.origin, msg.data.id, msg.data.payload.plugin),
 );
 async function startup(): Promise<void> {
-    await loadClientKey(createDeviceStorage());
-    registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
-    window.parent.postMessage(buildMessageSupervisorInitialized(), "*");
+    try {
+        await loadClientKey(createDeviceStorage());
+        registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
+        window.parent.postMessage(buildMessageSupervisorInitialized(), "*");
+    } catch (err) {
+        console.error("Supervisor startup failed:", err);
+        const message = err instanceof Error ? err.message : String(err);
+        window.parent.postMessage(
+            buildMessageSupervisorStartupFailed(message),
+            "*",
+        );
+    }
 }
 
-startup().catch((err) => {
-    console.error("Supervisor startup failed:", err);
-    throw err;
-});
+void startup();
