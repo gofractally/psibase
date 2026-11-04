@@ -1,7 +1,10 @@
+import { Ban } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
-import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader, Panel } from "@/components/page-header";
 
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import { cn } from "@shared/lib/utils";
 
 import { ACCOUNT_MARKETPLACE_PATH } from "./route";
@@ -17,6 +20,21 @@ const tabs = [
 ];
 
 export function AccountMarketplaceLayout() {
+    const { data: systemToken, isPending: isPendingToken } = useSystemToken();
+
+    if (!isPendingToken && systemToken?.untransferable) {
+        return (
+            <div className="flex flex-col gap-4">
+                <PageHeader title="Account Marketplace" />
+                <Panel title="Not available">
+                    <EmptyState icon={Ban} className="min-h-40">
+                        Premium account names are not available by self-service.
+                    </EmptyState>
+                </Panel>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-4">
             <PageHeader

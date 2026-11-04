@@ -9,6 +9,7 @@ export type SystemTokenInfo = {
     id: number;
     symbol: string | undefined;
     precision: number;
+    untransferable: boolean;
 };
 
 export type UserBalance = {

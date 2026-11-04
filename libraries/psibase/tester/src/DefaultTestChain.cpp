@@ -85,6 +85,10 @@ namespace
          s.setSchema(actions);
       }
 
+      transactor<Producers> psys{Producers::service, Producers::service};
+      std::vector<Producer> producerConfig = {{"firstprod"_a, {}}};
+      actions.push_back(psys.setProducers(producerConfig));
+
       for (auto& s : service_packages)
       {
          for (auto account : s.accounts())
@@ -110,9 +114,9 @@ namespace
          s.postinstall(actions, service_packages);
       }
 
-      transactor<Producers> psys{Producers::service, Producers::service};
-      std::vector<Producer> producerConfig = {{"firstprod"_a, {}}};
-      actions.push_back(psys.setProducers(producerConfig));
+      auto producer = "firstprod"_a;
+      actions.push_back(
+          transactor<Accounts>{producer, Accounts::service}.setAuthServ(AuthAny::service));
 
       auto root = AccountNumber{"root"};
       actions.push_back(asys.newAccount(root, AuthAny::service, NewAccountMode::requireNew));
