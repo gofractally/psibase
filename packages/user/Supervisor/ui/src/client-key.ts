@@ -9,10 +9,9 @@ let clientKey: Uint8Array | undefined;
 
 /**
  * Loads the client key from `storage`, generating one only when none exists,
- * and writes it back so backends whose entries expire renew it. Concurrent
- * calls wait on the same Web Lock so at most one bootstrap or refresh runs
- * across supervisor tabs. A failed renewal does not fail this call. A new key
- * is stored before this call resolves.
+ * and writes it back so backends whose entries expire renew it. A failed
+ * renewal does not fail this call. A new key is stored before this call
+ * resolves.
  */
 export async function loadClientKey(storage: DeviceStorage): Promise<void> {
     await navigator.locks.request(CLIENT_KEY_LOCK, async () => {
