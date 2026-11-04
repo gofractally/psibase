@@ -143,14 +143,11 @@ namespace
       return s.substr(low, high - low + 1);
    }
 
-   // Parses a weight parameter (e.g. "q=0.5") into thousandths
-   std::optional<int> parseQ(std::string_view param)
+   // Parses a qvalue (e.g. "0.5") into thousandths
+   std::optional<int> parseQValue(std::string_view param)
    {
       // qvalue = ( "0" [ "." 0*3DIGIT ] ) / ( "1" [ "." 0*3("0") ] )
-      if (param.size() < 3 || (param[0] != 'q' && param[0] != 'Q') || param[1] != '=')
-         return std::nullopt;
-      param.remove_prefix(2);
-      if (param[0] != '0' && param[0] != '1')
+      if (param.empty() || (param[0] != '0' && param[0] != '1'))
          return std::nullopt;
       int q = param[0] == '1' ? 1000 : 0;
       param.remove_prefix(1);
@@ -171,6 +168,15 @@ namespace
             return std::nullopt;
       }
       return q;
+   }
+
+   // Parses a weight parameter (e.g. "q=0.5") into thousandths. A malformed weight
+   // counts as 0. Returns nullopt for other parameters.
+   std::optional<int> parseQ(std::string_view param)
+   {
+      if (param.size() < 2 || (param[0] != 'q' && param[0] != 'Q') || param[1] != '=')
+         return std::nullopt;
+      return parseQValue(param.substr(2)).value_or(0);
    }
 
    const char* findSeparator(const char* pos, const char* end, char ch)

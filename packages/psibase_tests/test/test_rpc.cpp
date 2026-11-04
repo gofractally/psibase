@@ -260,13 +260,15 @@ TEST_CASE("acceptWeight")
    CHECK(weight({"text/html;q=1.000"}) == 1000);
    CHECK(weight({"text/html;level=1;q=0.3"}) == 300);
    CHECK(weight({R"(text/html;foo=";q=0";q=0.3)"}) == 300);
+   CHECK(weight({R"(text/html;q=0.3;foo=";q=0")"}) == 300);
 
-   SECTION("invalid weights are ignored")
+   SECTION("malformed weights count as 0")
    {
       for (auto q : {"2", "1.5", "0.0001", "0.x", ".5", "", "-0"})
       {
-         CHECK(weight({"text/html;q="s + q}) == 1000);
+         CHECK(weight({"text/html;q="s + q}) == 0);
       }
+      CHECK(weight({"text/html;Q=x, */*"}) == 0);
    }
 
    SECTION("the most specific range applies")

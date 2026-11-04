@@ -73,9 +73,10 @@ namespace psibase
 
    /// Returns the weight, in thousandths (0-1000), that the Accept headers
    /// give `type/subtype`. The most specific matching media range applies:
-   /// `type/subtype`, then `type/*`, then `*/*`. Returns 0 if no media range
-   /// matches, including when there is no Accept header, so callers should
-   /// compare the weights of the representations they can serve.
+   /// `type/subtype`, then `type/*`, then `*/*`. A malformed weight counts as
+   /// 0. Returns 0 if no media range matches, including when there is no
+   /// Accept header, so callers should compare the weights of the
+   /// representations they can serve.
    int acceptWeight(const HttpHeaders& headers, std::string_view type, std::string_view subtype);
 
    /// Returns the port suffix of the Host header, including the ':'
