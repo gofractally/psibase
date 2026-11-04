@@ -5,10 +5,6 @@ export type RootFreezeGap = {
     subaccounts: AccountNumber[];
 };
 
-/**
- * Subaccounts in `selected` whose root account is not also selected.
- * Whether that root is already frozen is left to `Accounts::freeze`.
- */
 export const rootFreezeGaps = (selected: Iterable<string>): RootFreezeGap[] => {
     const selectedSet = new Set(selected);
     const byRoot = new Map<string, string[]>();
