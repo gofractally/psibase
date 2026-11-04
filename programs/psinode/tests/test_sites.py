@@ -41,6 +41,12 @@ class TestSites(unittest.TestCase):
         self.assertPlainNotFound(a.get('/style.css', 'baz', headers=STYLESHEET), '/style.css')
         self.assertPlainNotFound(a.get('/common/nope', 'baz', headers=NAVIGATE), '/common/nope')
 
+        # The default page is served only when the client weighs text/html above text/plain
+        for accept in ['TEXT/HTML', 'text/html;q=0.9, text/plain;q=0.5', 'text/plain;q=0.5, text/*;q=0.8, text/html']:
+            self.assertDefaultPage(a.get('/', 'baz', headers={'Accept': accept}))
+        for accept in [None, '', '*/*', 'text/*', 'text/html;q=0', 'text/html;q=0, */*', 'text/html, text/plain', 'text/plain, text/html;q=0.5', 'text/html;q=0.000, text/*;q=0.1']:
+            self.assertPlainNotFound(a.get('/', 'baz', headers={'Accept': accept}), '/')
+
         # An account's own content takes precedence, and the default page's assets can't conflict with it
         self.assertResponse(a.get('/about.html', 'bar', headers=NAVIGATE), 'bar about')
         self.assertResponse(a.get('/style.css', 'bar'), 'bar css')

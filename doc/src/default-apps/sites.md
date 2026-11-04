@@ -10,7 +10,7 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 ## Default account page
 
-Every subdomain for valid account names is reachable, even for accounts that never upload any content or don't exist. When a browser navigation (a request whose `Accept` header includes `text/html`) matches none of an account's content, and the account has no `/index.html` and no proxy, the `sites` service serves a default page with a `404 Not Found` status and `Vary: Accept`. The page tells visitors there's nothing at that address yet, and links the account's owner to the Workshop app (when installed) and to the developer docs.
+Every subdomain for valid account names is reachable, even for accounts that never upload any content or don't exist. When a browser navigation (a request whose `Accept` header gives `text/html` a higher weight than `text/plain`) matches none of an account's content, and the account has no `/index.html` and no proxy, the `sites` service serves a default page with a `404 Not Found` status and `Vary: Accept`. The page tells visitors there's nothing at that address yet, and links the account's owner to the Workshop app (when installed) and to the developer docs.
 
 The default page is uploaded by the `common-api` service at `/common/default-pages/index.html`, along with the stylesheet and script it loads from the same directory. Since every `/common/` path is served by `common-api` on every subdomain, these files are always available and can't conflict with an account's own files.
 

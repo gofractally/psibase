@@ -71,6 +71,13 @@ namespace psibase
       return forwardedProto(request.headers);
    }
 
+   /// Returns the weight, in thousandths (0-1000), that the Accept headers
+   /// give `type/subtype`. The most specific matching media range applies:
+   /// `type/subtype`, then `type/*`, then `*/*`. Returns 0 if no media range
+   /// matches, including when there is no Accept header, so callers should
+   /// compare the weights of the representations they can serve.
+   int acceptWeight(const HttpHeaders& headers, std::string_view type, std::string_view subtype);
+
    /// Returns the port suffix of the Host header, including the ':'
    /// (e.g. ":8080"), or an empty string if the header has no port.
    /// The result points into the request's headers.

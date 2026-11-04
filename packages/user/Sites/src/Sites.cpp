@@ -415,19 +415,19 @@ namespace SystemService
          return content;
       }
 
-      // Browser navigations list text/html explicitly. Subresource loads, fetch(), and CLI
-      // clients send */* or nothing, and should get a plain error instead.
-      bool acceptsHtml(const HttpRequest& request)
+      // Whether the client prefers HTML over the plain-text 404. Subresource loads, fetch(), and CLI
+      // clients send */* or no Accept header, which weighs both equally, so they get plain text.
+      bool prefersHtml(const HttpRequest& request)
       {
-         auto accept = get_header_value(request, "Accept");
-         return accept && accept->find("text/html") != std::string::npos;
+         return acceptWeight(request.headers, "text", "html") >
+                acceptWeight(request.headers, "text", "plain");
       }
 
       // The page to serve, with a 404 status, when a request matches none of `account`'s content
       std::optional<SitesContentRow> getDefaultPage(const psibase::AccountNumber& account,
                                                     const HttpRequest&            request)
       {
-         if (!acceptsHtml(request) || account == Sites::service ||
+         if (!prefersHtml(request) || account == Sites::service ||
              account == HttpServer::commonApiService || getProxy(account))
          {
             return std::nullopt;
