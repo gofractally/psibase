@@ -459,7 +459,9 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
-        SharedBalance::get_or_new(creditor, get_sender(), token_id).reject(memo);
+        if let Some(mut shared) = SharedBalance::get(creditor, get_sender(), token_id) {
+            shared.reject(memo);
+        }
     }
 
     /// Sends tokens from an account's primary balance into a "sub-account" balance
