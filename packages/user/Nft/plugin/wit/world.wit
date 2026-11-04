@@ -32,6 +32,14 @@ interface user {
     /// Places NFT in shared table when the debitor has auto debit disabled
     credit: func(nft-id: u32, receiver: string, memo: string) -> result<_, error>;
 
+    /// Ensure a credit between the caller and `receiver`.
+    ///
+    /// Credits `receiver` when the caller owns the NFT and nothing is credited.
+    /// Leaves a credit that is already between those two accounts, in either
+    /// direction. Fails when neither account owns the NFT, or when the pending
+    /// credit is with someone else.
+    try-credit: func(nft-id: u32, receiver: string, memo: string) -> result<_, error>;
+
     /// Cancel a pending shared-balance credit.
     ///
     /// Arguments

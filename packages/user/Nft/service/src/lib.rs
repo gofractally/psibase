@@ -529,6 +529,32 @@ pub mod service {
         credit_record.debit(memo);
     }
 
+    /// Ensure a credit between the sender and `debitor`.
+    ///
+    /// Credits `debitor` when the sender owns the NFT and nothing is credited.
+    /// Leaves a credit that is already between those two accounts, in either
+    /// direction. Fails when neither account owns the NFT, or when the pending
+    /// credit is with someone else.
+    #[action]
+    pub fn try_credit(nft_id: NID, debitor: AccountNumber, memo: Memo) {
+        let nft = Nft::get_assert(nft_id);
+        let sender = get_sender();
+
+        if let Some(credit) = CreditRecord::get(nft_id) {
+            let between_them = (credit.creditor == sender && credit.debitor == debitor)
+                || (credit.creditor == debitor && credit.debitor == sender);
+            if nft.owner == sender {
+                assert!(between_them, "NFT already credited to an account");
+            } else {
+                assert!(between_them, "Missing required authority");
+            }
+            return;
+        }
+
+        nft.check_is_owner(sender);
+        credit(nft_id, debitor, memo);
+    }
+
     /// Debit a pending credit. The sender must be the debitor.
     /// Ownership is checked only when no credit record exists.
     #[action]

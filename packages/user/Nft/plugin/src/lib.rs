@@ -35,7 +35,7 @@ define_trust! {
     functions {
         None => [guess_id, get_user_conf],
         Medium => [mint],
-        High => [uncredit, debit, try_debit, enable_user_auto_debit, credit, burn, graphql],
+        High => [uncredit, debit, try_debit, enable_user_auto_debit, credit, try_credit, burn, graphql],
     }
 }
 
@@ -103,6 +103,22 @@ impl User for NftPlugin {
         .packed();
 
         add_action_to_transaction(Nft::action_structs::credit::ACTION_NAME, &packed_args)
+    }
+
+    fn try_credit(nft_id: u32, receiver: String, memo: String) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::try_credit,
+            vec!["namemarket".into()],
+        )?;
+
+        let packed_args = Nft::action_structs::try_credit {
+            memo: memo.try_into().unwrap(),
+            nftId: nft_id,
+            debitor: receiver.parse().unwrap(),
+        }
+        .packed();
+
+        add_action_to_transaction(Nft::action_structs::try_credit::ACTION_NAME, &packed_args)
     }
 
     fn uncredit(nft_id: u32, memo: String) -> Result<(), Error> {

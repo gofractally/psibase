@@ -31,6 +31,7 @@ namespace UserService
       NID  mint(std::optional<NID> nftId);
       void burn(NID nftId);
       void credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
+      void try_credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
       void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
       void debit(NID nftId, psio::view<const psibase::Memo> memo);
       void try_debit(NID nftId, psio::view<const psibase::Memo> memo);
@@ -64,6 +65,7 @@ namespace UserService
       method(mint, nftId),
       method(burn, nftId),
       method(credit, nftId, receiver, memo),
+      method(try_credit, nftId, receiver, memo),
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
       method(try_debit, nftId, memo),

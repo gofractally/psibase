@@ -229,10 +229,7 @@ impl Api for NameMarketPlugin {
     #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn buy_and_claim(account: String, max_cost: String) -> Result<(), Error> {
         let nft_id = schedule_buy(&account, &max_cost)?;
-        // Auto-debit consumes the purchase credit inside buy, so return the NFT for take.
-        if buyer_auto_debit()? {
-            bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
-        }
+        bindings::nft::plugin::user::try_credit(nft_id, &name_market::SERVICE.to_string(), "")?;
         add_claim(&account)
     }
 
@@ -322,23 +319,6 @@ struct PurchasedAccountFields {
     nft_id: u32,
 }
 
-#[derive(serde::Deserialize)]
-struct NftCreditResponse {
-    data: NftCreditData,
-}
-
-#[derive(serde::Deserialize)]
-struct NftCreditData {
-    #[serde(rename = "nftCredit")]
-    nft_credit: Option<NftCreditParties>,
-}
-
-#[derive(serde::Deserialize)]
-struct NftCreditParties {
-    creditor: String,
-    debitor: String,
-}
-
 fn schedule_buy(account: &str, max_cost: &String) -> Result<u32, Error> {
     let acct_name = AccountNumber::from_exact(account)
         .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
@@ -362,15 +342,12 @@ fn schedule_buy(account: &str, max_cost: &String) -> Result<u32, Error> {
     Ok(nft_id)
 }
 
-fn current_user() -> Result<String, Error> {
-    bindings::host::accounts::api::get_current_user().ok_or_else(|| ErrorType::NotLoggedIn.into())
-}
-
-/// Credits the redemption NFT to namemarket when `take` would not already succeed.
+/// Ensures a credit between the caller and namemarket, then claims.
+///
+/// `try_credit` creates that credit when the caller owns the NFT, and leaves
+/// one that already runs between them.
 fn schedule_claim(account: &str, nft_id: u32) -> Result<(), Error> {
-    if !can_take(nft_id)? {
-        bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
-    }
+    bindings::nft::plugin::user::try_credit(nft_id, &name_market::SERVICE.to_string(), "")?;
     add_claim(account)
 }
 
@@ -379,26 +356,6 @@ fn add_claim(account: &str) -> Result<(), Error> {
         .map_err(|_| ErrorType::InvalidAccountName(account.to_string()))?;
     name_market::Wrapper::add_to_tx().claim(acct);
     Ok(())
-}
-
-fn buyer_auto_debit() -> Result<bool, Error> {
-    let user = current_user()?;
-    let config = bindings::nft::plugin::user_config::get_user_conf(&user)?;
-    Ok(config.settings.auto_debit)
-}
-
-fn can_take(nft_id: u32) -> Result<bool, Error> {
-    let user = current_user()?;
-    let query = format!("query {{ nftCredit(nftId: {nft_id}) {{ creditor debitor }} }}");
-    let body = CommonServer::post_graphql_get_json(&query)?;
-    let response = serde_json::from_str::<NftCreditResponse>(&body)
-        .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-    let Some(credit) = response.data.nft_credit else {
-        return Ok(false);
-    };
-    let service = name_market::SERVICE.to_string();
-    Ok((credit.creditor == service && credit.debitor == user)
-        || (credit.creditor == user && credit.debitor == service))
 }
 
 fn fetch_purchased_nft_id(account: &str) -> Result<u32, Error> {

@@ -17,6 +17,4 @@ pub enum ErrorType {
     InitialPriceRequired(u8),
     #[error("no purchased account {0}")]
     PurchasedAccountNotFound(String),
-    #[error("not logged in")]
-    NotLoggedIn,
 }
