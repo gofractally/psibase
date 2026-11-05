@@ -1,3 +1,7 @@
+import { useState } from "react";
+
+import { siblingUrl } from "@psibase/common-lib";
+
 import { useBranding } from "@shared/hooks/use-branding";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
@@ -24,6 +28,11 @@ export const NetworkLogo = ({
     const { data: branding, isLoading } = useBranding({
         enabled: enableBranding,
     });
+    const [logoFailed, setLogoFailed] = useState(false);
+
+    const logoSrc = enableBranding
+        ? siblingUrl(null, "branding", "/network_logo.svg")
+        : undefined;
 
     let networkName = branding;
     if (producerName && networkName) {
@@ -38,8 +47,17 @@ export const NetworkLogo = ({
             className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground inline-flex w-fit cursor-pointer items-center gap-2 rounded-md p-2"
             {...props}
         >
-            <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                <PlaceholderNetworkIcon />
+            <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg">
+                {logoSrc && !logoFailed ? (
+                    <img
+                        src={logoSrc}
+                        alt=""
+                        className="size-full object-cover"
+                        onError={() => setLogoFailed(true)}
+                    />
+                ) : (
+                    <PlaceholderNetworkIcon />
+                )}
             </div>
             <div className="grid flex-1 select-none text-left text-sm leading-tight">
                 {isLoading ? (

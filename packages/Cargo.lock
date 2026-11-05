@@ -347,6 +347,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "auth-none"
+version = "0.29.0"
+dependencies = [
+ "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "auth-scope-plugin"
 version = "0.29.0"
 dependencies = [

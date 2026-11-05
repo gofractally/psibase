@@ -134,6 +134,51 @@ namespace
       return std::nullopt;
    }
 
+   std::string_view trimWhitespace(std::string_view s)
+   {
+      auto low = s.find_first_not_of(" \t");
+      if (low == std::string_view::npos)
+         return {};
+      auto high = s.find_last_not_of(" \t");
+      return s.substr(low, high - low + 1);
+   }
+
+   // Parses a qvalue (e.g. "0.5") into thousandths
+   std::optional<int> parseQValue(std::string_view param)
+   {
+      // qvalue = ( "0" [ "." 0*3DIGIT ] ) / ( "1" [ "." 0*3("0") ] )
+      if (param.empty() || (param[0] != '0' && param[0] != '1'))
+         return std::nullopt;
+      int q = param[0] == '1' ? 1000 : 0;
+      param.remove_prefix(1);
+      if (!param.empty())
+      {
+         if (param[0] != '.' || param.size() > 4)
+            return std::nullopt;
+         param.remove_prefix(1);
+         int scale = 100;
+         for (char ch : param)
+         {
+            if (ch < '0' || ch > '9')
+               return std::nullopt;
+            q += (ch - '0') * scale;
+            scale /= 10;
+         }
+         if (q > 1000)
+            return std::nullopt;
+      }
+      return q;
+   }
+
+   // Parses a weight parameter (e.g. "q=0.5") into thousandths. A malformed weight
+   // counts as 0. Returns nullopt for other parameters.
+   std::optional<int> parseQ(std::string_view param)
+   {
+      if (param.size() < 2 || (param[0] != 'q' && param[0] != 'Q') || param[1] != '=')
+         return std::nullopt;
+      return parseQValue(param.substr(2)).value_or(0);
+   }
+
    const char* findSeparator(const char* pos, const char* end, char ch)
    {
       while (pos != end)
@@ -243,3 +288,47 @@ std::optional<std::string> psibase::forwardedProto(const HttpHeaders& headers)
    return std::nullopt;
 }
 
+int psibase::acceptWeight(const HttpHeaders& headers,
+                          std::string_view   type,
+                          std::string_view   subtype)
+{
+   int bestSpecificity = -1;
+   int weight          = 0;
+   for (auto range : HttpHeader::split(headers, "accept"))
+   {
+      int  specificity = -1;
+      int  q           = 1000;
+      bool first       = true;
+      for (auto part : QSplit{range, ';'})
+      {
+         auto param = trimWhitespace(part);
+         if (first)
+         {
+            first      = false;
+            auto slash = param.find('/');
+            if (slash == std::string_view::npos)
+               break;
+            auto rangeType    = param.substr(0, slash);
+            auto rangeSubtype = param.substr(slash + 1);
+            if (iequal(rangeType, type) && iequal(rangeSubtype, subtype))
+               specificity = 2;
+            else if (iequal(rangeType, type) && rangeSubtype == "*")
+               specificity = 1;
+            else if (rangeType == "*" && rangeSubtype == "*")
+               specificity = 0;
+            else
+               break;
+         }
+         else if (auto newQ = parseQ(param))
+         {
+            q = *newQ;
+         }
+      }
+      if (specificity > bestSpecificity)
+      {
+         bestSpecificity = specificity;
+         weight          = q;
+      }
+   }
+   return weight;
+}

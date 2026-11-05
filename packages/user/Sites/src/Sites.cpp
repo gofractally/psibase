@@ -415,6 +415,37 @@ namespace SystemService
          return content;
       }
 
+      // Whether the client prefers HTML over the plain-text 404. Subresource loads, fetch(), and CLI
+      // clients send */* or no Accept header, which weighs both equally, so they get plain text.
+      bool prefersHtml(const HttpRequest& request)
+      {
+         return acceptWeight(request.headers, "text", "html") >
+                acceptWeight(request.headers, "text", "plain");
+      }
+
+      // The page to serve, with a 404 status, when a request matches none of `account`'s content
+      std::optional<SitesContentRow> getDefaultPage(const psibase::AccountNumber& account,
+                                                    const HttpRequest&            request)
+      {
+         if (!prefersHtml(request) || account == Sites::service ||
+             account == HttpServer::commonApiService || getProxy(account))
+         {
+            return std::nullopt;
+         }
+
+         auto index = Sites::Tables{getReceiver(), KvMode::read}
+                          .open<SitesContentTable>()
+                          .getIndex<0>();
+
+         if (index.get(SitesContentKey{account, "/index.html"}))
+         {
+            return std::nullopt;
+         }
+
+         return index.get(
+             SitesContentKey{HttpServer::commonApiService, std::string(Sites::defaultPage)});
+      }
+
       std::vector<char> getRawData(const SitesContentRow& row)
       {
          auto table = Sites::Tables{Sites::service, KvMode::read}.open<SitesDataTable>();
@@ -458,7 +489,13 @@ namespace SystemService
          Tables tables{getReceiver(), KvMode::read};
          auto   target = request.path();
 
-         auto content = getContentRow(account, target);
+         auto content  = getContentRow(account, target);
+         bool notFound = false;
+         if (!content)
+         {
+            content  = getDefaultPage(account, request);
+            notFound = content.has_value();
+         }
 
          if (content)
          {
@@ -466,7 +503,7 @@ namespace SystemService
                 getCspHeader(content, content->account, cspRootDomain(rootHost, request));
             auto etag = psio::hex(content->contentHash.data(), content->contentHash.data() + 8);
 
-            if (useCache(content->account) && shouldCache(request, etag))
+            if (!notFound && useCache(content->account) && shouldCache(request, etag))
             {
                // https://issues.chromium.org/issues/40132719
                // Chrome bug - Devtools still shows 200 status code sometimes
@@ -480,14 +517,23 @@ namespace SystemService
             }
 
             auto reply = HttpReply{
+                .status      = notFound ? HttpStatus::notFound : HttpStatus::ok,
                 .contentType = content->contentType,
                 .headers     = {{"Content-Security-Policy", cspHeader},
                                 {"Cache-Control", "no-cache"},
-                                {"ETag", etag},
                                 {"Access-Control-Allow-Origin", "*"},
                                 {"Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"},
                                 {"Access-Control-Allow-Headers", "*"}},
             };
+
+            if (notFound)
+            {
+               reply.headers.push_back({"Vary", "Accept"});
+            }
+            else
+            {
+               reply.headers.push_back({"ETag", etag});
+            }
 
             if (request.method != "HEAD")
             {
