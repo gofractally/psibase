@@ -7,6 +7,7 @@ mod errors;
 use errors::ErrorType::*;
 use exports::auth_delegate::plugin::api::{Error, Guest as Api};
 use exports::auth_delegate::plugin::queries::Guest as Queries;
+use exports::auth_delegate::plugin::session::{Guest as Session, Pem};
 use exports::transact_hook_user_auth::{Claim, Guest as HookUserAuth, Proof};
 use host::http::api::post_graphql_get_json;
 use transact::plugin::api::add_action_to_transaction;
@@ -52,6 +53,16 @@ impl HookUserAuth for AuthDelegate {
         _transaction_hash: Vec<u8>,
     ) -> Result<Option<Proof>, Error> {
         Err(NotYetImplemented("get_proofs"))?
+    }
+}
+
+impl Session for AuthDelegate {
+    fn add_account(_account_name: String, _private_key: Pem) -> Result<(), Error> {
+        Err(NotYetImplemented("session::add_account"))?
+    }
+
+    fn login(_account_name: String) -> Result<(), Error> {
+        Err(NotYetImplemented("session::login"))?
     }
 }
 

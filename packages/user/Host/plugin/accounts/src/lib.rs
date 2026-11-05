@@ -4,7 +4,6 @@ mod bindings;
 mod db;
 mod errors;
 mod helpers;
-mod import;
 use db::{apps_table::AppsTable, user_table::UserTable};
 /// App id for Host plugins and UI (no on-chain service).
 pub(crate) const HOST_APP: &str = "host";
@@ -12,11 +11,12 @@ use errors::ErrorType::NotConnected;
 use helpers::*;
 
 use bindings::exports::host::accounts::active_app::Guest as ActiveApp;
-use bindings::exports::host::accounts::admin::{Credential, Guest as Admin};
+use bindings::exports::host::accounts::admin::Guest as Admin;
 use bindings::exports::host::accounts::api::Guest as API;
+use bindings::exports::host::accounts::auth_svc::Guest as AuthSvc;
 use bindings::host::client::api as Client;
 use bindings::host::prompt::api as Prompt;
-use bindings::host::types::types::Error;
+use bindings::host::types::types::{Claim, Error};
 
 struct HostAccounts;
 
@@ -40,7 +40,7 @@ impl ActiveApp for HostAccounts {
             return Err(NotConnected(user).into());
         }
 
-        AppsTable::new(&app).login(&user)
+        AppsTable::new(&app).login(&user, None)
     }
 
     fn logout() -> Result<(), Error> {
@@ -73,20 +73,20 @@ impl ActiveApp for HostAccounts {
     }
 }
 
+impl AuthSvc for HostAccounts {
+    fn add_account(account: String) -> Result<(), Error> {
+        check_auth_service(&account, "add-account@host:accounts/auth-svc")?;
+        AppsTable::new(HOST_APP).connect(&account);
+        Ok(())
+    }
+
+    fn login(account: String, claim: Option<Claim>) -> Result<(), Error> {
+        check_auth_service(&account, "login@host:accounts/auth-svc")?;
+        AppsTable::new(&Client::get_active_app()).login(&account, claim.as_ref())
+    }
+}
+
 impl Admin for HostAccounts {
-    fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
-        check_caller(
-            &[HOST_APP, "homepage"],
-            "import-existing@host:accounts/admin",
-        );
-        import::import_existing(credentials)
-    }
-
-    fn login(user: String, app: String) -> Result<(), Error> {
-        check_caller(&[HOST_APP], "login@host:accounts/admin");
-        AppsTable::new(&app).login(&user)
-    }
-
     fn logout(app: String) {
         check_caller(&[HOST_APP], "logout@host:accounts/admin");
         AppsTable::new(&app).logout();

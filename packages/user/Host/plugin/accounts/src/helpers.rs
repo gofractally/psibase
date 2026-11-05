@@ -1,12 +1,25 @@
+use crate::bindings::accounts::query::api as AccountsQuery;
 use crate::bindings::host::client::api::{get_active_app, get_sender};
 use crate::bindings::host::types::types::Error;
-use crate::errors::ErrorType::Unauthorized;
+use crate::errors::ErrorType::{AccountNotFound, Unauthorized};
 
 pub fn check_caller(allowed: &[&str], context: &str) {
     let app = get_sender();
     if !allowed.contains(&app.as_str()) {
         panic!("[{}] Unauthorized caller: {}", context, app);
     }
+}
+
+/// Fails unless the caller is `account`'s auth service.
+pub fn check_auth_service(account: &str, context: &str) -> Result<(), Error> {
+    let Some(details) = AccountsQuery::get_account(account)? else {
+        return Err(AccountNotFound(account.to_string()).into());
+    };
+
+    if get_sender() != details.auth_service {
+        return Err(Unauthorized(context).into());
+    }
+    Ok(())
 }
 
 /// Returns the top-level app if the caller is the top-level app or one of `privileged_apps`.

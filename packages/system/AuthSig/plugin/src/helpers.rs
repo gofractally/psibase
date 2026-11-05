@@ -57,3 +57,7 @@ pub fn get_accounts_with_key(public_key: &str) -> Result<Vec<String>, CommonType
 pub fn from_transact() -> bool {
     Client::get_sender() == psibase::services::transact::SERVICE.to_string()
 }
+
+pub fn from_host() -> bool {
+    Client::get_sender() == "host"
+}

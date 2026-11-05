@@ -9,17 +9,18 @@ mod types;
 use trust::*;
 
 // Other plugins
+use bindings::host::accounts::auth_svc as HostAccounts;
 use bindings::host::crypto::keyvault as HostCrypto;
 use bindings::host::types::types as HostTypes;
-use bindings::host::types::types::{Keypair, Pem};
+use bindings::host::types::types::{Claim, Error, Keypair, Pem};
 use bindings::transact::plugin::api as Transact;
 
 // Exported interfaces
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, api::Guest as Api, keyvault::Guest as KeyVault,
-    queries::Guest as Queries,
+    queries::Guest as Queries, session::Guest as Session,
 };
-use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
+use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, Proof};
 
 // Services
 use psibase::services::auth_sig::action_structs as MyService;
@@ -53,16 +54,21 @@ psibase::define_trust! {
 
 struct AuthSig;
 
+fn resolve_credential(account_name: &str) -> Result<Claim, Error> {
+    let pubkey_der = AuthSig::to_der(get_pubkey(account_name)?)?;
+    Ok(Claim {
+        verify_service: psibase::services::verify_sig::SERVICE.to_string(),
+        raw_data: pubkey_der,
+    })
+}
+
 impl HookUserAuth for AuthSig {
     fn on_user_auth_claim(account_name: String) -> Result<Option<Claim>, Error> {
         if !from_transact() {
             return Err(Unauthorized("on_user_auth_claim".to_string()).into());
         }
 
-        Ok(Some(Claim {
-            verify_service: psibase::services::verify_sig::SERVICE.to_string(),
-            raw_data: AuthSig::to_der(get_pubkey(&account_name)?)?,
-        }))
+        Ok(Some(resolve_credential(&account_name)?))
     }
 
     fn on_user_auth_proof(
@@ -76,6 +82,31 @@ impl HookUserAuth for AuthSig {
         let public_key = HostCrypto::to_der(&get_pubkey(&account_name)?)?;
         let signature = AuthSig::sign(transaction_hash, public_key)?;
         Ok(Some(Proof { signature }))
+    }
+}
+
+impl Session for AuthSig {
+    fn add_account(account_name: String, private_key: Pem) -> Result<(), Error> {
+        if !from_host() {
+            return Err(Unauthorized("session::add_account".to_string()).into());
+        }
+
+        if !Self::can_authorize(private_key.clone(), account_name.clone()) {
+            return Err(AuthorizationFailed(account_name).into());
+        }
+        HostCrypto::import_key(&private_key)?;
+        HostAccounts::add_account(&account_name)
+    }
+
+    fn login(account_name: String) -> Result<(), Error> {
+        if !from_host() {
+            return Err(Unauthorized("session::login".to_string()).into());
+        }
+
+        // Pass the claim through for query-token minting only. User-tx
+        // claims still come from hook-user-auth at finish-tx.
+        let claim = resolve_credential(&account_name)?;
+        HostAccounts::login(&account_name, Some(&claim))
     }
 }
 

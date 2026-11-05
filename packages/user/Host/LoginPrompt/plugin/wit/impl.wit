@@ -7,7 +7,10 @@ world impl {
     include host:crypto/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
+    include accounts:query/imports;
     include auth-sig:plugin/imports;
+    include auth-any:plugin/imports;
+    include auth-recover:plugin/imports;
     include name-market:plugin/imports;
     include tokens:plugin/imports;
 

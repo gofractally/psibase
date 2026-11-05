@@ -11,6 +11,7 @@ use crate::bindings::tokens::plugin::{
     helpers as TokensHelpers,
     types::{SystemTokenInfo, UserBalance},
 };
+use crate::auth_service;
 use crate::bindings::transact::plugin::api as Transact;
 use crate::errors::ErrorType;
 use crate::plugin::LoginPrompt;
@@ -34,7 +35,7 @@ impl Api for LoginPrompt {
 
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
-        HostAccountsAdmin::import_existing(&credentials)
+        auth_service::import_existing(credentials)
     }
 
     fn create_account(account_name: String) -> Result<String, Error> {
@@ -79,7 +80,7 @@ impl Api for LoginPrompt {
         Ok(keypair.private_key)
     }
 
-    fn connect_account(account: String) {
+    fn login(account: String) -> Result<(), Error> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
         // The account must already have been imported
@@ -88,13 +89,15 @@ impl Api for LoginPrompt {
         let app = Client::get_active_app();
         HostAccountsAdmin::add_connected_app(&account, &app);
 
-        if HostAccountsAdmin::login(&account, &app).is_err() {
+        if let Err(e) = auth_service::login(&account) {
             HostAccountsAdmin::remove_connected_app(&account, &app);
+            return Err(e);
         }
 
         if Invites::get_active_invite().is_some() {
             Invites::accept();
         }
+        Ok(())
     }
 
     fn get_system_token() -> Result<Option<SystemTokenInfo>, Error> {

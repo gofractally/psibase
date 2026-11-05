@@ -58,6 +58,14 @@ interface types {
     /// PEM type is just a string
     type pem = string;
 
+    /// The claim is something that the submitter of a transaction claims to
+    /// know (e.g. a public key) and includes the service that can verify the
+    /// claim.
+    record claim {
+        verify-service: string,
+        raw-data: list<u8>,
+    }
+
     /// This represents a keypair of the specified type.
     /// The public and private keys are encoded in PEM format.
     record keypair {
