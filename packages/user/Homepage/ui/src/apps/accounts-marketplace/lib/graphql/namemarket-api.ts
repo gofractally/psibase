@@ -38,49 +38,82 @@ function mapNameEventEdges(edges: Array<{ cursor?: string; node?: unknown }>) {
         });
 }
 
+const PURCHASED_NAMES_FIELDS = `
+    edges {
+        node {
+            account
+        }
+    }
+    pageInfo {
+        hasNextPage
+        endCursor
+    }
+`;
+
+function accountNames(
+    connection: {
+        edges: Array<{ node?: { account: string } | null }>;
+    } | null | undefined,
+) {
+    return (connection?.edges ?? [])
+        .map((edge) => edge.node?.account)
+        .filter((account): account is string => !!account);
+}
+
+function nextPage(
+    connection: {
+        pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+    } | null | undefined,
+) {
+    const endCursor = connection?.pageInfo?.endCursor;
+    return {
+        more: !!connection?.pageInfo?.hasNextPage && !!endCursor,
+        after: endCursor ? `, after: "${endCursor}"` : "",
+    };
+}
+
 export async function fetchAllUnclaimedNames() {
     const allNames: string[] = [];
-    let hasNextPage = true;
-    let cursorArg = "";
+    let unclaimedAfter = "";
+    let debitedAfter = "";
+    let unclaimedMore = true;
+    let debitedMore = true;
 
-    while (hasNextPage) {
+    while (unclaimedMore || debitedMore) {
         const page = zUnclaimedNamesPageData.parse(
             await nameMarketAuthorizedGraphql(
                 `
                     {
-                        unclaimedNames(first: ${FETCH_BATCH_SIZE}${cursorArg}) {
-                            edges {
-                                node {
-                                    account
-                                }
-                            }
-                            pageInfo {
-                                hasNextPage
-                                endCursor
-                            }
+                        unclaimedNames(first: ${FETCH_BATCH_SIZE}${unclaimedAfter}) {
+                            ${PURCHASED_NAMES_FIELDS}
+                        }
+                        debitedNames(first: ${FETCH_BATCH_SIZE}${debitedAfter}) {
+                            ${PURCHASED_NAMES_FIELDS}
                         }
                     }
                 `,
             ),
         );
 
-        const connection = page.unclaimedNames;
-        if (!connection) {
-            break;
-        }
-
-        for (const edge of connection.edges) {
-            if (edge.node) {
-                allNames.push(edge.node.account);
+        if (unclaimedMore) {
+            allNames.push(...accountNames(page.unclaimedNames));
+            const next = nextPage(page.unclaimedNames);
+            unclaimedMore = next.more;
+            if (next.after) {
+                unclaimedAfter = next.after;
             }
         }
-
-        hasNextPage = connection.pageInfo?.hasNextPage ?? false;
-        const endCursor = connection.pageInfo?.endCursor;
-        cursorArg = endCursor ? `, after: "${endCursor}"` : "";
+        if (debitedMore) {
+            allNames.push(...accountNames(page.debitedNames));
+            const next = nextPage(page.debitedNames);
+            debitedMore = next.more;
+            if (next.after) {
+                debitedAfter = next.after;
+            }
+        }
     }
 
-    return allNames;
+    return [...new Set(allNames)];
 }
 
 const NAME_EVENT_NODE_FIELDS = `

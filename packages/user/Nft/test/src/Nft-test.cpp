@@ -76,6 +76,49 @@ namespace
       UNSCOPED_INFO(body);
       return psio::convert_from_json<StatusRoot>(body).data.nftStatus;
    }
+
+   struct AvailableData
+   {
+      bool idAvailable;
+      NID  nextId;
+   };
+   PSIO_REFLECT(AvailableData, idAvailable, nextId);
+
+   struct AvailableRoot
+   {
+      AvailableData data;
+   };
+   PSIO_REFLECT(AvailableRoot, data);
+
+   AvailableData availableQuery(DefaultTestChain& t, NID id)
+   {
+      auto query = std::format("query {{ idAvailable(id: {}) nextId }}", id);
+      auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
+      auto body  = std::string(res.body.begin(), res.body.end());
+      UNSCOPED_INFO(body);
+      return psio::convert_from_json<AvailableRoot>(body).data;
+   }
+
+   struct ChooseData
+   {
+      NID chooseId;
+   };
+   PSIO_REFLECT(ChooseData, chooseId);
+
+   struct ChooseRoot
+   {
+      ChooseData data;
+   };
+   PSIO_REFLECT(ChooseRoot, data);
+
+   NID chooseQuery(DefaultTestChain& t, NID id)
+   {
+      auto query = std::format("query {{ chooseId(id: {}) }}", id);
+      auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
+      auto body  = std::string(res.body.begin(), res.body.end());
+      UNSCOPED_INFO(body);
+      return psio::convert_from_json<ChooseRoot>(body).data.chooseId;
+   }
 }  // namespace
 
 SCENARIO("Minting & burning nfts")
@@ -317,6 +360,13 @@ SCENARIO("mint with an explicit id")
       THEN("A free id above the counter can be chosen")
       {
          NID chosen = next + 10;
+         auto before = availableQuery(t, chosen);
+         CHECK(before.idAvailable);
+         CHECK(before.nextId == next);
+         CHECK(chooseQuery(t, chosen) == chosen);
+         CHECK(chooseQuery(t, 0) == next);
+         CHECK(chooseQuery(t, sequential) == next);
+         CHECK_FALSE(availableQuery(t, 0).idAvailable);
          CHECK(firstAvailable(t, chosen) == chosen);
          CHECK(firstAvailable(t, 0) == next);
 
@@ -328,6 +378,10 @@ SCENARIO("mint with an explicit id")
          CHECK(nft.owner == alice.id);
          CHECK(nft.issuer == alice.id);
 
+         auto after = availableQuery(t, chosen);
+         CHECK_FALSE(after.idAvailable);
+         CHECK(after.nextId == next);
+         CHECK(chooseQuery(t, chosen) == chosen + 1);
          auto active = nftStatus(t, chosen);
          CHECK(active.state == "active");
          REQUIRE(active.nftDetail.has_value());
@@ -362,6 +416,7 @@ SCENARIO("mint with an explicit id")
          CHECK(!a.getNft(sequential).returnVal().has_value());
          CHECK(a.exists(sequential).returnVal() == false);
          CHECK(a.mint(sequential).failed(nftIdTaken));
+         CHECK_FALSE(availableQuery(t, sequential).idAvailable);
          CHECK(firstAvailable(t, sequential) == next);
          auto burned = nftStatus(t, sequential);
          CHECK(burned.state == "burned");
@@ -369,6 +424,15 @@ SCENARIO("mint with an explicit id")
          auto missing = nftStatus(t, next + 50);
          CHECK(missing.state == "available");
          CHECK_FALSE(missing.nftDetail.has_value());
+      }
+      THEN("A taken guess above the counter walks forward")
+      {
+         NID guess = next + 10;
+         REQUIRE(a.mint(guess).succeeded());
+         REQUIRE(a.mint(guess + 1).succeeded());
+         REQUIRE(a.burn(guess + 1).succeeded());
+         CHECK(availableQuery(t, guess).nextId == next);
+         CHECK(chooseQuery(t, guess) == guess + 2);
       }
       THEN("A burned explicit id cannot be reused")
       {
@@ -378,6 +442,11 @@ SCENARIO("mint with an explicit id")
          CHECK(!a.getNft(chosen).returnVal().has_value());
          CHECK(a.exists(chosen).returnVal() == false);
          CHECK(a.mint(chosen).failed(nftIdTaken));
+
+         auto available = availableQuery(t, chosen);
+         CHECK_FALSE(available.idAvailable);
+         CHECK(available.nextId == next);
+         CHECK(chooseQuery(t, chosen) == chosen + 1);
          CHECK(firstAvailable(t, chosen) == chosen + 1);
          CHECK(firstAvailable(t, 0) == next);
       }
@@ -389,6 +458,51 @@ SCENARIO("mint with an explicit id")
          CHECK(firstAvailable(t, last) == firstAvailable(t, 0));
          CHECK(firstAvailable(t, 0) != 0);
          CHECK(firstAvailable(t, last) != last);
+      }
+   }
+}
+
+SCENARIO("try_debit")
+{
+   GIVEN("Alice has minted an NFT")
+   {
+      DefaultTestChain t;
+
+      auto alice = t.from(t.addAccount("alice"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
+      auto a     = alice.to<Nft>();
+      auto b     = bob.to<Nft>();
+
+      auto mint = a.mint(std::nullopt);
+      auto nft  = a.getNft(mint.returnVal()).returnVal().value();
+
+      THEN("Alice may try_debit an NFT she already owns")
+      {
+         CHECK(a.try_debit(nft.id, "memo").succeeded());
+         CHECK(a.getNft(nft.id).returnVal().value().owner == alice.id);
+      }
+      THEN("Bob may not try_debit Alice's NFT")
+      {
+         CHECK(b.try_debit(nft.id, "memo").failed(missingRequiredAuth));
+      }
+      THEN("try_debit of a nonexistent NFT fails")
+      {
+         CHECK(a.try_debit(99, "memo").failed(nftDNE));
+      }
+      WHEN("Alice credits the NFT to Bob")
+      {
+         a.credit(nft.id, bob, "memo");
+
+         THEN("Bob's try_debit takes ownership")
+         {
+            CHECK(b.try_debit(nft.id, "memo").succeeded());
+            CHECK(b.getNft(nft.id).returnVal().value().owner == bob.id);
+            CHECK(b.try_debit(nft.id, "memo").succeeded());
+         }
+         THEN("Alice may not try_debit it")
+         {
+            CHECK(a.try_debit(nft.id, "memo").failed(missingRequiredAuth));
+         }
       }
    }
 }

@@ -228,6 +228,24 @@ mod service {
             }
         }
 
+        /// Id that `mint` would assign when its id argument is omitted.
+        async fn nextId(&self) -> u32 {
+            Nft::peek_next_id()
+        }
+
+        /// Whether `mint` can create `id`.
+        async fn idAvailable(&self, id: u32) -> bool {
+            Nft::id_available(id)
+        }
+
+        /// Id `mint(Some)` should use for `id`.
+        ///
+        /// Returns `id` when it is free. A taken id above `nextId` walks
+        /// forward. A taken id at or below `nextId` resumes there.
+        async fn chooseId(&self, id: u32) -> u32 {
+            Nft::choose_id(id)
+        }
+
         /// First id at or after `begin` that `mint` can create. The search wraps, and never returns 0.
         async fn firstAvailableId(&self, begin: u32) -> u32 {
             Nft::first_available_id(begin)

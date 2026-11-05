@@ -67,26 +67,29 @@ const zUnclaimedNameNode = z
     })
     .passthrough();
 
+const zPurchasedNamesConnection = z
+    .object({
+        edges: z
+            .array(
+                z.object({
+                    node: zUnclaimedNameNode.nullable().optional(),
+                }),
+            )
+            .nullish()
+            .transform((e) => e ?? []),
+        pageInfo: z
+            .object({
+                hasNextPage: z.boolean().optional(),
+                endCursor: z.string().nullish().optional(),
+            })
+            .optional(),
+    })
+    .nullable()
+    .optional();
+
 export const zUnclaimedNamesPageData = z.object({
-    unclaimedNames: z
-        .object({
-            edges: z
-                .array(
-                    z.object({
-                        node: zUnclaimedNameNode.nullable().optional(),
-                    }),
-                )
-                .nullish()
-                .transform((e) => e ?? []),
-            pageInfo: z
-                .object({
-                    hasNextPage: z.boolean().optional(),
-                    endCursor: z.string().nullish().optional(),
-                })
-                .optional(),
-        })
-        .nullable()
-        .optional(),
+    unclaimedNames: zPurchasedNamesConnection,
+    debitedNames: zPurchasedNamesConnection,
 });
 
 export type NameEvent = z.infer<typeof zNameEvent>;

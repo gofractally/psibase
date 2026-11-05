@@ -59,7 +59,9 @@ pub mod tables {
     }
 
     #[table(name = "NftTable", index = 1)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, PartialEq, SimpleObject)]
+    #[derive(
+        Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, PartialEq, SimpleObject,
+    )]
     pub struct Nft {
         #[primary_key]
         pub id: NID,
@@ -115,6 +117,31 @@ pub mod tables {
                     abort_message("no NFT id available");
                 }
             }
+        }
+
+        /// True when `mint(Some(id))` can create this id. Id 0 is never available.
+        pub fn id_available(id: NID) -> bool {
+            id != 0 && Self::status(id) == NftStatus::Available
+        }
+
+        /// Id `mint(None)` would assign, without moving the counter.
+        pub fn peek_next_id() -> NID {
+            Self::first_available_id(ConfigRow::get_assert().next_id.wrapping_add(1))
+        }
+
+        /// Id `mint(Some)` should use for `guess`.
+        ///
+        /// A free guess is returned as-is. A taken guess above the sequential
+        /// cursor walks forward from that guess, wrapping past the end and
+        /// skipping 0. A taken guess at or below the cursor resumes at the
+        /// cursor, so the packed prefix is not scanned.
+        pub fn choose_id(guess: NID) -> NID {
+            if Self::id_available(guess) {
+                return guess;
+            }
+            let next_id = Self::peek_next_id();
+            let start = if guess > next_id { guess } else { next_id };
+            Self::first_available_id(start)
         }
 
         pub fn check_is_owner(&self, account: AccountNumber) {
@@ -412,6 +439,7 @@ pub mod service {
     use crate::tables::*;
     use psibase::{
         get_sender, services::events, AccountNumber, EventDb, Memo, MethodNumber, ServiceWrapper,
+        Table, TableIndex, ToKey,
     };
 
     pub type NID = u32;
@@ -501,6 +529,17 @@ pub mod service {
         credit_record.debit(memo);
     }
 
+    /// Debit a pending credit. The sender must be the debitor.
+    /// Ownership is checked only when no credit record exists.
+    #[action]
+    pub fn try_debit(nftId: NID, memo: Memo) {
+        if CreditRecord::get(nftId).is_some() {
+            debit(nftId, memo);
+        } else {
+            Nft::get_assert(nftId).check_is_owner(get_sender());
+        }
+    }
+
     #[action]
     pub fn setUserConf(index: u8, enable: bool) {
         NftHolder::get_or_default(get_sender()).set_flag(index.into(), enable);
@@ -514,6 +553,24 @@ pub mod service {
     #[action]
     pub fn getNft(nftId: NID) -> Option<Nft> {
         Nft::get(nftId)
+    }
+
+    /// Ids `issuer` created that `owner` currently holds.
+    ///
+    /// The sender must share `issuer`'s base account, so a service and its
+    /// subaccounts can read each other's issuances.
+    #[action]
+    pub fn getHeldIds(issuer: AccountNumber, owner: AccountNumber) -> Vec<NID> {
+        assert_eq!(
+            get_sender().base(),
+            issuer.base(),
+            "Missing required authority",
+        );
+        let index = NftTable::read().get_index_by_issuer();
+        let mut prefix = index.prefix;
+        (issuer, owner).append_key(&mut prefix);
+        let held = TableIndex::<NID, Nft>::new(&index.db, prefix, true);
+        held.iter().map(|nft| nft.id).collect()
     }
 
     #[action]
@@ -531,4 +588,3 @@ pub mod service {
     ) {
     }
 }
-

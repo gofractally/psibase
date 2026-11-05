@@ -4,14 +4,14 @@ mod bindings;
 use bindings::exports::nft::plugin::authorized::Guest as Authorized;
 use bindings::exports::nft::plugin::issuer::Guest as Issuer;
 use bindings::exports::nft::plugin::user::Guest as User;
-use bindings::exports::nft::plugin::user_config::Guest as UserConfig;
+use bindings::exports::nft::plugin::user_config::{Guest as UserConfig, Settings, UserConf};
 
 use bindings::host::http::api::post_graphql_get_json;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
-use psibase::{define_trust, FlagsType};
+use psibase::{define_trust, AccountNumber, FlagsType};
 
 use psibase::services::nft::{self as Nft, NftHolderFlags};
 
@@ -33,20 +33,21 @@ define_trust! {
         ",
     }
     functions {
+        None => [guess_id, get_user_conf],
         Medium => [mint],
-        High => [uncredit, debit, enable_user_auto_debit, credit, burn, graphql],
+        High => [uncredit, debit, try_debit, enable_user_auto_debit, credit, burn, graphql],
     }
 }
 
 #[derive(Deserialize)]
-struct MintChoiceResponse {
-    data: MintChoiceData,
+struct ChooseIdResponse {
+    data: ChooseIdData,
 }
 
 #[derive(Deserialize)]
-#[allow(non_snake_case)]
-struct MintChoiceData {
-    firstAvailableId: u32,
+struct ChooseIdData {
+    #[serde(rename = "chooseId")]
+    id: u32,
 }
 
 fn plugin_error(message: impl Into<String>) -> Error {
@@ -60,11 +61,12 @@ fn plugin_error(message: impl Into<String>) -> Error {
     }
 }
 
-fn first_available_id(begin: u32) -> Result<u32, Error> {
-    let query = format!("query {{ firstAvailableId(begin: {begin}) }}");
+fn choose_id() -> Result<u32, Error> {
+    let guess: u32 = rand::rng().random();
+    let query = format!("query {{ chooseId(id: {guess}) }}");
     let body = post_graphql_get_json(&query)?;
-    serde_json::from_str::<MintChoiceResponse>(&body)
-        .map(|response| response.data.firstAvailableId)
+    serde_json::from_str::<ChooseIdResponse>(&body)
+        .map(|response| response.data.id)
         .map_err(|err| plugin_error(err.to_string()))
 }
 
@@ -74,17 +76,24 @@ impl Issuer for NftPlugin {
     fn mint() -> Result<u32, Error> {
         trust::assert_authorized(trust::FunctionName::mint)?;
 
-        let guess: u32 = rand::rng().random();
-        let id = first_available_id(guess)?;
+        let id = choose_id()?;
         let packed_args = Nft::action_structs::mint { nftId: Some(id) }.packed();
         add_action_to_transaction(Nft::action_structs::mint::ACTION_NAME, &packed_args)?;
         Ok(id)
+    }
+
+    fn guess_id() -> Result<u32, Error> {
+        trust::assert_authorized(trust::FunctionName::guess_id)?;
+        choose_id()
     }
 }
 
 impl User for NftPlugin {
     fn credit(nft_id: u32, receiver: String, memo: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::credit)?;
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::credit,
+            vec!["namemarket".into()],
+        )?;
 
         let packed_args = Nft::action_structs::credit {
             memo: memo.try_into().unwrap(),
@@ -120,6 +129,21 @@ impl User for NftPlugin {
         add_action_to_transaction(Nft::action_structs::debit::ACTION_NAME, &packed_args)
     }
 
+    fn try_debit(nft_id: u32, memo: String) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::try_debit,
+            vec!["namemarket".into()],
+        )?;
+
+        let packed_args = Nft::action_structs::try_debit {
+            memo: memo.try_into().unwrap(),
+            nftId: nft_id,
+        }
+        .packed();
+
+        add_action_to_transaction(Nft::action_structs::try_debit::ACTION_NAME, &packed_args)
+    }
+
     fn burn(nft_id: u32) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::burn)?;
 
@@ -129,7 +153,51 @@ impl User for NftPlugin {
     }
 }
 
+#[derive(Deserialize)]
+struct UserConfResponse {
+    data: UserConfData,
+}
+
+#[derive(Deserialize)]
+struct UserConfData {
+    #[serde(rename = "userConf")]
+    user_conf: UserConfFields,
+}
+
+#[derive(Deserialize)]
+struct UserConfFields {
+    account: String,
+    config: u8,
+    settings: UserConfSettings,
+}
+
+#[derive(Deserialize)]
+struct UserConfSettings {
+    #[serde(rename = "autoDebit")]
+    auto_debit: bool,
+}
+
 impl UserConfig for NftPlugin {
+    fn get_user_conf(account: String) -> Result<UserConf, Error> {
+        trust::assert_authorized(trust::FunctionName::get_user_conf)?;
+
+        let account =
+            AccountNumber::from_exact(&account).map_err(|err| plugin_error(err.to_string()))?;
+        let query = format!(
+            "query {{ userConf(user: \"{account}\") {{ account config settings {{ autoDebit }} }} }}"
+        );
+        let body = post_graphql_get_json(&query)?;
+        let response = serde_json::from_str::<UserConfResponse>(&body)
+            .map_err(|err| plugin_error(err.to_string()))?;
+        Ok(UserConf {
+            account: response.data.user_conf.account,
+            config: response.data.user_conf.config,
+            settings: Settings {
+                auto_debit: response.data.user_conf.settings.auto_debit,
+            },
+        })
+    }
+
     fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::enable_user_auto_debit)?;
 
