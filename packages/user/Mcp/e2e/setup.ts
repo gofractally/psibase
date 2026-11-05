@@ -1,6 +1,6 @@
-import type { Devnet } from "../../fixtures/devnet";
-import { createKeyAccount, pushActions, type KeyAccount } from "../../fixtures";
-import { raw } from "../x-mcp/client";
+import type { Devnet } from "../../../../e2e/fixtures/devnet";
+import { createKeyAccount, pushActions, type KeyAccount } from "../../../../e2e/fixtures";
+import { raw } from "../../../local/XMcp/e2e/client";
 
 /** POST a GraphQL query to <sub>/graphql (optionally with a query token). */
 export async function gql(devnet: Devnet, sub: string, query: string, token?: string): Promise<any> {

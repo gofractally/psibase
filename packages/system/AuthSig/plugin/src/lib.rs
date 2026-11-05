@@ -142,7 +142,10 @@ impl Actions for AuthSig {
     }
 
     fn create_account(new_account_name: String) -> Result<String, HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::create_account, vec!["host".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::create_account,
+            vec!["host".into(), "mcp".into()],
+        )?;
 
         let name = psibase::AccountNumber::from_exact(&new_account_name)
             .map_err(|_| ErrorType::InvalidAccountName(&new_account_name))?;

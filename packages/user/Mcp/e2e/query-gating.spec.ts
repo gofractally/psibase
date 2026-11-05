@@ -1,6 +1,6 @@
-import { test, expect, headlessLogin } from "../../fixtures";
-import { installMcpPackages } from "../x-mcp/install";
-import { raw } from "../x-mcp/client";
+import { test, expect, headlessLogin } from "../../../../e2e/fixtures";
+import { installMcpPackages } from "../../../local/XMcp/e2e/install";
+import { raw } from "../../../local/XMcp/e2e/client";
 
 // The needs-approval list on the objective `mcp` service is gated by the query
 // token: only the owning (parent) account can read it.

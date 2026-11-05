@@ -52,3 +52,16 @@ export function renderRows(rows) {
         )
         .join("\n");
 }
+
+/** Status list for parent-owned agent configs. */
+export function renderMyAgents(agents) {
+    if (!agents || agents.length === 0) {
+        return `<p data-testid="no-agents">No agents wired yet.</p>`;
+    }
+    return `<ul data-testid="agent-list">${agents
+        .map(
+            (a) =>
+                `<li data-testid="agent-cfg" data-account="${escapeHtml(a.account)}">managed <code>${escapeHtml(a.account)}</code> · agent <code>${escapeHtml(a.agent)}</code> · parent <code>${escapeHtml(a.parent)}</code></li>`,
+        )
+        .join("")}</ul>`;
+}

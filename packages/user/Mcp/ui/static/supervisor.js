@@ -28,7 +28,14 @@ export function connectSupervisor() {
         });
     };
     const isRedirect = (r) => r && typeof r === "object" && r.name === "RedirectErrorObject";
-    const isError = (r) => r && typeof r === "object" && typeof r.name === "string" && /ErrorObject$/.test(r.name);
+    // PluginErrorObject / GenericErrorObject, and raw PluginError (name "PluginError")
+    // which Supervisor sometimes forwards when the error is not recoverable.
+    const isError = (r) =>
+        r &&
+        typeof r === "object" &&
+        typeof r.name === "string" &&
+        typeof r.message === "string" &&
+        (/ErrorObject$/.test(r.name) || r.name === "PluginError" || r.name === "GenericError");
     return {
         ready,
         async call(service, intf, method, params, plugin = "plugin") {

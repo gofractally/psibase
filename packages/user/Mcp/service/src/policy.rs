@@ -16,6 +16,7 @@ pub fn banned_pairs() -> Vec<(AccountNumber, MethodNumber)> {
         p("staged-tx", "accept"),
         p("auth-dyn", "set_mgmt"),
         p("mcp", "set_agent"),
+        p("mcp", "bootstrap"),
         p("mcp", "grant"),
         p("mcp", "grant_missing"),
         p("mcp", "revoke"),

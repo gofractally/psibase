@@ -239,7 +239,10 @@ impl Api for TransactPlugin {
     }
 
     fn propose(actions: Vec<ExportAction>, auto_exec: bool) -> Result<(), HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::propose, vec!["packages".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::propose,
+            vec!["packages".into(), "mcp".into()],
+        )?;
 
         let actions: Vec<ImportAction> = actions
             .into_iter()

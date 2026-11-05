@@ -1,21 +1,32 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::auth_sig::plugin as AuthSig;
+use bindings::exports::mcp::plugin::agent_sign::Guest as AgentSign;
 use bindings::exports::mcp::plugin::approvals::Guest as Approvals;
+use bindings::exports::mcp::plugin::setup::Guest as Setup;
+use bindings::host::accounts::admin::{self as HostAccountsAdmin, Credential};
 use bindings::host::client::api as Client;
 use bindings::host::http::api as Server;
-use bindings::host::types::types::Error;
+use bindings::host::types::types::{Error, Pem};
+use bindings::profiles::plugin::api as Profiles;
+use bindings::profiles::plugin::types::Profile as PluginProfile;
 use bindings::staged_tx::plugin::respondent as StagedTx;
-use bindings::transact::plugin::api::add_action_to_transaction;
+use bindings::transact::plugin::api::{add_action_to_transaction, propose, set_propose_latch};
+use bindings::transact::plugin::types::Action as TxAction;
 use mcp::action_structs::*;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
+use serde::Deserialize;
 
 psibase::plugin_error! {
     pub ErrorType
     Unauthorized(app: String) => "Only the mcp app may call this plugin (caller: {app})",
     InvalidAccount(name: String) => "Invalid account name: {name}",
-    QueryFailed(msg: String) => "needsApproval query failed: {msg}",
+    QueryFailed(msg: String) => "query failed: {msg}",
+    BadActions(msg: String) => "invalid actions JSON: {msg}",
+    ImportFailed(msg: String) => "import-agent failed: {msg}",
+    HexDecode(msg: String) => "hex decode failed: {msg}",
 }
 
 fn only_mcp_app() -> Result<(), Error> {
@@ -30,13 +41,33 @@ fn account(name: &str) -> Result<AccountNumber, Error> {
     AccountNumber::from_exact(name).map_err(|_| ErrorType::InvalidAccount(name.to_string()).into())
 }
 
+fn decode_hex(s: &str) -> Result<Vec<u8>, Error> {
+    let s = s.trim().strip_prefix("0x").unwrap_or(s.trim());
+    if s.len() % 2 != 0 {
+        return Err(ErrorType::HexDecode("odd length".into()).into());
+    }
+    (0..s.len())
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(&s[i..i + 2], 16)
+                .map_err(|e| ErrorType::HexDecode(e.to_string()).into())
+        })
+        .collect()
+}
+
+#[derive(Deserialize)]
+struct ActionJson {
+    service: String,
+    method: String,
+    #[serde(rename = "rawData")]
+    raw_data: String,
+}
+
 struct McpPlugin;
 
 impl Approvals for McpPlugin {
     fn needs_approval() -> Result<String, Error> {
         only_mcp_app()?;
-        // No owner argument: r-mcp uses the query token's account, so this
-        // only ever returns the logged-in user's own list.
         let query = format!(
             r#"query {{ needsApproval {{
                 pending {{ account id txid proposer actions {{ sender service method rawData }} }}
@@ -67,6 +98,115 @@ impl Approvals for McpPlugin {
             &grant_missing { account, id }.packed(),
         )?;
         StagedTx::accept(id)
+    }
+}
+
+impl Setup for McpPlugin {
+    fn create_agent_account(agent_name: String) -> Result<Pem, Error> {
+        only_mcp_app()?;
+        account(&agent_name)?;
+        AuthSig::actions::create_account(&agent_name)
+    }
+
+    fn confirm_agent_key(agent_name: String, private_key: Pem) -> Result<bool, Error> {
+        only_mcp_app()?;
+        account(&agent_name)?;
+        Ok(AuthSig::api::can_authorize(&private_key, &agent_name))
+    }
+
+    fn bootstrap(managed_name: String, agent_name: String) -> Result<(), Error> {
+        only_mcp_app()?;
+        let managed = account(&managed_name)?;
+        let agent = account(&agent_name)?;
+        add_action_to_transaction(
+            bootstrap::ACTION_NAME,
+            &bootstrap {
+                account: managed,
+                agent,
+            }
+            .packed(),
+        )
+    }
+
+    fn my_agents() -> Result<String, Error> {
+        only_mcp_app()?;
+        let query = r#"query { myAgents { account agent parent } }"#;
+        let body = Server::post_graphql_get_json(query)?;
+        let v: serde_json::Value =
+            serde_json::from_str(&body).map_err(|e| ErrorType::QueryFailed(e.to_string()))?;
+        if let Some(errs) = v.get("errors") {
+            return Err(ErrorType::QueryFailed(errs.to_string()).into());
+        }
+        Ok(v["data"]["myAgents"].to_string())
+    }
+}
+
+impl AgentSign for McpPlugin {
+    fn import_agent(account_name: String, private_key: Pem) -> Result<(), Error> {
+        only_mcp_app()?;
+        account(&account_name)?;
+        let cred = Credential {
+            account: account_name.clone(),
+            key: private_key,
+        };
+        HostAccountsAdmin::import_existing(&[cred]).map_err(|errs| -> Error {
+            let msg = errs
+                .into_iter()
+                .map(|(a, e)| format!("{a}: {}", e.message))
+                .collect::<Vec<_>>()
+                .join("; ");
+            ErrorType::ImportFailed(msg).into()
+        })?;
+        HostAccountsAdmin::add_connected_app(&account_name, "mcp");
+        HostAccountsAdmin::login(&account_name, "mcp")?;
+        Ok(())
+    }
+
+    fn propose_as(managed: String, actions_json: String) -> Result<u32, Error> {
+        only_mcp_app()?;
+        account(&managed)?;
+        let parsed: Vec<ActionJson> = serde_json::from_str(&actions_json)
+            .map_err(|e| ErrorType::BadActions(e.to_string()))?;
+        if parsed.is_empty() {
+            return Err(ErrorType::BadActions("empty actions".into()).into());
+        }
+        let mut actions = Vec::with_capacity(parsed.len());
+        for a in parsed {
+            account(&a.service)?;
+            actions.push(TxAction {
+                sender: managed.clone(),
+                service: a.service,
+                method: a.method,
+                raw_data: decode_hex(&a.raw_data)?,
+            });
+        }
+        // WIT propose returns (); covered txs auto-execute via implicit accept.
+        // Callers that need a staged id query staged-tx afterward.
+        propose(&actions, true)?;
+        Ok(0)
+    }
+
+    fn propose_set_profile(
+        managed: String,
+        display_name: String,
+        bio: String,
+    ) -> Result<(), Error> {
+        only_mcp_app()?;
+        account(&managed)?;
+        // Same latch pattern as Homepage / Host LoginPrompt: actions added while
+        // latched become a staged-tx propose as the logged-in agent for `managed`.
+        set_propose_latch(Some(&managed))?;
+        let result = Profiles::set_profile(&PluginProfile {
+            display_name: Some(display_name),
+            bio: Some(bio),
+        });
+        set_propose_latch(None)?;
+        result
+    }
+
+    fn track(id: u32) -> Result<(), Error> {
+        only_mcp_app()?;
+        add_action_to_transaction(track::ACTION_NAME, &track { id }.packed())
     }
 }
 

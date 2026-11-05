@@ -1,5 +1,7 @@
 //! Chain tests (run with cargo-psibase's tester: `cargo psibase test`).
 use crate::Wrapper as Mcp;
+use psibase::services::accounts::Wrapper as Accounts;
+use psibase::services::auth_dyn::Wrapper as AuthDyn;
 use psibase::services::transact::ServiceMethod;
 use psibase::*;
 
@@ -35,5 +37,31 @@ fn allowlist_policy(chain: psibase::Chain) -> Result<(), psibase::Error> {
         .match_error("cannot be granted")?;
     let p = Mcp::push(&chain).get_policy(alice, sm("setcode", "setCode")).get()?;
     assert!(p.authorizers.is_empty() || p.threshold > p.authorizers.len() as u8);
+    Ok(())
+}
+
+#[psibase::test_case(packages("Mcp", "AuthDyn"))]
+fn bootstrap_creates_managed(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    let (managed, agent, parent) = (
+        account!("managed1"),
+        account!("agentxyz"),
+        account!("parentxy"),
+    );
+    for a in [agent, parent] {
+        chain.new_account(a)?;
+    }
+    Mcp::push_from(&chain, parent)
+        .bootstrap(managed, agent)
+        .get()?;
+    assert!(Accounts::push(&chain).exists(managed).get()?);
+    assert_eq!(
+        Accounts::push(&chain).getAuthOf(managed).get()?,
+        AuthDyn::SERVICE
+    );
+    assert!(Mcp::push(&chain).has_policy(managed).get()?);
+    let p = Mcp::push(&chain)
+        .get_policy(managed, sm("profiles", "setProfile"))
+        .get()?;
+    assert_eq!(p.authorizers[0].account, parent);
     Ok(())
 }

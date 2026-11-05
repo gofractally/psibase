@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approveActions, approveAndGrantActions, renderRows, visibleRows, summarize } from "./static/logic.js";
+import { approveActions, approveAndGrantActions, renderRows, renderMyAgents, visibleRows, summarize } from "./static/logic.js";
 
 const row = {
     pending: { id: 7, txid: "ab", account: "alice", proposer: "agent",
@@ -28,5 +28,11 @@ describe("mcp approval UI logic", () => {
         expect(html).toContain("&lt;x&gt;");
         expect(renderRows([])).toContain("Nothing needs approval");
         expect(summarize(row)).toBe("alice → nft.mint");
+    });
+    it("renders my agents list", () => {
+        expect(renderMyAgents([])).toContain("No agents wired yet");
+        expect(
+            renderMyAgents([{ account: "m", agent: "a", parent: "p" }]),
+        ).toContain("data-testid=\"agent-cfg\"");
     });
 });

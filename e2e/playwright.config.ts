@@ -4,8 +4,10 @@ import { assertE2ePrerequisites } from "./lib/psinode-bin";
 assertE2ePrerequisites();
 
 export default defineConfig({
-    testDir: "./specs",
-    testMatch: "**/*.spec.ts",
+    // Package suites: packages/<...>/e2e (Yarn-portaled into this harness).
+    // Harness-owned specs that predate colocation stay under e2e/specs/.
+    testDir: "..",
+    testMatch: ["packages/**/e2e/**/*.spec.ts", "e2e/specs/**/*.spec.ts"],
     // One worker per browser project; each worker boots one devnet and runs
     // its spec files serially on it, with the two browsers side by side.
     fullyParallel: false,

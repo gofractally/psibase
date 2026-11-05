@@ -1,5 +1,5 @@
 import http from "node:http";
-import type { Devnet } from "../../fixtures/devnet";
+import type { Devnet } from "../../../../e2e/fixtures/devnet";
 
 export const V2026 = "2026-07-28";
 

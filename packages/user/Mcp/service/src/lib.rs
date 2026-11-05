@@ -108,6 +108,9 @@ pub mod service {
     /// Called by the managed account (before `auth-dyn::set_mgmt(account, mcp)`)
     /// to register its agent and parent. Afterwards only the parent, via a
     /// StagedTx that this manager routes to it, can change it.
+    ///
+    /// Prefer [`bootstrap`] when the parent is creating a fresh managed
+    /// account: that path does not need the managed account to sign.
     #[action]
     fn set_agent(agent: AccountNumber, parent: AccountNumber) {
         let account = get_sender();
@@ -131,6 +134,37 @@ pub mod service {
         AgentTable::read_write()
             .put(&AgentCfg { account, agent, parent })
             .unwrap();
+    }
+
+    /// Parent-driven setup: create a new AuthDyn-managed account under `mcp`
+    /// with the given existing AuthSig `agent`. Sender becomes `parent`.
+    ///
+    /// Order: write `AgentCfg` first (so `has_policy` is true), then
+    /// `auth-dyn::newAccount` as `mcp` (mcp is manager; account auth is auth-dyn).
+    ///
+    /// Named `bootstrap` (not `bootstrap_agent`) so the method name fits
+    /// MethodNumber's 13-character limit.
+    #[action]
+    fn bootstrap(account: AccountNumber, agent: AccountNumber) {
+        let parent = get_sender();
+        check(
+            agent != account && parent != account && agent != parent,
+            "account, agent, and parent must be distinct",
+        );
+        check(Accounts::call().exists(agent), "agent account does not exist");
+        check(
+            !Accounts::call().exists(account),
+            "managed account already exists",
+        );
+        check(AgentCfg::get(account).is_none(), "agent already set for this account");
+        AgentTable::read_write()
+            .put(&AgentCfg {
+                account,
+                agent,
+                parent,
+            })
+            .unwrap();
+        psibase::services::auth_dyn::Wrapper::call_as(get_service()).newAccount(account);
     }
 
     /// Parent adds one service+method to the agent's allowlist.

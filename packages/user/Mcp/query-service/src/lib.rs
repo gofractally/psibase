@@ -81,6 +81,20 @@ mod service {
             AgentTable::with_service(mcp::SERVICE).get_index_pk().get(&account)
         }
 
+        /// Configs where `owner` is the parent (defaults to the query-token user).
+        async fn myAgents(&self, owner: Option<AccountNumber>) -> async_graphql::Result<Vec<AgentCfg>> {
+            let owner = owner.or(self.user).ok_or_else(|| {
+                async_graphql::Error::new(
+                    "permission denied: a query token for the owning account is required",
+                )
+            })?;
+            owner_only(self.user, owner)?;
+            Ok(AgentTable::with_service(mcp::SERVICE)
+                .get_index_by_parent()
+                .range((owner, AccountNumber::new(0))..=(owner, AccountNumber::new(u64::MAX)))
+                .collect())
+        }
+
         /// The allowlist for an account (owner-only, like needsApproval).
         async fn allowlist(&self, account: AccountNumber) -> async_graphql::Result<Vec<Allowed>> {
             let cfg = AgentTable::with_service(mcp::SERVICE)
@@ -109,5 +123,5 @@ mod service {
 #[cfg(test)]
 mod tests {
     // owner_only is private to the generated module; behaviour is covered by
-    // Playwright spec e2e/specs/mcp/query-gating.spec.ts.
+    // Playwright spec packages/user/Mcp/e2e/query-gating.spec.ts.
 }

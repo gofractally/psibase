@@ -1,8 +1,9 @@
 # @psibase/e2e
 
-Playwright end-to-end harness for psibase. This base provides the Playwright
-setup only (config, browser projects, CTest and CI wiring, binary and package
-resolution). Fixtures and specs are added by branches stacked on top of it.
+Playwright end-to-end harness for psibase. This directory owns the Playwright
+config, browser projects, CTest/CI wiring, shared fixtures, and binary/package
+resolution. Package suites live at `packages/<...>/e2e/` (Yarn-portaled here);
+harness-owned specs that predate colocation stay under `e2e/specs/`.
 
 ## Prerequisites
 
@@ -65,5 +66,4 @@ yarn test                      # all projects
 ./run-ctest.sh webkit [args]   # one browser, as CTest runs it
 ```
 
-With no specs yet, runs pass with no tests. Artifacts (traces, videos, HTML
-report) are written to `test-results/`.
+Artifacts (traces, videos, HTML report) are written to `test-results/`.

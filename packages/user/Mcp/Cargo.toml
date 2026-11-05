@@ -15,8 +15,10 @@ services = ["mcp"]
 [package.metadata.psibase.dependencies]
 Accounts = "0.29.0"
 AuthDyn = "0.29.0"
+AuthSig = "0.29.0"
 Host = "0.29.0"
 Permissions = "0.29.0"
+Profiles = "0.29.0"
 Transact = "0.29.0"
 HttpServer = "0.29.0"
 Sites = "0.29.0"

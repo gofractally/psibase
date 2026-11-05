@@ -76,14 +76,14 @@ impl ActiveApp for HostAccounts {
 impl Admin for HostAccounts {
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
         check_caller(
-            &[HOST_APP, "homepage"],
+            &[HOST_APP, "homepage", "mcp"],
             "import-existing@host:accounts/admin",
         );
         import::import_existing(credentials)
     }
 
     fn login(user: String, app: String) -> Result<(), Error> {
-        check_caller(&[HOST_APP], "login@host:accounts/admin");
+        check_caller(&[HOST_APP, "mcp"], "login@host:accounts/admin");
         AppsTable::new(&app).login(&user)
     }
 
@@ -114,7 +114,7 @@ impl Admin for HostAccounts {
     }
 
     fn add_connected_app(user: String, app: String) {
-        check_caller(&[HOST_APP], "add-connected-app@host:accounts/admin");
+        check_caller(&[HOST_APP, "mcp"], "add-connected-app@host:accounts/admin");
         UserTable::new(&user).add_connected_app(&app);
     }
 

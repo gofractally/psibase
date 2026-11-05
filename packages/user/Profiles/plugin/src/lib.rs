@@ -91,7 +91,10 @@ impl Contacts for ProfilesPlugin {
 
 impl Api for ProfilesPlugin {
     fn set_profile(profile: PluginProfile) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::set_profile, vec!["homepage".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::set_profile,
+            vec!["homepage".into(), "mcp".into()],
+        )?;
 
         let packed_profile_args = profiles::action_structs::setProfile {
             display_name: profile.display_name.unwrap_or_default(),

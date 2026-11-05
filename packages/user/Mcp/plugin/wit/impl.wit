@@ -3,8 +3,14 @@ package mcp:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
+    include host:accounts/imports;
+    import host:accounts/admin;
     include transact:plugin/imports;
     include staged-tx:plugin/imports;
+    include auth-sig:plugin/imports;
+    import profiles:plugin/api;
 
     export approvals;
+    export setup;
+    export agent-sign;
 }

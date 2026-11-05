@@ -44,7 +44,11 @@ export async function headlessLogin(page: Page, devnet: Devnet, account: { name:
         : await call({ service: "accounts", intf: "active-app", method: "connect-account", params: [] });
     if (!(isErr(c) && /user_prompt_request/.test(c.message))) throw new Error(`connect-account: ${JSON.stringify(c)}`);
     await page.goto(`${devnet.url("supervisor")}/prompt.html?returnPath=${encodeURIComponent("/")}`);
-    const prompt = page.frameLocator('iframe[src*="accounts."]').first();
+    // Connect UI lives on Host (LoginPrompt) when host:accounts is present;
+    // older boots still serve it from the accounts app.
+    const prompt = page
+        .frameLocator(headApi ? 'iframe[src*="host."]' : 'iframe[src*="accounts."]')
+        .first();
     await prompt.getByText(account.name, { exact: true }).click();
     await page.waitForURL((u) => u.hostname.startsWith(`${app}.`), { timeout: 30_000 });
 }

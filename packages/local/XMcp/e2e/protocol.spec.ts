@@ -1,4 +1,4 @@
-import { test, expect } from "../../fixtures";
+import { test, expect } from "../../../../e2e/fixtures";
 import { mcpPost, raw, v2026, callTool, V2026 } from "./client";
 import { installMcpPackages } from "./install";
 

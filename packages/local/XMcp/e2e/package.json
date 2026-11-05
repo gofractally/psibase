@@ -1,0 +1,8 @@
+{
+    "name": "@psibase/xmcp-e2e",
+    "private": true,
+    "version": "0.0.1",
+    "dependencies": {
+        "@playwright/test": "1.64.1"
+    }
+}

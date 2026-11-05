@@ -1,5 +1,12 @@
-import { test, expect, keyDir, pushActions, headlessLogin, clickWithTrust } from "../../fixtures";
-import { installMcpPackages } from "../x-mcp/install";
+import {
+    test,
+    expect,
+    keyDir,
+    pushActions,
+    headlessLogin,
+    clickWithTrust,
+} from "../../../../e2e/fixtures";
+import { installMcpPackages } from "../../../local/XMcp/e2e/install";
 import { setupAgent, agentSetsProfile, profileOf, pendingIdsFor } from "./setup";
 
 // POC approval flow (mcp-server-on-chain-v2.md, "POC approval flow").
