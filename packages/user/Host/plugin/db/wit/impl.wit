@@ -4,6 +4,7 @@ world impl {
     include supervisor:bridge/imports;
     include host:types/imports;
     include host:client/imports;
+    include aes:plugin/imports;
 
     export store;
 }

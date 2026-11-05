@@ -67,6 +67,7 @@ fn create_secret(private_data: &[u8]) -> (Vec<u8>, String) {
             key_data: key.to_vec(),
         },
         private_data,
+        &[],
     );
 
     (key.to_vec(), base64::standard::encode(&encrypted))

@@ -42,6 +42,7 @@ export interface BridgeImports {
         signExplicit: (msg: Uint8Array, privateKey: string) => Uint8Array;
         importKey: (privateKey: string) => string;
         importKeyTransient: (privateKey: string) => string;
+        getClientKey: () => Uint8Array;
     };
     "supervisor:bridge/database": {
         get: (duration: number, key: string) => Uint8Array | null;

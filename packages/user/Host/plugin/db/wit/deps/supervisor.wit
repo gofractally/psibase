@@ -2,6 +2,7 @@ package supervisor:bridge;
 
 interface intf {
     get-chain-id: func() -> string;
+    get-client-key: func() -> list<u8>;
 }
 
 interface database {

@@ -11,6 +11,7 @@ import {
 import { buildPreLoadPluginsRequest } from "./messaging/preload-plugins-request";
 import {
     isSupervisorInitialized,
+    isSupervisorStartupFailed,
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
@@ -25,6 +26,16 @@ import { assertTruthy } from "./utils";
 import { handlePluginUserPrompt } from "./prompts";
 
 const SupervisorIFrameId = "iframe-supervisor" as const;
+
+type SupervisorLoadState =
+    | { status: "pending" }
+    | { status: "ready" }
+    | { status: "failed"; error: GenericError };
+
+interface LoadWaiter {
+    resolve: (value?: unknown) => void;
+    reject: (reason?: unknown) => void;
+}
 
 interface Options {
     supervisorSrc?: string;
@@ -59,7 +70,7 @@ const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`
 // Convenient library for users to interact with the supervisor.
 export class Supervisor {
     private static instance: Supervisor;
-    isSupervisorInitialized = false;
+    private loadState: SupervisorLoadState = { status: "pending" };
     private iframeCreated = false;
     private supervisorSrc: string;
 
@@ -111,7 +122,7 @@ export class Supervisor {
         return request;
     }
 
-    private onLoadPromiseResolvers: ((value?: unknown) => void)[] = [];
+    private onLoadPromiseResolvers: LoadWaiter[] = [];
 
     private listenToRawMessages() {
         window.addEventListener("message", (event) =>
@@ -134,6 +145,10 @@ export class Supervisor {
         try {
             if (isSupervisorInitialized(messageEvent.data)) {
                 this.onSupervisorInitialized();
+            } else if (isSupervisorStartupFailed(messageEvent.data)) {
+                this.onSupervisorStartupFailed(
+                    messageEvent.data.payload.message,
+                );
             } else if (isFunctionCallResponse(messageEvent.data)) {
                 this.onFunctionCallResponse(messageEvent.data);
             }
@@ -146,9 +161,25 @@ export class Supervisor {
         }
     }
 
+    public get isSupervisorInitialized(): boolean {
+        return this.loadState.status === "ready";
+    }
+
     private onSupervisorInitialized() {
-        this.isSupervisorInitialized = true;
-        this.onLoadPromiseResolvers.forEach((resolver) => resolver());
+        this.loadState = { status: "ready" };
+        this.settleLoadWaiters((waiter) => waiter.resolve());
+    }
+
+    private onSupervisorStartupFailed(message: string) {
+        const error = new GenericError(message);
+        this.loadState = { status: "failed", error };
+        this.settleLoadWaiters((waiter) => waiter.reject(error));
+    }
+
+    private settleLoadWaiters(settle: (waiter: LoadWaiter) => void) {
+        const waiters = this.onLoadPromiseResolvers;
+        this.onLoadPromiseResolvers = [];
+        waiters.forEach(settle);
     }
 
     private onFunctionCallResponse(response: FunctionCallResponse) {
@@ -237,9 +268,10 @@ export class Supervisor {
 
     private async onLoaded() {
         this.ensureIFrame();
-        if (this.isSupervisorInitialized) return;
-        return new Promise((resolve) => {
-            this.onLoadPromiseResolvers.push(resolve);
+        if (this.loadState.status === "failed") throw this.loadState.error;
+        if (this.loadState.status === "ready") return;
+        return new Promise((resolve, reject) => {
+            this.onLoadPromiseResolvers.push({ resolve, reject });
         });
     }
 
