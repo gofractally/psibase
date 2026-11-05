@@ -279,6 +279,7 @@ add_rs_component_workspace(packages/:Plugins
     accounts-query
     aes
     auth-any
+    auth-none
     auth-delegate
     auth-sig
     base64
@@ -753,7 +754,10 @@ psibase_package(
     SERVICE auth-none
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthNone.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthNone-schema.json
+        DATA ${Plugins_OUTPUT_FILE_auth_none} /plugin.wasm
     DEPENDS wasm
+    DEPENDS ${Plugins_DEP}
+    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
