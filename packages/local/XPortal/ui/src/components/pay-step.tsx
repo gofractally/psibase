@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-import { PageContainer } from "@shared/components/page-container";
 import { Button } from "@shared/shadcn/ui/button";
 
 import { createEmbeddedCheckout, type EmbeddedCheckout } from "../lib/stripe";
@@ -50,8 +49,13 @@ export const PayStep = ({
     }, [publishableKey, clientSecret]);
 
     return (
-        <PageContainer className="space-y-6">
-            <h2 className="text-lg font-medium">Pay</h2>
+        <div className="space-y-6">
+            <div>
+                <h2 className="text-lg font-medium">Check out</h2>
+                <p className="text-muted-foreground mt-2 text-sm leading-6">
+                    Finish payment to create this account.
+                </p>
+            </div>
             {loadFailed ? (
                 <div className="space-y-4">
                     <p className="text-destructive text-sm">
@@ -70,6 +74,6 @@ export const PayStep = ({
             ) : (
                 <div ref={container} />
             )}
-        </PageContainer>
+        </div>
     );
 };

@@ -858,6 +858,18 @@ cargo_psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Nov5.psi
+    NAME Nov5
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "5 November demo status"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Nov5/postinstall.json
+    SERVICE nov5
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Nov5/ui/dist/* /
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    DEPENDS ${Nov5_js_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Nop.psi
     NAME Nop
     VERSION ${PSIBASE_VERSION}.0
@@ -1401,7 +1413,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps and a single-provider private system token."
     PACKAGE_DEPENDS Accounts Aes AuthNone AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Events Explorer Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Docs DiffAdjust Events Explorer Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Nov5 Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Supervisor Symbol Tokens NameMarket TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth SingleProd
 )
 
@@ -1457,7 +1469,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR} 1
     Accounts AccountsService Aes AuthAny AuthNone AuthDyn AuthDelegate AuthDelegateService AuthRecover AuthScope AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG PrivDefault
     Docs DiffAdjust DynLd Events EventsService Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host HostDb HostLoginPrompt Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles SingleProd TestDefault HttpServer Registry
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage VirtualServer WebCrypto Workshop WsAuth Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap NameMarket Transact TransactService Homepage Nov5 VirtualServer WebCrypto Workshop WsAuth Config
     XAdmin XBasic XCommonApi XDb XDefault XHttp XKeys XPackages XPeers XPortal XProxy XRun XSites XTimer XTransact)
 
 install(
@@ -1514,6 +1526,7 @@ install(
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
           ${SERVICE_DIR}/Nop.psi
+          ${SERVICE_DIR}/Nov5.psi
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Permissions.psi
           ${SERVICE_DIR}/NameMarket.psi

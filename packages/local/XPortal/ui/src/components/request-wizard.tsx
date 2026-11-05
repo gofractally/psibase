@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { CreatingStep } from "./creating-step";
 import { FailedStep } from "./failed-step";
@@ -46,6 +46,15 @@ export const RequestWizard = ({
         queryKey: xIdentityQueryKey,
         queryFn: getXIdentity,
     });
+
+    useEffect(() => {
+        if (isPending) return;
+        if (!identity && step.kind === "sign-up") return;
+        document.getElementById("account")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+        });
+    }, [identity, isPending, step.kind]);
 
     const fail = () => {
         forgetSignup();

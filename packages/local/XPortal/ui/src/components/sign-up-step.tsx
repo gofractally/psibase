@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { PageContainer } from "@shared/components/page-container";
+import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import { Label } from "@shared/shadcn/ui/label";
 import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
@@ -110,9 +110,17 @@ export const SignUpStep = ({
     ];
     const selected = chosen ?? options[0]?.value;
 
+    const continuingToCheckout = selected != null && selected !== FREE;
+
     return (
-        <PageContainer className="space-y-6">
-            <h2 className="text-lg font-medium">Choose an account</h2>
+        <div className="space-y-6">
+            <div>
+                <h2 className="text-lg font-medium">Choose a plan</h2>
+                <p className="text-muted-foreground mt-2 text-sm leading-6">
+                    A free account skips checkout. A paid account continues to
+                    checkout.
+                </p>
+            </div>
             {options.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
                     No accounts are offered right now.
@@ -121,13 +129,17 @@ export const SignUpStep = ({
                 <RadioGroup
                     value={selected}
                     onValueChange={setChosen}
-                    className="divide-y rounded-lg border"
+                    className="grid gap-3"
                 >
                     {options.map((option) => (
                         <Label
                             key={option.value}
                             htmlFor={`tier-${option.value}`}
-                            className="flex cursor-pointer items-center gap-3 px-4 py-3 font-normal"
+                            className={cn(
+                                "flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-4 font-normal",
+                                selected === option.value &&
+                                    "border-foreground",
+                            )}
                         >
                             <RadioGroupItem
                                 value={option.value}
@@ -151,17 +163,20 @@ export const SignUpStep = ({
                     This X account already has a free account.
                 </p>
             )}
-            <div className="flex justify-end">
-                <Button
-                    type="button"
-                    disabled={isPending || !selected}
-                    onClick={() =>
-                        signUp(selected === FREE ? undefined : Number(selected))
-                    }
-                >
-                    {isPending ? "Signing up..." : "Sign up"}
-                </Button>
-            </div>
-        </PageContainer>
+            <Button
+                type="button"
+                className="w-full"
+                disabled={isPending || !selected}
+                onClick={() =>
+                    signUp(selected === FREE ? undefined : Number(selected))
+                }
+            >
+                {isPending
+                    ? "Continuing..."
+                    : continuingToCheckout
+                      ? "Continue to checkout"
+                      : "Create account"}
+            </Button>
+        </div>
     );
 };

@@ -1,0 +1,267 @@
+/* Fraunces and Outfit are under the SIL Open Font License. See fonts/OFL.txt. */
+
+@font-face {
+    font-family: Fraunces;
+    src: url("./fonts/fraunces-500.woff2") format("woff2");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: Fraunces;
+    src: url("./fonts/fraunces-600.woff2") format("woff2");
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: Outfit;
+    src: url("./fonts/outfit-400.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: Outfit;
+    src: url("./fonts/outfit-500.woff2") format("woff2");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+:root {
+    color-scheme: dark;
+    --ink: #f3ece4;
+    --muted: #d4c4b6;
+    --amber: #f0c27a;
+    --amber-dim: rgba(240, 194, 122, 0.14);
+    --crimson: #e07a64;
+    --line: rgba(240, 194, 122, 0.28);
+    --card: #34241c;
+    font-family: Outfit, "Avenir Next", "Segoe UI", sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    min-height: 100%;
+}
+
+body {
+    margin: 0;
+    color: var(--ink);
+    background:
+        radial-gradient(ellipse 70% 42% at 50% -8%, rgba(176, 62, 24, 0.42), transparent 58%),
+        radial-gradient(ellipse 36% 32% at 100% 100%, rgba(92, 18, 16, 0.4), transparent 70%),
+        radial-gradient(ellipse 28% 24% at 0% 80%, rgba(120, 48, 16, 0.22), transparent 70%),
+        #100c0a;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.18;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+}
+
+.page {
+    position: relative;
+    width: min(1080px, calc(100% - 2.5rem));
+    margin: 0 auto;
+    padding: 4.25rem 0 5.5rem;
+}
+
+.hero {
+    text-align: center;
+    margin-bottom: 3.5rem;
+}
+
+.mark {
+    width: 58px;
+    height: auto;
+    margin: 0 auto 1rem;
+    display: block;
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+}
+
+.date,
+.lede,
+.band h2,
+.marker {
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.date {
+    margin: 0;
+    color: var(--amber);
+    font-size: 0.78rem;
+}
+
+.hero h1 {
+    margin: 0.35rem 0 0;
+    font-family: Fraunces, "Iowan Old Style", Palatino, Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(3.4rem, 8vw, 5.4rem);
+    letter-spacing: -0.035em;
+    line-height: 0.95;
+}
+
+.lede {
+    margin: 0.85rem 0 0;
+    color: var(--muted);
+    font-size: 0.72rem;
+}
+
+.band + .band {
+    margin-top: 2.75rem;
+}
+
+.band h2 {
+    margin: 0 0 0.9rem;
+    color: var(--amber);
+    font-size: 0.72rem;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+}
+
+.grid-sparse {
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 800px) {
+    .grid,
+    .grid-sparse {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .grid-sparse .card {
+        grid-column: 1;
+    }
+}
+
+.card {
+    height: 100%;
+    padding: 1.15rem 1.2rem 1.2rem;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background:
+        linear-gradient(180deg, rgba(255, 214, 170, 0.06), transparent 42%),
+        var(--card);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+    animation: rise 0.55s ease;
+    transition:
+        transform 0.22s ease,
+        border-color 0.22s ease,
+        box-shadow 0.22s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(240, 194, 122, 0.62);
+    box-shadow: 0 22px 36px rgba(0, 0, 0, 0.38);
+}
+
+.card-open:hover {
+    border-color: rgba(224, 122, 100, 0.95);
+}
+
+.card-service {
+    border-color: rgba(228, 181, 106, 0.38);
+}
+
+.card-open {
+    border-style: dashed;
+    border-color: rgba(224, 122, 100, 0.85);
+    background:
+        linear-gradient(180deg, rgba(224, 122, 100, 0.08), transparent 46%),
+        #3a221c;
+}
+
+.card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.15rem;
+}
+
+.icon {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    color: var(--amber);
+    background: var(--amber-dim);
+}
+
+.card-open .icon {
+    color: var(--crimson);
+    background: rgba(210, 100, 76, 0.14);
+}
+
+.marker {
+    color: rgba(195, 177, 163, 0.72);
+    font-size: 0.68rem;
+}
+
+.card h3 {
+    margin: 0;
+    font-family: Fraunces, "Iowan Old Style", Palatino, Georgia, serif;
+    font-weight: 500;
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+}
+
+.card p {
+    margin: 0.45rem 0 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+
+.grid .card:nth-child(1) { animation-delay: 0.02s; }
+.grid .card:nth-child(2) { animation-delay: 0.06s; }
+.grid .card:nth-child(3) { animation-delay: 0.1s; }
+.grid .card:nth-child(4) { animation-delay: 0.14s; }
+.grid .card:nth-child(5) { animation-delay: 0.18s; }
+.grid .card:nth-child(6) { animation-delay: 0.22s; }
+.grid .card:nth-child(7) { animation-delay: 0.26s; }
+.grid .card:nth-child(8) { animation-delay: 0.3s; }
+.grid .card:nth-child(9) { animation-delay: 0.34s; }
+.grid .card:nth-child(10) { animation-delay: 0.38s; }
+
+@keyframes rise {
+    from {
+        transform: translateY(8px);
+    }
+    to {
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card {
+        animation: none;
+        transition: none;
+    }
+
+    .card:hover {
+        transform: none;
+    }
+}

@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { PageContainer } from "@shared/components/page-container";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
@@ -79,7 +78,7 @@ export const CreatingStep = ({
     const retrying = signup?.state === "queued" && signup.retrying;
 
     return (
-        <PageContainer className="space-y-6">
+        <div className="space-y-6">
             <div>
                 <h2 className="text-lg font-medium">
                     {retrying
@@ -95,6 +94,6 @@ export const CreatingStep = ({
             <div className="bg-muted/40 flex items-center justify-center rounded-lg border px-6 py-10">
                 <Spinner className="text-muted-foreground size-5" />
             </div>
-        </PageContainer>
+        </div>
     );
 };
