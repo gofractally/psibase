@@ -178,10 +178,19 @@
         # unpinned `cargo install wasm-tools`.
         wasmTools = pkgs.wasm-tools;
 
+        # nixpkgs gnumake ships only `make`. CMake and some configure scripts look for
+        # `gmake` first, so without this a host `gmake` would be picked up via the
+        # inherited PATH.
+        gmake = pkgs.runCommand "gmake" { } ''
+          mkdir -p $out/bin
+          ln -s ${pkgs.gnumake}/bin/make $out/bin/gmake
+        '';
+
         commonPackages = with pkgs; [
           cmake
           ninja
           gnumake
+          gmake
           autoconf
           automake
           libtool
