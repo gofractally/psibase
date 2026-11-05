@@ -34,7 +34,8 @@ set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
 add_subdirectory(native)
 add_subdirectory(rust)
-file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\" \"rust\")\n")
+add_subdirectory(e2e)
+file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\" \"rust\" \"e2e\")\n")
 
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
