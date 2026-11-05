@@ -12,7 +12,11 @@ fi
 
 mkdir -p "$PROJECT_ROOT/build"
 cd "$PROJECT_ROOT/build"
+# CMAKE_SKIP_BUILD_RPATH: under Nix the cc/ld wrapper bakes RUNPATH itself.
+# If CMake also records a build RPATH, the install step's RPATH_CHANGE sees a
+# RUNPATH it did not write and aborts. Same flag nixpkgs' cmake hook uses.
 cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+      -DCMAKE_SKIP_BUILD_RPATH=ON \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_DEBUG_WASM=ON \
       -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
