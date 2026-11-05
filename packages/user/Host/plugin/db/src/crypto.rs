@@ -3,8 +3,8 @@
 //! HKDF-SHA256 expands the client key into separate HMAC and AES-256-GCM keys
 //! using distinct `info` strings (`HMAC_INFO`, `AES_INFO`).
 //!
-//! Storage keys are HMAC-SHA256 of the plaintext host:db key, encoded as
-//! lowercase hex (64 characters).
+//! Storage keys are HMAC-SHA256 of the plaintext host:db key. The 32-byte digest
+//! is stored as binary in `hostdb` and hex-encoded for HTTP transport.
 
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};

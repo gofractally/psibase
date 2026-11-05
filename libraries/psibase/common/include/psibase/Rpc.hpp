@@ -245,6 +245,17 @@ namespace psibase
       PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
    };
 
+   std::optional<std::string_view> serviceOrigin(std::string_view origin,
+                                                 AccountNumber      account,
+                                                 std::string_view   rootHost);
+   std::optional<std::string_view> serviceOrigin(const HttpRequest& req,
+                                                 AccountNumber      account,
+                                                 std::string_view   rootHost);
+   std::optional<std::string_view> subdomainOrigin(std::string_view origin,
+                                                   std::string_view   rootHost);
+   std::optional<std::string_view> subdomainOrigin(const HttpRequest& req,
+                                                   std::string_view   rootHost);
+
    std::vector<HttpHeader> allowCors(std::string_view origin = "*");
    std::vector<HttpHeader> allowCors(const HttpRequest& req,
                                      AccountNumber      account,

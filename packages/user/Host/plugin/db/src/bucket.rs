@@ -1,7 +1,6 @@
 use crate::exports::host::db::store::{Database, DbMode, GuestBucket, StorageDuration};
 use crate::host::client::api::get_sender;
 use crate::encrypted::EncryptedStore;
-use crate::supervisor::bridge::intf::get_chain_id;
 use regex::Regex;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -153,9 +152,7 @@ impl GuestBucket for Bucket {
             DbMode::NonTransactional => "non-trx",
             DbMode::Transactional => "trx",
         };
-        let chain_id = get_chain_id();
-
-        let bucket_id = format!("{}:{}:{}:{}", chain_id, mode, service_account, identifier);
+        let bucket_id = format!("{}:{}:{}", mode, service_account, identifier);
         Self { bucket_id, db }
     }
 
