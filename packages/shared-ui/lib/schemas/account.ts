@@ -85,6 +85,14 @@ export const zAccountNumber = z.string().superRefine((val, ctx) => {
     }
 });
 
+/** Root name of a `base+N` account, or null when `account` is not a subaccount. */
+export const rootAccount = (account: string): string | null => {
+    if (!zAccountNumber.safeParse(account).success) return null;
+    const sep = account.indexOf("+");
+    if (sep === -1) return null;
+    return account.slice(0, sep);
+};
+
 export type Account = z.infer<typeof zAccount>;
 export type AccountFree = z.infer<typeof zAccountFree>;
 export type LocalAccount = z.infer<typeof zLocalAccount>;
