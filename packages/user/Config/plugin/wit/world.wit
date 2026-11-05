@@ -124,13 +124,13 @@ interface symbol {
 
 interface virtual-server {
     use host:types/types.{error};
-    use virtual-server:plugin/types.{
+    use vserver:plugin/types.{
         server-specs,
         network-variables,
         cpu-pricing-params,
         net-pricing-params
     };
-    use virtual-server:plugin/types.{billing-config};
+    use vserver:plugin/types.{billing-config};
 
     /// Initialize the billing system
     /// A system token must have already been set to enable billing.

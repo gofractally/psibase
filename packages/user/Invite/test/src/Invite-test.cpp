@@ -79,7 +79,7 @@ auto createInvite = [](auto& user, const auto& pubKey)
    auto                 packed = psio::to_frac(payload);
    std::vector<uint8_t> packed_payload(packed.begin(), packed.end());
 
-   return user.createInvite(++inviteId, packed_payload, 1, false, 0);
+   return user.createInvite(++inviteId, packed_payload, 1, false, 0, std::nullopt);
 };
 
 // - Auth

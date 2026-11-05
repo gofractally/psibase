@@ -10,7 +10,7 @@ world impl {
     import transact:plugin/authorized;
     include packages:plugin/imports;
     include name-market:plugin/imports;
-    include virtual-server:plugin/imports;
+    include vserver:plugin/imports;
     include tokens:plugin/imports;
     include sites:plugin/imports;
 

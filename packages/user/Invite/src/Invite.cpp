@@ -28,12 +28,23 @@ using namespace SystemService;
 using std::optional;
 using std::string;
 using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+using std::chrono::nanoseconds;
 using std::chrono::seconds;
 using std::chrono::weeks;
 
 namespace
 {
    constexpr seconds ONE_WEEK = duration_cast<Seconds>(weeks(1));
+
+   // Measured `createAccount` redemption (billing on, nonzero subsidy):
+   // * 293 bytes network -> 300
+   // * 11.4–11.7 ms CPU -> 12 ms
+   // * 656 bytes disk written -> 700 (ignore freed-row refunds)
+   constexpr uint64_t CREATE_ACTION_NET_BYTES  = 300;
+   constexpr uint64_t CREATE_ACTION_CPU_NS =
+       duration_cast<nanoseconds>(milliseconds{12}).count();
+   constexpr uint64_t CREATE_ACTION_DISK_BYTES = 700;
 
    void hookOnInvAccept(const InviteRecord& invite, AccountNumber accepter)
    {
@@ -82,14 +93,6 @@ namespace
 {
    Quantity get_create_action_reserve()
    {
-      // The basic `createAccount` action (manually measured):
-      // * 293 bytes of network bandwidth -> Round up to 300
-      // * 6.7MS of CPU time              -> Round up to 7ms
-      // * 318 bytes of disk              -> Round up to 320
-      const uint64_t CREATE_ACTION_NET_BYTES  = 300;
-      const uint64_t CREATE_ACTION_CPU_NS     = 7000000;
-      const uint64_t CREATE_ACTION_DISK_BYTES = 320;
-
       auto virtualServer = to<VirtualServer>();
       auto net_cost      = virtualServer.get_net_cost(CREATE_ACTION_NET_BYTES);
       auto cpu_cost      = virtualServer.get_cpu_cost(CREATE_ACTION_CPU_NS);
@@ -105,20 +108,58 @@ namespace
       return to<VirtualServer>().std_buffer_cost();
    }
 
+   Quantity per_account_subsidy_for_invite(std::optional<Quantity> subsidy, bool isBilling)
+   {
+      if (!isBilling)
+      {
+         // With billing disabled, stored per-account subsidy is always zero.
+         return 0;
+      }
+      return subsidy.value_or(get_std_buffer_reserve());
+   }
+
+   template <typename Fn>
+   void for_redeemed_accounts_on_invite(RedeemedAccountTable& table,
+                                        uint32_t              inviteId,
+                                        Fn&&                  fn)
+   {
+      auto index = table.getIndex<0>();
+      for (auto iter = index.lower_bound(inviteId), end = index.upper_bound(inviteId); iter != end;)
+      {
+         auto row = *iter;
+         ++iter;
+         fn(row);
+      }
+   }
+
+   InviteRecord require_invite_from_inviter(InviteTable&        table,
+                                            uint32_t            inviteId,
+                                            AccountNumber       sender,
+                                            std::string_view    unauthError)
+   {
+      auto invite = table.get(inviteId);
+      check(invite.has_value(), inviteDNE.data());
+      check(invite->inviter == sender, unauthError.data());
+      return *invite;
+   }
+
 }  // namespace
 
-Quantity Invite::getInvCost(uint16_t numAccounts)
+Quantity Invite::getInvCost(uint16_t numAccounts, std::optional<Quantity> subsidy)
 {
    if (!to<VirtualServer>().is_billing_enabled())
    {
       return 0;
    }
 
-   auto create_action_reserve = get_create_action_reserve();
-   auto buffer_reserve        = get_std_buffer_reserve();
+   auto per_account_subsidy = per_account_subsidy_for_invite(subsidy, true);
+   return (get_create_action_reserve() + per_account_subsidy) * numAccounts;
+}
 
-   Quantity reserve_per_account = create_action_reserve + buffer_reserve;
-   return reserve_per_account * numAccounts;
+Quantity Invite::getInvQuote(uint16_t numAccounts, std::optional<Quantity> subsidy)
+{
+   Quantity cost = getInvCost(numAccounts, subsidy);
+   return Quantity{cost.value + cost.value / 2};
 }
 
 TID getSysToken()
@@ -132,7 +173,8 @@ uint32_t Invite::createInvite(uint32_t             inviteId,
                               std::vector<uint8_t> payload,
                               uint16_t             numAccounts,
                               bool                 useHooks,
-                              Quantity             resources)
+                              Quantity             resources,
+                              std::optional<Quantity> subsidy)
 {
    std::vector<char> payloadChars(payload.begin(), payload.end());
    auto              invPayload  = psio::from_frac<InvPayload>(payloadChars);
@@ -145,40 +187,40 @@ uint32_t Invite::createInvite(uint32_t             inviteId,
    Checksum256 fingerprint_checksum;
    std::memcpy(fingerprint_checksum.data(), fingerprint.data(), 32);
 
+   auto resolved_subsidy = per_account_subsidy_for_invite(subsidy, isBilling);
+
+   uint64_t needed = 0;
+   if (isBilling)
+   {
+      auto per_account = (get_create_action_reserve() + resolved_subsidy).value;
+      if (numAccounts > 0)
+      {
+         check(per_account <= std::numeric_limits<uint64_t>::max() /
+                                  static_cast<uint64_t>(numAccounts),
+               tooManyAccounts.data());
+      }
+      needed = per_account * static_cast<uint64_t>(numAccounts);
+      check(resources >= needed, notEnoughResources.data());
+   }
+
    auto cid = to<Credentials>().issue(fingerprint_checksum,  //
                                       ONE_WEEK.count(),      //
                                       std::vector<MethodNumber>{"createAccount"_m});
 
-   if (isBilling)
+   if (needed > 0)
    {
-      auto sys                   = getSysToken();
-      auto create_action_reserve = get_create_action_reserve();
-      auto gas_tank_reserve      = get_std_buffer_reserve();
-      auto sum                   = create_action_reserve + gas_tank_reserve;
-      if (numAccounts > 0)
-      {
-         check(
-             sum.value <= std::numeric_limits<uint64_t>::max() / static_cast<uint64_t>(numAccounts),
-             tooManyAccounts.data());
-      }
-      auto needed = sum.value * static_cast<uint64_t>(numAccounts);
-      check(resources >= needed, notEnoughResources.data());
+      auto sys = getSysToken();
+      to<Tokens>().debit(sys, sender, resources, "");
 
-      if (needed > 0)
-      {
-         to<Tokens>().debit(sys, sender, resources, "");
+      auto subsidy_reserve =
+          Quantity{resolved_subsidy.value * static_cast<uint64_t>(numAccounts)};
+      to<Tokens>().toSub(sys, std::to_string(inviteId), subsidy_reserve);
 
-         // Reserve the exact amount needed for basic resource buffering for new accounts)
-         auto resource_buffers_reserve =
-             Quantity{gas_tank_reserve * static_cast<uint64_t>(numAccounts)};
-         to<Tokens>().toSub(sys, std::to_string(inviteId), resource_buffers_reserve);
-
-         // The rest of the resources go to the credential, to subsidize the `create` action,
-         // which could (via hooks) require more resources than the simple default `createAccount` action.
-         auto credential_resources = resources - resource_buffers_reserve;
-         to<Tokens>().credit(sys, Credentials::service, credential_resources, "");
-         to<Credentials>().resource(cid, credential_resources);
-      }
+      // The rest of the resources go to the credential, to subsidize the `create` action,
+      // which could (via hooks) require more resources than the simple default `createAccount` action.
+      auto credential_resources = resources - subsidy_reserve;
+      to<Tokens>().credit(sys, Credentials::service, credential_resources, "");
+      to<Credentials>().resource(cid, credential_resources);
    }
 
    auto inviteTable = open<InviteTable>(KvMode::readWrite);
@@ -190,6 +232,7 @@ uint32_t Invite::createInvite(uint32_t             inviteId,
        .numAccounts = numAccounts,
        .useHooks    = useHooks,
        .secret      = invPayload.secret,
+       .subsidy     = resolved_subsidy,
    };
    inviteTable.put(invite);
 
@@ -231,20 +274,16 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
       auto balance = to<Tokens>().getSubBal(sys, sub_account);
       check(balance.has_value(), inviteCorrupted.data());
 
-      // If the amount needed to fill a standard buffer is less than the amount available
-      // for the new account, only use what's needed - This leaves more resources available per
-      // account for the rest.
-      auto     per_account     = (*balance) / (invite->numAccounts + 1);
-      auto     std_buffer_cost = to<VirtualServer>().std_buffer_cost().value;
-      uint64_t amount          = std::min(per_account, std_buffer_cost);
-
-      to<Tokens>().fromSub(sys, sub_account, amount);
-      to<Tokens>().credit(sys, VirtualServer::service, amount, "");
-      to<VirtualServer>().buy_res_for(amount, newAccount, "");
+      const uint64_t amount = invite->subsidy.value;
+      if (amount > 0)
+      {
+         to<Tokens>().fromSub(sys, sub_account, amount);
+         to<Tokens>().credit(sys, VirtualServer::service, amount, "");
+         to<VirtualServer>().buy_res_for(amount, newAccount, "");
+      }
 
       if (invite->numAccounts == 0)
       {
-         // Refund when there is still excess after the invite cannot create any accounts
          auto remainder = balance->value - amount;
          if (remainder > 0)
          {
@@ -254,6 +293,9 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
          }
       }
    }
+
+   Tables().open<RedeemedAccountTable>().put(
+       RedeemedAccountRecord{.inviteId = invite->id, .account = newAccount});
 
    emit().history().updated(invite->id, newAccount, InviteEventType::accountRedeemed);
 }
@@ -278,16 +320,14 @@ Quantity Invite::delInvite(uint32_t inviteId)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
-   auto invite      = inviteTable.get(inviteId);
-   check(invite.has_value(), inviteDNE.data());
-   check(invite->inviter == sender, unauthDelete.data());
+   auto invite      = require_invite_from_inviter(inviteTable, inviteId, sender, unauthDelete);
 
    Quantity refund    = 0;
    auto     sysRecord = to<Tokens>().getSysToken();
    if (sysRecord.has_value())
    {
       auto sys           = sysRecord->id;
-      auto sub_account   = std::to_string(invite->id);
+      auto sub_account   = std::to_string(invite.id);
       auto balanceRecord = to<Tokens>().getSubBal(sys, sub_account);
 
       if (balanceRecord.has_value())
@@ -296,16 +336,36 @@ Quantity Invite::delInvite(uint32_t inviteId)
          {
             refund = *balanceRecord;
             to<Tokens>().fromSub(sys, sub_account, refund);
-            to<Tokens>().credit(sys, invite->inviter, refund, "Unused invite tokens refunded");
+            to<Tokens>().credit(sys, invite.inviter, refund, "Unused invite tokens refunded");
          }
       }
    }
 
-   inviteTable.remove(*invite);
-   to<Credentials>().consume(invite->cid);
-   emit().history().updated(invite->id, getSender(), InviteEventType::deleted);
+   {
+      auto redeemedTable = Tables().open<RedeemedAccountTable>();
+      for_redeemed_accounts_on_invite(redeemedTable, inviteId, [&](const RedeemedAccountRecord& row) {
+         redeemedTable.remove(row);
+      });
+   }
+   inviteTable.remove(invite);
+   to<Credentials>().consume(invite.cid);
+   emit().history().updated(invite.id, getSender(), InviteEventType::deleted);
 
    return refund;
+}
+
+std::vector<AccountNumber> Invite::getNewAccts(uint32_t inviteId)
+{
+   auto sender      = getSender();
+   auto inviteTable = Tables(getReceiver(), KvMode::read).open<InviteTable>();
+   require_invite_from_inviter(inviteTable, inviteId, sender, unauthInviter);
+
+   std::vector<AccountNumber> accounts;
+   auto redeemedTable = Tables(getReceiver(), KvMode::read).open<RedeemedAccountTable>();
+   for_redeemed_accounts_on_invite(redeemedTable, inviteId, [&](const RedeemedAccountRecord& row) {
+      accounts.push_back(row.account);
+   });
+   return accounts;
 }
 
 optional<InviteRecord> Invite::getInvite(uint32_t inviteId)

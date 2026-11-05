@@ -66,16 +66,42 @@ namespace
          return scheme == "https" || host == "localhost" || host.ends_with(".localhost");
       }
 
-      bool isService(std::string_view rootHost, psibase::AccountNumber account)
+      bool isService(std::string_view rootHost, psibase::AccountNumber account) const
       {
-         return isSecure() && account.str() + '.' + std::string(rootHost) == host;
+         if (!isSecure())
+            return false;
+         auto dot = host.find('.');
+         if (dot == std::string_view::npos || dot == 0)
+            return false;
+         if (host.substr(dot + 1) != rootHost)
+            return false;
+         return psibase::AccountNumber(host.substr(0, dot)) == account;
       }
 
-      bool isSubdomain(std::string_view rootHost)
+      bool isSubdomain(std::string_view rootHost) const
       {
-         return isSecure() && host == rootHost || host.ends_with('.' + std::string(rootHost));
+         if (!isSecure())
+            return false;
+         return host == rootHost
+             || (host.size() > rootHost.size() + 1
+                 && host[host.size() - rootHost.size() - 1] == '.'
+                 && host.ends_with(rootHost));
       }
    };
+
+   std::vector<psibase::HttpHeader> withCorsCredentials(std::vector<psibase::HttpHeader> headers)
+   {
+      headers.push_back({"Access-Control-Allow-Credentials", "true"});
+      for (auto& h : headers)
+      {
+         if (h.matches("Access-Control-Allow-Headers"))
+         {
+            h.value = "Content-Type, Authorization";
+            break;
+         }
+      }
+      return headers;
+   }
 }  // namespace
 
 namespace psibase
@@ -284,6 +310,40 @@ namespace psibase
       return host;
    }
 
+   std::optional<std::string_view> serviceOrigin(std::string_view origin,
+                                                 AccountNumber      account,
+                                                 std::string_view   rootHost)
+   {
+      if (Origin(origin).isService(rootHost, account))
+         return origin;
+      return std::nullopt;
+   }
+
+   std::optional<std::string_view> serviceOrigin(const HttpRequest& req,
+                                                 AccountNumber      account,
+                                                 std::string_view   rootHost)
+   {
+      if (auto origin = req.getHeader("origin"))
+         return serviceOrigin(*origin, account, rootHost);
+      return std::nullopt;
+   }
+
+   std::optional<std::string_view> subdomainOrigin(std::string_view origin,
+                                                   std::string_view   rootHost)
+   {
+      if (Origin(origin).isSubdomain(rootHost))
+         return origin;
+      return std::nullopt;
+   }
+
+   std::optional<std::string_view> subdomainOrigin(const HttpRequest& req,
+                                                   std::string_view   rootHost)
+   {
+      if (auto origin = req.getHeader("origin"))
+         return subdomainOrigin(*origin, rootHost);
+      return std::nullopt;
+   }
+
    std::vector<HttpHeader> allowCors(std::string_view origin /* = "*" */)
    {
       return {
@@ -297,11 +357,8 @@ namespace psibase
                                      AccountNumber      account,
                                      bool               hostIsSubdomain)
    {
-      if (auto origin = req.getHeader("origin");
-          origin && Origin(*origin).isService(rootHost(req, hostIsSubdomain), account))
-      {
+      if (auto origin = serviceOrigin(req, account, rootHost(req, hostIsSubdomain)))
          return allowCors(*origin);
-      }
       return {};
    }
 
@@ -320,12 +377,29 @@ namespace psibase
 
    std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req, bool hostIsSubdomain)
    {
-      if (auto origin = req.getHeader("origin");
-          origin && Origin(*origin).isSubdomain(rootHost(req, hostIsSubdomain)))
-      {
+      if (auto origin = subdomainOrigin(req, rootHost(req, hostIsSubdomain)))
          return allowCors(*origin);
-      }
       return {};
+   }
+
+   std::vector<HttpHeader> allowCorsCredentials(const HttpRequest& req,
+                                                AccountNumber      account,
+                                                bool               hostIsSubdomain)
+   {
+      auto headers = allowCors(req, account, hostIsSubdomain);
+      if (headers.empty())
+         return {};
+      return withCorsCredentials(std::move(headers));
+   }
+
+   std::vector<HttpHeader> allowCorsCredentials(const HttpRequest&                req,
+                                                const std::vector<AccountNumber>& accounts,
+                                                bool                              hostIsSubdomain)
+   {
+      auto headers = allowCors(req, accounts, hostIsSubdomain);
+      if (headers.empty())
+         return {};
+      return withCorsCredentials(std::move(headers));
    }
 
    template <typename T>

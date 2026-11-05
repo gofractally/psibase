@@ -30,5 +30,5 @@ world = "impl"
 "profiles:plugin" = { path = "../../../Profiles/plugin/wit/world.wit" }
 "chainmail:plugin" = { path = "../../../Chainmail/plugin/wit/world.wit" }
 "invite:plugin" = { path = "../../../Invite/plugin/wit/world.wit" }
-"virtual-server:plugin" = { path = "../../../../system/VirtualServer/plugin/wit/world.wit" }
+"vserver:plugin" = { path = "../../../../system/VirtualServer/plugin/wit/world.wit" }
 "token-swap:plugin" = { path = "../../../TokenSwap/plugin/wit/world.wit" }

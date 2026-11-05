@@ -359,7 +359,8 @@ impl UserGuild for GuildsPlugin {
     ) -> Result<String, Error> {
         let guild = get_guild(&guild_account)?;
 
-        let d = bindings::invite::plugin::inviter::prepare_new_invite(
+        let d = bindings::invite::plugin::inviter::prepare_new_invite()?;
+        bindings::invite::plugin::inviter::pay_for_invite(
             num_accounts,
             &guild.fractal.to_string(),
         )?;

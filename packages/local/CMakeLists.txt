@@ -35,6 +35,7 @@ target_mapped_include_directories(services_local INTERFACE
     XProxy/include
     XRun/include
     XSites/include
+    XPortal/include
     XTimer/include
     XTransact/include
 )
@@ -47,6 +48,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(XKeys)
     add_subdirectory(XPackages)
     add_subdirectory(XPeers)
+    add_subdirectory(XPortal)
     add_subdirectory(XProxy)
     add_subdirectory(XRun)
     add_subdirectory(XSites)

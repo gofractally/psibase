@@ -36,7 +36,7 @@ export const useInstalledLocalPackages = () => {
         queryFn: async () => {
             const res = (await adminGraphql(
                 "{ installed(first: 100) { edges { node { name version } } } }",
-                { service: "x-packages" },
+                { service: "x-packages", credentials: "include" },
             )) as {
                 installed: { edges: { node: InstalledLocalPackage }[] };
             };

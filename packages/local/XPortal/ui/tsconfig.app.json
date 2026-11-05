@@ -1,0 +1,18 @@
+{
+    "extends": "../../../tsconfig.app.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": ".tmp/tsconfig.app.tsbuildinfo",
+        "baseUrl": "./",
+        "paths": {
+            "@/*": ["./src/*"],
+            "@shared/*": ["../../../shared-ui/*"],
+            "@psibase/common-lib": [
+                "../../../user/CommonApi/common/packages/common-lib/src"
+            ],
+            "@psibase/common-lib/*": [
+                "../../../user/CommonApi/common/packages/common-lib/src/*"
+            ]
+        }
+    },
+    "include": ["src"]
+}

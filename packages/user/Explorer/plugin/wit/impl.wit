@@ -17,7 +17,7 @@ world impl {
     import tokens:plugin/helpers;
     import tokens:plugin/authorized;
     import transact:plugin/authorized;
-    import virtual-server:plugin/authorized;
+    import vserver:plugin/authorized;
 
     export block-log;
     export authorized;

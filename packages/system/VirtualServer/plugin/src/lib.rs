@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 use errors::ErrorType;
 
-use bindings::exports::virtual_server::plugin as Exports;
+use bindings::exports::vserver::plugin as Exports;
 use Exports::types::{CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs};
 use Exports::{
     admin::Guest as Admin, authorized::Guest as Authorized, billing::Guest as Billing,
@@ -17,14 +17,28 @@ use Exports::{
 use bindings::host::accounts as HostAccounts;
 use bindings::tokens::plugin as TokensPlugin;
 use psibase::AccountNumber;
-use psibase_plugin::*;
+use psibase_plugin::{
+    host,
+    trust::{Capabilities, TrustConfig},
+    Error, Transact,
+};
 
 use psibase::services::tokens::{Precision, Quantity};
-use virtual_server::tables::tables::{self as ServiceTables};
-use virtual_server::Wrapper as VirtualServer;
-use virtual_server::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
+use vserver::tables::tables::{self as ServiceTables};
+use vserver::Wrapper as VirtualServer;
+use vserver::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
 struct VirtualServerPlugin;
+
+impl TrustConfig for VirtualServerPlugin {
+    fn capabilities() -> Capabilities {
+        Capabilities {
+            low: &[],
+            medium: &[],
+            high: &["Purchase network resources for an account"],
+        }
+    }
+}
 
 fn assert_caller(allowed: &[&str], context: &str) {
     let sender = host::client::get_sender();
@@ -199,12 +213,8 @@ impl Billing for VirtualServerPlugin {
         refill_to_capacity(Some(capacity), true)
     }
 
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn donate_gas(user: String, amount: String) -> Result<(), Error> {
-        assert_caller(
-            &["homepage", &host::client::get_receiver()],
-            "fill_gas_tank_for",
-        );
-
         let sys_id = get_sys()?;
         let amount_u64 = TokensPlugin::helpers::decimal_to_u64(sys_id, &amount)?;
 
@@ -245,7 +255,7 @@ impl TransactInterface for VirtualServerPlugin {
 impl Authorized for VirtualServerPlugin {
     fn graphql(query: String) -> Result<String, Error> {
         assert_caller(
-            &["homepage", "config", "explorer", &virtual_server::SERVICE.to_string()],
+            &["homepage", "config", "explorer", &vserver::SERVICE.to_string()],
             "authorized::graphql",
         );
 
@@ -254,7 +264,7 @@ impl Authorized for VirtualServerPlugin {
 
     fn get_billing_config() -> Result<Exports::types::BillingConfig, Error> {
         assert_caller(
-            &["homepage", "config", &virtual_server::SERVICE.to_string()],
+            &["homepage", "config", &vserver::SERVICE.to_string()],
             "authorized::get_billing_config",
         );
 

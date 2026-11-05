@@ -2,6 +2,7 @@
 
 #include <psibase/Table.hpp>
 #include <services/system/AuthSig.hpp>
+#include <services/user/tokenTypes.hpp>
 
 namespace UserService
 {
@@ -38,12 +39,27 @@ namespace UserService
          /// The encrypted secret used to redeem the invite
          std::string secret;
 
+         /// Per-account vserver resource subsidy reserved for each redeemed account
+         Quantity subsidy;
+
          using ByInviter = psibase::CompositeKey<&InviteRecord::inviter, &InviteRecord::id>;
       };
-      PSIO_REFLECT(InviteRecord, id, cid, inviter, numAccounts, useHooks, secret);
+      PSIO_REFLECT(InviteRecord, id, cid, inviter, numAccounts, useHooks, secret, subsidy);
       using InviteTable = psibase::
           Table<InviteRecord, &InviteRecord::id, InviteRecord::ByInviter{}, &InviteRecord::cid>;
       PSIO_REFLECT_TYPENAME(InviteTable)
+
+      struct RedeemedAccountRecord
+      {
+         uint32_t               inviteId;
+         psibase::AccountNumber account;
+      };
+      PSIO_REFLECT(RedeemedAccountRecord, inviteId, account);
+      using RedeemedAccountTable =
+          psibase::Table<RedeemedAccountRecord,
+                         &RedeemedAccountRecord::inviteId,
+                         &RedeemedAccountRecord::account>;
+      PSIO_REFLECT_TYPENAME(RedeemedAccountTable)
 
    }  // namespace InviteNs
 }  // namespace UserService

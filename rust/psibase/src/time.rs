@@ -1,6 +1,7 @@
 use crate::{Pack, ToKey, ToSchema, Unpack};
 use async_graphql::scalar;
 use chrono::{DateTime, FixedOffset, Utc};
+use fracpack::{AnyType, FracInputStream, SchemaBuilder};
 use serde::{
     de::{Deserializer, Visitor},
     ser::Serializer,
@@ -330,6 +331,48 @@ impl Sub<MicroSeconds> for TimePointUSec {
 
     fn sub(self, other: MicroSeconds) -> Self::Output {
         Self::from(self.microseconds - other.value)
+    }
+}
+
+/// Microseconds on the monotonic clock, whose epoch is unspecified but
+/// shared by all uses within a block. Packs as a bare `i64`.
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct MonotonicTimePointUSec {
+    pub microseconds: i64,
+}
+
+impl From<i64> for MonotonicTimePointUSec {
+    fn from(microseconds: i64) -> Self {
+        MonotonicTimePointUSec { microseconds }
+    }
+}
+
+impl fracpack::Pack for MonotonicTimePointUSec {
+    const FIXED_SIZE: u32 = <i64 as fracpack::Pack>::FIXED_SIZE;
+    const VARIABLE_SIZE: bool = false;
+
+    fn pack(&self, dest: &mut Vec<u8>) {
+        fracpack::Pack::pack(&self.microseconds, dest);
+    }
+}
+
+impl<'a> fracpack::Unpack<'a> for MonotonicTimePointUSec {
+    const FIXED_SIZE: u32 = <i64 as fracpack::Unpack>::FIXED_SIZE;
+    const VARIABLE_SIZE: bool = false;
+
+    fn unpack(src: &mut FracInputStream<'a>) -> fracpack::Result<Self> {
+        Ok(Self::from(<i64 as fracpack::Unpack>::unpack(src)?))
+    }
+
+    fn verify(src: &mut FracInputStream) -> fracpack::Result<()> {
+        <i64 as fracpack::Unpack>::verify(src)
+    }
+}
+
+impl fracpack::ToSchema for MonotonicTimePointUSec {
+    fn schema(builder: &mut SchemaBuilder) -> AnyType {
+        <i64 as fracpack::ToSchema>::schema(builder)
     }
 }
 

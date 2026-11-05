@@ -39,24 +39,24 @@ interface inviter {
     ///  * `invite-token` - This token can be imported on another device to redeem the invite.
     generate-invite: func() -> result<invite-token, error>;
 
-    /// Will prepare the information necessary to generate a new invite, but will 
-    /// not actually generate it. This is used when an app wants to control the invite 
-    /// creation in more detail, for example by creating the invite server-side and 
-    /// registering the creator service to receive hooks when the invite gets updated.
+    /// Prepares an invite payload without creating the invite or charging anyone.
     /// 
-    /// IMPORTANT: This plugin function WILL charge the logged-in user for the cost of the 
-    /// invite, and the amount will be credited to the caller app.
-    /// 
-    /// Parameters
-    /// * `num-accounts`: The number of accounts that will be created using the invite
-    /// * `service-name`: The name of the service that will ultimately be used to create the invite
+    /// The caller can create the invite later, for example server-side, and
+    /// register for hooks when the invite is updated.
     ///
     /// Returns:
     /// * `invite-token` - should be kept private, can be used to accept the invite
     /// * `invite-id` - An id that must be used when calling create-invite
     /// * `payload` - A packed payload containing various important invite data, must be passed through
     ///               to the service when calling create-invite
-    prepare-new-invite: func(num-accounts: u16, service-name: string) -> result<invite-details, error>;
+    prepare-new-invite: func() -> result<invite-details, error>;
+
+    /// Charges the logged-in user the minimum invite cost and credits that amount to `service-name`.
+    /// 
+    /// Parameters
+    /// * `num-accounts`: The number of accounts that will be created using the invite
+    /// * `service-name`: The account that receives the credit
+    pay-for-invite: func(num-accounts: u16, service-name: string) -> result<_, error>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
     /// from the database.

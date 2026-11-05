@@ -62,6 +62,7 @@ export async function installService(
             siblingUrl(null, "x-http", "/register_server"),
             {
                 method: "POST",
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json",
                     ...(await adminBearerAuthHeaders()),
@@ -142,6 +143,7 @@ export async function installDataFiles(zip: JSZip): Promise<void> {
             const url = siblingUrl(null, serviceName, filePath);
             const response = await fetch(url, {
                 method: "PUT",
+                credentials: "include",
                 headers: {
                     "Content-Type": contentType,
                     ...(await adminBearerAuthHeaders()),

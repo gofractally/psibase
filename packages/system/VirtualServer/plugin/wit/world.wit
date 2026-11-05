@@ -1,4 +1,4 @@
-package virtual-server:plugin;
+package vserver:plugin;
 
 interface types {
     record server-specs {

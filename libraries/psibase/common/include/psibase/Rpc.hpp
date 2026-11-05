@@ -245,6 +245,17 @@ namespace psibase
       PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
    };
 
+   std::optional<std::string_view> serviceOrigin(std::string_view origin,
+                                                 AccountNumber      account,
+                                                 std::string_view   rootHost);
+   std::optional<std::string_view> serviceOrigin(const HttpRequest& req,
+                                                 AccountNumber      account,
+                                                 std::string_view   rootHost);
+   std::optional<std::string_view> subdomainOrigin(std::string_view origin,
+                                                   std::string_view   rootHost);
+   std::optional<std::string_view> subdomainOrigin(const HttpRequest& req,
+                                                   std::string_view   rootHost);
+
    std::vector<HttpHeader> allowCors(std::string_view origin = "*");
    std::vector<HttpHeader> allowCors(const HttpRequest& req,
                                      AccountNumber      account,
@@ -253,6 +264,12 @@ namespace psibase
                                      const std::vector<AccountNumber>& accounts,
                                      bool                              hostIsSubdomain = true);
    std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req, bool hostIsSubdomain = true);
+   std::vector<HttpHeader> allowCorsCredentials(const HttpRequest& req,
+                                                AccountNumber      account,
+                                                bool               hostIsSubdomain = true);
+   std::vector<HttpHeader> allowCorsCredentials(const HttpRequest&                req,
+                                                const std::vector<AccountNumber>& accounts,
+                                                bool hostIsSubdomain = true);
 
    using HttpReply = BasicHttpReply<std::vector<char>>;
 

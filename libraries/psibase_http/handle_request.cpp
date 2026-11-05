@@ -832,7 +832,13 @@ namespace psibase::http
                        builder.req_version};
                    res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
                    for (auto& h : reply.headers)
-                      res.set(h.name, h.value);
+                   {
+                      // Each Set-Cookie is its own header, so a response can carry more than one.
+                      if (h.matches("set-cookie"))
+                         res.insert(h.name, h.value);
+                      else
+                         res.set(h.name, h.value);
+                   }
                    res.set(bhttp::field::content_type, reply.contentType);
                    builder.setKeepAlive(res);
                    res.body() = std::move(reply.body);

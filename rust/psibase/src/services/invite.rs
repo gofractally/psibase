@@ -28,6 +28,9 @@ pub struct InviteRecord {
 
     /// The encrypted secret used to redeem the invite
     secret: String,
+
+    /// Per-account vserver resource subsidy reserved for each redeemed account
+    subsidy: crate::services::tokens::Quantity,
 }
 
 #[derive(Clone, Pack, Unpack)]
@@ -79,7 +82,14 @@ mod service {
     /// Returns the current minimum cost of creating an invite that can create the specified number of
     /// accounts.
     #[action]
-    fn getInvCost(numAccounts: u16) -> Quantity {
+    fn getInvCost(numAccounts: u16, subsidy: Option<Quantity>) -> Quantity {
+        unimplemented!()
+    }
+
+    /// Returns [`getInvCost`](Self::getInvCost) plus a 50% buffer for resource cost increases between quote and
+    /// [`createInvite`](Self::createInvite).
+    #[action]
+    fn getInvQuote(numAccounts: u16, subsidy: Option<Quantity>) -> Quantity {
         unimplemented!()
     }
 
@@ -97,6 +107,8 @@ mod service {
     ///               new accounts). The caller must send this amount of system tokens to this
     ///               invite service before calling this action. Use the query interface to check
     ///               the resources required for an invite of the specified number of accounts.
+    /// - `subsidy` is the per-account vserver resource amount bought for each redeemed account.
+    ///             When omitted, one standard buffer is reserved; `0` means no buffer.
     ///
     /// If `useHooks` is true, the caller must be an account with a service deployed on it
     /// that implements the InviteHooks interface.
@@ -107,6 +119,7 @@ mod service {
         numAccounts: u16,
         useHooks: bool,
         resources: Quantity,
+        subsidy: Option<Quantity>,
     ) -> u32 {
         unimplemented!()
     }
@@ -145,6 +158,12 @@ mod service {
     /// Gets the expiration date of the specified invite
     #[action]
     fn getExpDate(inviteId: u32) -> TimePointSec {
+        unimplemented!()
+    }
+
+    /// Accounts created from the invite. Only the inviter may call.
+    #[action]
+    fn getNewAccts(inviteId: u32) -> Vec<AccountNumber> {
         unimplemented!()
     }
 

@@ -10,12 +10,13 @@ publish.workspace = true
 
 [package.metadata.psibase]
 package-name = "VirtualServer"
-services = ["virtual-server"]
+services = ["vserver"]
 
 [package.metadata.psibase.dependencies]
 Sites = "0.29.0"
 Accounts = "0.29.0"
 Host = "0.29.0"
+Permissions = "0.29.0"
 Nft = "0.29.0"
 Tokens = "0.29.0"
 Transact = "0.29.0"
@@ -28,6 +29,6 @@ DiffAdjust = "0.29.0"
 crate-type = ["rlib"]
 
 [dependencies]
-virtual-server = { path = "service", version = "0.29.0" }
+vserver = { path = "service", version = "0.29.0" }
 virtual-server-plugin = { path = "plugin", version = "0.29.0" }
 psibase-system-workspace-hack.workspace = true
