@@ -36,3 +36,17 @@ export function setupNamesValid(agentRaw: string, owner: string): boolean {
     const e = setupNameErrors(agentRaw, owner);
     return !e.agent && !e.form;
 }
+
+/** The enforcer is a third authorizer, never the owner or the agent. */
+export function enforcerNameError(
+    enforcer: string,
+    agent: string,
+    owner: string,
+): string | null {
+    return (
+        accountNameError(enforcer) ??
+        ([agent.trim(), owner.trim()].includes(enforcer.trim())
+            ? "Owner, agent and enforcer must all differ"
+            : null)
+    );
+}

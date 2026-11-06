@@ -11,6 +11,7 @@ import { installMcpPackages } from "../../../local/XMcp/e2e/install";
 import {
     type AgentSetup,
     agentSetsProfile,
+    enforcePending,
     gql,
     pendingIdsFor,
     profileOf,
@@ -33,12 +34,14 @@ test("UI: owner creates agent, confirms key, registers it on the owner account",
     const { dir, cleanup } = keyDir();
     try {
         const owner = await createKeyAccount(devnet, dir);
+        const enforcer = `v${owner.name.slice(1)}`.slice(0, 10);
         const agent = `a${owner.name.slice(1)}`.slice(0, 18);
 
         await headlessLogin(page, devnet, owner, "mcp");
         await page.goto(devnet.url("mcp"));
 
         await page.getByTestId("agent-name").fill(agent);
+        await page.getByTestId("enforcer-name").fill(enforcer);
         await clickWithTrust(
             page,
             () => page.getByTestId("create-agent").click(),
@@ -51,10 +54,12 @@ test("UI: owner creates agent, confirms key, registers it on the owner account",
             },
         );
         const pem = await page.getByTestId("agent-pem").innerText();
+        const verifierPem = await page.getByTestId("enforcer-pem").innerText();
 
         await page.getByTestId("saved-ack").check();
         await page.getByTestId("continue-confirm").click();
         await page.getByTestId("confirm-pem").fill(pem);
+        await page.getByTestId("confirm-enforcer-pem").fill(verifierPem);
         await clickWithTrust(
             page,
             () => page.getByTestId("confirm-bootstrap").click(),
@@ -70,15 +75,23 @@ test("UI: owner creates agent, confirms key, registers it on the owner account",
         const j = await gql(
             devnet,
             "mcp",
-            `{ agent(account: "${owner.name}") { account agent } }`,
+            `{ agent(account: "${owner.name}") { account agent enforcer } }`,
         );
-        expect(j?.data?.agent).toEqual({ account: owner.name, agent });
+        expect(j?.data?.agent).toEqual({
+            account: owner.name,
+            agent,
+            enforcer,
+        });
         const acct = await gql(
             devnet,
             "accounts",
             `{ getAccount(accountName: "${owner.name}") { authService } }`,
         );
         expect(acct?.data?.getAccount?.authService).toBe("mcp");
+        await page.getByTestId("agent-cfg").click();
+        expect(
+            await page.getByTestId("agent-prompt-text").inputValue(),
+        ).not.toContain(verifierPem);
     } finally {
         cleanup();
     }
@@ -130,6 +143,7 @@ test("agent.html: import agent key and covered setProfile auto-executes", async 
         // for-agents page propose path is exercised next; import is the Phase-2
         // login/key-vault piece under test here.
         await agentSetsProfile(devnet, dir, setup, "via-imported-key");
+        await enforcePending(devnet, dir, setup);
         expect(await profileOf(devnet, owner.name)).toBe("via-imported-key");
 
         await page.getByTestId("owner-account").fill(owner.name);
@@ -146,8 +160,11 @@ test("agent.html: import agent key and covered setProfile auto-executes", async 
                 timeout: 30_000,
             },
         );
+        await enforcePending(devnet, dir, setup);
         await expect
-            .poll(async () => profileOf(devnet, owner.name), { timeout: 15_000 })
+            .poll(async () => profileOf(devnet, owner.name), {
+                timeout: 15_000,
+            })
             .toBe("from-agent-page");
         expect(await pendingIdsFor(devnet, agent.name)).toEqual([]);
     } finally {

@@ -35,6 +35,7 @@ export async function gql(
 export interface AgentSetup {
     owner: KeyAccount;
     agent: KeyAccount;
+    enforcer: KeyAccount;
 }
 
 /**
@@ -48,6 +49,7 @@ export async function setupAgent(
 ): Promise<AgentSetup> {
     const owner = await createKeyAccount(devnet, dir);
     const agent = await createKeyAccount(devnet, dir);
+    const enforcer = await createKeyAccount(devnet, dir);
     await pushActions(
         devnet,
         dir,
@@ -56,7 +58,7 @@ export async function setupAgent(
                 sender: owner.name,
                 service: "mcp",
                 method: "bootstrap",
-                data: { agent: agent.name },
+                data: { agent: agent.name, enforcer: enforcer.name },
             },
             {
                 sender: owner.name,
@@ -67,7 +69,7 @@ export async function setupAgent(
         ],
         { keys: [owner.privateKeyPath] },
     );
-    return { owner, agent };
+    return { owner, agent, enforcer };
 }
 
 /** `setupAgent` plus the agent's tokens auto-debit, as the UI setup does. */
@@ -276,4 +278,33 @@ function tidFromCreateTrace(out: string): number {
         /* fall through */
     }
     return NaN;
+}
+
+/** Browser watcher equivalent: current on-chain rules checked before co-signing. */
+export async function enforcePending(
+    devnet: Devnet,
+    dir: string,
+    s: AgentSetup,
+) {
+    for (const tx of await stagedByProposer(devnet, s.agent.name)) {
+        await pushActions(
+            devnet,
+            dir,
+            [
+                {
+                    sender: s.enforcer.name,
+                    service: "mcp",
+                    method: "enforce",
+                    data: { account: s.owner.name, id: tx.id, txid: tx.txid },
+                },
+                {
+                    sender: s.enforcer.name,
+                    service: "staged-tx",
+                    method: "accept",
+                    data: { id: tx.id, txid: tx.txid },
+                },
+            ],
+            { keys: [s.enforcer.privateKeyPath] },
+        );
+    }
 }

@@ -83,7 +83,7 @@ export function AgentPage() {
             }
             setResult({ ok: true, executed: false, stagedId, tracked });
             setStatus(
-                `Staged as #${stagedId}; waiting for the owner to approve.`,
+                `Staged as #${stagedId}; waiting for enforcer checks or owner approval.`,
             );
         } catch (e) {
             setResult({ ok: false, error: errorMessage(e) });
@@ -120,9 +120,9 @@ export function AgentPage() {
                 </h1>
                 <p className="text-muted-foreground text-sm">
                     For agents (and tests): import the agent key, then propose
-                    actions with the owner account as sender. Signing happens here with
-                    the imported key; see <code>/agent.txt</code> for the
-                    element ids an automated agent should use.
+                    actions with the owner account as sender. Signing happens
+                    here with the imported key; see <code>/agent.txt</code> for
+                    the element ids an automated agent should use.
                 </p>
             </header>
 
@@ -252,14 +252,10 @@ export function AgentPage() {
                                     await mcpCall(
                                         "agent-sign",
                                         "propose-set-profile",
-                                        [
-                                            owner.trim(),
-                                            displayName.trim(),
-                                            "",
-                                        ],
+                                        [owner.trim(), displayName.trim(), ""],
                                     );
                                     setStatus(
-                                        "setProfile submitted (covered actions auto-execute).",
+                                        "setProfile submitted (covered actions execute after enforcer checks, if configured).",
                                     );
                                 })
                             }

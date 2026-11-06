@@ -201,11 +201,11 @@ Two accounts, not three:
 
 1. **The owner's account is the sender** on the inner actions. Tokens move, and other state changes, on the owner's account. There is no separate managed account and no AuthDyn-managed sibling.
 2. **The agent is a plain auth-sig account** with its own key. It never becomes the sender of the user's actions.
-3. **The agent proposes a staged transaction with the owner as sender.** Propose also counts as an implicit accept, so the agent is already an authorizer. For allowlisted methods, that is enough: the staged transaction can execute on the agent's signature alone.
+3. **The agent proposes a staged transaction with the owner as sender.** Propose also counts as an implicit accept, so the agent is already an authorizer. For allowlisted methods, the configured enforcer must also accept after parameter checks; without an enforcer the agent alone suffices. The owner can approve alone in either case.
 4. **The owner's auth service carries the allowlist** — per service and per method, allow or deny, the same granularity as mcp's current policy. For a method that is not allowlisted, the owner must accept with their key. Banned pairs (auth and code changes, and manager admin actions) are never grantable.
 5. **A new or extended auth service is attached to the owner's account.** It must enforce that allowlist on the staged path (`isAuthSys` / `getDlgsSys`) *and* still verify the owner's key on ordinary transactions (`checkAuthSys`). That combination does not exist today: AuthDyn covers the staged policy but rejects direct signing; auth-sig verifies the owner's key but has no allowlist and treats only the owner as an authorizer. This missing piece is required for the design. It can be an extension of AuthDyn or a new auth service.
 6. **The owner keeps normal key login** on their own account. Everyday actions they sign themselves go through `checkAuthSys` with their key and do not need StagedTx.
-7. **No third account.** Bootstrap creates an agent beside the existing owner; it does not create a managed sibling or convert the owner into an AuthDyn-only account.
+7. **No managed sibling.** Setup creates an agent and an optional enforcer beside the existing owner. The enforcer is only an extra authorizer; the owner stays the sender and keeps ordinary key login.
 
 **Funding advantage.** Because the owner's account is the sender, the owner no longer needs to fund a managed account to do token transfers. The agent can sign the owner's tokens over directly.
 
@@ -227,17 +227,17 @@ For the POC, signing is done through a headless UI that the agent drives in a he
 
 Every transaction the agent attempts follows one rule:
 
-1. **Covered:** if the owner's allowlist covers every action, the agent proposes a staged transaction whose sender is the owner. That propose is an implicit accept by the agent. The owner's auth service returns the agent as a sufficient authorizer for those methods, and the transaction executes on the agent's signature alone.
+1. **Covered:** if the owner's allowlist covers every action, the agent proposes a staged transaction whose sender is the owner. That propose is an implicit accept by the agent. The owner's auth service requires agent + enforcer (when configured), or owner alone. The enforcer checks standing parameter rules before co-signing; without an enforcer the agent alone suffices.
 2. **Not covered:** if any action is outside the allowlist, the owner's auth service requires the owner for those methods. The proposal waits in StagedTx until the owner accepts it with their key.
 3. **Needs-approval UI:** served by the objective `mcp` service (see Architecture split below), it lists the owner's pending transactions that lack sufficient agent permissions, with two buttons:
    - **Approve:** the owner accepts the proposal manually (signing `staged-tx/accept` as themselves, with their key).
    - **Approve and Grant:** the owner accepts and, in the same transaction, an admin action adds all ungranted service/method pairs to the allowlist, so a repeat transaction auto-executes.
 4. **Privacy:** the needs-approval query, hosted by `mcp`, is gated with the query token, so only the owning account can view it.
-5. **No auto-refresh (accepted POC trade-off, Nov 6, 2026).** The needs-approval page does not update itself when a new proposal arrives. The owner reopens or refreshes the page to see pending transactions. That is accepted for the POC and is not a problem to fix now.
+5. **Open-UI watcher (Nov 6, 2026).** The needs-approval page polls while idle every 10 seconds and checks passing proposals with the vault-held enforcer key. It is not an always-on daemon; closed tabs leave proposals pending.
 
 Allowlist granularity is per service+method, never amounts or other arguments.
 
-**Restricting the agent (status, Nov 6, 2026).** The POC restriction model is a per-service+method allowlist on the owner's auth service, owner approval for anything not yet granted, Approve and Grant to grow the list, and a banned set (auth/code changes and manager admin actions) that can never be granted. Amounts and arguments are out of scope — an auth-service allowlist cannot see them. That gap is what an optional checker/enforcer service could fill later (see below); it is not required for the POC. This is not a well-loved restriction model, but it is considered sufficient for now.
+**Restricting the agent (status, Nov 6, 2026).** The POC restriction model is a per-service+method allowlist on the owner's auth service, owner approval for anything not yet granted, Approve and Grant to grow the list, and a banned set (auth/code changes and manager admin actions) that can never be granted. The auth-service allowlist cannot see arguments. The implemented optional enforcer fills that gap with owner-configured standing parameter limits (see below). This is not a well-loved restriction model, but it is considered sufficient for now.
 
 ### Architecture split: `x-mcp` and `mcp` (decided Oct 30, 2026)
 
@@ -268,9 +268,9 @@ What AuthDyn **cannot** do, and why it is not attached to the owner as-is: AuthD
 The required new or extended auth service therefore does both:
 
 - **Ordinary transactions (`checkAuthSys`):** verify the owner's key, the way auth-sig does today, so the owner keeps normal login and can act on their own account without StagedTx.
-- **Staged path (`isAuthSys` / `getDlgsSys`):** consult the allowlist. Allowlisted methods: the agent is a sufficient authorizer (weight 1, threshold 1). Anything else the owner may grant: the owner must accept. Banned methods: `impossible()`.
+- **Staged path (`isAuthSys` / `getDlgsSys`):** consult the allowlist. Allowlisted methods: agent + enforcer (two approvals) when configured, or the owner alone; without an enforcer, agent or owner remains sufficient. Anything else the owner may grant: the owner must accept. Banned methods: `impossible()`.
 
-mcp administers that allowlist for the owner's account (grant, revoke, banned set, Approve and Grant). It does not create a third account to attach the policy to.
+mcp administers that allowlist for the owner's account (grant, revoke, banned set, Approve and Grant). The owner remains the sender; the extra enforcer account is only a co-authorizer, not a separate policy-managed sender.
 
 Existing AuthDyn managers such as Guilds and Fractals remain examples of the staged-only policy pattern (banned lists, per-method authorizers). They are not the POC's owner-account model.
 
@@ -278,30 +278,30 @@ Existing AuthDyn managers such as Guilds and Fractals remain examples of the sta
 
 - `checkAuthSys` delegates to `auth-sig::checkAuthSys`, so the owner's existing auth-sig key (still in auth-sig's table, never re-registered) is what ordinary transactions and login verify.
 - `canAuthUserSys` requires an `mcp` agent record *and* an auth-sig key, so `accounts::setAuthServ(mcp)` only succeeds after `mcp::bootstrap` and only for key accounts.
-- `isAuthSys`: allowlisted → the agent or the owner is enough; not allowlisted (or method `None` on nested checks) → the owner; banned → never. `getDlgsSys` returns those authorizers minus the owner. `isRejectSys`: the owner can always reject; banned proposals are always rejectable; the agent cannot reject for the owner.
+- `isAuthSys`: allowlisted → agent AND enforcer, OR owner alone (agent OR owner when no enforcer is registered); not allowlisted (or method `None` on nested checks) → the owner; banned → never. `getDlgsSys` returns those authorizers minus the owner. `isRejectSys`: the owner can always reject; banned proposals are always rejectable; the agent cannot reject for the owner.
 - Plugin side: the `mcp` plugin exports `transact-hook-user-auth` and produces the same claim/proof auth-sig would (owner's auth-sig pubkey; signature via `auth-sig` keyvault `sign`). Small whitelist additions make that possible: `auth-sig` keyvault `sign` now allows `mcp`; `accounts` plugin `set-auth-service` allows `mcp`; Host `import-existing` treats `mcp` like `auth-sig` for key import.
 - `auth-sig::setKey` joins the banned set so the agent can never be granted a key change on the owner.
 
 ### Delegated agent setup
 
 1. The owner already has an account and a key, and keeps both.
-2. Create an agent account with its own key (AuthSig).
-3. In one owner-signed transaction: `mcp::bootstrap(agent)` (owner and agent must differ), then `accounts::setAuthServ(mcp)`. The owner's key is unchanged. mcp's policy for that owner treats the agent as sufficient for allowlisted methods, the owner for methods that still need approval, and nobody for `setCode`, auth/key changes, and other banned pairs. The mcp UI setup does this after the agent key is offered and verified, then separately enables the agent's tokens auto-debit with the agent key. `mcp::set_agent(agent)` (owner-signed, banned on the staged path) replaces the agent later.
-4. The agent proposes a staged transaction whose inner actions use the owner as `sender`. Propose is an implicit accept. If every method is allowlisted, it executes immediately; otherwise it waits for the owner to accept.
+2. Create an agent and a distinct enforcer account, each with an AuthSig key. Show both keys to the owner and verify both by pasting them back. Import the enforcer key into the browser host vault; never include it in the agent hand-off.
+3. In one owner-signed transaction: `mcp::bootstrap(agent, enforcer)` (owner, agent and enforcer must all differ), then `accounts::setAuthServ(mcp)`. The owner's key is unchanged. mcp's policy for that owner requires agent + enforcer or owner alone for allowlisted methods, the owner for methods that still need approval, and nobody for `setCode`, auth/key changes, and other banned pairs. The mcp UI setup does this after both keys are offered and verified, then separately enables the agent's tokens auto-debit with the agent key. `mcp::set_agent(agent)` and `mcp::set_enforcer(enforcer)` are owner-only and banned on the staged path. `set_enforcer(None)` explicitly restores the no-enforcer policy.
+4. The agent proposes a staged transaction whose inner actions use the owner as `sender`. Propose is an implicit accept. If every method is allowlisted, the enforcer checks parameters and accepts passing proposals; otherwise it waits for the owner. The owner may always approve alone, even if the enforcer is unavailable.
 
-Out-of-scope actions fail on chain (or wait for the owner) rather than relying on the agent to behave. There is no three-account bootstrap and no managed-account creation.
+Out-of-scope actions fail on chain (or wait for the owner) rather than relying on the agent to behave. The optional third account is an authorizer only, never a managed sender.
 
-### Optional future: policy checker / enforcer
+### Policy checker / enforcer (implemented locally, Nov 6, 2026)
 
 Argument-level checks — for example a cap on token quantity — are **not** possible with the auth-service allowlist alone. The policy sees service and method, not `rawData`.
 
-A later addition could fill that gap: a checker or enforcer that inspects the full staged transaction, applies limits the allowlist cannot see (amounts and other arguments), and accepts or rejects. It is an extra authorizer account with its own key, not a return of the managed sender account. When the owner is part of approval, they already see the full transaction contents before accepting.
+The enforcer inspects full staged transaction arguments and applies owner-written limits. It accepts passing proposals and withholds its signature on failure; it NEVER auto-rejects. It is an extra authorizer account with its own key, not a return of the managed sender account. When the owner is part of approval, they already see the full transaction contents before accepting.
 
-This checker/enforcer is documented as a possible future addition. **The POC is valid without it.** X-MCP's role stays informational either way: descriptors carry `auth` per tool, and `build_transaction` can return StagedTx `propose` data. It does not enforce policy.
+The setup UI now creates the enforcer. Existing owners may keep the no-enforcer policy until they register one. X-MCP's role stays informational either way: descriptors carry `auth` per tool, and `build_transaction` can return StagedTx `propose` data. It does not enforce policy.
 
-#### Enforcer UI (possible future; not in the POC)
+#### Enforcer UI
 
-**Bootstrap.** When this addition is present, bootstrap also creates the extra enforcer account and its key. That key is offered to and verified by the human owner the same way the agent key is today: shown through the mcp setup flow and confirmed by the owner, not minted silently. The owner keeps the enforcer key (it is not handed to the language-model agent).
+**Bootstrap.** Setup also creates the extra enforcer account and its key. That key is offered to and verified by the human owner the same way the agent key is today: shown through the mcp setup flow and confirmed by the owner, not minted silently. The owner keeps the enforcer key (it is not handed to the language-model agent).
 
 **Pending list.** When the agent proposes a transaction and it appears in the mcp needs-approval list, each action shows the method name and every parameter as a name and its value.
 
@@ -309,11 +309,17 @@ This checker/enforcer is documented as a possible future addition. **The POC is 
 
 **Approve and Grant.** The existing **Approve and Grant** button (accept plus add the method to the allowlist so repeats can auto-execute) is also what activates those thresholds. The enabled limits become the standing rules for that approval. Later proposals of the same method are checked against them by the enforcer.
 
-**Limit failures stay pending.** When a proposal hits a standing-limit problem, the enforcer does not silently drop it. It withholds its signature and the transaction still appears in the needs-approval list as pending. The standing rules and threshold values that were in force are loaded into that row so the owner can see why it was held — for example, that it was rejected because this particular limit was in force, shown next to the parameter value that broke it.
+**Limit failures stay pending.** When a proposal hits a standing-limit problem, the enforcer does not silently drop it. It withholds its signature and the transaction still appears in the needs-approval list as pending. The standing rules and threshold values that were in force are loaded into that row so the owner can see why it was held — for example, that it was held because this particular limit was in force, shown next to the parameter value that broke it.
 
 **Reject.** The pending row has a third button, **Reject**, alongside Approve and Approve and Grant. Reject clears and cancels the staged transaction (`staged-tx/reject`, which deletes it when the reject threshold is met).
 
 **Bumping a rule.** From that same pending view, the owner can raise or change any standing threshold and press **Approve and Grant**. That updates the standing rule to the new limits and approves the transaction in one step, so a repeat within the new bounds can auto-execute later.
+
+**Chosen POC hook.** While the owner's mcp approvals UI is open, it scans on load and every 10 seconds while idle. The plugin queries `staged-tx/getIdsForParty` (paginated), then r-mcp loads live staged details and verifies the inner sender is the owner. This does not depend on agent-supplied `track` or proposed-event actors. r-mcp returns decoded parameters, owner-written limits, failure reasons and eligibility, gated by the owner's query token. Passing proposals call the plugin as the owner; it logs in as the vault-held enforcer, submits `mcp::enforce` followed by `staged-tx::accept` in one enforcer-signed transaction, then the UI restores the owner in a separate call after signing. `enforce` re-fetches the txid, allowlist, arguments and current on-chain rules before `staged-tx::accept` in the same top-level transaction, so stale UI data cannot bypass limits. Failures only withhold. No external daemon is needed.
+
+**Rule representation.** Owner-only `set_limits` replaces limits per owner/service/method. Parameter names are JSON pointers, including nested values such as `/amount/value`; each comparison is independently optional. Bounds are JSON (quote strings). Less-than/greater-than are strict exact decimal comparisons, including large integer strings, never floating-point; equality is typed JSON equality. Decoded integers outside JavaScript's safe range are consistently represented as decimal strings in the checker and UI. Missing parameters, malformed bounds, missing schemas or decode failures fail closed. Approve and Grant saves the edited limits, grants methods, and accepts as owner atomically; Approve alone leaves rules unchanged. Edits are synchronized across repeated actions of the same method; conflicting duplicate method rules are refused.
+
+**Remaining gaps / trust boundary.** This is an open-UI watcher, not an always-on daemon; closed tabs, missing vault keys, login/permissions prompts or connectivity failures leave proposals pending for the owner. New devices must import the owner's saved enforcer key (the setup plugin provides `import-enforcer`); no key recovery is provided. The enforcer's raw key, held by the owner, can also sign manual accepts: argument enforcement is a co-signer trust boundary, not a restriction on the human owner. Unknown schemas and mixed-sender proposals require owner review. Proposals with auto-execution disabled are not processed by the watcher; after owner acceptance, use the staged-tx UI to execute them. Limits are per-call, not cumulative spending/rate budgets. Existing deployed table/schema upgrades and the host keyvault signing/login flow still require devnet/e2e validation; no chain deployment is implied by local implementation.
 
 ## Security (non-optional if the endpoint is remote)
 
@@ -332,7 +338,7 @@ This is design-only until you ask to implement.
 1. **Descriptor spec** — JSON Schema for the MCP Service Descriptor; fracpack/`ServiceSchema` → JSON Schema mapping; GraphQL SDL / WIT import rules.
 2. **Install path** — generate baseline at `setSchema` / postinstall; accept optional `mcp.json` from the package; serve `GET /mcp-schema?service=`.
 3. **X-MCP** — psinode (or sidecar) Streamable HTTP at `x-mcp.<root-name>/` per 2026-07-28; meta tools + activation; transaction construction; GraphQL/HTTP reads; subjective state.
-4. **Owner auth service** — a new or extended auth service attached to the owner's account: verify the owner's key on ordinary transactions; on the staged path, apply the per-service+method allowlist (agent sufficient when covered, owner required otherwise, `impossible()` for banned methods). Required for the core design. An optional checker/enforcer service for argument-level limits is a later addition, not part of this list for the POC.
+4. **Owner auth service** — a new or extended auth service attached to the owner's account: verify the owner's key on ordinary transactions; on the staged path, apply the per-service+method allowlist (agent sufficient when covered, owner required otherwise, `impossible()` for banned methods). Required for the core design. The optional enforcer adds argument-level limits via the same mcp service/plugin/UI, without changing AuthDyn.
 5. **Seed descriptors** — hand-enrich a few high-value services (Tokens, Accounts, Packages, StagedTx) so the first agent loop is actually good.
 6. **Browser host (follow-up)** — Supervisor MCP implementing `kind: plugin` against the same descriptors.
 
@@ -350,7 +356,7 @@ Everything that benefits from a real browser or live chain uses Playwright. This
 | **Approve and Grant** executes and grows the allowlist; a repeat tx auto-executes | Playwright |
 | Query-token gating on the `mcp` query: a second `throwawayAccount` cannot see the list | Playwright |
 | Both MCP protocol revisions against the live `x-mcp` endpoint | Playwright request API |
-| Owner auth service: covered methods accept the agent alone; uncovered methods require the owner; grant action; owner key still works on a direct transaction | Rust service tester (cf. `packages/system/StagedTx/service/src/tests.rs`, Fractals tests) |
+| Owner auth service: covered methods require agent + enforcer (or owner alone), with no-enforcer fallback; uncovered methods require the owner; grant action; owner key still works on a direct transaction | Rust service tester (cf. `packages/system/StagedTx/service/src/tests.rs`, Fractals tests) |
 | StagedTx two paths (agent proposes with owner as sender and auto-executes when covered; owner accepts when not covered) | Rust/C++ tester |
 | XMcp local-only rules | C++ tester with a caller service (cf. `packages/local/XKeys/test/`) |
 | `mcp` needs-approval query filtering (only covered-lacking txs, owner-scoped) | Rust service tester |
@@ -365,7 +371,7 @@ Harness gaps to fill in the stacked PR: `throwawayAccount` does not fund account
 - ~~Three-account AuthDyn sibling (parent, agent, managed).~~ **Superseded (Nov 6, 2026):** the owner's account is the sender; the agent proposes staged transactions in the owner's name; no managed sibling (see Core design under Signing and delegation).
 - ~~Extend AuthDyn or add a new auth service?~~ **Chosen (Nov 6, 2026):** `mcp` is the owner auth service (shared, deployed with the Mcp package); AuthDyn unchanged. Open: whether the `mcp` whitelist entry on auth-sig keyvault `sign` is acceptable long term, or should move to a dedicated auth package.
 - Manager admin actions for scope and expiry: how the owner grants, narrows, expires, and revokes agent scope via mcp.
-- Amount/argument limits cannot be enforced by the auth-service allowlist. A checker/enforcer service is a possible future addition. **Status (Nov 6, 2026):** the POC's service+method allowlist is the restriction model we have. It is not well-loved, but it is considered sufficient for now; the enforcer is not a POC blocker.
+- Amount/argument limits cannot be enforced by the auth-service allowlist. The implemented optional enforcer co-signs only when the standing argument limits pass. **Status (Nov 6, 2026):** the POC now has method allowlists plus optional parameter limits. It is not well-loved, but it is considered sufficient for now; the enforcer is not a POC blocker.
 - Where AuthDelegate fits: agent-owned sub-accounts only; it is not part of this owner-as-sender design.
 
 **Autonomous signing without master keys**
@@ -384,7 +390,7 @@ Harness gaps to fill in the stacked PR: `throwawayAccount` does not fund account
 
 **Approval flow**
 - ~~How the needs-approval UI is served objectively.~~ **Resolved:** by the objective `mcp` service (see Architecture split).
-- ~~Whether the needs-approval page auto-refreshes.~~ **Accepted POC trade-off (Nov 6, 2026):** it does not; the owner reopens or refreshes to see pending transactions. Not a problem to fix now (see POC approval flow).
+- ~~Whether the needs-approval page auto-refreshes.~~ **Updated Nov 6, 2026:** the enforcer hook now polls while the UI is open; no always-on daemon is provided.
 - Account name of the service that administers the owner's allowlist (mcp, or a dedicated helper).
 
 **Endpoint access**
@@ -405,7 +411,7 @@ Local working-tree work; do not commit or push until agreed.
 2. **Dynamic node URL** in the copy-prompt, derived from the mcp page origin (`mcp.` stripped). In the working tree.
 3. **Foreign-origin 403 e2e** expectation removed; GET-is-405 remains. In the working tree.
 4. **Scaled-integer token-amount docs** in X-MCP instructions and `build_transaction`. In the working tree.
-5. **Staged-transaction redesign** (added Nov 6, 2026). Implement the core two-account design: the owner's account is the sender (no separate managed account); the agent is a plain auth-sig account; the agent proposes staged transactions with the owner as sender (propose is an implicit accept, so allowlisted methods execute on the agent's signature alone); the owner's auth service carries the per-service, per-method allowlist, and non-allowlisted methods require the owner to accept with their key; the owner keeps normal key login. A required new or extended auth service must both verify the owner's key on ordinary transactions (`checkAuthSys`) and treat the agent as sufficient on the staged path for allowlisted methods (`isAuthSys` / `getDlgsSys`) — that combination does not exist today. Bootstrap creates the agent account and key as before; it does not create a managed sibling or an enforcer account. The optional enforcer/watcher (argument-level checks such as token caps) is documented above as a possible future addition and is **not** part of this implementation; the POC is valid without it. **In the working tree:** `mcp` is the owner's auth service (see Owner auth service); `AgentCfg` is `{ account (owner), agent }`; bootstrap is `mcp::bootstrap(agent)` + `accounts::setAuthServ(mcp)`; UI, plugin, query service, and e2e setup use the owner as sender. Not yet run end to end on a devnet.
+5. **Staged-transaction redesign** (added Nov 6, 2026). Implement the core two-account design: the owner's account is the sender (no separate managed account); the agent is a plain auth-sig account; the agent proposes staged transactions with the owner as sender (propose is an implicit accept, so allowlisted methods execute on the agent's signature alone); the owner's auth service carries the per-service, per-method allowlist, and non-allowlisted methods require the owner to accept with their key; the owner keeps normal key login. A required new or extended auth service must both verify the owner's key on ordinary transactions (`checkAuthSys`) and treat the agent as sufficient on the staged path for allowlisted methods (`isAuthSys` / `getDlgsSys`) — that combination does not exist today. Bootstrap creates agent and enforcer accounts/keys; it does not create a managed sibling. The enforcer/watcher (argument-level checks such as token caps) is now implemented as described above; existing no-enforcer owners retain the fallback policy. **In the working tree:** `mcp` is the owner's auth service (see Owner auth service); `AgentCfg` is `{ account (owner), agent, enforcer? }`; bootstrap is `mcp::bootstrap(agent, enforcer)` + `accounts::setAuthServ(mcp)`; UI, plugin, query service, and e2e setup use the owner as sender. Not yet run end to end on a devnet.
 
 ## POC to-dos (Nov 6, 2026)
 

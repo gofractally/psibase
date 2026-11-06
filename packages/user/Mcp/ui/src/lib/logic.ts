@@ -15,12 +15,15 @@ export type PendingRow = {
         actions: PendingAction[];
     };
     missing: string[];
+    inspection?: string;
+    canEnforce?: boolean;
 };
 
 /** `account` is the owner (the sender on the agent's staged txs). */
 export type AgentCfg = {
     account: string;
     agent: string;
+    enforcer?: string | null;
 };
 
 /** Actions for "Approve": the owner accepts the staged tx, then drops the tracked row. */
@@ -102,7 +105,7 @@ export function agentHandOffPrompt(
     const { node, xMcp } = chainUrls(origin);
     const key = opts.pem?.trim() || PEM_PLACEHOLDER;
     return `You can execute transactions on the Psibase blockchain (node at ${node}) on behalf of the user.
-You are the agent account ${cfg.agent}. You act on behalf of the user's own account ${cfg.account}: propose staged transactions with ${cfg.account} as the sender. Allowlisted actions execute on your signature alone; anything else waits for the user to approve.
+You are the agent account ${cfg.agent}. You act on behalf of the user's own account ${cfg.account}: propose staged transactions with ${cfg.account} as the sender. Allowlisted actions execute after the owner-held enforcer also accepts when configured; anything else waits for the user to approve. Never request or use the enforcer key.
 
 Private key for ${cfg.agent}:
 ${key}

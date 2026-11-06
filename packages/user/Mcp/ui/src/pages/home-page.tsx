@@ -1,6 +1,6 @@
 import type { AgentCfg, PendingRow } from "../lib/logic";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
@@ -9,11 +9,16 @@ import { Label } from "@shared/shadcn/ui/label";
 import { Textarea } from "@shared/shadcn/ui/textarea";
 
 import {
+    type ApprovalMethod,
+    PendingApproval,
+} from "../components/pending-approval";
+import {
     MAX_ACCOUNT_NAME_LENGTH,
+    enforcerNameError,
     setupNameErrors,
     setupNamesValid,
 } from "../lib/account";
-import { agentHandOffPrompt, summarize } from "../lib/logic";
+import { agentHandOffPrompt } from "../lib/logic";
 import { errorMessage, loginAsParent, mcpCall } from "../lib/mcp";
 
 type SetupStep = "form" | "save" | "confirm" | "done";
@@ -28,12 +33,17 @@ export function HomePage() {
     // Logged-in owner: the sender on the agent's staged txs (no managed account).
     const [owner, setOwner] = useState("");
     const [agent, setAgent] = useState("");
+    const [enforcer, setEnforcer] = useState("");
+    const [enforcerPem, setEnforcerPem] = useState("");
+    const [confirmEnforcerPem, setConfirmEnforcerPem] = useState("");
+    const refreshing = useRef(false);
     const [step, setStep] = useState<SetupStep>("form");
     const [pendingPem, setPendingPem] = useState("");
     const [pendingAgent, setPendingAgent] = useState("");
     const [savedAck, setSavedAck] = useState(false);
     const [confirmPem, setConfirmPem] = useState("");
     const [busy, setBusy] = useState(false);
+    const [watching, setWatching] = useState(false);
     const [autoDebitWarning, setAutoDebitWarning] = useState("");
     const [selectedOwner, setSelectedOwner] = useState<string | null>(null);
     const [copiedPrompt, setCopiedPrompt] = useState(false);
@@ -47,7 +57,9 @@ export function HomePage() {
         Boolean(owner) &&
         agents.length === 0 &&
         setupNamesValid(agent, owner) &&
-        !busy;
+        !enforcerNameError(enforcer, agent, owner) &&
+        !busy &&
+        !watching;
 
     const selectedCfg = useMemo(
         () => agents.find((a) => a.account === selectedOwner) ?? null,
@@ -76,21 +88,51 @@ export function HomePage() {
     }, []);
 
     const refresh = useCallback(async () => {
+        if (refreshing.current) return;
+        refreshing.current = true;
+        setWatching(true);
         setStatus("Loading…");
         try {
             const res = await mcpCall("approvals", "needs-approval");
             if (typeof res !== "string" || !res.startsWith("[")) {
                 throw new Error(String(res));
             }
-            setRows(JSON.parse(res) as PendingRow[]);
+            let pending = JSON.parse(res) as PendingRow[];
+            setRows(pending);
+            let watcherError = "";
+            for (const row of pending.filter((r) => r.canEnforce)) {
+                try {
+                    await mcpCall("approvals", "enforce", [
+                        row.pending.account,
+                        row.pending.id,
+                    ]);
+                    // Do not assume accept executed/deleted the proposal.
+                    // Re-query after restoring the owner below.
+                } catch (e) {
+                    watcherError = `Enforcer withheld or unavailable: ${errorMessage(e)}`;
+                } finally {
+                    // The enforcer must remain logged in until its call signs.
+                    await mcpCall("setup", "restore-parent", [
+                        row.pending.account,
+                    ]);
+                }
+            }
+            if (pending.some((r) => r.canEnforce)) {
+                const live = await mcpCall("approvals", "needs-approval");
+                pending = JSON.parse(String(live)) as PendingRow[];
+            }
+            setRows(pending);
             setNeedsLogin(false);
-            setStatus("");
+            setStatus(watcherError);
             await refreshAgents();
         } catch (e) {
             setRows(null);
             setNeedsLogin(true);
             setStatus(`Log in to view your approvals. (${errorMessage(e)})`);
             setSetupStatus("Log in to set up an agent.");
+        } finally {
+            refreshing.current = false;
+            setWatching(false);
         }
     }, [refreshAgents]);
 
@@ -98,14 +140,23 @@ export function HomePage() {
         void refresh();
     }, [refresh]);
 
+    useEffect(() => {
+        if (busy || step === "save" || step === "confirm") return;
+        const timer = window.setInterval(() => void refresh(), 10000);
+        return () => window.clearInterval(timer);
+    }, [busy, step, refresh]);
+
     const onCreate = async () => {
-        if (!canCreate) return;
+        if (!canCreate || refreshing.current) return;
         setBusy(true);
         setSetupStatus("Creating agent account…");
         try {
-            const pem = await mcpCall("setup", "create-agent-account", [
-                agent.trim(),
-            ]);
+            const pem =
+                pendingAgent === agent.trim() && pendingPem
+                    ? pendingPem
+                    : await mcpCall("setup", "create-agent-account", [
+                          agent.trim(),
+                      ]);
             if (typeof pem !== "string" || !/BEGIN.*PRIVATE KEY/.test(pem)) {
                 throw new Error(
                     typeof pem === "string"
@@ -115,10 +166,19 @@ export function HomePage() {
             }
             setPendingPem(pem);
             setPendingAgent(agent.trim());
+            const verifierKey = await mcpCall("setup", "create-agent-account", [
+                enforcer.trim(),
+            ]);
+            if (
+                typeof verifierKey !== "string" ||
+                !/BEGIN.*PRIVATE KEY/.test(verifierKey)
+            )
+                throw new Error("No enforcer key returned");
+            setEnforcerPem(verifierKey);
             setSavedAck(false);
             setStep("save");
             setSetupStatus(
-                `Created ${agent.trim()}. Save the key, then confirm.`,
+                `Created ${agent.trim()}. Save both keys, then confirm.`,
             );
         } catch (e) {
             setSetupStatus(errorMessage(e));
@@ -129,6 +189,9 @@ export function HomePage() {
 
     const resetSetupForm = () => {
         setAgent("");
+        setEnforcer("");
+        setEnforcerPem("");
+        setConfirmEnforcerPem("");
         setPendingPem("");
         setPendingAgent("");
         setSavedAck(false);
@@ -150,12 +213,25 @@ export function HomePage() {
                 key,
             ]);
             if (!ok) throw new Error("Key does not match the agent account");
-            setSetupStatus("Registering agent on your account…");
+            const verifierKey = confirmEnforcerPem.trim();
+            const verifierOk = await mcpCall("setup", "confirm-agent-key", [
+                enforcer.trim(),
+                verifierKey,
+            ]);
+            if (!verifierOk)
+                throw new Error("Key does not match the enforcer account");
+            await mcpCall("setup", "import-enforcer", [
+                enforcer.trim(),
+                verifierKey,
+            ]);
+            setSetupStatus("Registering agent and enforcer on your account…");
             // Owner-only tx first (mcp::bootstrap + accounts::setAuthServ(mcp);
             // your key is unchanged). Agent auto-debit is a separate call so it
             // is not packed into a multi-sender transaction that would abort.
-            await mcpCall("setup", "bootstrap", [agentName]);
+            await mcpCall("setup", "bootstrap", [agentName, enforcer.trim()]);
             setPendingPem(key);
+            setEnforcerPem("");
+            setConfirmEnforcerPem("");
             const ownerName = String(await mcpCall("setup", "current-user"));
             try {
                 setSetupStatus("Enabling agent auto-debit…");
@@ -170,7 +246,7 @@ export function HomePage() {
             }
             // Separate call: the agent must stay logged in until its tx is signed.
             try {
-                await mcpCall("setup", "restore-ownerName", [ownerName]);
+                await mcpCall("setup", "restore-parent", [ownerName]);
             } catch (e) {
                 setAutoDebitWarning(
                     `Could not log ${ownerName} back in: ${errorMessage(e)}`,
@@ -189,14 +265,17 @@ export function HomePage() {
     };
 
     const runApproval = async (
-        method: "approve" | "approve-and-grant",
+        method: ApprovalMethod,
         row: PendingRow,
+        rules?: string,
     ) => {
+        if (refreshing.current) return;
         setBusy(true);
         try {
             await mcpCall("approvals", method, [
                 row.pending.account,
                 row.pending.id,
+                ...(method === "approve-and-grant" ? [rules ?? "[]"] : []),
             ]);
             await refresh();
         } catch (e) {
@@ -206,16 +285,18 @@ export function HomePage() {
         }
     };
 
-    const downloadKey = () => {
-        const blob = new Blob([pendingPem], {
+    const saveKey = (pem: string, name: string) => {
+        const blob = new Blob([pem], {
             type: "application/x-pem-file",
         });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `${pendingAgent || "agent"}.pem`;
+        a.download = `${name}.pem`;
         a.click();
         URL.revokeObjectURL(a.href);
     };
+
+    const downloadKey = () => saveKey(pendingPem, pendingAgent || "agent");
 
     return (
         <div className="bg-background text-foreground mx-auto max-w-3xl space-y-8 p-6">
@@ -265,46 +346,12 @@ export function HomePage() {
                     </p>
                 ) : (
                     rows?.map((r) => (
-                        <div
-                            key={r.pending.id}
-                            className="border-border space-y-2 rounded-lg border p-4"
-                            data-testid="pending-row"
-                            data-id={r.pending.id}
-                        >
-                            <div className="text-sm">
-                                <b>#{r.pending.id}</b> for{" "}
-                                <code>{r.pending.account}</code> (proposed by{" "}
-                                {r.pending.proposer})
-                            </div>
-                            <div className="text-muted-foreground text-sm">
-                                {summarize(r)}
-                            </div>
-                            <div className="text-sm text-amber-700 dark:text-amber-400">
-                                Not yet granted:{" "}
-                                {r.missing.join(", ") || "none"}
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Button
-                                    variant="outline"
-                                    disabled={busy}
-                                    data-act="approve"
-                                    onClick={() =>
-                                        void runApproval("approve", r)
-                                    }
-                                >
-                                    Approve
-                                </Button>
-                                <Button
-                                    disabled={busy}
-                                    data-act="grant"
-                                    onClick={() =>
-                                        void runApproval("approve-and-grant", r)
-                                    }
-                                >
-                                    Approve and Grant
-                                </Button>
-                            </div>
-                        </div>
+                        <PendingApproval
+                            key={`${r.pending.id}:${r.inspection}`}
+                            row={r}
+                            busy={busy || watching}
+                            run={runApproval}
+                        />
                     ))
                 )}
             </div>
@@ -316,13 +363,13 @@ export function HomePage() {
             >
                 <h2 className="text-xl font-semibold">Set up an agent</h2>
                 <p className="text-muted-foreground text-sm">
-                    Creates an AuthSig agent account (save the key) and
-                    registers it on your own account: the agent proposes
+                    Creates AuthSig agent and enforcer accounts (save both keys)
+                    and registers it on your own account: the agent proposes
                     staged transactions with you as the sender. Allowlisted
-                    actions run on the agent's signature; you approve the
-                    rest. Your account switches to the mcp auth service but
-                    keeps your existing key and login. The agent gets tokens
-                    auto-debit enabled.
+                    actions run on the agent and enforcer signatures; you
+                    approve the rest. Your account switches to the mcp auth
+                    service but keeps your existing key and login. The agent
+                    gets tokens auto-debit enabled.
                 </p>
                 <p className="text-sm" data-testid="setup-status">
                     {setupStatus}
@@ -363,14 +410,12 @@ export function HomePage() {
                                                         : "border-border hover:bg-muted/50 w-full rounded-md border px-3 py-2 text-left"
                                                 }
                                                 onClick={() => {
-                                                    setSelectedOwner(
-                                                        a.account,
-                                                    );
+                                                    setSelectedOwner(a.account);
                                                     setCopiedPrompt(false);
                                                 }}
                                             >
-                                                owner <code>{a.account}</code>{" "}
-                                                · agent <code>{a.agent}</code>
+                                                owner <code>{a.account}</code> ·
+                                                agent <code>{a.agent}</code>
                                             </button>
                                         </li>
                                     );
@@ -442,6 +487,22 @@ export function HomePage() {
                                 </p>
                             ) : null}
                         </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="enforcer-name">
+                                Enforcer account name (owner-held key)
+                            </Label>
+                            <Input
+                                id="enforcer-name"
+                                data-testid="enforcer-name"
+                                value={enforcer}
+                                maxLength={MAX_ACCOUNT_NAME_LENGTH}
+                                onChange={(e) => setEnforcer(e.target.value)}
+                            />
+                            <p className="text-xs">
+                                Owner, agent and enforcer must all differ. Never
+                                give the enforcer key to the agent.
+                            </p>
+                        </div>
                         {nameErrors.form ? (
                             <p className="text-destructive text-sm">
                                 {nameErrors.form}
@@ -471,6 +532,17 @@ export function HomePage() {
                         >
                             {pendingPem}
                         </code>
+                        <p className="text-sm">
+                            Save this enforcer private key separately. Keep it
+                            yourself; NEVER give it to your agent. The host
+                            vault retains it for checks while this UI is open.
+                        </p>
+                        <code
+                            className="bg-muted block whitespace-pre-wrap break-all rounded-md p-3 text-xs"
+                            data-testid="enforcer-pem"
+                        >
+                            {enforcerPem}
+                        </code>
                         <div className="flex flex-wrap gap-2">
                             <Button
                                 type="button"
@@ -494,6 +566,28 @@ export function HomePage() {
                                 Copy
                             </Button>
                         </div>
+                        <div className="flex gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                data-testid="download-enforcer-key"
+                                onClick={() =>
+                                    saveKey(enforcerPem, enforcer || "enforcer")
+                                }
+                            >
+                                Download enforcer .pem
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                data-testid="copy-enforcer-key"
+                                onClick={() =>
+                                    navigator.clipboard.writeText(enforcerPem)
+                                }
+                            >
+                                Copy enforcer key (owner only)
+                            </Button>
+                        </div>
                         <div className="flex items-center gap-2">
                             <Checkbox
                                 id="saved-ack"
@@ -502,7 +596,7 @@ export function HomePage() {
                                 onCheckedChange={(v) => setSavedAck(v === true)}
                             />
                             <Label htmlFor="saved-ack">
-                                I have saved this key
+                                I have saved both keys
                             </Label>
                         </div>
                         <Button
@@ -533,10 +627,27 @@ export function HomePage() {
                                 onChange={(e) => setConfirmPem(e.target.value)}
                             />
                         </div>
+                        <Label htmlFor="confirm-enforcer-pem">
+                            Paste the enforcer private key to confirm (owner
+                            only)
+                        </Label>
+                        <Textarea
+                            id="confirm-enforcer-pem"
+                            data-testid="confirm-enforcer-pem"
+                            rows={6}
+                            value={confirmEnforcerPem}
+                            onChange={(e) =>
+                                setConfirmEnforcerPem(e.target.value)
+                            }
+                        />
                         <Button
                             type="button"
                             data-testid="confirm-bootstrap"
-                            disabled={busy || !confirmPem.trim()}
+                            disabled={
+                                busy ||
+                                !confirmPem.trim() ||
+                                !confirmEnforcerPem.trim()
+                            }
                             onClick={() => void onConfirm()}
                         >
                             Confirm and bootstrap

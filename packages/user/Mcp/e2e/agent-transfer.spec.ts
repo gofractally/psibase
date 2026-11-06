@@ -10,6 +10,7 @@ import { callTool, raw } from "../../../local/XMcp/e2e/client";
 import { installMcpPackages } from "../../../local/XMcp/e2e/install";
 import {
     bootstrapAgent,
+    enforcePending,
     gql,
     issueAndCredit,
     pendingIdsFor,
@@ -206,7 +207,7 @@ test("X-MCP agent credit: owner-as-sender, propose, grant, auto-exec", async ({
             { keys: [recipient.privateKeyPath] },
         );
 
-        // Covered repeat through the same page now reports executed.
+        // Covered repeat still needs the enforcer co-signature.
         const again = await callTool(devnet, "build_transaction", {
             actions: [
                 {
@@ -227,9 +228,13 @@ test("X-MCP agent credit: owner-as-sender, propose, grant, auto-exec", async ({
             () => page.locator("#btn-propose").click(),
             devnet.url("mcp"),
         );
-        await expect(page.locator("#result")).toContainText('"executed":true', {
-            timeout: 30_000,
-        });
+        await expect(page.locator("#result")).toContainText(
+            '"executed":false',
+            {
+                timeout: 30_000,
+            },
+        );
+        await enforcePending(devnet, dir, s);
         expect(await pendingIdsFor(devnet, s.agent.name)).toEqual([]);
     } finally {
         cleanup();

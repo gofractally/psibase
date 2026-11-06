@@ -6,7 +6,9 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
-    use mcp::tables::{AgentCfg, AgentTable, AllowTable, Allowed, Pending, PendingTable};
+    use mcp::tables::{
+        AgentCfg, AgentTable, AllowTable, Allowed, Pending, PendingTable, RuleTable,
+    };
     use psibase::*;
 
     fn check(cond: bool, msg: &str) {
@@ -41,6 +43,9 @@ mod service {
         pending: Pending,
         /// service:method pairs Approve and Grant would add
         missing: Vec<String>,
+        /// JSON with decoded parameters, standing limits, and failures per action.
+        inspection: String,
+        can_enforce: bool,
     }
 
     #[Object]
@@ -52,6 +57,7 @@ mod service {
         async fn needsApproval(
             &self,
             owner: Option<AccountNumber>,
+            ids: Option<Vec<u32>>,
         ) -> async_graphql::Result<Vec<NeedsApproval>> {
             let owner = owner.or(self.user).ok_or_else(|| {
                 async_graphql::Error::new(
@@ -60,10 +66,42 @@ mod service {
             })?;
             owner_only(self.user, owner)?;
             let mut out = Vec::new();
-            for p in PendingTable::with_service(mcp::SERVICE)
-                .get_index_pk()
-                .range((owner, 0)..=(owner, u32::MAX))
-            {
+            let ids = ids.unwrap_or_else(|| {
+                PendingTable::with_service(mcp::SERVICE)
+                    .get_index_pk()
+                    .range((owner, 0)..=(owner, u32::MAX))
+                    .map(|p| p.id)
+                    .collect()
+            });
+            for id in ids {
+                let tx = services::staged_tx::Wrapper::call().get_staged_tx(id);
+                if !tx.action_list.actions.iter().any(|a| a.sender == owner) {
+                    continue;
+                }
+                let p = Pending {
+                    account: owner,
+                    id,
+                    txid: tx.txid,
+                    proposer: tx.proposer,
+                    actions: tx.action_list.actions,
+                };
+                let mut can_enforce = tx.auto_exec
+                    && !p.actions.is_empty()
+                    && AgentTable::with_service(mcp::SERVICE)
+                        .get_index_pk()
+                        .get(&owner)
+                        .and_then(|c| c.enforcer)
+                        .is_some();
+                let inspection: Vec<_> = p.actions.iter().map(|a| {
+                    let limits = RuleTable::with_service(mcp::SERVICE).get_index_pk()
+                        .get(&(owner, a.service, a.method)).map(|r| r.limits).unwrap_or_default();
+                    let checked = mcp::limits::inspect(a, &limits);
+                    can_enforce &= a.sender == owner && checked.failures.is_empty()
+                        && !mcp::policy::is_banned(a.service, a.method)
+                        && AllowTable::with_service(mcp::SERVICE).get_index_pk().get(&(owner, a.service, a.method)).is_some();
+                    serde_json::json!({ "service": a.service, "method": a.method,
+                        "parameters": checked.parameters, "limits": limits, "failures": checked.failures })
+                }).collect();
                 let pairs: Vec<_> = p.actions.iter().map(|a| (a.service, a.method)).collect();
                 let missing = mcp::policy::missing_pairs(&pairs, |s, m| {
                     AllowTable::with_service(mcp::SERVICE)
@@ -77,6 +115,8 @@ mod service {
                 out.push(NeedsApproval {
                     pending: p,
                     missing,
+                    inspection: serde_json::to_string(&inspection).unwrap(),
+                    can_enforce,
                 });
             }
             Ok(out)

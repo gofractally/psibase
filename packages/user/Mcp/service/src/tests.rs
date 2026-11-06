@@ -17,9 +17,9 @@ fn allowlist_policy(chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.new_account(a)?;
     }
     Mcp::push_from(&chain, owner)
-        .bootstrap(owner)
+        .bootstrap(owner, None)
         .match_error("owner and agent must differ")?;
-    Mcp::push_from(&chain, owner).bootstrap(agent).get()?;
+    Mcp::push_from(&chain, owner).bootstrap(agent, None).get()?;
 
     // Not allowlisted: only the owner.
     let p = Mcp::push(&chain)

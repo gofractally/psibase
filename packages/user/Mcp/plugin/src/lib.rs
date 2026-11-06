@@ -72,11 +72,41 @@ struct McpPlugin;
 impl Approvals for McpPlugin {
     fn needs_approval() -> Result<String, Error> {
         only_mcp_app()?;
+        let owner = HostAccountsApi::get_current_user()
+            .ok_or_else(|| ErrorType::QueryFailed("not logged in".into()))?;
+        account(&owner)?;
+        // Event actors are proposers. Discover by inner sender, not proposer.
+        let mut ids = Vec::new();
+        let mut after = String::new();
+        loop {
+            let q = format!(
+                r#"{{ getIdsForParty(party: "{owner}", first: 100{after}) {{ edges {{ node {{ id }} }} pageInfo {{ hasNextPage endCursor }} }} }}"#
+            );
+            let response = bindings::staged_tx::plugin::authorized::graphql(&q)?;
+            let v: serde_json::Value = serde_json::from_str(&response)
+                .map_err(|e| ErrorType::QueryFailed(e.to_string()))?;
+            if v.get("errors").is_some() {
+                return Err(ErrorType::QueryFailed(v.to_string()).into());
+            }
+            let page = &v["data"]["getIdsForParty"];
+            if let Some(edges) = page["edges"].as_array() {
+                for edge in edges {
+                    if let Some(id) = edge["node"]["id"].as_u64() {
+                        ids.push(id);
+                    }
+                }
+            }
+            if page["pageInfo"]["hasNextPage"].as_bool() != Some(true) {
+                break;
+            }
+            after = format!(", after: {}", page["pageInfo"]["endCursor"]);
+        }
         let query = format!(
-            r#"query {{ needsApproval {{
+            r#"query {{ needsApproval(ids: {}) {{
                 pending {{ account id txid proposer actions {{ sender service method rawData }} }}
-                missing
-            }} }}"#
+                missing inspection canEnforce
+            }} }}"#,
+            serde_json::to_string(&ids).unwrap()
         );
         let body = Server::post_graphql_get_json(&query)?;
         let v: serde_json::Value =
@@ -94,12 +124,77 @@ impl Approvals for McpPlugin {
         add_action_to_transaction(untrack::ACTION_NAME, &untrack { account, id }.packed())
     }
 
-    fn approve_and_grant(account_name: String, id: u32) -> Result<(), Error> {
+    fn approve_and_grant(account_name: String, id: u32, rules_json: String) -> Result<(), Error> {
         only_mcp_app()?;
         let account = account(&account_name)?;
+        #[derive(Deserialize)]
+        struct RuleInput {
+            service: AccountNumber,
+            method: psibase::MethodNumber,
+            limits: Vec<mcp::tables::ParamLimit>,
+        }
+        let rules: Vec<RuleInput> =
+            serde_json::from_str(&rules_json).map_err(|e| ErrorType::BadActions(e.to_string()))?;
+        for rule in rules {
+            add_action_to_transaction(
+                set_limits::ACTION_NAME,
+                &set_limits {
+                    service: rule.service,
+                    method: rule.method,
+                    limits: rule.limits,
+                }
+                .packed(),
+            )?;
+        }
         add_action_to_transaction(
             grant_missing::ACTION_NAME,
             &grant_missing { account, id }.packed(),
+        )?;
+        StagedTx::accept(id)
+    }
+    fn reject(account_name: String, id: u32) -> Result<(), Error> {
+        only_mcp_app()?;
+        let account = account(&account_name)?;
+        StagedTx::reject(id)?;
+        add_action_to_transaction(untrack::ACTION_NAME, &untrack { account, id }.packed())
+    }
+
+    fn enforce(owner: String, id: u32) -> Result<(), Error> {
+        only_mcp_app()?;
+        if HostAccountsApi::get_current_user().as_deref() != Some(&owner) {
+            return Err(ErrorType::Unauthorized("watcher requires owner session".into()).into());
+        }
+        let rows: serde_json::Value = serde_json::from_str(&Self::needs_approval()?)
+            .map_err(|e| ErrorType::QueryFailed(e.to_string()))?;
+        let row = rows
+            .as_array()
+            .and_then(|rows| {
+                rows.iter()
+                    .find(|r| r["pending"]["id"].as_u64() == Some(id as u64))
+            })
+            .ok_or_else(|| ErrorType::QueryFailed("proposal no longer pending".into()))?;
+        if row["canEnforce"].as_bool() != Some(true) {
+            return Err(ErrorType::QueryFailed("owner review required".into()).into());
+        }
+        let cfg = Server::post_graphql_get_json(&format!(
+            r#"{{ agent(account: "{owner}") {{ enforcer }} }}"#
+        ))?;
+        let cfg: serde_json::Value =
+            serde_json::from_str(&cfg).map_err(|e| ErrorType::QueryFailed(e.to_string()))?;
+        let enforcer = cfg["data"]["agent"]["enforcer"]
+            .as_str()
+            .ok_or_else(|| ErrorType::QueryFailed("no enforcer".into()))?;
+        let txid = serde_json::from_value(row["pending"]["txid"].clone())
+            .map_err(|e| ErrorType::QueryFailed(e.to_string()))?;
+        HostAccountsAdmin::login(enforcer, "mcp")?;
+        add_action_to_transaction(
+            enforce::ACTION_NAME,
+            &enforce {
+                account: account(&owner)?,
+                id,
+                txid,
+            }
+            .packed(),
         )?;
         StagedTx::accept(id)
     }
@@ -118,15 +213,34 @@ impl Setup for McpPlugin {
         Ok(AuthSig::api::can_authorize(&private_key, &agent_name))
     }
 
-    fn bootstrap(agent_name: String) -> Result<(), Error> {
+    fn bootstrap(agent_name: String, enforcer_name: String) -> Result<(), Error> {
         only_mcp_app()?;
         let agent = account(&agent_name)?;
+        let enforcer = Some(account(&enforcer_name)?);
         HostAccountsApi::get_current_user()
             .ok_or_else(|| ErrorType::ImportFailed("not logged in".into()))?;
         // Same tx, owner-signed: register the agent first (canAuthUserSys
         // requires it), then make mcp the owner's auth service.
-        add_action_to_transaction(bootstrap::ACTION_NAME, &bootstrap { agent }.packed())?;
+        add_action_to_transaction(
+            bootstrap::ACTION_NAME,
+            &bootstrap { agent, enforcer }.packed(),
+        )?;
         AccountsApi::set_auth_service(&mcp::SERVICE.to_string())
+    }
+
+    fn import_enforcer(enforcer_name: String, private_key: Pem) -> Result<(), Error> {
+        only_mcp_app()?;
+        account(&enforcer_name)?;
+        if !AuthSig::api::can_authorize(&private_key, &enforcer_name) {
+            return Err(ErrorType::ImportFailed("enforcer key does not match".into()).into());
+        }
+        HostAccountsAdmin::import_existing(&[Credential {
+            account: enforcer_name.clone(),
+            key: private_key,
+        }])
+        .map_err(|_| ErrorType::ImportFailed("could not import enforcer key".into()))?;
+        HostAccountsAdmin::add_connected_app(&enforcer_name, "mcp");
+        Ok(())
     }
 
     fn current_user() -> Result<String, Error> {
@@ -164,7 +278,7 @@ impl Setup for McpPlugin {
 
     fn my_agents() -> Result<String, Error> {
         only_mcp_app()?;
-        let query = r#"query { myAgents { account agent } }"#;
+        let query = r#"query { myAgents { account agent enforcer } }"#;
         let body = Server::post_graphql_get_json(query)?;
         let v: serde_json::Value =
             serde_json::from_str(&body).map_err(|e| ErrorType::QueryFailed(e.to_string()))?;

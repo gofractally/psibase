@@ -16,10 +16,13 @@ interface approvals {
 
     /// The logged-in owner `account` accepts staged tx `id`.
     approve: func(account: string, id: u32) -> result<_, error>;
+    reject: func(account: string, id: u32) -> result<_, error>;
+    /// Logs in as the vault-held enforcer; restore-parent after the call signs.
+    enforce: func(owner: string, id: u32) -> result<_, error>;
 
     /// In one transaction: grant every missing service/method pair of staged tx
-    /// `id` to the agent of `account`, then accept it.
-    approve-and-grant: func(account: string, id: u32) -> result<_, error>;
+    /// `id` to the agent of `account`, save the edited standing rules, then accept.
+    approve-and-grant: func(account: string, id: u32, rules-json: string) -> result<_, error>;
 }
 
 interface setup {
@@ -33,12 +36,14 @@ interface setup {
     confirm-agent-key: func(agent-name: string, private-key: pem) -> result<bool, error>;
 
     /// In one owner-signed tx: register `agent-name` as the logged-in owner's
-    /// agent (`mcp::bootstrap`), then switch the owner's auth service to `mcp`
+    /// agent and distinct enforcer (`mcp::bootstrap`), then switch the owner's auth service to `mcp`
     /// (`accounts::setAuthServ`). The owner's auth-sig key is unchanged, so
     /// key login keeps working. No managed account is created.
     /// Call `enable-agent-auto-debit` afterward (separate tx; agent must sign).
-    bootstrap: func(agent-name: string) -> result<_, error>;
+    bootstrap: func(agent-name: string, enforcer-name: string) -> result<_, error>;
 
+    /// Import a human-confirmed enforcer key; never hand it to the agent.
+    import-enforcer: func(enforcer-name: string, private-key: pem) -> result<_, error>;
     /// Account currently logged in to mcp (read the owner before switching).
     current-user: func() -> result<string, error>;
 
@@ -50,7 +55,7 @@ interface setup {
     /// Log the owner back in to mcp after `enable-agent-auto-debit`.
     restore-parent: func(parent: string) -> result<_, error>;
 
-    /// JSON array (0 or 1 rows) of the logged-in owner's AgentCfg `{ account, agent }`.
+    /// JSON array (0 or 1 rows) of the logged-in owner's AgentCfg `{ account, agent, enforcer }`.
     my-agents: func() -> result<string, error>;
 }
 

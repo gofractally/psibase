@@ -17,6 +17,9 @@ pub fn banned_pairs() -> Vec<(AccountNumber, MethodNumber)> {
         p("staged-tx", "accept"),
         p("auth-dyn", "set_mgmt"),
         p("mcp", "set_agent"),
+        p("mcp", "set_enforcer"),
+        p("mcp", "set_limits"),
+        p("mcp", "enforce"),
         p("mcp", "bootstrap"),
         p("mcp", "grant"),
         p("mcp", "grant_missing"),
@@ -33,7 +36,7 @@ pub fn is_banned(service: AccountNumber, method: MethodNumber) -> bool {
 /// Who must authorize a given (service, method) for an owner account.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Decision {
-    /// Allowlisted: the agent alone authorizes (auto-approve path).
+    /// Allowlisted: agent plus optional enforcer, or the owner alone.
     Agent,
     /// Not allowlisted: the owner (human) must accept with their key.
     Owner,
@@ -84,26 +87,40 @@ pub fn covered(
 pub fn authorizers(
     owner: AccountNumber,
     agent: Option<AccountNumber>,
+    enforcer: Option<AccountNumber>,
     decision: Decision,
 ) -> Vec<AccountNumber> {
     match (decision, agent) {
-        (Decision::Agent, Some(agent)) => vec![agent, owner],
+        (Decision::Agent, Some(agent)) => {
+            let mut out = vec![agent, owner];
+            if let Some(enforcer) = enforcer {
+                out.push(enforcer);
+            }
+            out
+        }
         (Decision::Impossible, _) => vec![],
         _ => vec![owner],
     }
 }
 
-/// `isAuthSys`: the agent alone is enough for allowlisted methods; the owner
-/// is always enough except for banned (impossible) methods.
+/// `isAuthSys`: allowlisted methods require the agent and the configured
+/// enforcer, if any. The owner alone suffices except for banned methods.
 pub fn is_approved(
     owner: AccountNumber,
     agent: Option<AccountNumber>,
+    enforcer: Option<AccountNumber>,
     decision: Decision,
     accepters: &[AccountNumber],
 ) -> bool {
-    authorizers(owner, agent, decision)
-        .iter()
-        .any(|a| accepters.contains(a))
+    if decision == Decision::Impossible {
+        return false;
+    }
+    if accepters.contains(&owner) {
+        return true;
+    }
+    decision == Decision::Agent
+        && agent.is_some_and(|a| accepters.contains(&a))
+        && enforcer.is_none_or(|e| accepters.contains(&e))
 }
 
 /// `isRejectSys`: the owner can always reject; an impossible tx can always be
@@ -142,14 +159,39 @@ mod tests {
         let agent = AccountNumber::from_exact("agent").unwrap();
         let other = AccountNumber::from_exact("other").unwrap();
         // Allowlisted: agent's implicit accept alone executes; owner also suffices.
-        assert!(is_approved(owner, Some(agent), Decision::Agent, &[agent]));
-        assert!(is_approved(owner, Some(agent), Decision::Agent, &[owner]));
-        assert!(!is_approved(owner, Some(agent), Decision::Agent, &[other]));
-        // Not allowlisted: owner must accept.
-        assert!(!is_approved(owner, Some(agent), Decision::Owner, &[agent]));
         assert!(is_approved(
             owner,
             Some(agent),
+            None,
+            Decision::Agent,
+            &[agent]
+        ));
+        assert!(is_approved(
+            owner,
+            Some(agent),
+            None,
+            Decision::Agent,
+            &[owner]
+        ));
+        assert!(!is_approved(
+            owner,
+            Some(agent),
+            None,
+            Decision::Agent,
+            &[other]
+        ));
+        // Not allowlisted: owner must accept.
+        assert!(!is_approved(
+            owner,
+            Some(agent),
+            None,
+            Decision::Owner,
+            &[agent]
+        ));
+        assert!(is_approved(
+            owner,
+            Some(agent),
+            None,
             Decision::Owner,
             &[agent, owner]
         ));
@@ -157,20 +199,42 @@ mod tests {
         assert!(!is_approved(
             owner,
             Some(agent),
+            None,
             Decision::Impossible,
             &[agent, owner]
         ));
         // No agent registered: behaves like AuthSig.
-        assert!(!is_approved(owner, None, Decision::Agent, &[agent]));
-        assert!(is_approved(owner, None, Decision::Agent, &[owner]));
+        assert!(!is_approved(owner, None, None, Decision::Agent, &[agent]));
+        assert!(is_approved(owner, None, None, Decision::Agent, &[owner]));
         // Reject: owner only (or always, for impossible).
         assert!(is_rejected(owner, Decision::Agent, &[owner]));
         assert!(!is_rejected(owner, Decision::Agent, &[agent]));
         assert!(is_rejected(owner, Decision::Impossible, &[]));
         assert_eq!(
-            authorizers(owner, Some(agent), Decision::Owner),
+            authorizers(owner, Some(agent), None, Decision::Owner),
             vec![owner]
         );
+    }
+
+    #[test]
+    fn enforcer_threshold() {
+        let owner = AccountNumber::from_exact("owner").unwrap();
+        let agent = AccountNumber::from_exact("agent").unwrap();
+        let enforcer = AccountNumber::from_exact("enforcer").unwrap();
+        let approved = |decision, votes: &[AccountNumber]| {
+            is_approved(owner, Some(agent), Some(enforcer), decision, votes)
+        };
+        assert!(!approved(Decision::Agent, &[agent]));
+        assert!(!approved(Decision::Agent, &[enforcer]));
+        assert!(approved(Decision::Agent, &[agent, enforcer]));
+        assert!(approved(Decision::Agent, &[owner]));
+        assert!(approved(Decision::Owner, &[owner]));
+        assert!(!approved(Decision::Owner, &[agent, enforcer]));
+        assert!(!approved(Decision::Impossible, &[owner, agent, enforcer]));
+        assert!(!is_rejected(owner, Decision::Agent, &[agent, enforcer]));
+        for method in ["set_enforcer", "set_limits", "enforce"] {
+            assert!(is_banned(sm("mcp", method).0, sm("mcp", method).1));
+        }
     }
 
     #[test]

@@ -5,14 +5,14 @@
 //!   owner's AuthSig key (the key stays registered in `auth-sig`, so normal key
 //!   login keeps working). On the staged path (`isAuthSys` / `getDlgsSys`) the
 //!   per-account service+method allowlist decides: allowlisted -> the agent's
-//!   accept (its implicit accept on `propose`) is enough and a covered tx
-//!   auto-executes; otherwise the owner must accept; auth/code changes ->
+//!   accept (implicit on `propose`) plus the optional enforcer auto-executes; otherwise the owner must accept; auth/code changes ->
 //!   impossible.
 //! - the record of staged transactions that need owner approval (`track`),
 //!   served by the query-token-gated `needsApproval` query in `r-mcp`.
 //! - the "Approve and Grant" admin action (`grant_missing`), which the UI
 //!   bundles with `staged-tx::accept` in one transaction.
 
+pub mod limits;
 pub mod policy;
 
 #[psibase::service_tables]
@@ -32,6 +32,7 @@ pub mod tables {
         #[primary_key]
         pub account: AccountNumber,
         pub agent: AccountNumber,
+        pub enforcer: Option<AccountNumber>,
     }
 
     impl AgentCfg {
@@ -63,6 +64,31 @@ pub mod tables {
                 .get_index_pk()
                 .get(&(account, service, method))
                 .is_some()
+        }
+    }
+
+    /// Standing parameter limits, writable only by the owner. JSON pointers
+    /// identify parameters (including nested values); absent comparisons are disabled.
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct ParamLimit {
+        pub parameter: String,
+        pub lt: Option<String>,
+        pub gt: Option<String>,
+        pub eq: Option<String>,
+    }
+
+    #[table(name = "RuleTable", index = 3)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct StandingRule {
+        pub account: AccountNumber,
+        pub service: AccountNumber,
+        pub method: MethodNumber,
+        pub limits: Vec<ParamLimit>,
+    }
+    impl StandingRule {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber, MethodNumber) {
+            (self.account, self.service, self.method)
         }
     }
 
@@ -130,8 +156,9 @@ pub mod service {
     /// Named `bootstrap` (not `bootstrap_agent`) so the method name fits
     /// MethodNumber's 13-character limit.
     #[action]
-    fn bootstrap(agent: AccountNumber) {
+    fn bootstrap(agent: AccountNumber, enforcer: Option<AccountNumber>) {
         let owner = get_sender();
+        validate_enforcer(owner, agent, enforcer);
         check(agent != owner, "owner and agent must differ");
         check(
             Accounts::call().exists(agent),
@@ -145,6 +172,7 @@ pub mod service {
             .put(&AgentCfg {
                 account: owner,
                 agent,
+                enforcer,
             })
             .unwrap();
     }
@@ -160,8 +188,109 @@ pub mod service {
             Accounts::call().exists(agent),
             "agent account does not exist",
         );
+        validate_enforcer(owner, agent, cfg.enforcer);
         cfg.agent = agent;
         AgentTable::read_write().put(&cfg).unwrap();
+    }
+
+    fn validate_enforcer(
+        owner: AccountNumber,
+        agent: AccountNumber,
+        enforcer: Option<AccountNumber>,
+    ) {
+        if let Some(enforcer) = enforcer {
+            check(
+                enforcer != owner && enforcer != agent,
+                "owner, agent and enforcer must differ",
+            );
+            check(
+                Accounts::call().exists(enforcer),
+                "enforcer account does not exist",
+            );
+        }
+    }
+
+    #[action]
+    fn set_enforcer(enforcer: Option<AccountNumber>) {
+        let owner = get_sender();
+        let mut cfg = require_owner(owner);
+        validate_enforcer(owner, cfg.agent, enforcer);
+        cfg.enforcer = enforcer;
+        AgentTable::read_write().put(&cfg).unwrap();
+    }
+
+    /// Replaces all limits for one method; unchecked comparisons are None.
+    #[action]
+    fn set_limits(service: AccountNumber, method: MethodNumber, limits: Vec<ParamLimit>) {
+        let account = get_sender();
+        require_owner(account);
+        check(
+            !policy::is_banned(service, method),
+            "method cannot be granted",
+        );
+        for limit in &limits {
+            check(
+                limit.parameter.starts_with('/'),
+                "parameter must be a JSON pointer",
+            );
+            for value in [&limit.lt, &limit.gt, &limit.eq].into_iter().flatten() {
+                check(
+                    serde_json::from_str::<serde_json::Value>(value).is_ok(),
+                    "limit must be JSON",
+                );
+            }
+        }
+        RuleTable::read_write()
+            .put(&StandingRule {
+                account,
+                service,
+                method,
+                limits,
+            })
+            .unwrap();
+    }
+
+    /// The browser watcher signs this as the enforcer. Re-check on chain at
+    /// acceptance time, not against agent-supplied decoded data or stale UI state.
+    #[action]
+    fn enforce(account: AccountNumber, id: u32, txid: Checksum256) {
+        let cfg = AgentCfg::get(account).expect("no agent");
+        check(
+            cfg.enforcer == Some(get_sender()),
+            "only the registered enforcer",
+        );
+        let tx = StagedTx::call().get_staged_tx(id);
+        check(tx.txid == txid, "staged transaction changed");
+        check(!tx.action_list.actions.is_empty(), "empty transaction");
+        for action in &tx.action_list.actions {
+            // Do not co-sign another sender or a not-yet-granted action.
+            check(
+                action.sender == account,
+                "mixed senders require owner review",
+            );
+            check(
+                decision(
+                    account,
+                    &Some(ServiceMethod {
+                        service: action.service,
+                        method: action.method,
+                    }),
+                ) == Decision::Agent,
+                "method requires owner review",
+            );
+            let limits = RuleTable::read()
+                .get_index_pk()
+                .get(&(account, action.service, action.method))
+                .map(|r| r.limits)
+                .unwrap_or_default();
+            check(
+                crate::limits::inspect(action, &limits).failures.is_empty(),
+                "standing parameter limit failed",
+            );
+        }
+        // The plugin follows this check with staged-tx::accept as the enforcer
+        // in the SAME top-level transaction. mcp cannot runAs an auth-sig
+        // enforcer (and must not be granted that independent authority).
     }
 
     /// Owner adds one service+method to the agent's allowlist.
@@ -198,11 +327,18 @@ pub mod service {
     #[action]
     fn grant_missing(account: AccountNumber, id: u32) {
         require_owner(account);
-        let row = PendingTable::read()
-            .get_index_pk()
-            .get(&(account, id))
-            .expect("unknown pending transaction");
-        let pairs: Vec<_> = row.actions.iter().map(|a| (a.service, a.method)).collect();
+        let tx = StagedTx::call().get_staged_tx(id);
+        check(
+            tx.action_list.actions.iter().any(|a| a.sender == account),
+            "not an owner proposal",
+        );
+        let pairs: Vec<_> = tx
+            .action_list
+            .actions
+            .iter()
+            .filter(|a| a.sender == account)
+            .map(|a| (a.service, a.method))
+            .collect();
         let table = AllowTable::read_write();
         for (service, method) in policy::missing_pairs(&pairs, allowed_fn(account)) {
             table
@@ -213,12 +349,14 @@ pub mod service {
                 })
                 .unwrap();
         }
-        PendingTable::read_write().remove(&row);
+        if let Some(row) = PendingTable::read().get_index_pk().get(&(account, id)) {
+            PendingTable::read_write().remove(&row);
+        }
     }
 
     /// Records staged tx `id` as needing owner approval. Anyone may call it
     /// (normally the agent, right after `propose`); it only records txs that
-    /// act as an X-MCP owner and are not fully covered by the allowlist.
+    /// act as an X-MCP owner and need owner or enforcer approval.
     #[action]
     fn track(id: u32) {
         let tx = StagedTx::call().get_staged_tx(id);
@@ -237,7 +375,8 @@ pub mod service {
             .map(|a| (a.service, a.method))
             .collect();
         check(
-            !policy::covered(&pairs, allowed_fn(account)),
+            AgentCfg::get(account).unwrap().enforcer.is_some()
+                || !policy::covered(&pairs, allowed_fn(account)),
             "covered by the allowlist; no approval needed",
         );
         PendingTable::read_write()
@@ -254,13 +393,11 @@ pub mod service {
     /// Owner (after Approve) or proposer removes a tracked row.
     #[action]
     fn untrack(account: AccountNumber, id: u32) {
-        let row = PendingTable::read()
-            .get_index_pk()
-            .get(&(account, id))
-            .expect("unknown pending transaction");
-        let s = get_sender();
-        check(s == account || s == row.proposer, "only owner or proposer");
-        PendingTable::read_write().remove(&row);
+        if let Some(row) = PendingTable::read().get_index_pk().get(&(account, id)) {
+            let s = get_sender();
+            check(s == account || s == row.proposer, "only owner or proposer");
+            PendingTable::read_write().remove(&row);
+        }
     }
 
     /// Who may authorize `method` for `account` on the staged path (read-only
@@ -268,7 +405,12 @@ pub mod service {
     #[action]
     fn get_policy(account: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         let agent = AgentCfg::get(account).map(|c| c.agent);
-        policy::authorizers(account, agent, decision(account, &method))
+        policy::authorizers(
+            account,
+            agent,
+            AgentCfg::get(account).and_then(|c| c.enforcer),
+            decision(account, &method),
+        )
     }
 
     // ---- Auth service interface (owner accounts) ----
@@ -302,13 +444,19 @@ pub mod service {
     #[allow(non_snake_case)]
     fn getDlgsSys(sender: AccountNumber, method: Option<ServiceMethod>) -> Vec<AccountNumber> {
         let agent = AgentCfg::get(sender).map(|c| c.agent);
-        policy::authorizers(sender, agent, decision(sender, &method))
-            .into_iter()
-            .filter(|a| *a != sender)
-            .collect()
+        policy::authorizers(
+            sender,
+            agent,
+            AgentCfg::get(sender).and_then(|c| c.enforcer),
+            decision(sender, &method),
+        )
+        .into_iter()
+        .filter(|a| *a != sender)
+        .collect()
     }
 
-    /// Staged path: allowlisted -> agent or owner; otherwise owner; banned -> never.
+    /// Staged path: allowlisted -> agent + optional enforcer OR owner alone.
+    /// Otherwise owner; banned -> never.
     #[action]
     #[allow(non_snake_case)]
     fn isAuthSys(
@@ -317,7 +465,13 @@ pub mod service {
         method: Option<ServiceMethod>,
     ) -> bool {
         let agent = AgentCfg::get(sender).map(|c| c.agent);
-        policy::is_approved(sender, agent, decision(sender, &method), &authorizers)
+        policy::is_approved(
+            sender,
+            agent,
+            AgentCfg::get(sender).and_then(|c| c.enforcer),
+            decision(sender, &method),
+            &authorizers,
+        )
     }
 
     /// Staged path: the owner can always reject; banned txs are always rejectable.

@@ -24,3 +24,5 @@ Flow:
      already tracked for the owner to approve in the mcp Approvals page.
 
 Signing happens in the page with the imported key. Nothing private is sent to the node.
+
+The enforcer key belongs only to the human owner. Never request, import, or use it. Limit failures withhold the enforcer signature; only the owner approves overrides or rejects.
