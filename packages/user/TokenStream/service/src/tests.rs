@@ -4,7 +4,7 @@
 mod tests {
     use crate::tables::Stream;
     use crate::Wrapper as TokenStream;
-    use psibase::services::nft::{NftHolderFlags, Wrapper as Nfts};
+    use psibase::services::nft::Wrapper as Nfts;
     use psibase::services::tokens::{Quantity, Wrapper as Tokens};
     use psibase::*;
 
@@ -50,11 +50,6 @@ mod tests {
     fn setup_env(chain: &psibase::Chain) -> u32 {
         for account in [ALICE, BOB, CHARLIE] {
             chain.new_account(account).unwrap();
-            // For NFTs (including token-stream NFTs)
-            Nfts::push_from(&chain, account)
-                .setUserConf(NftHolderFlags::AUTO_DEBIT.index(), true)
-                .get()
-                .unwrap();
 
             // For token balances
             Tokens::push_from(&chain, account)
@@ -70,6 +65,15 @@ mod tests {
 
         let token_id = Tokens::push_from(&chain, ALICE)
             .create(4.try_into().unwrap(), supply)
+            .get()
+            .unwrap();
+        let nft_id = Tokens::push(&chain)
+            .getToken(token_id)
+            .get()
+            .unwrap()
+            .nft_id;
+        Nfts::push_from(&chain, ALICE)
+            .debit(nft_id, "".into())
             .get()
             .unwrap();
 
@@ -177,10 +181,15 @@ mod tests {
         half_life_seconds: u32,
         token_id: u32,
     ) -> u32 {
-        TokenStream::push_from(&chain, author)
+        let id = TokenStream::push_from(&chain, author)
             .create(half_life_seconds, token_id)
             .get()
-            .unwrap()
+            .unwrap();
+        Nfts::push_from(&chain, author)
+            .debit(id, "".into())
+            .get()
+            .unwrap();
+        id
     }
 
     #[psibase::test_case(packages("TokenStream"))]

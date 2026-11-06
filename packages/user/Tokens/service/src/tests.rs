@@ -42,12 +42,14 @@ mod tests {
             .unwrap()
     }
 
-    fn enable_nft_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
-        psibase::services::nft::Wrapper::push_from(&chain, account)
-            .setUserConf(
-                psibase::services::nft::NftHolderFlags::AUTO_DEBIT.index(),
-                true,
-            )
+    fn claim_token_nft(chain: &psibase::Chain, account: AccountNumber, token_id: u32) {
+        let nft_id = Wrapper::push(chain)
+            .getToken(token_id)
+            .get()
+            .unwrap()
+            .nft_id;
+        psibase::services::nft::Wrapper::push_from(chain, account)
+            .debit(nft_id, "".into())
             .get()
             .unwrap();
     }
@@ -68,8 +70,6 @@ mod tests {
             false,
         );
 
-        enable_nft_auto_debit(&chain, alice);
-
         let malicious_mike = account!("mike");
         chain.new_account(malicious_mike).unwrap();
 
@@ -80,6 +80,7 @@ mod tests {
 
         // Alice can create a new token
         let tid = a.create(4.try_into().unwrap(), 80000.into()).get()?;
+        claim_token_nft(&chain, alice, tid);
 
         // Alice can mint a portion of the token supply;
         assert_eq!(0, a.getBalance(tid, alice).get().unwrap().value);
@@ -121,8 +122,6 @@ mod tests {
         chain.new_account(alice).unwrap();
         let a = Wrapper::push_from(&chain, alice);
 
-        enable_nft_auto_debit(&chain, alice);
-
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
         let b = Wrapper::push_from(&chain, bob);
@@ -130,6 +129,7 @@ mod tests {
         let tid = a
             .create(Precision::new(4).unwrap(), 100_0000.into())
             .get()?;
+        claim_token_nft(&chain, alice, tid);
         a.mint(tid, 100.into(), memo.clone());
 
         assert_eq!(100, a.getBalance(tid, alice).get()?.value);
@@ -159,14 +159,13 @@ mod tests {
         chain.new_account(carol).unwrap();
         let c = Wrapper::push_from(&chain, carol);
 
-        enable_nft_auto_debit(&chain, alice);
-
         let memo = Memo::new("memo".to_string()).unwrap();
         let savings = "savings".to_string();
         let checking = "checking".to_string();
 
         let issue = |amount: u64| -> Result<u32, psibase::Error> {
             let tid = a.create(4.try_into().unwrap(), 1_000_0000.into()).get()?;
+            claim_token_nft(&chain, alice, tid);
             a.mint(tid, amount.into(), memo.clone()).get()?;
             a.credit(tid, bob, amount.into(), memo.clone()).get()?;
             b.debit(tid, alice, amount.into(), memo.clone()).get()?;
@@ -392,8 +391,6 @@ mod tests {
                 )
                 .get()
                 .unwrap();
-
-            enable_nft_auto_debit(&chain, account);
         };
         auto_debit_user(alice);
         auto_debit_user(bob);
@@ -405,6 +402,7 @@ mod tests {
         let b = Wrapper::push_from(&chain, bob);
 
         let tid = a.create(4.try_into().unwrap(), 100_0000.into()).get()?;
+        claim_token_nft(&chain, alice, tid);
         a.mint(tid, 10_0000.into(), "".into()).get()?;
         assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
         a.credit(tid, bob, 10_0000.into(), "".into()).get()?;
@@ -542,6 +540,7 @@ mod tests {
         assert_eq!(8_0000, a.getBalance(tid, alice).get()?.value);
 
         let tid2 = a.create(4.try_into().unwrap(), 100_0000.into()).get()?;
+        claim_token_nft(&chain, alice, tid2);
         a.mint(tid2, 5_0000.into(), "".into()).get()?;
         a.toSub(tid2, savings.clone(), 3_0000.into()).get()?;
         assert_eq!(2_0000, a.getBalance(tid2, alice).get()?.value);
