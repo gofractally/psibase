@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psibase/GetSchemaFn.hpp>
 #include <psibase/block.hpp>
 
 #include <psio/chrono.hpp>
@@ -39,13 +40,6 @@ namespace psibase
 
    void             trimRawData(ActionTrace& t, size_t max = 32);
    TransactionTrace trimRawData(TransactionTrace t, size_t max = 32);
-
-   struct ServiceSchema;
-   using GetSchemaFn = std::function<const ServiceSchema*(AccountNumber)>;
-   struct NoSchema
-   {
-      const ServiceSchema* operator()(AccountNumber) const { return nullptr; }
-   };
 
    void        prettyTrace(std::string& dest, const std::string& s, const std::string& indent = "");
    void        prettyTrace(std::string&        dest,

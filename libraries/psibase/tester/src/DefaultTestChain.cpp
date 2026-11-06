@@ -7,6 +7,7 @@
 #include <services/system/AuthDelegate.hpp>
 #include <services/system/Producers.hpp>
 #include <services/system/SetCode.hpp>
+#include "TestChainSchemas.hpp"
 
 #include <utility>
 #include <vector>
@@ -224,12 +225,56 @@ void TestChain::boot(const std::vector<std::string>& names, bool installUI)
    startBlock();
 }
 
+void TestChain::install(const PackagedService& package, bool installUI)
+{
+   TestChainSchemas oldSchemas;
+   PackageSchemas   newSchemas{{&package, 1}};
+
+   AccountNumber root{"root"};
+
+   std::vector<Action> actions;
+
+   transactor<Accounts>     asys(Accounts::service, Accounts::service);
+   transactor<AuthDelegate> auth(root, AuthDelegate::service);
+
+   for (auto account : package.accounts())
+   {
+      actions.push_back(asys.preapproveAcc(account));
+      actions.push_back(auth.newAccount(account, root, NewAccountMode::matchExisting));
+   }
+
+   package.installCode(actions);
+   package.setSchema(actions);
+
+   package.regServer(actions);
+
+   if (installUI || package.needsUI())
+   {
+      package.storeData(actions);
+   }
+
+   package.postinstall(actions,
+                       [&](AccountNumber service)
+                       {
+                          if (auto result = newSchemas(service))
+                             return result;
+                          return oldSchemas(service);
+                       });
+   package.commitInstall(actions, root);
+
+   for (const auto& trx : makeTransactions(*this, std::move(actions)))
+   {
+      auto trace = pushTransaction(trx);
+      check(psibase::show(false, trace) == "", "Failed to install");
+   }
+}
+
 std::vector<std::string> DefaultTestChain::defaultPackages()
 {
-   return {"Accounts", "AuthAny",     "AuthDelegate", "AuthNone",   "AuthSig", "CommonApi",
-           "CpuLimit", "Credentials", "Events",       "Explorer",   "Invite",
-           "Nft",      "Packages",    "Producers",    "HttpServer", "Sites",
-           "SetCode",  "StagedTx",    "Symbol",       "Tokens",     "Transact"};
+   return {"Accounts", "AuthAny",     "AuthDelegate", "AuthNone", "AuthSig", "CommonApi",
+           "CpuLimit", "Credentials", "Events",       "Explorer", "Invite",  "Nft",
+           "Packages", "Producers",   "HttpServer",   "Sites",    "SetCode", "StagedTx",
+           "Symbol",   "Tokens",      "Transact"};
 }
 
 DefaultTestChain::DefaultTestChain() : TestChain(defaultChainInstance(), true)
