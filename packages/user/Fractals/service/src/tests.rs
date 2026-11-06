@@ -113,7 +113,7 @@ mod chain {
     };
     use crate::helpers::donation_sub_account;
     use crate::Wrapper;
-    use psibase::services::tokens::{BalanceFlags, Quantity, Wrapper as Tokens};
+    use psibase::services::tokens::{Quantity, Wrapper as Tokens};
     use psibase::*;
 
     const ALICE: AccountNumber = account!("alice");
@@ -179,10 +179,6 @@ mod chain {
 
     fn setup(chain: &mut Chain) -> u32 {
         chain.new_account(ALICE).unwrap();
-        Tokens::push_from(chain, ALICE)
-            .setUserConf(BalanceFlags::AUTO_DEBIT.index(), true)
-            .get()
-            .unwrap();
 
         Wrapper::push_from(chain, ALICE)
             .create_frac(FRACTAL, "Test".into(), "Mission".into())
@@ -203,6 +199,16 @@ mod chain {
             .claim_rew(FRACTAL, ALICE)
             .get()
             .unwrap();
+        let pending = Tokens::push(chain)
+            .getSharedBal(tid, Wrapper::SERVICE, ALICE)
+            .get()
+            .unwrap();
+        if pending.value > 0 {
+            Tokens::push_from(chain, ALICE)
+                .debit(tid, Wrapper::SERVICE, pending, "".into())
+                .get()
+                .unwrap();
+        }
         // Claiming applies the recruitment levy into the fractal stream; drain it
         // so later dist_token can observe donations (or income) in isolation.
         drain_stream(chain);
@@ -267,6 +273,14 @@ mod chain {
         Wrapper::push_from(&chain, ALICE)
             .claim_rew(FRACTAL, ALICE)
             .get()?;
+        let pending = Tokens::push(&chain)
+            .getSharedBal(tid, Wrapper::SERVICE, ALICE)
+            .get()?;
+        if pending.value > 0 {
+            Tokens::push_from(&chain, ALICE)
+                .debit(tid, Wrapper::SERVICE, pending, "".into())
+                .get()?;
+        }
         let after = Tokens::push(&chain).getBalance(tid, ALICE).get()?.value;
         assert!(
             after > before,
