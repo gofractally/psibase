@@ -1,19 +1,28 @@
 import {
-    test,
-    expect,
-    keyDir,
-    createKeyAccount,
-    pushActions,
-    headlessLogin,
     clickWithTrust,
+    createKeyAccount,
+    expect,
+    headlessLogin,
+    keyDir,
+    pushActions,
+    test,
 } from "../../../../e2e/fixtures";
 import { installMcpPackages } from "../../../local/XMcp/e2e/install";
-import { gql, profileOf, pendingIdsFor, agentSetsProfile, type AgentSetup } from "./setup";
+import {
+    type AgentSetup,
+    agentSetsProfile,
+    gql,
+    pendingIdsFor,
+    profileOf,
+} from "./setup";
 
 test.beforeEach(async ({ devnet }) => {
     await installMcpPackages(devnet);
     const r = await devnet.get("mcp", "/graphql");
-    test.skip(!r.body.includes("myAgents"), "Mcp package not installed (set MCP_PSI) or myAgents missing");
+    test.skip(
+        !r.body.includes("myAgents"),
+        "Mcp package not installed (set MCP_PSI) or myAgents missing",
+    );
 });
 
 test("UI: parent creates agent, confirms key, bootstraps AuthDyn managed account", async ({
@@ -36,9 +45,12 @@ test("UI: parent creates agent, confirms key, bootstraps AuthDyn managed account
             () => page.getByTestId("create-agent").click(),
             devnet.url("mcp"),
         );
-        await expect(page.getByTestId("agent-pem")).toContainText(/BEGIN.*PRIVATE KEY/, {
-            timeout: 30_000,
-        });
+        await expect(page.getByTestId("agent-pem")).toContainText(
+            /BEGIN.*PRIVATE KEY/,
+            {
+                timeout: 30_000,
+            },
+        );
         const pem = await page.getByTestId("agent-pem").innerText();
 
         await page.getByTestId("saved-ack").check();
@@ -50,9 +62,10 @@ test("UI: parent creates agent, confirms key, bootstraps AuthDyn managed account
             devnet.url("mcp"),
         );
 
-        await expect(page.getByTestId("setup-status")).toContainText(/Bootstrapped/i, {
+        await expect(page.getByTestId("setup-done")).toBeVisible({
             timeout: 30_000,
         });
+        await expect(page.getByTestId("setup-success")).toContainText(managed);
         await expect(page.getByTestId("agent-cfg")).toContainText(managed);
 
         const j = await gql(
@@ -119,15 +132,23 @@ test("agent.html: import agent key and covered setProfile auto-executes", async 
             () => page.getByTestId("import-agent").click(),
             devnet.url("mcp"),
         );
-        await expect(page.getByTestId("agent-status")).toContainText(`Logged in as ${agent.name}`, {
-            timeout: 30_000,
-        });
+        await expect(page.getByTestId("agent-status")).toContainText(
+            `Logged in as ${agent.name}`,
+            {
+                timeout: 30_000,
+            },
+        );
 
         // Prove the imported agent key works for covered StagedTx (CLI). The
         // for-agents page propose path is exercised next; import is the Phase-2
         // login/key-vault piece under test here.
         const setup: AgentSetup = {
-            managed: { name: managed, publicKeyPem: "", privateKeyPem: "", privateKeyPath: "" },
+            managed: {
+                name: managed,
+                publicKeyPem: "",
+                privateKeyPem: "",
+                privateKeyPath: "",
+            },
             agent,
             parent,
         };
@@ -135,15 +156,19 @@ test("agent.html: import agent key and covered setProfile auto-executes", async 
         expect(await profileOf(devnet, managed)).toBe("via-imported-key");
 
         await page.getByTestId("managed-account").fill(managed);
+        await page.getByText("Demo and manual tracking").click();
         await page.getByTestId("display-name").fill("from-agent-page");
         await clickWithTrust(
             page,
             () => page.getByTestId("propose-set-profile").click(),
             devnet.url("mcp"),
         );
-        await expect(page.getByTestId("agent-status")).toContainText(/submitted/i, {
-            timeout: 30_000,
-        });
+        await expect(page.getByTestId("agent-status")).toContainText(
+            /submitted/i,
+            {
+                timeout: 30_000,
+            },
+        );
         await expect
             .poll(async () => profileOf(devnet, managed), { timeout: 15_000 })
             .toBe("from-agent-page");

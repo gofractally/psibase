@@ -179,7 +179,7 @@ pub fn handle(req: &Req, chain: &dyn ChainView) -> Resp {
                         "protocolVersion": v,
                         "capabilities": {"tools": {"listChanged": false}},
                         "serverInfo": server_info(),
-                        "instructions": INSTRUCTIONS,
+                        "instructions": instructions(req.root_host),
                     }),
                 ),
             );
@@ -192,7 +192,7 @@ pub fn handle(req: &Req, chain: &dyn ChainView) -> Resp {
             "supportedVersions": [V2026, "2025-11-25", "2025-06-18", "2025-03-26"],
             "capabilities": {"tools": {}},
             "serverInfo": server_info(),
-            "instructions": INSTRUCTIONS,
+            "instructions": instructions(req.root_host),
         })),
         "ping" => Ok(json!({})),
         "tools/list" => Ok(json!({ "tools": meta_tools() })),
@@ -224,10 +224,35 @@ fn server_info() -> Value {
     json!({"name": "x-mcp", "title": "X-MCP (psibase)", "version": env!("CARGO_PKG_VERSION")})
 }
 
-const INSTRUCTIONS: &str =
-    "X-MCP describes on-chain psibase services and builds unsigned transactions. \
-It never signs or pushes. Use list_services, then describe_service, then build_transaction. \
-Sign the returned transaction outside X-MCP (POC: the headless signing UI).";
+fn instructions(root_host: &str) -> String {
+    format!(
+        "X-MCP describes on-chain psibase services and builds unsigned transactions. \
+It never signs or pushes.
+
+Node: {root_host}, over the same scheme and port you used to reach this server. \
+\"The node\" below means this URL; other hosts below use the same scheme and port.
+
+Build: list_services, then describe_service, then build_transaction. \
+Pass `tapos` from GET /common/tapos/head on the node. The result is for review and for \
+pasting into the signing page below. Token amounts are integers scaled by the token's \
+precision; the system token id and precision come from \
+tokens.{root_host}/graphql with {{ config {{ sysTid token {{ precision }} }} }}.
+
+Submit: signing happens with your own key, never through X-MCP.
+- Signing page (default, needs only a browser): mcp.{root_host}/agent.html. \
+Open it with ?agent=<your account>&managed=<account you act for>&actions=<url-encoded \
+build_transaction result>, paste your private key, click #btn-import then #btn-propose, \
+and read #result (JSON: executed, or stagedId when the managed account's parent must approve). \
+Full element contract: mcp.{root_host}/agent.txt.
+- psibase CLI (only if you have it): save the actions you passed to build_transaction \
+as a JSON array file and run `psibase push -a <node URL> <file> -s <PEM key file> \
+--proposer <your account>`.
+
+Acting for a managed account: keep that account as each action's sender; you are the \
+proposer. The transaction is staged. It runs at once if your account is allowed to act for \
+the sender; otherwise it waits for that account's parent to approve in mcp.{root_host}/."
+    )
+}
 
 pub fn meta_tools() -> Value {
     json!([

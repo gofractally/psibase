@@ -6,12 +6,14 @@ use bindings::exports::mcp::plugin::agent_sign::Guest as AgentSign;
 use bindings::exports::mcp::plugin::approvals::Guest as Approvals;
 use bindings::exports::mcp::plugin::setup::Guest as Setup;
 use bindings::host::accounts::admin::{self as HostAccountsAdmin, Credential};
+use bindings::host::accounts::api as HostAccountsApi;
 use bindings::host::client::api as Client;
 use bindings::host::http::api as Server;
 use bindings::host::types::types::{Error, Pem};
 use bindings::profiles::plugin::api as Profiles;
 use bindings::profiles::plugin::types::Profile as PluginProfile;
 use bindings::staged_tx::plugin::respondent as StagedTx;
+use bindings::tokens::plugin::user_config as TokensUserConfig;
 use bindings::transact::plugin::api::{add_action_to_transaction, propose, set_propose_latch};
 use bindings::transact::plugin::types::Action as TxAction;
 use mcp::action_structs::*;
@@ -118,6 +120,8 @@ impl Setup for McpPlugin {
         only_mcp_app()?;
         let managed = account(&managed_name)?;
         let agent = account(&agent_name)?;
+        HostAccountsApi::get_current_user()
+            .ok_or_else(|| ErrorType::ImportFailed("not logged in".into()))?;
         add_action_to_transaction(
             bootstrap::ACTION_NAME,
             &bootstrap {
@@ -125,7 +129,41 @@ impl Setup for McpPlugin {
                 agent,
             }
             .packed(),
-        )
+        )?;
+        Ok(())
+    }
+
+    fn current_user() -> Result<String, Error> {
+        only_mcp_app()?;
+        HostAccountsApi::get_current_user()
+            .ok_or_else(|| ErrorType::ImportFailed("not logged in".into()).into())
+    }
+
+    fn enable_agent_auto_debit(agent_name: String, agent_key: Pem) -> Result<(), Error> {
+        only_mcp_app()?;
+        account(&agent_name)?;
+        let cred = Credential {
+            account: agent_name.clone(),
+            key: agent_key,
+        };
+        HostAccountsAdmin::import_existing(&[cred]).map_err(|errs| -> Error {
+            let msg = errs
+                .into_iter()
+                .map(|(a, e)| format!("{a}: {}", e.message))
+                .collect::<Vec<_>>()
+                .join("; ");
+            ErrorType::ImportFailed(msg).into()
+        })?;
+        HostAccountsAdmin::add_connected_app(&agent_name, "mcp");
+        HostAccountsAdmin::login(&agent_name, "mcp")?;
+        TokensUserConfig::enable_user_auto_debit(true)?;
+        Ok(())
+    }
+
+    fn restore_parent(parent: String) -> Result<(), Error> {
+        only_mcp_app()?;
+        account(&parent)?;
+        HostAccountsAdmin::login(&parent, "mcp")
     }
 
     fn my_agents() -> Result<String, Error> {

@@ -85,7 +85,9 @@ mod tests {
     fn sm(s: &str, m: &str) -> (AccountNumber, MethodNumber) {
         (AccountNumber::from_exact(s).unwrap(), MethodNumber::from(m))
     }
-    fn allow(list: Vec<(AccountNumber, MethodNumber)>) -> impl Fn(AccountNumber, MethodNumber) -> bool {
+    fn allow(
+        list: Vec<(AccountNumber, MethodNumber)>,
+    ) -> impl Fn(AccountNumber, MethodNumber) -> bool {
         move |s, m| list.contains(&(s, m))
     }
 
@@ -94,20 +96,31 @@ mod tests {
         let a = allow(vec![sm("tokens", "credit")]);
         assert_eq!(decide(Some(sm("tokens", "credit")), &a), Decision::Agent);
         assert_eq!(decide(Some(sm("nft", "mint")), &a), Decision::Parent);
-        assert_eq!(decide(Some(sm("setcode", "setCode")), &a), Decision::Impossible);
+        assert_eq!(
+            decide(Some(sm("setcode", "setCode")), &a),
+            Decision::Impossible
+        );
         assert_eq!(decide(None, &a), Decision::Parent);
     }
 
     #[test]
     fn banned_cannot_be_allowlisted() {
         let a = allow(vec![sm("accounts", "setAuthServ")]);
-        assert_eq!(decide(Some(sm("accounts", "setAuthServ")), &a), Decision::Impossible);
+        assert_eq!(
+            decide(Some(sm("accounts", "setAuthServ")), &a),
+            Decision::Impossible
+        );
     }
 
     #[test]
     fn coverage_and_missing() {
         let a = allow(vec![sm("tokens", "credit")]);
-        let tx = vec![sm("tokens", "credit"), sm("nft", "mint"), sm("nft", "mint"), sm("setcode", "setCode")];
+        let tx = vec![
+            sm("tokens", "credit"),
+            sm("nft", "mint"),
+            sm("nft", "mint"),
+            sm("setcode", "setCode"),
+        ];
         assert!(!covered(&tx, &a));
         assert_eq!(missing_pairs(&tx, &a), vec![sm("nft", "mint")]);
         assert!(covered(&tx[..1], &a));

@@ -4,10 +4,27 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
+        "dev": "vite",
+        "build": "node ../../../if-build-needed.mjs 'tsc -b --noEmit && yarn lint && vite build'",
+        "lint": "eslint .",
+        "preview": "vite preview",
         "test": "vitest run"
     },
-    "devDependencies": {
-        "vitest": "2.1.9"
+    "dependencies": {
+        "@psibase/common-lib": "workspace:*",
+        "@tanstack/react-query": "^5.90.6",
+        "lucide-react": "^0.475.0",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        "zod": "^3.24.2"
     },
-    "packageManager": "yarn@4.18.0"
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "@types/react": "^19.1.0",
+        "@types/react-dom": "^19.1.0",
+        "eslint": "^9.15.0",
+        "typescript": "^5.7.3",
+        "vite": "^5.4.1",
+        "vitest": "2.1.9"
+    }
 }

@@ -1,0 +1,26 @@
+mcp agent signing page — contract for automated agents
+
+Open:  /agent.html?agent=<agent account>&managed=<managed account>&actions=<url-encoded JSON>
+       (all three optional; the private key is never read from the URL)
+
+Elements (stable ids):
+  #agent-account   input   agent account name
+  #agent-key       textarea PEM private key for the agent account
+  #btn-import      button  imports the key into this browser and logs in as the agent
+  #managed-account input   managed account the actions are sent as
+  #actions-json    textarea JSON: either an array of {service, method, rawData(hex)}
+                           or the whole X-MCP build_transaction result (propose-wrapped is fine)
+  #btn-propose     button  proposes the actions as the managed account, signed by the agent
+  #status          text    human-readable progress
+  #result          text    JSON, written after #btn-propose finishes:
+                           {"ok":true,"executed":true}
+                           {"ok":true,"executed":false,"stagedId":N,"tracked":true}
+                           {"ok":false,"error":"..."}
+
+Flow:
+  1. fill #agent-account and #agent-key, click #btn-import, wait for #status to read "Logged in as <agent>"
+  2. fill #managed-account and #actions-json, click #btn-propose
+  3. read #result. executed:true means it ran. executed:false means it is staged and
+     already tracked for the managed account's parent to approve in the mcp Approvals page.
+
+Signing happens in the page with the imported key. Nothing private is sent to the node.

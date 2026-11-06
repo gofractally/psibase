@@ -9,6 +9,7 @@ world impl {
     include staged-tx:plugin/imports;
     include auth-sig:plugin/imports;
     import profiles:plugin/api;
+    import tokens:plugin/user-config;
 
     export approvals;
     export setup;

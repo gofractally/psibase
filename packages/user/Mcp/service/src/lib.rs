@@ -15,7 +15,9 @@ pub mod policy;
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Action, MethodNumber, Pack, Table, ToSchema, Unpack, Checksum256};
+    use psibase::{
+        AccountNumber, Action, Checksum256, MethodNumber, Pack, Table, ToSchema, Unpack,
+    };
     use serde::{Deserialize, Serialize};
 
     /// A managed account, its agent, and its parent (approver).
@@ -52,7 +54,11 @@ pub mod tables {
         fn pk(&self) -> (AccountNumber, AccountNumber, MethodNumber) {
             (self.account, self.service, self.method)
         }
-        pub fn is_allowed(account: AccountNumber, service: AccountNumber, method: MethodNumber) -> bool {
+        pub fn is_allowed(
+            account: AccountNumber,
+            service: AccountNumber,
+            method: MethodNumber,
+        ) -> bool {
             AllowTable::read()
                 .get_index_pk()
                 .get(&(account, service, method))
@@ -79,13 +85,14 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "mcp", tables = "tables")]
+#[psibase::service(name = "mcp", tables = "tables", recursive = true)]
 pub mod service {
     use crate::policy::{self, Decision};
     use crate::tables::*;
-    use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
     use psibase::services::accounts::Wrapper as Accounts;
+    use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
     use psibase::services::staged_tx::Wrapper as StagedTx;
+    use psibase::services::tokens::{BalanceFlags, Wrapper as Tokens};
     use psibase::services::transact::ServiceMethod;
     use psibase::*;
 
@@ -101,7 +108,10 @@ pub mod service {
 
     fn require_parent(account: AccountNumber) -> AgentCfg {
         let cfg = AgentCfg::get(account).expect("account has no X-MCP agent");
-        check(get_sender() == cfg.parent, "only the parent account may do this");
+        check(
+            get_sender() == cfg.parent,
+            "only the parent account may do this",
+        );
         cfg
     }
 
@@ -115,24 +125,40 @@ pub mod service {
     fn set_agent(agent: AccountNumber, parent: AccountNumber) {
         let account = get_sender();
         if let Some(cfg) = AgentCfg::get(account) {
-            check(false, &format!("agent already set; parent {} must change it", cfg.parent));
+            check(
+                false,
+                &format!("agent already set; parent {} must change it", cfg.parent),
+            );
         }
-        check(agent != account && parent != account, "agent and parent must differ from account");
-        check(Accounts::call().exists(agent), "agent account does not exist");
-        check(Accounts::call().exists(parent), "parent account does not exist");
+        check(
+            agent != account && parent != account,
+            "agent and parent must differ from account",
+        );
+        check(
+            Accounts::call().exists(agent),
+            "agent account does not exist",
+        );
+        check(
+            Accounts::call().exists(parent),
+            "parent account does not exist",
+        );
         // Ordering rule (set_agent before management handover): this must run
         // while `account` still signs for itself. `has_policy` is false until
         // it has, so `auth-dyn::set_mgmt(account, mcp)` aborts if attempted
         // first; once managed, `set_agent` is `impossible()` under this
         // manager's own policy, so it cannot be re-run through StagedTx.
         check(
-            Accounts::call()
-                .getAccount(account)
-                .map_or(true, |a| a.authService != psibase::services::auth_dyn::SERVICE),
+            Accounts::call().getAccount(account).map_or(true, |a| {
+                a.authService != psibase::services::auth_dyn::SERVICE
+            }),
             "set_agent must be called before handing management to mcp",
         );
         AgentTable::read_write()
-            .put(&AgentCfg { account, agent, parent })
+            .put(&AgentCfg {
+                account,
+                agent,
+                parent,
+            })
             .unwrap();
     }
 
@@ -151,12 +177,18 @@ pub mod service {
             agent != account && parent != account && agent != parent,
             "account, agent, and parent must be distinct",
         );
-        check(Accounts::call().exists(agent), "agent account does not exist");
+        check(
+            Accounts::call().exists(agent),
+            "agent account does not exist",
+        );
         check(
             !Accounts::call().exists(account),
             "managed account already exists",
         );
-        check(AgentCfg::get(account).is_none(), "agent already set for this account");
+        check(
+            AgentCfg::get(account).is_none(),
+            "agent already set for this account",
+        );
         AgentTable::read_write()
             .put(&AgentCfg {
                 account,
@@ -165,15 +197,31 @@ pub mod service {
             })
             .unwrap();
         psibase::services::auth_dyn::Wrapper::call_as(get_service()).newAccount(account);
+        // Credits land without a manual debit. call_as works because get_policy
+        // lists mcp alongside parent for tokens/setUserConf. Agent auto-debit
+        // is signed with the agent key in the plugin instead.
+        let auto_debit = BalanceFlags::AUTO_DEBIT.index();
+        Tokens::call_as(account).setUserConf(auto_debit, true);
+        check(
+            Tokens::call().getUserConf(account, auto_debit),
+            "failed to enable managed auto-debit",
+        );
     }
 
     /// Parent adds one service+method to the agent's allowlist.
     #[action]
     fn grant(account: AccountNumber, service: AccountNumber, method: MethodNumber) {
         require_parent(account);
-        check(!policy::is_banned(service, method), "method cannot be granted to an agent");
+        check(
+            !policy::is_banned(service, method),
+            "method cannot be granted to an agent",
+        );
         AllowTable::read_write()
-            .put(&Allowed { account, service, method })
+            .put(&Allowed {
+                account,
+                service,
+                method,
+            })
             .unwrap();
     }
 
@@ -181,7 +229,11 @@ pub mod service {
     #[action]
     fn revoke(account: AccountNumber, service: AccountNumber, method: MethodNumber) {
         require_parent(account);
-        AllowTable::read_write().remove(&Allowed { account, service, method });
+        AllowTable::read_write().remove(&Allowed {
+            account,
+            service,
+            method,
+        });
     }
 
     /// "Approve and Grant": the parent grants every ungranted (non-banned)
@@ -197,7 +249,13 @@ pub mod service {
         let pairs: Vec<_> = row.actions.iter().map(|a| (a.service, a.method)).collect();
         let table = AllowTable::read_write();
         for (service, method) in policy::missing_pairs(&pairs, allowed_fn(account)) {
-            table.put(&Allowed { account, service, method }).unwrap();
+            table
+                .put(&Allowed {
+                    account,
+                    service,
+                    method,
+                })
+                .unwrap();
         }
         PendingTable::read_write().remove(&row);
     }
@@ -222,7 +280,10 @@ pub mod service {
             .filter(|a| a.sender == account)
             .map(|a| (a.service, a.method))
             .collect();
-        check(!policy::covered(&pairs, allowed_fn(account)), "covered by the allowlist; no approval needed");
+        check(
+            !policy::covered(&pairs, allowed_fn(account)),
+            "covered by the allowlist; no approval needed",
+        );
         PendingTable::read_write()
             .put(&Pending {
                 account,
@@ -243,7 +304,10 @@ pub mod service {
             .expect("unknown pending transaction");
         let cfg = AgentCfg::get(account).unwrap();
         let s = get_sender();
-        check(s == cfg.parent || s == row.proposer, "only parent or proposer");
+        check(
+            s == cfg.parent || s == row.proposer,
+            "only parent or proposer",
+        );
         PendingTable::read_write().remove(&row);
     }
 
@@ -253,7 +317,20 @@ pub mod service {
         let cfg = AgentCfg::get(account).expect("account has no X-MCP agent");
         match policy::decide(method.map(|m| (m.service, m.method)), allowed_fn(account)) {
             Decision::Agent => DynamicAuthPolicy::from_sole_authorizer(cfg.agent),
-            Decision::Parent => DynamicAuthPolicy::from_sole_authorizer(cfg.parent),
+            Decision::Parent => match method {
+                // So bootstrap can Tokens::call_as for managed auto-debit;
+                // parent remains able to change the flag later.
+                Some(m)
+                    if m.service == Tokens::SERVICE
+                        && m.method == MethodNumber::from("setUserConf") =>
+                {
+                    DynamicAuthPolicy::from_weighted_authorizers(
+                        vec![(cfg.parent, 1), (get_service(), 1)],
+                        1,
+                    )
+                }
+                _ => DynamicAuthPolicy::from_sole_authorizer(cfg.parent),
+            },
             Decision::Impossible => DynamicAuthPolicy::impossible(),
         }
     }

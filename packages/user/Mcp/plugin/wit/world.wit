@@ -32,7 +32,20 @@ interface setup {
     confirm-agent-key: func(agent-name: string, private-key: pem) -> result<bool, error>;
 
     /// Parent wires a fresh managed account under AuthDyn/`mcp` with `agent-name`.
+    /// Managed auto-debit is set inside the on-chain bootstrap action.
+    /// Call `enable-agent-auto-debit` afterward (separate tx; agent must sign).
     bootstrap: func(managed-name: string, agent-name: string) -> result<_, error>;
+
+    /// Account currently logged in to mcp (read the parent before switching).
+    current-user: func() -> result<string, error>;
+
+    /// Import `agent-key`, log in as the agent, and enable tokens auto-debit.
+    /// The agent stays logged in so the tx is signed by the agent; call
+    /// `restore-parent` in a separate call.
+    enable-agent-auto-debit: func(agent-name: string, agent-key: pem) -> result<_, error>;
+
+    /// Log the parent back in to mcp after `enable-agent-auto-debit`.
+    restore-parent: func(parent: string) -> result<_, error>;
 
     /// JSON array of AgentCfg rows where the logged-in user is parent.
     my-agents: func() -> result<string, error>;

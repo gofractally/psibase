@@ -577,6 +577,7 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Mcp.psi
     PATH packages/user/Mcp
     TARGET_DIR ${USER_WORKSPACE_TARGET}
+    DEPENDS ${Mcp_js_DEP}
 )
 
 # X-MCP is a Rust local service (own cargo workspace; scope = "local").

@@ -86,7 +86,13 @@ fn initialize_2025_and_notification() {
         ),
         &Fake,
     );
-    assert_eq!(r.body.unwrap()["result"]["protocolVersion"], "2025-06-18");
+    let body = r.body.unwrap();
+    assert_eq!(body["result"]["protocolVersion"], "2025-06-18");
+    let instructions = body["result"]["instructions"].as_str().unwrap();
+    assert!(instructions.contains("Node: psibase.localhost:8080"));
+    assert!(instructions.contains("mcp.psibase.localhost:8080/agent.html"));
+    assert!(instructions.contains("mcp.psibase.localhost:8080/agent.txt"));
+    assert!(instructions.find("agent.html") < instructions.find("psibase push"));
     assert!(r.headers.iter().any(|h| h.0 == "Mcp-Session-Id"));
     let r = handle(
         &post(

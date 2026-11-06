@@ -220,7 +220,7 @@ impl User for TokensPlugin {
 }
 
 impl UserConfig for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "mcp"])]
     fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
         Tokens::add_to_tx().setUserConf(BalanceFlags::AUTO_DEBIT.index(), enable);
         Ok(())
