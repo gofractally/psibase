@@ -66,26 +66,7 @@ namespace psibase
          PSIO_REFLECT(PrettyAction, sender, service, method, rawData, data)
       };
 
-      const ServiceSchema* getSchema(std::span<const PackagedService> packages,
-                                     AccountNumber                    service)
-      {
-         for (const auto& package : packages)
-         {
-            for (const auto& [account, _, info] : package.services)
-            {
-               if (service == account)
-               {
-                  if (info.schema)
-                     return &*info.schema;
-                  else
-                     return nullptr;
-               }
-            }
-         }
-         return nullptr;
-      }
-
-      std::vector<PrettyAction> readPostinstall(PackagedService& package)
+      std::vector<PrettyAction> readPostinstall(const PackagedService& package)
       {
          std::vector<PrettyAction> result;
          if (package.postinstallScript)
@@ -146,8 +127,7 @@ namespace psibase
          }
       }
 
-      psio::schema_types::CustomTypes action_types(
-          const std::span<const PackagedService>* packages);
+      psio::schema_types::CustomTypes action_types(const GetSchemaFn* packages);
 
       struct PrettyActionRef
       {
@@ -199,7 +179,7 @@ namespace psibase
          {
             abortMessage("not implemented");
          }
-         static void json2frac(const std::span<const PackagedService>* packages,
+         static void json2frac(const GetSchemaFn*                      schemas,
                                const psio::schema_types::CompiledType* ty,
                                const psio::json::any&                  in,
                                psio::StreamBase&                       out)
@@ -208,14 +188,14 @@ namespace psibase
 
             if (act.data)
             {
-               auto* schema = getSchema(*packages, act.service);
+               auto* schema = (*schemas)(act.service);
                if (!schema)
                   abortMessage("Cannot find schema for " + act.service.str());
                auto pos = schema->actions.find(act.method.str());
                check(pos != schema->actions.end(), "Action not found");
                const auto&                        ty = pos->second.params;
                psio::schema_types::CompiledSchema cschema{
-                   schema->types, action_types(packages), {&ty}};
+                   schema->types, action_types(schemas), {&ty}};
                auto* cty = cschema.get(ty.resolve(schema->types));
                act.rawData.emplace();
                psio::vector_stream stream{*act.rawData};
@@ -238,14 +218,14 @@ namespace psibase
          }
       };
 
-      psio::schema_types::CustomTypes action_types(const std::span<const PackagedService>* packages)
+      psio::schema_types::CustomTypes action_types(const GetSchemaFn* schemas)
       {
          auto result = psibase_types();
-         result.insert("Action", psio::schema_types::CustomHandler{ActionParser{}, packages});
+         result.insert("Action", psio::schema_types::CustomHandler{ActionParser{}, schemas});
          return result;
       }
 
-      Action to_action(PrettyAction&& act, std::span<const PackagedService> packages)
+      Action to_action(PrettyAction&& act, const GetSchemaFn& schemas)
       {
          auto service = AccountNumber{act.service};
          if (service == AccountNumber{})
@@ -254,13 +234,13 @@ namespace psibase
          {
             return Action{act.sender, service, act.method, std::move(*act.rawData)};
          }
-         auto* schema = getSchema(packages, service);
+         auto* schema = schemas(service);
          if (!schema)
             abortMessage("Cannot find schema for " + act.service);
          auto pos = schema->actions.find(act.method.str());
          check(pos != schema->actions.end(), "Action not found");
          const auto&                        ty = pos->second.params;
-         psio::schema_types::CompiledSchema cschema{schema->types, action_types(&packages), {&ty}};
+         psio::schema_types::CompiledSchema cschema{schema->types, action_types(&schemas), {&ty}};
          auto*                              cty = cschema.get(ty.resolve(schema->types));
          if (!act.data)
             act.data = psio::json::any_object{};
@@ -277,10 +257,10 @@ namespace psibase
 
       struct ActionAccountCollector
       {
-         std::span<const PackagedService> packages;
-         std::vector<AccountNumber>&      accounts;
-         std::vector<AccountNumber>&      services;
-         static bool                      match(const psio::schema_types::CompiledType* ty)
+         const GetSchemaFn&          schemas;
+         std::vector<AccountNumber>& accounts;
+         std::vector<AccountNumber>& services;
+         static bool                 match(const psio::schema_types::CompiledType* ty)
          {
             return psio::schema_types::matchCustomType(ty, (Action*)nullptr);
          }
@@ -314,7 +294,7 @@ namespace psibase
 
          void collect(AccountNumber service, MethodNumber method, const psio::json::any& data)
          {
-            auto* schema = getSchema(packages, service);
+            auto* schema = schemas(service);
             if (!schema)
                abortMessage("Cannot find schema for " + service.str());
             auto pos = schema->actions.find(method.str());
@@ -332,7 +312,7 @@ namespace psibase
 
       struct RequiredAccounts
       {
-         RequiredAccounts(PackagedService& package, std::span<const PackagedService> packages)
+         RequiredAccounts(PackagedService& package, const GetSchemaFn& schemas)
          {
             bool local = package.meta.scope == "local";
 
@@ -355,7 +335,7 @@ namespace psibase
                }
             }
 
-            ActionAccountCollector collector{packages, accounts, services};
+            ActionAccountCollector collector{schemas, accounts, services};
             for (const auto& act : readPostinstall(package))
             {
                auto service = AccountNumber{act.service};
@@ -375,7 +355,6 @@ namespace psibase
                auto res = std::ranges::unique(services);
                services.erase(res.begin(), res.end());
             }
-            packages = {};
          }
          std::vector<AccountNumber> accounts;
          std::vector<AccountNumber> services;
@@ -553,7 +532,7 @@ namespace psibase
       return {path, guessMimeType(path)};
    }
 
-   void PackagedService::genesis(std::vector<GenesisService>& out)
+   void PackagedService::genesis(std::vector<GenesisService>& out) const
    {
       for (const auto& [account, index, info] : services)
       {
@@ -583,7 +562,7 @@ namespace psibase
       }
       return false;
    }
-   void PackagedService::installCode(std::vector<Action>& actions)
+   void PackagedService::installCode(std::vector<Action>& actions) const
    {
       for (const auto& [account, index, info] : services)
       {
@@ -602,7 +581,7 @@ namespace psibase
          }
       }
    }
-   void PackagedService::setSchema(std::vector<Action>& actions)
+   void PackagedService::setSchema(std::vector<Action>& actions) const
    {
       for (const auto& [account, index, info] : services)
       {
@@ -613,7 +592,7 @@ namespace psibase
          }
       }
    }
-   void PackagedService::storeData(std::vector<Action>& actions)
+   void PackagedService::storeData(std::vector<Action>& actions) const
    {
       for (const auto& [sender, index] : data)
       {
@@ -622,7 +601,7 @@ namespace psibase
              path, mimeType, std::nullopt, archive.getEntry(index).read()));
       }
    }
-   void PackagedService::regServer(std::vector<Action>& actions)
+   void PackagedService::regServer(std::vector<Action>& actions) const
    {
       for (const auto& [account, index, info] : services)
       {
@@ -637,7 +616,7 @@ namespace psibase
    {
       return meta.accounts;
    }
-   bool PackagedService::needsUI()
+   bool PackagedService::needsUI() const
    {
       for (const auto& action : readPostinstall(*this))
       {
@@ -649,11 +628,15 @@ namespace psibase
       return false;
    }
    void PackagedService::postinstall(std::vector<Action>&             actions,
-                                     std::span<const PackagedService> packages)
+                                     std::span<const PackagedService> packages) const
+   {
+      postinstall(actions, PackageSchemas{packages});
+   }
+   void PackagedService::postinstall(std::vector<Action>& actions, const GetSchemaFn& schemas) const
    {
       for (auto&& action : readPostinstall(*this))
       {
-         actions.push_back(to_action(std::move(action), packages));
+         actions.push_back(to_action(std::move(action), schemas));
       }
    }
 
@@ -681,7 +664,7 @@ namespace psibase
       return result;
    }
 
-   std::vector<char> PackagedService::manifest()
+   std::vector<char> PackagedService::manifest() const
    {
       std::vector<char>   manifest;
       psio::vector_stream stream{manifest};
@@ -739,7 +722,7 @@ namespace psibase
       return manifest;
    }
 
-   void PackagedService::commitInstall(std::vector<Action>& actions, AccountNumber sender)
+   void PackagedService::commitInstall(std::vector<Action>& actions, AccountNumber sender) const
    {
       actions.push_back(transactor<Packages>{sender, Packages::service}.postinstall(
           meta, gzip(std::move(manifest()))));
@@ -841,6 +824,24 @@ namespace psibase
       return result;
    }
 
+   const ServiceSchema* PackageSchemas::operator()(AccountNumber service) const
+   {
+      for (const auto& package : packages)
+      {
+         for (const auto& [account, _, info] : package.services)
+         {
+            if (service == account)
+            {
+               if (info.schema)
+                  return &*info.schema;
+               else
+                  return nullptr;
+            }
+         }
+      }
+      return nullptr;
+   }
+
    void sortPackages(std::span<PackagedService>     packages,
                      std::span<const AccountNumber> priorityServices)
    {
@@ -887,7 +888,7 @@ namespace psibase
       {
          std::vector<std::string_view>        all_required_packages;
          std::unordered_set<std::string_view> visited;
-         for (auto service : RequiredAccounts{package, packages}.services)
+         for (auto service : RequiredAccounts{package, PackageSchemas{packages}}.services)
          {
             auto pos = provides_service.find(service);
             if (pos == provides_service.end())
