@@ -15,23 +15,24 @@ export function accountNameError(raw: string): string | null {
     return result.error.issues[0]?.message ?? "Invalid account name";
 }
 
-/** Setup-form errors for managed + agent names (format + distinct). */
+/**
+ * Setup-form errors for the agent name. The owner is the logged-in account
+ * (the sender on the agent's staged txs); owner and agent must differ.
+ */
 export function setupNameErrors(
-    managedRaw: string,
     agentRaw: string,
-): { managed: string | null; agent: string | null; form: string | null } {
-    const managed = managedRaw.trim();
+    owner: string,
+): { agent: string | null; form: string | null } {
     const agent = agentRaw.trim();
-    const managedErr = accountNameError(managedRaw);
     const agentErr = accountNameError(agentRaw);
     let form: string | null = null;
-    if (!managedErr && !agentErr && managed === agent) {
-        form = "Managed and agent names must differ";
+    if (!agentErr && owner && agent === owner.trim()) {
+        form = "Agent must differ from your (owner) account";
     }
-    return { managed: managedErr, agent: agentErr, form };
+    return { agent: agentErr, form };
 }
 
-export function setupNamesValid(managedRaw: string, agentRaw: string): boolean {
-    const e = setupNameErrors(managedRaw, agentRaw);
-    return !e.managed && !e.agent && !e.form;
+export function setupNamesValid(agentRaw: string, owner: string): boolean {
+    const e = setupNameErrors(agentRaw, owner);
+    return !e.agent && !e.form;
 }

@@ -36,13 +36,13 @@ export function AgentPage() {
 
     const [agentAccount, setAgentAccount] = useState(prefill.agent);
     const [agentKey, setAgentKey] = useState("");
-    const [managed, setManaged] = useState(prefill.managed);
+    const [owner, setOwner] = useState(prefill.owner);
     const [displayName, setDisplayName] = useState("");
     const [actionsJson, setActionsJson] = useState(prefill.actions);
     const [trackId, setTrackId] = useState("");
 
     const agentErr = agentAccount ? accountNameError(agentAccount) : null;
-    const managedErr = managed ? accountNameError(managed) : null;
+    const ownerErr = owner ? accountNameError(owner) : null;
 
     const run = async (label: string, fn: () => Promise<void>) => {
         setBusy(true);
@@ -63,7 +63,7 @@ export function AgentPage() {
             const actions = normalizeActions(actionsJson.trim());
             const before = new Set(await stagedIdsFor(agent));
             await mcpCall("agent-sign", "propose-as", [
-                managed.trim(),
+                owner.trim(),
                 JSON.stringify(actions),
             ]);
             const after = await stagedIdsFor(agent);
@@ -83,7 +83,7 @@ export function AgentPage() {
             }
             setResult({ ok: true, executed: false, stagedId, tracked });
             setStatus(
-                `Staged as #${stagedId}; waiting for the parent to approve.`,
+                `Staged as #${stagedId}; waiting for the owner to approve.`,
             );
         } catch (e) {
             setResult({ ok: false, error: errorMessage(e) });
@@ -120,7 +120,7 @@ export function AgentPage() {
                 </h1>
                 <p className="text-muted-foreground text-sm">
                     For agents (and tests): import the agent key, then propose
-                    actions as the managed account. Signing happens here with
+                    actions with the owner account as sender. Signing happens here with
                     the imported key; see <code>/agent.txt</code> for the
                     element ids an automated agent should use.
                 </p>
@@ -177,19 +177,19 @@ export function AgentPage() {
             </section>
 
             <section data-testid="propose-section" className="space-y-4">
-                <h2 className="text-lg font-medium">2. Propose as managed</h2>
+                <h2 className="text-lg font-medium">2. Propose as owner</h2>
                 <div className="space-y-2">
-                    <Label htmlFor="managed-account">Managed account</Label>
+                    <Label htmlFor="owner-account">Owner account</Label>
                     <Input
-                        id="managed-account"
-                        data-testid="managed-account"
+                        id="owner-account"
+                        data-testid="owner-account"
                         autoComplete="off"
-                        value={managed}
-                        aria-invalid={Boolean(managedErr)}
-                        onChange={(e) => setManaged(e.target.value)}
+                        value={owner}
+                        aria-invalid={Boolean(ownerErr)}
+                        onChange={(e) => setOwner(e.target.value)}
                     />
-                    {managedErr ? (
-                        <p className="text-destructive text-sm">{managedErr}</p>
+                    {ownerErr ? (
+                        <p className="text-destructive text-sm">{ownerErr}</p>
                     ) : null}
                 </div>
                 <div className="space-y-2">
@@ -214,8 +214,8 @@ export function AgentPage() {
                     data-testid="propose-as"
                     disabled={
                         busy ||
-                        Boolean(managedErr) ||
-                        !managed.trim() ||
+                        Boolean(ownerErr) ||
+                        !owner.trim() ||
                         !actionsJson.trim()
                     }
                     onClick={() => void run("Proposing…", propose)}
@@ -245,7 +245,7 @@ export function AgentPage() {
                             variant="outline"
                             data-testid="propose-set-profile"
                             disabled={
-                                busy || Boolean(managedErr) || !managed.trim()
+                                busy || Boolean(ownerErr) || !owner.trim()
                             }
                             onClick={() =>
                                 void run("Proposing setProfile…", async () => {
@@ -253,7 +253,7 @@ export function AgentPage() {
                                         "agent-sign",
                                         "propose-set-profile",
                                         [
-                                            managed.trim(),
+                                            owner.trim(),
                                             displayName.trim(),
                                             "",
                                         ],
@@ -292,7 +292,7 @@ export function AgentPage() {
                                 })
                             }
                         >
-                            Track for parent approval
+                            Track for owner approval
                         </Button>
                     </div>
                 </details>

@@ -45,7 +45,8 @@ describe("agent page input normalization", () => {
     });
     it("prefills from query params without a key", () => {
         expect(
-            prefillFromSearch("?agent=a1&managed=m1&actions=%5B%5D"),
-        ).toEqual({ agent: "a1", managed: "m1", actions: "[]" });
+            prefillFromSearch("?agent=a1&owner=m1&actions=%5B%5D"),
+        ).toEqual({ agent: "a1", owner: "m1", actions: "[]" });
+        expect(prefillFromSearch("?managed=m2").owner).toBe("m2");
     });
 });

@@ -17,10 +17,10 @@ import {
 } from "./setup";
 
 /**
- * End-to-end path for a browser-only agent: bootstrap a managed account, fund
- * it without its key, discover/build a tokens.credit via X-MCP, submit it
- * through agent.html (signed in-page), parent Approve-and-Grant, then a
- * covered repeat that executes.
+ * End-to-end path for a browser-only agent: register the agent on the owner's
+ * own account (no managed account to fund), discover/build a tokens.credit of
+ * the owner's tokens via X-MCP, submit it through agent.html (signed in-page,
+ * owner as sender), owner Approve-and-Grant, then a covered repeat that executes.
  */
 test.beforeEach(async ({ devnet }) => {
     await installMcpPackages(devnet);
@@ -42,7 +42,7 @@ test.beforeEach(async ({ devnet }) => {
     );
 });
 
-test("X-MCP agent credit: fund managed without its key, propose, grant, auto-exec", async ({
+test("X-MCP agent credit: owner-as-sender, propose, grant, auto-exec", async ({
     devnet,
     page,
 }) => {
@@ -55,16 +55,30 @@ test("X-MCP agent credit: fund managed without its key, propose, grant, auto-exe
         const cfg = await gql(
             devnet,
             "mcp",
-            `{ agent(account: "${s.managed}") { account agent parent } }`,
+            `{ agent(account: "${s.owner.name}") { account agent } }`,
         );
         expect(cfg?.data?.agent).toEqual({
-            account: s.managed,
+            account: s.owner.name,
             agent: s.agent.name,
-            parent: s.parent.name,
         });
 
-        // Managed has no key; parent credits land because bootstrap set AUTO_DEBIT.
-        const tid = await issueAndCredit(devnet, dir, s.parent, s.managed);
+        // The owner holds its own tokens: a funder credits the owner directly
+        // (owner signs its own auto-debit with its key; no managed account).
+        await pushActions(
+            devnet,
+            dir,
+            [
+                {
+                    sender: s.owner.name,
+                    service: "tokens",
+                    method: "setUserConf",
+                    data: { index: 0, enabled: true },
+                },
+            ],
+            { keys: [s.owner.privateKeyPath] },
+        );
+        const funder = await createKeyAccount(devnet, dir);
+        const tid = await issueAndCredit(devnet, dir, funder, s.owner.name);
         await pushActions(
             devnet,
             dir,
@@ -96,7 +110,7 @@ test("X-MCP agent credit: fund managed without its key, propose, grant, auto-exe
                 .replace(/\.\d+Z$/, ".000Z"),
         };
         const credit = {
-            sender: s.managed,
+            sender: s.owner.name,
             service: "tokens",
             method: "credit",
             data: {
@@ -118,12 +132,12 @@ test("X-MCP agent credit: fund managed without its key, propose, grant, auto-exe
         // build_transaction result pasted as-is; signing stays in the page.
         const q = new URLSearchParams({
             agent: s.agent.name,
-            managed: s.managed,
+            owner: s.owner.name,
             actions: JSON.stringify(built),
         });
         await page.goto(`${devnet.url("mcp")}/agent.html?${q}`);
         await expect(page.locator("#agent-account")).toHaveValue(s.agent.name);
-        await expect(page.locator("#managed-account")).toHaveValue(s.managed);
+        await expect(page.locator("#owner-account")).toHaveValue(s.owner.name);
         await page.locator("#agent-key").fill(s.agent.privateKeyPem);
         await clickWithTrust(
             page,
@@ -156,23 +170,23 @@ test("X-MCP agent credit: fund managed without its key, propose, grant, auto-exe
             dir,
             [
                 {
-                    sender: s.parent.name,
+                    sender: s.owner.name,
                     service: "mcp",
                     method: "grant_missing",
-                    data: { account: s.managed, id: staged[0].id },
+                    data: { account: s.owner.name, id: staged[0].id },
                 },
                 {
-                    sender: s.parent.name,
+                    sender: s.owner.name,
                     service: "staged-tx",
                     method: "accept",
                     data: { id: staged[0].id, txid: staged[0].txid },
                 },
             ],
-            { keys: [s.parent.privateKeyPath] },
+            { keys: [s.owner.privateKeyPath] },
         );
         expect(await pendingIdsFor(devnet, s.agent.name)).toEqual([]);
 
-        // Recipient can spend what the managed account credited (auto-debit on).
+        // Recipient can spend what the owner credited (auto-debit on).
         await pushActions(
             devnet,
             dir,
@@ -183,7 +197,7 @@ test("X-MCP agent credit: fund managed without its key, propose, grant, auto-exe
                     method: "credit",
                     data: {
                         token_id: tid,
-                        debitor: s.parent.name,
+                        debitor: s.owner.name,
                         amount: { value: "1" },
                         memo: "prove receipt",
                     },

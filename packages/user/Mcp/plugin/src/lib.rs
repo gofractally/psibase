@@ -1,10 +1,12 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::accounts::plugin::api as AccountsApi;
 use bindings::auth_sig::plugin as AuthSig;
 use bindings::exports::mcp::plugin::agent_sign::Guest as AgentSign;
 use bindings::exports::mcp::plugin::approvals::Guest as Approvals;
 use bindings::exports::mcp::plugin::setup::Guest as Setup;
+use bindings::exports::transact_hook_user_auth::{Claim, Guest as HookUserAuth, Proof};
 use bindings::host::accounts::admin::{self as HostAccountsAdmin, Credential};
 use bindings::host::accounts::api as HostAccountsApi;
 use bindings::host::client::api as Client;
@@ -116,21 +118,15 @@ impl Setup for McpPlugin {
         Ok(AuthSig::api::can_authorize(&private_key, &agent_name))
     }
 
-    fn bootstrap(managed_name: String, agent_name: String) -> Result<(), Error> {
+    fn bootstrap(agent_name: String) -> Result<(), Error> {
         only_mcp_app()?;
-        let managed = account(&managed_name)?;
         let agent = account(&agent_name)?;
         HostAccountsApi::get_current_user()
             .ok_or_else(|| ErrorType::ImportFailed("not logged in".into()))?;
-        add_action_to_transaction(
-            bootstrap::ACTION_NAME,
-            &bootstrap {
-                account: managed,
-                agent,
-            }
-            .packed(),
-        )?;
-        Ok(())
+        // Same tx, owner-signed: register the agent first (canAuthUserSys
+        // requires it), then make mcp the owner's auth service.
+        add_action_to_transaction(bootstrap::ACTION_NAME, &bootstrap { agent }.packed())?;
+        AccountsApi::set_auth_service(&mcp::SERVICE.to_string())
     }
 
     fn current_user() -> Result<String, Error> {
@@ -168,7 +164,7 @@ impl Setup for McpPlugin {
 
     fn my_agents() -> Result<String, Error> {
         only_mcp_app()?;
-        let query = r#"query { myAgents { account agent parent } }"#;
+        let query = r#"query { myAgents { account agent } }"#;
         let body = Server::post_graphql_get_json(query)?;
         let v: serde_json::Value =
             serde_json::from_str(&body).map_err(|e| ErrorType::QueryFailed(e.to_string()))?;
@@ -200,9 +196,9 @@ impl AgentSign for McpPlugin {
         Ok(())
     }
 
-    fn propose_as(managed: String, actions_json: String) -> Result<u32, Error> {
+    fn propose_as(owner: String, actions_json: String) -> Result<u32, Error> {
         only_mcp_app()?;
-        account(&managed)?;
+        account(&owner)?;
         let parsed: Vec<ActionJson> = serde_json::from_str(&actions_json)
             .map_err(|e| ErrorType::BadActions(e.to_string()))?;
         if parsed.is_empty() {
@@ -212,7 +208,7 @@ impl AgentSign for McpPlugin {
         for a in parsed {
             account(&a.service)?;
             actions.push(TxAction {
-                sender: managed.clone(),
+                sender: owner.clone(),
                 service: a.service,
                 method: a.method,
                 raw_data: decode_hex(&a.raw_data)?,
@@ -224,16 +220,13 @@ impl AgentSign for McpPlugin {
         Ok(0)
     }
 
-    fn propose_set_profile(
-        managed: String,
-        display_name: String,
-        bio: String,
-    ) -> Result<(), Error> {
+    fn propose_set_profile(owner: String, display_name: String, bio: String) -> Result<(), Error> {
         only_mcp_app()?;
-        account(&managed)?;
+        account(&owner)?;
         // Same latch pattern as Homepage / Host LoginPrompt: actions added while
-        // latched become a staged-tx propose as the logged-in agent for `managed`.
-        set_propose_latch(Some(&managed))?;
+        // latched become a staged-tx propose by the logged-in agent with `owner`
+        // as sender.
+        set_propose_latch(Some(&owner))?;
         let result = Profiles::set_profile(&PluginProfile {
             display_name: Some(display_name),
             bio: Some(bio),
@@ -245,6 +238,42 @@ impl AgentSign for McpPlugin {
     fn track(id: u32) -> Result<(), Error> {
         only_mcp_app()?;
         add_action_to_transaction(track::ACTION_NAME, &track { id }.packed())
+    }
+}
+
+/// `mcp` is the owner's auth service; the owner's key is still the auth-sig
+/// key, so the claim and proof are exactly what auth-sig would produce.
+impl HookUserAuth for McpPlugin {
+    fn on_user_auth_claim(account_name: String) -> Result<Option<Claim>, Error> {
+        if Client::get_sender() != psibase::services::transact::SERVICE.to_string() {
+            return Err(ErrorType::Unauthorized(Client::get_sender()).into());
+        }
+        let Some(pubkey) = AuthSig::queries::get_pubkey(&account_name)? else {
+            return Err(
+                ErrorType::QueryFailed(format!("{account_name} has no auth-sig key")).into(),
+            );
+        };
+        Ok(Some(Claim {
+            verify_service: psibase::services::verify_sig::SERVICE.to_string(),
+            raw_data: AuthSig::keyvault::to_der(&pubkey)?,
+        }))
+    }
+
+    fn on_user_auth_proof(
+        account_name: String,
+        transaction_hash: Vec<u8>,
+    ) -> Result<Option<Proof>, Error> {
+        if Client::get_sender() != psibase::services::transact::SERVICE.to_string() {
+            return Err(ErrorType::Unauthorized(Client::get_sender()).into());
+        }
+        let Some(pubkey) = AuthSig::queries::get_pubkey(&account_name)? else {
+            return Err(
+                ErrorType::QueryFailed(format!("{account_name} has no auth-sig key")).into(),
+            );
+        };
+        let der = AuthSig::keyvault::to_der(&pubkey)?;
+        let signature = AuthSig::keyvault::sign(&transaction_hash, &der)?;
+        Ok(Some(Proof { signature }))
     }
 }
 

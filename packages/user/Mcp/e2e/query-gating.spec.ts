@@ -3,7 +3,7 @@ import { installMcpPackages } from "../../../local/XMcp/e2e/install";
 import { raw } from "../../../local/XMcp/e2e/client";
 
 // The needs-approval list on the objective `mcp` service is gated by the query
-// token: only the owning (parent) account can read it.
+// token: only the owner account can read it.
 const Q = (owner: string) => ({ query: `{ needsApproval(owner: "${owner}") { pending { id account } missing } }` });
 
 test.beforeEach(async ({ devnet }) => {

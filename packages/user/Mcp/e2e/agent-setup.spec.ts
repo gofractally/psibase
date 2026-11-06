@@ -14,6 +14,7 @@ import {
     gql,
     pendingIdsFor,
     profileOf,
+    setupAgent,
 } from "./setup";
 
 test.beforeEach(async ({ devnet }) => {
@@ -25,20 +26,18 @@ test.beforeEach(async ({ devnet }) => {
     );
 });
 
-test("UI: parent creates agent, confirms key, bootstraps AuthDyn managed account", async ({
+test("UI: owner creates agent, confirms key, registers it on the owner account", async ({
     devnet,
     page,
 }) => {
     const { dir, cleanup } = keyDir();
     try {
-        const parent = await createKeyAccount(devnet, dir);
-        const managed = `m${parent.name.slice(1)}`.slice(0, 18);
-        const agent = `a${parent.name.slice(1)}`.slice(0, 18);
+        const owner = await createKeyAccount(devnet, dir);
+        const agent = `a${owner.name.slice(1)}`.slice(0, 18);
 
-        await headlessLogin(page, devnet, parent, "mcp");
+        await headlessLogin(page, devnet, owner, "mcp");
         await page.goto(devnet.url("mcp"));
 
-        await page.getByTestId("managed-name").fill(managed);
         await page.getByTestId("agent-name").fill(agent);
         await clickWithTrust(
             page,
@@ -65,19 +64,21 @@ test("UI: parent creates agent, confirms key, bootstraps AuthDyn managed account
         await expect(page.getByTestId("setup-done")).toBeVisible({
             timeout: 30_000,
         });
-        await expect(page.getByTestId("setup-success")).toContainText(managed);
-        await expect(page.getByTestId("agent-cfg")).toContainText(managed);
+        await expect(page.getByTestId("setup-success")).toContainText(agent);
+        await expect(page.getByTestId("agent-cfg")).toContainText(owner.name);
 
         const j = await gql(
             devnet,
             "mcp",
-            `{ agent(account: "${managed}") { account agent parent } }`,
+            `{ agent(account: "${owner.name}") { account agent } }`,
         );
-        expect(j?.data?.agent).toEqual({
-            account: managed,
-            agent,
-            parent: parent.name,
-        });
+        expect(j?.data?.agent).toEqual({ account: owner.name, agent });
+        const acct = await gql(
+            devnet,
+            "accounts",
+            `{ getAccount(accountName: "${owner.name}") { authService } }`,
+        );
+        expect(acct?.data?.getAccount?.authService).toBe("mcp");
     } finally {
         cleanup();
     }
@@ -89,39 +90,25 @@ test("agent.html: import agent key and covered setProfile auto-executes", async 
 }) => {
     const { dir, cleanup } = keyDir();
     try {
-        const parent = await createKeyAccount(devnet, dir);
-        const agent = await createKeyAccount(devnet, dir);
-        const managed = `m${parent.name.slice(1)}`.slice(0, 18);
+        const setup: AgentSetup = await setupAgent(devnet, dir);
+        const { owner, agent } = setup;
 
         await pushActions(
             devnet,
             dir,
             [
                 {
-                    sender: parent.name,
-                    service: "mcp",
-                    method: "bootstrap",
-                    data: { account: managed, agent: agent.name },
-                },
-            ],
-            { keys: [parent.privateKeyPath] },
-        );
-        await pushActions(
-            devnet,
-            dir,
-            [
-                {
-                    sender: parent.name,
+                    sender: owner.name,
                     service: "mcp",
                     method: "grant",
                     data: {
-                        account: managed,
+                        account: owner.name,
                         service: "profiles",
                         method: "setProfile",
                     },
                 },
             ],
-            { keys: [parent.privateKeyPath] },
+            { keys: [owner.privateKeyPath] },
         );
 
         await page.goto(devnet.url("mcp") + "/agent.html");
@@ -142,20 +129,10 @@ test("agent.html: import agent key and covered setProfile auto-executes", async 
         // Prove the imported agent key works for covered StagedTx (CLI). The
         // for-agents page propose path is exercised next; import is the Phase-2
         // login/key-vault piece under test here.
-        const setup: AgentSetup = {
-            managed: {
-                name: managed,
-                publicKeyPem: "",
-                privateKeyPem: "",
-                privateKeyPath: "",
-            },
-            agent,
-            parent,
-        };
         await agentSetsProfile(devnet, dir, setup, "via-imported-key");
-        expect(await profileOf(devnet, managed)).toBe("via-imported-key");
+        expect(await profileOf(devnet, owner.name)).toBe("via-imported-key");
 
-        await page.getByTestId("managed-account").fill(managed);
+        await page.getByTestId("owner-account").fill(owner.name);
         await page.getByText("Demo and manual tracking").click();
         await page.getByTestId("display-name").fill("from-agent-page");
         await clickWithTrust(
@@ -170,7 +147,7 @@ test("agent.html: import agent key and covered setProfile auto-executes", async 
             },
         );
         await expect
-            .poll(async () => profileOf(devnet, managed), { timeout: 15_000 })
+            .poll(async () => profileOf(devnet, owner.name), { timeout: 15_000 })
             .toBe("from-agent-page");
         expect(await pendingIdsFor(devnet, agent.name)).toEqual([]);
     } finally {

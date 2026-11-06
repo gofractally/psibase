@@ -104,7 +104,12 @@ impl KeyVault for AuthSig {
     }
 
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
-        assert_authorized_with_whitelist(FunctionName::sign, vec!["transact".into()])?;
+        // `mcp` is an auth service that reuses the owner's auth-sig key, so its
+        // transact-hook-user-auth signs through here.
+        assert_authorized_with_whitelist(
+            FunctionName::sign,
+            vec!["transact".into(), "mcp".into()],
+        )?;
         HostCrypto::sign(&hashed_message, &public_key)
     }
 

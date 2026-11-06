@@ -53,21 +53,24 @@ describe("mcp approval UI logic", () => {
         const p = agentHandOffPrompt({
             account: "not-prod7",
             agent: "agentprod7",
-        });
+        }, { protocol: "https:", host: "mcp.example.org:9090" });
         expect(p).toContain("Psibase blockchain");
-        expect(p).toContain("http://psibase.localhost:8080/");
+        expect(p).toContain("node at https://example.org:9090/");
         expect(p).toContain("agent account agentprod7");
-        expect(p).toContain("managed account not-prod7");
+        expect(p).toContain("user's own account not-prod7");
+        expect(p).toContain("not-prod7 as the sender");
+        expect(p).not.toMatch(/managed/i);
         expect(p).toContain("Private key for agentprod7:");
         expect(p).toContain("<PASTE agent private key HERE>");
         expect(p).toContain("Model Context Protocol");
-        expect(p).toContain("http://x-mcp.psibase.localhost:8080/");
+        expect(p).toContain("https://x-mcp.example.org:9090/");
         expect(p).not.toMatch(/Cursor/i);
         expect(p).not.toMatch(/Transfer/i);
     });
     it("hand-off prompt can embed a saved PEM", () => {
         const p = agentHandOffPrompt(
             { account: "m1", agent: "a1" },
+            { protocol: "http:", host: "mcp.psibase.localhost:8080" },
             {
                 pem: "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----",
             },
@@ -75,6 +78,8 @@ describe("mcp approval UI logic", () => {
         expect(p).toContain("Private key for a1:");
         expect(p).toContain("BEGIN PRIVATE KEY");
         expect(p).not.toContain("<PASTE");
+        expect(p).toContain("node at http://psibase.localhost:8080/");
+        expect(p).toContain("http://x-mcp.psibase.localhost:8080/");
     });
 });
 
@@ -87,9 +92,9 @@ describe("account name validation", () => {
         expect(accountNameError("bad--name")).toMatch(/consecutive/i);
         expect(accountNameError("trailing-")).toMatch(/hyphen/i);
     });
-    it("accepts valid names and requires distinct managed/agent", () => {
+    it("accepts valid names and requires agent to differ from owner", () => {
         expect(accountNameError("myprodtx01")).toBeNull();
-        expect(setupNamesValid("myprodtx01", "agentprod1")).toBe(true);
+        expect(setupNamesValid("agentprod1", "myprodtx01")).toBe(true);
         expect(setupNameErrors("sameacct01", "sameacct01").form).toMatch(
             /differ/i,
         );

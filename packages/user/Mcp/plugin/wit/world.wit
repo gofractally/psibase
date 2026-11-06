@@ -1,19 +1,20 @@
-/// Parent/owner side of X-MCP agents: list the agent transactions that need
-/// your approval, and approve them (optionally granting the agent the
-/// missing service/method pairs so a repeat auto-executes).
-/// Also: mint an agent account, bootstrap AuthDyn management, and (for the
-/// agent signing page) propose actions as a managed account.
+/// Owner side of X-MCP agents: list the agent transactions that need your
+/// approval, and approve them (optionally granting the agent the missing
+/// service/method pairs so a repeat auto-executes).
+/// Also: mint an agent account, make `mcp` the owner's auth service (owner
+/// keeps their key), and (for the agent signing page) propose actions with the
+/// owner as sender.
 package mcp:plugin;
 
 interface approvals {
     use host:types/types.{error};
 
     /// JSON array of `{ pending: { account, id, txid, proposer, actions }, missing: [string] }`
-    /// for every managed account whose parent is the logged-in user.
+    /// for staged txs whose sender is the logged-in owner.
     /// Uses the logged-in user's query token, so only the owner can read it.
     needs-approval: func() -> result<string, error>;
 
-    /// The logged-in parent accepts staged tx `id` of managed `account`.
+    /// The logged-in owner `account` accepts staged tx `id`.
     approve: func(account: string, id: u32) -> result<_, error>;
 
     /// In one transaction: grant every missing service/method pair of staged tx
@@ -24,30 +25,32 @@ interface approvals {
 interface setup {
     use host:types/types.{error, pem};
 
-    /// Create a new AuthSig agent account (logged-in parent pays/signs).
+    /// Create a new AuthSig agent account (logged-in owner pays/signs).
     /// Returns the new private key PEM; caller must save/confirm it.
     create-agent-account: func(agent-name: string) -> result<pem, error>;
 
     /// True if `private-key` authorizes `agent-name` (post-create ownership check).
     confirm-agent-key: func(agent-name: string, private-key: pem) -> result<bool, error>;
 
-    /// Parent wires a fresh managed account under AuthDyn/`mcp` with `agent-name`.
-    /// Managed auto-debit is set inside the on-chain bootstrap action.
+    /// In one owner-signed tx: register `agent-name` as the logged-in owner's
+    /// agent (`mcp::bootstrap`), then switch the owner's auth service to `mcp`
+    /// (`accounts::setAuthServ`). The owner's auth-sig key is unchanged, so
+    /// key login keeps working. No managed account is created.
     /// Call `enable-agent-auto-debit` afterward (separate tx; agent must sign).
-    bootstrap: func(managed-name: string, agent-name: string) -> result<_, error>;
+    bootstrap: func(agent-name: string) -> result<_, error>;
 
-    /// Account currently logged in to mcp (read the parent before switching).
+    /// Account currently logged in to mcp (read the owner before switching).
     current-user: func() -> result<string, error>;
 
     /// Import `agent-key`, log in as the agent, and enable tokens auto-debit.
     /// The agent stays logged in so the tx is signed by the agent; call
-    /// `restore-parent` in a separate call.
+    /// `restore-parent` (restores the owner) in a separate call.
     enable-agent-auto-debit: func(agent-name: string, agent-key: pem) -> result<_, error>;
 
-    /// Log the parent back in to mcp after `enable-agent-auto-debit`.
+    /// Log the owner back in to mcp after `enable-agent-auto-debit`.
     restore-parent: func(parent: string) -> result<_, error>;
 
-    /// JSON array of AgentCfg rows where the logged-in user is parent.
+    /// JSON array (0 or 1 rows) of the logged-in owner's AgentCfg `{ account, agent }`.
     my-agents: func() -> result<string, error>;
 }
 
@@ -57,18 +60,18 @@ interface agent-sign {
     /// Import agent credentials into this browser's vault and connect them to mcp.
     import-agent: func(account: string, private-key: pem) -> result<_, error>;
 
-    /// Propose (and implicitly accept) actions as `managed`.
+    /// Propose (and implicitly accept, as the agent) actions whose sender is `owner`.
     /// `actions-json` is a JSON array of
     /// `{ "service": string, "method": string, "rawData": "<hex>" }`.
     /// Covered allowlisted actions auto-execute; otherwise call `track`
     /// afterward (or use the parent approvals UI). Returns 0 (id not
     /// surfaced by transact propose yet).
-    propose-as: func(managed: string, actions-json: string) -> result<u32, error>;
+    propose-as: func(owner: string, actions-json: string) -> result<u32, error>;
 
-    /// Convenience: propose `profiles.setProfile` as `managed`.
-    propose-set-profile: func(managed: string, display-name: string, bio: string) -> result<_, error>;
+    /// Convenience: propose `profiles.setProfile` with `owner` as sender.
+    propose-set-profile: func(owner: string, display-name: string, bio: string) -> result<_, error>;
 
-    /// Record staged tx `id` on the parent's needs-approval list.
+    /// Record staged tx `id` on the owner's needs-approval list.
     track: func(id: u32) -> result<_, error>;
 }
 

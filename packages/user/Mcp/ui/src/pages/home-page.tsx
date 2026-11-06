@@ -25,28 +25,33 @@ export function HomePage() {
     const [setupStatus, setSetupStatus] = useState("");
     const [needsLogin, setNeedsLogin] = useState(false);
 
-    const [managed, setManaged] = useState("");
+    // Logged-in owner: the sender on the agent's staged txs (no managed account).
+    const [owner, setOwner] = useState("");
     const [agent, setAgent] = useState("");
     const [step, setStep] = useState<SetupStep>("form");
     const [pendingPem, setPendingPem] = useState("");
     const [pendingAgent, setPendingAgent] = useState("");
-    const [pendingManaged, setPendingManaged] = useState("");
     const [savedAck, setSavedAck] = useState(false);
     const [confirmPem, setConfirmPem] = useState("");
     const [busy, setBusy] = useState(false);
     const [autoDebitWarning, setAutoDebitWarning] = useState("");
-    const [selectedManaged, setSelectedManaged] = useState<string | null>(null);
+    const [selectedOwner, setSelectedOwner] = useState<string | null>(null);
     const [copiedPrompt, setCopiedPrompt] = useState(false);
 
     const nameErrors = useMemo(
-        () => setupNameErrors(managed, agent),
-        [managed, agent],
+        () => setupNameErrors(agent, owner),
+        [agent, owner],
     );
-    const canCreate = setupNamesValid(managed, agent) && !busy;
+    // One agent per owner: setup is only offered until one is wired.
+    const canCreate =
+        Boolean(owner) &&
+        agents.length === 0 &&
+        setupNamesValid(agent, owner) &&
+        !busy;
 
     const selectedCfg = useMemo(
-        () => agents.find((a) => a.account === selectedManaged) ?? null,
-        [agents, selectedManaged],
+        () => agents.find((a) => a.account === selectedOwner) ?? null,
+        [agents, selectedOwner],
     );
     const handOffPrompt = useMemo(() => {
         if (!selectedCfg) return "";
@@ -54,7 +59,7 @@ export function HomePage() {
             selectedCfg.agent === pendingAgent && pendingPem
                 ? pendingPem
                 : undefined;
-        return agentHandOffPrompt(selectedCfg, { pem });
+        return agentHandOffPrompt(selectedCfg, location, { pem });
     }, [selectedCfg, pendingAgent, pendingPem]);
 
     const refreshAgents = useCallback(async () => {
@@ -63,6 +68,7 @@ export function HomePage() {
             const parsed =
                 typeof res === "string" ? JSON.parse(res) : (res as AgentCfg[]);
             setAgents(Array.isArray(parsed) ? parsed : []);
+            setOwner(String(await mcpCall("setup", "current-user")));
         } catch (e) {
             setAgents([]);
             setSetupStatus(errorMessage(e));
@@ -122,11 +128,9 @@ export function HomePage() {
     };
 
     const resetSetupForm = () => {
-        setManaged("");
         setAgent("");
         setPendingPem("");
         setPendingAgent("");
-        setPendingManaged("");
         setSavedAck(false);
         setConfirmPem("");
         setAutoDebitWarning("");
@@ -138,7 +142,6 @@ export function HomePage() {
         setBusy(true);
         setSetupStatus("Confirming…");
         setAutoDebitWarning("");
-        const managedName = managed.trim();
         const agentName = pendingAgent;
         const key = confirmPem.trim();
         try {
@@ -147,13 +150,13 @@ export function HomePage() {
                 key,
             ]);
             if (!ok) throw new Error("Key does not match the agent account");
-            setSetupStatus("Bootstrapping managed account…");
-            // Parent-only tx first. Agent auto-debit is a separate call so it
+            setSetupStatus("Registering agent on your account…");
+            // Owner-only tx first (mcp::bootstrap + accounts::setAuthServ(mcp);
+            // your key is unchanged). Agent auto-debit is a separate call so it
             // is not packed into a multi-sender transaction that would abort.
-            await mcpCall("setup", "bootstrap", [managedName, agentName]);
-            setPendingManaged(managedName);
+            await mcpCall("setup", "bootstrap", [agentName]);
             setPendingPem(key);
-            const parent = String(await mcpCall("setup", "current-user"));
+            const ownerName = String(await mcpCall("setup", "current-user"));
             try {
                 setSetupStatus("Enabling agent auto-debit…");
                 await mcpCall("setup", "enable-agent-auto-debit", [
@@ -162,19 +165,19 @@ export function HomePage() {
                 ]);
             } catch (e) {
                 setAutoDebitWarning(
-                    `Managed account is ready, but agent auto-debit failed: ${errorMessage(e)}`,
+                    `Agent is registered, but agent auto-debit failed: ${errorMessage(e)}`,
                 );
             }
             // Separate call: the agent must stay logged in until its tx is signed.
             try {
-                await mcpCall("setup", "restore-parent", [parent]);
+                await mcpCall("setup", "restore-ownerName", [ownerName]);
             } catch (e) {
                 setAutoDebitWarning(
-                    `Could not log ${parent} back in: ${errorMessage(e)}`,
+                    `Could not log ${ownerName} back in: ${errorMessage(e)}`,
                 );
             }
             await refreshAgents();
-            setSelectedManaged(managedName);
+            setSelectedOwner(ownerName);
             setCopiedPrompt(false);
             setStep("done");
             setSetupStatus("Setup complete.");
@@ -313,11 +316,13 @@ export function HomePage() {
             >
                 <h2 className="text-xl font-semibold">Set up an agent</h2>
                 <p className="text-muted-foreground text-sm">
-                    Creates an AuthSig agent account (save the key), then a
-                    managed account under AuthDyn that your agent can act
-                    through. You (logged-in) are the parent who approves
-                    uncovered actions. Both new accounts get tokens auto-debit
-                    enabled.
+                    Creates an AuthSig agent account (save the key) and
+                    registers it on your own account: the agent proposes
+                    staged transactions with you as the sender. Allowlisted
+                    actions run on the agent's signature; you approve the
+                    rest. Your account switches to the mcp auth service but
+                    keeps your existing key and login. The agent gets tokens
+                    auto-debit enabled.
                 </p>
                 <p className="text-sm" data-testid="setup-status">
                     {setupStatus}
@@ -336,8 +341,7 @@ export function HomePage() {
                                 Existing agents
                             </h3>
                             <p className="text-muted-foreground text-xs">
-                                On-chain setups for this parent. Use new account
-                                names below to create another.
+                                The agent registered on your account.
                             </p>
                             <ul
                                 data-testid="agent-list"
@@ -345,7 +349,7 @@ export function HomePage() {
                             >
                                 {agents.map((a) => {
                                     const selected =
-                                        a.account === selectedManaged;
+                                        a.account === selectedOwner;
                                     return (
                                         <li key={a.account}>
                                             <button
@@ -359,15 +363,14 @@ export function HomePage() {
                                                         : "border-border hover:bg-muted/50 w-full rounded-md border px-3 py-2 text-left"
                                                 }
                                                 onClick={() => {
-                                                    setSelectedManaged(
+                                                    setSelectedOwner(
                                                         a.account,
                                                     );
                                                     setCopiedPrompt(false);
                                                 }}
                                             >
-                                                managed <code>{a.account}</code>{" "}
-                                                · agent <code>{a.agent}</code> ·
-                                                parent <code>{a.parent}</code>
+                                                owner <code>{a.account}</code>{" "}
+                                                · agent <code>{a.agent}</code>
                                             </button>
                                         </li>
                                     );
@@ -416,34 +419,8 @@ export function HomePage() {
                     )}
                 </div>
 
-                {step === "form" && (
+                {step === "form" && agents.length === 0 && (
                     <div id="setup-form" className="max-w-md space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="managed-name">
-                                Managed account name
-                            </Label>
-                            <Input
-                                id="managed-name"
-                                data-testid="managed-name"
-                                autoComplete="off"
-                                maxLength={MAX_ACCOUNT_NAME_LENGTH}
-                                value={managed}
-                                aria-invalid={Boolean(
-                                    managed && nameErrors.managed,
-                                )}
-                                onChange={(e) => setManaged(e.target.value)}
-                            />
-                            {managed && nameErrors.managed ? (
-                                <p className="text-destructive text-sm">
-                                    {nameErrors.managed}
-                                </p>
-                            ) : (
-                                <p className="text-muted-foreground text-xs">
-                                    {MAX_ACCOUNT_NAME_LENGTH} chars max;
-                                    lowercase letters, numbers, hyphens.
-                                </p>
-                            )}
-                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="agent-name">
                                 Agent account name
@@ -577,9 +554,8 @@ export function HomePage() {
                             className="text-sm font-medium"
                             data-testid="setup-success"
                         >
-                            Ready. Managed <code>{pendingManaged}</code> is
-                            under AuthDyn with agent <code>{pendingAgent}</code>
-                            .
+                            Ready. Agent <code>{pendingAgent}</code> can propose
+                            as your account <code>{owner}</code>.
                         </p>
                         <p className="text-muted-foreground text-sm">
                             Keep the agent private key you saved — it cannot be
@@ -602,7 +578,7 @@ export function HomePage() {
                             </p>
                         ) : (
                             <p className="text-muted-foreground text-sm">
-                                Tokens auto-debit is enabled on both accounts.
+                                Tokens auto-debit is enabled on the agent.
                             </p>
                         )}
                         <div className="flex flex-wrap gap-2">

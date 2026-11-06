@@ -56,12 +56,12 @@ function isAction(
     );
 }
 
-/** Prefill from `?agent=&managed=&actions=` (key is never read from the URL). */
+/** Prefill from `?agent=&owner=&actions=` (legacy `managed=` accepted) (key is never read from the URL). */
 export function prefillFromSearch(search: string) {
     const p = new URLSearchParams(search);
     return {
         agent: p.get("agent") ?? "",
-        managed: p.get("managed") ?? "",
+        owner: p.get("owner") ?? p.get("managed") ?? "",
         actions: p.get("actions") ?? "",
     };
 }

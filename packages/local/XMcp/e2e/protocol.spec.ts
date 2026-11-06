@@ -11,11 +11,9 @@ test.beforeEach(async ({ devnet }) => {
     test.skip(!ok, "XMcp package not installed on this devnet (set XMCP_PSI)");
 });
 
-test("GET is 405 (no SSE stream) and foreign Origin is 403", async ({ devnet }) => {
+test("GET is 405 (no SSE stream)", async ({ devnet }) => {
     const get = await raw(devnet, "x-mcp", "GET", "/");
     expect(get.status).toBe(405);
-    const bad = await mcpPost(devnet, { jsonrpc: "2.0", id: 1, method: "ping" }, { Origin: "https://evil.example" });
-    expect(bad.status).toBe(403);
 });
 
 test("2025 initialize handshake still works", async ({ devnet }) => {

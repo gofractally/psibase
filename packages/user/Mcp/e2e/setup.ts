@@ -31,94 +31,66 @@ export async function gql(
     return JSON.parse(r.text);
 }
 
+/** Two-account model: the owner keeps its key and is the sender; the agent proposes. */
 export interface AgentSetup {
-    managed: KeyAccount;
+    owner: KeyAccount;
     agent: KeyAccount;
-    parent: KeyAccount;
-}
-
-/** Parent-driven bootstrap: managed has no key; mcp sets AuthDyn + auto-debit. */
-export interface BootstrappedAgent {
-    managed: string;
-    agent: KeyAccount;
-    parent: KeyAccount;
 }
 
 /**
- * Delegated agent setup (V2 doc): managed account M registers its agent and
- * parent with `mcp`, then hands its auth to `mcp` via auth-dyn, in one tx.
+ * Owner-signed setup (V2 doc, same txs as the mcp UI): register the agent on
+ * the owner's own account, then make `mcp` the owner's auth service. The
+ * owner's auth-sig key is unchanged. No managed account is created.
  */
 export async function setupAgent(
     devnet: Devnet,
     dir: string,
 ): Promise<AgentSetup> {
-    const managed = await createKeyAccount(devnet, dir);
+    const owner = await createKeyAccount(devnet, dir);
     const agent = await createKeyAccount(devnet, dir);
-    const parent = await createKeyAccount(devnet, dir);
     await pushActions(
         devnet,
         dir,
         [
             {
-                sender: managed.name,
+                sender: owner.name,
                 service: "mcp",
-                method: "set_agent",
-                data: { agent: agent.name, parent: parent.name },
+                method: "bootstrap",
+                data: { agent: agent.name },
             },
             {
-                sender: managed.name,
-                service: "auth-dyn",
-                method: "set_mgmt",
-                data: { account: managed.name, manager: "mcp" },
-            },
-            {
-                sender: managed.name,
+                sender: owner.name,
                 service: "accounts",
                 method: "setAuthServ",
-                data: { authService: "auth-dyn" },
+                data: { authService: "mcp" },
             },
         ],
-        { keys: [managed.privateKeyPath] },
+        { keys: [owner.privateKeyPath] },
     );
-    return { managed, agent, parent };
+    return { owner, agent };
 }
 
-/** Same path as the mcp UI setup: parent bootstraps a fresh managed account. */
+/** `setupAgent` plus the agent's tokens auto-debit, as the UI setup does. */
 export async function bootstrapAgent(
     devnet: Devnet,
     dir: string,
-): Promise<BootstrappedAgent> {
-    const parent = await createKeyAccount(devnet, dir);
-    const agent = await createKeyAccount(devnet, dir);
-    const managed = `m${parent.name.slice(1)}`.slice(0, 18);
-    await pushActions(
-        devnet,
-        dir,
-        [
-            {
-                sender: parent.name,
-                service: "mcp",
-                method: "bootstrap",
-                data: { account: managed, agent: agent.name },
-            },
-        ],
-        { keys: [parent.privateKeyPath] },
-    );
+): Promise<AgentSetup> {
+    const s = await setupAgent(devnet, dir);
     // Matches enable-agent-auto-debit in the plugin (agent signs for itself).
     await pushActions(
         devnet,
         dir,
         [
             {
-                sender: agent.name,
+                sender: s.agent.name,
                 service: "tokens",
                 method: "setUserConf",
                 data: { index: 0, enabled: true },
             },
         ],
-        { keys: [agent.privateKeyPath] },
+        { keys: [s.agent.privateKeyPath] },
     );
-    return { managed, agent, parent };
+    return s;
 }
 
 export async function profileOf(
@@ -133,7 +105,7 @@ export async function profileOf(
     return j?.data?.profile?.displayName ?? undefined;
 }
 
-/** The agent stages `profiles.setProfile` as M; returns the staged-tx id if it is still pending. */
+/** The agent stages `profiles.setProfile` with the owner as sender; returns the staged-tx id if it is still pending. */
 export async function agentSetsProfile(
     devnet: Devnet,
     dir: string,
@@ -145,7 +117,7 @@ export async function agentSetsProfile(
         dir,
         [
             {
-                sender: s.managed.name,
+                sender: s.owner.name,
                 service: "profiles",
                 method: "setProfile",
                 data: { display_name: displayName, bio: "" },
@@ -180,7 +152,7 @@ export async function stagedByProposer(
 
 /**
  * Create a token as `issuer`, mint it, and credit `debitor`. Debitor needs
- * AUTO_DEBIT (bootstrap sets that on managed accounts). No debitor key required.
+ * AUTO_DEBIT. No debitor key required.
  */
 export async function issueAndCredit(
     devnet: Devnet,
@@ -267,7 +239,7 @@ export async function issueAndCredit(
                     token_id: tid,
                     debitor,
                     amount: { value: amount },
-                    memo: "e2e fund managed",
+                    memo: "e2e fund owner",
                 },
             },
         ],

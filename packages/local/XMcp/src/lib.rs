@@ -7,7 +7,8 @@ pub mod rpc;
 #[psibase::service(name = "x-mcp")]
 #[allow(non_snake_case)]
 mod service {
-    use crate::rpc::{self, ChainView, PackageInfo};
+    use crate::rpc::{self, ChainView, HeadTapos, PackageInfo};
+    use psibase::services::transact;
     use psibase::services::packages::{InstalledPackageTable, InstalledSchemaTable, SERVICE as PACKAGES};
     use psibase::*;
 
@@ -34,6 +35,13 @@ mod service {
                 .get_index_pk()
                 .get(&service)
                 .map(|s| s.schema)
+        }
+        /// Same calls as CommonApi's GET /common/tapos/head, plus the
+        /// current block time as "now".
+        fn head_tapos(&self) -> HeadTapos {
+            let t = transact::Wrapper::call();
+            let (ref_block_index, ref_block_suffix) = t.headTapos();
+            HeadTapos { ref_block_index, ref_block_suffix, now_seconds: t.currentBlock().time.seconds().seconds }
         }
     }
 

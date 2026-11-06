@@ -17,23 +17,23 @@ export type PendingRow = {
     missing: string[];
 };
 
+/** `account` is the owner (the sender on the agent's staged txs). */
 export type AgentCfg = {
     account: string;
     agent: string;
-    parent: string;
 };
 
-/** Actions for "Approve": the parent accepts the staged tx, then drops the tracked row. */
-export function approveActions(parent: string, row: PendingRow) {
+/** Actions for "Approve": the owner accepts the staged tx, then drops the tracked row. */
+export function approveActions(owner: string, row: PendingRow) {
     return [
         {
-            sender: parent,
+            sender: owner,
             service: "staged-tx",
             method: "accept",
             data: { id: row.pending.id, txid: row.pending.txid },
         },
         {
-            sender: parent,
+            sender: owner,
             service: "mcp",
             method: "untrack",
             data: { account: row.pending.account, id: row.pending.id },
@@ -46,16 +46,16 @@ export function approveActions(parent: string, row: PendingRow) {
  * service/method pair (mcp::grant_missing, which also drops the tracked row),
  * then accept.
  */
-export function approveAndGrantActions(parent: string, row: PendingRow) {
+export function approveAndGrantActions(owner: string, row: PendingRow) {
     return [
         {
-            sender: parent,
+            sender: owner,
             service: "mcp",
             method: "grant_missing",
             data: { account: row.pending.account, id: row.pending.id },
         },
         {
-            sender: parent,
+            sender: owner,
             service: "staged-tx",
             method: "accept",
             data: { id: row.pending.id, txid: row.pending.txid },
@@ -76,23 +76,37 @@ export function summarize(row: PendingRow) {
         .join(", ");
 }
 
+/**
+ * Node root URL from the mcp page's origin: `http://mcp.psibase.localhost:8080`
+ * -> `http://psibase.localhost:8080/` (same derivation as the agent page).
+ */
+export function chainUrls(origin: { protocol: string; host: string }) {
+    const root = origin.host.replace(/^mcp\./, "");
+    return {
+        node: `${origin.protocol}//${root}/`,
+        xMcp: `${origin.protocol}//x-mcp.${root}/`,
+    };
+}
+
 const PEM_PLACEHOLDER = "<PASTE agent private key HERE>";
 
 /**
  * Setup hand-off: identity and how to reach the chain. No task — that comes
- * in a later message. Managed account is named until a by-agent lookup exists.
+ * in a later message. The owner account is the sender on proposals.
  */
 export function agentHandOffPrompt(
     cfg: Pick<AgentCfg, "account" | "agent">,
+    origin: { protocol: string; host: string },
     opts: { pem?: string } = {},
 ) {
+    const { node, xMcp } = chainUrls(origin);
     const key = opts.pem?.trim() || PEM_PLACEHOLDER;
-    return `You can execute transactions on the Psibase blockchain (node at http://psibase.localhost:8080/) on behalf of the user.
-You are the agent account ${cfg.agent}. You act on behalf of the user via their managed account ${cfg.account}.
+    return `You can execute transactions on the Psibase blockchain (node at ${node}) on behalf of the user.
+You are the agent account ${cfg.agent}. You act on behalf of the user's own account ${cfg.account}: propose staged transactions with ${cfg.account} as the sender. Allowlisted actions execute on your signature alone; anything else waits for the user to approve.
 
 Private key for ${cfg.agent}:
 ${key}
 
 Use this Model Context Protocol (MCP) endpoint for on-chain service discovery and unsigned transaction building. It never signs or pushes; follow its instructions for how to submit:
-http://x-mcp.psibase.localhost:8080/`;
+${xMcp}`;
 }

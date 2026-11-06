@@ -1,15 +1,16 @@
-//! Pure allowlist logic for the X-MCP agent manager. No chain access, so it is
+//! Pure allowlist logic for the X-MCP owner auth service. No chain access, so it is
 //! unit-testable natively (`cargo test -p mcp --lib policy`).
 
 use psibase::{AccountNumber, MethodNumber};
 
 /// Service/method pairs the agent can never be granted, and that the manager
-/// answers with `DynamicAuthPolicy::impossible()` (auth changes, code changes,
-/// and nested StagedTx use).
+/// treats as impossible on the staged path (auth/key changes, code changes,
+/// nested StagedTx use, and mcp's own admin actions).
 pub fn banned_pairs() -> Vec<(AccountNumber, MethodNumber)> {
     let p = |s: &str, m: &str| (AccountNumber::from_exact(s).unwrap(), MethodNumber::from(m));
     vec![
         p("accounts", "setAuthServ"),
+        p("auth-sig", "setKey"),
         p("setcode", "setCode"),
         p("setcode", "setCodeStaged"),
         p("staged-tx", "propose"),
@@ -29,13 +30,13 @@ pub fn is_banned(service: AccountNumber, method: MethodNumber) -> bool {
         .any(|(s, m)| *s == service && *m == method)
 }
 
-/// Who must authorize a given (service, method) for a managed account.
+/// Who must authorize a given (service, method) for an owner account.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Decision {
     /// Allowlisted: the agent alone authorizes (auto-approve path).
     Agent,
-    /// Not allowlisted: the parent (human) must approve.
-    Parent,
+    /// Not allowlisted: the owner (human) must accept with their key.
+    Owner,
     /// Never allowed through this manager.
     Impossible,
 }
@@ -46,10 +47,10 @@ pub fn decide(
 ) -> Decision {
     match method {
         // Nested authorizer checks carry no method: be conservative.
-        None => Decision::Parent,
+        None => Decision::Owner,
         Some((s, m)) if is_banned(s, m) => Decision::Impossible,
         Some((s, m)) if is_allowed(s, m) => Decision::Agent,
-        Some(_) => Decision::Parent,
+        Some(_) => Decision::Owner,
     }
 }
 
@@ -69,7 +70,7 @@ pub fn missing_pairs(
 }
 
 /// True when every action is allowlisted, i.e. the agent's proposal executes
-/// without the parent.
+/// without the owner.
 pub fn covered(
     actions: &[(AccountNumber, MethodNumber)],
     is_allowed: impl Fn(AccountNumber, MethodNumber) -> bool,
@@ -77,6 +78,38 @@ pub fn covered(
     actions
         .iter()
         .all(|&(s, m)| decide(Some((s, m)), &is_allowed) == Decision::Agent)
+}
+
+/// Accounts that can authorize on the staged path for `decision`.
+pub fn authorizers(
+    owner: AccountNumber,
+    agent: Option<AccountNumber>,
+    decision: Decision,
+) -> Vec<AccountNumber> {
+    match (decision, agent) {
+        (Decision::Agent, Some(agent)) => vec![agent, owner],
+        (Decision::Impossible, _) => vec![],
+        _ => vec![owner],
+    }
+}
+
+/// `isAuthSys`: the agent alone is enough for allowlisted methods; the owner
+/// is always enough except for banned (impossible) methods.
+pub fn is_approved(
+    owner: AccountNumber,
+    agent: Option<AccountNumber>,
+    decision: Decision,
+    accepters: &[AccountNumber],
+) -> bool {
+    authorizers(owner, agent, decision)
+        .iter()
+        .any(|a| accepters.contains(a))
+}
+
+/// `isRejectSys`: the owner can always reject; an impossible tx can always be
+/// cleared. The agent cannot reject on the owner's behalf.
+pub fn is_rejected(owner: AccountNumber, decision: Decision, rejecters: &[AccountNumber]) -> bool {
+    decision == Decision::Impossible || rejecters.contains(&owner)
 }
 
 #[cfg(test)]
@@ -95,12 +128,57 @@ mod tests {
     fn decide_paths() {
         let a = allow(vec![sm("tokens", "credit")]);
         assert_eq!(decide(Some(sm("tokens", "credit")), &a), Decision::Agent);
-        assert_eq!(decide(Some(sm("nft", "mint")), &a), Decision::Parent);
+        assert_eq!(decide(Some(sm("nft", "mint")), &a), Decision::Owner);
         assert_eq!(
             decide(Some(sm("setcode", "setCode")), &a),
             Decision::Impossible
         );
-        assert_eq!(decide(None, &a), Decision::Parent);
+        assert_eq!(decide(None, &a), Decision::Owner);
+    }
+
+    #[test]
+    fn staged_auth() {
+        let owner = AccountNumber::from_exact("owner").unwrap();
+        let agent = AccountNumber::from_exact("agent").unwrap();
+        let other = AccountNumber::from_exact("other").unwrap();
+        // Allowlisted: agent's implicit accept alone executes; owner also suffices.
+        assert!(is_approved(owner, Some(agent), Decision::Agent, &[agent]));
+        assert!(is_approved(owner, Some(agent), Decision::Agent, &[owner]));
+        assert!(!is_approved(owner, Some(agent), Decision::Agent, &[other]));
+        // Not allowlisted: owner must accept.
+        assert!(!is_approved(owner, Some(agent), Decision::Owner, &[agent]));
+        assert!(is_approved(
+            owner,
+            Some(agent),
+            Decision::Owner,
+            &[agent, owner]
+        ));
+        // Banned: nobody.
+        assert!(!is_approved(
+            owner,
+            Some(agent),
+            Decision::Impossible,
+            &[agent, owner]
+        ));
+        // No agent registered: behaves like AuthSig.
+        assert!(!is_approved(owner, None, Decision::Agent, &[agent]));
+        assert!(is_approved(owner, None, Decision::Agent, &[owner]));
+        // Reject: owner only (or always, for impossible).
+        assert!(is_rejected(owner, Decision::Agent, &[owner]));
+        assert!(!is_rejected(owner, Decision::Agent, &[agent]));
+        assert!(is_rejected(owner, Decision::Impossible, &[]));
+        assert_eq!(
+            authorizers(owner, Some(agent), Decision::Owner),
+            vec![owner]
+        );
+    }
+
+    #[test]
+    fn key_changes_are_banned() {
+        assert!(is_banned(
+            sm("auth-sig", "setKey").0,
+            sm("auth-sig", "setKey").1
+        ));
     }
 
     #[test]

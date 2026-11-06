@@ -10,6 +10,11 @@ world impl {
     include auth-sig:plugin/imports;
     import profiles:plugin/api;
     import tokens:plugin/user-config;
+    import accounts:plugin/api;
+
+    // mcp is the owner's auth service, so transact asks this plugin for the
+    // owner's claim/proof; it delegates to the owner's auth-sig key.
+    include transact:plugin/hook-user-auth;
 
     export approvals;
     export setup;

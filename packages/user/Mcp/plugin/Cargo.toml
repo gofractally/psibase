@@ -32,4 +32,5 @@ world = "impl"
 "staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 "profiles:plugin" = { path = "../../Profiles/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }

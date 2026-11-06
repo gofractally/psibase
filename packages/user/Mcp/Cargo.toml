@@ -1,6 +1,6 @@
 [package]
 name = "mcp-pkg"
-description = "Parent/owner frontend for X-MCP agents: needs-approval UI and agent allowlist manager"
+description = "Owner frontend for X-MCP agents: needs-approval UI, agent allowlist, and owner auth service"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -14,7 +14,6 @@ services = ["mcp"]
 
 [package.metadata.psibase.dependencies]
 Accounts = "0.29.0"
-AuthDyn = "0.29.0"
 AuthSig = "0.29.0"
 Host = "0.29.0"
 Permissions = "0.29.0"

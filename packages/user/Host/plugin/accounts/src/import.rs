@@ -14,7 +14,8 @@ fn import_credential(credential: &Credential, known_accounts: &AppsTable) -> Res
 
     match details.auth_service.as_str() {
         "auth-any" => {}
-        "auth-sig" => {
+        // `mcp` (X-MCP owner auth) verifies the owner's auth-sig key.
+        "auth-sig" | "mcp" => {
             if !AuthSig::api::can_authorize(&credential.key, account) {
                 return Err(AuthorizationFailed(account.clone()).into());
             }

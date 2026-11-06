@@ -39,6 +39,9 @@ impl ChainView for Fake {
     fn schema(&self, s: AccountNumber) -> Option<Schema> {
         (s.to_string() == "tokens").then(tokens_schema)
     }
+    fn head_tapos(&self) -> HeadTapos {
+        HeadTapos { ref_block_index: 7, ref_block_suffix: 4242, now_seconds: 1_800_000_000 }
+    }
 }
 
 fn post<'a>(
@@ -191,4 +194,47 @@ fn build_transaction_propose_wraps() {
     assert_eq!(a["service"], "staged-tx");
     assert_eq!(a["sender"], "agent");
     assert_eq!(a["data"]["actions"][0]["sender"], "alice");
+}
+
+fn credit_args(extra: Value) -> Value {
+    let mut a = json!({"actions": [{"sender": "alice", "service": "tokens", "method": "credit",
+        "data": {"token_id": 1, "debitor": "bob", "amount": "1", "memo": ""}}]});
+    for (k, v) in extra.as_object().unwrap() {
+        a[k] = v.clone();
+    }
+    a
+}
+
+#[test]
+fn build_transaction_fills_tapos() {
+    let exp = TimePointSec::from(1_800_000_000 + TAPOS_EXPIRATION_SECS).to_string();
+    // Omitted: head ref + now+120s, never 1970.
+    let v = build_transaction(&credit_args(json!({})), &Fake).unwrap();
+    let t = &v["transaction"]["tapos"];
+    assert_eq!(t["refBlockIndex"], 7);
+    assert_eq!(t["refBlockSuffix"], 4242);
+    assert_eq!(t["expiration"], exp.as_str());
+    assert!(!t["expiration"].as_str().unwrap().starts_with("1970"));
+    assert!(v["notes"][0].as_str().unwrap().contains("filled by the server"));
+    // Head ref only: expiration filled, ref kept.
+    let v = build_transaction(&credit_args(json!({"tapos": {"refBlockIndex": 1, "refBlockSuffix": 2}})), &Fake).unwrap();
+    let t = &v["transaction"]["tapos"];
+    assert_eq!((t["refBlockIndex"].clone(), t["refBlockSuffix"].clone()), (json!(1), json!(2)));
+    assert_eq!(t["expiration"], exp.as_str());
+    // Full override is kept as given, no notes.
+    let full = json!({"refBlockIndex": 1, "refBlockSuffix": 2, "expiration": "2030-01-01T00:00:00.000Z", "flags": 0});
+    let v = build_transaction(&credit_args(json!({"tapos": full})), &Fake).unwrap();
+    assert_eq!(v["transaction"]["tapos"]["expiration"], serde_json::to_value("2030-01-01T00:00:00.000Z".parse::<TimePointSec>().unwrap()).unwrap());
+    assert_eq!(v["transaction"]["tapos"]["refBlockSuffix"], 2);
+    assert_eq!(v["notes"], json!([]));
+}
+
+#[test]
+fn instructions_document_tapos_and_token_scaling() {
+    let s = instructions("psibase.test");
+    assert!(!s.contains("GET /common/tapos/head"));
+    assert!(!s.contains("sysTid token {"));
+    assert!(s.contains("{ config { sysTid } }"));
+    assert!(s.contains("token(tokenId: \"<that id>\") { precision id symbol }"));
+    assert!(s.contains("100000"));
 }
