@@ -73,7 +73,6 @@ SCENARIO("Buying a symbol")
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
-      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       THEN("Alice cannot create a symbol with numbers")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
@@ -120,7 +119,8 @@ SCENARIO("Buying a symbol")
          AND_THEN("Alice owns the symbol")
          {
             auto ownerNftId = getSymbol.returnVal().ownerNft;
-            auto getNft     = alice.to<Nft>().getNft(ownerNftId);
+            CHECK(alice.to<Nft>().debit(ownerNftId, memo).succeeded());
+            auto getNft = alice.to<Nft>().getNft(ownerNftId);
             CHECK(getNft.succeeded());
 
             auto nft = getNft.returnVal().value();
