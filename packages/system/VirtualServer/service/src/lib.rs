@@ -148,7 +148,7 @@ mod service {
     use psibase::services::{
         accounts::Wrapper as Accounts,
         cpu_limit::Wrapper as CpuLimit,
-        nft::{NftHolderFlags, Wrapper as Nft},
+        nft::Wrapper as Nft,
         tokens::{BalanceFlags, Quantity, Wrapper as Tokens},
         transact::Wrapper as Transact,
     };
@@ -199,7 +199,7 @@ mod service {
             return;
         }
 
-        Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
+        Nft::call().setAutoDebit(false);
         Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
         Tokens::call().setUserConf(BalanceFlags::KEEP_ZERO_BALANCE.index(), true);
 

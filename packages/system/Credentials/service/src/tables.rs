@@ -2,7 +2,7 @@
 pub mod tables {
     use psibase::fracpack::{Pack, Unpack};
     use psibase::services::{
-        nft::{NftHolderFlags, Wrapper as Nft},
+        nft::Wrapper as Nft,
         tokens::{BalanceFlags, Wrapper as Tokens},
         transact::Wrapper as Transact,
     };
@@ -26,9 +26,9 @@ pub mod tables {
             table.put(&InitRow {}).unwrap();
 
             Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
-            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setAutoDebit(false);
 
-            Nft::call_as(crate::CRED_SYS).setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
+            Nft::call_as(crate::CRED_SYS).setAutoDebit(false);
             Tokens::call_as(crate::CRED_SYS).setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
         }
     }

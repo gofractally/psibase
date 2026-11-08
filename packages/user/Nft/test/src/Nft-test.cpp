@@ -20,8 +20,6 @@ using std::vector;
 
 namespace
 {
-   constexpr auto autoDebit = Nft::autoDebit;
-
    struct FirstIdData
    {
       NID firstAvailableId;
@@ -163,20 +161,27 @@ SCENARIO("Transferring NFTs")
       auto b = bob.to<Nft>();
       auto c = charlie.to<Nft>();
 
-      THEN("Bob has auto-debit disabled by default")
+      THEN("Bob has auto-debit enabled by default")
       {
-         CHECK(b.getUserConf(bob, autoDebit).returnVal() == false);
+         CHECK(b.getNftHolder(bob).returnVal().autodebit == true);
       }
-      THEN("Bob is able to opt in to auto-debit")
+      THEN("A service account has auto-debit disabled by default")
       {
-         CHECK(b.setUserConf(autoDebit, true).succeeded());
-         CHECK(true == b.getUserConf(bob, autoDebit).returnVal());
+         CHECK(a.getNftHolder(Nft::service).returnVal().autodebit == false);
+      }
+      THEN("Bob is able to set auto-debit")
+      {
+         CHECK(b.setAutoDebit(false).succeeded());
+         CHECK(b.getNftHolder(bob).returnVal().autodebit == false);
+         CHECK(b.setAutoDebit(true).succeeded());
+         CHECK(b.getNftHolder(bob).returnVal().autodebit == true);
       }
 
-      THEN("Alice is unable to credit, uncredit, or debit a non-existent NFT")
+      THEN("Alice is unable to credit, transfer, uncredit, or debit a non-existent NFT")
       {
          NID invalidId = 99;
          CHECK(a.credit(invalidId, bob, "memo").failed(nftDNE));
+         CHECK(a.transfer(invalidId, bob, "memo").failed(nftDNE));
          CHECK(a.uncredit(invalidId, "memo").failed(uncreditRequiresCredit));
          CHECK(a.debit(invalidId, "memo").failed(nothingToDebit));
       }
@@ -192,22 +197,29 @@ SCENARIO("Transferring NFTs")
             CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
          }
 
-         THEN("Bob may not credit the NFT to Bob")
+         THEN("Bob may not credit or transfer the NFT")
          {
             CHECK(b.credit(nft.id, alice, "memo").failed(missingRequiredAuth));
+            CHECK(b.transfer(nft.id, alice, "memo").failed(missingRequiredAuth));
          }
-         THEN("Alice may not credit the NFT to herself")
+         THEN("Alice may not credit or transfer the NFT to herself")
          {
             CHECK(a.credit(nft.id, alice, "memo").failed(creditorIsDebitor));
+            CHECK(a.transfer(nft.id, alice, "memo").failed(creditorIsDebitor));
          }
-         THEN("Alice may credit the NFT to Bob")
+         THEN("Credit does not move the NFT when auto-debit is enabled")
          {
             CHECK(a.credit(nft.id, bob, "memo").succeeded());
+            CHECK(bob.id != b.getNft(nft.id).returnVal().value().owner);
          }
-         WHEN("Alice credits the NFT to Bob")
+         THEN("Transfer to a service account stays pending")
          {
-            bob.to<Nft>().setUserConf(autoDebit, true);
-            CHECK(a.credit(nft.id, bob, "memo").succeeded());
+            CHECK(a.transfer(nft.id, Nft::service, "memo").succeeded());
+            CHECK(alice.id == a.getNft(nft.id).returnVal().value().owner);
+         }
+         WHEN("Alice transfers the NFT to Bob")
+         {
+            CHECK(a.transfer(nft.id, bob, "memo").succeeded());
 
             THEN("Bob immediately owns the NFT")
             {
@@ -221,11 +233,11 @@ SCENARIO("Transferring NFTs")
          }
          WHEN("Bob opts out of auto-debit")
          {
-            b.setUserConf(autoDebit, false);
+            b.setAutoDebit(false);
 
-            AND_WHEN("Alice credits the NFT to Bob")
+            AND_WHEN("Alice transfers the NFT to Bob")
             {
-               auto credit = a.credit(nft.id, bob, "memo");
+               CHECK(a.transfer(nft.id, bob, "memo").succeeded());
 
                THEN("The NFT is not yet owned by Bob")
                {
@@ -251,10 +263,10 @@ SCENARIO("Transferring NFTs")
                   auto uncredit = a.uncredit(nft.id, "memo");
                   CHECK(uncredit.succeeded());
                }
-               THEN("Alice may not credit the NFT to someone else")
+               THEN("Alice may not transfer the NFT to someone else")
                {
-                  auto credit = a.credit(nft.id, charlie, "Memo");
-                  CHECK(credit.failed(alreadyCredited));
+                  auto transferred = a.transfer(nft.id, charlie, "Memo");
+                  CHECK(transferred.failed(alreadyCredited));
                }
                AND_WHEN("Bob debits the NFT")
                {
@@ -290,9 +302,9 @@ SCENARIO("Transferring NFTs")
                      CHECK(b.debit(nft.id, "memo").failed(nothingToDebit));
                      CHECK(c.debit(nft.id, "memo").failed(nothingToDebit));
                   }
-                  THEN("Alice may credit the NFT again")
+                  THEN("Alice may transfer the NFT again")
                   {
-                     CHECK(a.credit(nft.id, bob, "memo").succeeded());
+                     CHECK(a.transfer(nft.id, bob, "memo").succeeded());
                   }
                }
             }

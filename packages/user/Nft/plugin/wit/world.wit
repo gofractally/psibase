@@ -22,8 +22,18 @@ interface user {
     /// * `receiver` - Recipient account
     /// * `memo`     - Memo describing the credit
     ///
-    /// Places NFT in shared table when the debitor has auto debit disabled
+    /// Places the NFT in the shared table until it is debited
     credit: func(nft-id: u32, receiver: string, memo: string) -> result<_, error>;
+
+    /// Transfer an NFT to a recipient.
+    ///
+    /// Arguments
+    /// * `nft_id`   - Unique NFT identifier
+    /// * `receiver` - Recipient account
+    /// * `memo`     - Memo describing the transfer
+    ///
+    /// Credits the NFT, then debits it when the recipient has auto-debit enabled
+    transfer: func(nft-id: u32, receiver: string, memo: string) -> result<_, error>;
 
     /// Cancel a pending shared-balance credit.
     ///

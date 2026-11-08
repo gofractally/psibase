@@ -3,8 +3,8 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        abort_message, define_flags, get_sender, AccountNumber, Memo, Pack, ServiceWrapper, Table,
-        ToSchema, Unpack,
+        abort_message, get_sender, AccountNumber, Memo, Pack, ServiceWrapper, Table, ToSchema,
+        Unpack,
     };
     use serde::{Deserialize, Serialize};
 
@@ -17,10 +17,6 @@ pub mod tables {
     pub const CREDITED: u8 = 2;
     pub const DEBITED: u8 = 3;
     pub const UNCREDITED: u8 = 4;
-
-    define_flags!(NftHolderFlags, u8, {
-        auto_debit,
-    });
 
     #[table(name = "ConfigTable", index = 0)]
     #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
@@ -195,11 +191,10 @@ pub mod tables {
 
     #[table(name = "NftHolderTable", index = 2)]
     #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone)]
-    #[graphql(complex)]
     pub struct NftHolder {
         #[primary_key]
         pub account: AccountNumber,
-        pub config: u8,
+        pub autodebit: bool,
     }
 
     #[table(name = "CreditTable", index = 3)]
@@ -377,32 +372,38 @@ pub mod tables {
         }
     }
 
-    impl NftHolder {
-        pub fn get_or_default(account: AccountNumber) -> Self {
-            NftHolderTable::read()
-                .get_index_pk()
-                .get(&account)
-                .unwrap_or(Self { account, config: 0 })
-        }
-
-        pub fn get_flag(&self, flag: NftHolderFlags) -> bool {
-            psibase::Flags::new(self.config).get(flag)
-        }
-
-        pub fn set_flag(&mut self, flag: NftHolderFlags, enable: bool) {
-            self.config = psibase::Flags::new(self.config).set(flag, enable).value();
-            self.save();
-        }
-
-        pub fn save(&self) {
-            NftHolderTable::read_write().put(self).unwrap();
-        }
+    fn account_has_service(account: AccountNumber) -> bool {
+        let native = psibase::KvHandle::new(psibase::DbId::Native, &[], psibase::KvMode::Read);
+        let key = (
+            psibase::CODE_TABLE,
+            psibase::NATIVE_TABLE_PRIMARY_INDEX,
+            account,
+        );
+        psibase::kv_get::<psibase::CodeRow, _>(&native, &key)
+            .unwrap()
+            .is_some_and(|row| row.codeHash != psibase::Checksum256::default())
     }
 
-    #[ComplexObject]
     impl NftHolder {
-        pub async fn settings(&self) -> NftHolderFlagsJson {
-            NftHolderFlagsJson::from(psibase::Flags::new(self.config))
+        fn new(account: AccountNumber) -> Self {
+            Self {
+                account,
+                autodebit: !account_has_service(account),
+            }
+        }
+
+        fn get(account: AccountNumber) -> Option<Self> {
+            NftHolderTable::read().get_index_pk().get(&account)
+        }
+
+        pub fn get_or_new(account: AccountNumber) -> Self {
+            Self::get(account).unwrap_or_else(|| Self::new(account))
+        }
+
+        pub fn set(account: AccountNumber, autodebit: bool) {
+            NftHolderTable::read_write()
+                .put(&Self { account, autodebit })
+                .unwrap();
         }
     }
 }
@@ -459,19 +460,23 @@ pub mod service {
     pub fn credit(nft_id: NID, debitor: AccountNumber, memo: Memo) {
         let creditor = get_sender();
         Nft::get_assert(nft_id).check_is_owner(creditor);
+        CreditRecord::add(nft_id, creditor, debitor, memo);
+    }
+
+    #[action]
+    pub fn transfer(nft_id: NID, debitor: AccountNumber, memo: Memo) {
+        let creditor = get_sender();
+        Nft::get_assert(nft_id).check_is_owner(creditor);
 
         let credit_record = CreditRecord::add(nft_id, creditor, debitor, memo.clone());
-
-        let receiver_holder = NftHolder::get_or_default(debitor);
-        let auto_debit = receiver_holder.get_flag(NftHolderFlags::AUTO_DEBIT);
-        if auto_debit {
+        if NftHolder::get_or_new(debitor).autodebit {
             credit_record.debit(memo);
         }
     }
 
     #[action]
     fn getNftHolder(account: AccountNumber) -> NftHolder {
-        NftHolder::get_or_default(account)
+        NftHolder::get_or_new(account)
     }
 
     #[action]
@@ -502,13 +507,8 @@ pub mod service {
     }
 
     #[action]
-    pub fn setUserConf(index: u8, enable: bool) {
-        NftHolder::get_or_default(get_sender()).set_flag(index.into(), enable);
-    }
-
-    #[action]
-    pub fn getUserConf(account: AccountNumber, index: u8) -> bool {
-        NftHolder::get_or_default(account).get_flag(index.into())
+    pub fn setAutoDebit(autodebit: bool) {
+        NftHolder::set(get_sender(), autodebit);
     }
 
     #[action]
