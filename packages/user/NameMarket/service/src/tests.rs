@@ -200,7 +200,7 @@ mod tests {
             .and_then(|v| v.as_u64())
             .expect("purchasedAccount.nftId") as u32;
         Nfts::push_from(&chain, alice)
-            .try_debit(nft_id, "".into())
+            .debit(nft_id, "".into())
             .get()?;
         Nfts::push_from(&chain, alice)
             .credit(nft_id, NameMarket::SERVICE, "".into())

@@ -529,17 +529,6 @@ pub mod service {
         credit_record.debit(memo);
     }
 
-    /// Debit a pending credit. The sender must be the debitor.
-    /// Ownership is checked only when no credit record exists.
-    #[action]
-    pub fn try_debit(nftId: NID, memo: Memo) {
-        if CreditRecord::get(nftId).is_some() {
-            debit(nftId, memo);
-        } else {
-            Nft::get_assert(nftId).check_is_owner(get_sender());
-        }
-    }
-
     #[action]
     pub fn setUserConf(index: u8, enable: bool) {
         NftHolder::get_or_default(get_sender()).set_flag(index.into(), enable);

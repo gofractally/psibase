@@ -75,11 +75,9 @@ function nextPage(
 export async function fetchAllUnclaimedNames() {
     const allNames: string[] = [];
     let unclaimedAfter = "";
-    let debitedAfter = "";
     let unclaimedMore = true;
-    let debitedMore = true;
 
-    while (unclaimedMore || debitedMore) {
+    while (unclaimedMore) {
         const page = zUnclaimedNamesPageData.parse(
             await nameMarketAuthorizedGraphql(
                 `
@@ -87,33 +85,20 @@ export async function fetchAllUnclaimedNames() {
                         unclaimedNames(first: ${FETCH_BATCH_SIZE}${unclaimedAfter}) {
                             ${PURCHASED_NAMES_FIELDS}
                         }
-                        debitedNames(first: ${FETCH_BATCH_SIZE}${debitedAfter}) {
-                            ${PURCHASED_NAMES_FIELDS}
-                        }
                     }
                 `,
             ),
         );
 
-        if (unclaimedMore) {
-            allNames.push(...accountNames(page.unclaimedNames));
-            const next = nextPage(page.unclaimedNames);
-            unclaimedMore = next.more;
-            if (next.after) {
-                unclaimedAfter = next.after;
-            }
-        }
-        if (debitedMore) {
-            allNames.push(...accountNames(page.debitedNames));
-            const next = nextPage(page.debitedNames);
-            debitedMore = next.more;
-            if (next.after) {
-                debitedAfter = next.after;
-            }
+        allNames.push(...accountNames(page.unclaimedNames));
+        const next = nextPage(page.unclaimedNames);
+        unclaimedMore = next.more;
+        if (next.after) {
+            unclaimedAfter = next.after;
         }
     }
 
-    return [...new Set(allNames)];
+    return allNames;
 }
 
 const NAME_EVENT_NODE_FIELDS = `

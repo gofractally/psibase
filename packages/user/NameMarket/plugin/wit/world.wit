@@ -86,7 +86,7 @@ interface api {
 
     /// Purchase an account name.
     ///
-    /// Guesses a redemption NFT id and buys the name with that id.
+    /// Guesses a redemption NFT id, buys the name with that id, and debits the NFT to the buyer.
     /// * `account`: the account to purchase the name for
     /// * `max-cost`: maximum payment in network token
     buy: func(account: string, max-cost: string) -> result<_, error>;

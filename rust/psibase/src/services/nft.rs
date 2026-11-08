@@ -79,11 +79,6 @@ mod service {
     }
 
     #[action]
-    fn try_debit(nftId: crate::services::nft::NID, memo: Memo) {
-        unimplemented!()
-    }
-
-    #[action]
     fn setUserConf(index: u8, enable: bool) {
         unimplemented!()
     }

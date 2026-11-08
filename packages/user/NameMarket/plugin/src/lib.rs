@@ -222,16 +222,16 @@ impl Api for NameMarketPlugin {
 
     #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
-        schedule_buy(&account, &max_cost)?;
+        let nft_id = schedule_buy(&account, &max_cost)?;
+        bindings::nft::plugin::user::debit(nft_id, "")?;
         Ok(())
     }
 
     #[psibase_plugin::authorized(High, whitelist = ["host", "homepage"])]
     fn buy_and_claim(account: String, max_cost: String) -> Result<(), Error> {
         let nft_id = schedule_buy(&account, &max_cost)?;
-        bindings::nft::plugin::user::try_debit(nft_id, "")?;
-        bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
-        add_claim(&account)
+        bindings::nft::plugin::user::debit(nft_id, "")?;
+        schedule_claim(&account, nft_id)
     }
 
     #[psibase_plugin::authorized(Medium, whitelist = ["host", "homepage"])]
@@ -343,9 +343,8 @@ fn schedule_buy(account: &str, max_cost: &String) -> Result<u32, Error> {
     Ok(nft_id)
 }
 
-/// Takes a pending credit to the caller, credits the NFT to namemarket, then claims.
+/// Credits the caller's redemption NFT to namemarket, then claims.
 fn schedule_claim(account: &str, nft_id: u32) -> Result<(), Error> {
-    bindings::nft::plugin::user::try_debit(nft_id, "")?;
     bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
     add_claim(account)
 }

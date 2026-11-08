@@ -89,7 +89,6 @@ const zPurchasedNamesConnection = z
 
 export const zUnclaimedNamesPageData = z.object({
     unclaimedNames: zPurchasedNamesConnection,
-    debitedNames: zPurchasedNamesConnection,
 });
 
 export type NameEvent = z.infer<typeof zNameEvent>;
