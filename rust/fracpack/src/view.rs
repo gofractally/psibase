@@ -156,6 +156,7 @@ generic_view!(VecView<T>: Vec<T>);
 impl<'a, T: MakeView + Unpack<'a>> Index<usize> for VecView<T> {
     type Output = View<T>;
     fn index(&self, index: usize) -> &Self::Output {
+        assert!(index < self.len());
         let stream = FracInputStream::new(&self.data);
         let orig_pos = 4 + T::FIXED_SIZE * index as u32;
         if T::VARIABLE_SIZE && !T::IS_OPTIONAL {
