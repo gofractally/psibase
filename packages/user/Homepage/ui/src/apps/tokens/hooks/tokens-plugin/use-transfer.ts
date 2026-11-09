@@ -15,9 +15,9 @@ const Args = z.object({
     receiver: zAccount,
 });
 
-export const useCredit = (user: string | null) => {
+export const useTransfer = (user: string | null) => {
     return useMutation<void, Error, z.infer<typeof Args>>({
-        mutationKey: ["credit"],
+        mutationKey: ["transfer"],
         mutationFn: (vars) => {
             const { receiver, amount, memo, tokenId } = Args.parse(vars);
 
@@ -33,7 +33,7 @@ export const useCredit = (user: string | null) => {
                 service: "homepage",
                 plugin: "plugin",
                 intf: "tokens",
-                method: "credit",
+                method: "transfer",
                 params: [tokenId, receiver, amount, memo],
             });
         },

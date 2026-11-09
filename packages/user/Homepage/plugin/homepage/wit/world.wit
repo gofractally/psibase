@@ -20,6 +20,7 @@ interface tokens {
     use tokens:plugin/types.{decimal, system-token-info, user-balance};
 
     credit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
+    transfer: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
     uncredit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
     debit: func(token-id: u32, creditor: string, amount: decimal, memo: string) -> result<_, error>;
     reject: func(token-id: u32, creditor: string, memo: string) -> result<_, error>;
