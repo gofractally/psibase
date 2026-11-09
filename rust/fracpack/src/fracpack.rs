@@ -6,7 +6,7 @@
 //!
 //! - Quickly pack and unpack data, making it suitable for service-to-service communication, node-to-node communication, blockchain-to-outside communication, and database storage.
 //! - Forwards and backwards compatibility; it supports adding new optional fields to the end of structs and tuples, even when they are embedded in variable-length vectors, fixed-length arrays, optional, and other structs and tuples.
-//! - Option to read without unpacking (almost zero-copy); helps to efficiently handle large data. TODO: this library doesn't implement this feature yet.
+//! - Option to read without unpacking (almost zero-copy); helps to efficiently handle large data.
 //! - Doesn't require a code generator to support either C++ or Rust; macros and metaprogramming handle it.
 //! - Efficient compression when combined with the compression algorithm from Cap 'n' Proto.
 //!
