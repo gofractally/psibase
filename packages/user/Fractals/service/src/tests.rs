@@ -113,7 +113,7 @@ mod chain {
     };
     use crate::helpers::donation_sub_account;
     use crate::Wrapper;
-    use psibase::services::tokens::{BalanceFlags, Quantity, Wrapper as Tokens};
+    use psibase::services::tokens::{Quantity, Wrapper as Tokens};
     use psibase::*;
 
     const ALICE: AccountNumber = account!("alice");
@@ -177,12 +177,23 @@ mod chain {
         dist_token(chain);
     }
 
+    fn take_claim(chain: &Chain, tid: u32) -> Result<(), psibase::Error> {
+        Wrapper::push_from(chain, ALICE)
+            .claim_rew(FRACTAL, ALICE)
+            .get()?;
+        let pending = Tokens::push(chain)
+            .getSharedBal(tid, Wrapper::SERVICE, ALICE)
+            .get()?;
+        if pending.value > 0 {
+            Tokens::push_from(chain, ALICE)
+                .debit(tid, Wrapper::SERVICE, pending, "".into())
+                .get()?;
+        }
+        Ok(())
+    }
+
     fn setup(chain: &mut Chain) -> u32 {
         chain.new_account(ALICE).unwrap();
-        Tokens::push_from(chain, ALICE)
-            .setUserConf(BalanceFlags::AUTO_DEBIT.index(), true)
-            .get()
-            .unwrap();
 
         Wrapper::push_from(chain, ALICE)
             .create_frac(FRACTAL, "Test".into(), "Mission".into())
@@ -199,10 +210,7 @@ mod chain {
 
         drain_stream(chain);
         pass_time(chain, DEFAULT_MEMBER_DISTRIBUTION_INTERVAL as i64);
-        Wrapper::push_from(chain, ALICE)
-            .claim_rew(FRACTAL, ALICE)
-            .get()
-            .unwrap();
+        take_claim(chain, tid).unwrap();
         // Claiming applies the recruitment levy into the fractal stream; drain it
         // so later dist_token can observe donations (or income) in isolation.
         drain_stream(chain);
@@ -264,9 +272,7 @@ mod chain {
 
         pass_time(&chain, DEFAULT_MEMBER_DISTRIBUTION_INTERVAL as i64);
         let before = Tokens::push(&chain).getBalance(tid, ALICE).get()?.value;
-        Wrapper::push_from(&chain, ALICE)
-            .claim_rew(FRACTAL, ALICE)
-            .get()?;
+        take_claim(&chain, tid)?;
         let after = Tokens::push(&chain).getBalance(tid, ALICE).get()?.value;
         assert!(
             after > before,

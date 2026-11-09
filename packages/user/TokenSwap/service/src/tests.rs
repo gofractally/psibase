@@ -4,19 +4,29 @@
 mod tests {
     use crate::Wrapper;
     use psibase::services::nft::NID;
-    use psibase::services::tokens::{BalanceFlags, Quantity, Wrapper as Tokens, TID};
+    use psibase::services::tokens::{Quantity, Wrapper as Tokens, TID};
     use psibase::*;
 
-    fn enable_token_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
-        Tokens::push_from(chain, account)
-            .setUserConf(BalanceFlags::AUTO_DEBIT.index(), true)
+    fn claim_credit(
+        chain: &psibase::Chain,
+        holder: AccountNumber,
+        token_id: TID,
+        creditor: AccountNumber,
+    ) {
+        let pending = Tokens::push(chain)
+            .getSharedBal(token_id, creditor, holder)
             .get()
             .unwrap();
+        if pending.value > 0 {
+            Tokens::push_from(chain, holder)
+                .debit(token_id, creditor, pending, "".into())
+                .get()
+                .unwrap();
+        }
     }
 
     fn setup_user(chain: &psibase::Chain, account: AccountNumber) {
         chain.new_account(account).unwrap();
-        enable_token_auto_debit(chain, account);
     }
 
     #[track_caller]
@@ -146,6 +156,13 @@ mod tests {
 
         action();
 
+        let token_swap = account!("token-swap");
+        for &(token, exp_delta) in &expectations {
+            if exp_delta > 0 {
+                claim_credit(chain, sender, token, token_swap);
+            }
+        }
+
         // Assert deltas
         for (i, &(token, exp_delta)) in expectations.iter().enumerate() {
             let after = get_balance(chain, token, sender);
@@ -180,6 +197,7 @@ mod tests {
             b_reserve_amount,
             None,
         );
+        claim_credit(&chain, sender, pool_id, account!("token-swap"));
 
         (pool_id, nft_id, token_a, token_b)
     }
@@ -294,6 +312,7 @@ mod tests {
                     .add_liquidity(pool_id, token_a, token_b, 100.into(), 200.into())
                     .get()
                     .unwrap();
+                claim_credit(&chain, alice, pool_id, account!("token-swap"));
             },
         );
 
@@ -324,6 +343,7 @@ mod tests {
                     .add_liquidity(pool_id, token_a, token_b, 5000.into(), 5000.into())
                     .get()
                     .unwrap();
+                claim_credit(&chain, alice, pool_id, account!("token-swap"));
             },
         );
 
@@ -379,6 +399,7 @@ mod tests {
             100_000.into(),
             None,
         );
+        claim_credit(&chain, alice, pool_bc, token_swap);
 
         // Swap A → C via A-B then B-C
         swap_and_assert(

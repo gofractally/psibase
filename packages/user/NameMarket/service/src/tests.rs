@@ -9,7 +9,7 @@ mod tests {
 
     use crate::Wrapper as NameMarket;
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::services::tokens::{BalanceFlags, Precision, Quantity, Wrapper as Tokens, TID};
+    use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
     use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
 
@@ -24,13 +24,6 @@ mod tests {
             .credit(sys, NameMarket::SERVICE, amount, "".into())
             .get()?;
         Ok(())
-    }
-
-    fn enable_token_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
-        Tokens::push_from(chain, account)
-            .setUserConf(BalanceFlags::AUTO_DEBIT.index(), true)
-            .get()
-            .unwrap();
     }
 
     fn initial_setup(chain: &psibase::Chain) -> Result<TID, psibase::Error> {
@@ -59,15 +52,19 @@ mod tests {
             .mint(sys, Quantity::from(supply), "".into())
             .get()?;
 
-        enable_token_auto_debit(chain, alice);
-        enable_token_auto_debit(chain, bob);
-
+        let user_balance: Quantity = 100_000_0000u64.into();
         Tokens::push_from(chain, symbol)
-            .credit(sys, alice, 100_000_0000u64.into(), "".into())
+            .credit(sys, alice, user_balance, "".into())
+            .get()?;
+        Tokens::push_from(chain, alice)
+            .debit(sys, symbol, user_balance, "".into())
             .get()?;
 
         Tokens::push_from(chain, symbol)
-            .credit(sys, bob, 100_000_0000u64.into(), "".into())
+            .credit(sys, bob, user_balance, "".into())
+            .get()?;
+        Tokens::push_from(chain, bob)
+            .debit(sys, symbol, user_balance, "".into())
             .get()?;
 
         Ok(sys)

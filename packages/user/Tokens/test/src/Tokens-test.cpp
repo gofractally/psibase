@@ -42,8 +42,7 @@ SCENARIO("Using system token")
 
       auto alice = t.from(t.addAccount("alice"_a));
       auto a     = alice.to<Tokens>();
-      a.setUserConf(Tokens::autoDebit, true);
-      auto bob = t.from(t.addAccount("bob"_a));
+      auto bob   = t.from(t.addAccount("bob"_a));
 
       auto     sysIssuer = t.from(Symbol::service).to<Tokens>();
       Quantity userBalance{1'000'000'00e4};
@@ -72,6 +71,7 @@ SCENARIO("Using system token")
 
       THEN("Alice cannot credit system tokens to anyone")
       {
+         CHECK(a.debit(sysToken, Symbol::service, userBalance, memo).succeeded());
          CHECK(a.credit(sysToken, bob, userBalance / 2, memo).failed(tokenUntradeable));
       }
 
@@ -81,6 +81,7 @@ SCENARIO("Using system token")
 
          AND_THEN("Alice may credit system tokens to anyone")
          {
+            CHECK(a.debit(sysToken, Symbol::service, userBalance, memo).succeeded());
             CHECK(a.credit(sysToken, bob, userBalance / 2, memo).succeeded());
          }
          AND_THEN("Alice may not credit the system token to herself")
@@ -224,9 +225,8 @@ SCENARIO("Recalling tokens")
       claimIssuedNft(alice, tokenId);
       auto token   = a.getToken(tokenId).returnVal();
       a.mint(tokenId, 1'000e4, memo);
-      a.setUserConf(Tokens::autoDebit, true);
-      b.setUserConf(Tokens::autoDebit, true);
       a.credit(tokenId, bob, 1'000e4, memo);
+      CHECK(b.debit(tokenId, alice, 1'000e4, memo).succeeded());
 
       THEN("The token is recallable by default")
       {
@@ -280,9 +280,6 @@ SCENARIO("Interactions with the Issuer NFT")
       auto token   = a.getToken(tokenId).returnVal();
       auto nft     = alice.to<Nft>().getNft(token.nft_id).returnVal().value();
 
-      a.setUserConf(Tokens::autoDebit, true);
-      b.setUserConf(Tokens::autoDebit, true);
-
       THEN("The Issuer NFT is owned by Alice")
       {
          CHECK(nft.owner == alice.id);
@@ -322,6 +319,7 @@ SCENARIO("Interactions with the Issuer NFT")
             Quantity q{1'000e4};
             b.mint(tokenId, q, memo);
             b.credit(tokenId, alice, q, memo);
+            CHECK(a.debit(tokenId, bob, q, memo).succeeded());
             CHECK(b.recall(tokenId, alice, q, memo, std::nullopt).succeeded());
          }
       }
@@ -330,6 +328,7 @@ SCENARIO("Interactions with the Issuer NFT")
          Quantity quantity{1'000e4};
          a.mint(tokenId, quantity, memo);
          a.credit(tokenId, bob, quantity, memo);
+         CHECK(b.debit(tokenId, alice, quantity, memo).succeeded());
          alice.to<Nft>().burn(nft.id);
 
          THEN("Alice may not mint new tokens")
@@ -372,9 +371,8 @@ SCENARIO("Burning tokens")
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
 
-      a.setUserConf(Tokens::autoDebit, true);
-      b.setUserConf(Tokens::autoDebit, true);
       a.credit(tokenId, bob, 100e4, memo);
+      CHECK(b.debit(tokenId, alice, 100e4, memo).succeeded());
 
       THEN("Alice may not burn 101 tokens")
       {
@@ -711,14 +709,11 @@ SCENARIO("Mapping a symbol to a token")
       auto bob         = t.from(t.addAccount("bob"_a));
       auto aliceTokens = alice.to<Tokens>();
       auto aliceSymbol = alice.to<Symbol>();
-      auto bobTokens   = bob.to<Tokens>();
       auto bobSymbol   = bob.to<Symbol>();
 
       // Issue system tokens
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e4;
-      aliceTokens.setUserConf(Tokens::autoDebit, true);
-      bobTokens.setUserConf(Tokens::autoDebit, true);
 
       auto sysToken = sysIssuer.create(Precision{4}, userBalance).returnVal();
 
@@ -732,6 +727,7 @@ SCENARIO("Mapping a symbol to a token")
       REQUIRE(t.from(Tokens::service).to<Tokens>().setSysToken(sysToken).succeeded());
       REQUIRE(t.from(Symbol::service).to<Symbol>().sellLength(3, 10000000, 24, 5000).succeeded());
       sysIssuer.credit(sysToken, alice, userBalance, memo);
+      CHECK(aliceTokens.debit(sysToken, Symbol::service, userBalance, memo).succeeded());
 
       // Mint a second token
       auto newToken = aliceTokens.create(Precision{4}, userBalance).returnVal();
@@ -854,9 +850,6 @@ TEST_CASE("GraphQL Queries")
    auto a     = alice.to<Tokens>();
    auto bob   = t.from(t.addAccount("bob"_a));
 
-   a.setUserConf(Tokens::autoDebit, true);
-   bob.to<Tokens>().setUserConf(Tokens::autoDebit, true);
-
    auto sysIssuer = t.from(Symbol::service).to<Tokens>();
    auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
    t.from(Symbol::service).to<Nft>().debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "");
@@ -867,6 +860,7 @@ TEST_CASE("GraphQL Queries")
    sysIssuer.mint(sysToken, userBalance, memo);
 
    REQUIRE(sysIssuer.credit(sysToken, alice, userBalance, memo).succeeded());
+   REQUIRE(a.debit(sysToken, Symbol::service, userBalance, memo).succeeded());
    REQUIRE(sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false).succeeded());
    t.finishBlock();
 
@@ -884,6 +878,7 @@ TEST_CASE("GraphQL Queries")
        R"({"data":{"userBalances":{"edges":[{"node":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
 
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 500e4, memo).succeeded());
+   REQUIRE(bob.to<Tokens>().debit(sysToken, alice, 500e4, memo).succeeded());
    REQUIRE(alice.to<Tokens>().setUserConf(Tokens::autoDebit, false).succeeded());
    REQUIRE(bob.to<Tokens>().setUserConf(Tokens::autoDebit, false).succeeded());
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
