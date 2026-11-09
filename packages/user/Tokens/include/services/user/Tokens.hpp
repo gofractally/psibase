@@ -69,8 +69,7 @@ namespace UserService
       /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
       ///
       /// Configurations:
-      /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
-      ///                           the receiver.
+      /// * 0: auto_debit       - If enabled, transfers to this account are automatically debited.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
       void setUserConf(uint8_t index, bool enable);
@@ -85,8 +84,7 @@ namespace UserService
       /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
       ///
       /// Configurations:
-      /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
-      ///                           the receiver.
+      /// * 0: auto_debit       - If enabled, transfers to this account are automatically debited.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
       void setBalConf(TID tokenId, uint8_t index, bool enable);
@@ -113,8 +111,8 @@ namespace UserService
 
       /// Credit tokens to a debitor (recipient).
       ///
-      /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
-      /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
+      /// On credit, tokens are placed in the shared balance until the debitor debits them.
+      /// `transfer` debits them automatically when the debitor has `auto_debit` enabled.
       ///
       /// # Shared balance mechanics
       /// When in the shared balance, the tokens can be:
@@ -129,10 +127,21 @@ namespace UserService
       /// * `memo`     - Memo
       void credit(TID tokenId, psibase::AccountNumber debitor, Quantity amount, Memo memo);
 
+      /// Transfer tokens to a debitor (recipient).
+      ///
+      /// Credits the tokens, then debits them when the recipient has auto-debit enabled.
+      ///
+      /// # Arguments
+      /// * `token_id` - Unique token identifier
+      /// * `debitor`  - Debitor / recipient
+      /// * `amount`   - Amount to transfer
+      /// * `memo`     - Memo
+      void transfer(TID tokenId, psibase::AccountNumber debitor, Quantity amount, Memo memo);
+
       /// Uncredit tokens that were credited into a shared balance
       ///
-      /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
-      /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
+      /// On credit, tokens are placed in the shared balance until the debitor debits them.
+      /// `transfer` debits them automatically when the debitor has `auto_debit` enabled.
       ///
       /// # Shared balance mechanics
       /// When in the shared balance, the tokens can be:
@@ -149,8 +158,8 @@ namespace UserService
 
       /// Rejects the shared balance between a creditor and a debitor
       ///
-      /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
-      /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
+      /// On credit, tokens are placed in the shared balance until the debitor debits them.
+      /// `transfer` debits them automatically when the debitor has `auto_debit` enabled.
       ///
       /// # Shared balance mechanics
       /// When in the shared balance, the tokens can be:
@@ -166,8 +175,8 @@ namespace UserService
 
       /// Debit tokens that were credited into a shared balance
       ///
-      /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
-      /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
+      /// On credit, tokens are placed in the shared balance until the debitor debits them.
+      /// `transfer` debits them automatically when the debitor has `auto_debit` enabled.
       ///
       /// # Shared balance mechanics
       /// When in the shared balance, the tokens can be:
@@ -303,8 +312,7 @@ namespace UserService
       ///                See `Configurations` for details
       ///
       /// Configurations:
-      /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
-      ///                           the receiver.
+      /// * 0: auto_debit       - If enabled, transfers to this account are automatically debited.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
       ///
@@ -322,8 +330,7 @@ namespace UserService
       ///                See `Configurations` for details
       ///
       /// Configurations:
-      /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
-      ///                           the receiver.
+      /// * 0: auto_debit       - If enabled, transfers to this account are automatically debited.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
       ///
@@ -400,6 +407,7 @@ namespace UserService
       method(setUserConf, index, enable),
       method(setTokenConf, tokenId, index, enable),
       method(credit, tokenId, debitor, amount, memo),
+      method(transfer, tokenId, debitor, amount, memo),
       method(uncredit, tokenId, debitor, amount, memo),
       method(reject, tokenId, creditor, memo),
       method(toSub, tokenId, subAccount, amount),

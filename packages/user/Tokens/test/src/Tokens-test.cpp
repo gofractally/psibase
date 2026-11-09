@@ -448,15 +448,27 @@ SCENARIO("Toggling auto-debit")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      THEN("Alice and Bob both have autoDebit disabled")
+      THEN("Alice and Bob both have autoDebit enabled")
       {
          auto isAutoDebit1 = a.getUserConf(alice, Tokens::autoDebit);
          REQUIRE(isAutoDebit1.succeeded());
-         CHECK(isAutoDebit1.returnVal() == false);
+         CHECK(isAutoDebit1.returnVal() == true);
 
          auto isAutoDebit2 = a.getUserConf(bob, Tokens::autoDebit);
          REQUIRE(isAutoDebit2.succeeded());
-         CHECK(isAutoDebit2.returnVal() == false);
+         CHECK(isAutoDebit2.returnVal() == true);
+      }
+      THEN("A service account has autoDebit disabled")
+      {
+         auto isAutoDebit = a.getUserConf(Tokens::service, Tokens::autoDebit);
+         REQUIRE(isAutoDebit.succeeded());
+         CHECK(isAutoDebit.returnVal() == false);
+      }
+      THEN("Setting keep-zero does not clear auto-debit")
+      {
+         CHECK(a.setUserConf(1, true).succeeded());
+         CHECK(a.getUserConf(alice, Tokens::autoDebit).returnVal() == true);
+         CHECK(a.getUserConf(alice, 1).returnVal() == true);
       }
       THEN("Alice may enable auto-debit")
       {  //
@@ -470,9 +482,9 @@ SCENARIO("Toggling auto-debit")
          {  //
             CHECK(a.getUserConf(alice, Tokens::autoDebit).returnVal() == true);
          }
-         THEN("Bob still has auto-debit disabled")
+         THEN("Bob still has auto-debit enabled")
          {  //
-            CHECK(a.getUserConf(bob, Tokens::autoDebit).returnVal() == false);
+            CHECK(a.getUserConf(bob, Tokens::autoDebit).returnVal() == true);
          }
          THEN("Alice may enable auto-debit again. Idempotent.")
          {
@@ -491,9 +503,9 @@ SCENARIO("Toggling auto-debit")
             {  //
                CHECK(a.getUserConf(alice, Tokens::autoDebit).returnVal() == false);
             }
-            AND_THEN("Bob still has auto-debit disabled")
+            AND_THEN("Bob still has auto-debit enabled")
             {
-               CHECK(a.getUserConf(bob, Tokens::autoDebit).returnVal() == false);
+               CHECK(a.getUserConf(bob, Tokens::autoDebit).returnVal() == true);
             }
          }
       }
@@ -517,19 +529,31 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       auto mint    = a.mint(tokenId, 200e4, memo);
       a.setUserConf(Tokens::autoDebit, true);
       b.setUserConf(Tokens::autoDebit, true);
-      a.credit(tokenId, bob, 100e4, memo);
+      a.transfer(tokenId, bob, 100e4, memo);
 
-      THEN("Alice may not credit Bob 101 tokens")
+      THEN("Credit does not move tokens when auto-debit is enabled")
       {
-         CHECK(a.credit(tokenId, bob, 101e4, memo).failed(insufficientBalance));
+         CHECK(a.credit(tokenId, bob, 10e4, memo).succeeded());
+         CHECK(b.getBalance(tokenId, bob).returnVal().value == 100e4);
+         CHECK(a.getSharedBal(tokenId, alice, bob).returnVal().value == 10e4);
       }
-      THEN("Alice may credit Bob 100 tokens")
+      THEN("Transfer to a service account stays pending")
       {
-         CHECK(a.credit(tokenId, bob, 100e4, memo).succeeded());
+         CHECK(a.transfer(tokenId, Tokens::service, 10e4, memo).succeeded());
+         CHECK(a.getBalance(tokenId, Tokens::service).returnVal().value == 0);
+         CHECK(a.getSharedBal(tokenId, alice, Tokens::service).returnVal().value == 10e4);
       }
-      WHEN("Alice credits Bob 100 tokens")
+      THEN("Alice may not transfer Bob 101 tokens")
       {
-         a.credit(tokenId, bob, 100e4, memo);
+         CHECK(a.transfer(tokenId, bob, 101e4, memo).failed(insufficientBalance));
+      }
+      THEN("Alice may transfer Bob 100 tokens")
+      {
+         CHECK(a.transfer(tokenId, bob, 100e4, memo).succeeded());
+      }
+      WHEN("Alice transfers Bob 100 tokens")
+      {
+         a.transfer(tokenId, bob, 100e4, memo);
 
          THEN("Bob immediately has 200 tokens")
          {  //
@@ -539,9 +563,9 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
          {  //
             CHECK(a.getBalance(tokenId, alice).returnVal().value == 0e4);
          }
-         THEN("Alice may not credit Bob 1 token")
+         THEN("Alice may not transfer Bob 1 token")
          {
-            CHECK(a.credit(tokenId, bob, 1e4, memo).failed(insufficientBalance));
+            CHECK(a.transfer(tokenId, bob, 1e4, memo).failed(insufficientBalance));
          }
          THEN("Bob may not debit any tokens")
          {
@@ -551,13 +575,13 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
          {
             CHECK(a.uncredit(tokenId, bob, 1e4, memo).failed(missingSharedBalance));
          }
-         THEN("Bob may credit Alice 10 tokens")
+         THEN("Bob may transfer Alice 10 tokens")
          {
-            CHECK(b.credit(tokenId, alice, 10e4, memo).succeeded());
+            CHECK(b.transfer(tokenId, alice, 10e4, memo).succeeded());
          }
-         AND_WHEN("Bob credits Alice 10 tokens")
+         AND_WHEN("Bob transfers Alice 10 tokens")
          {
-            b.credit(tokenId, alice, 10e4, memo);
+            b.transfer(tokenId, alice, 10e4, memo);
 
             THEN("Bob has 190 tokens")
             {  //
@@ -583,25 +607,26 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      a.setUserConf(Tokens::autoDebit, false);
       b.setUserConf(Tokens::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       claimIssuedNft(alice, tokenId);
       auto token   = a.getToken(tokenId).returnVal();
 
       a.mint(tokenId, 200e4, memo);
-      a.credit(tokenId, bob, 100e4, memo);
+      a.transfer(tokenId, bob, 100e4, memo);
 
-      THEN("Alice may credit Bob 50 tokens")
+      THEN("Alice may transfer Bob 50 tokens")
       {
-         CHECK(a.credit(tokenId, bob, 50e4, memo).succeeded());
+         CHECK(a.transfer(tokenId, bob, 50e4, memo).succeeded());
       }
-      THEN("Bob may credit Alice 50 tokens")
+      THEN("Bob may transfer Alice 50 tokens")
       {
-         CHECK(b.credit(tokenId, alice, 50e4, memo).succeeded());
+         CHECK(b.transfer(tokenId, alice, 50e4, memo).succeeded());
       }
-      WHEN("Alice credits Bob 50 tokens")
+      WHEN("Alice transfers Bob 50 tokens")
       {
-         a.credit(tokenId, bob, 50e4, memo);
+         a.transfer(tokenId, bob, 50e4, memo);
 
          THEN("The transfer happens immediately")
          {
@@ -619,9 +644,9 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
             CHECK(b.debit(tokenId, alice, 50e4, memo).failed(missingSharedBalance));
          }
       }
-      WHEN("Bob credits Alice 50 tokens")
+      WHEN("Bob transfers Alice 50 tokens")
       {
-         CHECK(b.credit(tokenId, alice, 50e4, memo).succeeded());
+         CHECK(b.transfer(tokenId, alice, 50e4, memo).succeeded());
 
          THEN("Bob owns 50 tokens in his individual balance")
          {
@@ -690,9 +715,9 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
             {
                CHECK(b.uncredit(tokenId, alice, 1e4, memo).failed(missingSharedBalance));
             }
-            AND_THEN("Bob may credit an additional 25 tokens")
+            AND_THEN("Bob may transfer an additional 25 tokens")
             {
-               CHECK(b.credit(tokenId, alice, 25e4, memo).succeeded());
+               CHECK(b.transfer(tokenId, alice, 25e4, memo).succeeded());
             }
          }
       }
