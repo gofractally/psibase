@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use crate::{FracInputStream, Result, Unpack};
 use std::marker::PhantomData;
 use std::ops::{Deref, Index};
@@ -302,8 +300,6 @@ impl<'a, T: MakeView + Unpack<'a>, const N: usize> ArrayView<T, N> {
         self.map(|x| x)
     }
     pub fn iter(&'a self) -> ViewIterator<'a, T> {
-        let mut pos = 0;
-        let stream = FracInputStream::new(&self.get_data());
         let size = N as u32 * T::FIXED_SIZE;
         ViewIterator {
             data: self.get_data(),
