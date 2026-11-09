@@ -62,6 +62,7 @@ fn view_def(fracpack_mod: &TokenStream2, input: &DeriveInput, opts: &Options) ->
     let lifetime = new_lifetime(&input.generics);
     let where_predicates = input.generics.where_clause.as_ref().map(|w| &w.predicates);
     quote! {
+        #[repr(transparent)]
         #vis struct #view_ty #impl_generics #where_clause (#fracpack_mod::GenericView<#ty #ty_generics>);
         impl #impl_generics #fracpack_mod::ViewData for #view_ty #ty_generics #where_clause {
             fn new_unchecked(data: &[u8]) -> &Self {
