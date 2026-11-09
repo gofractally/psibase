@@ -91,24 +91,20 @@ export function chainUrls(origin: { protocol: string; host: string }) {
     };
 }
 
-const PEM_PLACEHOLDER = "<PASTE agent private key HERE>";
-
 /**
  * Setup hand-off: identity and how to reach the chain. No task — that comes
  * in a later message. The owner account is the sender on proposals.
+ * The agent private key is never embedded; the owner pastes it separately.
  */
 export function agentHandOffPrompt(
     cfg: Pick<AgentCfg, "account" | "agent">,
     origin: { protocol: string; host: string },
-    opts: { pem?: string } = {},
 ) {
     const { node, xMcp } = chainUrls(origin);
-    const key = opts.pem?.trim() || PEM_PLACEHOLDER;
     return `You can execute transactions on the Psibase blockchain (node at ${node}) on behalf of the user.
 You are the agent account ${cfg.agent}. You act on behalf of the user's own account ${cfg.account}: propose staged transactions with ${cfg.account} as the sender. Allowlisted actions execute after the owner-held enforcer also accepts when configured; anything else waits for the user to approve. Never request or use the enforcer key.
 
-Private key for ${cfg.agent}:
-${key}
+Ask me for the private key you'll need to sign when you're ready to properly store a secret.
 
 Use this Model Context Protocol (MCP) endpoint for on-chain service discovery and unsigned transaction building. It never signs or pushes; follow its instructions for how to submit:
 ${xMcp}`;

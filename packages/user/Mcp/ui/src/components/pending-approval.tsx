@@ -1,19 +1,156 @@
 import type { PendingRow } from "../lib/logic";
 
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 
 import { Button } from "@shared/shadcn/ui/button";
-import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Input } from "@shared/shadcn/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@shared/shadcn/ui/select";
 
 import {
+    type Comparison,
     type InspectedAction,
-    type ParamLimit,
+    activeBound,
+    activeComparison,
     displayedParameters,
+    setComparison,
     standingRules,
 } from "../lib/limits";
 
 export type ApprovalMethod = "approve" | "approve-and-grant" | "reject";
+
+const COMPARISON_LABEL: Record<Comparison, string> = {
+    gt: ">",
+    lt: "<",
+    eq: "=",
+};
+
+function ActionSection({
+    action: a,
+    index,
+    ops,
+    setOps,
+    change,
+}: {
+    action: InspectedAction;
+    index: number;
+    ops: Record<string, Comparison>;
+    setOps: Dispatch<SetStateAction<Record<string, Comparison>>>;
+    change: (
+        index: number,
+        parameter: string,
+        comparison: Comparison,
+        value: string,
+    ) => void;
+}) {
+    const fields = displayedParameters(a);
+    const fieldFailures = new Set(
+        fields.flatMap(([name]) =>
+            a.failures.filter((reason) => reason.startsWith(`${name}:`)),
+        ),
+    );
+    return (
+        <section className="space-y-2">
+            <h3 className="font-medium">
+                {a.service}.{a.method}
+            </h3>
+            {a.failures
+                .filter((reason) => !fieldFailures.has(reason))
+                .map((reason) => (
+                    <p key={reason} className="text-amber-700" role="status">
+                        {reason}
+                    </p>
+                ))}
+            <p className="text-muted-foreground text-xs">
+                Filled thresholds are saved by Approve and Grant for future txs.
+                Values are JSON: quote strings; numbers compare exactly. &lt;
+                and &gt; are strict.
+            </p>
+            {fields.map(([name, value]) => {
+                const limit = a.limits.find((l) => l.parameter === name);
+                const comparison =
+                    ops[`${index}:${name}`] ??
+                    activeComparison(limit) ??
+                    "gt";
+                const bound = activeBound(limit) ?? "";
+                return (
+                    <div
+                        key={name}
+                        className="border-border space-y-1 border-t pt-2"
+                    >
+                        <p>
+                            <code>{name}</code>:{" "}
+                            <code>{JSON.stringify(value) ?? "missing"}</code>
+                        </p>
+                        {a.failures
+                            .filter((reason) =>
+                                reason.startsWith(`${name}:`),
+                            )
+                            .map((reason) => (
+                                <p
+                                    key={reason}
+                                    className="text-xs text-amber-700"
+                                >
+                                    {reason}
+                                </p>
+                            ))}
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={comparison}
+                                onValueChange={(next) => {
+                                    const op = next as Comparison;
+                                    setOps((old) => ({
+                                        ...old,
+                                        [`${index}:${name}`]: op,
+                                    }));
+                                    if (bound !== "")
+                                        change(index, name, op, bound);
+                                }}
+                            >
+                                <SelectTrigger
+                                    size="sm"
+                                    className="w-16"
+                                    aria-label={`${name} comparison`}
+                                >
+                                    <SelectValue>
+                                        {COMPARISON_LABEL[comparison]}
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(["gt", "lt", "eq"] as const).map(
+                                        (op) => (
+                                            <SelectItem key={op} value={op}>
+                                                {COMPARISON_LABEL[op]}
+                                            </SelectItem>
+                                        ),
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            <Input
+                                aria-label={`${name} threshold`}
+                                placeholder="threshold"
+                                value={bound}
+                                onChange={(e) =>
+                                    change(
+                                        index,
+                                        name,
+                                        comparison,
+                                        e.target.value,
+                                    )
+                                }
+                            />
+                        </div>
+                    </div>
+                );
+            })}
+        </section>
+    );
+}
 
 export function PendingApproval({
     row,
@@ -31,31 +168,28 @@ export function PendingApproval({
     const [actions, setActions] = useState<InspectedAction[]>(() =>
         JSON.parse(row.inspection ?? "[]"),
     );
+    const [ops, setOps] = useState<Record<string, Comparison>>({});
     const [error, setError] = useState("");
     const change = (
         index: number,
         parameter: string,
-        comparison: "lt" | "gt" | "eq",
-        value: string | null,
+        comparison: Comparison,
+        value: string,
     ) => {
         setActions((old) =>
-            old.map((a) => {
-                if (
-                    a.service !== old[index].service ||
-                    a.method !== old[index].method
-                )
-                    return a;
-                const limit: ParamLimit = a.limits.find(
-                    (l) => l.parameter === parameter,
-                ) ?? { parameter, lt: null, gt: null, eq: null };
-                return {
-                    ...a,
-                    limits: [
-                        ...a.limits.filter((l) => l.parameter !== parameter),
-                        { ...limit, [comparison]: value },
-                    ],
-                };
-            }),
+            old.map((a, i) =>
+                i !== index
+                    ? a
+                    : {
+                          ...a,
+                          limits: setComparison(
+                              a.limits,
+                              parameter,
+                              comparison,
+                              value,
+                          ),
+                      },
+            ),
         );
     };
     return (
@@ -70,107 +204,14 @@ export function PendingApproval({
             </p>
             <p>Not yet granted: {row.missing.join(", ") || "none"}</p>
             {actions.map((a, index) => (
-                <section key={index} className="space-y-2">
-                    <h3 className="font-medium">
-                        {a.service}.{a.method}
-                    </h3>
-                    {a.failures.map((reason) => (
-                        <p
-                            key={reason}
-                            className="text-amber-700"
-                            role="status"
-                        >
-                            {reason}
-                        </p>
-                    ))}
-                    <p className="text-muted-foreground text-xs">
-                        Enabled limits are saved by Approve and Grant. Values
-                        are JSON: quote strings; numbers compare exactly,
-                        including numeric strings. &lt; and &gt; are strict.
-                    </p>
-                    {displayedParameters(a).map(([name, value]) => {
-                        const limit = a.limits.find(
-                            (l) => l.parameter === name,
-                        );
-                        return (
-                            <div
-                                key={name}
-                                className="border-border space-y-1 border-t pt-2"
-                            >
-                                <p>
-                                    <code>{name}</code>:{" "}
-                                    <code>
-                                        {JSON.stringify(value) ?? "missing"}
-                                    </code>
-                                </p>
-                                {a.failures
-                                    .filter((reason) =>
-                                        reason.startsWith(`${name}:`),
-                                    )
-                                    .map((reason) => (
-                                        <p
-                                            key={reason}
-                                            className="text-xs text-amber-700"
-                                        >
-                                            {reason}
-                                        </p>
-                                    ))}
-                                {(["lt", "gt", "eq"] as const).map(
-                                    (comparison) => {
-                                        const bound =
-                                            limit?.[comparison] ?? null;
-                                        const label = `${name} ${comparison}`;
-                                        return (
-                                            <div
-                                                key={comparison}
-                                                className="flex items-center gap-2"
-                                            >
-                                                <Checkbox
-                                                    aria-label={`Enable ${label}`}
-                                                    checked={bound !== null}
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        change(
-                                                            index,
-                                                            name,
-                                                            comparison,
-                                                            checked === true
-                                                                ? (JSON.stringify(
-                                                                      value,
-                                                                  ) ?? "null")
-                                                                : null,
-                                                        )
-                                                    }
-                                                />
-                                                <span>
-                                                    {comparison === "lt"
-                                                        ? "Less than"
-                                                        : comparison === "gt"
-                                                          ? "Greater than"
-                                                          : "Specific value"}
-                                                </span>
-                                                <Input
-                                                    aria-label={label}
-                                                    disabled={bound === null}
-                                                    value={bound ?? ""}
-                                                    onChange={(e) =>
-                                                        change(
-                                                            index,
-                                                            name,
-                                                            comparison,
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                        );
-                                    },
-                                )}
-                            </div>
-                        );
-                    })}
-                </section>
+                <ActionSection
+                    key={index}
+                    action={a}
+                    index={index}
+                    ops={ops}
+                    setOps={setOps}
+                    change={change}
+                />
             ))}
             {error && <p role="alert">{error}</p>}
             <div className="flex flex-wrap gap-2">

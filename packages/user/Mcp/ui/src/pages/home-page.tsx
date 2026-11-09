@@ -47,6 +47,7 @@ export function HomePage() {
     const [autoDebitWarning, setAutoDebitWarning] = useState("");
     const [selectedOwner, setSelectedOwner] = useState<string | null>(null);
     const [copiedPrompt, setCopiedPrompt] = useState(false);
+    const [copiedKey, setCopiedKey] = useState(false);
 
     const nameErrors = useMemo(
         () => setupNameErrors(agent, owner),
@@ -67,12 +68,12 @@ export function HomePage() {
     );
     const handOffPrompt = useMemo(() => {
         if (!selectedCfg) return "";
-        const pem =
-            selectedCfg.agent === pendingAgent && pendingPem
-                ? pendingPem
-                : undefined;
-        return agentHandOffPrompt(selectedCfg, location, { pem });
-    }, [selectedCfg, pendingAgent, pendingPem]);
+        return agentHandOffPrompt(selectedCfg, location);
+    }, [selectedCfg]);
+    const handOffPem =
+        selectedCfg && selectedCfg.agent === pendingAgent && pendingPem
+            ? pendingPem
+            : "";
 
     const refreshAgents = useCallback(async () => {
         try {
@@ -412,6 +413,7 @@ export function HomePage() {
                                                 onClick={() => {
                                                     setSelectedOwner(a.account);
                                                     setCopiedPrompt(false);
+                                                    setCopiedKey(false);
                                                 }}
                                             >
                                                 owner <code>{a.account}</code> ·
@@ -430,16 +432,14 @@ export function HomePage() {
                                         Prompt for your agent
                                     </p>
                                     <p className="text-muted-foreground text-xs">
-                                        Give this to your agent.{" "}
-                                        {pendingAgent === selectedCfg.agent &&
-                                        pendingPem
-                                            ? "The key from this session is included."
-                                            : "Replace the key placeholder with the agent PEM you saved at setup."}
+                                        Give this to your agent. The private key
+                                        is separate — only share it when the
+                                        agent asks and can store a secret.
                                     </p>
                                     <Textarea
                                         data-testid="agent-prompt-text"
                                         readOnly
-                                        rows={14}
+                                        rows={12}
                                         className="font-mono text-xs"
                                         value={handOffPrompt}
                                     />
@@ -452,12 +452,43 @@ export function HomePage() {
                                                 handOffPrompt,
                                             );
                                             setCopiedPrompt(true);
+                                            setCopiedKey(false);
                                         }}
                                     >
                                         {copiedPrompt
                                             ? "Copied"
                                             : "Copy prompt"}
                                     </Button>
+                                    {handOffPem ? (
+                                        <div className="space-y-2 pt-2">
+                                            <Label>
+                                                Agent private key for{" "}
+                                                <code>{selectedCfg.agent}</code>
+                                            </Label>
+                                            <code
+                                                className="bg-muted block whitespace-pre-wrap break-all rounded-md p-3 text-xs"
+                                                data-testid="agent-prompt-pem"
+                                            >
+                                                {handOffPem}
+                                            </code>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                data-testid="copy-agent-prompt-pem"
+                                                onClick={async () => {
+                                                    await navigator.clipboard.writeText(
+                                                        handOffPem,
+                                                    );
+                                                    setCopiedKey(true);
+                                                    setCopiedPrompt(false);
+                                                }}
+                                            >
+                                                {copiedKey
+                                                    ? "Copied"
+                                                    : "Copy"}
+                                            </Button>
+                                        </div>
+                                    ) : null}
                                 </div>
                             ) : null}
                         </div>
@@ -522,71 +553,96 @@ export function HomePage() {
                 {step === "save" && (
                     <div id="setup-save" className="max-w-xl space-y-4">
                         <p className="text-sm">
-                            Save this agent private key. You cannot recover it
+                            Save both private keys. You cannot recover them
                             later.
                         </p>
-                        <code
-                            className="bg-muted block whitespace-pre-wrap break-all rounded-md p-3 text-xs"
-                            id="agent-pem"
-                            data-testid="agent-pem"
-                        >
-                            {pendingPem}
-                        </code>
-                        <p className="text-sm">
-                            Save this enforcer private key separately. Keep it
-                            yourself; NEVER give it to your agent. The host
-                            vault retains it for checks while this UI is open.
-                        </p>
-                        <code
-                            className="bg-muted block whitespace-pre-wrap break-all rounded-md p-3 text-xs"
-                            data-testid="enforcer-pem"
-                        >
-                            {enforcerPem}
-                        </code>
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                data-testid="download-key"
-                                onClick={downloadKey}
+                        <div className="space-y-2">
+                            <Label htmlFor="agent-pem">
+                                Agent key for <code>{pendingAgent}</code>
+                            </Label>
+                            <p className="text-muted-foreground text-xs">
+                                Give this to your agent so it can propose
+                                transactions.
+                            </p>
+                            <code
+                                className="bg-muted block whitespace-pre-wrap break-all rounded-md p-3 text-xs"
+                                id="agent-pem"
+                                data-testid="agent-pem"
                             >
-                                Download .pem
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                data-testid="copy-key"
-                                onClick={async () => {
-                                    await navigator.clipboard.writeText(
-                                        pendingPem,
-                                    );
-                                    setSetupStatus("Copied.");
-                                }}
-                            >
-                                Copy
-                            </Button>
+                                {pendingPem}
+                            </code>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    data-testid="copy-key"
+                                    onClick={async () => {
+                                        await navigator.clipboard.writeText(
+                                            pendingPem,
+                                        );
+                                        setSetupStatus(
+                                            `Copied agent key for ${pendingAgent}.`,
+                                        );
+                                    }}
+                                >
+                                    Copy
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    data-testid="download-key"
+                                    onClick={downloadKey}
+                                >
+                                    Download
+                                </Button>
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                data-testid="download-enforcer-key"
-                                onClick={() =>
-                                    saveKey(enforcerPem, enforcer || "enforcer")
-                                }
+                        <div className="space-y-2">
+                            <Label htmlFor="enforcer-pem">
+                                Enforcer key for <code>{enforcer}</code>
+                            </Label>
+                            <p className="text-muted-foreground text-xs">
+                                Keep this yourself. Never give it to your agent.
+                                The host vault retains it for checks while this
+                                UI is open.
+                            </p>
+                            <code
+                                className="bg-muted block whitespace-pre-wrap break-all rounded-md p-3 text-xs"
+                                id="enforcer-pem"
+                                data-testid="enforcer-pem"
                             >
-                                Download enforcer .pem
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                data-testid="copy-enforcer-key"
-                                onClick={() =>
-                                    navigator.clipboard.writeText(enforcerPem)
-                                }
-                            >
-                                Copy enforcer key (owner only)
-                            </Button>
+                                {enforcerPem}
+                            </code>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    data-testid="copy-enforcer-key"
+                                    onClick={async () => {
+                                        await navigator.clipboard.writeText(
+                                            enforcerPem,
+                                        );
+                                        setSetupStatus(
+                                            `Copied enforcer key for ${enforcer}.`,
+                                        );
+                                    }}
+                                >
+                                    Copy
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    data-testid="download-enforcer-key"
+                                    onClick={() =>
+                                        saveKey(
+                                            enforcerPem,
+                                            enforcer || "enforcer",
+                                        )
+                                    }
+                                >
+                                    Download
+                                </Button>
+                            </div>
                         </div>
                         <div className="flex items-center gap-2">
                             <Checkbox
@@ -669,16 +725,15 @@ export function HomePage() {
                             as your account <code>{owner}</code>.
                         </p>
                         <p className="text-muted-foreground text-sm">
-                            Keep the agent private key you saved — it cannot be
-                            recovered. Use{" "}
+                            Keep both keys — they cannot be recovered. Use{" "}
                             <a
                                 className="text-primary underline-offset-4 hover:underline"
                                 href="/agent.html"
                             >
                                 Agent sign
                             </a>{" "}
-                            to import it in this browser when you want the agent
-                            to propose actions.
+                            to import the agent key when it should propose
+                            actions.
                         </p>
                         {autoDebitWarning ? (
                             <p
@@ -692,23 +747,94 @@ export function HomePage() {
                                 Tokens auto-debit is enabled on the agent.
                             </p>
                         )}
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                data-testid="download-key-again"
-                                onClick={downloadKey}
-                            >
-                                Download agent key again
-                            </Button>
-                            <Button
-                                type="button"
-                                data-testid="setup-another"
-                                onClick={resetSetupForm}
-                            >
-                                Set up another
-                            </Button>
-                        </div>
+                        {pendingPem ? (
+                            <div className="space-y-2">
+                                <Label>
+                                    Agent key for <code>{pendingAgent}</code>
+                                </Label>
+                                <code
+                                    className="bg-muted block whitespace-pre-wrap break-all rounded-md p-3 text-xs"
+                                    data-testid="agent-pem-again"
+                                >
+                                    {pendingPem}
+                                </code>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        data-testid="copy-key-again"
+                                        onClick={async () => {
+                                            await navigator.clipboard.writeText(
+                                                pendingPem,
+                                            );
+                                            setSetupStatus(
+                                                `Copied agent key for ${pendingAgent}.`,
+                                            );
+                                        }}
+                                    >
+                                        Copy
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        data-testid="download-key-again"
+                                        onClick={downloadKey}
+                                    >
+                                        Download
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : null}
+                        {enforcerPem ? (
+                            <div className="space-y-2">
+                                <Label>
+                                    Enforcer key for <code>{enforcer}</code>
+                                </Label>
+                                <code
+                                    className="bg-muted block whitespace-pre-wrap break-all rounded-md p-3 text-xs"
+                                    data-testid="enforcer-pem-again"
+                                >
+                                    {enforcerPem}
+                                </code>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        data-testid="copy-enforcer-key-again"
+                                        onClick={async () => {
+                                            await navigator.clipboard.writeText(
+                                                enforcerPem,
+                                            );
+                                            setSetupStatus(
+                                                `Copied enforcer key for ${enforcer}.`,
+                                            );
+                                        }}
+                                    >
+                                        Copy
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        data-testid="download-enforcer-key-again"
+                                        onClick={() =>
+                                            saveKey(
+                                                enforcerPem,
+                                                enforcer || "enforcer",
+                                            )
+                                        }
+                                    >
+                                        Download
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : null}
+                        <Button
+                            type="button"
+                            data-testid="setup-another"
+                            onClick={resetSetupForm}
+                        >
+                            Set up another
+                        </Button>
                     </div>
                 )}
             </section>

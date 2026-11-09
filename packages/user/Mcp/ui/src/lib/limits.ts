@@ -12,17 +12,19 @@ export type InspectedAction = {
     failures: string[];
 };
 
-/** Include whole parameters and nested fields, using unambiguous JSON pointers. */
+export type Comparison = "lt" | "gt" | "eq";
+
+/** Leaf fields only, as JSON pointers (nested objects are not listed themselves). */
 export function parameters(
     value: Record<string, unknown>,
     prefix = "",
 ): [string, unknown][] {
     return Object.entries(value).flatMap(([name, v]) => {
         const path = `${prefix}/${name.replace(/~/g, "~0").replace(/\//g, "~1")}`;
-        const row: [string, unknown] = [path, v];
-        return v !== null && typeof v === "object"
-            ? [row, ...parameters(v as Record<string, unknown>, path)]
-            : [row];
+        if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+            return parameters(v as Record<string, unknown>, path);
+        }
+        return [[path, v] as [string, unknown]];
     });
 }
 
@@ -64,4 +66,40 @@ export function displayedParameters(
             rows.push([limit.parameter, undefined]);
     }
     return rows;
+}
+
+/** Active comparison for a limit row (at most one is set by the Approvals UI). */
+export function activeComparison(limit?: ParamLimit): Comparison | null {
+    if (!limit) return null;
+    if (limit.gt !== null) return "gt";
+    if (limit.lt !== null) return "lt";
+    if (limit.eq !== null) return "eq";
+    return null;
+}
+
+export function activeBound(limit?: ParamLimit): string | null {
+    const comparison = activeComparison(limit);
+    if (!comparison || !limit) return null;
+    return limit[comparison];
+}
+
+/** Build a single-comparison limit, or drop the parameter when the value is empty. */
+export function setComparison(
+    limits: ParamLimit[],
+    parameter: string,
+    comparison: Comparison,
+    value: string,
+): ParamLimit[] {
+    const rest = limits.filter((l) => l.parameter !== parameter);
+    if (value.trim() === "") return rest;
+    return [
+        ...rest,
+        {
+            parameter,
+            lt: null,
+            gt: null,
+            eq: null,
+            [comparison]: value,
+        },
+    ];
 }

@@ -60,24 +60,25 @@ describe("mcp approval UI logic", () => {
         expect(p).toContain("user's own account not-prod7");
         expect(p).toContain("not-prod7 as the sender");
         expect(p).not.toMatch(/managed/i);
-        expect(p).toContain("Private key for agentprod7:");
-        expect(p).toContain("<PASTE agent private key HERE>");
+        expect(p).toContain(
+            "Ask me for the private key you'll need to sign when you're ready to properly store a secret.",
+        );
+        expect(p).not.toMatch(/BEGIN PRIVATE KEY/);
+        expect(p).not.toContain("<PASTE");
         expect(p).toContain("Model Context Protocol");
         expect(p).toContain("https://x-mcp.example.org:9090/");
         expect(p).not.toMatch(/Cursor/i);
         expect(p).not.toMatch(/Transfer/i);
     });
-    it("hand-off prompt can embed a saved PEM", () => {
+    it("hand-off prompt never embeds a PEM", () => {
         const p = agentHandOffPrompt(
             { account: "m1", agent: "a1" },
             { protocol: "http:", host: "mcp.psibase.localhost:8080" },
-            {
-                pem: "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----",
-            },
         );
-        expect(p).toContain("Private key for a1:");
-        expect(p).toContain("BEGIN PRIVATE KEY");
-        expect(p).not.toContain("<PASTE");
+        expect(p).toContain(
+            "Ask me for the private key you'll need to sign when you're ready to properly store a secret.",
+        );
+        expect(p).not.toMatch(/BEGIN PRIVATE KEY/);
         expect(p).toContain("node at http://psibase.localhost:8080/");
         expect(p).toContain("http://x-mcp.psibase.localhost:8080/");
     });

@@ -46,7 +46,7 @@ pub mod service {
     /// has been initialized.
     #[pre_action(exclude(init))]
     fn check_init() {
-        let table: InitTable = InitTable::new();
+        let table = InitTable::read();
         table
             .get_index_pk()
             .get(&())
@@ -243,7 +243,7 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     #[action]
     fn get_staged_tx(id: u32) -> StagedTx {
-        StagedTxTable::new()
+        StagedTxTable::read()
             .get_index_pk()
             .get(&id)
             .expect("Unknown staged tx")

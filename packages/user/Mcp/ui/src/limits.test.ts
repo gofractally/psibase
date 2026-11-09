@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { enforcerNameError } from "./lib/account";
-import { displayedParameters } from "./lib/limits";
-import { type InspectedAction, parameters, standingRules } from "./lib/limits";
+import {
+    type InspectedAction,
+    displayedParameters,
+    parameters,
+    setComparison,
+    standingRules,
+} from "./lib/limits";
 import { agentHandOffPrompt } from "./lib/logic";
 
 describe("standing parameter rules", () => {
@@ -12,13 +17,13 @@ describe("standing parameter rules", () => {
         expect(enforcerNameError("", "agent", "owner")).toBeTruthy();
         expect(enforcerNameError("verifier", "agent", "owner")).toBeNull();
     });
-    it("displays nested parameters with escaped JSON pointers", () => {
+    it("lists leaf parameters with escaped JSON pointers", () => {
         expect(
             parameters({
                 amount: { value: "18446744073709551615" },
                 "a/b": true,
             }).map(([p]) => p),
-        ).toEqual(["/amount", "/amount/value", "/a~1b"]);
+        ).toEqual(["/amount/value", "/a~1b"]);
     });
     const action: InspectedAction = {
         service: "tokens",
@@ -33,6 +38,21 @@ describe("standing parameter rules", () => {
         expect(displayedParameters(action)).toEqual([
             ["/amount/value", undefined],
         ]);
+    });
+    it("saves a single comparison and clears empty thresholds", () => {
+        expect(
+            setComparison([], "/amount/value", "gt", "100000"),
+        ).toEqual([
+            {
+                parameter: "/amount/value",
+                lt: null,
+                gt: "100000",
+                eq: null,
+            },
+        ]);
+        expect(
+            setComparison(action.limits, "/amount/value", "lt", "   "),
+        ).toEqual([]);
     });
     it("saves enabled limits and preserves disabled comparisons", () => {
         expect(standingRules([action, action])).toEqual([
@@ -52,20 +72,22 @@ describe("standing parameter rules", () => {
             standingRules([action, { ...action, limits: [] }]),
         ).toThrow(/Conflicting/);
     });
-    it("hand-off never serializes the enforcer or any extra credential fields", () => {
+    it("hand-off never serializes agent, enforcer, or other credential fields", () => {
         const cfg = {
             account: "owner",
             agent: "agent",
             enforcer: "verifier",
             enforcerKey: "OWNER-ONLY-SECRET",
         };
-        const prompt = agentHandOffPrompt(
-            cfg,
-            { protocol: "https:", host: "mcp.example.com" },
-            { pem: "AGENT-KEY" },
-        );
-        expect(prompt).toContain("AGENT-KEY");
+        const prompt = agentHandOffPrompt(cfg, {
+            protocol: "https:",
+            host: "mcp.example.com",
+        });
+        expect(prompt).not.toContain("AGENT-KEY");
         expect(prompt).not.toContain("OWNER-ONLY-SECRET");
         expect(prompt).not.toContain("verifier");
+        expect(prompt).toContain(
+            "Ask me for the private key you'll need to sign when you're ready to properly store a secret.",
+        );
     });
 });
