@@ -17,7 +17,7 @@ interface name-market {
 
 interface tokens {
     use host:types/types.{error};
-    use tokens:plugin/types.{decimal, system-token-info, user-balance};
+    use tokens:plugin/types.{decimal, icon, system-token-info, user-balance};
 
     credit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
     uncredit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
@@ -26,6 +26,10 @@ interface tokens {
     enable-user-auto-debit: func(enable: bool) -> result<_, error>;
     get-system-token: func() -> result<option<system-token-info>, error>;
     get-user-balances: func(user: string) -> result<list<user-balance>, error>;
+    /// If `propose-as` is set, the change is proposed on behalf of that account (the token owner)
+    /// rather than sent by the current user.
+    set-token-icon: func(token-id: u32, icon: icon, propose-as: option<string>) -> result<_, error>;
+    remove-token-icon: func(token-id: u32, propose-as: option<string>) -> result<_, error>;
     graphql: func(query: string) -> result<string, error>;
 }
 

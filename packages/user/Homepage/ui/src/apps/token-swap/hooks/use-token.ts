@@ -10,6 +10,7 @@ import { zAccount } from "@shared/lib/schemas/account";
 export const zToken = z.object({
     precision: z.number().int(),
     symbol: zAccount.nullable(),
+    icon: z.string().nullable(),
 });
 
 export const getToken = async (tokenId: number) => {
@@ -20,6 +21,7 @@ export const getToken = async (tokenId: number) => {
                 token(tokenId: "${tokenId}") {
                     precision
                     symbol
+                    icon
                 }
             }
         `,

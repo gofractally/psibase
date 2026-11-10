@@ -8,6 +8,7 @@ const qs = {
     tokenMeta: (tokenId: string) => `
         token(tokenId: "${tokenId}") {
             id
+            owner
             settings {
                 untransferable
                 unrecallable
@@ -76,6 +77,7 @@ export {
 
 const zTokenMetaNodeSchema = z.object({
     id: z.number(),
+    owner: zAccount.nullable(),
     settings: z.object({
         untransferable: z.boolean(),
         unrecallable: z.boolean(),

@@ -19,6 +19,8 @@ export interface Token {
     label: string;
     precision: number;
     isTransferable: boolean;
+    icon: string | null;
+    owner: string | null;
 }
 
 export const useUserTokenBalances = (
@@ -50,15 +52,19 @@ export const useUserTokenBalances = (
                     balance.symbol,
                 );
 
+                const meta = tokensMeta.find(
+                    (meta) => meta.id === balance.tokenId,
+                );
+
                 return {
                     id: balance.tokenId,
                     symbol: balance.symbol ?? null,
                     precision: quan.precision,
                     label: quan.getDisplayLabel(),
                     balance: quan,
-                    isTransferable:
-                        tokensMeta.find((meta) => meta.id === balance.tokenId)
-                            ?.settings.untransferable === false,
+                    isTransferable: meta?.settings.untransferable === false,
+                    icon: balance.icon ?? null,
+                    owner: meta?.owner ?? null,
                 };
             });
 

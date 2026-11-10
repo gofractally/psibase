@@ -10,7 +10,10 @@ use Exports::{
     issuer::Guest as Issuer, user::Guest as User, user_config::Guest as UserConfig,
 };
 
-use psibase::services::tokens::{Decimal, Precision, Quantity};
+use psibase::image_content_type;
+use psibase::services::tokens::{
+    is_icon_content_type, Decimal, Precision, Quantity, MAX_ICON_SIZE,
+};
 use psibase::FlagsType;
 use psibase_plugin::{trust::*, *};
 
@@ -31,6 +34,7 @@ impl TrustConfig for TokensPlugin {
             low: &[],
             medium: &[
                 "Create new tokens",
+                "Set and remove icons of tokens you own",
                 "Configure balance and transfer preferences",
             ],
             high: &[
@@ -113,6 +117,26 @@ impl Issuer for TokensPlugin {
         Tokens::add_to_tx().setTokenConf(token_id, TokenFlags::UNRECALLABLE.index(), enable);
         Ok(())
     }
+
+    #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
+    fn set_token_icon(token_id: u32, icon: Exports::types::Icon) -> Result<(), Error> {
+        if icon.content.len() > MAX_ICON_SIZE {
+            return Err(ErrorType::IconTooBig(MAX_ICON_SIZE).into());
+        }
+
+        let content_type = image_content_type::parse(&icon.content_type)
+            .filter(|content_type| is_icon_content_type(*content_type))
+            .ok_or_else(|| ErrorType::InvalidIconContentType(icon.content_type.clone()))?;
+
+        Tokens::add_to_tx().setIcon(token_id, icon.content, content_type);
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
+    fn remove_token_icon(token_id: u32) -> Result<(), Error> {
+        Tokens::add_to_tx().removeIcon(token_id);
+        Ok(())
+    }
 }
 
 impl Helpers for TokensPlugin {
@@ -143,6 +167,7 @@ impl Helpers for TokensPlugin {
                 symbol: balance.symbol,
                 precision: balance.precision,
                 account: balance.account,
+                icon: balance.icon,
             })
             .collect())
     }

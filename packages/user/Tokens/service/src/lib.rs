@@ -8,8 +8,12 @@ pub use tables::tables::{BalanceFlags, TokenFlags};
 pub mod service {
     pub use crate::tables::tables::{BalanceFlags, TokenFlags};
     use crate::tables::tables::{ConfigRow, SubAccount, *};
+    use psibase::image_content_type::{self, ImgContentType};
     use psibase::services::events;
-    use psibase::services::tokens::{Decimal, Precision, Quantity};
+    use psibase::services::sites::Wrapper as Sites;
+    use psibase::services::tokens::{
+        icon_path, is_icon_content_type, Decimal, Precision, Quantity, MAX_ICON_SIZE,
+    };
     use psibase::{get_sender, AccountNumber, Memo};
 
     use psibase::*;
@@ -220,6 +224,60 @@ pub mod service {
             format!("Flag: {}: {}", flag.to_string(), enabled)
                 .try_into()
                 .unwrap(),
+        );
+    }
+
+    /// Sets the icon of a token. Only the token owner can set the icon.
+    ///
+    /// The icon is served at `/icon/<token_id>` on the tokens subdomain.
+    ///
+    /// # Arguments
+    /// * `token_id`    - Unique token identifier
+    /// * `image`       - Image bytes, at most `MAX_ICON_SIZE` bytes
+    /// * `contentType` - Image type (see `image_content_type`). PNG, JPEG, and WebP are allowed.
+    #[action]
+    fn setIcon(token_id: TID, image: Vec<u8>, contentType: ImgContentType) {
+        Token::get_assert(token_id).check_is_owner(get_sender());
+        assert!(
+            image.len() <= MAX_ICON_SIZE,
+            "Icon exceeds max size of {MAX_ICON_SIZE} bytes"
+        );
+        let Some(mime) =
+            image_content_type::mime(contentType).filter(|_| is_icon_content_type(contentType))
+        else {
+            abort_message("Icon content type not allowed");
+        };
+
+        Sites::call().storeSys(icon_path(token_id), mime.to_string(), None, Hex(image));
+
+        Wrapper::emit().history().configured(
+            token_id,
+            "iconSet".to_string(),
+            format!("Icon set ({mime})").try_into().unwrap(),
+        );
+    }
+
+    /// Removes the icon of a token. Only the token owner can remove the icon.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    #[action]
+    fn removeIcon(token_id: TID) {
+        Token::get_assert(token_id).check_is_owner(get_sender());
+        let path = icon_path(token_id);
+        assert!(
+            Sites::call()
+                .getProps(Wrapper::SERVICE, path.clone())
+                .is_some(),
+            "Token has no icon"
+        );
+
+        Sites::call().remove(path);
+
+        Wrapper::emit().history().configured(
+            token_id,
+            "iconRemoved".to_string(),
+            "Icon removed".try_into().unwrap(),
         );
     }
 

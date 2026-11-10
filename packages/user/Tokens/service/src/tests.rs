@@ -552,4 +552,91 @@ mod tests {
 
         Ok(())
     }
+
+    fn get_icon_url(
+        chain: &psibase::Chain,
+        token_id: u32,
+    ) -> Result<Option<String>, psibase::Error> {
+        #[derive(serde::Deserialize)]
+        struct TokenIcon {
+            icon: Option<String>,
+        }
+        #[derive(serde::Deserialize)]
+        struct TokenData {
+            token: TokenIcon,
+        }
+
+        let query = format!(r#"query {{ token(tokenId: "{token_id}") {{ icon }} }}"#);
+        let response: Response<TokenData> = chain.graphql(Wrapper::SERVICE, &query)?;
+        if let Some(errors) = response.errors {
+            return Err(anyhow!("GraphQL error: {}", errors[0].message).into());
+        }
+        Ok(response.data.unwrap().token.icon)
+    }
+
+    #[psibase::test_case(packages("Tokens"))]
+    fn test_icons(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        use psibase::image_content_type::{GIF, PNG, WEBP};
+        use psibase::services::tokens::MAX_ICON_SIZE;
+
+        Wrapper::push(&chain).init();
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let a = Wrapper::push_from(&chain, alice);
+        let b = Wrapper::push_from(&chain, bob);
+
+        let tid = a.create(4.try_into().unwrap(), 80000.into()).get()?;
+        claim_token_nft(&chain, alice, tid);
+
+        let icon = vec![1u8, 2, 3];
+        let target = format!("/icon/{tid}");
+
+        // Only the token owner can set or remove the icon
+        assert_error(
+            b.setIcon(tid, icon.clone(), PNG),
+            "Missing required authority",
+        );
+
+        assert_error(
+            a.setIcon(tid, vec![0; MAX_ICON_SIZE + 1], PNG),
+            "Icon exceeds max size",
+        );
+        assert_error(
+            a.setIcon(tid, icon.clone(), GIF),
+            "Icon content type not allowed",
+        );
+        assert_error(
+            a.setIcon(tid, icon.clone(), 99),
+            "Icon content type not allowed",
+        );
+        assert_error(a.removeIcon(tid), "Token has no icon");
+        assert_eq!(get_icon_url(&chain, tid)?, None);
+
+        a.setIcon(tid, icon.clone(), PNG).get()?;
+        let reply = chain.get(Wrapper::SERVICE, &target)?;
+        assert_eq!(reply.status, 200);
+        assert_eq!(reply.contentType, "image/png");
+        assert_eq!(reply.body.0, icon);
+
+        let url = get_icon_url(&chain, tid)?.expect("token should have an icon");
+        assert!(url.starts_with(&format!("{target}?v=")), "{url}");
+
+        // The versioned URL changes when the icon changes
+        a.setIcon(tid, vec![4, 5, 6], WEBP).get()?;
+        assert_eq!(
+            chain.get(Wrapper::SERVICE, &target)?.contentType,
+            "image/webp"
+        );
+        assert_ne!(get_icon_url(&chain, tid)?, Some(url));
+
+        assert_error(b.removeIcon(tid), "Missing required authority");
+        a.removeIcon(tid).get()?;
+        assert_eq!(chain.get(Wrapper::SERVICE, &target)?.status, 404);
+        assert_eq!(get_icon_url(&chain, tid)?, None);
+
+        Ok(())
+    }
 }

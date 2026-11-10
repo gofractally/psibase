@@ -7,8 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Panel } from "@/components/page-header";
 import { DataTable, THead, Table, Td, Th, Tr } from "@/components/table";
 
-import { colorFor } from "@/lib/colors";
-
+import { TokenIcon } from "@shared/components/token-icon";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -35,12 +34,17 @@ const formatReserve = (value: string) => {
     return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 };
 
-const TokenChip = ({ symbol, id }: { symbol?: string | null; id: number }) => (
+const TokenChip = ({
+    symbol,
+    id,
+    icon,
+}: {
+    symbol?: string | null;
+    id: number;
+    icon: string | null;
+}) => (
     <span className="inline-flex items-center gap-1">
-        <span
-            className="size-2 rounded-full"
-            style={{ backgroundColor: colorFor(symbol ?? String(id)) }}
-        />
+        <TokenIcon tokenId={id} icon={icon} className="size-4" />
         <span
             className={cn(
                 "font-mono",
@@ -115,6 +119,7 @@ const PoolsPanel = () => {
                                                 <TokenChip
                                                     symbol={pool.tokenASymbol}
                                                     id={pool.tokenAId}
+                                                    icon={pool.tokenAIcon}
                                                 />
                                                 <span className="text-muted-foreground">
                                                     /
@@ -122,6 +127,7 @@ const PoolsPanel = () => {
                                                 <TokenChip
                                                     symbol={pool.tokenBSymbol}
                                                     id={pool.tokenBId}
+                                                    icon={pool.tokenBIcon}
                                                 />
                                             </span>
                                         </Td>

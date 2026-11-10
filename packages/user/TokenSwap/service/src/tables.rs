@@ -174,6 +174,11 @@ pub mod tables {
                 .map(|s| s.symbolId)
         }
 
+        /// Versioned path of the token's icon on the tokens subdomain, or null if it has no icon
+        pub async fn icon(&self) -> Option<String> {
+            psibase::services::tokens::icon_url(self.token_id)
+        }
+
         pub async fn pool(&self) -> Pool {
             Pool::get_assert(self.pool_id)
         }

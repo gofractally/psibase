@@ -18,6 +18,12 @@ export type UserBalance = {
     symbol: string | undefined;
     precision: number;
     account: string;
+    icon: string | undefined;
+};
+
+export type TokenIconImage = {
+    contentType: string;
+    content: Uint8Array;
 };
 
 class Issuer extends PluginInterface {

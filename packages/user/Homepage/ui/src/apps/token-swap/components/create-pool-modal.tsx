@@ -13,6 +13,7 @@ import {
 import { Button } from "@shared/shadcn/ui/button";
 
 import { useCreatePool } from "../hooks/use-create-pool";
+import { useToken } from "../hooks/use-token";
 import { AmountSummary } from "./amount-summary";
 
 export const CreatePoolModal = ({
@@ -29,6 +30,9 @@ export const CreatePoolModal = ({
     onSuccess?: () => void;
 }) => {
     const { mutateAsync: createPool, isPending } = useCreatePool();
+
+    const { data: firstDepositToken } = useToken(firstDeposit?.tokenId);
+    const { data: secondDepositToken } = useToken(secondDeposit?.tokenId);
 
     const trigger = async () => {
         await createPool([firstDeposit!, secondDeposit!, undefined]);
@@ -55,7 +59,8 @@ export const CreatePoolModal = ({
                 <div className="mt-3 space-y-4">
                     <AmountSummary
                         amount={Number(firstDeposit?.amount).toString() || ""}
-                        avatarSeed={firstDeposit?.tokenId?.toString() ?? "?"}
+                        tokenId={firstDeposit?.tokenId}
+                        icon={firstDepositToken?.icon}
                         label="Founding deposit #1"
                         title={firstDeposit?.tokenId.toString() ?? "?"}
                     />
@@ -66,7 +71,8 @@ export const CreatePoolModal = ({
 
                     <AmountSummary
                         amount={Number(secondDeposit?.amount).toString() || ""}
-                        avatarSeed={secondDeposit?.tokenId?.toString() ?? "?"}
+                        tokenId={secondDeposit?.tokenId}
+                        icon={secondDepositToken?.icon}
                         label="Founding deposit #2"
                         title={secondDeposit?.tokenId?.toString() ?? "?"}
                     />

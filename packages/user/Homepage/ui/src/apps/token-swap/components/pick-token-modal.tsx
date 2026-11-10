@@ -1,4 +1,4 @@
-import { Avatar } from "@shared/components/avatar";
+import { TokenIcon } from "@shared/components/token-icon";
 import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
 import {
@@ -11,6 +11,7 @@ import {
 interface Token {
     id: number;
     symbol: string | null | undefined;
+    icon?: string | null;
     balance?: Quantity;
 }
 
@@ -56,9 +57,9 @@ export const PickTokenModal = ({
                                     )}
                                 >
                                     <div className="flex items-center gap-2">
-                                        <Avatar
-                                            account={token.id.toString()}
-                                            type="glass"
+                                        <TokenIcon
+                                            tokenId={token.id}
+                                            icon={token.icon}
                                             className="size-5"
                                         />
                                         <span

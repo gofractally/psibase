@@ -29,6 +29,7 @@ struct Node {
     symbol: Option<String>,
     precision: u8,
     account: AccountNumber,
+    icon: Option<String>,
 }
 
 pub struct UserBalance {
@@ -37,6 +38,7 @@ pub struct UserBalance {
     pub symbol: Option<String>,
     pub precision: u8,
     pub account: String,
+    pub icon: Option<String>,
 }
 
 pub fn get_user_balances(user: &str) -> Result<Vec<UserBalance>, ErrorType> {
@@ -49,6 +51,7 @@ pub fn get_user_balances(user: &str) -> Result<Vec<UserBalance>, ErrorType> {
                     symbol
                     precision
                     account
+                    icon
                 }}
             }}
         }}"#
@@ -70,6 +73,7 @@ pub fn get_user_balances(user: &str) -> Result<Vec<UserBalance>, ErrorType> {
             symbol: node.symbol.filter(|s| !s.trim().is_empty()),
             precision: node.precision,
             account: node.account.to_string(),
+            icon: node.icon,
         })
         .collect())
 }

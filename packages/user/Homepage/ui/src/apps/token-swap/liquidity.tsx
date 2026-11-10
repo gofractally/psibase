@@ -291,13 +291,22 @@ export const Liquidity = () => {
     const reserveTokensRedeemable = pools
         .filter((pool) => userPoolTokens.some((token) => token.id == pool.id))
         .flatMap((pool) => [
-            { id: pool.reserveA.tokenId, symbol: pool.reserveA.symbol },
-            { id: pool.reserveB.tokenId, symbol: pool.reserveB.symbol },
+            {
+                id: pool.reserveA.tokenId,
+                symbol: pool.reserveA.symbol,
+                icon: pool.reserveA.icon,
+            },
+            {
+                id: pool.reserveB.tokenId,
+                symbol: pool.reserveB.symbol,
+                icon: pool.reserveB.icon,
+            },
         ]);
 
     const userTokens = (userBalances || [])?.map((balance) => ({
         id: balance.id,
         symbol: balance.symbol,
+        icon: balance.icon,
         balance: balance.balance,
     }));
 

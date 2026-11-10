@@ -17,12 +17,20 @@ interface types {
         symbol: option<string>,
         precision: u8,
         account: string,
+        /// Versioned path of the token's icon on the tokens subdomain
+        icon: option<string>,
+    }
+
+    /// A token icon image. Must be PNG, JPEG, or WebP, and no larger than 32 KB.
+    record icon {
+        content-type: string,
+        content: list<u8>,
     }
 }
 
 interface issuer {
     use host:types/types.{error};
-    use types.{decimal};
+    use types.{decimal, icon};
 
     /// Create a new token
     ///
@@ -73,6 +81,19 @@ interface issuer {
     /// * `token_id` - Unique token identifier
     /// * `enable`   - `true` to prevent recalls, `false` to allow them
     enable-token-unrecallable: func(token-id: u32, enable: bool) -> result<_, error>;
+
+    /// Sets the token's icon, replacing any existing icon. Only the token owner may set it.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `icon`     - Icon image (PNG, JPEG, or WebP; at most 32 KB)
+    set-token-icon: func(token-id: u32, icon: icon) -> result<_, error>;
+
+    /// Removes the token's icon. Only the token owner may remove it.
+    ///
+    /// Arguments
+    /// * `token_id` - Unique token identifier
+    remove-token-icon: func(token-id: u32) -> result<_, error>;
 }
 
 interface user {

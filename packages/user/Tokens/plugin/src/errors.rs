@@ -9,4 +9,8 @@ pub enum ErrorType {
     QueryError(String),
     #[error("Token does not exist: {0}")]
     TokenMismatch(String),
+    #[error("Icon exceeds max size of {0} bytes")]
+    IconTooBig(usize),
+    #[error("Icon content type not allowed: {0}. Use PNG, JPEG, or WebP")]
+    InvalidIconContentType(String),
 }

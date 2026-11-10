@@ -82,7 +82,8 @@ export const ConfirmSwapModal = ({
                     {/* From Account */}
                     <AmountSummary
                         amount={Number(fromAmount).toString() || ""}
-                        avatarSeed={fromToken?.toString() ?? "?"}
+                        tokenId={fromTokenId}
+                        icon={fromToken?.icon}
                         label="From"
                         title={fromToken?.symbol || `ID: ${fromTokenId}`}
                     />
@@ -95,7 +96,8 @@ export const ConfirmSwapModal = ({
                     {/* To Account */}
                     <AmountSummary
                         amount={Number(expectedReturn).toString() ?? ""}
-                        avatarSeed={toToken?.toString() ?? "?"}
+                        tokenId={toTokenId}
+                        icon={toToken?.icon}
                         label="To"
                         title={toToken?.symbol || `ID: ${toTokenId}`}
                     />
