@@ -3,21 +3,33 @@ export interface PreparedImage {
     content: Uint8Array;
 }
 
+/**
+ * How a non-square source becomes a square, using CSS `object-fit` names:
+ * - `cover`: scale to fill the square and crop the overflow, centered
+ * - `contain`: scale to fit inside the square and pad with transparency
+ * - `fill`: stretch to the square, ignoring the aspect ratio
+ */
+export type ImageFit = "cover" | "contain" | "fill";
+
 export interface PrepareImageOptions {
     /** Largest encoded size, in bytes */
     maxBytes: number;
-    /** Largest width and height, in pixels. Smaller images are not upscaled. */
+    /** Largest width and height, in pixels. Raster sources are not upscaled. */
     maxDimension: number;
+    /** Defaults to `cover` */
+    fit?: ImageFit;
 }
 
 export const TOKEN_ICON_OPTIONS: PrepareImageOptions = {
     maxBytes: 32 * 1024,
     maxDimension: 256,
+    fit: "cover",
 };
 
 const WEBP_QUALITIES = [0.85, 0.75, 0.6];
 const JPEG_QUALITY = 0.85;
-const FALLBACK_DIMENSIONS = [192, 128];
+/** Fallback sizes, as fractions of the first attempt's size */
+const FALLBACK_SCALES = [0.75, 0.5];
 
 export class ImageTooLargeError extends Error {
     constructor(maxBytes: number) {
@@ -51,23 +63,35 @@ const loadImage = async (source: Blob) => {
 const draw = (
     img: HTMLImageElement,
     maxDimension: number,
+    fit: ImageFit,
     isVector: boolean,
 ) => {
     // SVGs without intrinsic dimensions report 0 (or the 150px default)
     const width = img.naturalWidth || maxDimension;
     const height = img.naturalHeight || maxDimension;
-    const fit = maxDimension / Math.max(width, height);
-    const scale = isVector ? fit : Math.min(1, fit);
-    const w = Math.max(1, Math.round(width * scale));
-    const h = Math.max(1, Math.round(height * scale));
-    const side = Math.max(w, h);
+
+    // The source length that maps onto the square's side
+    const governing =
+        fit === "cover" ? Math.min(width, height) : Math.max(width, height);
+    const side = Math.max(
+        1,
+        Math.round(isVector ? maxDimension : Math.min(maxDimension, governing)),
+    );
 
     const canvas = document.createElement("canvas");
     canvas.width = side;
     canvas.height = side;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas is not supported");
-    ctx.drawImage(img, (side - w) / 2, (side - h) / 2, w, h);
+
+    if (fit === "fill") {
+        ctx.drawImage(img, 0, 0, side, side);
+    } else {
+        const scale = side / governing;
+        const w = width * scale;
+        const h = height * scale;
+        ctx.drawImage(img, (side - w) / 2, (side - h) / 2, w, h);
+    }
     return { canvas, ctx };
 };
 
@@ -100,9 +124,9 @@ const encode = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
 async function* candidates(
     img: HTMLImageElement,
     isVector: boolean,
-    { maxDimension }: PrepareImageOptions,
+    { maxDimension, fit = "cover" }: PrepareImageOptions,
 ): AsyncGenerator<Blob> {
-    const { canvas, ctx } = draw(img, maxDimension, isVector);
+    const { canvas, ctx } = draw(img, maxDimension, fit, isVector);
 
     const first = await encode(canvas, "image/webp", WEBP_QUALITIES[0]);
     yield first;
@@ -117,9 +141,10 @@ async function* candidates(
         yield await encode(canvas, "image/jpeg", JPEG_QUALITY);
     }
 
-    for (const dimension of FALLBACK_DIMENSIONS) {
-        if (dimension >= canvas.width) continue;
-        const smaller = draw(img, dimension, isVector).canvas;
+    for (const scale of FALLBACK_SCALES) {
+        const dimension = Math.round(canvas.width * scale);
+        if (dimension < 1) continue;
+        const smaller = draw(img, dimension, fit, isVector).canvas;
         if (hasWebp) {
             yield await encode(
                 smaller,
@@ -138,11 +163,11 @@ async function* candidates(
  * Converts any browser-decodable image (PNG, JPEG, WebP, GIF, SVG, ...) into a
  * square PNG, JPEG, or WebP no larger than `maxDimension` and `maxBytes`.
  * Raster images are never upscaled; SVGs are rasterized at `maxDimension`.
- * Non-square images are padded with transparency; GIFs keep their first frame.
+ * GIFs keep their first frame.
  */
 export const prepareImage = async (
     source: Blob,
-    options: PrepareImageOptions = TOKEN_ICON_OPTIONS,
+    options: PrepareImageOptions,
 ): Promise<PreparedImage> => {
     const img = await loadImage(source);
 

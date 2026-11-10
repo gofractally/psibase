@@ -59,7 +59,7 @@ export const TokenIconSettings = ({
                     <p className="text-muted-foreground text-xs">
                         {token.icon
                             ? "Using your uploaded icon."
-                            : "Using a generated icon. Upload an image to replace it; it is resized to 256×256."}
+                            : "Using a generated icon. Upload an image to replace it; it is cropped to a centered square of at most 256×256."}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
                         <Button

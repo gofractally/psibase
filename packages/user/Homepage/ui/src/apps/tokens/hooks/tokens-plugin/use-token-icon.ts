@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import QueryKey from "@/lib/query-keys";
 
 import { callPluginFunction, homepage } from "@shared/lib/plugins";
-import { prepareImage } from "@shared/lib/prepare-image";
+import { TOKEN_ICON_OPTIONS, prepareImage } from "@shared/lib/prepare-image";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 const refreshIcons = (client: QueryClient, user: string | null) => {
@@ -27,7 +27,7 @@ export const useSetTokenIcon = (user: string | null) =>
     >({
         mutationKey: ["setTokenIcon"],
         mutationFn: async ({ tokenId, file, proposeAs }) => {
-            const icon = await prepareImage(file);
+            const icon = await prepareImage(file, TOKEN_ICON_OPTIONS);
             await callPluginFunction(homepage.tokens.setTokenIcon, [
                 tokenId,
                 icon,
