@@ -4,7 +4,7 @@ use psibase::{
 };
 
 use super::{apply_rate, cash_sub, emit_pair_activity, expires_live, Connection};
-use crate::tables::tables::{Asset, CashQuote, CashQuoteTab};
+use crate::tables::tables::{Asset, CashQuote, CashQuoteTab, TokenRelay};
 
 impl CashQuote {
     fn save(&self) {
@@ -89,16 +89,25 @@ impl CashQuote {
         Tokens::call().fromSub(token_id, cash_sub(poster, token_id), amount);
     }
 
+    /// Move tokens from one cashier vault to another. Both are Banx sub-accounts.
+    pub(crate) fn move_vault(
+        from: AccountNumber,
+        to: AccountNumber,
+        token_id: u32,
+        amount: Quantity,
+    ) {
+        let tokens = Tokens::call();
+        tokens.fromSub(token_id, cash_sub(from, token_id), amount);
+        tokens.toSub(token_id, cash_sub(to, token_id), amount);
+    }
+
     /// Shared(`from`, Banx) → poster's Tokens sub-account on Banx.
     pub fn take_tokens(from: AccountNumber, token_id: u32, amount: Quantity, memo: &str) {
         Self::tokens_debit(from, token_id, amount, memo);
         Self::to_sub(from, token_id, amount);
     }
 
-    /// Poster's sub-account → `to` (via Banx primary).
-    ///
-    /// `credit` is not delivery. Without auto-debit the tokens sit in a shared
-    /// balance, and a later reject leaves them in Banx's primary balance.
+    /// Poster's sub-account → credit `to`. The recipient debits when they want the balance.
     pub fn pay_tokens(
         poster: AccountNumber,
         to: AccountNumber,
@@ -106,15 +115,8 @@ impl CashQuote {
         amount: Quantity,
         memo: &str,
     ) {
-        let tokens = Tokens::call();
-        let before = tokens.getBalance(token_id, to);
         Self::from_sub(poster, token_id, amount);
-        tokens.credit(token_id, to, amount, Self::token_memo(memo));
-        let after = tokens.getBalance(token_id, to);
-        assert!(
-            after - before == amount,
-            "token credit was not delivered; recipient must enable auto-debit"
-        );
+        Tokens::call().credit(token_id, to, amount, Self::token_memo(memo));
     }
 
     fn spend(&mut self, amount: Quantity) {
@@ -132,6 +134,10 @@ impl CashQuote {
         assert!(self.is_out, "cash quote is not out");
         assert!(taker != self.poster, "cannot cash_out with self");
         assert!(amount_banx.value > 0, "cash_out amount must be positive");
+        assert!(
+            !TokenRelay::vault_backs(self.poster, self.token_id),
+            "token vault backs a relay"
+        );
         self.spend(amount_banx);
         let tokens = self.apply(amount_banx);
         assert!(
@@ -162,6 +168,11 @@ impl CashQuote {
         assert!(!self.is_out, "cash quote is not in");
         assert!(taker != self.poster, "cannot cash_in with self");
         assert!(amount_tokens.value > 0, "cash_in amount must be positive");
+        assert!(
+            !TokenRelay::vault_backs(self.poster, self.token_id),
+            "token vault backs a relay"
+        );
+        let taker_before = TokenRelay::vault_balance(taker, self.token_id);
         self.spend(amount_tokens);
         let banx_amt = self.apply(amount_tokens);
         assert!(
@@ -174,6 +185,12 @@ impl CashQuote {
         );
         Self::from_sub(taker, self.token_id, amount_tokens);
         Self::to_sub(self.poster, self.token_id, amount_tokens);
+        TokenRelay::sync_vault(
+            taker,
+            self.token_id,
+            taker_before,
+            TokenRelay::vault_balance(taker, self.token_id),
+        );
         let netted = Connection::get_live(taker, self.poster, self.asset_id).deposit(banx_amt, 0);
         emit_pair_activity(
             taker,

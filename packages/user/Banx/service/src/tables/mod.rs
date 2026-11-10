@@ -1,4 +1,5 @@
 mod asset;
+mod banx_relay;
 mod book_auth;
 mod cash_quote;
 mod claim_offer;
@@ -14,6 +15,7 @@ mod pair_cycle;
 mod path;
 mod pay_auth;
 mod pay_request;
+mod token_relay;
 
 pub use connection::Connection;
 pub(crate) use helpers::emit_pair_activity_as;
@@ -442,6 +444,56 @@ pub mod tables {
         pub next_due: TimePointSec,
         /// A period may be paid only when its start is before this. 0 means no scheduled end.
         pub ends_at: TimePointSec,
+    }
+
+    /// Constant-product curve between two Banx assets, posted by `owner`.
+    ///
+    /// Both reserves are virtual weights. A path that changes asset on
+    /// `owner` uses this curve instead of a [`CurrencyPolicy`] for the pair.
+    /// One row prices both directions. `asset_lo` is the lower asset id.
+    #[table(name = "BanxRelayTable", index = 13)]
+    #[derive(
+        Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
+    )]
+    pub struct BanxRelay {
+        pub owner: AccountNumber,
+        pub asset_lo: u16,
+        pub asset_hi: u16,
+        pub reserve_lo: Quantity,
+        pub reserve_hi: Quantity,
+        /// Taken from the input before the curve. `10_000` = 1%. Must be `< PPM_SCALE`.
+        pub fee_ppm: u32,
+    }
+
+    impl BanxRelay {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, u16, u16) {
+            (self.owner, self.asset_lo, self.asset_hi)
+        }
+    }
+
+    /// Constant-product curve between one Banx asset and one token.
+    ///
+    /// `reserve_banx` is the virtual Banx weight. The token reserve is the
+    /// owner's cash vault `{owner}/{token_id}` on Banx, not a second number.
+    /// One token vault backs one relay.
+    #[table(name = "TokenRelayTable", index = 14)]
+    #[derive(
+        Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
+    )]
+    pub struct TokenRelay {
+        pub owner: AccountNumber,
+        pub asset_id: u16,
+        pub token_id: u32,
+        pub reserve_banx: Quantity,
+        pub fee_ppm: u32,
+    }
+
+    impl TokenRelay {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, u16, u32) {
+            (self.owner, self.asset_id, self.token_id)
+        }
     }
 }
 

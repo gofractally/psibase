@@ -11,6 +11,70 @@ pub const PPM_SCALE: u32 = 1_000_000;
 /// Equal to [`PPM_SCALE`]; `RATE_SCALE` = identity (1:1).
 pub const RATE_SCALE: u64 = PPM_SCALE as u64;
 
+/// Constant-product output. `fee_ppm` stays in the input reserve.
+///
+/// `out = reserve_out * in_after_fee / (reserve_in + in_after_fee)`.
+/// The output is always less than `reserve_out`.
+pub fn try_swap_out(
+    reserve_in: u64,
+    reserve_out: u64,
+    amount_in: u64,
+    fee_ppm: u32,
+) -> Option<u64> {
+    if reserve_in == 0 || reserve_out == 0 || amount_in == 0 || fee_ppm >= PPM_SCALE {
+        return None;
+    }
+    let keep = (PPM_SCALE - fee_ppm) as u128;
+    let after_fee = (amount_in as u128)
+        .checked_mul(keep)?
+        .checked_div(PPM_SCALE as u128)?;
+    let after_fee = u64::try_from(after_fee).ok()?;
+    if after_fee == 0 {
+        return None;
+    }
+    let denom = reserve_in.checked_add(after_fee)?;
+    let out = (reserve_out as u128)
+        .checked_mul(after_fee as u128)?
+        .checked_div(denom as u128)?;
+    let out = u64::try_from(out).ok()?;
+    (out > 0 && out < reserve_out).then_some(out)
+}
+
+/// Smallest input such that [`try_swap_out`] is at least `amount_out`.
+pub fn try_swap_in(
+    reserve_in: u64,
+    reserve_out: u64,
+    amount_out: u64,
+    fee_ppm: u32,
+) -> Option<u64> {
+    if reserve_in == 0
+        || reserve_out == 0
+        || amount_out == 0
+        || amount_out >= reserve_out
+        || fee_ppm >= PPM_SCALE
+    {
+        return None;
+    }
+    let keep = (PPM_SCALE - fee_ppm) as u128;
+    if keep == 0 {
+        return None;
+    }
+    let denom = (reserve_out - amount_out) as u128;
+    let num = (amount_out as u128).checked_mul(reserve_in as u128)?;
+    let after_fee = num.checked_add(denom - 1)?.checked_div(denom)?;
+    let amount_in = after_fee
+        .checked_mul(PPM_SCALE as u128)?
+        .checked_add(keep - 1)?
+        .checked_div(keep)?;
+    let mut amount_in = u64::try_from(amount_in).ok()?;
+    let mut out = try_swap_out(reserve_in, reserve_out, amount_in, fee_ppm)?;
+    if out < amount_out {
+        amount_in = amount_in.checked_add(1)?;
+        out = try_swap_out(reserve_in, reserve_out, amount_in, fee_ppm)?;
+    }
+    (out >= amount_out).then_some(amount_in)
+}
+
 /// `out = (in - fee_fixed) * rate / RATE_SCALE`.
 pub fn try_apply_rate(amount_in: u64, fee_fixed: u64, rate: u64) -> Option<u64> {
     if fee_fixed >= amount_in || rate == 0 {
@@ -171,6 +235,16 @@ mod tests {
         assert_eq!(try_apply_spread(10_000, 0, -50_000), Some(10_500));
         assert_eq!(try_apply_spread(100, 100, 0), None);
         assert_eq!(try_apply_rate(50, 50, RATE_SCALE), None);
+    }
+
+    #[test]
+    fn constant_product_keeps_the_fee_in_the_input() {
+        assert_eq!(try_swap_out(10_000, 15_000, 1_000, 0), Some(1_363));
+        assert_eq!(try_swap_in(10_000, 15_000, 1_363, 0), Some(1_000));
+        assert_eq!(try_swap_out(10_000, 15_000, 1_000, 100_000), Some(1_238));
+        assert_eq!(try_swap_out(15_000, 10_000, 1_000, 0), Some(625));
+        assert_eq!(try_swap_out(10_000, 15_000, 1_000, PPM_SCALE), None);
+        assert_eq!(try_swap_in(10_000, 15_000, 15_000, 0), None);
     }
 
     #[test]

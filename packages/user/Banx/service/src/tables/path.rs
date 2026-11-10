@@ -1,12 +1,19 @@
+use std::collections::{HashMap, HashSet};
+
 use psibase::{services::tokens::Quantity, AccountNumber};
 
 use super::{emit_pair_activity_as, invert_hop_fee, invert_rate, Connection};
-use crate::tables::tables::{CurrencyPolicy, ForwardOffer, PathHop, PayRequest};
+use crate::math::{try_apply_hop_fee, try_apply_rate};
+use crate::tables::tables::{BanxRelay, CurrencyPolicy, ForwardOffer, PathHop, PayRequest};
 
 /// Exact-out send: walk hops backward from `target_out` at the last hop
-/// (undo hop fees, then FX).
+/// (undo hop fees, then FX). A relay used twice is priced forward, because
+/// the second touch has to see the reserves the first touch already moved.
 pub fn path_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
     assert!(!hops.is_empty(), "path_pay must include at least one hop");
+    if relay_used_twice(hops) {
+        return sequential_required_send(hops, target_out);
+    }
     let mut need = target_out;
     for i in (1..hops.len()).rev() {
         let prev = hops[i - 1];
@@ -14,17 +21,113 @@ pub fn path_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
         let offer = ForwardOffer::get_live(prev.account, hop.account, hop.asset_id);
         need = invert_hop_fee(need, offer.fee_fixed, offer.fee_percent);
         if hop.asset_id != prev.asset_id {
-            let pol =
-                CurrencyPolicy::get_assert(prev.account, prev.asset_id, hop.asset_id, true);
-            pol.assert_live();
-            need = invert_rate(need, pol.fee_fixed, pol.fx_rate);
-            assert!(
-                need.value <= pol.remaining.value,
-                "currency policy amount exceeds remaining"
-            );
+            if let Some(relay) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) {
+                need = relay.swap_in(prev.asset_id, need);
+            } else {
+                let pol =
+                    CurrencyPolicy::get_assert(prev.account, prev.asset_id, hop.asset_id, true);
+                pol.assert_live();
+                need = invert_rate(need, pol.fee_fixed, pol.fx_rate);
+                assert!(
+                    need.value <= pol.remaining.value,
+                    "currency policy amount exceeds remaining"
+                );
+            }
         }
     }
     need
+}
+
+fn relay_used_twice(hops: &[PathHop]) -> bool {
+    let mut seen = HashSet::new();
+    for i in 1..hops.len() {
+        let prev = hops[i - 1];
+        let hop = hops[i];
+        if hop.asset_id == prev.asset_id {
+            continue;
+        }
+        let Some(relay) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) else {
+            continue;
+        };
+        if !seen.insert((relay.owner, relay.asset_lo, relay.asset_hi)) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Smallest send whose forward pricing, with reserves updated in order, meets `target_out`.
+fn sequential_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
+    assert!(target_out.value > 0, "path amount must be positive");
+    let mut lo = 0u64;
+    let mut hi = 1u64;
+    let mut saw = false;
+    let mut found = false;
+    for _ in 0..64 {
+        match forward_amount(hops, hi) {
+            Some(out) if out >= target_out.value => {
+                found = true;
+                break;
+            }
+            Some(_) => {
+                saw = true;
+                if hi > u64::MAX / 2 {
+                    break;
+                }
+                lo = hi;
+                hi *= 2;
+            }
+            // A tiny input can round to no output. Keep raising it.
+            None if !saw => {
+                if hi > u64::MAX / 2 {
+                    break;
+                }
+                hi *= 2;
+            }
+            None => break,
+        }
+    }
+    assert!(found, "relay cannot produce that output");
+    while lo + 1 < hi {
+        let mid = lo + (hi - lo) / 2;
+        match forward_amount(hops, mid) {
+            Some(out) if out >= target_out.value => hi = mid,
+            _ => lo = mid,
+        }
+    }
+    hi.into()
+}
+
+/// Same pricing as [`execute_path`], on local relay copies. Does not draw or save.
+fn forward_amount(hops: &[PathHop], amount: u64) -> Option<u64> {
+    let mut pools: HashMap<(AccountNumber, u16, u16), BanxRelay> = HashMap::new();
+    let mut spent: HashMap<(AccountNumber, u16, u16), u64> = HashMap::new();
+    let mut forward = amount;
+    for i in 1..hops.len() {
+        let prev = hops[i - 1];
+        let hop = hops[i];
+        if hop.asset_id != prev.asset_id {
+            if let Some(stored) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) {
+                let key = (stored.owner, stored.asset_lo, stored.asset_hi);
+                let relay = pools.entry(key).or_insert(stored);
+                forward = relay.apply_out(prev.asset_id, forward)?;
+            } else {
+                let pol =
+                    CurrencyPolicy::get_assert(prev.account, prev.asset_id, hop.asset_id, true);
+                pol.assert_live();
+                let key = (prev.account, prev.asset_id, hop.asset_id);
+                let used = spent.get(&key).copied().unwrap_or(0);
+                if forward > pol.remaining.value.saturating_sub(used) {
+                    return None;
+                }
+                spent.insert(key, used + forward);
+                forward = try_apply_rate(forward, pol.fee_fixed.value, pol.fx_rate)?;
+            }
+        }
+        let offer = ForwardOffer::get_live(prev.account, hop.account, hop.asset_id);
+        forward = try_apply_hop_fee(forward, offer.fee_fixed.value, offer.fee_percent)?;
+    }
+    (forward > 0).then_some(forward)
 }
 
 /// Run a path draw. Returns the last-hop amount.
@@ -66,9 +169,13 @@ pub(crate) fn execute_path(
         }
 
         if asset_id != prev_asset {
-            let mut pol = CurrencyPolicy::get_assert(path_debtor, prev_asset, asset_id, true);
-            pol.spend(forward);
-            forward = pol.apply(forward);
+            if let Some(mut relay) = BanxRelay::get(path_debtor, prev_asset, asset_id) {
+                forward = relay.swap_out(prev_asset, forward);
+            } else {
+                let mut pol = CurrencyPolicy::get_assert(path_debtor, prev_asset, asset_id, true);
+                pol.spend(forward);
+                forward = pol.apply(forward);
+            }
         }
         assert!(forward.value > 0, "path hop produced nothing to forward");
         forward = ForwardOffer::get_live(path_debtor, next_creditor, asset_id)

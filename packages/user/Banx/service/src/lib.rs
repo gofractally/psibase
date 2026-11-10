@@ -11,8 +11,8 @@ pub mod tables;
 pub mod service {
     use crate::tables::{
         assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BanxInvite,
-        BookAuth, CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy, ForwardOffer,
-        InitRow, InitTable, Obligation, PathHop, PayAuth, PayRequest,
+        BanxRelay, BookAuth, CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy,
+        ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayAuth, PayRequest, TokenRelay,
     };
     use psibase::{
         services::events,
@@ -520,6 +520,90 @@ pub mod service {
         CurrencyPolicy::get_assert(get_sender(), from_asset, to_asset, poster_is_creditor).remove();
     }
 
+    /// Post a constant-product relay between two Banx assets.
+    ///
+    /// Both reserves are virtual weights, not a debt. One row prices both
+    /// directions. Posting again replaces them. A path that changes asset
+    /// on the sender uses this curve instead of a currency policy for the pair.
+    #[action]
+    fn st_relay(
+        asset_a: u16,
+        reserve_a: Quantity,
+        asset_b: u16,
+        reserve_b: Quantity,
+        fee_ppm: u32,
+    ) {
+        BanxRelay::upsert(
+            get_sender(),
+            asset_a,
+            reserve_a,
+            asset_b,
+            reserve_b,
+            fee_ppm,
+        );
+    }
+
+    /// Delete the sender's relay for this pair. Claims already drawn stay.
+    #[action]
+    fn rm_relay(asset_a: u16, asset_b: u16) {
+        BanxRelay::get(get_sender(), asset_a, asset_b)
+            .expect("relay not found")
+            .remove();
+    }
+
+    /// Post a Banx↔token relay. `reserve_banx` is the virtual Banx weight.
+    /// The token side is the sender's cash vault `{sender}/{token_id}`.
+    /// One vault backs one relay.
+    #[action]
+    fn st_tok_relay(asset_id: u16, token_id: u32, reserve_banx: Quantity, fee_ppm: u32) {
+        TokenRelay::upsert(get_sender(), asset_id, token_id, reserve_banx, fee_ppm);
+    }
+
+    /// Delete the sender's token relay. Tokens stay in the vault.
+    #[action]
+    fn rm_tok_relay(asset_id: u16, token_id: u32) {
+        TokenRelay::get_assert(get_sender(), asset_id, token_id).remove();
+    }
+
+    /// Draw `amount_banx` on `owner` and receive tokens from their relay.
+    #[action]
+    fn tok_relay_out(
+        owner: AccountNumber,
+        asset_id: u16,
+        token_id: u32,
+        amount_banx: Quantity,
+        min_tokens: Quantity,
+    ) {
+        TokenRelay::cash_out(
+            owner,
+            get_sender(),
+            asset_id,
+            token_id,
+            amount_banx,
+            min_tokens,
+        );
+    }
+
+    /// Send tokens from the sender's vault into `owner`'s relay.
+    /// `owner` owes the sender the curve's Banx output. Fund the vault first.
+    #[action]
+    fn tok_relay_in(
+        owner: AccountNumber,
+        asset_id: u16,
+        token_id: u32,
+        amount_tokens: Quantity,
+        min_banx: Quantity,
+    ) {
+        TokenRelay::cash_in(
+            owner,
+            get_sender(),
+            asset_id,
+            token_id,
+            amount_tokens,
+            min_banx,
+        );
+    }
+
     /// Post a cash quote: Banx `asset_id` ↔ Tokens `token_id`.
     ///
     /// `is_out` true: taker draws Banx, receives tokens. False: taker sends
@@ -560,7 +644,15 @@ pub mod service {
     fn csh_fund(token_id: u32, amount: Quantity) {
         assert!(amount.value > 0, "csh_fund amount must be positive");
         let _ = Tokens::call().getToken(token_id);
-        CashQuote::take_tokens(get_sender(), token_id, amount, "csh_fund");
+        let poster = get_sender();
+        let before = TokenRelay::vault_balance(poster, token_id);
+        CashQuote::take_tokens(poster, token_id, amount, "csh_fund");
+        TokenRelay::sync_vault(
+            poster,
+            token_id,
+            before,
+            TokenRelay::vault_balance(poster, token_id),
+        );
     }
 
     /// Return tokens from Banx's `{sender}/{token_id}` sub-account.
@@ -568,7 +660,14 @@ pub mod service {
     fn csh_wd(token_id: u32, amount: Quantity) {
         assert!(amount.value > 0, "csh_wd amount must be positive");
         let poster = get_sender();
+        let before = TokenRelay::vault_balance(poster, token_id);
         CashQuote::pay_tokens(poster, poster, token_id, amount, "csh_wd");
+        TokenRelay::sync_vault(
+            poster,
+            token_id,
+            before,
+            TokenRelay::vault_balance(poster, token_id),
+        );
     }
 
     /// Draw `amount_banx` on `cashier`'s line; receive tokens from their vault.
@@ -719,11 +818,10 @@ pub mod service {
     /// `path_pay([(Gary, AUD), (Steve, USD)], amount_aud, min_return_usd)`:
     /// 1. **First hop** — sender draws `amount` on Gary in **AUD** (line and/or
     ///    reverse claim that auto-nets).
-    /// 2. **Currency change** — apply the previous-hop **creditor's**
-    ///    creditor-side [`CurrencyPolicy`] to size the next hop. The fee is
-    ///    subtracted from what they owe onward. Does **not** rebook the
-    ///    previous claim: the payer still owes the middle man the full
-    ///    from-asset.
+    /// 2. **Currency change** — if the previous hop posted a [`BanxRelay`]
+    ///    for the pair, the curve sizes the next hop. Otherwise apply their
+    ///    creditor-side [`CurrencyPolicy`]. Does **not** rebook the previous
+    ///    claim: the payer still owes the middle man the full from-asset.
     /// 3. **Later hops** — intermediate's live [`ForwardOffer`] (fee + max
     ///    line APR); draw on next line.
     /// 4. **`min_return`** — final hop principal (in **last** asset) ≥ this.
@@ -740,6 +838,35 @@ pub mod service {
         assert!(!hops.is_empty(), "path_pay must include at least one hop");
         assert!(amount.value > 0, "path_pay amount must be positive");
         run_path(get_sender(), hops, amount, min_return, request_id, "");
+    }
+
+    /// Path-pay that ends by selling the last hop's Banx for that account's tokens.
+    ///
+    /// The last hop must have posted a token relay for that asset and
+    /// `token_id`. The path draws the Banx amount on them, then their vault
+    /// pays `recipient`. They do not also owe `recipient` the Banx asset.
+    /// `min_tokens` floors the token output.
+    #[action]
+    fn path_cash(
+        hops: Vec<PathHop>,
+        amount: Quantity,
+        token_id: u32,
+        recipient: AccountNumber,
+        min_tokens: Quantity,
+    ) {
+        assert!(!hops.is_empty(), "path_cash must include at least one hop");
+        assert!(amount.value > 0, "path_cash amount must be positive");
+        assert_account_exists(recipient);
+        let last = hops[hops.len() - 1];
+        let banx_in = run_path(get_sender(), hops, amount, Quantity::new(1), 0, "");
+        TokenRelay::pay_tokens_for_banx(
+            last.account,
+            last.asset_id,
+            token_id,
+            banx_in,
+            recipient,
+            min_tokens,
+        );
     }
 
     /// Pay a live invoice by walking hops **backward** from remaining.
@@ -845,7 +972,7 @@ pub mod service {
     ///   `convert` | `credit_line` | `rm_credit_line` | `book_auth` |
     ///   `rm_book_auth` | `sell_claim` | `buy_claim` | `invoice` |
     ///   `please_book` | `fulfill` | `req_cancel` |
-    ///   `forgive` | `cash_out` | `cash_in`
+    ///   `forgive` | `cash_out` | `cash_in` | `relay`
     /// - `amount`: primary quantity (human decimal at `asset_id` precision)
     /// - `netted`: auto-net cancelled; convert/`path_pay` output at `other_asset_id`
     /// - `other_asset_id`: convert/`path_pay` destination asset; else same as `asset_id`

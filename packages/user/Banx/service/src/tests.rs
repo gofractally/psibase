@@ -10,9 +10,9 @@ extern "C" {
 mod tests {
     use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
     use crate::tables::{
-        Asset, BanxInvite, BanxInviteTable, BookAuth, CashQuote, ClaimOffer, CreditLine,
+        Asset, BanxInvite, BanxInviteTable, BanxRelay, BookAuth, CashQuote, ClaimOffer, CreditLine,
         CurrencyPolicy, InitTable, Obligation, ObligationTable, PairCycle, PathHop, PayAuth,
-        PayAuthTab, PayRequest, PPM_SCALE, RATE_SCALE,
+        PayAuthTab, PayRequest, TokenRelay, PPM_SCALE, RATE_SCALE,
     };
     use crate::Wrapper;
     use psibase::fracpack::Pack;
@@ -42,6 +42,27 @@ mod tests {
 
     fn banx_gql(chain: &psibase::Chain, query: &str) -> Result<serde_json::Value, psibase::Error> {
         Ok(chain.graphql(Wrapper::SERVICE, query)?)
+    }
+
+    fn activity_nodes(chain: &psibase::Chain, account: AccountNumber) -> Vec<serde_json::Value> {
+        let graph = banx_gql(
+            chain,
+            &format!(
+                r#"{{ activity(account: "{account}", last: 50) {{
+                    edges {{ node {{ kind amount netted }} }}
+                }} }}"#
+            ),
+        )
+        .unwrap_or_else(|err| panic!("activity query failed: {err}"));
+        let edges = graph
+            .pointer("/data/activity/edges")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_else(|| panic!("activity edges missing: {graph}"));
+        edges
+            .into_iter()
+            .filter_map(|edge| edge.get("node").cloned())
+            .collect()
     }
 
     /// Replay a stored obligation the service can no longer create.
@@ -5992,6 +6013,26 @@ mod tests {
             .value
     }
 
+    fn shared_from_banx(chain: &psibase::Chain, token_id: u32, who: AccountNumber) -> u64 {
+        psibase::services::tokens::Wrapper::push(chain)
+            .getSharedBal(token_id, Wrapper::SERVICE, who)
+            .get()
+            .unwrap()
+            .value
+    }
+
+    fn take_from_banx(chain: &psibase::Chain, who: AccountNumber, token_id: u32, amount: u64) {
+        psibase::services::tokens::Wrapper::push_from(chain, who)
+            .debit(
+                token_id,
+                Wrapper::SERVICE,
+                Quantity::new(amount),
+                "take".to_string().try_into().unwrap(),
+            )
+            .get()
+            .unwrap();
+    }
+
     /// Alice mints a 4 dp token (same scale as USD) and credits `holder`.
     fn mint_gas(
         chain: &psibase::Chain,
@@ -6026,6 +6067,15 @@ mod tests {
                 .credit(
                     token_id,
                     holder,
+                    Quantity::new(supply),
+                    "gas".to_string().try_into().unwrap(),
+                )
+                .get()
+                .unwrap();
+            psibase::services::tokens::Wrapper::push_from(chain, holder)
+                .debit(
+                    token_id,
+                    minter,
                     Quantity::new(supply),
                     "gas".to_string().try_into().unwrap(),
                 )
@@ -6067,7 +6117,6 @@ mod tests {
         let bob = account!("bob");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
-        enable_auto_debit(&chain, alice);
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let gas = mint_gas(&chain, bob, bob, 10_000_000);
         fund_vault(&chain, bob, gas, 5_000_000);
@@ -6108,8 +6157,9 @@ mod tests {
             )
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 1_000_000);
-        assert_eq!(token_balance(&chain, gas, alice), 1_000_000);
+        assert_eq!(shared_from_banx(&chain, gas, alice), 1_000_000);
         assert_eq!(vault_bal(&chain, bob, gas), 4_000_000);
+        take_from_banx(&chain, alice, gas, 1_000_000);
 
         fund_vault(&chain, alice, gas, 1_000_000);
         Wrapper::push_from(&chain, alice)
@@ -6136,7 +6186,6 @@ mod tests {
         let bob = account!("bob");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
-        enable_auto_debit(&chain, alice);
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let gas = mint_gas(&chain, bob, bob, 10_000_000);
         fund_vault(&chain, bob, gas, 5_000_000);
@@ -6168,7 +6217,7 @@ mod tests {
             )
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 100_000);
-        assert_eq!(token_balance(&chain, gas, alice), 200_000);
+        assert_eq!(shared_from_banx(&chain, gas, alice), 200_000);
         Ok(())
     }
 
@@ -6317,15 +6366,15 @@ mod tests {
             .csh_wd(gas, Quantity::new(400_000))
             .get()?;
         assert_eq!(vault_bal(&chain, bob, gas), 0);
+        assert_eq!(shared_from_banx(&chain, gas, bob), 400_000);
+        take_from_banx(&chain, bob, gas, 400_000);
         assert_eq!(token_balance(&chain, gas, bob), 1_000_000);
         Ok(())
     }
 
-    /// A cash-out that the taker has not auto-debited must not book the claim.
+    /// A cash-out credits the taker. Debiting that credit is the taker's choice.
     #[psibase::test_case(packages("Banx"))]
-    fn test_cash_out_requires_delivered_tokens(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_cash_out_credits_without_debit(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let bob = account!("bob");
@@ -6349,7 +6398,7 @@ mod tests {
             )
             .get()?;
 
-        let err = Wrapper::push_from(&chain, alice)
+        Wrapper::push_from(&chain, alice)
             .cash_out(
                 bob,
                 usd,
@@ -6357,29 +6406,22 @@ mod tests {
                 Quantity::new(100_000),
                 Quantity::new(100_000),
             )
-            .get()
-            .unwrap_err();
-        assert!(
-            err.to_string().contains("token credit was not delivered"),
-            "got {err}"
-        );
-        assert_eq!(exp(&chain, bob, alice, usd), 0);
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 100_000);
+        assert_eq!(shared_from_banx(&chain, gas, alice), 100_000);
         assert_eq!(token_balance(&chain, gas, alice), 0);
-        assert_eq!(vault_bal(&chain, bob, gas), 500_000);
-        assert_eq!(
-            CreditLine::get_assert(bob, alice, usd).remaining.value,
-            100_000
-        );
+        assert_eq!(vault_bal(&chain, bob, gas), 400_000);
+        assert_eq!(CreditLine::get_assert(bob, alice, usd).remaining.value, 0);
         assert_eq!(
             CashQuote::get_assert(bob, usd, gas, true).remaining.value,
-            100_000
+            0
         );
         Ok(())
     }
 
-    /// Withdrawing the vault without auto-debit must leave the vault in place.
+    /// Withdrawing the vault credits the poster even when auto-debit is off.
     #[psibase::test_case(packages("Banx"))]
-    fn test_cash_withdraw_requires_delivered_tokens(
+    fn test_cash_withdraw_credits_without_debit(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -6394,15 +6436,11 @@ mod tests {
             )
             .get()?;
 
-        let err = Wrapper::push_from(&chain, bob)
+        Wrapper::push_from(&chain, bob)
             .csh_wd(gas, Quantity::new(400_000))
-            .get()
-            .unwrap_err();
-        assert!(
-            err.to_string().contains("token credit was not delivered"),
-            "got {err}"
-        );
-        assert_eq!(vault_bal(&chain, bob, gas), 400_000);
+            .get()?;
+        assert_eq!(vault_bal(&chain, bob, gas), 0);
+        assert_eq!(shared_from_banx(&chain, gas, bob), 400_000);
         assert_eq!(token_balance(&chain, gas, bob), 600_000);
         Ok(())
     }
@@ -6420,7 +6458,6 @@ mod tests {
         // james friend Bob comes along
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
-        enable_auto_debit(&chain, bob);
 
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         // Out: 1 USD → 0.1 gas. Fair reverse is 1 gas → 10 USD.
@@ -6451,9 +6488,10 @@ mod tests {
             .cash_out(james, usd, gas, 5_000.into(), 500.into())
             .get()?;
 
-        assert_eq!(token_balance(&chain, gas, bob), 500);
+        assert_eq!(shared_from_banx(&chain, gas, bob), 500);
         assert_eq!(exp(&chain, james, bob, usd), 5_000);
         assert_eq!(vault_bal(&chain, james, gas), 399_500);
+        take_from_banx(&chain, bob, gas, 500);
 
         // James allows his friend to send it back, but only at a 10% worse rate.
         Wrapper::push_from(&chain, james)
@@ -6962,7 +7000,6 @@ mod tests {
         let bob = account!("bob");
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
-        enable_auto_debit(&chain, alice);
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let gas = mint_gas(&chain, bob, bob, 1_000);
         fund_vault(&chain, bob, gas, 1_000);
@@ -7028,6 +7065,8 @@ mod tests {
             CashQuote::get_assert(bob, usd, gas, true).remaining.value,
             0
         );
+        assert_eq!(shared_from_banx(&chain, gas, alice), 150);
+        take_from_banx(&chain, alice, gas, 150);
 
         fund_vault(&chain, alice, gas, 80);
         Wrapper::push_from(&chain, bob)
@@ -8106,6 +8145,1047 @@ mod tests {
             CreditLine::get_assert(bob, alice, usd).remaining.value,
             AMOUNT
         );
+        Ok(())
+    }
+
+    struct RelayNet {
+        bob: AccountNumber,
+        brandon: AccountNumber,
+        john: AccountNumber,
+        alice: AccountNumber,
+        usd: u16,
+        aud: u16,
+    }
+
+    /// Bob draws Brandon, Brandon draws John, in USD. John's AUD line to Alice
+    /// is the exit. Reserves are John's 10000 USD / 15000 AUD.
+    fn relay_net(chain: &psibase::Chain) -> RelayNet {
+        Wrapper::push(chain).init().get().unwrap();
+        let bob = account!("bob");
+        let brandon = account!("brandon");
+        let john = account!("john");
+        let alice = account!("alice");
+        for a in [bob, brandon, john, alice] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        Wrapper::push_from(chain, brandon)
+            .st_crd_lne(bob, usd, Quantity::new(100_000), false, 0, 0)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, john)
+            .st_crd_lne(brandon, usd, Quantity::new(100_000), false, 0, 0)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, alice)
+            .st_crd_lne(john, aud, Quantity::new(100_000), false, 0, 0)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, brandon)
+            .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, john)
+            .st_glb_fwd(aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()
+            .unwrap();
+        RelayNet {
+            bob,
+            brandon,
+            john,
+            alice,
+            usd,
+            aud,
+        }
+    }
+
+    fn post_relay(chain: &psibase::Chain, john: AccountNumber, usd: u16, aud: u16, fee_ppm: u32) {
+        Wrapper::push_from(chain, john)
+            .st_relay(
+                usd,
+                Quantity::new(10_000),
+                aud,
+                Quantity::new(15_000),
+                fee_ppm,
+            )
+            .get()
+            .unwrap();
+    }
+
+    fn relay_sides(john: AccountNumber, usd: u16, aud: u16) -> (u64, u64) {
+        let row = BanxRelay::get(john, usd, aud).expect("relay");
+        if row.asset_lo == usd {
+            (row.reserve_lo.value, row.reserve_hi.value)
+        } else {
+            (row.reserve_hi.value, row.reserve_lo.value)
+        }
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_relay_path_usd_to_aud(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let net = relay_net(&chain);
+        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_000, 15_000));
+
+        let carol = account!("carol");
+        chain.new_account(carol).unwrap();
+        let missing = Wrapper::push_from(&chain, net.bob)
+            .path_pay(
+                vec![
+                    hop(net.brandon, net.usd),
+                    hop(net.john, net.usd),
+                    hop(carol, net.aud),
+                ],
+                Quantity::new(1_000),
+                Quantity::new(1),
+                0,
+            )
+            .get();
+        assert!(missing.is_err(), "a hop with no line must abort");
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_000, 15_000));
+        assert_eq!(exp(&chain, net.brandon, net.bob, net.usd), 0);
+
+        let short = Wrapper::push_from(&chain, net.bob)
+            .path_pay(
+                vec![
+                    hop(net.brandon, net.usd),
+                    hop(net.john, net.usd),
+                    hop(net.alice, net.aud),
+                ],
+                Quantity::new(1_000),
+                Quantity::new(1_364),
+                0,
+            )
+            .get();
+        assert!(short.is_err(), "min_return above the curve must abort");
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_000, 15_000));
+        assert_eq!(exp(&chain, net.alice, net.john, net.aud), 0);
+
+        Wrapper::push_from(&chain, net.bob)
+            .path_pay(
+                vec![
+                    hop(net.brandon, net.usd),
+                    hop(net.john, net.usd),
+                    hop(net.alice, net.aud),
+                ],
+                Quantity::new(1_000),
+                Quantity::new(1_363),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, net.brandon, net.bob, net.usd), 1_000);
+        assert_eq!(exp(&chain, net.john, net.brandon, net.usd), 1_000);
+        assert_eq!(exp(&chain, net.alice, net.john, net.aud), 1_363);
+        assert_eq!(exp(&chain, net.john, net.bob, net.usd), 0);
+        assert_eq!(exp(&chain, net.bob, net.john, net.usd), 0);
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (11_000, 13_637));
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_relay_exact_out_inverts_curve(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let net = relay_net(&chain);
+        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        let id = Wrapper::push_from(&chain, net.alice)
+            .st_req(
+                PayRequest::INVOICE,
+                net.bob,
+                net.aud,
+                Quantity::new(1_363),
+                "aud".into(),
+                never(),
+            )
+            .get()?;
+        let hops = vec![
+            hop(net.brandon, net.usd),
+            hop(net.john, net.usd),
+            hop(net.alice, net.aud),
+        ];
+        let err = Wrapper::push_from(&chain, net.bob)
+            .pay_inv(hops.clone(), Quantity::new(999), id)
+            .get()
+            .expect_err("999 is under the curve's required send");
+        assert!(
+            err.to_string().contains("max_spend below required send"),
+            "{err}"
+        );
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_000, 15_000));
+        assert_eq!(PayRequest::get_assert(id).remaining.value, 1_363);
+
+        Wrapper::push_from(&chain, net.bob)
+            .pay_inv(hops, Quantity::new(1_000), id)
+            .get()?;
+        assert!(PayRequest::get(id).is_none());
+        assert_eq!(exp(&chain, net.alice, net.john, net.aud), 1_363);
+        assert_eq!(exp(&chain, net.brandon, net.bob, net.usd), 1_000);
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (11_000, 13_637));
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_relay_replaces_currency_policy(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let net = relay_net(&chain);
+        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        Wrapper::push_from(&chain, net.john)
+            .st_cur_pol(
+                net.usd,
+                net.aud,
+                true,
+                Quantity::new(0),
+                RATE_SCALE * 2,
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
+            .get()?;
+
+        let graph = banx_gql(
+            &chain,
+            r#"{ pathGraph(from: "bob", to: "alice", maxHops: 4) {
+                currencyPolicies { poster fromAsset toAsset }
+                relays { owner assetLo assetHi feePpm }
+            } }"#,
+        )?;
+        let policies = graph
+            .pointer("/data/pathGraph/currencyPolicies")
+            .and_then(|v| v.as_array())
+            .expect("policies");
+        assert!(
+            policies
+                .iter()
+                .all(|row| row.get("poster").and_then(|v| v.as_str()) != Some("john")),
+            "{graph}"
+        );
+        let relays = graph
+            .pointer("/data/pathGraph/relays")
+            .and_then(|v| v.as_array())
+            .expect("relays");
+        assert_eq!(relays.len(), 1, "{graph}");
+        assert_eq!(
+            relays[0].get("owner").and_then(|v| v.as_str()),
+            Some("john")
+        );
+        assert_eq!(relays[0].get("feePpm").and_then(|v| v.as_u64()), Some(0));
+
+        Wrapper::push_from(&chain, net.bob)
+            .path_pay(
+                vec![
+                    hop(net.brandon, net.usd),
+                    hop(net.john, net.usd),
+                    hop(net.alice, net.aud),
+                ],
+                Quantity::new(1_000),
+                Quantity::new(1_363),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, net.alice, net.john, net.aud), 1_363);
+
+        Wrapper::push_from(&chain, net.john)
+            .rm_relay(net.usd, net.aud)
+            .get()?;
+        assert!(BanxRelay::get(net.john, net.usd, net.aud).is_none());
+        assert_eq!(exp(&chain, net.alice, net.john, net.aud), 1_363);
+        assert_eq!(exp(&chain, net.john, net.brandon, net.usd), 1_000);
+
+        Wrapper::push_from(&chain, net.bob)
+            .path_pay(
+                vec![
+                    hop(net.brandon, net.usd),
+                    hop(net.john, net.usd),
+                    hop(net.alice, net.aud),
+                ],
+                Quantity::new(1_000),
+                Quantity::new(2_000),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, net.alice, net.john, net.aud), 3_363);
+        assert_eq!(exp(&chain, net.john, net.brandon, net.usd), 2_000);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_relay_fee_stays_in_the_input(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let net = relay_net(&chain);
+        post_relay(&chain, net.john, net.usd, net.aud, 100_000);
+        Wrapper::push_from(&chain, net.bob)
+            .path_pay(
+                vec![
+                    hop(net.brandon, net.usd),
+                    hop(net.john, net.usd),
+                    hop(net.alice, net.aud),
+                ],
+                Quantity::new(1_000),
+                Quantity::new(1_238),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, net.alice, net.john, net.aud), 1_238);
+        assert_eq!(exp(&chain, net.john, net.brandon, net.usd), 1_000);
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (11_000, 13_762));
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_token_relay_out(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let john = account!("john");
+        chain.new_account(alice).unwrap();
+        chain.new_account(john).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let gas = mint_gas(&chain, john, john, 20_000);
+        fund_vault(&chain, john, gas, 15_000);
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
+            .get()?;
+
+        let tokens = Wrapper::push_from(&chain, alice)
+            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1_363))
+            .get();
+        assert!(tokens.is_ok(), "{tokens:?}");
+        assert_eq!(exp(&chain, john, alice, aud), 1_000);
+        assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
+        assert_eq!(token_balance(&chain, gas, alice), 0);
+        assert_eq!(vault_bal(&chain, john, gas), 13_637);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            11_000
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_relay_path_cash_pays_tokens(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let bob = account!("bob");
+        let brandon = account!("brandon");
+        let john = account!("john");
+        let alice = account!("alice");
+        for a in [bob, brandon, john, alice] {
+            chain.new_account(a).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let gas = mint_gas(&chain, john, john, 20_000);
+        fund_vault(&chain, john, gas, 15_000);
+        Wrapper::push_from(&chain, brandon)
+            .st_crd_lne(bob, aud, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(brandon, aud, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, brandon)
+            .st_glb_fwd(aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
+            .get()?;
+
+        let ghost = account!("nobody");
+        let missing = Wrapper::push_from(&chain, bob)
+            .path_cash(
+                vec![hop(brandon, aud), hop(john, aud)],
+                Quantity::new(1_000),
+                gas,
+                ghost,
+                Quantity::new(1),
+            )
+            .get()
+            .expect_err("path_cash must name an existing account");
+        assert!(missing.to_string().contains("does not exist"), "{missing}");
+        assert_eq!(exp(&chain, brandon, bob, aud), 0);
+        assert_eq!(exp(&chain, john, brandon, aud), 0);
+        assert_eq!(vault_bal(&chain, john, gas), 15_000);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            10_000
+        );
+
+        Wrapper::push_from(&chain, bob)
+            .path_cash(
+                vec![hop(brandon, aud), hop(john, aud)],
+                Quantity::new(1_000),
+                gas,
+                alice,
+                Quantity::new(1_363),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, brandon, bob, aud), 1_000);
+        assert_eq!(exp(&chain, john, brandon, aud), 1_000);
+        assert_eq!(exp(&chain, john, alice, aud), 0);
+        assert_eq!(exp(&chain, alice, john, aud), 0);
+        assert!(
+            activity_nodes(&chain, alice)
+                .iter()
+                .all(|row| row.get("kind").and_then(|k| k.as_str()) != Some("relay")),
+            "token recipient has no Banx claim on the relay owner"
+        );
+        assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
+        assert_eq!(token_balance(&chain, gas, alice), 0);
+        assert_eq!(vault_bal(&chain, john, gas), 13_637);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            11_000
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_token_relay_in(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let john = account!("john");
+        chain.new_account(alice).unwrap();
+        chain.new_account(john).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let gas = mint_gas(&chain, john, john, 20_000);
+        fund_vault(&chain, john, gas, 15_000);
+        psibase::services::tokens::Wrapper::push_from(&chain, john)
+            .credit(
+                gas,
+                alice,
+                Quantity::new(1_000),
+                "sell".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        psibase::services::tokens::Wrapper::push_from(&chain, alice)
+            .debit(
+                gas,
+                john,
+                Quantity::new(1_000),
+                "take".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        fund_vault(&chain, alice, gas, 1_000);
+        Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .tok_relay_in(john, aud, gas, Quantity::new(1_000), Quantity::new(625))
+            .get()?;
+        assert_eq!(exp(&chain, alice, john, aud), 625);
+        assert_eq!(vault_bal(&chain, john, gas), 16_000);
+        assert_eq!(vault_bal(&chain, alice, gas), 0);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            9_375
+        );
+        Ok(())
+    }
+
+    /// Selling Banx that John already owes is one relay row, netted in full.
+    /// It is not a path hop plus a second row that pretends nothing netted.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_token_relay_out_records_the_net(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let john = account!("john");
+        chain.new_account(alice).unwrap();
+        chain.new_account(john).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let gas = mint_gas(&chain, john, john, 20_000);
+        fund_vault(&chain, john, gas, 15_000);
+        Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .deposit(alice, aud, Quantity::new(1_000), 0, 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1_363))
+            .get()?;
+        assert_eq!(exp(&chain, alice, john, aud), 0);
+        assert_eq!(exp(&chain, john, alice, aud), 0);
+
+        let nodes = activity_nodes(&chain, alice);
+        assert!(
+            nodes
+                .iter()
+                .all(|row| row.get("kind").and_then(|k| k.as_str()) != Some("path_draw")),
+            "a relay swap is not a path hop: {nodes:?}"
+        );
+        let relays: Vec<_> = nodes
+            .iter()
+            .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("relay"))
+            .collect();
+        assert_eq!(relays.len(), 1, "{nodes:?}");
+        assert_eq!(
+            relays[0].get("amount").and_then(|v| v.as_str()),
+            Some("0.1000")
+        );
+        assert_eq!(
+            relays[0].get("netted").and_then(|v| v.as_str()),
+            Some("0.1000")
+        );
+        Ok(())
+    }
+
+    /// Buying Banx that cancels a debt Alice already owes is recorded as that net.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_token_relay_in_records_the_net(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let john = account!("john");
+        chain.new_account(alice).unwrap();
+        chain.new_account(john).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let gas = mint_gas(&chain, john, john, 20_000);
+        fund_vault(&chain, john, gas, 15_000);
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(john, aud)],
+                Quantity::new(625),
+                Quantity::new(625),
+                0,
+            )
+            .get()?;
+        psibase::services::tokens::Wrapper::push_from(&chain, john)
+            .credit(
+                gas,
+                alice,
+                Quantity::new(1_000),
+                "sell".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        psibase::services::tokens::Wrapper::push_from(&chain, alice)
+            .debit(
+                gas,
+                john,
+                Quantity::new(1_000),
+                "take".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        fund_vault(&chain, alice, gas, 1_000);
+        Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .tok_relay_in(john, aud, gas, Quantity::new(1_000), Quantity::new(625))
+            .get()?;
+        assert_eq!(exp(&chain, alice, john, aud), 0);
+        assert_eq!(exp(&chain, john, alice, aud), 0);
+
+        let nodes = activity_nodes(&chain, alice);
+        let relays: Vec<_> = nodes
+            .iter()
+            .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("relay"))
+            .collect();
+        assert_eq!(relays.len(), 1, "{nodes:?}");
+        assert_eq!(
+            relays[0].get("amount").and_then(|v| v.as_str()),
+            Some("0.0625")
+        );
+        assert_eq!(
+            relays[0].get("netted").and_then(|v| v.as_str()),
+            Some("0.0625")
+        );
+        let draws = nodes
+            .iter()
+            .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("path_draw"))
+            .count();
+        assert_eq!(
+            draws, 1,
+            "the setup draw stays; the swap does not add one: {nodes:?}"
+        );
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Banx"))]
+    fn test_token_relay_one_vault(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let john = account!("john");
+        chain.new_account(alice).unwrap();
+        chain.new_account(john).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        let gas = mint_gas(&chain, john, john, 20_000);
+        fund_vault(&chain, john, gas, 15_000);
+        Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
+            .get()?;
+        let err = Wrapper::push_from(&chain, john)
+            .st_tok_relay(usd, gas, Quantity::new(10_000), 0)
+            .get()
+            .expect_err("one vault cannot back two relays");
+        assert!(
+            err.to_string()
+                .contains("token vault already backs another relay"),
+            "{err}"
+        );
+
+        Wrapper::push_from(&chain, john)
+            .csh_wd(gas, Quantity::new(15_000))
+            .get()?;
+        assert_eq!(vault_bal(&chain, john, gas), 0);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            10_000
+        );
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        let empty = Wrapper::push_from(&chain, alice)
+            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1))
+            .get();
+        assert!(empty.is_err(), "an empty vault cannot pay the curve");
+        assert_eq!(exp(&chain, john, alice, aud), 0);
+
+        // Same posted weight. Refilling does not require posting the relay again.
+        take_from_banx(&chain, john, gas, 15_000);
+        fund_vault(&chain, john, gas, 15_000);
+        assert_eq!(vault_bal(&chain, john, gas), 15_000);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            10_000
+        );
+        Wrapper::push_from(&chain, alice)
+            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1_363))
+            .get()?;
+        assert_eq!(exp(&chain, john, alice, aud), 1_000);
+        assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
+        assert_eq!(vault_bal(&chain, john, gas), 13_637);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            11_000
+        );
+
+        Wrapper::push_from(&chain, john)
+            .rm_tok_relay(aud, gas)
+            .get()?;
+        assert!(TokenRelay::get(john, aud, gas).is_none());
+        assert_eq!(vault_bal(&chain, john, gas), 13_637);
+        Ok(())
+    }
+
+    /// Withdrawing inventory scales the virtual Banx weight. A fixed cash
+    /// quote cannot move the same vault while the relay is posted.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_token_relay_withdraw_keeps_price(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let john = account!("john");
+        chain.new_account(alice).unwrap();
+        chain.new_account(john).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let gas = mint_gas(&chain, john, john, 20_000);
+        fund_vault(&chain, john, gas, 15_000);
+        Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_csh_qte(
+                aud,
+                gas,
+                true,
+                0.into(),
+                RATE_SCALE,
+                Quantity::new(u64::MAX),
+                never(),
+            )
+            .get()?;
+        let blocked = Wrapper::push_from(&chain, alice)
+            .cash_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1))
+            .get()
+            .expect_err("a cash quote cannot drain a relay vault");
+        assert!(
+            blocked.to_string().contains("token vault backs a relay"),
+            "{blocked}"
+        );
+        assert_eq!(vault_bal(&chain, john, gas), 15_000);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            10_000
+        );
+
+        Wrapper::push_from(&chain, john)
+            .csh_wd(gas, Quantity::new(14_000))
+            .get()?;
+        assert_eq!(vault_bal(&chain, john, gas), 1_000);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            666
+        );
+
+        psibase::services::tokens::Wrapper::push_from(&chain, john)
+            .credit(
+                gas,
+                alice,
+                Quantity::new(1_000),
+                "sell".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        psibase::services::tokens::Wrapper::push_from(&chain, alice)
+            .debit(
+                gas,
+                john,
+                Quantity::new(1_000),
+                "take".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        fund_vault(&chain, alice, gas, 1_000);
+        Wrapper::push_from(&chain, alice)
+            .tok_relay_in(john, aud, gas, Quantity::new(1_000), Quantity::new(333))
+            .get()?;
+        assert_eq!(exp(&chain, alice, john, aud), 333);
+        assert_eq!(vault_bal(&chain, john, gas), 2_000);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            333
+        );
+        Ok(())
+    }
+
+    /// A round trip through one relay prices the second swap on the reserves
+    /// the first swap saved. 500 exact-out costs 501. 1,000 in delivers 999.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_relay_round_trip_matches_quote(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let net = relay_net(&chain);
+        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        let carol = account!("carol");
+        chain.new_account(carol).unwrap();
+        Wrapper::push_from(&chain, net.alice)
+            .st_glb_fwd(net.aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, net.john)
+            .st_glb_fwd(net.usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .st_crd_lne(net.john, net.usd, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        let hops = vec![
+            hop(net.brandon, net.usd),
+            hop(net.john, net.usd),
+            hop(net.alice, net.aud),
+            hop(net.john, net.aud),
+            hop(carol, net.usd),
+        ];
+
+        let id = Wrapper::push_from(&chain, carol)
+            .st_req(
+                PayRequest::INVOICE,
+                net.bob,
+                net.usd,
+                Quantity::new(500),
+                "usd".into(),
+                never(),
+            )
+            .get()?;
+        let short = Wrapper::push_from(&chain, net.bob)
+            .pay_inv(hops.clone(), Quantity::new(500), id)
+            .get()
+            .expect_err("500 is one short of the sequential curve");
+        assert!(
+            short.to_string().contains("max_spend below required send"),
+            "{short}"
+        );
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_000, 15_000));
+
+        Wrapper::push_from(&chain, net.bob)
+            .pay_inv(hops.clone(), Quantity::new(501), id)
+            .get()?;
+        assert!(PayRequest::get(id).is_none());
+        assert_eq!(exp(&chain, carol, net.john, net.usd), 500);
+        assert_eq!(exp(&chain, net.brandon, net.bob, net.usd), 501);
+        assert_eq!(exp(&chain, net.john, net.brandon, net.usd), 501);
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_001, 15_000));
+
+        Wrapper::push_from(&chain, net.bob)
+            .path_pay(hops, Quantity::new(1_000), Quantity::new(999), 0)
+            .get()?;
+        assert_eq!(exp(&chain, carol, net.john, net.usd), 1_499);
+        Ok(())
+    }
+
+    struct WowBook {
+        john: AccountNumber,
+        aud: u16,
+        wow: u16,
+    }
+
+    /// John's virtual book: 10,000 WoW gold against 15,000 AUD, no fee.
+    /// Amounts are raw. WoW is precision 4, same as AUD.
+    fn open_wow_book(chain: &psibase::Chain, friends: &[AccountNumber]) -> WowBook {
+        Wrapper::push(chain).init().get().unwrap();
+        let john = account!("john");
+        chain.new_account(john).unwrap();
+        for friend in friends {
+            chain.new_account(*friend).unwrap();
+        }
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let wow = Wrapper::push_from(chain, john)
+            .add_asset(
+                account!("wow"),
+                Precision::new(4).unwrap(),
+                "1.0000 = 1 WoW gold".into(),
+            )
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, john)
+            .st_relay(wow, Quantity::new(10_000), aud, Quantity::new(15_000), 0)
+            .get()
+            .unwrap();
+        WowBook { john, aud, wow }
+    }
+
+    fn offer_line(
+        chain: &psibase::Chain,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        asset: u16,
+    ) {
+        Wrapper::push_from(chain, creditor)
+            .st_crd_lne(debitor, asset, Quantity::new(100_000), false, 0, 0)
+            .get()
+            .unwrap();
+    }
+
+    fn forward_any(chain: &psibase::Chain, poster: AccountNumber, asset: u16) {
+        Wrapper::push_from(chain, poster)
+            .st_glb_fwd(asset, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()
+            .unwrap();
+    }
+
+    /// (AUD reserve, WoW reserve). WoW is registered after the seed list, so AUD is the low id.
+    fn aud_wow(john: AccountNumber, aud: u16, wow: u16) -> (u64, u64) {
+        let row = BanxRelay::get(john, aud, wow).expect("relay");
+        assert_eq!((row.asset_lo, row.asset_hi), (aud, wow));
+        (row.reserve_lo.value, row.reserve_hi.value)
+    }
+
+    /// Billy mails John 1,000 WoW gold and sells it on John's relay.
+    ///
+    /// John lines Anthony, and Anthony lines Billy, both in AUD. Those lines
+    /// let Billy pay dollars through his dad. They do not let the sale pay
+    /// Billy. The gold unwind is the deposit itself. The curve's AUD is a
+    /// claim Anthony holds on John, which needs Anthony's line to John.
+    /// Billy then spends 500 AUD through that claim.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_wow_billy_sells_through_anthony(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let anthony = account!("anthony");
+        let billy = account!("billy");
+        let book = open_wow_book(&chain, &[anthony, billy]);
+        let john = book.john;
+        let aud = book.aud;
+        let wow = book.wow;
+
+        offer_line(&chain, john, anthony, aud);
+        offer_line(&chain, anthony, billy, aud);
+        // Receive side. John's line to Anthony lets Anthony pay John, not hold John's debt.
+        offer_line(&chain, anthony, john, aud);
+        forward_any(&chain, john, aud);
+        forward_any(&chain, anthony, aud);
+        assert!(CreditLine::get(john, billy, aud).is_none());
+
+        let gold = 1_000u64;
+        let id = Wrapper::push_from(&chain, billy)
+            .st_req(
+                PayRequest::PLEASE_BOOK,
+                john,
+                wow,
+                Quantity::new(gold),
+                "mailed gold".into(),
+                never(),
+            )
+            .get()?;
+
+        let sell = vec![hop(john, wow), hop(anthony, aud)];
+        let early = Wrapper::push_from(&chain, billy)
+            .path_pay(sell.clone(), Quantity::new(gold), Quantity::new(1), 0)
+            .get()
+            .expect_err("unvalidated mail is not gold John owes Billy");
+        assert!(
+            early
+                .to_string()
+                .contains("insufficient path capacity (line + reverse claim)"),
+            "{early}"
+        );
+        assert_eq!(aud_wow(john, aud, wow), (15_000, 10_000));
+        assert_eq!(exp(&chain, billy, john, wow), 0);
+
+        assert!(Wrapper::push_from(&chain, anthony)
+            .deposit(billy, wow, Quantity::new(gold), 0, id)
+            .get()
+            .is_err());
+        assert!(Wrapper::push_from(&chain, billy)
+            .deposit(billy, wow, Quantity::new(gold), 0, id)
+            .get()
+            .is_err());
+        Wrapper::push_from(&chain, john)
+            .deposit(billy, wow, Quantity::new(gold), 0, id)
+            .get()?;
+        assert!(PayRequest::get(id).is_none());
+        assert_eq!(exp(&chain, billy, john, wow), gold);
+
+        let over = Wrapper::push_from(&chain, billy)
+            .path_pay(sell.clone(), Quantity::new(gold + 1), Quantity::new(1), 0)
+            .get()
+            .expect_err("the sale cannot draw more gold than John owes");
+        assert!(
+            over.to_string()
+                .contains("insufficient path capacity (line + reverse claim)"),
+            "{over}"
+        );
+        assert_eq!(exp(&chain, billy, john, wow), gold);
+        assert_eq!(aud_wow(john, aud, wow), (15_000, 10_000));
+
+        let direct = Wrapper::push_from(&chain, billy)
+            .path_pay(
+                vec![hop(john, aud)],
+                Quantity::new(gold),
+                Quantity::new(1),
+                0,
+            )
+            .get()
+            .expect_err("John did not line Billy in AUD");
+        assert!(
+            direct
+                .to_string()
+                .contains("insufficient path capacity (line + reverse claim)"),
+            "{direct}"
+        );
+
+        let back = Wrapper::push_from(&chain, billy)
+            .path_pay(
+                vec![hop(john, wow), hop(anthony, aud), hop(billy, aud)],
+                Quantity::new(gold),
+                Quantity::new(1),
+                0,
+            )
+            .get()
+            .expect_err("the sale cannot pay Billy");
+        assert!(
+            back.to_string()
+                .contains("path cannot route back through the sender"),
+            "{back}"
+        );
+        assert_eq!(exp(&chain, billy, john, wow), gold);
+        assert_eq!(aud_wow(john, aud, wow), (15_000, 10_000));
+
+        // 15,000 * 1,000 / 11,000 = 1,363 AUD. Reserves become 13,637 AUD and 11,000 gold.
+        Wrapper::push_from(&chain, billy)
+            .path_pay(sell, Quantity::new(gold), Quantity::new(1_363), 0)
+            .get()?;
+        assert_eq!(exp(&chain, billy, john, wow), 0);
+        assert_eq!(exp(&chain, john, billy, wow), 0);
+        assert_eq!(exp(&chain, anthony, john, aud), 1_363);
+        assert_eq!(exp(&chain, john, anthony, aud), 0);
+        assert_eq!(exp(&chain, anthony, billy, aud), 0);
+        assert_eq!(exp(&chain, billy, john, aud), 0);
+        assert!(CreditLine::get(john, billy, aud).is_none());
+        assert_eq!(aud_wow(john, aud, wow), (13_637, 11_000));
+
+        // Billy spends 500 AUD through Anthony. That unwinds 500 of the sale, so John owes Anthony 863.
+        Wrapper::push_from(&chain, billy)
+            .path_pay(
+                vec![hop(anthony, aud), hop(john, aud)],
+                Quantity::new(500),
+                Quantity::new(500),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, anthony, billy, aud), 500);
+        assert_eq!(exp(&chain, anthony, john, aud), 863);
+        assert_eq!(exp(&chain, john, anthony, aud), 0);
+        assert_eq!(exp(&chain, john, billy, aud), 0);
+        assert_eq!(aud_wow(john, aud, wow), (13_637, 11_000));
+        Ok(())
+    }
+
+    /// Matt buys WoW gold through Josh.
+    ///
+    /// John lines Josh, and Josh lines Matt, in AUD and in WOW. Matt pays
+    /// 1,000 AUD along the AUD lines. The path cannot end on Matt, so the
+    /// 625 gold is John owing Josh. Josh lines John in WOW to hold that
+    /// gold. John's WOW line to Josh is the spend direction and stays unused.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_wow_matt_buys_through_josh(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let josh = account!("josh");
+        let matt = account!("matt");
+        let book = open_wow_book(&chain, &[josh, matt]);
+        let john = book.john;
+        let aud = book.aud;
+        let wow = book.wow;
+
+        offer_line(&chain, john, josh, aud);
+        offer_line(&chain, josh, matt, aud);
+        offer_line(&chain, john, josh, wow);
+        offer_line(&chain, josh, matt, wow);
+        forward_any(&chain, josh, aud);
+        forward_any(&chain, john, wow);
+        assert!(CreditLine::get(john, matt, aud).is_none());
+        assert!(CreditLine::get(john, matt, wow).is_none());
+
+        let skip = Wrapper::push_from(&chain, matt)
+            .path_pay(
+                vec![hop(john, aud), hop(josh, wow)],
+                Quantity::new(1_000),
+                Quantity::new(1),
+                0,
+            )
+            .get()
+            .expect_err("Matt cannot skip Josh");
+        assert!(
+            skip.to_string()
+                .contains("insufficient path capacity (line + reverse claim)"),
+            "{skip}"
+        );
+
+        let back = Wrapper::push_from(&chain, matt)
+            .path_pay(
+                vec![hop(josh, aud), hop(john, aud), hop(matt, wow)],
+                Quantity::new(1_000),
+                Quantity::new(1),
+                0,
+            )
+            .get()
+            .expect_err("the gold cannot land on Matt");
+        assert!(
+            back.to_string()
+                .contains("path cannot route back through the sender"),
+            "{back}"
+        );
+        assert_eq!(aud_wow(john, aud, wow), (15_000, 10_000));
+        assert_eq!(exp(&chain, josh, matt, aud), 0);
+
+        let buy = vec![hop(josh, aud), hop(john, aud), hop(josh, wow)];
+        let no_exit = Wrapper::push_from(&chain, matt)
+            .path_pay(buy.clone(), Quantity::new(1_000), Quantity::new(1), 0)
+            .get()
+            .expect_err("Josh has no WOW line to John yet");
+        assert!(
+            no_exit
+                .to_string()
+                .contains("insufficient path capacity (line + reverse claim)"),
+            "{no_exit}"
+        );
+        assert_eq!(aud_wow(john, aud, wow), (15_000, 10_000));
+
+        offer_line(&chain, josh, john, wow);
+        // 10,000 * 1,000 / 16,000 = 625 gold. Reserves become 16,000 AUD and 9,375 gold.
+        Wrapper::push_from(&chain, matt)
+            .path_pay(buy, Quantity::new(1_000), Quantity::new(625), 0)
+            .get()?;
+        assert_eq!(exp(&chain, josh, matt, aud), 1_000);
+        assert_eq!(exp(&chain, john, josh, aud), 1_000);
+        assert_eq!(exp(&chain, josh, john, wow), 625);
+        assert_eq!(exp(&chain, john, josh, wow), 0);
+        assert_eq!(exp(&chain, josh, matt, wow), 0);
+        assert_eq!(exp(&chain, matt, josh, wow), 0);
+        assert_eq!(exp(&chain, matt, john, wow), 0);
+        assert_eq!(aud_wow(john, aud, wow), (16_000, 9_375));
         Ok(())
     }
 }

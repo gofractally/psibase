@@ -3,13 +3,13 @@
 mod service {
     use async_graphql::*;
     use banx::tables::{
-        Asset, AssetTable, BanxInvite, BanxInviteTable, BookAuth, BookAuthTab, CashQuote,
-        CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection, CreditLine, CreditLineTable,
-        CurrencyPolicy, CurrencyPolicyTab, ForwardOffer, ForwardOfferTab, Obligation,
-        ObligationTable, PairCycle, PayAuth, PayAuthTab, PayRequest, RequestTab, PPM_SCALE,
-        RATE_SCALE,
+        Asset, AssetTable, BanxInvite, BanxInviteTable, BanxRelay, BanxRelayTable, BookAuth,
+        BookAuthTab, CashQuote, CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection, CreditLine,
+        CreditLineTable, CurrencyPolicy, CurrencyPolicyTab, ForwardOffer, ForwardOfferTab,
+        Obligation, ObligationTable, PairCycle, PayAuth, PayAuthTab, PayRequest, RequestTab,
+        TokenRelayTable, PPM_SCALE, RATE_SCALE,
     };
-    use psibase::services::tokens::{Decimal, Precision, Wrapper as Tokens};
+    use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
     use psibase::*;
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
@@ -266,6 +266,55 @@ mod service {
         Tokens::call().getToken(token_id).precision
     }
 
+    fn cash_vault_balance(poster: AccountNumber, token_id: u32) -> Quantity {
+        let name = format!("{poster}/{token_id}");
+        let Some(sa) = SubAccountTable::with_service(Tokens::SERVICE)
+            .get_index_pk()
+            .iter()
+            .find(|sa| sa.account == banx::SERVICE && sa.sub_account == name)
+        else {
+            return Quantity::new(0);
+        };
+        SubAccountBalanceTable::with_service(Tokens::SERVICE)
+            .get_index_pk()
+            .get(&(sa.id, token_id))
+            .map(|b| b.balance)
+            .unwrap_or_else(|| Quantity::new(0))
+    }
+
+    #[derive(SimpleObject)]
+    struct BanxRelayView {
+        owner: AccountNumber,
+        assetLo: u16,
+        assetHi: u16,
+        reserveLo: Decimal,
+        reserveHi: Decimal,
+        feePpm: u32,
+    }
+
+    impl BanxRelayView {
+        fn from_row(r: BanxRelay) -> Self {
+            Self {
+                owner: r.owner,
+                assetLo: r.asset_lo,
+                assetHi: r.asset_hi,
+                reserveLo: Decimal::new(r.reserve_lo, asset_precision(r.asset_lo)),
+                reserveHi: Decimal::new(r.reserve_hi, asset_precision(r.asset_hi)),
+                feePpm: r.fee_ppm,
+            }
+        }
+    }
+
+    #[derive(SimpleObject)]
+    struct TokenRelayView {
+        owner: AccountNumber,
+        assetId: u16,
+        tokenId: u32,
+        reserveBanx: Decimal,
+        tokenReserve: Decimal,
+        feePpm: u32,
+    }
+
     #[derive(SimpleObject)]
     struct CashQuoteView {
         poster: AccountNumber,
@@ -322,6 +371,8 @@ mod service {
         creditLines: Vec<CreditLineView>,
         forwardOffers: Vec<ForwardOfferView>,
         currencyPolicies: Vec<CurrencyPolicyView>,
+        /// Constant-product Banx relays owned by an account on the path.
+        relays: Vec<BanxRelayView>,
         /// Chain unix seconds at query time (offer / FX expiry).
         now: i64,
     }
@@ -817,11 +868,35 @@ mod service {
                     .map(ForwardOfferView::from)
                     .collect();
 
+            let relay_rows: Vec<BanxRelay> = BanxRelayTable::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|r| debtors.contains(&r.owner))
+                .collect();
+            let relay_pairs: HashSet<(AccountNumber, u16, u16)> = relay_rows
+                .iter()
+                .map(|r| (r.owner, r.asset_lo, r.asset_hi))
+                .collect();
+            let relays = relay_rows
+                .into_iter()
+                .map(BanxRelayView::from_row)
+                .collect();
+
             let currency_policies: Vec<CurrencyPolicyView> =
                 CurrencyPolicyTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
-                    .filter(|p| debtors.contains(&p.poster) && p.is_live() && p.poster_is_creditor)
+                    .filter(|p| {
+                        if !(debtors.contains(&p.poster) && p.is_live() && p.poster_is_creditor) {
+                            return false;
+                        }
+                        let (lo, hi) = if p.from_asset < p.to_asset {
+                            (p.from_asset, p.to_asset)
+                        } else {
+                            (p.to_asset, p.from_asset)
+                        };
+                        !relay_pairs.contains(&(p.poster, lo, hi))
+                    })
                     .map(CurrencyPolicyView::from)
                     .collect();
 
@@ -832,8 +907,37 @@ mod service {
                 creditLines: credit_lines,
                 forwardOffers: forward_offers,
                 currencyPolicies: currency_policies,
+                relays,
                 now,
             }
+        }
+
+        async fn banxRelays(&self, owner: AccountNumber) -> Vec<BanxRelayView> {
+            BanxRelayTable::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|r| r.owner == owner)
+                .map(BanxRelayView::from_row)
+                .collect()
+        }
+
+        async fn tokenRelays(&self, owner: AccountNumber) -> Vec<TokenRelayView> {
+            TokenRelayTable::with_service(banx::SERVICE)
+                .get_index_pk()
+                .iter()
+                .filter(|r| r.owner == owner)
+                .map(|r| {
+                    let tokens = cash_vault_balance(r.owner, r.token_id);
+                    TokenRelayView {
+                        owner: r.owner,
+                        assetId: r.asset_id,
+                        tokenId: r.token_id,
+                        reserveBanx: Decimal::new(r.reserve_banx, asset_precision(r.asset_id)),
+                        tokenReserve: Decimal::new(tokens, token_precision(r.token_id)),
+                        feePpm: r.fee_ppm,
+                    }
+                })
+                .collect()
         }
 
         /// Activity history for `account`. Omit `counterparty` / `assetId` for

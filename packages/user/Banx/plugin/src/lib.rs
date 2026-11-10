@@ -37,6 +37,7 @@ define_trust! {
             - Convert debt between assets
             - Buy or sell claims under a posted claim offer
             - Post cash quotes, fund/withdraw the cash vault, cash_in (from your vault)
+            - Post or remove a Banx relay or a token relay
             - Create or revoke Banx invites (onboard + extend a credit line, one claimee)
             - Register a new asset
         ",
@@ -45,6 +46,7 @@ define_trust! {
             - Pay an invoice along a path (max spend)
             - Run a repeating payment (draws the payer)
             - cash_out (draw Banx, receive tokens)
+            - Swap through a token relay, or path-pay out to tokens
         ",
     }
     functions {
@@ -87,11 +89,23 @@ define_trust! {
             cash_fund,
             cash_withdraw,
             cash_in,
+            set_relay,
+            remove_relay,
+            set_token_relay,
+            remove_token_relay,
             create_invite,
             delete_invite,
             add_asset,
         ],
-        High => [path_pay, pay_inv, run_pay_auth, cash_out],
+        High => [
+            path_pay,
+            pay_inv,
+            run_pay_auth,
+            cash_out,
+            token_relay_out,
+            token_relay_in,
+            path_cash,
+        ],
     }
 }
 
@@ -1047,6 +1061,126 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::cash_in::ACTION_NAME, &packed)
+    }
+
+    fn set_relay(
+        asset_a: u16,
+        asset_b: u16,
+        reserve_a: String,
+        reserve_b: String,
+        fee_ppm: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_relay)?;
+        let packed = banx::action_structs::st_relay {
+            asset_a,
+            reserve_a: parse_amount_nonzero(asset_a, &reserve_a)?,
+            asset_b,
+            reserve_b: parse_amount_nonzero(asset_b, &reserve_b)?,
+            fee_ppm,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_relay::ACTION_NAME, &packed)
+    }
+
+    fn remove_relay(asset_a: u16, asset_b: u16) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_relay)?;
+        let packed = banx::action_structs::rm_relay { asset_a, asset_b }.packed();
+        add_action_to_transaction(banx::action_structs::rm_relay::ACTION_NAME, &packed)
+    }
+
+    fn set_token_relay(
+        asset_id: u16,
+        token_id: u32,
+        reserve_banx: String,
+        fee_ppm: u32,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::set_token_relay)?;
+        let packed = banx::action_structs::st_tok_relay {
+            asset_id,
+            token_id,
+            reserve_banx: parse_amount_nonzero(asset_id, &reserve_banx)?,
+            fee_ppm,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::st_tok_relay::ACTION_NAME, &packed)
+    }
+
+    fn remove_token_relay(asset_id: u16, token_id: u32) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::remove_token_relay)?;
+        let packed = banx::action_structs::rm_tok_relay { asset_id, token_id }.packed();
+        add_action_to_transaction(banx::action_structs::rm_tok_relay::ACTION_NAME, &packed)
+    }
+
+    fn token_relay_out(
+        owner: String,
+        asset_id: u16,
+        token_id: u32,
+        amount_banx: String,
+        min_tokens: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::token_relay_out)?;
+        let packed = banx::action_structs::tok_relay_out {
+            owner: parse_account(&owner)?,
+            asset_id,
+            token_id,
+            amount_banx: parse_amount_nonzero(asset_id, &amount_banx)?,
+            min_tokens: parse_token_amount(token_id, &min_tokens)?,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::tok_relay_out::ACTION_NAME, &packed)
+    }
+
+    fn token_relay_in(
+        owner: String,
+        asset_id: u16,
+        token_id: u32,
+        amount_tokens: String,
+        min_banx: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::token_relay_in)?;
+        let packed = banx::action_structs::tok_relay_in {
+            owner: parse_account(&owner)?,
+            asset_id,
+            token_id,
+            amount_tokens: parse_token_amount_nonzero(token_id, &amount_tokens)?,
+            min_banx: parse_amount(asset_id, &min_banx)?,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::tok_relay_in::ACTION_NAME, &packed)
+    }
+
+    fn path_cash(
+        hops: Vec<WitPathHop>,
+        amount: String,
+        token_id: u32,
+        recipient: String,
+        min_tokens: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::path_cash)?;
+        if hops.is_empty() {
+            return Err(
+                ErrorType::ConversionError("path must have at least one hop".into()).into(),
+            );
+        }
+        let first_asset = hops[0].asset_id;
+        let amount = parse_amount_nonzero(first_asset, &amount)?;
+        let min_tokens = parse_token_amount(token_id, &min_tokens)?;
+        let mut path = Vec::with_capacity(hops.len());
+        for h in hops {
+            path.push(banx::tables::PathHop {
+                account: parse_account(&h.account)?,
+                asset_id: h.asset_id,
+            });
+        }
+        let packed = banx::action_structs::path_cash {
+            hops: path,
+            amount,
+            token_id,
+            recipient: parse_account(&recipient)?,
+            min_tokens,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::path_cash::ACTION_NAME, &packed)
     }
 
     fn create_invite(

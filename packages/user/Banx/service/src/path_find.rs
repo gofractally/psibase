@@ -11,7 +11,7 @@ use psibase::AccountNumber;
 pub use crate::math::{
     try_apply_hop_fee as apply_hop_fee, try_apply_rate as apply_rate, PPM_SCALE, RATE_SCALE,
 };
-use crate::math::{try_invert_hop_fee, try_invert_rate};
+use crate::math::{try_invert_hop_fee, try_invert_rate, try_swap_in, try_swap_out};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LineEdge {
@@ -56,6 +56,76 @@ pub struct FxEdge {
     /// From-asset still accepted. 0 means the quote is spent.
     pub remaining: u64,
     pub expires_at: i64,
+    /// Both non-zero: this edge is a constant-product relay, not a fixed quote.
+    pub reserve_in: u64,
+    pub reserve_out: u64,
+    /// Relay fee in ppm. Ignored for a fixed quote.
+    pub fee_ppm: u32,
+}
+
+impl FxEdge {
+    fn is_relay(&self) -> bool {
+        self.reserve_in > 0 && self.reserve_out > 0
+    }
+
+    fn convert(&self, amount_in: u64) -> Option<u64> {
+        if self.is_relay() {
+            try_swap_out(self.reserve_in, self.reserve_out, amount_in, self.fee_ppm)
+        } else if amount_in > self.remaining {
+            None
+        } else {
+            apply_rate(amount_in, self.fee_fixed, self.fx_rate)
+        }
+    }
+
+    fn invert(&self, amount_out: u64) -> Option<u64> {
+        if self.is_relay() {
+            try_swap_in(self.reserve_in, self.reserve_out, amount_out, self.fee_ppm)
+        } else {
+            let need = try_invert_rate(amount_out, self.fee_fixed, self.fx_rate)?;
+            (need <= self.remaining).then_some(need)
+        }
+    }
+}
+
+/// Reserves after earlier swaps on this path. Keyed by poster and unordered pair.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct RelayBook {
+    pools: HashMap<(AccountNumber, u16, u16), (u64, u64, u32)>,
+}
+
+impl RelayBook {
+    /// Price `edge`, then keep the new reserves for a later touch of the same relay.
+    fn convert(&mut self, edge: &FxEdge, amount_in: u64) -> Option<u64> {
+        if !edge.is_relay() {
+            return edge.convert(amount_in);
+        }
+        let (lo, hi) = unordered_pair(edge.from_asset, edge.to_asset);
+        let key = (edge.poster, lo, hi);
+        let seeded = if edge.from_asset == lo {
+            (edge.reserve_in, edge.reserve_out, edge.fee_ppm)
+        } else {
+            (edge.reserve_out, edge.reserve_in, edge.fee_ppm)
+        };
+        let (reserve_in, reserve_out, fee) = {
+            let pool = self.pools.entry(key).or_insert(seeded);
+            if edge.from_asset == lo {
+                (pool.0, pool.1, pool.2)
+            } else {
+                (pool.1, pool.0, pool.2)
+            }
+        };
+        let out = try_swap_out(reserve_in, reserve_out, amount_in, fee)?;
+        let reserve_in = reserve_in.checked_add(amount_in)?;
+        let reserve_out = reserve_out.checked_sub(out)?;
+        let pool = self.pools.get_mut(&key).expect("relay pool");
+        if edge.from_asset == lo {
+            *pool = (reserve_in, reserve_out, fee);
+        } else {
+            *pool = (reserve_out, reserve_in, fee);
+        }
+        Some(out)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -83,6 +153,29 @@ pub struct PathQuote {
 
 fn policy_live(expires_at: i64, now: i64) -> bool {
     expires_at == 0 || expires_at >= now
+}
+
+fn unordered_pair(a: u16, b: u16) -> (u16, u16) {
+    if a < b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+fn relay_covers(fx: &[FxEdge], poster: AccountNumber, from_asset: u16, to_asset: u16) -> bool {
+    let pair = unordered_pair(from_asset, to_asset);
+    fx.iter().any(|e| {
+        e.is_relay() && e.poster == poster && unordered_pair(e.from_asset, e.to_asset) == pair
+    })
+}
+
+/// A posted relay replaces a fixed quote for that poster and pair.
+fn fx_visible(e: &FxEdge, fx: &[FxEdge], now: i64) -> bool {
+    if !e.is_relay() && relay_covers(fx, e.poster, e.from_asset, e.to_asset) {
+        return false;
+    }
+    e.is_relay() || (policy_live(e.expires_at, now) && e.fx_rate > 0)
 }
 
 fn is_global_creditor(c: AccountNumber) -> bool {
@@ -122,6 +215,8 @@ struct Label {
     /// Creditors already drawn on, keyed by the asset of that draw.
     /// The same account may be a hub again in another asset.
     visited: HashSet<(AccountNumber, u16)>,
+    /// Relay reserves after the swaps already taken on this path.
+    book: RelayBook,
 }
 
 fn note_payee(
@@ -154,7 +249,11 @@ fn admit(labels: &mut Vec<Label>, new: Label) -> bool {
     let mut i = 0;
     while i < labels.len() {
         let old = &labels[i];
-        if old.account != new.account || old.asset != new.asset || old.amount != new.amount {
+        if old.account != new.account
+            || old.asset != new.asset
+            || old.amount != new.amount
+            || old.book != new.book
+        {
             i += 1;
             continue;
         }
@@ -228,7 +327,7 @@ pub fn find_banx_path(
 
     let mut fx_by_poster_from: HashMap<(AccountNumber, u16), Vec<&FxEdge>> = HashMap::new();
     for e in fx {
-        if policy_live(e.expires_at, now) && e.fx_rate > 0 && e.remaining > 0 {
+        if fx_visible(e, fx, now) && (e.is_relay() || e.remaining > 0) {
             fx_by_poster_from
                 .entry((e.poster, e.from_asset))
                 .or_default()
@@ -253,6 +352,7 @@ pub fn find_banx_path(
             amount: amount_in,
             hops: vec![(line.creditor, line.asset_id)],
             visited: HashSet::from([(line.creditor, line.asset_id)]),
+            book: RelayBook::default(),
         };
         if admit(&mut admitted, label.clone()) {
             frontier.push(label);
@@ -273,6 +373,7 @@ pub fn find_banx_path(
                 label,
                 label.asset,
                 label.amount,
+                &label.book,
                 &lines_by_debtor,
                 &known,
                 routing,
@@ -283,16 +384,15 @@ pub fn find_banx_path(
             );
             if let Some(fx_list) = fx_by_poster_from.get(&(label.account, label.asset)) {
                 for e in fx_list {
-                    if label.amount > e.remaining {
-                        continue;
-                    }
-                    let Some(after_fx) = apply_rate(label.amount, e.fee_fixed, e.fx_rate) else {
+                    let mut book = label.book.clone();
+                    let Some(after_fx) = book.convert(e, label.amount) else {
                         continue;
                     };
                     expand_hops(
                         label,
                         e.to_asset,
                         after_fx,
+                        &book,
                         &lines_by_debtor,
                         &known,
                         routing,
@@ -354,6 +454,7 @@ fn simulate_path_fees(
     let mut forward = amount_in;
     let mut path_debtor = sender;
     let mut prev_asset = hop_keys[0].1;
+    let mut book = RelayBook::default();
 
     for (i, (next_creditor, asset_id)) in hop_keys.iter().enumerate() {
         let next_creditor = *next_creditor;
@@ -379,13 +480,22 @@ fn simulate_path_fees(
                 e.poster == path_debtor
                     && e.from_asset == prev_asset
                     && e.to_asset == asset_id
-                    && policy_live(e.expires_at, now)
-                    && e.fx_rate > 0
-                    && e.remaining >= forward
+                    && fx_visible(e, fx, now)
             })?;
-            fx_fee = e.fee_fixed;
+            let before = forward;
+            forward = book.convert(e, forward)?;
+            fx_fee = if e.is_relay() {
+                before.saturating_sub(
+                    (before as u128)
+                        .checked_mul((PPM_SCALE - e.fee_ppm) as u128)
+                        .and_then(|v| v.checked_div(PPM_SCALE as u128))
+                        .and_then(|v| u64::try_from(v).ok())
+                        .unwrap_or(before),
+                )
+            } else {
+                e.fee_fixed
+            };
             fx_from_asset = Some(prev_asset);
-            forward = apply_rate(forward, e.fee_fixed, e.fx_rate)?;
         }
 
         let rpol = resolve_routing(routing, next_creditor, path_debtor, asset_id, now)?;
@@ -515,9 +625,8 @@ fn walk_exact_out(
     for edge in fx {
         if edge.poster != account
             || edge.from_asset != asset
-            || edge.fx_rate == 0
-            || edge.remaining == 0
-            || !policy_live(edge.expires_at, now)
+            || !fx_visible(edge, fx, now)
+            || (!edge.is_relay() && edge.remaining == 0)
         {
             continue;
         }
@@ -589,15 +698,100 @@ fn push_exact_hop(
 }
 
 /// Smallest send on this sequence. Walk fees backward: undo the hop fee, then FX.
+fn relay_reused(hop_keys: &[(AccountNumber, u16)], fx: &[FxEdge], now: i64) -> bool {
+    let mut seen = HashSet::new();
+    for i in 1..hop_keys.len() {
+        let (prev_account, prev_asset) = hop_keys[i - 1];
+        let (_, next_asset) = hop_keys[i];
+        if next_asset == prev_asset {
+            continue;
+        }
+        let reused = fx.iter().any(|edge| {
+            edge.is_relay()
+                && edge.poster == prev_account
+                && edge.from_asset == prev_asset
+                && edge.to_asset == next_asset
+                && fx_visible(edge, fx, now)
+                && !seen.insert((edge.poster, unordered_pair(edge.from_asset, edge.to_asset)))
+        });
+        if reused {
+            return true;
+        }
+    }
+    false
+}
+
+/// Smallest send whose forward simulation meets `need`. Used when one relay
+/// is swapped twice, so a backward walk would price both touches on the
+/// original reserves.
+fn smallest_in(
+    hop_keys: &[(AccountNumber, u16)],
+    need: u64,
+    sender: AccountNumber,
+    lines: &[LineEdge],
+    routing: &[RoutingEdge],
+    fx: &[FxEdge],
+    now: i64,
+) -> Option<u64> {
+    let simulate = |amount| {
+        simulate_path_fees(hop_keys, amount, sender, lines, routing, fx, now)
+            .and_then(|hops| hops.last().map(|hop| hop.amount))
+    };
+    let mut lo = 0u64;
+    let mut hi = 1u64;
+    let mut saw = false;
+    let mut found = false;
+    for _ in 0..64 {
+        match simulate(hi) {
+            Some(out) if out >= need => {
+                found = true;
+                break;
+            }
+            Some(_) => {
+                saw = true;
+                if hi > u64::MAX / 2 {
+                    return None;
+                }
+                lo = hi;
+                hi *= 2;
+            }
+            // A tiny input can round to no output on the second swap.
+            None if !saw => {
+                if hi > u64::MAX / 2 {
+                    return None;
+                }
+                hi *= 2;
+            }
+            None => return None,
+        }
+    }
+    if !found {
+        return None;
+    }
+    while lo + 1 < hi {
+        let mid = lo + (hi - lo) / 2;
+        match simulate(mid) {
+            Some(out) if out >= need => hi = mid,
+            _ => lo = mid,
+        }
+    }
+    Some(hi)
+}
+
 fn required_in(
     hop_keys: &[(AccountNumber, u16)],
     mut need: u64,
+    sender: AccountNumber,
+    lines: &[LineEdge],
     routing: &[RoutingEdge],
     fx: &[FxEdge],
     now: i64,
 ) -> Option<u64> {
     if hop_keys.is_empty() || need == 0 {
         return None;
+    }
+    if relay_reused(hop_keys, fx, now) {
+        return smallest_in(hop_keys, need, sender, lines, routing, fx, now);
     }
     for i in (1..hop_keys.len()).rev() {
         let prev_account = hop_keys[i - 1].0;
@@ -610,13 +804,9 @@ fn required_in(
                 edge.poster == prev_account
                     && edge.from_asset == prev_asset
                     && edge.to_asset == next_asset
-                    && policy_live(edge.expires_at, now)
-                    && edge.fx_rate > 0
+                    && fx_visible(edge, fx, now)
             })?;
-            need = try_invert_rate(need, edge.fee_fixed, edge.fx_rate)?;
-            if need > edge.remaining {
-                return None;
-            }
+            need = edge.invert(need)?;
         }
     }
     Some(need)
@@ -633,7 +823,7 @@ fn note_exact_sequence(
     now: i64,
     best: &mut Option<PathQuote>,
 ) {
-    let Some(amount_in) = required_in(hop_keys, amount_out, routing, fx, now) else {
+    let Some(amount_in) = required_in(hop_keys, amount_out, sender, lines, routing, fx, now) else {
         return;
     };
     let Some(hops) = simulate_path_fees(hop_keys, amount_in, sender, lines, routing, fx, now)
@@ -716,6 +906,7 @@ fn expand_hops(
     parent: &Label,
     hop_asset: u16,
     amount_in: u64,
+    book: &RelayBook,
     lines_by_debtor: &HashMap<AccountNumber, Vec<&LineEdge>>,
     known: &HashSet<(AccountNumber, AccountNumber, u16)>,
     routing: &[RoutingEdge],
@@ -770,6 +961,7 @@ fn expand_hops(
             amount: draw,
             hops,
             visited,
+            book: book.clone(),
         };
         if admit(admitted, label.clone()) {
             out.push(label);
@@ -1263,6 +1455,9 @@ mod tests {
             fx_rate: RATE_SCALE * 70 / 100,
             remaining: u64::MAX,
             expires_at: 0,
+            reserve_in: 0,
+            reserve_out: 0,
+            fee_ppm: 0,
         }];
         let q = find_out(
             &lines,
@@ -1299,6 +1494,9 @@ mod tests {
             fx_rate: RATE_SCALE * 70 / 100,
             remaining: 999,
             expires_at: 0,
+            reserve_in: 0,
+            reserve_out: 0,
+            fee_ppm: 0,
         }];
         assert!(find_out(
             &lines,
@@ -1365,6 +1563,9 @@ mod tests {
             fx_rate: RATE_SCALE * 65 / 100,
             remaining: u64::MAX,
             expires_at: 0,
+            reserve_in: 0,
+            reserve_out: 0,
+            fee_ppm: 0,
         }];
 
         let q = find(
@@ -1558,6 +1759,9 @@ mod tests {
             fx_rate: RATE_SCALE * 70 / 100,
             remaining: u64::MAX,
             expires_at: 0,
+            reserve_in: 0,
+            reserve_out: 0,
+            fee_ppm: 0,
         }];
         let q = find(
             &lines,
@@ -1594,6 +1798,9 @@ mod tests {
             fx_rate: RATE_SCALE * 70 / 100,
             remaining: u64::MAX,
             expires_at: 0,
+            reserve_in: 0,
+            reserve_out: 0,
+            fee_ppm: 0,
         }];
         let q = find(
             &lines,
@@ -1631,6 +1838,9 @@ mod tests {
             fx_rate: RATE_SCALE * 70 / 100,
             remaining: u64::MAX,
             expires_at: 0,
+            reserve_in: 0,
+            reserve_out: 0,
+            fee_ppm: 0,
         }];
         let q = find(
             &lines,
@@ -1670,6 +1880,9 @@ mod tests {
                 fx_rate: RATE_SCALE * 70 / 100,
                 remaining: u64::MAX,
                 expires_at: 0,
+                reserve_in: 0,
+                reserve_out: 0,
+                fee_ppm: 0,
             },
             FxEdge {
                 poster: acct("steve"),
@@ -1679,6 +1892,9 @@ mod tests {
                 fx_rate: RATE_SCALE * 80 / 100,
                 remaining: u64::MAX,
                 expires_at: 0,
+                reserve_in: 0,
+                reserve_out: 0,
+                fee_ppm: 0,
             },
         ];
         let q = find(
@@ -1854,6 +2070,9 @@ mod tests {
                 fx_rate: RATE_SCALE,
                 remaining: u64::MAX,
                 expires_at: 0,
+                reserve_in: 0,
+                reserve_out: 0,
+                fee_ppm: 0,
             },
             FxEdge {
                 poster: acct("relay"),
@@ -1863,6 +2082,9 @@ mod tests {
                 fx_rate: RATE_SCALE,
                 remaining: u64::MAX,
                 expires_at: 0,
+                reserve_in: 0,
+                reserve_out: 0,
+                fee_ppm: 0,
             },
         ];
         let q = find(
@@ -1922,6 +2144,122 @@ mod tests {
             )
             .is_none(),
             "returning to hub in AUD must not shrink 200 down to dave's line"
+        );
+    }
+
+    /// 1000 USD into 10000/15000 yields 1363 AUD. A richer fixed quote is hidden.
+    #[test]
+    fn relay_curve_hides_fixed_quote() {
+        let usd = 1u16;
+        let aud = 2u16;
+        let lines = vec![
+            line("brandon", "bob", usd, 100_000),
+            line("john", "brandon", usd, 100_000),
+            line("alice", "john", aud, 100_000),
+        ];
+        let routing = vec![global_rte("brandon", usd, 0), global_rte("john", aud, 0)];
+        let fx = vec![
+            FxEdge {
+                poster: acct("john"),
+                from_asset: usd,
+                to_asset: aud,
+                fee_fixed: 0,
+                fx_rate: RATE_SCALE * 2,
+                remaining: u64::MAX,
+                expires_at: 0,
+                reserve_in: 0,
+                reserve_out: 0,
+                fee_ppm: 0,
+            },
+            FxEdge {
+                poster: acct("john"),
+                from_asset: usd,
+                to_asset: aud,
+                fee_fixed: 0,
+                fx_rate: 0,
+                remaining: u64::MAX,
+                expires_at: 0,
+                reserve_in: 10_000,
+                reserve_out: 15_000,
+                fee_ppm: 0,
+            },
+        ];
+        let q = find(
+            &lines,
+            &routing,
+            &fx,
+            "bob",
+            "alice",
+            1_000,
+            usd,
+            Some(aud),
+            4,
+            0,
+        )
+        .expect("relay path");
+        assert_eq!(q.amount_out, 1_363);
+        let back = find_out(
+            &lines,
+            &routing,
+            &fx,
+            "bob",
+            "alice",
+            1_363,
+            usd,
+            Some(aud),
+            4,
+            0,
+        )
+        .expect("relay invert");
+        assert_eq!(back.amount_in, 1_000);
+        assert_eq!(back.amount_out, 1_363);
+    }
+
+    fn relay_fx(poster: &str, from: u16, to: u16, reserve_in: u64, reserve_out: u64) -> FxEdge {
+        FxEdge {
+            poster: acct(poster),
+            from_asset: from,
+            to_asset: to,
+            fee_fixed: 0,
+            fx_rate: 0,
+            remaining: u64::MAX,
+            expires_at: 0,
+            reserve_in,
+            reserve_out,
+            fee_ppm: 0,
+        }
+    }
+
+    /// 1,000 in priced on the original reserves is 832. The second touch sees
+    /// the reserves the first swap already moved, so execution and the quote
+    /// are 999. Exact-out of 500 needs 501, not 556.
+    #[test]
+    fn relay_round_trip_prices_updated_reserves() {
+        let usd = 1u16;
+        let aud = 2u16;
+        let bob = acct("bob");
+        let hops = vec![
+            (acct("brandon"), usd),
+            (acct("john"), usd),
+            (acct("alice"), aud),
+            (acct("john"), aud),
+            (acct("carol"), usd),
+        ];
+        let routing = vec![
+            global_rte("brandon", usd, 0),
+            global_rte("john", aud, 0),
+            global_rte("alice", aud, 0),
+            global_rte("john", usd, 0),
+        ];
+        let fx = vec![
+            relay_fx("john", usd, aud, 10_000, 15_000),
+            relay_fx("john", aud, usd, 15_000, 10_000),
+        ];
+        let sim = simulate_path_fees(&hops, 1_000, bob, &[], &routing, &fx, 0).expect("forward");
+        assert_eq!(sim.last().unwrap().amount, 999);
+        assert_eq!(
+            required_in(&hops, 500, bob, &[], &routing, &fx, 0).expect("exact out"),
+            501
         );
     }
 }

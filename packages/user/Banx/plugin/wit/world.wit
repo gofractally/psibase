@@ -405,6 +405,66 @@ interface api {
         min-banx: string,
     ) -> result<_, error>;
 
+    /// Post a constant-product relay between two Banx assets. Reserves are
+    /// virtual weights, one row for both directions. Saving again replaces
+    /// them. `reserve-a` and `reserve-b` are human decimals. `fee-ppm` is
+    /// taken from the input before the curve (`10000` = 1%).
+    set-relay: func(
+        asset-a: u16,
+        asset-b: u16,
+        reserve-a: string,
+        reserve-b: string,
+        fee-ppm: u32,
+    ) -> result<_, error>;
+
+    /// Delete the sender's relay for this pair. Claims already drawn stay.
+    remove-relay: func(asset-a: u16, asset-b: u16) -> result<_, error>;
+
+    /// Post a Banx↔token relay. `reserve-banx` is the virtual Banx weight.
+    /// The token side is the sender's cash vault for `token-id`. One vault
+    /// backs one relay.
+    set-token-relay: func(
+        asset-id: u16,
+        token-id: u32,
+        reserve-banx: string,
+        fee-ppm: u32,
+    ) -> result<_, error>;
+
+    /// Delete the sender's token relay. Tokens stay in the vault.
+    remove-token-relay: func(asset-id: u16, token-id: u32) -> result<_, error>;
+
+    /// Draw Banx on `owner`'s relay and receive tokens from their vault.
+    token-relay-out: func(
+        owner: string,
+        asset-id: u16,
+        token-id: u32,
+        amount-banx: string,
+        min-tokens: string,
+    ) -> result<_, error>;
+
+    /// Send tokens from the sender's vault into `owner`'s relay. `owner`
+    /// owes the sender the curve's Banx output. Fund the vault first.
+    token-relay-in: func(
+        owner: string,
+        asset-id: u16,
+        token-id: u32,
+        amount-tokens: string,
+        min-banx: string,
+    ) -> result<_, error>;
+
+    /// Path-pay that ends by selling the last hop's Banx for that account's
+    /// tokens. The last hop must have posted a token relay for that asset.
+    /// They pay `recipient` the tokens and do not also owe them the Banx
+    /// asset. `amount` is a human decimal in the first hop's asset.
+    /// `min-tokens` floors the token output.
+    path-cash: func(
+        hops: list<path-hop>,
+        amount: string,
+        token-id: u32,
+        recipient: string,
+        min-tokens: string,
+    ) -> result<_, error>;
+
     /// Discover a multi-hop path from `from-account` to `to-account` (TokenSwap-style
     /// max amount_out search over credit lines / forward offers / FX). Uses a scoped GraphQL
     /// subgraph around the two endpoints — not a full-network dump.

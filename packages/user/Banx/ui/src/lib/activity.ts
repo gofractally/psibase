@@ -18,6 +18,7 @@ const PAYMENT_KINDS = new Set([
     "convert",
     "cash_out",
     "cash_in",
+    "relay",
     "fulfill",
 ]);
 const CLAIM_KINDS = new Set(["sell_claim", "buy_claim"]);
@@ -71,6 +72,8 @@ export function kindLabel(kind: string): string {
             return "Cash out";
         case "cash_in":
             return "Cash in";
+        case "relay":
+            return "Relay";
         case "credit_line":
             return "Credit line";
         case "book":
@@ -198,6 +201,16 @@ export function describeEvent(
                     : `${actor} cashed in ${qty(e.amount, sym)}`,
                 detail: `Tokens into vault · ${other}`,
             };
+        case "relay": {
+            const title = you
+                ? `You swapped ${qty(e.amount, sym)} on the relay`
+                : `${actor} swapped ${qty(e.amount, sym)} on the relay`;
+            const detail =
+                nettedRaw > 0n
+                    ? `Auto-netted ${qty(e.netted, sym)} · ${other}`
+                    : `With ${other}`;
+            return { title, detail };
+        }
         case "invoice": {
             const who =
                 other === "0" || !other

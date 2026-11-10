@@ -22,6 +22,7 @@ struct PathGraph {
     credit_lines: Vec<GqlCreditLine>,
     forward_offers: Vec<GqlForward>,
     currency_policies: Vec<GqlCurrency>,
+    relays: Vec<GqlRelay>,
     now: i64,
 }
 
@@ -64,6 +65,17 @@ struct GqlCurrency {
     expires_at: i64,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GqlRelay {
+    owner: AccountNumber,
+    asset_lo: u16,
+    asset_hi: u16,
+    reserve_lo: Decimal,
+    reserve_hi: Decimal,
+    fee_ppm: u32,
+}
+
 pub struct PathGraphSnapshot {
     pub lines: Vec<LineEdge>,
     pub routing: Vec<RoutingEdge>,
@@ -95,6 +107,9 @@ pub fn fetch_path_graph(
                 }}
                 currencyPolicies {{
                     poster fromAsset toAsset feeFixed fxRate remaining expiresAt
+                }}
+                relays {{
+                    owner assetLo assetHi reserveLo reserveHi feePpm
                 }}
             }}
         }}"#
@@ -137,8 +152,45 @@ pub fn fetch_path_graph(
         });
     }
 
-    let mut fx = Vec::with_capacity(g.currency_policies.len());
+    let mut fx = Vec::with_capacity(g.currency_policies.len() + g.relays.len() * 2);
+    for r in &g.relays {
+        fx.push(FxEdge {
+            poster: r.owner,
+            from_asset: r.asset_lo,
+            to_asset: r.asset_hi,
+            fee_fixed: 0,
+            fx_rate: 0,
+            remaining: u64::MAX,
+            expires_at: 0,
+            reserve_in: r.reserve_lo.quantity.value,
+            reserve_out: r.reserve_hi.quantity.value,
+            fee_ppm: r.fee_ppm,
+        });
+        fx.push(FxEdge {
+            poster: r.owner,
+            from_asset: r.asset_hi,
+            to_asset: r.asset_lo,
+            fee_fixed: 0,
+            fx_rate: 0,
+            remaining: u64::MAX,
+            expires_at: 0,
+            reserve_in: r.reserve_hi.quantity.value,
+            reserve_out: r.reserve_lo.quantity.value,
+            fee_ppm: r.fee_ppm,
+        });
+    }
     for c in g.currency_policies {
+        let (lo, hi) = if c.from_asset < c.to_asset {
+            (c.from_asset, c.to_asset)
+        } else {
+            (c.to_asset, c.from_asset)
+        };
+        if g.relays
+            .iter()
+            .any(|r| r.owner == c.poster && r.asset_lo == lo && r.asset_hi == hi)
+        {
+            continue;
+        }
         fx.push(FxEdge {
             poster: c.poster,
             from_asset: c.from_asset,
@@ -147,6 +199,9 @@ pub fn fetch_path_graph(
             fx_rate: parse_u64(&c.fx_rate)?,
             remaining: c.remaining.quantity.value,
             expires_at: c.expires_at,
+            reserve_in: 0,
+            reserve_out: 0,
+            fee_ppm: 0,
         });
     }
 
