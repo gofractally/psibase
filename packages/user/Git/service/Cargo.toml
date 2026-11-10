@@ -10,13 +10,23 @@ publish = false
 [package.metadata.psibase]
 server = "git"
 # Filled by scripts/pack-install-dist.sh (CI); empty in plain dev builds.
-data = [{ src = "../install-dist", dst = "/install" }]
+# ui/ is the committed POC page (install strip + PRs).
+data = [
+    { src = "../install-dist", dst = "/install" },
+    { src = "../ui", dst = "/" },
+]
+# Open CSP so browsers / agents on any origin can embed or fetch git.<root>
+# (same Sites postinstall pattern as Mcp; frame-ancestors / connect-src opened).
+postinstall = [
+    { sender = "git", service = "sites", method = "setcsp", data = { path = "*", csp = "default-src 'self';script-src 'self';style-src 'self' 'unsafe-inline';img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};font-src 'self';connect-src *;frame-src supervisor.{{root}};frame-ancestors *;base-uri 'none';form-action 'self';object-src 'none';" } },
+]
 
 [dependencies]
 psibase.workspace = true
 psibase_macros.workspace = true
 psibase_service.workspace = true
 serde.workspace = true
+async-graphql.workspace = true
 miniz_oxide = "0.8"
 sha1 = { version = "0.10", default-features = false }
 psibase-user-workspace-hack.workspace = true

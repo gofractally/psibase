@@ -38,7 +38,7 @@ For a local node that is `http://git.psibase.localhost:8080/alice/notes.git`. `<
 | Private repository | — | No. Every full node stores the objects. Hiding them from HTTP does not hide them from a node operator. |
 | Git Large File Storage, shallow clone, partial clone | — | No. Those need either a side store or the smart HTTP negotiation this design does not implement. |
 | Submodules | whatever URL the submodule uses | A submodule that points at another repo on this service is another dumb HTTP clone. Other URLs are git's problem. |
-| Pull requests | POC web page on `git.<root>` | Minimal. A PR list (source branch, base branch, merge button). Merging happens in the browser and is refused when trees conflict. See [POC pull requests and merge](#poc-pull-requests-and-merge). |
+| Pull requests | POC web page on `git.<root>/` | Minimal. Install strip at the top, then a PR list (source branch, base branch, merge button). Merging happens in the browser and is refused when trees conflict. See [POC pull requests and merge](#poc-pull-requests-and-merge). |
 | Review, browsing files in a browser | — | Out of scope. Setup is actions, not a web user interface. |
 
 ## On-chain service and node-local service
@@ -63,7 +63,7 @@ One user package. One account, `git`, installed by `root`.
 
 On install the `git` account calls `http-server::registerServer`, so requests to `git.<root>` are dispatched to `git::serveSys`. Queries run in RPC (remote procedure call) mode: `serveSys` may read its tables and may not write them.
 
-The package has no plugin. The only browser user interface is the POC pull-request page described in [POC pull requests and merge](#poc-pull-requests-and-merge).
+The package has no plugin. The only browser user interface is the POC page on `git.<root>/` described in [POC pull requests and merge](#poc-pull-requests-and-merge). That page is static Sites content plus CommonApi's `common-lib.js`. It does not call Supervisor for writes.
 
 ### Tables
 
@@ -89,6 +89,15 @@ The owner is not stored as a writer. The owner has every flag.
 
 - `data`: zlib-compressed loose object, the exact bytes a dumb HTTP client expects
 
+`PrRow`, keyed by `(owner, name, id)`
+
+- `id`: `u32`, assigned by the service, monotonic per repo
+- `source`: full ref name of the branch to merge from (must exist under `refs/heads/` when opened)
+- `base`: full ref name of the branch to merge into (must exist under `refs/heads/` when opened)
+- `opener`: account that called `openPr`
+
+A PR is only a named pair of branches plus an opener. It does not store a tip oid. Merge always reads the live tips of `source` and `base` at click time. Closing or a successful merge deletes the row. There is no review state, title, or description in the POC.
+
 Objects are global and content-addressed, same pattern as `SitesDataRow`. Two repos that contain the same blob store it once. The first transaction to write an oid pays for those bytes when disk billing is on (`Transact` bills `trxSender`). A later put of the same oid writes nothing.
 
 The v1 proof of concept has no garbage collection. It never deletes objects, so a force-push leaves the old history on chain. GC that an admin can configure is deferred to later. Because the object table is shared across repos, that later design has to account for an object still being reachable from other repos.
@@ -107,6 +116,16 @@ Every action's sender is the account that authorized the transaction. The servic
 `setWriter(name, account, flags)` and `removeWriter(name, account)`
 
 - Sender is the owner.
+
+`openPr(name, source, base)`
+
+- Repo must exist. `source` and `base` are full ref names under `refs/heads/`, must differ, and both must currently exist as refs.
+- Anyone may open. Opening does not grant write permission. Merge still requires update (or force, if the result is not a fast-forward — the POC merge always produces a merge commit whose first parent is `base`, so the base move is a fast-forward of `base` once the merge commit exists).
+- Allocates the next `id` for that repo (`1 +` the current max `id` for that `(owner, name)`, or `1` if none) and stores a `PrRow`. Fails if an open PR already has the same `(source, base)` pair.
+
+`closePr(name, id)`
+
+- Sender is the opener or the repo owner. Deletes the row. No ref moves.
 
 `putObjects(name, objects)`
 
@@ -155,6 +174,8 @@ Dumb HTTP, as specified by `gitprotocol-http`. Git's smart discovery is `GET <re
 | `GET /install.sh` and `GET /install/install.sh` | `200`, `text/x-shellscript`. The installer, generated per request with this chain's URL baked in. Matched ahead of repo paths, since `install` is a valid owner name. See [Installing the client](#installing-the-client). |
 | `GET /install/SHA256SUMS` and `GET /install/version` | `302` to the same path plus `.txt`. Sites picks the MIME type from the file extension and rejects files without one. |
 | any other `GET /install/...` | Not handled. The request falls through to Sites, which serves the `git` package's files. |
+| `GET /graphql` | GraphQL. Lists repos, refs, and open PRs for the POC page. See [POC pull requests and merge](#poc-pull-requests-and-merge). |
+| `GET /`, `GET /index.html`, and other non-repo paths | Not handled. Falls through to Sites, which serves the POC page files uploaded at package install. |
 
 Reads are not authenticated. `serveSys` receives the logged-in account when the request carries a bearer token or a `__Host-SESSION` cookie, and v1 ignores it. The bytes are on every full node anyway.
 
@@ -275,6 +296,7 @@ Not used in v1: libgit2, gitoxide, `git-http-backend`, Radicle. Those matter for
 3. `serveSys` for `HEAD`, `info/refs`, and loose objects. `git clone` of a repo that was pushed with `psibase push` must succeed with an unmodified git.
 4. `git-remote-psibase` push, then fetch, against the same node.
 5. Tests: second clone sees the push; a fast-forward from a second writer lands; a non-fast-forward without the force flag fails; two updates with the same `old_oid` produce one success and one rejected transaction; an object whose bytes do not match its id is rejected; a ref that points at a missing blob is rejected.
+6. POC page: Sites UI under `/`, GraphQL for repos/refs/PRs, `openPr` / `closePr`, browser merge via CommonApi `common-lib`. See [POC pull requests and merge](#poc-pull-requests-and-merge).
 
 > **Implementation notes (V1 POC, `packages/user/Git`, `rust/git-remote-psibase`).** Where the code differs from the text above:
 > - `putObjects(owner, name, objects)` and `updateRefs(owner, name, updates)` take the repo `owner` explicitly, so a writer can target someone else's repo. Each object is `{oid, data}`: the claimed id is checked against the computed hash, which is what makes "bytes do not match its id" rejectable.
@@ -375,6 +397,8 @@ Users install the client for the on-chain instantiation with one script. The sam
 curl --proto '=https' --tlsv1.2 -fsSL https://git.<root>/install.sh | sh
 ```
 
+The same one-liner is the copyable field at the top of the POC page on `git.<root>/` (see [POC pull requests and merge](#poc-pull-requests-and-merge)), with scheme and host taken from the page's own URL.
+
 Node operators who are running the sidecar add `--host`:
 
 ```sh
@@ -432,11 +456,54 @@ Each repo gets its own Psibase account (for example `admin-hash`). That account 
 
 ## POC pull requests and merge
 
-The POC adds a minimal web page on `git.<root>`.
+Decided: one static page at `http://git.<root>/` (Sites files of the `git` package). No plugin. No Supervisor keystore writes. Layout, top to bottom:
 
-- A PR list per repo. Each entry has a source branch, a base branch, and a merge button.
-- Merging happens in the browser. The page fetches the objects over the same HTTP URLs that stock git uses. It computes the merge tree and commit client-side, then signs and submits one transaction. That transaction calls `putObjects` for the new tree and commit objects and `updateRefs` to move the base branch, with the base's current oid as `old_oid`.
-- No merge conflict handling. When both sides changed the same path, the merge button refuses and tells the user to resolve locally and push first. There is no rename detection and no conflict editor.
+1. **Install strip** (Homebrew-style). A short label, then one read-only text field with the install command for *this* chain, and a Copy button. The command is built from `window.location` so the scheme and host match the page the user is on, for example:
+
+   ```sh
+   curl --proto '=https' --tlsv1.2 -fsSL http://git.psibase.localhost:8080/install.sh | sh
+   ```
+
+   On a TLS host the field uses `https` and drops the non-default-port form. The field is the documented one-liner from [Installing the client](#installing-the-client), not a separate download link. A small note under the field points at `install.sh` for people who want to inspect the script before piping. No other install chrome (no OS tabs, no checksum UI).
+
+2. **Repo and PR panel.** A repo selector (`owner` / `name`), the open-PR list for that repo, a small form to open a PR (source branch, base branch), and per-row Merge and Close.
+
+### Packaging and serving
+
+- Files live under `packages/user/Git/ui/` (`index.html`, `app.mjs`, and any tiny CSS). The service `data` metadata uploads that directory to `/` alongside the existing `/install` entry. The UI files are committed (unlike `install-dist/`).
+- `serveSys` does not handle `/` or `/index.html`. Those fall through to Sites. Repo paths and `/install.sh` stay ahead of Sites as today.
+- CSP stays open (`connect-src *`, `frame-ancestors *`) so agents and other origins can fetch. `script-src 'self'` is enough: `http-server` serves `/common/common-lib.js` on the `git.<root>` host, so the page imports it same-origin.
+- GraphQL: `serveSys` answers GraphQL on `/graphql` with `serve_graphql` over `RepoRow`, `RefRow`, and `PrRow`. The page uses CommonApi `postGraphQLGetJson` against `git.<root>/graphql`. Dumb HTTP remains the way to fetch object bytes. Also enable `serve_pack_action` so the page can `POST /pack_action/<method>` for JSON-shaped actions.
+
+### Opening and listing PRs
+
+- `openPr` / `closePr` as in [Actions](#actions). The page lists open rows for the selected repo.
+- Opening is a normal signed transaction from the page (same signing path as merge). Closing likewise.
+- Branch names in the open form come from GraphQL refs for that repo, filtered to `refs/heads/*`.
+
+### Merge (browser)
+
+1. Read live tips of `source` and `base` from GraphQL or `info/refs`.
+2. Fetch commit, tree, and blob objects over dumb HTTP (`/<owner>/<repo>.git/objects/…`) until both sides' trees are local in memory.
+3. Find the merge base (best common ancestor of the two commits). Build a three-way tree merge. If any path was changed on both sides relative to the base (content or mode), **refuse**: show which paths conflict and tell the user to resolve locally and push, then retry. No rename detection. No conflict editor. Blobs are compared by oid only.
+4. Build a merge commit object: two parents (`base` tip, then `source` tip), tree = merge result, message `Merge <source> into <base>`. Author and committer come from two fields on the page (`Name <email>` lines); if empty, use `psibase-git-ui <git-ui@psibase.local>` and the current Unix time.
+5. Zlib-compress the new tree and commit objects and submit **one** transaction whose actions are, in order: `putObjects` (new objects only, `rawData` hex), `updateRefs` moving `base` from its current oid to the merge commit oid, and `closePr` for that id. Post with `wait_for=applied` so a lost compare-and-swap is visible. If `base` moved under the user, the CAS fails and the page shows the rejection; the PR row stays open.
+
+### Signing on the page
+
+Decided: paste-key, same pattern as CommonApi's external-app / SimpleUI examples. No plugin.
+
+- The page imports `/common/common-lib.js` (`getTaposForHeadBlock`, pack helpers, and a push that posts to `transact.<root>/push_transaction?wait_for=applied`).
+- Fields always visible near the PR panel: account name, private key (`PVT_K1_…` / `PVT_R1_…`). The key never leaves the browser; it only signs locally.
+- `openPr` / `closePr` / `updateRefs` use schema-shaped JSON through `/pack_action/<method>`. `putObjects` uses `rawData` hex for the zlib object bytes.
+- A Host-keystore / Supervisor path would need a thin `git` plugin (`add-action-to-transaction` is own-service only). Out of scope; keep "no plugin."
+
+### What the page does not do
+
+- Diff view, file browser, CI status, assignees, review comments.
+- Merge conflict resolution in the browser.
+- Creating repos or granting writers (still CLI / `psibase push`).
+- Serving a UI under each `/<owner>/<repo>` path; one page, repo selected in the UI.
 
 ## CLI
 
@@ -460,6 +527,6 @@ Signing reuses the existing `psibase` CLI signing code, linked into the helper a
 
 ## Out of scope for this plan
 
-Browser UI beyond the POC pull-request page, and merge conflict resolution in the browser. Full compose of the two instantiations: one remote whose bytes live on a host and whose tip is chain state, including quarantine, fork repair, and multi-host discovery. A smart-HTTP front end over the on-chain object table is that compose, not a phase of instantiation 1.
+Browser UI beyond the POC page (install strip + PR list/merge), and merge conflict resolution in the browser. Full compose of the two instantiations: one remote whose bytes live on a host and whose tip is chain state, including quarantine, fork repair, and multi-host discovery. A smart-HTTP front end over the on-chain object table is that compose, not a phase of instantiation 1.
 
 For the on-chain instantiation specifically: a node-local object cache, smart HTTP, packfiles, deleting history, private repos, Large File Storage, and shallow or partial clone. Those last items exist only in the node-hosted instantiation, and only from a machine that is actually hosting that repo. Git LFS, in [Most Likely Pragmatic Design](#most-likely-pragmatic-design), is the user's own server, not a Psibase-hosted store.

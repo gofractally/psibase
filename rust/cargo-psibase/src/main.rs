@@ -836,6 +836,10 @@ async fn build(
 }
 
 async fn build_plugins(args: &Args, packages: &[&Package]) -> Result<Vec<ArtifactFile>, Error> {
+    // No -p means cargo component builds the whole workspace; skip when unused.
+    if packages.is_empty() {
+        return Ok(Vec::new());
+    }
     let mut command = tokio::process::Command::new(get_cargo());
     command
         .arg("component")

@@ -4,11 +4,12 @@ pub mod gitobj;
 
 #[psibase::service_tables]
 pub mod tables {
+    use async_graphql::SimpleObject;
     use psibase::{AccountNumber, Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "RepoTable", index = 0)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
     pub struct RepoRow {
         pub owner: AccountNumber,
         pub name: String,
@@ -37,7 +38,7 @@ pub mod tables {
     }
 
     #[table(name = "RefTable", index = 2)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
     pub struct RefRow {
         pub owner: AccountNumber,
         pub name: String,
@@ -66,12 +67,30 @@ pub mod tables {
             self.oid.clone()
         }
     }
+
+    #[table(name = "PrTable", index = 4)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
+    pub struct PrRow {
+        pub owner: AccountNumber,
+        pub name: String,
+        pub id: u32,
+        pub source: String,
+        pub base: String,
+        pub opener: AccountNumber,
+    }
+    impl PrRow {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, String, u32) {
+            (self.owner, self.name.clone(), self.id)
+        }
+    }
 }
 
 #[psibase::service(name = "git", tables = "tables")]
 pub mod service {
     use crate::gitobj::{self, Kind, ZERO_OID};
     use crate::tables::*;
+    use async_graphql::Object;
     use psibase::*;
     use serde::{Deserialize, Serialize};
     use std::collections::{BTreeSet, HashSet, VecDeque};
@@ -260,6 +279,67 @@ pub mod service {
         WriterTable::new().erase(&(owner, name, account));
     }
 
+    /// Open a PR: a named `(source, base)` branch pair. Anyone may open.
+    #[action]
+    #[allow(non_snake_case)]
+    fn openPr(owner: AccountNumber, name: String, source: String, base: String) {
+        get_repo(owner, &name);
+        check_refname(&source);
+        check_refname(&base);
+        if !source.starts_with("refs/heads/") || !base.starts_with("refs/heads/") {
+            fail("PR branches must be under refs/heads/");
+        }
+        if source == base {
+            fail("source and base must differ");
+        }
+        let refs = RefTable::read().get_index_pk();
+        if refs.get(&(owner, name.clone(), source.clone())).is_none() {
+            fail("source branch does not exist");
+        }
+        if refs.get(&(owner, name.clone(), base.clone())).is_none() {
+            fail("base branch does not exist");
+        }
+        let mut next_id: u32 = 1;
+        for pr in PrTable::read()
+            .get_index_pk()
+            .range((owner, name.clone(), 0u32)..)
+            .take_while(|p| p.owner == owner && p.name == name)
+        {
+            if pr.source == source && pr.base == base {
+                fail("PR already open for this source and base");
+            }
+            if pr.id >= next_id {
+                next_id = pr.id + 1;
+            }
+        }
+        PrTable::new()
+            .put(&PrRow {
+                owner,
+                name,
+                id: next_id,
+                source,
+                base,
+                opener: get_sender(),
+            })
+            .unwrap();
+    }
+
+    /// Close a PR. Opener or repo owner only. No ref moves.
+    #[action]
+    #[allow(non_snake_case)]
+    fn closePr(owner: AccountNumber, name: String, id: u32) {
+        get_repo(owner, &name);
+        let table = PrTable::new();
+        let Some(row) = table.get_index_pk().get(&(owner, name.clone(), id)) else {
+            fail("PR does not exist");
+        };
+        let sender = get_sender();
+        if sender != row.opener && sender != owner {
+            fail("only opener or owner may close");
+        }
+        table.erase(&(owner, name, id));
+    }
+
     /// Store zlib loose objects. Each is inflated, size-capped (1 MiB per
     /// object), hashed, and stored under its computed id.
     #[action]
@@ -356,11 +436,13 @@ pub mod service {
     }
 
     fn reply(status: u16, ct: &str, body: Vec<u8>) -> Option<HttpReply> {
+        let mut headers = allow_cors_with_origin("*");
+        headers.push(HttpHeader::new("Cache-Control", "no-cache"));
         Some(HttpReply {
             status,
             contentType: ct.into(),
             body: body.into(),
-            headers: vec![HttpHeader::new("Cache-Control", "no-cache")],
+            headers,
         })
     }
 
@@ -423,7 +505,33 @@ pub mod service {
             .into_bytes()
     }
 
+    struct Query;
+
+    #[Object]
+    impl Query {
+        async fn repos(&self) -> Vec<RepoRow> {
+            RepoTable::read().get_index_pk().iter().collect()
+        }
+
+        async fn refs(&self, owner: AccountNumber, name: String) -> Vec<RefRow> {
+            RefTable::read()
+                .get_index_pk()
+                .range((owner, name.clone(), String::new())..)
+                .take_while(|r| r.owner == owner && r.name == name)
+                .collect()
+        }
+
+        async fn prs(&self, owner: AccountNumber, name: String) -> Vec<PrRow> {
+            PrTable::read()
+                .get_index_pk()
+                .range((owner, name.clone(), 0u32)..)
+                .take_while(|p| p.owner == owner && p.name == name)
+                .collect()
+        }
+    }
+
     /// Installer: `/install.sh` (generated) and `/install/*` (Sites files).
+    /// GraphQL `/graphql`, pack `/pack_action/*`, POC page via Sites `/`.
     /// Dumb HTTP: `/<owner>/<repo>[.git]/{HEAD,info/refs,objects/xx/yyyy}`.
     #[action]
     #[allow(non_snake_case)]
@@ -432,6 +540,20 @@ pub mod service {
         _socket: Option<i32>,
         _user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
+        if request.method == "OPTIONS" {
+            return Some(HttpReply {
+                status: 204,
+                contentType: "".into(),
+                body: Vec::new().into(),
+                headers: allow_cors_with_origin("*"),
+            });
+        }
+        if let Some(r) = serve_graphql(&request, Query) {
+            return Some(r);
+        }
+        if let Some(r) = serve_pack_action::<Wrapper>(&request) {
+            return Some(r);
+        }
         if request.method != "GET" && request.method != "HEAD" {
             return if request.target.contains("/git-") {
                 not_found()
@@ -451,17 +573,20 @@ pub mod service {
         if path == "/install/SHA256SUMS" || path == "/install/version" {
             // Sites picks the MIME type from the extension, so these two are
             // stored as `.txt`; keep the documented extensionless paths.
+            let mut headers = allow_cors_with_origin("*");
+            headers.push(HttpHeader::new("Location", &format!("{path}.txt")));
             return Some(HttpReply {
                 status: 302,
                 contentType: "text/plain".into(),
                 body: Vec::new().into(),
-                headers: vec![HttpHeader::new("Location", &format!("{path}.txt"))],
+                headers,
             });
         }
         if path == "/install" || path.starts_with("/install/") {
             // Tarballs, SHA256SUMS.txt and version.txt are package files in Sites.
             return None;
         }
+        // `/` and other non-repo paths fall through to Sites (POC UI).
         let mut parts = path.trim_start_matches('/').splitn(3, '/');
         let (owner, repo, rest) = (parts.next()?, parts.next()?, parts.next()?);
         let owner = AccountNumber::from_exact(owner).ok()?;

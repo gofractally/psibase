@@ -1,0 +1,160 @@
+:root {
+  color-scheme: light;
+  --fg: #1a1a1a;
+  --muted: #5a5a5a;
+  --border: #c8c8c8;
+  --bg: #f6f4ef;
+  --card: #fff;
+  --accent: #0b5fff;
+  --danger: #a11;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #ebe6da 0%, var(--bg) 40%, #e4ece8 100%);
+  color: var(--fg);
+  min-height: 100vh;
+}
+
+main {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+h1,
+h2 {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.lede,
+.note,
+.status {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.install,
+.prs {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 1.25rem 1.35rem 1.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.copy-row {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.copy-row input {
+  flex: 1;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  background: #fafafa;
+}
+
+button,
+.select-like {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: #eee;
+  padding: 0.55rem 0.85rem;
+}
+
+button:hover {
+  background: #e4e4e4;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.danger {
+  color: var(--danger);
+}
+
+.grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  align-items: end;
+  margin: 1rem 0;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+input,
+select {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--fg);
+}
+
+.pr-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+.pr-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.pr-meta {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.9rem;
+}
+
+.pr-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.status {
+  min-height: 1.25rem;
+  white-space: pre-wrap;
+}
+
+.status.error {
+  color: var(--danger);
+}
+
+code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+a {
+  color: var(--accent);
+}

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>git on psibase</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <section class="install" aria-labelledby="install-heading">
+        <h1 id="install-heading">Install</h1>
+        <p class="lede">Install the <code>git-remote-psibase</code> helper for this chain.</p>
+        <div class="copy-row">
+          <input id="install-cmd" type="text" readonly spellcheck="false" />
+          <button type="button" id="copy-install">Copy</button>
+        </div>
+        <p class="note">
+          Inspect the script first:
+          <a id="install-sh-link" href="/install.sh">install.sh</a>
+          · requires stock <code>git</code> on <code>PATH</code>
+        </p>
+      </section>
+
+      <section class="prs" aria-labelledby="prs-heading">
+        <h2 id="prs-heading">Pull requests</h2>
+
+        <div class="auth grid">
+          <label>
+            Account
+            <input id="account" type="text" autocomplete="username" placeholder="alice" />
+          </label>
+          <label>
+            Private key
+            <input
+              id="key"
+              type="password"
+              autocomplete="off"
+              placeholder="PVT_K1_…"
+            />
+          </label>
+          <label>
+            Author
+            <input id="author" type="text" placeholder="Name &lt;email&gt; (optional)" />
+          </label>
+        </div>
+
+        <div class="repo-pick grid">
+          <label>
+            Repo
+            <select id="repo"></select>
+          </label>
+          <button type="button" id="refresh">Refresh</button>
+        </div>
+
+        <form id="open-form" class="open-form grid">
+          <label>
+            Source
+            <select id="source" required></select>
+          </label>
+          <label>
+            Base
+            <select id="base" required></select>
+          </label>
+          <button type="submit">Open PR</button>
+        </form>
+
+        <ul id="pr-list" class="pr-list"></ul>
+        <p id="status" class="status" role="status"></p>
+      </section>
+    </main>
+    <script type="module" src="/app.mjs"></script>
+  </body>
+</html>
