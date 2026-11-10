@@ -1,5 +1,38 @@
 # Git on Psibase
 
+## Demo playbook (local)
+
+Assumes chain up at `http://psibase.localhost:8080/` with `Git` installed. Work outside the `psibase/` checkout so the demo repo is not nested.
+
+- UI: `http://git.psibase.localhost:8080/`
+- From `psibase/` (direnv on; needs `psibase` CLI):
+  - `curl --proto '=https' --tlsv1.2 -fsSL http://git.psibase.localhost:8080/install.sh | sh`
+  - `psibase create -a http://psibase.localhost:8080 -i alice`
+  - `openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out ~/alice.pem`
+- Leave `psibase/` (direnv unload drops PATH exports — set these in the new shell/cwd):
+  - `export PATH="$HOME/.local/bin:$PATH"`
+  - `export PSIBASE_GIT_ACCOUNT=alice PSIBASE_GIT_KEY=$HOME/alice.pem`
+  - `mkdir -p ~/mike-notes && cd ~/mike-notes`
+- Init + first commit + push:
+  - `git init -b main`
+  - `echo hello > README && git add README && git commit -m first`
+  - `git remote add origin psibase::http://psibase.localhost:8080/alice/notes`
+  - `git push -u origin main`
+- Feature branch + push:
+  - `git checkout -b feature`
+  - `echo change >> README && git add README && git commit -m feature`
+  - `git push -u origin feature`
+- Merge PR in UI:
+  - open `http://git.psibase.localhost:8080/`
+  - Login (Supervisor; use an account already in the Host keystore — Homepage create/login, or import `~/alice.pem`)
+  - select `alice` / `notes`
+  - open PR: source `feature`, base `main`
+  - Merge
+- Verify merge locally (still on `feature` after the UI merge):
+  - `git checkout main && git pull` → Fast-forward to the merge commit
+
+---
+
 Primary approach: **keep separate instantiations**. Two ways to run git, with no shared data path.
 
 1. **On-chain objects.** A `git` service stores refs and loose objects in the consensus database and serves them over ordinary HTTP (Hypertext Transfer Protocol). Stock `git clone` and `git fetch` work against that URL. Stock `git push` does not. Push goes through a git remote helper that signs a normal Psibase transaction. This is the instantiation to build. No node-local service is on this path. Local services cannot run git, and they are the wrong place to keep this repo.
@@ -456,7 +489,7 @@ Each repo gets its own Psibase account (for example `admin-hash`). That account 
 
 ## POC pull requests and merge
 
-Decided: one static page at `http://git.<root>/` (Sites files of the `git` package). No plugin. No Supervisor keystore writes. Layout, top to bottom:
+Decided: one static page at `http://git.<root>/` (Sites files of the `git` package), plus a thin `git` plugin so open/close/merge go through Supervisor like other apps. Layout, top to bottom:
 
 1. **Install strip** (Homebrew-style). A short label, then one read-only text field with the install command for *this* chain, and a Copy button. The command is built from `window.location` so the scheme and host match the page the user is on, for example:
 
@@ -491,12 +524,11 @@ Decided: one static page at `http://git.<root>/` (Sites files of the `git` packa
 
 ### Signing on the page
 
-Decided: paste-key, same pattern as CommonApi's external-app / SimpleUI examples. No plugin.
+Decided: Supervisor Login, same pattern as other apps (Homepage, Tokens, etc.).
 
-- The page imports `/common/common-lib.js` (`getTaposForHeadBlock`, pack helpers, and a push that posts to `transact.<root>/push_transaction?wait_for=applied`).
-- Fields always visible near the PR panel: account name, private key (`PVT_K1_…` / `PVT_R1_…`). The key never leaves the browser; it only signs locally.
-- `openPr` / `closePr` / `updateRefs` use schema-shaped JSON through `/pack_action/<method>`. `putObjects` uses `rawData` hex for the zlib object bytes.
-- A Host-keystore / Supervisor path would need a thin `git` plugin (`add-action-to-transaction` is own-service only). Out of scope; keep "no plugin."
+- Login / Logout via `host:accounts` (`connectAccount` / `logout` / `getCurrentUser`). No paste-key fields.
+- A thin `git` plugin exposes `openPr`, `closePr`, and `mergePr` (`putObjects` + `updateRefs` + `closePr` in one transaction) via `add_action_to_transaction`. The Host keystore signs as the logged-in user.
+- The page still imports `/common/common-lib.js` for GraphQL helpers and `getSupervisor`. Merge packing (zlib objects, oids) stays in the browser; only the signed submit goes through the plugin.
 
 ### What the page does not do
 

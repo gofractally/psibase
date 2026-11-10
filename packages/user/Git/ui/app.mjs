@@ -1,14 +1,8 @@
-import {
-  getTaposForHeadBlock,
-  packSignedTransaction,
-  postArrayBufferGetJson,
-  postJsonGetJson,
-  siblingUrl,
-  signTransaction,
-} from "/common/common-lib.js";
-import { fetchLoose, mergeBranches, toHex } from "./merge.mjs";
+import { getSupervisor, postJsonGetJson } from "/common/common-lib.js";
+import { fetchLoose, mergeBranches } from "./merge.mjs";
 
 const $ = (id) => document.getElementById(id);
+const supervisor = getSupervisor();
 
 function installCommand() {
   const { protocol, host } = window.location;
@@ -21,14 +15,6 @@ function setStatus(msg, isError = false) {
   const el = $("status");
   el.textContent = msg || "";
   el.classList.toggle("error", !!isError);
-}
-
-function account() {
-  return $("account").value.trim();
-}
-
-function privateKey() {
-  return $("key").value.trim();
 }
 
 function authorLine() {
@@ -51,40 +37,74 @@ async function gql(query, variables) {
   return res.data;
 }
 
-function rootUrl() {
-  const root = window.location.hostname.replace(/^git\./, "");
-  return `${window.location.protocol}//${root}${
-    window.location.port ? ":" + window.location.port : ""
-  }`;
+async function currentUser() {
+  return supervisor.functionCall({
+    service: "host",
+    plugin: "accounts",
+    intf: "api",
+    method: "getCurrentUser",
+    params: [],
+  });
 }
 
-async function pushActions(actions) {
-  const base = rootUrl();
-  const sender = account();
-  const key = privateKey();
-  if (!sender) throw new Error("account required");
-  if (!key) throw new Error("private key required");
-  const transaction = {
-    tapos: {
-      ...(await getTaposForHeadBlock(base)),
-      expiration: new Date(Date.now() + 30_000),
-    },
-    actions: actions.map((a) => ({
-      sender,
-      service: "git",
-      ...a,
-    })),
-  };
-  const signed = await signTransaction(base, transaction, [key]);
-  const packed = await packSignedTransaction(base, signed);
-  const url = siblingUrl(base, "transact", "/push_transaction?wait_for=applied");
-  const trace = await postArrayBufferGetJson(url, packed);
-  if (trace.error) throw new Error(trace.error);
-  return trace;
+async function refreshUser() {
+  const user = await currentUser();
+  const label = $("user-label");
+  const btn = $("login");
+  if (user) {
+    label.textContent = user;
+    btn.textContent = "Logout";
+  } else {
+    label.textContent = "Not logged in";
+    btn.textContent = "Login";
+  }
+  return user;
+}
+
+async function toggleLogin() {
+  const user = await currentUser();
+  if (user) {
+    await supervisor.functionCall({
+      service: "host",
+      plugin: "accounts",
+      intf: "activeApp",
+      method: "logout",
+      params: [],
+    });
+  } else {
+    await supervisor.functionCall(
+      {
+        service: "host",
+        plugin: "accounts",
+        intf: "activeApp",
+        method: "connectAccount",
+        params: [],
+      },
+      { enabled: true, returnPath: "/" },
+    );
+  }
+  await refreshUser();
+}
+
+async function requireUser() {
+  const user = await currentUser();
+  if (!user) throw new Error("Login required");
+  return user;
+}
+
+async function callGit(method, params) {
+  await requireUser();
+  return supervisor.functionCall({
+    service: "git",
+    plugin: "plugin",
+    intf: "api",
+    method,
+    params,
+  });
 }
 
 async function loadRepos() {
-  const data = await gql(`{ repos { owner name default_branch } }`);
+  const data = await gql(`{ repos { owner name defaultBranch } }`);
   const repos = data.repos || [];
   const sel = $("repo");
   const prev = sel.value;
@@ -117,17 +137,18 @@ async function loadRefsAndPrs() {
     r.refname.startsWith("refs/heads/"),
   );
   for (const r of heads) {
-    for (const sel of [source, base]) {
+    for (const sel of [base, source]) {
       const opt = document.createElement("option");
       opt.value = r.refname;
       opt.textContent = r.refname.replace(/^refs\/heads\//, "");
       sel.appendChild(opt);
     }
   }
-  if (heads.length >= 2) {
-    base.value = heads[0].refname;
-    source.value = heads[1].refname;
-  }
+  const main = heads.find((r) => r.refname === "refs/heads/main");
+  if (main) base.value = main.refname;
+  else if (heads[0]) base.value = heads[0].refname;
+  const sourceHead = heads.find((r) => r.refname !== base.value);
+  if (sourceHead) source.value = sourceHead.refname;
 
   for (const pr of data.prs || []) {
     const li = document.createElement("li");
@@ -164,12 +185,7 @@ async function doOpen(ev) {
   const source = $("source").value;
   const base = $("base").value;
   setStatus("Opening PR…");
-  await pushActions([
-    {
-      method: "openPr",
-      data: { owner: repo.owner, name: repo.name, source, base },
-    },
-  ]);
+  await callGit("openPr", [repo.owner, repo.name, source, base]);
   setStatus("PR opened.");
   await loadRefsAndPrs();
 }
@@ -177,12 +193,7 @@ async function doOpen(ev) {
 async function doClose(pr) {
   const repo = selectedRepo();
   setStatus(`Closing PR #${pr.id}…`);
-  await pushActions([
-    {
-      method: "closePr",
-      data: { owner: repo.owner, name: repo.name, id: pr.id },
-    },
-  ]);
+  await callGit("closePr", [repo.owner, repo.name, pr.id]);
   setStatus(`Closed PR #${pr.id}.`);
   await loadRefsAndPrs();
 }
@@ -195,7 +206,9 @@ async function doMerge(pr) {
   const data = await gql(`{
       refs(owner: "${repo.owner}", name: "${repo.name}") { refname oid }
     }`);
-  const byRef = Object.fromEntries((data.refs || []).map((r) => [r.refname, r.oid]));
+  const byRef = Object.fromEntries(
+    (data.refs || []).map((r) => [r.refname, r.oid]),
+  );
   const baseOid = byRef[pr.base];
   const sourceOid = byRef[pr.source];
   if (!baseOid || !sourceOid) throw new Error("source or base ref missing");
@@ -217,56 +230,29 @@ async function doMerge(pr) {
     message,
   );
 
-  // Skip objects already on chain (decodeLoose oid matches).
   const toPut = [];
   for (const o of objects) {
     try {
       await fetchLoose(repo.owner, repo.name, o.oid);
     } catch {
-      toPut.push(o);
+      toPut.push({ oid: o.oid, data: Array.from(o.zlib) });
     }
   }
 
-  const actions = [];
-  if (toPut.length) {
-    actions.push({
-      method: "putObjects",
-      data: {
-        owner: repo.owner,
-        name: repo.name,
-        objects: toPut.map((o) => ({
-          oid: o.oid,
-          data: toHex(o.zlib),
-        })),
-      },
-    });
-  }
-  actions.push({
-    method: "updateRefs",
-    data: {
-      owner: repo.owner,
-      name: repo.name,
-      updates: [
-        {
-          refname: pr.base,
-          old_oid: baseOid,
-          new_oid: mergeOid,
-        },
-      ],
-    },
-  });
-  actions.push({
-    method: "closePr",
-    data: { owner: repo.owner, name: repo.name, id: pr.id },
-  });
-
-  await pushActions(actions);
+  await callGit("mergePr", [
+    repo.owner,
+    repo.name,
+    pr.id,
+    toPut,
+    [{ refname: pr.base, oldOid: baseOid, newOid: mergeOid }],
+  ]);
   setStatus(`Merged PR #${pr.id} → ${mergeOid.slice(0, 12)}`);
   await loadRefsAndPrs();
 }
 
 async function refresh() {
   setStatus("Loading…");
+  await refreshUser();
   await loadRepos();
   await loadRefsAndPrs();
   setStatus("");
@@ -286,6 +272,7 @@ $("copy-install").addEventListener("click", async () => {
   }
 });
 
+$("login").addEventListener("click", () => toggleLogin().catch(showErr));
 $("refresh").addEventListener("click", () => refresh().catch(showErr));
 $("repo").addEventListener("change", () => loadRefsAndPrs().catch(showErr));
 $("open-form").addEventListener("submit", (ev) => doOpen(ev).catch(showErr));

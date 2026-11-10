@@ -26,19 +26,10 @@
         <h2 id="prs-heading">Pull requests</h2>
 
         <div class="auth grid">
-          <label>
-            Account
-            <input id="account" type="text" autocomplete="username" placeholder="alice" />
-          </label>
-          <label>
-            Private key
-            <input
-              id="key"
-              type="password"
-              autocomplete="off"
-              placeholder="PVT_K1_…"
-            />
-          </label>
+          <div class="login-row">
+            <span id="user-label" class="user-label">Not logged in</span>
+            <button type="button" id="login">Login</button>
+          </div>
           <label>
             Author
             <input id="author" type="text" placeholder="Name &lt;email&gt; (optional)" />
@@ -55,12 +46,12 @@
 
         <form id="open-form" class="open-form grid">
           <label>
-            Source
-            <select id="source" required></select>
-          </label>
-          <label>
             Base
             <select id="base" required></select>
+          </label>
+          <label>
+            Source
+            <select id="source" required></select>
           </label>
           <button type="submit">Open PR</button>
         </form>

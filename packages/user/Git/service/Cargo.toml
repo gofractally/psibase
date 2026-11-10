@@ -9,6 +9,7 @@ publish = false
 
 [package.metadata.psibase]
 server = "git"
+plugin = "git-plugin"
 # Filled by scripts/pack-install-dist.sh (CI); empty in plain dev builds.
 # ui/ is the committed POC page (install strip + PRs).
 data = [

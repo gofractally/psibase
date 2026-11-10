@@ -98,6 +98,18 @@ button.danger {
   margin: 1rem 0;
 }
 
+.login-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.user-label {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.95rem;
+  color: var(--fg);
+}
+
 label {
   display: flex;
   flex-direction: column;

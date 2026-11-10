@@ -60,6 +60,7 @@ members = [
     "Nft/query-service",
     "Git",
     "Git/service",
+    "Git/plugin",
     "Guilds",
     "Guilds/service",
     "Guilds/query-service",

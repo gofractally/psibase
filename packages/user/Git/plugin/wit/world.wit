@@ -1,0 +1,34 @@
+package git:plugin;
+
+interface types {
+    record git-object {
+        oid: string,
+        data: list<u8>,
+    }
+
+    record ref-update {
+        refname: string,
+        old-oid: string,
+        new-oid: string,
+    }
+}
+
+interface api {
+    use host:types/types.{error};
+    use types.{git-object, ref-update};
+
+    open-pr: func(owner: string, name: string, source: string, base: string) -> result<_, error>;
+    close-pr: func(owner: string, name: string, id: u32) -> result<_, error>;
+    /// putObjects, then updateRefs, then closePr — one transaction.
+    merge-pr: func(
+        owner: string,
+        name: string,
+        id: u32,
+        objects: list<git-object>,
+        updates: list<ref-update>,
+    ) -> result<_, error>;
+}
+
+world imports {
+    import api;
+}
