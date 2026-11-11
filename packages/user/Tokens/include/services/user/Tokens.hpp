@@ -111,6 +111,22 @@ namespace UserService
       /// * 1: Unrecallable    - If enabled, the token cannot be recalled
       void setTokenConf(TID tokenId, uint8_t index, bool enable);
 
+      /// Sets the icon of a token. Only the token owner can set the icon.
+      ///
+      /// The icon is served at `/icon/<token_id>` on the tokens subdomain.
+      ///
+      /// # Arguments
+      /// * `tokenId`     - Unique token identifier
+      /// * `image`       - Image bytes, at most 32 KiB
+      /// * `contentType` - Image type: 0 = PNG, 1 = JPEG, 2 = WebP
+      void setIcon(TID tokenId, std::vector<uint8_t> image, uint8_t contentType);
+
+      /// Removes the icon of a token. Only the token owner can remove the icon.
+      ///
+      /// # Arguments
+      /// * `tokenId` - Unique token identifier
+      void removeIcon(TID tokenId);
+
       /// Credit tokens to a debitor (recipient).
       ///
       /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
@@ -399,6 +415,8 @@ namespace UserService
       method(delBalConf, tokenId),
       method(setUserConf, index, enable),
       method(setTokenConf, tokenId, index, enable),
+      method(setIcon, tokenId, image, contentType),
+      method(removeIcon, tokenId),
       method(credit, tokenId, debitor, amount, memo),
       method(uncredit, tokenId, debitor, amount, memo),
       method(reject, tokenId, creditor, memo),
