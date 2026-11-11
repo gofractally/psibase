@@ -16,10 +16,13 @@ import {
 export const TokenBalances = ({
     tokens,
     selectedToken,
+    incomingTokenIds,
     onSelect,
 }: {
     tokens: Token[];
     selectedToken?: Token;
+    /** Tokens with an incoming transfer waiting to be accepted */
+    incomingTokenIds?: ReadonlySet<number>;
     onSelect: (tokenId: string) => void;
 }) => {
     return (
@@ -78,6 +81,13 @@ export const TokenBalances = ({
                                                         Not transferable
                                                     </TooltipContent>
                                                 </Tooltip>
+                                            )}
+                                            {incomingTokenIds?.has(
+                                                token.id,
+                                            ) && (
+                                                <span className="rounded bg-amber-500/15 px-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                                                    Pending
+                                                </span>
                                             )}
                                         </span>
                                         <span className="text-muted-foreground text-[11px]">

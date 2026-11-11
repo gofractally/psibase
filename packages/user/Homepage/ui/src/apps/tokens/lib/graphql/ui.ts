@@ -34,6 +34,9 @@ const qs = {
                         id
                         symbol
                         precision
+                        settings {
+                            untransferable
+                        }
                     }
                     balance
                     creditor
@@ -136,6 +139,9 @@ export const zSharedBalSchema = z.object({
         id: z.number(),
         symbol: z.string().nullable(),
         precision: z.number(),
+        settings: z.object({
+            untransferable: z.boolean(),
+        }),
     }),
     balance: z.string(),
     creditor: zAccount,

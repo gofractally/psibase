@@ -1,6 +1,6 @@
 import { ArrowRightLeft, Clock, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useMatch } from "react-router-dom";
+import { NavLink, Outlet, useMatch, useSearchParams } from "react-router-dom";
 
 import {
     type Token,
@@ -11,6 +11,7 @@ import { Loading } from "@/components/loading";
 import { PageHeader } from "@/components/page-header";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
 
 import { TokenBalances } from "./components/token-balances";
@@ -68,7 +69,44 @@ export const TokensLayout = () => {
 
     const currentUser = isSuccess ? currentUserData : null;
 
-    const tokens = useMemo(() => data ?? [], [data]);
+    const { data: pending } = useUserPendingBalance(currentUser);
+
+    const incomingTokenIds = useMemo(
+        () =>
+            new Set(
+                (pending ?? [])
+                    .filter((p) => p.debitor === currentUser)
+                    .map((p) => p.token.id),
+            ),
+        [pending, currentUser],
+    );
+
+    // Tokens with an incoming transfer but no balance yet are listed with a zero balance
+    // so their pending transfers can be selected and accepted.
+    const tokens = useMemo(() => {
+        const held = data ?? [];
+        const awaiting = new Map<number, Token>();
+        for (const { debitor, token } of pending ?? []) {
+            if (debitor !== currentUser) continue;
+            if (held.some((t) => t.id === token.id)) continue;
+            if (awaiting.has(token.id)) continue;
+            const balance = new Quantity(
+                "0",
+                token.precision,
+                token.id,
+                token.symbol,
+            );
+            awaiting.set(token.id, {
+                id: token.id,
+                balance,
+                symbol: token.symbol,
+                label: balance.getDisplayLabel(),
+                precision: token.precision,
+                isTransferable: !token.settings.untransferable,
+            });
+        }
+        return [...held, ...awaiting.values()];
+    }, [data, pending, currentUser]);
 
     const [selectedTokenId, setSelectedTokenId] = useState<string>("");
 
@@ -76,9 +114,23 @@ export const TokensLayout = () => {
 
     useEffect(() => {
         if (selectedTokenId) return;
-        if (tokens.length === 0) return;
+        if (!data || tokens.length === 0) return;
         setSelectedTokenId(tokens[0].id.toString());
-    }, [selectedTokenId, tokens]);
+    }, [selectedTokenId, tokens, data]);
+
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tokenParam = searchParams.get("token");
+    useEffect(() => {
+        if (!tokenParam) return;
+        setSelectedTokenId(tokenParam);
+        setSearchParams(
+            (params) => {
+                params.delete("token");
+                return params;
+            },
+            { replace: true },
+        );
+    }, [tokenParam, setSearchParams]);
 
     const handleTokenSelect = (tokenId: string) => {
         setSelectedTokenId(tokenId);
@@ -89,7 +141,6 @@ export const TokensLayout = () => {
         (balance) => balance.id == Number(selectedTokenId),
     );
 
-    const { data: pending } = useUserPendingBalance(currentUser);
     const pendingForToken = useMemo(
         () =>
             selectedToken
@@ -134,6 +185,7 @@ export const TokensLayout = () => {
                         <TokenBalances
                             tokens={tokens}
                             selectedToken={selectedToken}
+                            incomingTokenIds={incomingTokenIds}
                             onSelect={handleTokenSelect}
                         />
 
