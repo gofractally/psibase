@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { fetchTokenMeta } from "@/apps/tokens/lib/graphql/ui";
+import {
+    type TokenSummary,
+    fetchTokenMeta,
+    fetchUserTokensWithActivity,
+} from "@/apps/tokens/lib/graphql/ui";
 
 import QueryKey from "@/lib/query-keys";
 
@@ -20,6 +24,27 @@ export interface Token {
     precision: number;
     isTransferable: boolean;
 }
+
+/** A token the user has no balance in, e.g. one with only past or pending activity */
+export const zeroBalanceToken = (token: TokenSummary): Token => {
+    const balance = new Quantity("0", token.precision, token.id, token.symbol);
+    return {
+        id: token.id,
+        balance,
+        symbol: token.symbol,
+        label: balance.getDisplayLabel(),
+        precision: token.precision,
+        isTransferable: !token.settings.untransferable,
+    };
+};
+
+/** Tokens with balance history for the user, including those now at zero */
+export const useUserTokensWithActivity = (username?: Account | null) =>
+    useQuery<TokenSummary[]>({
+        queryKey: QueryKey.userTokensWithActivity(username),
+        enabled: !!username,
+        queryFn: () => fetchUserTokensWithActivity(zAccount.parse(username)),
+    });
 
 export const useUserTokenBalances = (
     optionalUsername?: Account | undefined | null,

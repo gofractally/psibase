@@ -8,13 +8,10 @@ use psibase::*;
 
 pub(crate) const ONE_MILLION: f64 = 1_000_000.0;
 
-/// Create credits the admin NFT; without auto-debit the creator is not yet owner.
-pub(crate) fn enable_nft_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
+/// Accept the pending admin NFT credited by `create`.
+pub(crate) fn claim_admin_nft(chain: &psibase::Chain, account: AccountNumber, nft_id: u32) {
     psibase::services::nft::Wrapper::push_from(chain, account)
-        .setUserConf(
-            psibase::services::nft::NftHolderFlags::AUTO_DEBIT.index(),
-            true,
-        )
+        .debit(nft_id, "".into())
         .get()
         .unwrap();
 }
