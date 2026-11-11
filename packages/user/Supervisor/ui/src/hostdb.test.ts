@@ -31,13 +31,13 @@ function httpOkBytes(value: Uint8Array): HttpResponse {
 }
 
 describe("HostDb cache", () => {
-    it("get after set hits positive cache without a network request", () => {
+    it("get after set hits cache without a network request", () => {
         const db = new HostDb();
         const value = makeValue(8);
         const send = vi.fn(() => httpNotFound());
 
         db.set(0, HEX_KEY, value);
-        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toEqual(value);
+        expect(db.get(0, HEX_KEY, PLAINTEXT_KEY, send)).toBe(value);
         expect(send).not.toHaveBeenCalled();
     });
 });
