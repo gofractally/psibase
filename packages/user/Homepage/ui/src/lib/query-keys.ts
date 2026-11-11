@@ -23,6 +23,9 @@ const QueryKey = {
     userSettings: (user?: string | null) => ["userSettings", user] as const,
     userTokenBalances: (user?: string | null) =>
         ["userTokenBalances", user] as const,
+    // Nested under userTokenBalances so balance invalidations also refresh it
+    userTokensWithActivity: (user?: string | null) =>
+        ["userTokenBalances", user, "activity"] as const,
     userTokenBalanceChanges: (user?: string | null, tokenId?: number) =>
         ["userTokenBalanceChanges", user, tokenId] as const,
     nameMarketUnclaimedNames: (user?: string | null) =>

@@ -237,3 +237,55 @@ TEST_CASE("Test QSplit")
    CHECK(split(R"(",", a )") == V{R"(",")", " a "});
    CHECK(std::ranges::equal(QSplit{"a,b,c", ','}, V{"a", "b", "c"}));
 }
+
+TEST_CASE("acceptWeight")
+{
+   auto weight = [](std::vector<std::string> accept)
+   {
+      HttpHeaders headers;
+      for (auto& value : accept)
+         headers.push_back({"Accept", std::move(value)});
+      return acceptWeight(headers, "text", "html");
+   };
+   CHECK(weight({}) == 0);
+   CHECK(weight({""}) == 0);
+   CHECK(weight({"text/html"}) == 1000);
+   CHECK(weight({"TEXT/Html"}) == 1000);
+   CHECK(weight({"text/plain"}) == 0);
+   CHECK(weight({"*/*"}) == 1000);
+   CHECK(weight({"text/*;q=0.5"}) == 500);
+   CHECK(weight({"text/html;q=0"}) == 0);
+   CHECK(weight({"text/html ; Q=0.25"}) == 250);
+   CHECK(weight({"text/html;q=0.05"}) == 50);
+   CHECK(weight({"text/html;q=1.000"}) == 1000);
+   CHECK(weight({"text/html;level=1;q=0.3"}) == 300);
+   CHECK(weight({R"(text/html;foo=";q=0";q=0.3)"}) == 300);
+   CHECK(weight({R"(text/html;q=0.3;foo=";q=0")"}) == 300);
+
+   SECTION("malformed weights count as 0")
+   {
+      for (auto q : {"2", "1.5", "0.0001", "0.x", ".5", "", "-0"})
+      {
+         CHECK(weight({"text/html;q="s + q}) == 0);
+      }
+      CHECK(weight({"text/html;Q=x, */*"}) == 0);
+   }
+
+   SECTION("the most specific range applies")
+   {
+      CHECK(weight({"text/html;q=0, */*"}) == 0);
+      CHECK(weight({"*/*, text/*;q=0.2, text/html;q=0.7"}) == 700);
+      CHECK(weight({"*/*;q=0.1, text/*;q=0.2"}) == 200);
+      CHECK(weight({"text/*;q=0.2", "text/html;q=0.6"}) == 600);
+   }
+
+   SECTION("browser navigation")
+   {
+      HttpHeaders headers{
+          {"Accept",
+           "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,"
+           "image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"}};
+      CHECK(acceptWeight(headers, "text", "html") == 1000);
+      CHECK(acceptWeight(headers, "text", "plain") == 800);
+   }
+}

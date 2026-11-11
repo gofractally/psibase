@@ -87,7 +87,15 @@ namespace SystemService
       using Tables                  = psibase::
           ServiceTables<SitesContentTable, SiteConfigTable, SitesDataTable, SitesDataRefTable>;
 
+      /// The page served, with a 404 status, to browsers visiting subdomains without a site
+      static constexpr std::string_view defaultPage = "/common/default-pages/index.html";
+
       /// Serves a request by looking up the content uploaded to the specified subdomain
+      ///
+      /// If no content matches a request whose `Accept` header weighs `text/html` above
+      /// `text/plain` (as browser navigations do), and the subdomain has no `/index.html` and
+      /// no proxy, the common-api service's `defaultPage` is served with a 404 status. Other
+      /// requests that match no content are not handled.
       auto serveSys(psibase::HttpRequest        request,
                     std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 

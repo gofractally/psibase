@@ -153,6 +153,39 @@ mod service {
             .await
         }
 
+        /// Returns the tokens with at least one balance change for the specified user,
+        /// including tokens whose balance has since returned to zero.
+        /// Only considers events that haven't yet been pruned from this node.
+        async fn user_tokens_with_activity(
+            &self,
+            user: AccountNumber,
+        ) -> async_graphql::Result<Vec<Token>> {
+            self.check_user_auth(user)?;
+
+            #[derive(serde::Deserialize)]
+            struct Row {
+                #[serde(
+                    deserialize_with = "serde_aux::field_attributes::deserialize_number_from_string"
+                )]
+                token_id: TID,
+            }
+
+            let json = psibase::services::r_events::Wrapper::call().sqlQuery(
+                "SELECT DISTINCT token_id FROM \"history.tokens.balChanged\" WHERE account = ?"
+                    .to_string(),
+                vec![user.to_string()],
+            );
+            let rows: Vec<Row> = serde_json::from_str(&json).map_err(|e| {
+                async_graphql::Error::new(format!("Failed to read balance history: {e}"))
+            })?;
+
+            let tokens = TokenTable::with_service(tokens::SERVICE).get_index_pk();
+            Ok(rows
+                .into_iter()
+                .filter_map(|row| tokens.get(&row.token_id))
+                .collect())
+        }
+
         /// Returns the specified user's current balance for the specified token.
         async fn user_balance(
             &self,
