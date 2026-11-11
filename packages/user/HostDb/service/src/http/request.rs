@@ -1,4 +1,4 @@
-use psibase::HttpStatus::{BadRequest, Forbidden};
+use psibase::HttpStatus::BadRequest;
 use psibase::*;
 
 use crate::batch::{batch_ops_from_body, decode_fixed_hex, BatchOp, Duration};
@@ -49,20 +49,18 @@ pub(crate) struct HostDbRequest<'a> {
 }
 
 impl<'a> HostDbRequest<'a> {
-    /// Entry point for `serveSys`: checks the supervisor `Origin`, resolves the
-    /// device cookie, and parses the route. The returned `HostDbReply` already
-    /// includes CORS and `Set-Cookie` for the device when applicable.
-    pub(crate) fn accept(
-        http: &'a HttpRequest,
-        root: &str,
-    ) -> Result<(Self, HostDbReply), HttpReply> {
+    /// Entry point for `serveSys`: resolves the device cookie and parses the
+    /// route. The returned `HostDbReply` already includes CORS (when the
+    /// request sends `Origin`) and `Set-Cookie` for the device when applicable.
+    pub(crate) fn accept(http: &'a HttpRequest) -> Result<(Self, HostDbReply), HttpReply> {
         let mut reply = HostDbReply::empty();
-        let origin = service_origin(http, account!("supervisor"), root)
-            .ok_or_else(|| reply.set_status(Forbidden))?;
-        reply.allow_origin(origin);
+        reply.mirror_request_origin(http);
         let device = Self::device_id(http).ok_or_else(|| reply.set_status(BadRequest))?;
         reply.set_device(&device);
         let request = Self::new(http, device).map_err(|status| reply.set_status(status))?;
+        if matches!(request.route, Route::CorsPreflight) {
+            reply.set_preflight(http);
+        }
         Ok((request, reply))
     }
 

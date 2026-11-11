@@ -16,6 +16,12 @@ impl HostDbReply {
         }
     }
 
+    pub(crate) fn mirror_request_origin(&mut self, http: &HttpRequest) {
+        if let Some(origin) = http.get_header("origin") {
+            self.allow_origin(origin);
+        }
+    }
+
     pub(crate) fn allow_origin(&mut self, origin: &str) {
         self.headers.extend(cors_headers(origin));
     }
