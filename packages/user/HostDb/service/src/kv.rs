@@ -34,7 +34,18 @@ impl DeviceKv {
         value
     }
 
-    pub(crate) fn session_value(&self, session: &[u8], key: &[u8]) -> Option<Vec<u8>> {
+    /// Session id from `existing`, or the next id for this device when `existing` is `None`.
+    pub(crate) fn session_id(&self, existing: Option<u32>) -> u32 {
+        if let Some(id) = existing {
+            return id;
+        }
+        let now = block_time();
+        subjective_tx! {
+            DeviceTable::new().allocate_session(self.device(), now)
+        }
+    }
+
+    pub(crate) fn session_value(&self, session: u32, key: &[u8]) -> Option<Vec<u8>> {
         let now = block_time();
         let value = {
             subjective_tx! {
@@ -54,7 +65,7 @@ impl DeviceKv {
 
     pub(crate) fn apply_batch(
         &self,
-        session: Option<&[u8]>,
+        session: Option<u32>,
         ops: Vec<BatchOp>,
     ) -> Result<(), HttpStatus> {
         use Duration::*;
@@ -126,7 +137,7 @@ impl DeviceKv {
         persistent: &KvTable,
         sessions: &SessionKvTable,
         store: &[u8],
-        session: Option<&[u8]>,
+        session: Option<u32>,
         op: &BatchOp,
     ) -> Option<Vec<u8>> {
         match op.duration {

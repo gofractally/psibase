@@ -13,7 +13,7 @@ mod tables;
 
 #[psibase::service(name = "hostdb", tables = "tables::tables")]
 mod service {
-    use crate::http::{HostDbRequest, Route};
+    use crate::http::{BatchSession, HostDbRequest, Route};
     use crate::kv::DeviceKv;
     use psibase::services::http_server::Wrapper as HttpServer;
     use psibase::*;
@@ -33,9 +33,9 @@ mod service {
     /// | Cookie | Description |
     /// |--------|-------------|
     /// | `__Host-HOSTDB-DEVICE` | 32-byte device id (hex); minted when absent; scopes all keys |
-    /// | `__Host-HOSTDB-SESSION` | 16-byte session id (hex); minted when absent on session-scoped routes; scopes session keys |
+    /// | `__Host-HOSTDB-SESSION` | decimal session id from the device's counter; minted when absent on session-scoped routes; scopes session keys |
     ///
-    /// - A device or session cookie with bad hex or length yields `400` on routes that use that cookie.
+    /// - A device cookie with bad hex or length, or a session cookie that is not a decimal integer without leading zeros, yields `400` on routes that use that cookie.
     /// - A missing device cookie causes a new device id to be minted.
     /// - A missing session cookie is minted only for `GET /kv/session/...` or batch ops with `"duration":"session"`,
     /// - Accepted ids (valid cookie or freshly minted) are sent back in `Set-Cookie`.
@@ -94,16 +94,22 @@ mod service {
             }
             Route::GetPersistent(key) => Ok(reply.finish_with_body(kv.persistent_value(&key))),
             Route::GetSession(key) => {
-                let session = req
-                    .required_session()
-                    .map_err(|status| reply.set_status(status))?;
+                let session = kv.session_id(
+                    req.session_cookie()
+                        .map_err(|status| reply.set_status(status))?,
+                );
                 reply.set_session(session);
                 Ok(reply.finish_with_body(kv.session_value(session, &key)))
             }
             Route::PostBatch(ops) => {
-                let session = req
+                let session = match req
                     .batch_session(&ops)
-                    .map_err(|status| reply.set_status(status))?;
+                    .map_err(|status| reply.set_status(status))?
+                {
+                    BatchSession::NotNeeded => None,
+                    BatchSession::Absent => Some(kv.session_id(None)),
+                    BatchSession::Present(id) => Some(id),
+                };
                 if let Some(session) = session {
                     reply.set_session(session);
                 }

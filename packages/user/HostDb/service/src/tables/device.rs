@@ -8,6 +8,7 @@ impl DeviceRow {
             device: device.to_vec(),
             last_seen: now,
             store: store.to_vec(),
+            next_session: 1,
         }
     }
 
@@ -16,6 +17,7 @@ impl DeviceRow {
             device,
             last_seen: self.last_seen,
             store: self.store.clone(),
+            next_session: self.next_session,
         }
     }
 
@@ -31,23 +33,39 @@ impl DeviceTable {
         self.get_index(0).get(&device).map(|row| row.store)
     }
 
+    /// The stored device row, creating it on first sight.
+    fn ensure_row(&self, device: &[u8], now: TimePointSec) -> DeviceRow {
+        if let Some(row) = self.get_index(0).get(&device) {
+            return row;
+        }
+        let row = DeviceRow::new(device, now, &random_bytes(STORE_PREFIX_LEN));
+        self.put(&row).unwrap();
+        row
+    }
+
+    /// Returns the next session id for `device` and advances the counter.
+    /// Creates the device row on first sight.
+    pub(crate) fn allocate_session(&self, device: &[u8], now: TimePointSec) -> u32 {
+        let mut row = self.ensure_row(device, now);
+        let id = row.next_session;
+        row.next_session = row
+            .next_session
+            .checked_add(1)
+            .expect("session counter overflow");
+        row.last_seen = now;
+        self.put(&row).unwrap();
+        id
+    }
+
     /// Returns `device`'s store prefix, creating it on first sight.
     /// Rewrites `last_seen` when it differs from `now`.
     pub(crate) fn touch_store(&self, device: &[u8], now: TimePointSec) -> Vec<u8> {
-        match self.get_index(0).get(&device) {
-            Some(mut row) => {
-                if row.last_seen != now {
-                    row.last_seen = now;
-                    self.put(&row).unwrap();
-                }
-                row.store
-            }
-            None => {
-                let store = random_bytes(STORE_PREFIX_LEN);
-                self.put(&DeviceRow::new(device, now, &store)).unwrap();
-                store
-            }
+        let mut row = self.ensure_row(device, now);
+        if row.last_seen != now {
+            row.last_seen = now;
+            self.put(&row).unwrap();
         }
+        row.store
     }
 
     /// Deletes up to `GC_LIMIT` persistent rows of idle devices, oldest first.

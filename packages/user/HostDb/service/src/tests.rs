@@ -3,7 +3,7 @@ mod tests {
     use crate::batch::Duration::{self, *};
     use crate::policy::{
         DEVICE_COOKIE, DEVICE_ID_LEN, DEVICE_RETENTION_SECS, KEY_LEN, SESSION_COOKIE,
-        SESSION_ID_LEN, SESSION_RETENTION_SECS,
+        SESSION_RETENTION_SECS,
     };
     use base64::engine::general_purpose::STANDARD;
     use base64::Engine;
@@ -25,11 +25,11 @@ mod tests {
     }
 
     fn session_a() -> String {
-        fill_hex(0x33, SESSION_ID_LEN)
+        "1".into()
     }
 
     fn session_b() -> String {
-        fill_hex(0x44, SESSION_ID_LEN)
+        "2".into()
     }
 
     fn storage_key() -> String {
@@ -397,8 +397,7 @@ mod tests {
         // A session read with no session cookie mints one.
         let minted_session = get(&chain, &session_target, Some(ORIGIN), Some(&cookie))?;
         assert_status(&minted_session, HttpStatus::NotFound);
-        let minted_session_id = require_cookie(&minted_session, SESSION_COOKIE);
-        assert_eq!(minted_session_id.len(), SESSION_ID_LEN * 2);
+        require_cookie(&minted_session, SESSION_COOKIE);
         let session_header = set_cookie_header(&minted_session, SESSION_COOKIE);
         assert_cookie_attrs(session_header);
 
@@ -451,9 +450,57 @@ mod tests {
         let minted_write = post_store(&chain, &cookie, Session, &key, &encode(b"minted"))?;
         assert_status(&minted_write, HttpStatus::NoContent);
         let minted_write_id = require_cookie(&minted_write, SESSION_COOKIE);
-        assert_eq!(minted_write_id.len(), SESSION_ID_LEN * 2);
         let minted_cookie = cookies(&device, Some(minted_write_id));
         assert_stored(&chain, Session, &minted_cookie, &key, b"minted")?;
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("HostDb"))]
+    fn session_ids(chain: Chain) -> Result<(), Error> {
+        chain.start_block();
+        let key = storage_key();
+        let device = cookies(&device_a(), None);
+        let other_device = cookies(&device_b(), None);
+
+        let first = post_store(&chain, &device, Session, &key, &encode(b"first"))?;
+        assert_status(&first, HttpStatus::NoContent);
+        assert_eq!(require_cookie(&first, SESSION_COOKIE), "1");
+
+        let second = post_store(&chain, &device, Session, &key, &encode(b"second"))?;
+        assert_status(&second, HttpStatus::NoContent);
+        assert_eq!(require_cookie(&second, SESSION_COOKIE), "2");
+        assert_stored(
+            &chain,
+            Session,
+            &cookies(&device_a(), Some("1")),
+            &key,
+            b"first",
+        )?;
+        assert_stored(
+            &chain,
+            Session,
+            &cookies(&device_a(), Some("2")),
+            &key,
+            b"second",
+        )?;
+
+        let other = post_store(&chain, &other_device, Session, &key, &encode(b"other"))?;
+        assert_status(&other, HttpStatus::NoContent);
+        assert_eq!(require_cookie(&other, SESSION_COOKIE), "1");
+        assert_stored(
+            &chain,
+            Session,
+            &cookies(&device_b(), Some("1")),
+            &key,
+            b"other",
+        )?;
+        assert_stored(
+            &chain,
+            Session,
+            &cookies(&device_a(), Some("1")),
+            &key,
+            b"first",
+        )?;
         Ok(())
     }
 

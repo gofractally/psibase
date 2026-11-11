@@ -4,7 +4,6 @@ pub(crate) const DEVICE_COOKIE: &str = "__Host-HOSTDB-DEVICE";
 pub(crate) const SESSION_COOKIE: &str = "__Host-HOSTDB-SESSION";
 
 pub(crate) const DEVICE_ID_LEN: usize = 32;
-pub(crate) const SESSION_ID_LEN: usize = 16;
 
 /// Storage key length (32-byte HMAC digest on the wire as hex).
 pub(crate) const KEY_LEN: usize = 32;

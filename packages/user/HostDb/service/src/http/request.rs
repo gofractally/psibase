@@ -2,7 +2,7 @@ use psibase::HttpStatus::{BadRequest, Forbidden};
 use psibase::*;
 
 use crate::batch::{batch_ops_from_body, decode_fixed_hex, BatchOp, Duration};
-use crate::policy::{DEVICE_COOKIE, DEVICE_ID_LEN, KEY_LEN, SESSION_COOKIE, SESSION_ID_LEN};
+use crate::policy::{DEVICE_COOKIE, DEVICE_ID_LEN, KEY_LEN, SESSION_COOKIE};
 
 use super::reply::HostDbReply;
 
@@ -19,15 +19,24 @@ pub(crate) enum Route {
     NotFound,
 }
 
-enum CookieValue {
-    Id(Vec<u8>),
+enum CookieLookup<'a> {
+    Value(&'a str),
     Missing,
     Malformed,
 }
 
+/// How a batch should scope session storage.
+#[derive(Copy, Clone)]
+pub(crate) enum BatchSession {
+    NotNeeded,
+    Absent,
+    Present(u32),
+}
+
+#[derive(Copy, Clone)]
 enum SessionState {
     Absent,
-    Valid(Vec<u8>),
+    Valid(u32),
     Malformed,
 }
 
@@ -58,11 +67,7 @@ impl<'a> HostDbRequest<'a> {
     }
 
     fn new(http: &'a HttpRequest, device: Vec<u8>) -> Result<Self, HttpStatus> {
-        let session = match Self::cookie_id::<SESSION_ID_LEN>(http, SESSION_COOKIE) {
-            CookieValue::Id(id) => SessionState::Valid(id),
-            CookieValue::Missing => SessionState::Absent,
-            CookieValue::Malformed => SessionState::Malformed,
-        };
+        let session = Self::session_state(http);
         let route = parse_route(http)?;
         Ok(Self {
             http,
@@ -84,61 +89,71 @@ impl<'a> HostDbRequest<'a> {
         std::mem::replace(&mut self.route, Route::NotFound)
     }
 
-    /// Session id for session-scoped routes; mints when the cookie was absent.
-    pub(crate) fn required_session(&mut self) -> Result<&[u8], HttpStatus> {
-        if matches!(self.session, SessionState::Absent) {
-            self.session = SessionState::Valid(random_bytes(SESSION_ID_LEN));
-        }
-        match &self.session {
-            SessionState::Valid(id) => Ok(id),
+    /// `Some(id)` when the session cookie is present, `None` when it is absent.
+    pub(crate) fn session_cookie(&self) -> Result<Option<u32>, HttpStatus> {
+        match self.session {
+            SessionState::Valid(id) => Ok(Some(id)),
+            SessionState::Absent => Ok(None),
             SessionState::Malformed => Err(BadRequest),
-            SessionState::Absent => unreachable!(),
         }
     }
 
-    /// `Some(session)` when `ops` include session-scoped work; mints when needed.
-    pub(crate) fn batch_session(&mut self, ops: &[BatchOp]) -> Result<Option<&[u8]>, HttpStatus> {
-        if ops.iter().any(|op| op.duration == Duration::Session) {
-            self.required_session().map(Some)
-        } else {
-            Ok(None)
+    pub(crate) fn batch_session(&self, ops: &[BatchOp]) -> Result<BatchSession, HttpStatus> {
+        if !ops.iter().any(|op| op.duration == Duration::Session) {
+            return Ok(BatchSession::NotNeeded);
+        }
+        match self.session_cookie()? {
+            None => Ok(BatchSession::Absent),
+            Some(id) => Ok(BatchSession::Present(id)),
         }
     }
 
     fn device_id(http: &HttpRequest) -> Option<Vec<u8>> {
-        Self::cookie_or_mint::<DEVICE_ID_LEN>(http, DEVICE_COOKIE)
-    }
-
-    fn cookie_or_mint<const N: usize>(http: &HttpRequest, name: &str) -> Option<Vec<u8>> {
-        match Self::cookie_id::<N>(http, name) {
-            CookieValue::Id(id) => Some(id),
-            CookieValue::Missing => Some(random_bytes(N)),
-            CookieValue::Malformed => None,
+        match Self::cookie_value(http, DEVICE_COOKIE) {
+            CookieLookup::Value(value) => decode_fixed_hex::<DEVICE_ID_LEN>(value),
+            CookieLookup::Missing => Some(random_bytes(DEVICE_ID_LEN)),
+            CookieLookup::Malformed => None,
         }
     }
 
-    fn cookie_id<const N: usize>(http: &HttpRequest, name: &str) -> CookieValue {
+    fn session_state(http: &HttpRequest) -> SessionState {
+        match Self::cookie_value(http, SESSION_COOKIE) {
+            CookieLookup::Missing => SessionState::Absent,
+            CookieLookup::Malformed => SessionState::Malformed,
+            CookieLookup::Value(value) => match parse_session_id(value) {
+                Some(id) => SessionState::Valid(id),
+                None => SessionState::Malformed,
+            },
+        }
+    }
+
+    fn cookie_value<'b>(http: &'b HttpRequest, name: &str) -> CookieLookup<'b> {
         let mut found = None;
         for part in http.cookies() {
             let Ok((cookie_name, value)) = part else {
-                return CookieValue::Malformed;
+                return CookieLookup::Malformed;
             };
             if cookie_name != name {
                 continue;
             }
             if found.is_some() {
-                return CookieValue::Malformed;
+                return CookieLookup::Malformed;
             }
             found = Some(value);
         }
         match found {
-            None => CookieValue::Missing,
-            Some(value) => match decode_fixed_hex::<N>(value) {
-                Some(id) => CookieValue::Id(id),
-                None => CookieValue::Malformed,
-            },
+            Some(value) => CookieLookup::Value(value),
+            None => CookieLookup::Missing,
         }
     }
+}
+
+/// Decimal `u32` with no leading zeros.
+fn parse_session_id(value: &str) -> Option<u32> {
+    if value.len() > 1 && value.starts_with('0') {
+        return None;
+    }
+    value.parse().ok()
 }
 
 fn is_storage_path(path: &str) -> bool {

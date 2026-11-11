@@ -24,7 +24,7 @@ pub mod tables {
     #[derive(Pack, Unpack, ToSchema)]
     pub struct SessionKvRow {
         pub store: Vec<u8>,
-        pub session: Vec<u8>,
+        pub session: u32,
         pub key: Vec<u8>,
         pub value: Vec<u8>,
         pub last_access: TimePointSec,
@@ -32,16 +32,16 @@ pub mod tables {
 
     impl SessionKvRow {
         #[primary_key]
-        fn by_store_session_key(&self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-            (self.store.clone(), self.session.clone(), self.key.clone())
+        fn by_store_session_key(&self) -> (Vec<u8>, u32, Vec<u8>) {
+            (self.store.clone(), self.session, self.key.clone())
         }
 
         #[secondary_key(1)]
-        fn by_last_access(&self) -> (TimePointSec, Vec<u8>, Vec<u8>, Vec<u8>) {
+        fn by_last_access(&self) -> (TimePointSec, Vec<u8>, u32, Vec<u8>) {
             (
                 self.last_access,
                 self.store.clone(),
-                self.session.clone(),
+                self.session,
                 self.key.clone(),
             )
         }
@@ -53,6 +53,7 @@ pub mod tables {
         pub device: Vec<u8>,
         pub last_seen: TimePointSec,
         pub store: Vec<u8>,
+        pub next_session: u32,
     }
 
     impl DeviceRow {

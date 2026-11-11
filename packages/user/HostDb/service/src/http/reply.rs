@@ -24,7 +24,7 @@ impl HostDbReply {
         self.headers.push(device_set_cookie(device));
     }
 
-    pub(crate) fn set_session(&mut self, session: &[u8]) {
+    pub(crate) fn set_session(&mut self, session: u32) {
         self.headers.push(session_set_cookie(session));
     }
 
@@ -64,10 +64,10 @@ fn device_set_cookie(device: &[u8]) -> HttpHeader {
     )
 }
 
-fn session_set_cookie(session: &[u8]) -> HttpHeader {
+fn session_set_cookie(session: u32) -> HttpHeader {
     HttpHeader::new(
         "Set-Cookie",
-        &format!("{SESSION_COOKIE}={}; {COOKIE_ATTRS}", hex_encode(session)),
+        &format!("{SESSION_COOKIE}={session}; {COOKIE_ATTRS}"),
     )
 }
 
