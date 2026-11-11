@@ -514,7 +514,7 @@ mod service {
     /// * `image`       - Image bytes, at most `MAX_ICON_SIZE` bytes
     /// * `contentType` - Image type (see `image_content_type`). PNG, JPEG, and WebP are allowed.
     #[action]
-    fn setIcon(token_id: TID, image: Vec<u8>, contentType: ImgContentType) {
+    fn setIcon(token_id: TID, image: crate::Hex<Vec<u8>>, contentType: ImgContentType) {
         unimplemented!()
     }
 

@@ -128,7 +128,7 @@ impl Issuer for TokensPlugin {
             .filter(|content_type| is_icon_content_type(*content_type))
             .ok_or_else(|| ErrorType::InvalidIconContentType(icon.content_type.clone()))?;
 
-        Tokens::add_to_tx().setIcon(token_id, icon.content, content_type);
+        Tokens::add_to_tx().setIcon(token_id, icon.content.into(), content_type);
         Ok(())
     }
 

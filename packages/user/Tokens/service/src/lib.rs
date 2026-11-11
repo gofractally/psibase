@@ -236,19 +236,17 @@ pub mod service {
     /// * `image`       - Image bytes, at most `MAX_ICON_SIZE` bytes
     /// * `contentType` - Image type (see `image_content_type`). PNG, JPEG, and WebP are allowed.
     #[action]
-    fn setIcon(token_id: TID, image: Vec<u8>, contentType: ImgContentType) {
+    fn setIcon(token_id: TID, image: Hex<Vec<u8>>, contentType: ImgContentType) {
         Token::get_assert(token_id).check_is_owner(get_sender());
         assert!(
             image.len() <= MAX_ICON_SIZE,
             "Icon exceeds max size of {MAX_ICON_SIZE} bytes"
         );
-        let Some(mime) =
-            image_content_type::mime(contentType).filter(|_| is_icon_content_type(contentType))
-        else {
-            abort_message("Icon content type not allowed");
-        };
+        let mime = image_content_type::mime(contentType)
+            .filter(|_| is_icon_content_type(contentType))
+            .expect("Icon content type not allowed");
 
-        Sites::call().storeSys(icon_path(token_id), mime.to_string(), None, Hex(image));
+        Sites::call().storeSys(icon_path(token_id), mime.to_string(), None, image);
 
         Wrapper::emit().history().configured(
             token_id,

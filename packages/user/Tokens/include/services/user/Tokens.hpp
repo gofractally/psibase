@@ -119,7 +119,7 @@ namespace UserService
       /// * `tokenId`     - Unique token identifier
       /// * `image`       - Image bytes, at most 32 KiB
       /// * `contentType` - Image type: 0 = PNG, 1 = JPEG, 2 = WebP
-      void setIcon(TID tokenId, std::vector<uint8_t> image, uint8_t contentType);
+      void setIcon(TID tokenId, std::vector<char> image, uint8_t contentType);
 
       /// Removes the icon of a token. Only the token owner can remove the icon.
       ///

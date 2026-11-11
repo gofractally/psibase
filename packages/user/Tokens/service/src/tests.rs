@@ -596,26 +596,26 @@ mod tests {
 
         // Only the token owner can set or remove the icon
         assert_error(
-            b.setIcon(tid, icon.clone(), PNG),
+            b.setIcon(tid, icon.clone().into(), PNG),
             "Missing required authority",
         );
 
         assert_error(
-            a.setIcon(tid, vec![0; MAX_ICON_SIZE + 1], PNG),
+            a.setIcon(tid, vec![0; MAX_ICON_SIZE + 1].into(), PNG),
             "Icon exceeds max size",
         );
         assert_error(
-            a.setIcon(tid, icon.clone(), GIF),
+            a.setIcon(tid, icon.clone().into(), GIF),
             "Icon content type not allowed",
         );
         assert_error(
-            a.setIcon(tid, icon.clone(), 99),
+            a.setIcon(tid, icon.clone().into(), 99),
             "Icon content type not allowed",
         );
         assert_error(a.removeIcon(tid), "Token has no icon");
         assert_eq!(get_icon_url(&chain, tid)?, None);
 
-        a.setIcon(tid, icon.clone(), PNG).get()?;
+        a.setIcon(tid, icon.clone().into(), PNG).get()?;
         let reply = chain.get(Wrapper::SERVICE, &target)?;
         assert_eq!(reply.status, 200);
         assert_eq!(reply.contentType, "image/png");
@@ -625,7 +625,7 @@ mod tests {
         assert!(url.starts_with(&format!("{target}?v=")), "{url}");
 
         // The versioned URL changes when the icon changes
-        a.setIcon(tid, vec![4, 5, 6], WEBP).get()?;
+        a.setIcon(tid, vec![4, 5, 6].into(), WEBP).get()?;
         assert_eq!(
             chain.get(Wrapper::SERVICE, &target)?.contentType,
             "image/webp"
