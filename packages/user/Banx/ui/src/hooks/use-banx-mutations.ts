@@ -39,6 +39,8 @@ export function useInvalidateLedger() {
         });
         void qc.invalidateQueries({ queryKey: QueryKey.invites(user) });
         void qc.invalidateQueries({ queryKey: ["banx", "cashQuotes"] });
+        void qc.invalidateQueries({ queryKey: ["banx", "banxRelays"] });
+        void qc.invalidateQueries({ queryKey: ["banx", "tokenRelays"] });
         void qc.invalidateQueries({
             queryKey: QueryKey.cashVault(user),
         });
@@ -1091,6 +1093,108 @@ export function useConvert() {
         onSuccess: () => {
             invalidate();
             toast.success("Convert succeeded");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetRelay() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetA: number;
+            assetB: number;
+            reserveA: string;
+            reserveB: string;
+            feePpm: number;
+        }) =>
+            banxCall("setRelay", [
+                p.assetA,
+                p.assetB,
+                p.reserveA,
+                p.reserveB,
+                p.feePpm,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Relay posted");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveRelay() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetA: number; assetB: number }) =>
+            banxCall("removeRelay", [p.assetA, p.assetB]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Relay removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useSetTokenRelay() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            assetId: number;
+            tokenId: number;
+            reserveBanx: string;
+            feePpm: number;
+        }) =>
+            banxCall("setTokenRelay", [
+                p.assetId,
+                p.tokenId,
+                p.reserveBanx,
+                p.feePpm,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Token relay posted");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function useRemoveTokenRelay() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: { assetId: number; tokenId: number }) =>
+            banxCall("removeTokenRelay", [p.assetId, p.tokenId]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Token relay removed");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
+export function usePathCash() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            hops: { account: string; assetId: number }[];
+            amount: string;
+            tokenId: number;
+            recipient: string;
+            minTokens: string;
+        }) =>
+            banxCall("pathCash", [
+                p.hops.map((h) => ({
+                    account: h.account,
+                    assetId: h.assetId,
+                })),
+                p.amount,
+                p.tokenId,
+                p.recipient,
+                p.minTokens,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Swap succeeded");
         },
         onError: (e: Error) => toast.error(e.message),
     });

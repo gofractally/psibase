@@ -18,6 +18,10 @@ export const QueryKey = {
         ["banx", "currencyPolicies", account ?? ""] as const,
     cashQuotes: (poster: string | null | undefined) =>
         ["banx", "cashQuotes", poster ?? "*"] as const,
+    banxRelays: (owner: string | null | undefined) =>
+        ["banx", "banxRelays", owner ?? "*"] as const,
+    tokenRelays: (owner: string | null | undefined) =>
+        ["banx", "tokenRelays", owner ?? "*"] as const,
     cashVault: (account: string | null | undefined) =>
         ["banx", "cashVault", account ?? ""] as const,
     tokenPrecision: (tokenId: number) =>

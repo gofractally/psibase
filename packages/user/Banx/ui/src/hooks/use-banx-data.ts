@@ -6,8 +6,10 @@ import {
     fetchActivityFeed,
     fetchActivityWith,
     fetchBookAuths,
+    fetchBanxRelays,
     fetchCashQuotes,
     fetchCashVault,
+    fetchTokenRelays,
     fetchCreditLines,
     fetchNetworkLines,
     fetchNetworkForwardOffers,
@@ -21,9 +23,11 @@ import {
     fetchTokenPrecision,
     type ActivityEvent,
     type BanxInvite,
+    type BanxRelay,
     type BookAuth,
     type CashQuote,
     type CashVault,
+    type TokenRelay,
     type ClaimOffer,
     type CreditLine,
     type CurrencyPolicy,
@@ -177,6 +181,32 @@ export function useCashQuotes(
         queryKey: QueryKey.cashQuotes(key),
         queryFn: () => fetchCashQuotes(all ? undefined : poster ?? undefined),
         enabled: all || !!poster?.trim(),
+    });
+}
+
+/** Constant-product Banx relays. Omit `owner` for every relay. */
+export function useBanxRelays(
+    owner?: string | null,
+): UseQueryResult<BanxRelay[], Error> {
+    const all = owner === undefined;
+    const key = all ? "*" : (owner ?? "");
+    return useQuery({
+        queryKey: QueryKey.banxRelays(key),
+        queryFn: () => fetchBanxRelays(all ? undefined : owner ?? undefined),
+        enabled: all || !!owner?.trim(),
+    });
+}
+
+/** Banx↔token relays. Omit `owner` for every relay. */
+export function useTokenRelays(
+    owner?: string | null,
+): UseQueryResult<TokenRelay[], Error> {
+    const all = owner === undefined;
+    const key = all ? "*" : (owner ?? "");
+    return useQuery({
+        queryKey: QueryKey.tokenRelays(key),
+        queryFn: () => fetchTokenRelays(all ? undefined : owner ?? undefined),
+        enabled: all || !!owner?.trim(),
     });
 }
 

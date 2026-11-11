@@ -10,6 +10,7 @@ import { NetworkPage } from "@/pages/network";
 import { ObligationsPage } from "@/pages/obligations";
 import { PayeesPage } from "@/pages/payees";
 import { PoliciesPage } from "@/pages/policies";
+import { RelaysPage } from "@/pages/relays";
 import { RequestsPage } from "@/pages/requests";
 
 function withGate(page: React.ReactNode) {
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
             { path: "requests", element: withGate(<RequestsPage />) },
             { path: "cash", element: withGate(<CashPage />) },
             { path: "policies", element: withGate(<PoliciesPage />) },
+            { path: "relays", element: withGate(<RelaysPage />) },
             { path: "assets", element: <Navigate to="/accounts" replace /> },
         ],
     },

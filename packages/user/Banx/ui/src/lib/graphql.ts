@@ -94,6 +94,24 @@ const zCashVault = z.object({
     balance: z.string(),
 });
 
+const zBanxRelay = z.object({
+    owner: z.string(),
+    assetLo: z.number(),
+    assetHi: z.number(),
+    reserveLo: z.string(),
+    reserveHi: z.string(),
+    feePpm: z.number(),
+});
+
+const zTokenRelay = z.object({
+    owner: z.string(),
+    assetId: z.number(),
+    tokenId: z.number(),
+    reserveBanx: z.string(),
+    tokenReserve: z.string(),
+    feePpm: z.number(),
+});
+
 const zCurrencyPolicy = z.object({
     poster: z.string(),
     debtor: z.string().optional(),
@@ -172,6 +190,8 @@ export type ClaimOffer = z.infer<typeof zClaimOffer>;
 export type BuyClaimOffer = ClaimOffer;
 export type CashQuote = z.infer<typeof zCashQuote>;
 export type CashVault = z.infer<typeof zCashVault>;
+export type BanxRelay = z.infer<typeof zBanxRelay>;
+export type TokenRelay = z.infer<typeof zTokenRelay>;
 export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
 export type PayRequest = z.infer<typeof zPayRequest>;
 export type PayAuth = z.infer<typeof zPayAuth>;
@@ -310,6 +330,26 @@ export async function fetchCashQuotes(poster?: string): Promise<CashQuote[]> {
         `{ cashQuotes${arg} { ${cashQuoteFields} } }`,
     );
     return zCashQuote.array().parse(data.cashQuotes);
+}
+
+const banxRelayFields = `owner assetLo assetHi reserveLo reserveHi feePpm`;
+
+export async function fetchBanxRelays(owner?: string): Promise<BanxRelay[]> {
+    const arg = owner?.trim() ? `(owner: "${owner.trim()}")` : "";
+    const data = await gql<{ banxRelays: BanxRelay[] }>(
+        `{ banxRelays${arg} { ${banxRelayFields} } }`,
+    );
+    return zBanxRelay.array().parse(data.banxRelays);
+}
+
+const tokenRelayFields = `owner assetId tokenId reserveBanx tokenReserve feePpm`;
+
+export async function fetchTokenRelays(owner?: string): Promise<TokenRelay[]> {
+    const arg = owner?.trim() ? `(owner: "${owner.trim()}")` : "";
+    const data = await gql<{ tokenRelays: TokenRelay[] }>(
+        `{ tokenRelays${arg} { ${tokenRelayFields} } }`,
+    );
+    return zTokenRelay.array().parse(data.tokenRelays);
 }
 
 export async function fetchCashVault(poster: string): Promise<CashVault[]> {

@@ -912,20 +912,23 @@ mod service {
             }
         }
 
-        async fn banxRelays(&self, owner: AccountNumber) -> Vec<BanxRelayView> {
+        /// Constant-product Banx relays. Omit `owner` for every relay.
+        async fn banxRelays(&self, owner: Option<AccountNumber>) -> Vec<BanxRelayView> {
             BanxRelayTable::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
-                .filter(|r| r.owner == owner)
+                .filter(|r| owner.map(|o| r.owner == o).unwrap_or(true))
                 .map(BanxRelayView::from_row)
                 .collect()
         }
 
-        async fn tokenRelays(&self, owner: AccountNumber) -> Vec<TokenRelayView> {
+        /// Banx↔token relays. Omit `owner` for every relay.
+        /// `tokenReserve` is the live vault `{owner}/{token_id}`.
+        async fn tokenRelays(&self, owner: Option<AccountNumber>) -> Vec<TokenRelayView> {
             TokenRelayTable::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
-                .filter(|r| r.owner == owner)
+                .filter(|r| owner.map(|o| r.owner == o).unwrap_or(true))
                 .map(|r| {
                     let tokens = cash_vault_balance(r.owner, r.token_id);
                     TokenRelayView {
