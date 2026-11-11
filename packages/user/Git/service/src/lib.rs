@@ -195,9 +195,9 @@ pub mod service {
         false
     }
 
-    /// Check every object reachable from `tips` is stored, not descending
-    /// into anything in `stop` (existing ref tips of this repo, whose
-    /// closure was checked when they were written).
+    /// Check every object needed to materialize `tips` is stored, not
+    /// descending into anything in `stop` (existing ref tips). Commit parents
+    /// are not walked (`is_ancestor` covers history on non-create updates).
     fn check_closure(tips: &[String], stop: &HashSet<String>) {
         let mut seen: HashSet<String> = HashSet::new();
         let mut q: VecDeque<String> = tips.iter().cloned().collect();
@@ -211,10 +211,7 @@ pub mod service {
                 Kind::Tree => {
                     q.extend(gitobj::tree_entries(&o.content).unwrap_or_else(|e| fail(&e)))
                 }
-                Kind::Commit => {
-                    q.extend(gitobj::commit_tree(&o.content));
-                    q.extend(gitobj::commit_parents(&o.content));
-                }
+                Kind::Commit => q.extend(gitobj::commit_tree(&o.content)),
                 Kind::Tag => q.extend(gitobj::tag_target(&o.content)),
             }
         }
@@ -340,7 +337,7 @@ pub mod service {
         table.erase(&(owner, name, id));
     }
 
-    /// Store zlib loose objects. Each is inflated, size-capped (1 MiB per
+    /// Store zlib loose objects. Each is inflated, size-capped (2.5 MiB per
     /// object), hashed, and stored under its computed id.
     #[action]
     #[allow(non_snake_case)]

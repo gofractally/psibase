@@ -7,11 +7,11 @@
 //! `transact.<root>/push_transaction`.
 //!
 //! Account and key, first match wins:
-//! 1. `PSIBASE_GIT_ACCOUNT` / `PSIBASE_GIT_KEY` environment variables
-//! 2. git config `psibase.account` / `psibase.key`
-//! 3. `~/.psibase.toml` section `[git.<name>]`, where `<name>` is the
+//! 1. git config `psibase.account` / `psibase.key`
+//! 2. `~/.psibase.toml` section `[git.<name>]`, where `<name>` is the
 //!    `[hosts]` alias whose URL matches the remote's root URL, or the
 //!    remote's `host[:port]`
+//! 3. `PSIBASE_GIT_ACCOUNT` / `PSIBASE_GIT_KEY` environment variables
 //! The account defaults to the repo owner. The key is a key reference, not
 //! key material: a PEM/DER private key file path or a PKCS #11 URI, parsed by
 //! the same code as `psibase push --sign` (`AnyPrivateKey::from_str`, i.e.
@@ -33,9 +33,10 @@ use std::str::FromStr;
 use url::Url;
 
 const ZERO_OID: &str = "0000000000000000000000000000000000000000";
-const MAX_OBJECT_SIZE: usize = 1024 * 1024;
-/// Keep each transaction well under the 8 MiB soft block budget.
-const MAX_TX_BYTES: usize = 3 * 1024 * 1024;
+const MAX_OBJECT_SIZE: usize = 2560 * 1024;
+/// Keep each putObjects action small enough for the WASM CPU budget.
+/// Large first imports (thousands of objects) time out at ~1–3 MiB/action.
+const MAX_TX_BYTES: usize = 256 * 1024;
 
 #[derive(Pack)]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -178,17 +179,9 @@ fn psibase_toml() -> Option<toml::Value> {
 }
 
 fn signer(remote: &Remote) -> Result<Signer> {
-    let mut account = std::env::var("PSIBASE_GIT_ACCOUNT")
-        .ok()
-        .filter(|s| !s.is_empty());
-    let mut key = std::env::var("PSIBASE_GIT_KEY")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .map(|k| (k, "PSIBASE_GIT_KEY"));
-    account = account.or_else(|| git_config("psibase.account"));
-    key = key.or_else(|| {
-        git_config_typed("psibase.key", Some("--type=path")).map(|k| (k, "git config psibase.key"))
-    });
+    let mut account = git_config("psibase.account");
+    let mut key =
+        git_config_typed("psibase.key", Some("--type=path")).map(|k| (k, "git config psibase.key"));
     if account.is_none() || key.is_none() {
         if let Some(cfg) = psibase_toml() {
             let root = remote.root.as_str().trim_end_matches('/');
@@ -211,18 +204,31 @@ fn signer(remote: &Remote) -> Result<Signer> {
                         account = sec
                             .get("account")
                             .and_then(|v| v.as_str())
+                            .filter(|s| !s.is_empty() && *s != "CHANGE_ME")
                             .map(String::from);
                     }
                     if key.is_none() {
                         key = sec
                             .get("key")
                             .and_then(|v| v.as_str())
+                            .filter(|s| !s.is_empty() && *s != "CHANGE_ME")
                             .map(|k| (relative_to_home(k), "~/.psibase.toml [git.<host>] key"));
                     }
                     break;
                 }
             }
         }
+    }
+    if account.is_none() {
+        account = std::env::var("PSIBASE_GIT_ACCOUNT")
+            .ok()
+            .filter(|s| !s.is_empty());
+    }
+    if key.is_none() {
+        key = std::env::var("PSIBASE_GIT_KEY")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(|k| (k, "PSIBASE_GIT_KEY"));
     }
     let account = match account {
         Some(a) => AccountNumber::from_str(&a).map_err(|e| anyhow!("bad account {a}: {e}"))?,
@@ -391,7 +397,7 @@ fn new_objects(new: &[String], remote_tips: &[String]) -> Result<Vec<(String, St
         content.pop();
         if size > MAX_OBJECT_SIZE {
             bail!(
-                "{} {} ({} bytes) exceeds the 1 MiB per-object limit; track it with `git lfs track {}`",
+                "{} {} ({} bytes) exceeds the 2.5 MiB per-object limit; track it with `git lfs track {}`",
                 parts[1],
                 if path.is_empty() { &oid } else { &path },
                 size,
@@ -417,7 +423,7 @@ async fn submit(
     let now: TimePointSec = chrono::Utc::now().into();
     let trx = Transaction {
         tapos: Tapos {
-            expiration: now + Seconds::new(10),
+            expiration: now + Seconds::new(60),
             refBlockSuffix: tapos.ref_block_suffix,
             flags: 0,
             refBlockIndex: tapos.ref_block_index,
@@ -506,7 +512,7 @@ fn load_key(reference: &str, source: &str) -> Result<AnyPrivateKey> {
 async fn push(remote: &Remote, specs: &[String]) -> Result<Vec<(String, Result<(), String>)>> {
     let s = signer(remote)?;
     let (key, source) = s.key.clone().ok_or_else(|| {
-        anyhow!("no signing key: set PSIBASE_GIT_KEY, git config psibase.key, or [git.<host>] key in ~/.psibase.toml (a PEM/DER key file or pkcs11: URI)")
+        anyhow!("no signing key: set [git.<host>] key in ~/.psibase.toml (install.sh seeds that file), git config psibase.key, or PSIBASE_GIT_KEY (a PEM/DER key file or pkcs11: URI)")
     })?;
     let keys = vec![load_key(&key, source)?];
     // A repo that does not exist yet is created by the first push.

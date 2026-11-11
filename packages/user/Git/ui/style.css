@@ -1,13 +1,25 @@
 :root {
   color-scheme: light;
-  --fg: #1a1a1a;
-  --muted: #5a5a5a;
-  --border: #c8c8c8;
-  --bg: #f6f4ef;
-  --card: #fff;
-  --accent: #0b5fff;
-  --danger: #a11;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--foreground);
+  background: var(--background);
 }
 
 * {
@@ -16,115 +28,167 @@
 
 body {
   margin: 0;
-  background: linear-gradient(180deg, #ebe6da 0%, var(--bg) 40%, #e4ece8 100%);
-  color: var(--fg);
   min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 3.5rem;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.auth {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-label {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
 }
 
 main {
-  max-width: 52rem;
+  max-width: 42rem;
   margin: 0 auto;
-  padding: 2rem 1.25rem 4rem;
+  padding: 1.5rem 1.25rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.35rem 1.35rem;
 }
 
 h1,
 h2 {
-  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: 1.125rem;
   font-weight: 600;
-  margin: 0 0 0.5rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.35rem;
 }
 
 .lede,
 .note,
 .status {
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-
-.install,
-.prs {
-  background: var(--card);
-  border: 1px solid var(--border);
-  padding: 1.25rem 1.35rem 1.4rem;
-  margin-bottom: 1.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  margin: 0.35rem 0 0;
 }
 
 .copy-row {
   display: flex;
   gap: 0.5rem;
-  margin: 0.75rem 0 0.5rem;
+  margin: 0.85rem 0 0.35rem;
 }
 
 .copy-row input {
   flex: 1;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.85rem;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--border);
-  background: #fafafa;
-}
-
-button,
-.select-like {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: #eee;
-  padding: 0.55rem 0.85rem;
-}
-
-button:hover {
-  background: #e4e4e4;
-}
-
-button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-button.danger {
-  color: var(--danger);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
 }
 
 .grid {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   align-items: end;
-  margin: 1rem 0;
-}
-
-.login-row {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.user-label {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.95rem;
-  color: var(--fg);
+  margin: 1rem 0 0;
 }
 
 label {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  font-size: 0.85rem;
-  color: var(--muted);
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
 }
 
 input,
 select {
   font: inherit;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--fg);
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.45rem 0.65rem;
+  height: 2rem;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+.btn:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 40%, transparent);
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:hover {
+  background: color-mix(in oklch, var(--primary) 85%, white);
+}
+
+.btn-outline {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+.btn-outline:hover {
+  background: var(--muted);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.btn-danger {
+  background: color-mix(in oklch, var(--destructive) 12%, white);
+  color: var(--destructive);
+  border-color: color-mix(in oklch, var(--destructive) 25%, transparent);
+}
+
+.btn-danger:hover {
+  background: color-mix(in oklch, var(--destructive) 20%, white);
 }
 
 .pr-list {
@@ -144,8 +208,8 @@ select {
 }
 
 .pr-meta {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
 }
 
 .pr-actions {
@@ -159,14 +223,20 @@ select {
 }
 
 .status.error {
-  color: var(--danger);
+  color: var(--destructive);
 }
 
 code {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 0.9em;
 }
 
 a {
-  color: var(--accent);
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  opacity: 0.8;
 }

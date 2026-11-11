@@ -110,10 +110,84 @@ if [ "$HOST" = 1 ]; then
     say "  psibase-git-host --api $ROOT --repo-dir $PREFIX/share/psibase-git/repos"
 fi
 
+# Seed ~/.psibase.toml so pushes read account/key from disk, not the environment.
+ensure_psibase_toml() {
+    [ -n "${HOME:-}" ] || die "HOME is not set; cannot write ~/.psibase.toml"
+    cfg="$HOME/.psibase.toml"
+    root_norm=$(printf '%s' "$ROOT" | sed 's|/*$||')
+    alias=""
+    if [ -f "$cfg" ]; then
+        # Prefer an existing [hosts] alias whose URL matches this chain.
+        alias=$(awk -v want="$root_norm" '
+            /^\[hosts\]/ { in_hosts=1; next }
+            /^\[/ { in_hosts=0 }
+            in_hosts && $0 ~ /^[[:space:]]*[A-Za-z0-9_-]+[[:space:]]*=/ {
+                line=$0
+                sub(/#.*/, "", line)
+                eq = index(line, "=")
+                if (eq < 1) next
+                name = substr(line, 1, eq - 1)
+                url = substr(line, eq + 1)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", url)
+                gsub(/^["'\'']|["'\'']$/, "", url)
+                sub(/\/$/, "", url)
+                if (url == want) { print name; exit }
+            }
+        ' "$cfg")
+    fi
+    if [ -z "$alias" ]; then
+        alias=local
+        n=1
+        while [ -f "$cfg" ] && grep -qE "^[[:space:]]*${alias}[[:space:]]*=" "$cfg" 2>/dev/null; do
+            alias="local$n"
+            n=$((n + 1))
+        done
+        if [ ! -f "$cfg" ]; then
+            printf '[hosts]\n%s = "%s/"\n' "$alias" "$root_norm" >"$cfg"
+        elif grep -q '^\[hosts\]' "$cfg"; then
+            # Insert the alias immediately after the [hosts] header.
+            tmp=$(mktemp)
+            awk -v name="$alias" -v url="$root_norm/" '
+                BEGIN { done=0 }
+                { print }
+                /^\[hosts\]/ && !done {
+                    printf "%s = \"%s\"\n", name, url
+                    done=1
+                }
+                END {
+                    if (!done) printf "\n[hosts]\n%s = \"%s\"\n", name, url
+                }
+            ' "$cfg" >"$tmp"
+            mv -f "$tmp" "$cfg"
+        else
+            printf '\n[hosts]\n%s = "%s/"\n' "$alias" "$root_norm" >>"$cfg"
+        fi
+        say "added [hosts].$alias = $root_norm/ to $cfg"
+    fi
+    if ! grep -qE "^\[git\.${alias}\]" "$cfg" 2>/dev/null; then
+        cat >>"$cfg" <<EOF
+
+[git.${alias}]
+account = "CHANGE_ME"
+key = "CHANGE_ME"
+EOF
+        say "added [git.$alias] placeholders to $cfg"
+    fi
+    say "set account and key under [git.$alias] in $cfg (key = path to a PEM/DER file or a pkcs11: URI)"
+}
+
+ensure_psibase_toml
+
+path_ok=1
 case ":${PATH:-}:" in
-    *":$BIN:"*) say "done; use remotes like psibase::$ROOT/<owner>/<repo>" ;;
-    *)
-        say "$BIN is not on PATH, so git cannot find git-remote-psibase yet. Add:"
-        say "  export PATH=\"$BIN:\$PATH\""
-        exit 1 ;;
+    *":$BIN:"*) ;;
+    *) path_ok=0 ;;
 esac
+if [ "$path_ok" = 1 ]; then
+    say "done; use remotes like psibase::$ROOT/<owner>/<repo>"
+else
+    say "$BIN is not on PATH, so git cannot find git-remote-psibase yet. Add:"
+    say "  export PATH=\"$BIN:\$PATH\""
+    exit 1
+fi

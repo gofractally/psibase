@@ -3,17 +3,29 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>git on psibase</title>
+    <title>Git</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
+    <header class="topbar">
+      <div class="brand">Git</div>
+      <div class="auth">
+        <span id="user-label" class="user-label" hidden></span>
+        <button type="button" id="login" class="btn">Log in</button>
+      </div>
+    </header>
+
     <main>
-      <section class="install" aria-labelledby="install-heading">
+      <section class="card" aria-labelledby="install-heading">
         <h1 id="install-heading">Install</h1>
-        <p class="lede">Install the <code>git-remote-psibase</code> helper for this chain.</p>
+        <p class="lede">
+          Install the <code>git-remote-psibase</code> helper for this chain.
+        </p>
         <div class="copy-row">
           <input id="install-cmd" type="text" readonly spellcheck="false" />
-          <button type="button" id="copy-install">Copy</button>
+          <button type="button" id="copy-install" class="btn btn-outline">
+            Copy
+          </button>
         </div>
         <p class="note">
           Inspect the script first:
@@ -22,17 +34,17 @@
         </p>
       </section>
 
-      <section class="prs" aria-labelledby="prs-heading">
+      <section class="card" aria-labelledby="prs-heading">
         <h2 id="prs-heading">Pull requests</h2>
 
-        <div class="auth grid">
-          <div class="login-row">
-            <span id="user-label" class="user-label">Not logged in</span>
-            <button type="button" id="login">Login</button>
-          </div>
+        <div class="grid">
           <label>
             Author
-            <input id="author" type="text" placeholder="Name &lt;email&gt; (optional)" />
+            <input
+              id="author"
+              type="text"
+              placeholder="Name &lt;email&gt; (optional)"
+            />
           </label>
         </div>
 
@@ -41,7 +53,9 @@
             Repo
             <select id="repo"></select>
           </label>
-          <button type="button" id="refresh">Refresh</button>
+          <button type="button" id="refresh" class="btn btn-outline">
+            Refresh
+          </button>
         </div>
 
         <form id="open-form" class="open-form grid">
@@ -53,7 +67,7 @@
             Source
             <select id="source" required></select>
           </label>
-          <button type="submit">Open PR</button>
+          <button type="submit" class="btn btn-primary">Open PR</button>
         </form>
 
         <ul id="pr-list" class="pr-list"></ul>

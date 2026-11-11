@@ -11,7 +11,7 @@ Assumes chain up at `http://psibase.localhost:8080/` with `Git` installed. Work 
   - `openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out ~/alice.pem`
 - Leave `psibase/` (direnv unload drops PATH exports — set these in the new shell/cwd):
   - `export PATH="$HOME/.local/bin:$PATH"`
-  - `export PSIBASE_GIT_ACCOUNT=alice PSIBASE_GIT_KEY=$HOME/alice.pem`
+  - Edit `~/.psibase.toml`: under the `[git.<alias>]` block that `install.sh` added for this chain, set `account = "alice"` and `key = "alice.pem"` (path relative to `$HOME`, or absolute)
   - `mkdir -p ~/mike-notes && cd ~/mike-notes`
 - Init + first commit + push:
   - `git init -b main`
@@ -265,7 +265,7 @@ Helper operations, the ones git actually calls:
 
 Signing and posting use the same path as `psibase push`: build the actions, sign with the `--sign` key, `POST` the packed bytes to `/push_transaction` as `application/octet-stream`. Decided: the helper links the `psibase` CLI's signing code in-process as a shared Rust crate. It does not spawn the `psibase` binary, for objects or for anything else. Spawning is a poor fit for objects anyway, because the CLI's JSON action file carries either schema-shaped JSON or hex `rawData`. The helper is one statically linked binary.
 
-The key setting is a key reference, never key material: a PEM or DER private key file path, or a PKCS #11 URI. The helper passes it to `AnyPrivateKey::from_str`, which is the parser behind `psibase push --sign` (`psibase::load_private_key`). That parser reads a `pkcs11:` URI as a token object and anything else as a file path: PEM with label `PRIVATE KEY`, else DER PKCS #8. It never parses the string as a key. Sources, first match wins: `PSIBASE_GIT_KEY`, then `git config psibase.key` (read with `--type=path`, so `~/` expands), then `key` in the `[git.<host>]` section of `~/.psibase.toml` (a relative path there is relative to `$HOME`). A load error names the source.
+The key setting is a key reference, never key material: a PEM or DER private key file path, or a PKCS #11 URI. The helper passes it to `AnyPrivateKey::from_str`, which is the parser behind `psibase push --sign` (`psibase::load_private_key`). That parser reads a `pkcs11:` URI as a token object and anything else as a file path: PEM with label `PRIVATE KEY`, else DER PKCS #8. It never parses the string as a key. Sources, first match wins: `git config psibase.key` (read with `--type=path`, so `~/` expands), then `key` in the `[git.<host>]` section of `~/.psibase.toml` (a relative path there is relative to `$HOME`), then optional `PSIBASE_GIT_KEY`. A load error names the source.
 
 PKCS #11 and the static release binary do not mix. The `cryptoki` crate loads the token module with `dlopen`, and a static musl binary has no dynamic loader. The release helper refuses a `pkcs11:` key with that explanation. A helper built from source with `cargo build -p git-remote-psibase` (dynamically linked) supports PKCS #11. Open decision: ship a second, dynamically linked build for hardware-token users, or accept file keys only in the installed helper.
 
@@ -300,7 +300,7 @@ These are properties of the chain, not of git.
 - A packed block has a hard ceiling of 16 MiB in triedent. When resource monitoring is off, `RTransact` also stops adding transactions once the current block reaches a soft budget of 8 MiB.
 - One `HttpReply` is a single buffer. There is no streamed body. That is fine, because v1 never builds a pack.
 
-Each object is capped at 1 MiB (inflated size), and `putObjects` rejects anything larger. The cap applies to each object, not to a push or the transport. A push can carry an 800 KiB object plus many tiny ones. The helper spreads objects across as many `putObjects` transactions as it needs to stay inside the block budget. That rules out large binaries. Source trees of small files are the intended contents.
+Each object is capped at 2.5 MiB (inflated size), and `putObjects` rejects anything larger. The cap applies to each object, not to a push or the transport. A push can carry an 800 KiB object plus many tiny ones. The helper spreads objects across as many `putObjects` transactions as it needs to stay inside the block budget. That rules out large binaries. Source trees of small files are the intended contents.
 
 The reachability walk in `updateRefs` has to finish inside the transaction's CPU budget. A first import of a repo with a long history is many `putObjects` transactions and one `updateRefs` that walks only the newly reachable set. If that walk is too expensive for one transaction, the import has to land as several ref moves (push an intermediate commit, then a later one), not as one jump from empty to a huge tip. The helper can do that when a single `updateRefs` fails for resource limits.
 
@@ -336,7 +336,7 @@ Not used in v1: libgit2, gitoxide, `git-http-backend`, Radicle. Those matter for
 > - Oids are stored and passed as 40-char lowercase hex strings, not 20 raw bytes.
 > - The reachability walk in `updateRefs` stops at any oid that is already a ref tip in the same repo (its closure was checked when that ref was written), instead of computing the full set reachable from the old tips.
 > - The helper posts the final `updateRefs` transaction with `wait_for=final`, not `applied`, because HTTP queries read committed state and an immediate second push would otherwise see stale refs and lose the compare-and-swap. Earlier `putObjects` transactions use `applied`. Batches are capped at about 3 MiB of compressed objects per transaction.
-> - Helper account and key lookup order: `PSIBASE_GIT_ACCOUNT` / `PSIBASE_GIT_KEY`, then git config `psibase.account` / `psibase.key`, then `~/.psibase.toml` `[git.<name>]` where `<name>` is the `[hosts]` alias whose URL matches the remote root, or the remote's `host:port`. Account defaults to the repo owner. The node comes from the remote URL itself, not `-a`/`PSINODE_URL`.
+> - Helper account and key lookup order: git config `psibase.account` / `psibase.key`, then `~/.psibase.toml` `[git.<name>]` where `<name>` is the `[hosts]` alias whose URL matches the remote root, or the remote's `host:port`, then optional `PSIBASE_GIT_ACCOUNT` / `PSIBASE_GIT_KEY`. Account defaults to the repo owner. The node comes from the remote URL itself, not `-a`/`PSINODE_URL`.
 > - Tests are `packages/user/Git/test/git_e2e.py`, run against a live local psinode rather than the service tester.
 
 ## The other instantiation
@@ -406,7 +406,7 @@ Cons
 
 Pros
 
-- The on-chain service shrinks to repo rows, writer rows, and ref ids. No object table, no inflate, no reachability walk, no 1 MiB chunking.
+- The on-chain service shrinks to repo rows, writer rows, and ref ids. No object table, no inflate, no reachability walk, no 2.5 MiB chunking.
 - The sidecar shells out to git (or links libgit2) and gets the pack protocol, deltas, and thin packs from that code.
 - `x-git` is a small local package: the subjective list of hosted repos. It is not on the data path of clone or push.
 
@@ -459,6 +459,7 @@ The script is the whole installer. It does not hand off to a package manager.
 - It requires `git` on `PATH` and exits with that message if it is missing. It does not install git.
 - It selects a release tarball from the OS and architecture (`linux` `x86_64` and `linux` `aarch64` only; macOS is not in the first release), downloads the tarball and its SHA-256 checksum, and checks the checksum before extracting.
 - It installs `git-remote-psibase` into `<prefix>/bin`. Git finds remote helpers by name on `PATH`, so if that directory is not on `PATH` the script prints the export line and stops short of claiming success.
+- It seeds `~/.psibase.toml`: a `[hosts]` alias for this chain's root URL, and a `[git.<alias>]` block with `account` / `key` placeholders (`CHANGE_ME`). Existing matching host aliases and git sections are left alone. The helper reads those values on push (no env vars required).
 - The helper signs and posts transactions itself, with the in-process signing crate and the same key formats as `psibase push --sign`. The script does not install the `psibase` CLI and does not need it.
 - `--host` also installs `psibase-git-host` into the same `bin`. It does not start it, enable a service unit, or open a port. It prints the run command: `psibase-git-host --api http://<root> --repo-dir <prefix>/share/psibase-git/repos`.
 - Re-running the script replaces the binaries at the same paths.
@@ -471,7 +472,7 @@ On-chain git as above, with large files moved to Git LFS on a server the user ch
 
 - Each repo row carries an optional LFS endpoint URL. The API key for that server never goes on chain. It lives in the user's local git config or credential helper, and `git-lfs` sends it to the LFS server directly.
 - The chain stores only small LFS pointer files (oid and size). The bytes live on the user's LFS server. Psibase does not host, bill, or replicate them.
-- `putObjects` rejects any object whose inflated size is over 1 MiB. This is a per-object cap, not a per-push limit. Anything larger has to be tracked by LFS. The helper checks this before signing. When a staged blob is over the limit and is not an LFS pointer, it fails with a message naming the file and the `git lfs track` command to fix it.
+- `putObjects` rejects any object whose inflated size is over 2.5 MiB. This is a per-object cap, not a per-push limit. Anything larger has to be tracked by LFS. The helper checks this before signing. When a staged blob is over the limit and is not an LFS pointer, it fails with a message naming the file and the `git lfs track` command to fix it.
 - Clone and fetch still work with stock git plus `git-lfs`. Without LFS access, a clone gets the source tree and the pointer files, but not the large files.
 
 This keeps every on-chain object well inside the transaction budget in [Size limits](#size-limits). Media and binaries stay off the chain, and no node has to run storage infrastructure. The tradeoff is that large files are only as available as the user's LFS server. They are not covered by consensus.
@@ -541,19 +542,18 @@ Decided: Supervisor Login, same pattern as other apps (Homepage, Tokens, etc.).
 
 To the user, the git CLI looks like a typical git CLI: `git init`, `git clone`, `git fetch`, `git push` against a `psibase::` remote. The first `git push` to a repo that does not exist yet creates it on chain (see [Bootstrapping a new repo](#bootstrapping-a-new-repo)).
 
-One-time setup is editing `~/.psibase.toml`. For each host, it sets a default account and a default key. The key is a reference, a PEM or DER private key file path or a PKCS #11 URI. The file never holds raw key bytes. The node comes from `-a` or `PSINODE_URL`, which defaults to the local node (`http://psibase.localhost:8080/`). Named hosts are saved in the same file (`psibase config set hosts.<name> <url>`).
+One-time setup after `install.sh` is editing `~/.psibase.toml`. The installer adds a `[hosts]` alias for the chain you installed from and a matching `[git.<alias>]` with placeholders. Set `account` and `key` there. The key is a reference, a PEM or DER private key file path or a PKCS #11 URI — never raw key bytes. A relative key path is relative to `$HOME`.
 
 ```toml
 [hosts]
 prod = "https://prod.example.com"
 
-# new: per-host defaults for the git helper
 [git.prod]
 account = "alice"
 key = "pkcs11:token=...;object=..."   # or a path to a PEM/DER key file
 ```
 
-The remote URL lives in normal git config as a `psibase::` URL (`git remote add origin psibase::https://prod.example.com/alice/notes.git`), so git itself stores the host and repo. Git cannot pass extra flags to a remote helper, so `git-remote-psibase` picks up the account and key from `~/.psibase.toml` or the environment.
+The remote URL lives in normal git config as a `psibase::` URL (`git remote add origin psibase::https://prod.example.com/alice/notes.git`), so git itself stores the host and repo. Git cannot pass extra flags to a remote helper, so `git-remote-psibase` picks up the account and key from git config, then `~/.psibase.toml`, then (optional override) `PSIBASE_GIT_*` env vars.
 
 Signing reuses the existing `psibase` CLI signing code, linked into the helper as a shared Rust crate, which already signs with a key file or a PKCS #11 token (`--sign`). Node-local keys in `x-keys` are out of scope for now.
 

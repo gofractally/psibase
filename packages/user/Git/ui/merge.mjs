@@ -31,28 +31,37 @@ export async function flattenTree(fetchObj, treeOid, prefix = "") {
   return map;
 }
 
-/** Best common ancestor (first found by BFS from a intersecting ancestors of b). */
+/**
+ * Best common ancestor via interleaved BFS from both tips.
+ * Stops at the first commit reachable from both; does not preload either side's
+ * full history (needed when the on-chain object store is incomplete).
+ */
 export async function mergeBase(fetchObj, a, b) {
-  const ancestors = new Set();
-  const qb = [b];
-  while (qb.length) {
-    const c = qb.shift();
-    if (ancestors.has(c)) continue;
-    ancestors.add(c);
-    const obj = await fetchObj(c);
-    if (obj.kind !== "commit") continue;
-    qb.push(...commitParents(obj.content));
-  }
+  if (a === b) return a;
+  const fromA = new Set([a]);
+  const fromB = new Set([b]);
   const qa = [a];
-  const seen = new Set();
-  while (qa.length) {
-    const c = qa.shift();
-    if (seen.has(c)) continue;
-    seen.add(c);
-    if (ancestors.has(c)) return c;
+  const qb = [b];
+
+  async function expand(queue, mine, other) {
+    if (!queue.length) return null;
+    const c = queue.shift();
     const obj = await fetchObj(c);
-    if (obj.kind !== "commit") continue;
-    qa.push(...commitParents(obj.content));
+    if (obj.kind !== "commit") return null;
+    for (const p of commitParents(obj.content)) {
+      if (other.has(p)) return p;
+      if (!mine.has(p)) {
+        mine.add(p);
+        queue.push(p);
+      }
+    }
+    return null;
+  }
+
+  while (qa.length || qb.length) {
+    const hit =
+      (await expand(qa, fromA, fromB)) || (await expand(qb, fromB, fromA));
+    if (hit) return hit;
   }
   return null;
 }

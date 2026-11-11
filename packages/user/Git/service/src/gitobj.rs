@@ -3,7 +3,7 @@
 use sha1::{Digest, Sha1};
 
 /// Maximum inflated size of a single object (header + content).
-pub const MAX_OBJECT_SIZE: usize = 1024 * 1024;
+pub const MAX_OBJECT_SIZE: usize = 2560 * 1024;
 
 pub const ZERO_OID: &str = "0000000000000000000000000000000000000000";
 
@@ -37,7 +37,7 @@ pub fn is_oid(s: &str) -> bool {
 /// Inflate a zlib loose object, enforcing the size cap on the inflated bytes.
 pub fn inflate(data: &[u8]) -> Result<Vec<u8>, String> {
     miniz_oxide::inflate::decompress_to_vec_zlib_with_limit(data, MAX_OBJECT_SIZE + 64)
-        .map_err(|e| format!("bad zlib stream or object exceeds 1 MiB: {:?}", e.status))
+        .map_err(|e| format!("bad zlib stream or object exceeds 2.5 MiB: {:?}", e.status))
 }
 
 /// Parse `type SP size NUL content`, check the cap, return (oid, object).
@@ -56,7 +56,7 @@ pub fn decode(data: &[u8]) -> Result<(String, Object), String> {
     }
     if size > MAX_OBJECT_SIZE {
         return Err(format!(
-            "object is {} bytes; limit is 1 MiB per object",
+            "object is {} bytes; limit is 2.5 MiB per object",
             size
         ));
     }

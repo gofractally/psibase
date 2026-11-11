@@ -299,11 +299,11 @@ def _():
     assert p.returncode != 0 and "mismatch" in (p.stdout + p.stderr), p.stdout + p.stderr
 
 
-@test("object over 1 MiB (inflated) is rejected; 800 KiB object plus small ones accepted")
+@test("object over 2.5 MiB (inflated) is rejected; 800 KiB object plus small ones accepted")
 def _():
-    oid, data = loose("blob", b"\0" * (1024 * 1024 + 1))
+    oid, data = loose("blob", b"\0" * (2560 * 1024 + 1))
     p = push_actions(AK, [act(alice, "putObjects", {"owner": alice, "name": REPO, "objects": [{"oid": oid, "data": data}]})], check=False)
-    assert p.returncode != 0 and "1 MiB" in (p.stdout + p.stderr), p.stdout + p.stderr
+    assert p.returncode != 0 and "2.5 MiB" in (p.stdout + p.stderr), p.stdout + p.stderr
     objs = [loose("blob", b"y" * (800 * 1024))] + [loose("blob", f"tiny{i}\n".encode()) for i in range(50)]
     push_actions(AK, [act(alice, "putObjects", {"owner": alice, "name": REPO,
                                               "objects": [{"oid": o, "data": d} for o, d in objs]})])
@@ -311,13 +311,13 @@ def _():
     assert st == 200
 
 
-@test("helper refuses a >1 MiB file before signing, naming the file")
+@test("helper refuses a >2.5 MiB file before signing, naming the file")
 def _():
     d = os.path.join(WORK, "big")
     run("git", "clone", "-q", HELPER_URL, d)
     env = git_env(alice, AK)
     with open(os.path.join(d, "big.bin"), "wb") as fh:
-        fh.write(os.urandom(1024 * 1024 + 10))
+        fh.write(os.urandom(2560 * 1024 + 10))
     run("git", "add", "big.bin", cwd=d)
     run("git", "commit", "-qm", "big", cwd=d, env=env)
     p = run("git", "push", "origin", "main", cwd=d, env=env, check=False)

@@ -52,11 +52,15 @@ async function refreshUser() {
   const label = $("user-label");
   const btn = $("login");
   if (user) {
+    label.hidden = false;
     label.textContent = user;
-    btn.textContent = "Logout";
+    btn.textContent = "Log out";
+    btn.classList.add("btn-outline");
   } else {
-    label.textContent = "Not logged in";
-    btn.textContent = "Login";
+    label.hidden = true;
+    label.textContent = "";
+    btn.textContent = "Log in";
+    btn.classList.remove("btn-outline");
   }
   return user;
 }
@@ -72,6 +76,7 @@ async function toggleLogin() {
       params: [],
     });
   } else {
+    const returnPath = `${window.location.pathname}${window.location.search}${window.location.hash}` || "/";
     await supervisor.functionCall(
       {
         service: "host",
@@ -80,7 +85,7 @@ async function toggleLogin() {
         method: "connectAccount",
         params: [],
       },
-      { enabled: true, returnPath: "/" },
+      { enabled: true, returnPath },
     );
   }
   await refreshUser();
@@ -159,12 +164,12 @@ async function loadRefsAndPrs() {
     actions.className = "pr-actions";
     const mergeBtn = document.createElement("button");
     mergeBtn.type = "button";
-    mergeBtn.className = "primary";
+    mergeBtn.className = "btn btn-primary";
     mergeBtn.textContent = "Merge";
     mergeBtn.addEventListener("click", () => doMerge(pr).catch(showErr));
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
-    closeBtn.className = "danger";
+    closeBtn.className = "btn btn-danger";
     closeBtn.textContent = "Close";
     closeBtn.addEventListener("click", () => doClose(pr).catch(showErr));
     actions.append(mergeBtn, closeBtn);
