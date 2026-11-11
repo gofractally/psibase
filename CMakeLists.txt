@@ -1369,7 +1369,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps and a single-provider private system token."
     PACKAGE_DEPENDS Accounts Aes AuthNone AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Events Explorer Homepage Host HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
+                    Docs DiffAdjust Events Explorer Homepage Host HostDb HostLoginPrompt HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry ReservedNames
                     Sites SetCode StagedTx Supervisor Symbol Tokens NameMarket TokenSwap Transact VirtualServer WebCrypto Workshop WsAuth SingleProd
 )
 
