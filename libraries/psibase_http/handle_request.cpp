@@ -1,4 +1,5 @@
 #include "http_session_base.hpp"
+#include "reply_headers.hpp"
 #include "websocket.hpp"
 #include "websocket_log_session.hpp"
 
@@ -444,10 +445,10 @@ namespace psibase::http
                                  // Connection may contain additional tokens besides websocket
                                  rep.set(bhttp::field::connection, h.value);
                               }
+                              else if (h.matches("set-cookie"))
+                                 mergeSetCookie(rep, h);
                               else
-                              {
                                  rep.insert(h.name, h.value);
-                              }
                            }
                         }));
              });
@@ -833,9 +834,8 @@ namespace psibase::http
                    res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
                    for (auto& h : reply.headers)
                    {
-                      // Each Set-Cookie is its own header, so a response can carry more than one.
                       if (h.matches("set-cookie"))
-                         res.insert(h.name, h.value);
+                         mergeSetCookie(res, h);
                       else
                          res.set(h.name, h.value);
                    }
