@@ -108,29 +108,27 @@ impl HttpRequest {
             .map(|h| h.value.as_str())
     }
 
-    /// Parses the first `Cookie` header into trimmed pairs or [`CookiePart::Malformed`].
-    pub fn cookies(&self) -> impl Iterator<Item = CookiePart<'_>> + '_ {
+    /// Parses the first `Cookie` header into trimmed name/value pairs or [`CookieError`].
+    pub fn cookies(&self) -> impl Iterator<Item = Result<(&str, &str), CookieError>> + '_ {
         self.get_header("cookie")
             .into_iter()
             .flat_map(|value| value.split(';').map(parse_cookie_segment))
     }
 }
 
-/// One name/value pair from a `Cookie` header, or a malformed segment.
-#[derive(Debug, PartialEq, Eq)]
-pub enum CookiePart<'a> {
-    Pair { name: &'a str, value: &'a str },
-    Malformed,
-}
+/// A `Cookie` header segment that is not a cookie-pair.
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub struct CookieError;
 
-fn parse_cookie_segment(segment: &str) -> CookiePart<'_> {
-    segment
-        .trim()
-        .split_once('=')
-        .map_or(CookiePart::Malformed, |(name, value)| CookiePart::Pair {
-            name: name.trim(),
-            value: value.trim(),
-        })
+fn parse_cookie_segment(segment: &str) -> Result<(&str, &str), CookieError> {
+    let Some((name, value)) = segment.trim().split_once('=') else {
+        return Err(CookieError);
+    };
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(CookieError);
+    }
+    Ok((name, value.trim()))
 }
 
 pub struct HttpBody {
@@ -252,34 +250,25 @@ pub fn root_host(req: &HttpRequest, host_is_subdomain: bool) -> &str {
     }
 }
 
-pub fn service_origin_str<'a>(
-    origin: &'a str,
-    account: AccountNumber,
-    root_host: &str,
-) -> Option<&'a str> {
-    Origin::new(origin)
-        .is_service(root_host, account)
-        .then_some(origin)
-}
-
-pub fn subdomain_origin_str<'a>(origin: &'a str, root_host: &str) -> Option<&'a str> {
-    Origin::new(origin)
-        .is_subdomain(root_host)
-        .then_some(origin)
-}
-
+/// The `Origin` header when it is `account`'s service origin on `root_host`.
 pub fn service_origin<'a>(
     req: &'a HttpRequest,
     account: AccountNumber,
     root_host: &str,
 ) -> Option<&'a str> {
-    req.get_header("origin")
-        .and_then(|origin| service_origin_str(origin, account, root_host))
+    req.get_header("origin").and_then(|origin| {
+        Origin::new(origin)
+            .is_service(root_host, account)
+            .then_some(origin)
+    })
 }
 
-pub fn subdomain_origin<'a>(req: &'a HttpRequest, root_host: &str) -> Option<&'a str> {
-    req.get_header("origin")
-        .and_then(|origin| subdomain_origin_str(origin, root_host))
+fn subdomain_origin<'a>(req: &'a HttpRequest, root_host: &str) -> Option<&'a str> {
+    req.get_header("origin").and_then(|origin| {
+        Origin::new(origin)
+            .is_subdomain(root_host)
+            .then_some(origin)
+    })
 }
 
 pub fn allow_cors_for_account(
@@ -310,69 +299,31 @@ pub fn allow_cors_with_origin(origin: &str) -> Vec<HttpHeader> {
 mod tests {
     use super::*;
 
-    fn cookie_parts(request: &HttpRequest) -> Vec<CookiePart<'_>> {
-        request.cookies().collect()
-    }
-
     #[test]
     fn cookies() {
         let cases = [
             (
                 vec![HttpHeader::new("Cookie", "foo=10; bar=27; session=xxx")],
-                vec![
-                    CookiePart::Pair {
-                        name: "foo",
-                        value: "10",
-                    },
-                    CookiePart::Pair {
-                        name: "bar",
-                        value: "27",
-                    },
-                    CookiePart::Pair {
-                        name: "session",
-                        value: "xxx",
-                    },
-                ],
+                vec![Ok(("foo", "10")), Ok(("bar", "27")), Ok(("session", "xxx"))],
             ),
             (
                 vec![
                     HttpHeader::new("CooKiE", "foo=10; bar=27"),
                     HttpHeader::new("cookie", "bar=7"),
                 ],
-                vec![
-                    CookiePart::Pair {
-                        name: "foo",
-                        value: "10",
-                    },
-                    CookiePart::Pair {
-                        name: "bar",
-                        value: "27",
-                    },
-                ],
+                vec![Ok(("foo", "10")), Ok(("bar", "27"))],
             ),
             (
                 vec![HttpHeader::new("cookie", "  foo = 10 ; ; bar=27  ")],
-                vec![
-                    CookiePart::Pair {
-                        name: "foo",
-                        value: "10",
-                    },
-                    CookiePart::Malformed,
-                    CookiePart::Pair {
-                        name: "bar",
-                        value: "27",
-                    },
-                ],
+                vec![Ok(("foo", "10")), Err(CookieError), Ok(("bar", "27"))],
             ),
             (
                 vec![HttpHeader::new("cookie", "foo=10; badsegment")],
-                vec![
-                    CookiePart::Pair {
-                        name: "foo",
-                        value: "10",
-                    },
-                    CookiePart::Malformed,
-                ],
+                vec![Ok(("foo", "10")), Err(CookieError)],
+            ),
+            (
+                vec![HttpHeader::new("cookie", "=foo;   =bar; baz=")],
+                vec![Err(CookieError), Err(CookieError), Ok(("baz", ""))],
             ),
         ];
         for (headers, expected) in cases {
@@ -380,7 +331,7 @@ mod tests {
                 headers,
                 ..Default::default()
             };
-            assert_eq!(cookie_parts(&request), expected);
+            assert_eq!(request.cookies().collect::<Vec<_>>(), expected);
         }
     }
 }

@@ -120,19 +120,16 @@ impl<'a> HostDbRequest<'a> {
     fn cookie_id<const N: usize>(http: &HttpRequest, name: &str) -> CookieValue {
         let mut found = None;
         for part in http.cookies() {
-            match part {
-                CookiePart::Malformed => return CookieValue::Malformed,
-                CookiePart::Pair {
-                    name: cookie_name,
-                    value,
-                } if cookie_name == name => {
-                    if found.is_some() {
-                        return CookieValue::Malformed;
-                    }
-                    found = Some(value);
-                }
-                _ => {}
+            let Ok((cookie_name, value)) = part else {
+                return CookieValue::Malformed;
+            };
+            if cookie_name != name {
+                continue;
             }
+            if found.is_some() {
+                return CookieValue::Malformed;
+            }
+            found = Some(value);
         }
         match found {
             None => CookieValue::Missing,
