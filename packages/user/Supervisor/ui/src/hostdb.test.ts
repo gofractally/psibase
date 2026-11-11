@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpResponse } from "./host-interface";
-import { HostDb, sha256Hex } from "./hostdb";
+import { HostDb, loadHostDbCookies, sha256Hex } from "./hostdb";
 
 const HEX_KEY = "a".repeat(64);
 const PLAINTEXT_KEY = "non-trx:accounts:contacts:alice";
@@ -156,5 +156,55 @@ describe("HostDb flush", () => {
                 expected: expectedHash,
             },
         ]);
+    });
+});
+
+describe("loadHostDbCookies", () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+    let lockRequest: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+        fetchMock = vi.fn();
+        vi.stubGlobal("fetch", fetchMock);
+
+        let tail: Promise<unknown> = Promise.resolve();
+        lockRequest = vi.fn((_name: string, callback: () => Promise<void>) => {
+            const run = tail.then(() => callback());
+            tail = run.then(
+                () => undefined,
+                () => undefined,
+            );
+            return run;
+        });
+        vi.stubGlobal("navigator", { locks: { request: lockRequest } });
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("holds one exclusive lock until a credentialed session read finishes", async () => {
+        let releaseFirst: (response: Response) => void = () => {};
+        const first = new Promise<Response>((resolve) => {
+            releaseFirst = resolve;
+        });
+        fetchMock.mockImplementationOnce(() => first);
+        fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
+
+        const both = Promise.all([loadHostDbCookies(), loadHostDbCookies()]);
+        await vi.waitFor(() => {
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        });
+        const [url, init] = fetchMock.mock.calls[0];
+        expect(url).toMatch(/\/kv\/session\/0{64}$/);
+        expect(init).toEqual({ credentials: "include" });
+        expect(lockRequest.mock.calls.map((call) => call[0])).toEqual([
+            "hostdb-device",
+            "hostdb-device",
+        ]);
+
+        releaseFirst(new Response(null, { status: 404 }));
+        await both;
+        expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 });

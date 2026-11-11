@@ -47,6 +47,27 @@ async function postBatch(body: string): Promise<void> {
     }
 }
 
+const HOSTDB_COOKIE_LOCK = "hostdb-device";
+
+// Valid storage key. This read ignores the stored value.
+const HOSTDB_COOKIE_READ_KEY = "0".repeat(64);
+
+// Holds one exclusive lock across supervisor tabs until a credentialed
+//   session read finishes. A 404 still applies the device and session cookies.
+export async function loadHostDbCookies(): Promise<void> {
+    await navigator.locks.request(HOSTDB_COOKIE_LOCK, async () => {
+        const url = siblingUrl(
+            null,
+            "hostdb",
+            `/kv/session/${HOSTDB_COOKIE_READ_KEY}`,
+        );
+        const res = await fetch(url, { credentials: "include" });
+        if (res.status !== 200 && res.status !== 404) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+    });
+}
+
 function storagePath(duration: Duration, key: string): string {
     return `${duration}/${key}`;
 }
