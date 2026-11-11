@@ -5,13 +5,14 @@ import { NavLink, Outlet, useMatch, useSearchParams } from "react-router-dom";
 import {
     type Token,
     useUserTokenBalances,
+    useUserTokensWithActivity,
+    zeroBalanceToken,
 } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
 
 import { Loading } from "@/components/loading";
 import { PageHeader } from "@/components/page-header";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
 
 import { TokenBalances } from "./components/token-balances";
@@ -63,6 +64,8 @@ const WalletTabs = ({ pendingCount }: { pendingCount: number }) => (
 
 export const TokensLayout = () => {
     const isSwap = useMatch("/tokens/swap") !== null;
+    const isPendingTab =
+        useMatch({ path: "/tokens/Pending", end: false }) !== null;
     const { data: currentUserData, isSuccess } = useCurrentUser();
     const { data, isLoading: isLoadingBalances } =
         useUserTokenBalances(currentUserData);
@@ -81,42 +84,37 @@ export const TokensLayout = () => {
         [pending, currentUser],
     );
 
-    // Tokens with an incoming transfer but no balance yet are listed with a zero balance
-    // so their pending transfers can be selected and accepted.
-    const tokens = useMemo(() => {
+    const { data: activity } = useUserTokensWithActivity(currentUser);
+
+    // Send tab: tokens held now or with past balance changes, so their activity stays reachable
+    const activeTokens = useMemo(() => {
         const held = data ?? [];
-        const awaiting = new Map<number, Token>();
-        for (const { debitor, token } of pending ?? []) {
-            if (debitor !== currentUser) continue;
-            if (held.some((t) => t.id === token.id)) continue;
-            if (awaiting.has(token.id)) continue;
-            const balance = new Quantity(
-                "0",
-                token.precision,
+        const past = (activity ?? [])
+            .filter((token) => !held.some((t) => t.id === token.id))
+            .map(zeroBalanceToken);
+        return [...held, ...past];
+    }, [data, activity]);
+
+    // Pending tab: tokens with an open transfer in either direction
+    const pendingTokens = useMemo(() => {
+        const result = new Map<number, Token>();
+        for (const { token } of pending ?? []) {
+            if (result.has(token.id)) continue;
+            result.set(
                 token.id,
-                token.symbol,
+                activeTokens.find((t) => t.id === token.id) ??
+                    zeroBalanceToken(token),
             );
-            awaiting.set(token.id, {
-                id: token.id,
-                balance,
-                symbol: token.symbol,
-                label: balance.getDisplayLabel(),
-                precision: token.precision,
-                isTransferable: !token.settings.untransferable,
-            });
         }
-        return [...held, ...awaiting.values()];
-    }, [data, pending, currentUser]);
+        return [...result.values()];
+    }, [pending, activeTokens]);
+
+    const tokens = isPendingTab ? pendingTokens : activeTokens;
+    const tokensReady = isPendingTab ? !!pending : !!data;
 
     const [selectedTokenId, setSelectedTokenId] = useState<string>("");
 
     const { handleSetMaxAmount, clearAmountErrors } = useTransferActions();
-
-    useEffect(() => {
-        if (selectedTokenId) return;
-        if (!data || tokens.length === 0) return;
-        setSelectedTokenId(tokens[0].id.toString());
-    }, [selectedTokenId, tokens, data]);
 
     const [searchParams, setSearchParams] = useSearchParams();
     const tokenParam = searchParams.get("token");
@@ -137,9 +135,10 @@ export const TokensLayout = () => {
         clearAmountErrors?.();
     };
 
-    const selectedToken = tokens.find(
-        (balance) => balance.id == Number(selectedTokenId),
-    );
+    // Falls back to the first token when the selection isn't in this tab's list
+    const selectedToken =
+        tokens.find((token) => token.id == Number(selectedTokenId)) ??
+        (tokensReady ? tokens[0] : undefined);
 
     const pendingForToken = useMemo(
         () =>
@@ -150,7 +149,7 @@ export const TokensLayout = () => {
                 : (pending ?? []),
         [pending, selectedToken],
     );
-    const incomingCount = pendingForToken.filter(
+    const incomingCount = (pending ?? []).filter(
         (p) => p.debitor === currentUser,
     ).length;
 
@@ -183,9 +182,17 @@ export const TokensLayout = () => {
 
                     <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
                         <TokenBalances
+                            title={isPendingTab ? "Pending Tokens" : "Tokens"}
+                            emptyLabel={
+                                isPendingTab
+                                    ? "No pending transfers"
+                                    : "No token activity yet"
+                            }
                             tokens={tokens}
                             selectedToken={selectedToken}
-                            incomingTokenIds={incomingTokenIds}
+                            incomingTokenIds={
+                                isPendingTab ? undefined : incomingTokenIds
+                            }
                             onSelect={handleTokenSelect}
                         />
 

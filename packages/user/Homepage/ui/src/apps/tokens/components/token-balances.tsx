@@ -14,11 +14,15 @@ import {
 } from "@shared/shadcn/ui/tooltip";
 
 export const TokenBalances = ({
+    title,
+    emptyLabel,
     tokens,
     selectedToken,
     incomingTokenIds,
     onSelect,
 }: {
+    title: string;
+    emptyLabel: string;
     tokens: Token[];
     selectedToken?: Token;
     /** Tokens with an incoming transfer waiting to be accepted */
@@ -27,12 +31,12 @@ export const TokenBalances = ({
 }) => {
     return (
         <Panel
-            title="Balances"
+            title={title}
             description={`${tokens.length} token${tokens.length === 1 ? "" : "s"}`}
             className="self-start"
         >
             {tokens.length === 0 ? (
-                <EmptyState className="min-h-24">No tokens held</EmptyState>
+                <EmptyState className="min-h-24">{emptyLabel}</EmptyState>
             ) : (
                 <ul className="flex flex-col">
                     {tokens.map((token) => {

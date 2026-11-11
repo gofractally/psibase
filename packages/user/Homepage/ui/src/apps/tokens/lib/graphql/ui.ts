@@ -4,6 +4,15 @@ import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { homepage } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
+const tokenSummaryFields = `
+    id
+    symbol
+    precision
+    settings {
+        untransferable
+    }
+`;
+
 const qs = {
     tokenMeta: (tokenId: string) => `
         token(tokenId: "${tokenId}") {
@@ -31,12 +40,7 @@ const qs = {
             nodes {
                 sharedBal {
                     token {
-                        id
-                        symbol
-                        precision
-                        settings {
-                            untransferable
-                        }
+                        ${tokenSummaryFields}
                     }
                     balance
                     creditor
@@ -133,16 +137,37 @@ export const fetchUserTokenBalanceChanges = async (
     return parsed.balChanges.nodes;
 };
 
+export const zTokenSummarySchema = z.object({
+    id: z.number(),
+    symbol: z.string().nullable(),
+    precision: z.number(),
+    settings: z.object({
+        untransferable: z.boolean(),
+    }),
+});
+
+export type TokenSummary = z.infer<typeof zTokenSummarySchema>;
+
+// Tokens with balance history
+const zUserTokensWithActivityResSchema = z.object({
+    userTokensWithActivity: z.array(zTokenSummarySchema),
+});
+
+export const fetchUserTokensWithActivity = async (username: string) => {
+    const query = `{
+        userTokensWithActivity(user: "${username}") {
+            ${tokenSummaryFields}
+        }
+    }`;
+    const res = await graphqlAuth<
+        z.infer<typeof zUserTokensWithActivityResSchema>
+    >(homepage.tokens.graphql, query);
+    return zUserTokensWithActivityResSchema.parse(res).userTokensWithActivity;
+};
+
 // Open Lines of Credit
 export const zSharedBalSchema = z.object({
-    token: z.object({
-        id: z.number(),
-        symbol: z.string().nullable(),
-        precision: z.number(),
-        settings: z.object({
-            untransferable: z.boolean(),
-        }),
-    }),
+    token: zTokenSummarySchema,
     balance: z.string(),
     creditor: zAccount,
     debitor: zAccount,
