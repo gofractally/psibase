@@ -19,3 +19,6 @@ psibase_service.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
+
+[dev-dependencies]
+hostdb-pkg = { path = "..", version = "0.29.0" }

@@ -1,6 +1,9 @@
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::{Pack, ToSchema, Unpack};
+    use psibase::{Pack, TimePointSec, ToSchema, Unpack};
+
+    pub(crate) const STORE_PREFIX_LEN: usize = 16;
+    pub(crate) const GC_LIMIT: usize = 16;
 
     #[table(name = "KvTable", index = 0, db = "Subjective")]
     #[derive(Pack, Unpack, ToSchema)]
@@ -24,7 +27,7 @@ pub mod tables {
         pub session: Vec<u8>,
         pub key: Vec<u8>,
         pub value: Vec<u8>,
-        pub last_access: u64,
+        pub last_access: TimePointSec,
     }
 
     impl SessionKvRow {
@@ -33,10 +36,8 @@ pub mod tables {
             (self.store.clone(), self.session.clone(), self.key.clone())
         }
 
-        /// `last_access` leads so the index is oldest-first. The row identity
-        /// follows so each row has its own index entry.
         #[secondary_key(1)]
-        fn by_last_access(&self) -> (u64, Vec<u8>, Vec<u8>, Vec<u8>) {
+        fn by_last_access(&self) -> (TimePointSec, Vec<u8>, Vec<u8>, Vec<u8>) {
             (
                 self.last_access,
                 self.store.clone(),
@@ -50,7 +51,7 @@ pub mod tables {
     #[derive(Pack, Unpack, ToSchema)]
     pub struct DeviceRow {
         pub device: Vec<u8>,
-        pub last_seen: u64,
+        pub last_seen: TimePointSec,
         pub store: Vec<u8>,
     }
 
@@ -61,8 +62,12 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_last_seen(&self) -> (u64, Vec<u8>) {
+        fn by_last_seen(&self) -> (TimePointSec, Vec<u8>) {
             (self.last_seen, self.device.clone())
         }
     }
 }
+
+mod device;
+mod kv;
+mod session_kv;
