@@ -243,7 +243,12 @@ export function PoliciesPage() {
         onSubmit: async ({ value }) => {
             const from = legOf(value.fromKind, value.fromAsset, value.fromToken);
             const to = legOf(value.toKind, value.toAsset, value.toToken);
-            if (!from || !to || sameLegs(from, to) || !value.remaining.trim()) {
+            if (!from || !to || sameLegs(from, to)) {
+                toast.error("Pick two different assets.");
+                return;
+            }
+            if (!value.remaining.trim()) {
+                toast.error("Enter a quantity.");
                 return;
             }
             if (from.kind === "token" && to.kind === "token") {
@@ -252,7 +257,10 @@ export function PoliciesPage() {
             }
             const mixed = from.kind !== to.kind;
             if (mixed) {
-                if (value.quoteMode === "both" || !value.toRate.trim()) return;
+                if (value.quoteMode === "both" || !value.toRate.trim()) {
+                    toast.error("Enter a price.");
+                    return;
+                }
                 const fromPrec = precRef.current(from);
                 const toPrec = precRef.current(to);
                 if (fromPrec === undefined || toPrec === undefined) {
@@ -290,7 +298,14 @@ export function PoliciesPage() {
                 PPM_SCALE,
             );
             if (value.quoteMode === "both") {
-                if (!value.remainingOther.trim()) return;
+                if (!value.remainingOther.trim() || !value.toRate.trim()) {
+                    toast.error(
+                        !value.toRate.trim()
+                            ? "Enter a price."
+                            : "Enter both quantities.",
+                    );
+                    return;
+                }
                 const spreadPpm = percentStringToPpm(
                     value.spreadPct.trim() || "0",
                     MAX_HOP_FEE_PPM,
@@ -314,6 +329,10 @@ export function PoliciesPage() {
                     );
                 });
                 setOrderOpen(false);
+                return;
+            }
+            if (!value.toRate.trim()) {
+                toast.error("Enter a price.");
                 return;
             }
             await new Promise<void>((resolve, reject) => {
@@ -361,7 +380,7 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Trade"
-                description="Orders you have posted."
+                description="Orders you have posted. Swap is the other way: a payment that uses someone else's rate."
                 action={
                     <Button
                         type="button"
@@ -418,8 +437,8 @@ export function PoliciesPage() {
                                     >
                                         <TableCell>
                                             {p.posterIsCreditor
-                                                ? "Buy"
-                                                : "Sell"}
+                                                ? "You buy"
+                                                : "You sell"}
                                         </TableCell>
                                         <TableCell>
                                             {symbolOf(p.fromAsset)} /{" "}
@@ -438,7 +457,8 @@ export function PoliciesPage() {
                                             {symbolOf(p.fromAsset)}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
-                                            {displayAmount(p.feeFixed)}
+                                            {displayAmount(p.feeFixed)}{" "}
+                                            {symbolOf(p.fromAsset)}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {ppmToPercent(p.toInterestRatePpm)}
@@ -520,7 +540,9 @@ export function PoliciesPage() {
                                     <TableRow
                                         key={`cash-${q.isOut ? 1 : 0}-${q.assetId}-${q.tokenId}`}
                                     >
-                                        <TableCell>Buy</TableCell>
+                                        <TableCell>
+                                            {q.isOut ? "You buy" : "You sell"}
+                                        </TableCell>
                                         <TableCell>
                                             {q.isOut
                                                 ? `${banxLabel} / ${tokenLabel}`
@@ -534,7 +556,8 @@ export function PoliciesPage() {
                                             {q.isOut ? banxLabel : tokenLabel}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
-                                            {displayAmount(q.feeFixed)}
+                                            {displayAmount(q.feeFixed)}{" "}
+                                            {q.isOut ? banxLabel : tokenLabel}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             —
@@ -759,7 +782,7 @@ export function PoliciesPage() {
                                                     )
                                                 }
                                             >
-                                                Buy
+                                                You buy
                                             </Button>
                                             <Button
                                                 type="button"
@@ -778,7 +801,7 @@ export function PoliciesPage() {
                                                     )
                                                 }
                                             >
-                                                Sell
+                                                You sell
                                             </Button>
                                             {banxPair ? (
                                                 <Button
@@ -1152,7 +1175,9 @@ export function PoliciesPage() {
                                                     </span>{" "}
                                                     The fee is already in
                                                     these prices. A payment
-                                                    uses the buy.
+                                                    through you uses the buy.
+                                                    Swap can also spend that
+                                                    rate.
                                                 </>
                                             ) : (
                                                 <>
@@ -1224,6 +1249,14 @@ export function PoliciesPage() {
                                             Each quantity is how much of that
                                             asset the order will take. Saving
                                             again replaces it.
+                                        </p>
+                                    ) : banxPair ? (
+                                        <p className="text-muted-foreground text-sm">
+                                            This remaining is a public path
+                                            rate, not a private quote for one
+                                            person. Anyone who can draw you in{" "}
+                                            {fromSym} can spend it on a payment.
+                                            Saving again replaces it.
                                         </p>
                                     ) : null}
                                     <currencyForm.AppField

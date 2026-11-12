@@ -121,7 +121,9 @@ export function AccountTrades({
                                     key={`${p.fromAsset}-${p.toAsset}-${p.posterIsCreditor ? 1 : 0}`}
                                 >
                                     <TableCell>
-                                        {p.posterIsCreditor ? "Buy" : "Sell"}
+                                        {p.posterIsCreditor
+                                            ? "They buy"
+                                            : "They sell"}
                                     </TableCell>
                                     <TableCell>
                                         {symbolOf(p.fromAsset)} /{" "}
@@ -140,7 +142,8 @@ export function AccountTrades({
                                         {symbolOf(p.fromAsset)}
                                     </TableCell>
                                     <TableCell className="text-right font-mono">
-                                        {displayAmount(p.feeFixed)}
+                                        {displayAmount(p.feeFixed)}{" "}
+                                        {symbolOf(p.fromAsset)}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {ppmToPercent(p.toInterestRatePpm)}
@@ -165,8 +168,8 @@ export function AccountTrades({
                                                     p.fromAsset,
                                                     p.posterIsCreditor,
                                                 )
-                                                    ? "Convert"
-                                                    : "Take"}
+                                                    ? "Rebook"
+                                                    : "Open trade"}
                                             </Button>
                                         </TableCell>
                                     ) : null}
@@ -191,7 +194,9 @@ export function AccountTrades({
                                     <TableRow
                                         key={`cash-${q.isOut ? 1 : 0}-${q.assetId}-${q.tokenId}`}
                                     >
-                                        <TableCell>Buy</TableCell>
+                                        <TableCell>
+                                            {q.isOut ? "They buy" : "They sell"}
+                                        </TableCell>
                                         <TableCell>
                                             {q.isOut
                                                 ? `${banxLabel} / ${tokenLabel}`
@@ -205,7 +210,8 @@ export function AccountTrades({
                                             {q.isOut ? banxLabel : tokenLabel}
                                         </TableCell>
                                         <TableCell className="text-right font-mono">
-                                            {displayAmount(q.feeFixed)}
+                                            {displayAmount(q.feeFixed)}{" "}
+                                            {q.isOut ? banxLabel : tokenLabel}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             —

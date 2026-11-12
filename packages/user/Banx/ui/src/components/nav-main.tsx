@@ -32,7 +32,7 @@ const items: {
     { to: "/payees", label: "Payees", icon: Contact },
     { to: "/invites", label: "Invites", icon: UserPlus },
     { to: "/cash", label: "Cash", icon: Banknote },
-    { to: "/policies", label: "Trade", icon: ArrowLeftRight },
+    { to: "/trade", label: "Trade", icon: ArrowLeftRight },
     { to: "/relays", label: "Pools", icon: Repeat },
 ];
 

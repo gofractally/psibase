@@ -199,7 +199,7 @@ export function SwapPage() {
         <div>
             <PageHeader
                 title="Swap"
-                description="You pay the top IOU. The path comes back to you in the bottom one, through whoever can carry it."
+                description="You pay the top IOU. The path comes back to you in the bottom one, through whoever has a line and a rate. That rate is theirs, not an order you posted on Trade."
             />
             <Card className="mx-auto w-full max-w-md gap-0 overflow-hidden py-0">
                 <div className="flex flex-col gap-4 p-4">

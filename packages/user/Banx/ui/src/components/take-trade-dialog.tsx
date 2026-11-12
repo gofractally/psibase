@@ -346,7 +346,9 @@ export function TakeTradeDialog({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        {policy && (immediate || selling) ? "Convert" : "Take"}
+                        {policy && (immediate || selling)
+                            ? "Rebook"
+                            : "Open trade"}
                     </DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
@@ -406,7 +408,13 @@ export function TakeTradeDialog({
                             children={(field) => (
                                 <field.TextField
                                     label={`Amount (${fromSymbol})`}
-                                    description={`Up to ${capHuman} ${fromSymbol}.`}
+                                    description={
+                                        policy && (immediate || selling)
+                                            ? `Up to ${capHuman} ${fromSymbol}. This becomes ${toSymbol} debt, same direction.`
+                                            : policy
+                                              ? `Up to ${capHuman} ${fromSymbol}. You will owe them that, and they will owe you ${toSymbol}.`
+                                              : `Up to ${capHuman} ${fromSymbol}.`
+                                    }
                                     inputMode="decimal"
                                     required
                                     placeholder={amountPlaceholder(fromPrec)}
@@ -461,8 +469,8 @@ export function TakeTradeDialog({
                                 <form.SubmitButton
                                     labels={
                                         immediate || selling
-                                            ? ["Convert", "Converting…"]
-                                            : ["Take", "Taking…"]
+                                            ? ["Rebook", "Rebooking…"]
+                                            : ["Open trade", "Opening…"]
                                     }
                                     loading={pending}
                                 />

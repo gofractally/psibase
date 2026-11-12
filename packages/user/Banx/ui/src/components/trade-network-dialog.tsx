@@ -141,7 +141,7 @@ export function TradeNetworkDialog({
     pair: TradePair | null;
     onOpenChange: (open: boolean) => void;
 }) {
-    const { user, label } = useBanxContacts("/policies");
+    const { user, label } = useBanxContacts("/trade");
     const { data: lines = [], isLoading, isError } = useCreditLines();
     const left = pair?.left;
     const right = pair?.right;
