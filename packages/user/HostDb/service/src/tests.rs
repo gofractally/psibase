@@ -469,38 +469,18 @@ mod tests {
         let second = post_store(&chain, &device, Session, &key, &encode(b"second"))?;
         assert_status(&second, HttpStatus::NoContent);
         assert_eq!(require_cookie(&second, SESSION_COOKIE), "2");
-        assert_stored(
-            &chain,
-            Session,
-            &cookies(&device_a(), Some("1")),
-            &key,
-            b"first",
-        )?;
-        assert_stored(
-            &chain,
-            Session,
-            &cookies(&device_a(), Some("2")),
-            &key,
-            b"second",
-        )?;
+        let first_session = cookies(&device_a(), Some(require_cookie(&first, SESSION_COOKIE)));
+        let second_session = cookies(&device_a(), Some(require_cookie(&second, SESSION_COOKIE)));
+        assert_stored(&chain, Session, &first_session, &key, b"first")?;
+        assert_stored(&chain, Session, &second_session, &key, b"second")?;
 
         let other = post_store(&chain, &other_device, Session, &key, &encode(b"other"))?;
         assert_status(&other, HttpStatus::NoContent);
         assert_eq!(require_cookie(&other, SESSION_COOKIE), "1");
-        assert_stored(
-            &chain,
-            Session,
-            &cookies(&device_b(), Some("1")),
-            &key,
-            b"other",
-        )?;
-        assert_stored(
-            &chain,
-            Session,
-            &cookies(&device_a(), Some("1")),
-            &key,
-            b"first",
-        )?;
+        let other_first_session =
+            cookies(&device_b(), Some(require_cookie(&other, SESSION_COOKIE)));
+        assert_stored(&chain, Session, &other_first_session, &key, b"other")?;
+        assert_stored(&chain, Session, &first_session, &key, b"first")?;
         Ok(())
     }
 
