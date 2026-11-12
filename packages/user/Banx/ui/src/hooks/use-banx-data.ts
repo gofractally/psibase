@@ -132,6 +132,17 @@ export function useForwardOffers(): UseQueryResult<ForwardOffer[], Error> {
     });
 }
 
+/** Path forwarding posted by `poster`, including another account. */
+export function usePosterForwardOffers(
+    poster: string | null | undefined,
+): UseQueryResult<ForwardOffer[], Error> {
+    return useQuery({
+        queryKey: QueryKey.forwardOffers(poster),
+        queryFn: () => fetchForwardOffers(poster!),
+        enabled: !!poster,
+    });
+}
+
 export function useClaimOffers(): UseQueryResult<ClaimOffer[], Error> {
     const { data: user } = useCurrentUser();
     return useQuery({

@@ -6,6 +6,10 @@ import { ArrowDownUp, ChevronDown, Plus } from "lucide-react";
 import { AssetField, ExpiresField } from "@/components/form-fields";
 import { formatExpiresAt } from "@/components/expires-at-picker";
 import { PageHeader } from "@/components/page-header";
+import {
+    TradeNetworkDialog,
+    type TradePair,
+} from "@/components/trade-network-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCashQuotes,
@@ -216,6 +220,7 @@ export function PoliciesPage() {
     const removeCash = useRemoveCashQuote();
     const [moreOpen, setMoreOpen] = useState(false);
     const [orderOpen, setOrderOpen] = useState(false);
+    const [network, setNetwork] = useState<TradePair | null>(null);
     const precRef = useRef<(leg: Leg) => number | undefined>(() => undefined);
 
     const currencyForm = useAppForm({
@@ -442,24 +447,55 @@ export function PoliciesPage() {
                                             {formatExpiresAt(p.expiresAt)}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={
-                                                    removeCurrency.isPending
-                                                }
-                                                onClick={() =>
-                                                    removeCurrency.mutate({
-                                                        fromAsset: p.fromAsset,
-                                                        toAsset: p.toAsset,
-                                                        posterIsCreditor:
-                                                            p.posterIsCreditor,
-                                                    })
-                                                }
-                                            >
-                                                Remove
-                                            </Button>
+                                            <div className="flex flex-wrap justify-end gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    aria-label={`Network for ${symbolOf(p.fromAsset)} and ${symbolOf(p.toAsset)}`}
+                                                    onClick={() =>
+                                                        setNetwork({
+                                                            left: {
+                                                                kind: "banx",
+                                                                assetId:
+                                                                    p.fromAsset,
+                                                                symbol: symbolOf(
+                                                                    p.fromAsset,
+                                                                ),
+                                                            },
+                                                            right: {
+                                                                kind: "banx",
+                                                                assetId:
+                                                                    p.toAsset,
+                                                                symbol: symbolOf(
+                                                                    p.toAsset,
+                                                                ),
+                                                            },
+                                                        })
+                                                    }
+                                                >
+                                                    Network
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={
+                                                        removeCurrency.isPending
+                                                    }
+                                                    onClick={() =>
+                                                        removeCurrency.mutate({
+                                                            fromAsset:
+                                                                p.fromAsset,
+                                                            toAsset: p.toAsset,
+                                                            posterIsCreditor:
+                                                                p.posterIsCreditor,
+                                                        })
+                                                    }
+                                                >
+                                                    Remove
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -507,21 +543,56 @@ export function PoliciesPage() {
                                             {formatExpiresAt(q.expiresAt)}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={removeCash.isPending}
-                                                onClick={() =>
-                                                    removeCash.mutate({
-                                                        assetId: q.assetId,
-                                                        tokenId: q.tokenId,
-                                                        isOut: q.isOut,
-                                                    })
-                                                }
-                                            >
-                                                Remove
-                                            </Button>
+                                            <div className="flex flex-wrap justify-end gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    aria-label={`Network for ${q.isOut ? banxLabel : tokenLabel} and ${q.isOut ? tokenLabel : banxLabel}`}
+                                                    onClick={() => {
+                                                        const iou = {
+                                                            kind: "banx" as const,
+                                                            assetId: q.assetId,
+                                                            symbol: banxLabel,
+                                                        };
+                                                        const token = {
+                                                            kind: "token" as const,
+                                                            tokenId: q.tokenId,
+                                                            symbol: tokenLabel,
+                                                        };
+                                                        setNetwork(
+                                                            q.isOut
+                                                                ? {
+                                                                      left: iou,
+                                                                      right: token,
+                                                                  }
+                                                                : {
+                                                                      left: token,
+                                                                      right: iou,
+                                                                  },
+                                                        );
+                                                    }}
+                                                >
+                                                    Network
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={
+                                                        removeCash.isPending
+                                                    }
+                                                    onClick={() =>
+                                                        removeCash.mutate({
+                                                            assetId: q.assetId,
+                                                            tokenId: q.tokenId,
+                                                            isOut: q.isOut,
+                                                        })
+                                                    }
+                                                >
+                                                    Remove
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -1420,6 +1491,12 @@ export function PoliciesPage() {
                     </form>
                 </DialogContent>
             </Dialog>
+            <TradeNetworkDialog
+                pair={network}
+                onOpenChange={(open) => {
+                    if (!open) setNetwork(null);
+                }}
+            />
         </div>
     );
 }

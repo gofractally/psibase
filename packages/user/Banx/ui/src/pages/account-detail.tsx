@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { AccountRowAction } from "@/components/account-row-action";
+import { AccountTrades } from "@/components/account-trades";
 import { ActivityFeed } from "@/components/activity-feed";
 import { BookAuthDialog } from "@/components/book-auth-dialog";
 import { BookExpenseDialog } from "@/components/book-expense-dialog";
@@ -438,6 +439,7 @@ export function AccountDetailPage() {
                 assets={assets}
                 precisionOf={precisionOf}
             />
+            <AccountTrades account={account} display={display} />
             {isLoading ? (
                 <p className="text-muted-foreground text-sm">Loading…</p>
             ) : isError ? (
