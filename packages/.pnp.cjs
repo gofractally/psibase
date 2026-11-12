@@ -6945,7 +6945,7 @@ const RAW_RUNTIME_STATE =
           ["jiti", "npm:2.7.0"],\
           ["lightningcss", "npm:1.32.0"],\
           ["magic-string", "npm:0.30.21"],\
-          ["source-map-js", "npm:1.2.1"],\
+          ["source-map-js", "npm:1.2.2"],\
           ["tailwindcss", "npm:4.3.1"]\
         ],\
         "linkType": "HARD"\
@@ -8807,7 +8807,7 @@ const RAW_RUNTIME_STATE =
           ["@vue/shared", "npm:3.5.38"],\
           ["entities", "npm:7.0.1"],\
           ["estree-walker", "npm:2.0.2"],\
-          ["source-map-js", "npm:1.2.1"]\
+          ["source-map-js", "npm:1.2.2"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -10089,7 +10089,7 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["css-tree", "npm:2.2.1"],\
           ["mdn-data", "npm:2.0.28"],\
-          ["source-map-js", "npm:1.2.1"]\
+          ["source-map-js", "npm:1.2.2"]\
         ],\
         "linkType": "HARD"\
       }],\
@@ -10098,7 +10098,7 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["css-tree", "npm:2.3.1"],\
           ["mdn-data", "npm:2.0.30"],\
-          ["source-map-js", "npm:1.2.1"]\
+          ["source-map-js", "npm:1.2.2"]\
         ],\
         "linkType": "HARD"\
       }],\
@@ -10107,7 +10107,7 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["css-tree", "npm:3.2.1"],\
           ["mdn-data", "npm:2.27.1"],\
-          ["source-map-js", "npm:1.2.1"]\
+          ["source-map-js", "npm:1.2.2"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -14488,7 +14488,7 @@ const RAW_RUNTIME_STATE =
           ["nanoid", "npm:3.3.12"],\
           ["picocolors", "npm:1.1.1"],\
           ["postcss", "npm:8.5.15"],\
-          ["source-map-js", "npm:1.2.1"]\
+          ["source-map-js", "npm:1.2.2"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -16203,10 +16203,10 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["source-map-js", [\
-      ["npm:1.2.1", {\
-        "packageLocation": "../.caches/yarn/source-map-js-npm-1.2.1-b9a47d7e1a-7bda1fc4c1.zip/node_modules/source-map-js/",\
+      ["npm:1.2.2", {\
+        "packageLocation": "../.caches/yarn/source-map-js-npm-1.2.2-d40ce9a415-d5d6dec622.zip/node_modules/source-map-js/",\
         "packageDependencies": [\
-          ["source-map-js", "npm:1.2.1"]\
+          ["source-map-js", "npm:1.2.2"]\
         ],\
         "linkType": "HARD"\
       }]\
