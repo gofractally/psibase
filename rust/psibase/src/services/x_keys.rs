@@ -31,8 +31,9 @@ mod service {
 
 #[test]
 fn verify_schema() {
-    // TODO:
-    // C++ uses shared_view_ptr in SignedTransaction
-    // Rust uses raw Hex<Vec<u8>>
-    // crate::assert_schema_matches_package::<Wrapper>();
+    // C++ `SignedTransaction::transaction` is a nested `Transaction`; Rust holds
+    // its packed bytes. Both pack as the same length-prefixed bytes.
+    crate::assert_schema_matches_package_allowing::<Wrapper>(
+        fracpack::SchemaDifference::ADD_ALTERNATIVE,
+    );
 }

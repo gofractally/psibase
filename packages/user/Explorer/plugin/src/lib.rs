@@ -147,7 +147,7 @@ impl Tokens for ExplorerPlugin {
 impl VirtualServer for ExplorerPlugin {
     fn graphql(query: String) -> Result<String, Error> {
         assert_caller_self();
-        virtual_server::plugin::authorized::graphql(&query)
+        vserver::plugin::authorized::graphql(&query)
     }
 }
 

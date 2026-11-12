@@ -2,7 +2,7 @@ use async_graphql::{EmptyMutation, EmptySubscription, Schema};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use virtual_server::rpc::Query;
+use vserver::rpc::Query;
 
 fn main() {
     println!("cargo:rerun-if-changed=../service/src/rpc.rs");

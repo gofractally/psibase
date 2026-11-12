@@ -351,7 +351,7 @@ export const VirtualServer = () => {
                                                 className="w-36"
                                             />
                                             <form.Field name="storageUnit">
-                                                {(unitField: any) => (
+                                                {(unitField) => (
                                                     <div className="mt-2">
                                                         <StorageUnitSelect
                                                             value={
@@ -455,7 +455,7 @@ export const VirtualServer = () => {
                                                         />
                                                         <form.Field name="perBlockSysCpuUnit">
                                                             {(
-                                                                unitField: any,
+                                                                unitField,
                                                             ) => (
                                                                 <div className="mt-2">
                                                                     <PerBlockSysCpuUnitSelect
@@ -514,9 +514,8 @@ export const VirtualServer = () => {
                                                             className="w-36"
                                                         />
                                                         <form.Field name="objStorageUnit">
-                                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                             {(
-                                                                unitField: any,
+                                                                unitField,
                                                             ) => (
                                                                 <div className="mt-2">
                                                                     <StorageUnitSelect

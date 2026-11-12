@@ -53,13 +53,13 @@ pub struct GetInviteResponse<T> {
 
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
-pub struct GetInviteCostResponse {
-    pub getInviteCost: String,
+pub struct GetInviteQuoteResponse {
+    pub getInviteQuote: String,
 }
 
-impl TryParseGqlResponse for GetInviteCostResponse {
+impl TryParseGqlResponse for GetInviteQuoteResponse {
     fn from_gql(response: String) -> Result<Self, Error> {
-        let response_root: ResponseRoot<GetInviteCostResponse> =
+        let response_root: ResponseRoot<GetInviteQuoteResponse> =
             serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
         Ok(response_root.data)
     }

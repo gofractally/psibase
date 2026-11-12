@@ -14,7 +14,7 @@ world impl {
     import profiles:plugin/contacts;
     include chainmail:plugin/imports;
     include invite:plugin/imports;
-    include virtual-server:plugin/imports;
+    include vserver:plugin/imports;
     include token-swap:plugin/imports;
 
     export name-market;

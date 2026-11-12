@@ -21,11 +21,13 @@
             "user/FractalCore/ui",
             "user/TokenStream/ui",
             "user/Homepage/ui",
+            "user/Nov5/ui",
             "user/Identity/ui",
             "user/Packages/ui",
             "user/Permissions/ui",
             "user/Workshop/ui",
             "local/XAdmin/ui",
+            "local/XPortal/ui",
             "local/XProxy/ui"
         ]
     },

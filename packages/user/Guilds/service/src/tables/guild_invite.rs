@@ -34,7 +34,7 @@ impl GuildInvite {
     }
 
     fn invite_cost(num_accounts: u16) -> Quantity {
-        psibase::services::invite::Wrapper::call().getInvCost(num_accounts)
+        psibase::services::invite::Wrapper::call().getInvCost(num_accounts, None)
     }
 
     pub fn add(
@@ -59,7 +59,14 @@ impl GuildInvite {
             invite_cost,
         );
 
-        Invite::call().createInvite(invite_id, invite_payload, num_accounts, true, invite_cost);
+        Invite::call().createInvite(
+            invite_id,
+            invite_payload,
+            num_accounts,
+            true,
+            invite_cost,
+            None,
+        );
 
         Self::new(guild, invite_id, pre_attest).save();
     }

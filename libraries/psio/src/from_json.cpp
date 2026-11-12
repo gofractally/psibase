@@ -105,22 +105,46 @@ namespace psio
       return reader.IterativeParseComplete();
    }
 
-   std::reference_wrapper<const json_token> json_token_stream::peek_token()
+   bool json_token_stream::try_peek_token()
    {
       if (current_token.type != json_token_type::type_unread)
-         return current_token;
-      else if (reader.IterativeParseNext<
-                   rapidjson::kParseInsituFlag | rapidjson::kParseValidateEncodingFlag |
-                   rapidjson::kParseIterativeFlag | rapidjson::kParseNumbersAsStringsFlag>(ss,
-                                                                                           *this))
-         return current_token;
-      else
+         return true;
+      return reader.IterativeParseNext<
+          rapidjson::kParseInsituFlag | rapidjson::kParseValidateEncodingFlag |
+          rapidjson::kParseIterativeFlag | rapidjson::kParseNumbersAsStringsFlag>(ss, *this);
+   }
+
+   std::reference_wrapper<const json_token> json_token_stream::peek_token()
+   {
+      if (!try_peek_token())
          abort_error(convert_error(reader.GetParseErrorCode()));
+      return current_token;
    }
 
    void json_token_stream::eat_token()
    {
       current_token.type = json_token_type::type_unread;
+   }
+
+   bool json_token_stream::try_skip_value()
+   {
+      if (!try_peek_token())
+         return false;
+      uint64_t depth = 0;
+      do
+      {
+         auto type = current_token.type;
+         if (type == json_token_type::type_start_object ||
+             type == json_token_type::type_start_array)
+            ++depth;
+         else if (type == json_token_type::type_end_object ||
+                  type == json_token_type::type_end_array)
+            --depth;
+         eat_token();
+         if (depth > 0 && !try_peek_token())
+            return false;
+      } while (depth > 0);
+      return true;
    }
 
    void json_token_stream::get_end()
@@ -160,12 +184,18 @@ namespace psio
       return t.get().value_string;
    }
 
-   void json_token_stream::get_start_object()
+   bool json_token_stream::get_start_object_pred()
    {
       auto t = peek_token();
       if (t.get().type != json_token_type::type_start_object)
-         abort_error(from_json_error::expected_start_object);
+         return false;
       eat_token();
+      return true;
+   }
+
+   void json_token_stream::get_start_object()
+   {
+      check(get_start_object_pred(), from_json_error::expected_start_object);
    }
 
    std::string_view json_token_stream::get_key()

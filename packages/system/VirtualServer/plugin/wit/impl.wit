@@ -1,4 +1,4 @@
-package virtual-server:plugin;
+package vserver:plugin;
 
 world impl {
     include tokens:plugin/imports;

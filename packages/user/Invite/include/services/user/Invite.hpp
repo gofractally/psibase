@@ -38,7 +38,7 @@ namespace UserService
       class Invite : public psibase::Service
       {
         public:
-         using Tables = psibase::ServiceTables<InviteTable, InitTable>;
+         using Tables = psibase::ServiceTables<InviteTable, RedeemedAccountTable, InitTable>;
 
          static constexpr auto service = SystemService::Accounts::inviteService;
 
@@ -48,7 +48,11 @@ namespace UserService
 
          /// Returns the current minimum cost of creating an invite that can create the specified number of
          /// accounts.
-         Quantity getInvCost(uint16_t numAccounts);
+         Quantity getInvCost(uint16_t numAccounts, std::optional<Quantity> subsidy = std::nullopt);
+
+         /// Returns `getInvCost` plus a 50% buffer for resource cost increases between quote and
+         /// `createInvite`.
+         Quantity getInvQuote(uint16_t numAccounts, std::optional<Quantity> subsidy = std::nullopt);
 
          /// Creates and stores a new invite object that can be used to create new accounts
          /// Returns the ID of the newly created invite
@@ -64,6 +68,8 @@ namespace UserService
          ///               new accounts). The caller must send this amount of system tokens to this
          ///               invite service before calling this action. Use the query interface to check
          ///               the resources required for an invite of the specified number of accounts.
+         /// - `subsidy` is the per-account vserver resource amount bought for each redeemed account.
+         ///             When omitted, one standard buffer is reserved; `0` means no buffer.
          ///
          /// If `useHooks` is true, the caller must be an account with a service deployed on it
          /// that implements the InviteHooks interface.
@@ -71,7 +77,8 @@ namespace UserService
                                std::vector<uint8_t>  payload,
                                uint16_t              numAccounts,
                                bool                  useHooks,
-                               UserService::Quantity resources);
+                               UserService::Quantity resources,
+                               std::optional<UserService::Quantity> subsidy = std::nullopt);
 
          /// Called by an invite credential (not a user account) to create the specified
          /// account. The new account is authorized by the specified public key.
@@ -95,6 +102,9 @@ namespace UserService
          /// Gets the expiration date of the specified invite
          psibase::TimePointSec getExpDate(uint32_t inviteId);
 
+         /// Accounts created from the invite. Only the inviter may call.
+         std::vector<psibase::AccountNumber> getNewAccts(uint32_t inviteId);
+
          // clang-format off
          struct Events
          {
@@ -109,13 +119,15 @@ namespace UserService
       // clang-format off
       PSIO_REFLECT(Invite,
          method(init),
-         method(getInvCost, numAccounts),
-         method(createInvite, inviteId, payload, numAccounts, useHooks, resources),
+         method(getInvCost, numAccounts, subsidy),
+         method(getInvQuote, numAccounts, subsidy),
+         method(createInvite, inviteId, payload, numAccounts, useHooks, resources, subsidy),
          method(createAccount, account, accountKey),
          method(accept, inviteId),
          method(delInvite, inviteId),
          method(getInvite, inviteId),
          method(getExpDate, inviteId),
+         method(getNewAccts, inviteId),
       );
       PSIBASE_REFLECT_HISTORY_EVENTS(Invite,
          method(updated, inviteId, actor, event),

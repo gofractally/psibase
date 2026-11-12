@@ -174,7 +174,7 @@ pub(super) fn get_total_consumed_disk(
         .unwrap_or(0)
 }
 
-pub(super) fn get_invite_cost(
+pub(super) fn get_invite_quote(
     chain: &psibase::Chain,
     num_accounts: u16,
     auth_token: &str,
@@ -182,8 +182,8 @@ pub(super) fn get_invite_cost(
     query_auth(
         chain,
         psibase::services::invite::SERVICE,
-        "getInviteCost",
-        &format!(r#"query {{ getInviteCost(numAccounts: {num_accounts}) }}"#),
+        "getInviteQuote",
+        &format!(r#"query {{ getInviteQuote(numAccounts: {num_accounts}) }}"#),
         auth_token,
     )
 }

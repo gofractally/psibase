@@ -1,0 +1,34 @@
+package x-portal:plugin;
+
+interface api {
+    use host:types/types.{error};
+    use auth-scope:plugin/api.{allowed-action};
+
+    /// In one transaction, creates `ac-creator` owned by `owner` and has it enable tokens auto-debit.
+    /// Only callable by `x-portal`.
+    create-admin-accounts: func(pubkey-pem: string, owner: string, allowed: list<allowed-action>) -> result<_, error>;
+
+    /// The signed-in admin credits `amount` of the system token to `ac-creator`.
+    /// `amount` is a decimal string. Only callable by `x-portal`.
+    send-tokens: func(amount: string) -> result<_, error>;
+
+    /// The signed-in admin credits `amount` of the system token to `vserver` and buys that much resource for `ac-creator`.
+    /// `amount` is a decimal string. Only callable by `x-portal`.
+    send-resources: func(amount: string) -> result<_, error>;
+
+    /// The signed-in owner sets `ac-creator`'s key to `pubkey-pem`.
+    /// Only callable by `x-portal`.
+    set-creator-key: func(pubkey-pem: string) -> result<_, error>;
+}
+
+world impl {
+    include host:client/imports;
+    include host:types/imports;
+    import auth-scope:plugin/api;
+    import transact:plugin/api;
+    import tokens:plugin/user-config;
+    import tokens:plugin/helpers;
+    import tokens:plugin/user;
+    import vserver:plugin/billing;
+    export api;
+}

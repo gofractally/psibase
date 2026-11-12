@@ -1,1 +1,1 @@
-pub use virtual_server;
+pub use vserver;

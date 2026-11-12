@@ -88,10 +88,13 @@ void XTimer::runOne()
       }
    }
    if (row)
+   {
+      auto _ = recurse();
       call(Action{.sender  = XTimer::service,
                   .service = row->service,
                   .method  = row->method,
                   .rawData = psio::convert_to_frac(std::tuple(row->id))});
+   }
 }
 
 PSIBASE_DISPATCH(XTimer)

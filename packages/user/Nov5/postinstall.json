@@ -1,0 +1,17 @@
+[
+    {
+        "sender": "nov5",
+        "service": "sites",
+        "method": "enablespa",
+        "data": { "enable": true }
+    },
+    {
+        "sender": "nov5",
+        "service": "sites",
+        "method": "setcsp",
+        "data": {
+            "path": "*",
+            "csp": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'none'; frame-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; object-src 'none';"
+        }
+    }
+]

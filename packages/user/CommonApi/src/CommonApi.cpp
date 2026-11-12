@@ -1,12 +1,15 @@
 #include "services/system/CommonApi.hpp"
 
-#include <chrono>
 #include <psibase/check.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/to_json.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/Transact.hpp>
+
+#include <algorithm>
+#include <optional>
+#include <string_view>
 
 static constexpr bool enable_print = false;
 
@@ -15,39 +18,83 @@ using namespace LocalService;
 
 namespace SystemService
 {
-   struct TokenData
+   struct CookieData
    {
-      std::string accessToken;
+      std::string name;
+      std::string value;
+      int         maxAge   = 0;
+      bool        httpOnly = false;
    };
-   PSIO_REFLECT(TokenData, accessToken);
+   PSIO_REFLECT(CookieData, name, value, maxAge, httpOnly);
 
    namespace
    {
-      constexpr auto cookieMaxAge =
-          std::chrono::duration_cast<std::chrono::seconds>(std::chrono::days(30)).count();
+      struct InsituJsonBody
+      {
+         HttpRequest& req;
+         explicit InsituJsonBody(HttpRequest& r) : req(r) { req.body.push_back(0); }
+         ~InsituJsonBody() { req.body.pop_back(); }
+         char* data() { return req.body.data(); }
+      };
 
       template <typename T>
       T extractData(HttpRequest& request)
       {
-         request.body.push_back(0);
-         psio::json_token_stream jstream{request.body.data()};
-         auto                    result = psio::from_json<T>(jstream);
-         request.body.pop_back();
-         return result;
+         InsituJsonBody          body{request};
+         psio::json_token_stream jstream{body.data()};
+         return psio::from_json<T>(jstream);
       }
 
-      HttpHeader authCookie(const HttpRequest& req, const std::string& accessToken, int maxAge)
+      template <typename T>
+      std::optional<T> tryExtractData(HttpRequest& request)
       {
-         std::string cookieName = "__Host-SESSION";
+         return psio::try_convert_from_json<T>(std::string{request.body.begin(), request.body.end()});
+      }
+
+      bool isAllowedChar(char ch, std::string_view excluded)
+      {
+         auto c = static_cast<unsigned char>(ch);
+         return c >= 0x21 && c <= 0x7E && excluded.find(ch) == std::string_view::npos;
+      }
+
+      bool isTokenChar(char ch)
+      {
+         return isAllowedChar(ch, "()<>@,;:\\\"/[]?={}");
+      }
+
+      bool isCookieOctet(char ch)
+      {
+         return isAllowedChar(ch, "\",;\\");
+      }
+
+      bool isValidCookieName(std::string_view name)
+      {
+         return !name.empty() && std::ranges::all_of(name, isTokenChar);
+      }
+
+      bool isValidCookieValue(std::string_view value)
+      {
+         if (value.size() >= 2 && value.front() == '"' && value.back() == '"')
+            value = value.substr(1, value.size() - 2);
+         return std::ranges::all_of(value, isCookieOctet);
+      }
+
+      HttpHeader setCookieHeader(const std::string& name,
+                                 const std::string& value,
+                                 int                maxAge,
+                                 bool               httpOnly)
+      {
+         std::string cookieName = "__Host-" + name;
 
          std::string cookieAttribs;
-         cookieAttribs += "Path=/; ";
-         cookieAttribs += "HttpOnly; ";
-         cookieAttribs += "SameSite=Strict; ";
-         cookieAttribs += "Max-Age=" + std::to_string(maxAge);
-         cookieAttribs += "; Secure; ";
+         cookieAttribs += "; Path=/";
+         cookieAttribs += "; SameSite=Strict";
+         cookieAttribs += "; Secure";
+         cookieAttribs += "; Max-Age=" + std::to_string(maxAge);
+         if (httpOnly)
+            cookieAttribs += "; HttpOnly";
 
-         std::string cookieValue = cookieName + "=" + accessToken + "; " + cookieAttribs;
+         std::string cookieValue = cookieName + "=" + value + cookieAttribs;
          return HttpHeader{"Set-Cookie", cookieValue};
       }
 
@@ -75,6 +122,16 @@ namespace SystemService
       {
          bool hostIsSubdomain = to<XHttp>().rootHost(req.host) != req.host;
          return allowCors(req, subdomain, hostIsSubdomain);
+      }
+
+      // Empty unless the request's Origin is the subdomain.
+      std::vector<HttpHeader> allowCredentialedCorsFrom(const HttpRequest& req,
+                                                        AccountNumber      subdomain)
+      {
+         auto headers = allowCorsFrom(req, subdomain);
+         if (!headers.empty())
+            headers.push_back(allowCredentials());
+         return headers;
       }
    }  // namespace
 
@@ -126,11 +183,9 @@ namespace SystemService
 
       if (request.method == "OPTIONS")
       {
-         if (request.target == "/common/set-auth-cookie" ||
-             request.target == "/common/remove-auth-cookie")
+         if (request.target == "/common/set-host-cookie")
          {
-            auto headers = allowCorsFrom(request, "supervisor"_a);
-            headers.push_back(allowCredentials());
+            auto headers = allowCredentialedCorsFrom(request, "supervisor"_a);
             reflectRequestedHeaders(headers, request);
 
             return HttpReply{.headers = headers};
@@ -139,8 +194,26 @@ namespace SystemService
 
       if (request.method == "POST")
       {
+         auto requireJson = [&] -> std::optional<HttpReply>
+         {
+            if (request.contentType != "application/json")
+            {
+               auto headers = allowCors();
+               headers.push_back({"Allow", "application/json"});
+               auto msg = std::string_view("Content-Type must be application/json");
+               return HttpReply{
+                   .status      = HttpStatus::unsupportedMediaType,
+                   .contentType = "text/html",
+                   .body        = {msg.begin(), msg.end()},
+                   .headers     = std::move(headers),
+               };
+            }
+            return {};
+         };
          if (request.target == "/common/pack/Transaction")
          {
+            if (auto result = requireJson())
+               return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(extractData<Transaction>(request)),
@@ -149,30 +222,39 @@ namespace SystemService
          }
          if (request.target == "/common/pack/SignedTransaction")
          {
+            if (auto result = requireJson())
+               return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
                 .body        = psio::convert_to_frac(extractData<SignedTransaction>(request)),
                 .headers     = allowCors(),
             };
          }
-         if (request.target == "/common/set-auth-cookie")
+         if (request.target == "/common/set-host-cookie")
          {
-            auto data = extractData<TokenData>(request);
+            if (auto result = requireJson())
+               return result;
 
-            auto headers = allowCorsFrom(request, "supervisor"_a);
-            headers.push_back(allowCredentials());
-            headers.push_back(authCookie(request, data.accessToken, cookieMaxAge));
+            auto headers = allowCredentialedCorsFrom(request, "supervisor"_a);
 
-            return HttpReply{.status      = HttpStatus::ok,
-                             .contentType = "text/plain",
-                             .body        = {},
-                             .headers     = headers};
-         }
-         if (request.target == "/common/remove-auth-cookie")
-         {
-            auto headers = allowCorsFrom(request, "supervisor"_a);
-            headers.push_back(allowCredentials());
-            headers.push_back(authCookie(request, "", 0));
+            auto badRequest = [&]() {
+               return HttpReply{.status      = HttpStatus::badRequest,
+                                .contentType = "text/plain",
+                                .body        = {},
+                                .headers     = headers};
+            };
+
+            auto data = tryExtractData<CookieData>(request);
+            if (!data)
+               return badRequest();
+
+            // cookie-name and cookie-value per RFC 6265; maxAge must be non-negative.
+            if (!isValidCookieName(data->name) || !isValidCookieValue(data->value) ||
+                data->maxAge < 0)
+               return badRequest();
+
+            headers.push_back(
+                setCookieHeader(data->name, data->value, data->maxAge, data->httpOnly));
 
             return HttpReply{.status      = HttpStatus::ok,
                              .contentType = "text/plain",

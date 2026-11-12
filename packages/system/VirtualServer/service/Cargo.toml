@@ -1,5 +1,5 @@
 [package]
-name = "virtual-server"
+name = "vserver"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -7,7 +7,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 flags = ["isPrivileged"]
-server = "virtual-server"
+server = "vserver"
 plugins = ["virtual-server-plugin"]
 postinstall = [{ sender = "vserver", service = "vserver", method = "init" }]
 

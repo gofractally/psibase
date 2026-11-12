@@ -23,7 +23,7 @@ use super::utils::{fmt_mb, fmt_num, fmt_sys};
 
 use super::helpers::{assert_error, check_balance, enable_billing as setup_enable_billing};
 use super::query::{
-    DiskPricingState, get_billing_config, get_disk_state, get_invite_cost, get_network_vars,
+    DiskPricingState, get_billing_config, get_disk_state, get_invite_quote, get_network_vars,
     get_server_specs, get_total_consumed_disk, get_user_resources,
 };
 
@@ -551,7 +551,7 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Create the invite
     let (public_key, private_key) = psibase::generate_keypair()?;
     let invite_id: u32 = rand::rng().random();
-    let min_cost = get_invite_cost(&chain, 1, &token_prod)?;
+    let min_cost = get_invite_quote(&chain, 1, &token_prod)?;
     let min_cost = Decimal::from_str(&min_cost).unwrap().quantity;
     assert!(min_cost.value > 0, "Cost of an invite should be > 0");
 
@@ -570,7 +570,7 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     .packed();
 
     invite::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-        .createInvite(invite_id, payload, 1, false, min_cost.into())
+        .createInvite(invite_id, payload, 1, false, min_cost.into(), None)
         .get()?;
 
     // Create an account using the invite
