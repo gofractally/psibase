@@ -304,7 +304,7 @@ pub mod service {
             table.put(&InitRow {}).unwrap();
 
             Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
-            Nft::call().setAutoDebit(false);
+            Nft::call().setAutoDebit(Some(false));
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
@@ -415,4 +415,3 @@ pub mod service {
     #[event(history)]
     fn symEvent(symbol: SID, actor: AccountNumber, action: u8) {}
 }
-

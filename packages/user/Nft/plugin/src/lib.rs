@@ -146,7 +146,10 @@ impl UserConfig for NftPlugin {
     fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::enable_user_auto_debit)?;
 
-        let packed_args = Nft::action_structs::setAutoDebit { autodebit: enable }.packed();
+        let packed_args = Nft::action_structs::setAutoDebit {
+            autodebit: Some(enable),
+        }
+        .packed();
 
         add_action_to_transaction(
             Nft::action_structs::setAutoDebit::ACTION_NAME,

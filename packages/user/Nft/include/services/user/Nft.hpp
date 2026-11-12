@@ -34,7 +34,7 @@ namespace UserService
                     psio::view<const psibase::Memo> memo);
       void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
       void debit(NID nftId, psio::view<const psibase::Memo> memo);
-      void setAutoDebit(bool autodebit);
+      void setAutoDebit(std::optional<bool> autodebit);
 
       // Read-only:
       std::optional<NftRecord>    getNft(NID nftId);

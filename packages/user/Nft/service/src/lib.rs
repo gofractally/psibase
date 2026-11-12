@@ -405,6 +405,11 @@ pub mod tables {
                 .put(&Self { account, autodebit })
                 .unwrap();
         }
+
+        /// Drop a stored setting so the next read uses the default.
+        pub fn remove(account: AccountNumber) {
+            NftHolderTable::read_write().erase(&account);
+        }
     }
 }
 
@@ -506,9 +511,17 @@ pub mod service {
         credit_record.debit(memo);
     }
 
+    /// Set the sender's auto-debit flag, or clear it.
+    ///
+    /// `Some` stores the choice. `None` deletes the row so the account
+    /// falls back to the default: on for a user, off for a service.
     #[action]
-    pub fn setAutoDebit(autodebit: bool) {
-        NftHolder::set(get_sender(), autodebit);
+    pub fn setAutoDebit(autodebit: Option<bool>) {
+        let account = get_sender();
+        match autodebit {
+            Some(value) => NftHolder::set(account, value),
+            None => NftHolder::remove(account),
+        }
     }
 
     #[action]
@@ -531,4 +544,3 @@ pub mod service {
     ) {
     }
 }
-

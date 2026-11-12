@@ -134,7 +134,7 @@ mod tx_cache;
 ///                        v
 ///        +--------------------------------+
 ///        | Send final fee to fee receiver |
-///        +--------------------------------+          
+///        +--------------------------------+
 /// ```
 ///
 #[psibase::service(name = "vserver", recursive = "true", tables = "tables::tables")]
@@ -199,7 +199,7 @@ mod service {
             return;
         }
 
-        Nft::call().setAutoDebit(false);
+        Nft::call().setAutoDebit(Some(false));
         Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
         Tokens::call().setUserConf(BalanceFlags::KEEP_ZERO_BALANCE.index(), true);
 

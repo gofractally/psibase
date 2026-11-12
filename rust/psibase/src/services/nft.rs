@@ -80,7 +80,7 @@ mod service {
     }
 
     #[action]
-    fn setAutoDebit(autodebit: bool) {
+    fn setAutoDebit(autodebit: Option<bool>) {
         unimplemented!()
     }
 

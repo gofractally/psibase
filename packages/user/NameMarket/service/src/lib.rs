@@ -117,7 +117,7 @@ pub mod service {
 
         table.put(&InitRow {}).unwrap();
         Tokens::Wrapper::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
-        Nfts::Wrapper::call().setAutoDebit(false);
+        Nfts::Wrapper::call().setAutoDebit(Some(false));
 
         register_prem_acct_event_indices();
     }

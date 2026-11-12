@@ -26,9 +26,9 @@ pub mod tables {
             table.put(&InitRow {}).unwrap();
 
             Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
-            Nft::call().setAutoDebit(false);
+            Nft::call().setAutoDebit(Some(false));
 
-            Nft::call_as(crate::CRED_SYS).setAutoDebit(false);
+            Nft::call_as(crate::CRED_SYS).setAutoDebit(Some(false));
             Tokens::call_as(crate::CRED_SYS).setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
         }
     }

@@ -175,6 +175,10 @@ SCENARIO("Transferring NFTs")
          CHECK(b.getNftHolder(bob).returnVal().autodebit == false);
          CHECK(b.setAutoDebit(true).succeeded());
          CHECK(b.getNftHolder(bob).returnVal().autodebit == true);
+         // Clearing the stored choice falls back to the user default.
+         CHECK(b.setAutoDebit(false).succeeded());
+         CHECK(b.setAutoDebit(std::nullopt).succeeded());
+         CHECK(b.getNftHolder(bob).returnVal().autodebit == true);
       }
 
       THEN("Alice is unable to credit, transfer, uncredit, or debit a non-existent NFT")

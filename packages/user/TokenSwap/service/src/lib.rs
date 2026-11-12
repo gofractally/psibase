@@ -22,7 +22,7 @@ pub mod service {
             InitRow::init();
 
             Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
-            Nft::call().setAutoDebit(false);
+            Nft::call().setAutoDebit(Some(false));
         };
         let add_index = |method: &str, columns: Vec<u8>| {
             for column in columns {
