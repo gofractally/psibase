@@ -145,6 +145,7 @@ const zPayAuth = z.object({
     assetId: z.number(),
     amount: z.string(),
     maxSpend: z.string(),
+    maxInterestRatePpm: z.number(),
     periodSeconds: z.number(),
     nextDue: z.number(),
     endsAt: z.number(),
@@ -313,7 +314,7 @@ export async function fetchRequests(account: string): Promise<PayRequest[]> {
     return zPayRequest.array().parse(data.requests);
 }
 
-const payAuthFields = `id payer payee assetId amount maxSpend periodSeconds nextDue endsAt`;
+const payAuthFields = `id payer payee assetId amount maxSpend maxInterestRatePpm periodSeconds nextDue endsAt`;
 
 export async function fetchPayAuths(account: string): Promise<PayAuth[]> {
     const data = await gql<{ payAuths: PayAuth[] }>(

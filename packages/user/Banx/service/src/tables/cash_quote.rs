@@ -108,7 +108,17 @@ impl CashQuote {
         Tokens::call().toSub(token_id, sub, amount);
     }
 
-    /// `sub` → credit `to`. The recipient debits when they want the balance.
+    /// Shared(`from`, Banx) → poster's Tokens sub-account on Banx.
+    pub fn take_tokens(from: AccountNumber, token_id: u32, amount: Quantity, memo: &str) {
+        Self::tokens_debit(from, token_id, amount, memo);
+        Self::to_sub(from, token_id, amount);
+    }
+
+    /// Move `sub` onto the Banx primary balance and credit `to`.
+    ///
+    /// A later `tokens.reject` returns that credit to the Banx service
+    /// account. The tokens do not go back to `sub`, and the draw or curve
+    /// from the payout stays. Refusing the credit is the recipient's choice.
     pub(crate) fn pay_named(
         sub: String,
         to: AccountNumber,
@@ -120,13 +130,9 @@ impl CashQuote {
         Tokens::call().credit(token_id, to, amount, Self::token_memo(memo));
     }
 
-    /// Shared(`from`, Banx) → poster's Tokens sub-account on Banx.
-    pub fn take_tokens(from: AccountNumber, token_id: u32, amount: Quantity, memo: &str) {
-        Self::tokens_debit(from, token_id, amount, memo);
-        Self::to_sub(from, token_id, amount);
-    }
-
-    /// Poster's sub-account → credit `to`. The recipient debits when they want the balance.
+    /// Poster's vault sub-account → credit `to`. The recipient debits to take
+    /// the tokens. Refusing them leaves the tokens on the Banx service
+    /// account; see [`Self::pay_named`].
     pub fn pay_tokens(
         poster: AccountNumber,
         to: AccountNumber,

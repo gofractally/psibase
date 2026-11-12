@@ -308,6 +308,7 @@ export function useSetPayAuth() {
             assetId: number;
             amount: string;
             maxSpend: string;
+            maxInterestRatePpm: number;
             periodSeconds: number;
             nextDueSeconds: number;
             endsAtSeconds: number;
@@ -317,6 +318,7 @@ export function useSetPayAuth() {
                 p.assetId,
                 p.amount,
                 p.maxSpend,
+                p.maxInterestRatePpm,
                 p.periodSeconds,
                 p.nextDueSeconds,
                 p.endsAtSeconds,

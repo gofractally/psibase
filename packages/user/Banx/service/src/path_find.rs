@@ -8,10 +8,12 @@ use std::collections::{HashMap, HashSet};
 
 use psibase::AccountNumber;
 
+use crate::math::{
+    smallest_input_for_output, try_invert_hop_fee, try_invert_rate, try_swap_in, try_swap_out,
+};
 pub use crate::math::{
     try_apply_hop_fee as apply_hop_fee, try_apply_rate as apply_rate, PPM_SCALE, RATE_SCALE,
 };
-use crate::math::{try_invert_hop_fee, try_invert_rate, try_swap_in, try_swap_out};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LineEdge {
@@ -766,45 +768,7 @@ fn smallest_in(
         simulate_path_fees(hop_keys, amount, sender, lines, routing, fx, now)
             .and_then(|hops| hops.last().map(|hop| hop.amount))
     };
-    let mut lo = 0u64;
-    let mut hi = 1u64;
-    let mut saw = false;
-    let mut found = false;
-    for _ in 0..64 {
-        match simulate(hi) {
-            Some(out) if out >= need => {
-                found = true;
-                break;
-            }
-            Some(_) => {
-                saw = true;
-                if hi > u64::MAX / 2 {
-                    return None;
-                }
-                lo = hi;
-                hi *= 2;
-            }
-            // A tiny input can round to no output on the second swap.
-            None if !saw => {
-                if hi > u64::MAX / 2 {
-                    return None;
-                }
-                hi *= 2;
-            }
-            None => return None,
-        }
-    }
-    if !found {
-        return None;
-    }
-    while lo + 1 < hi {
-        let mid = lo + (hi - lo) / 2;
-        match simulate(mid) {
-            Some(out) if out >= need => hi = mid,
-            _ => lo = mid,
-        }
-    }
-    Some(hi)
+    smallest_input_for_output(need, simulate)
 }
 
 fn required_in(
@@ -2388,6 +2352,53 @@ mod tests {
         assert_eq!(
             required_in(&hops, 500, bob, &[], &routing, &fx, 0).expect("exact out"),
             501
+        );
+    }
+
+    /// 1_024 prices a short output. 2_048 is past the currency cap. 1_401,
+    /// which is not a power of two, still delivers 1_400.
+    #[test]
+    fn exact_out_survives_a_gap_with_no_power_of_two() {
+        let eur = 3u16;
+        let usd = 1u16;
+        let aud = 2u16;
+        let bob = acct("bob");
+        let hops = vec![
+            (acct("brandon"), eur),
+            (acct("john"), usd),
+            (acct("alice"), aud),
+            (acct("john"), aud),
+            (acct("carol"), usd),
+        ];
+        let routing = vec![
+            global_rte("brandon", usd, 0),
+            global_rte("john", aud, 0),
+            global_rte("alice", aud, 0),
+            global_rte("john", usd, 0),
+        ];
+        let fx = vec![
+            FxEdge {
+                poster: acct("brandon"),
+                from_asset: eur,
+                to_asset: usd,
+                fee_fixed: 0,
+                fx_rate: crate::math::RATE_SCALE,
+                remaining: 1_500,
+                expires_at: 0,
+                reserve_in: 0,
+                reserve_out: 0,
+                fee_ppm: 0,
+            },
+            relay_fx("john", usd, aud, 10_000, 15_000),
+            relay_fx("john", aud, usd, 15_000, 10_000),
+        ];
+        let short = simulate_path_fees(&hops, 1_024, bob, &[], &routing, &fx, 0)
+            .expect("1024 is inside the cap");
+        assert!(short.last().unwrap().amount < 1_400);
+        assert!(simulate_path_fees(&hops, 2_048, bob, &[], &routing, &fx, 0).is_none());
+        assert_eq!(
+            required_in(&hops, 1_400, bob, &[], &routing, &fx, 0).expect("exact out"),
+            1_401
         );
     }
 }

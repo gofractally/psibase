@@ -16,6 +16,7 @@ import {
     useDeposit,
 } from "@/hooks/use-banx-mutations";
 import { displayAmount } from "@/lib/amount";
+import { ppmToPercent } from "@/lib/constants";
 import {
     REQUEST_INVOICE,
     REQUEST_PLEASE_BOOK,
@@ -289,6 +290,9 @@ export function RequestsPage() {
                                     <TableHead className="text-right">
                                         Each period
                                     </TableHead>
+                                    <TableHead className="text-right">
+                                        Max APR
+                                    </TableHead>
                                     <TableHead>Every</TableHead>
                                     <TableHead>Next due</TableHead>
                                     <TableHead className="text-right">
@@ -313,6 +317,11 @@ export function RequestsPage() {
                                             </TableCell>
                                             <TableCell className="text-right font-mono">
                                                 {displayAmount(row.amount)}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {ppmToPercent(
+                                                    row.maxInterestRatePpm,
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 {periodLabel(row.periodSeconds)}

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use psibase::{services::tokens::Quantity, AccountNumber};
 
 use super::{emit_pair_activity_as, invert_hop_fee, invert_rate, Connection};
-use crate::math::{try_apply_hop_fee, try_apply_rate};
+use crate::math::{smallest_input_for_output, try_apply_hop_fee, try_apply_rate};
 use crate::tables::tables::{BanxRelay, CurrencyPolicy, ForwardOffer, PathHop, PayRequest};
 
 /// Exact-out send: walk hops backward from `target_out` at the last hop
@@ -59,43 +59,9 @@ fn relay_used_twice(hops: &[PathHop]) -> bool {
 /// Smallest send whose forward pricing, with reserves updated in order, meets `target_out`.
 fn sequential_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
     assert!(target_out.value > 0, "path amount must be positive");
-    let mut lo = 0u64;
-    let mut hi = 1u64;
-    let mut saw = false;
-    let mut found = false;
-    for _ in 0..64 {
-        match forward_amount(hops, hi) {
-            Some(out) if out >= target_out.value => {
-                found = true;
-                break;
-            }
-            Some(_) => {
-                saw = true;
-                if hi > u64::MAX / 2 {
-                    break;
-                }
-                lo = hi;
-                hi *= 2;
-            }
-            // A tiny input can round to no output. Keep raising it.
-            None if !saw => {
-                if hi > u64::MAX / 2 {
-                    break;
-                }
-                hi *= 2;
-            }
-            None => break,
-        }
-    }
-    assert!(found, "relay cannot produce that output");
-    while lo + 1 < hi {
-        let mid = lo + (hi - lo) / 2;
-        match forward_amount(hops, mid) {
-            Some(out) if out >= target_out.value => hi = mid,
-            _ => lo = mid,
-        }
-    }
-    hi.into()
+    smallest_input_for_output(target_out.value, |amount| forward_amount(hops, amount))
+        .expect("relay cannot produce that output")
+        .into()
 }
 
 /// Same pricing as [`execute_path`], on local relay copies. Does not draw or save.

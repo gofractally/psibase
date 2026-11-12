@@ -6228,6 +6228,63 @@ mod tests {
         Ok(())
     }
 
+    /// A touch that adds no unit must keep the epoch. One unit of 10% on
+    /// 1_000_000 needs 316 seconds, so a net every 5 minutes used to finish
+    /// the day still at 1_000_000. The epoch stays until a unit is earned,
+    /// which is every 10 minutes here. Each of those 144 units starts a new
+    /// epoch, so the day bills 144, not the 273 a single untouched evaluation
+    /// would.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_noop_net_keeps_unbilled_interest(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, alice)
+            .deposit(bob, usd, Quantity::new(1_000_000), 100_000, 0)
+            .get()?;
+
+        for _ in 0..288 {
+            chain.start_block_after(Seconds::new(300).into());
+            Wrapper::push_from(&chain, alice)
+                .net(bob, usd, Quantity::new(0))
+                .get()?;
+        }
+        assert_eq!(exp(&chain, bob, alice, usd), 1_000_144);
+        Ok(())
+    }
+
+    /// The same checkpoint used to freeze decay. 3_650 at −10% loses 1 in an
+    /// untouched day and used to lose nothing across two 12-hour nets.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_noop_net_keeps_unbilled_decay(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        allow_book(&chain, alice, bob, usd, -100_000);
+        Wrapper::push_from(&chain, bob)
+            .book(alice, usd, Quantity::new(3_650), -100_000, "".into())
+            .get()?;
+
+        let half = Seconds::new(12 * 60 * 60);
+        chain.start_block_after(half.into());
+        Wrapper::push_from(&chain, alice)
+            .net(bob, usd, Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 3_650);
+        chain.start_block_after(half.into());
+        Wrapper::push_from(&chain, alice)
+            .net(bob, usd, Quantity::new(0))
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 3_649);
+        Ok(())
+    }
+
     /// One day of interest on a near-max principal fills the u64 cap and splits
     /// it across principal and accrued. Another unit must fail, and the row
     /// must still forgive.
@@ -6760,6 +6817,7 @@ mod tests {
                 asset,
                 Quantity::new(amount),
                 Quantity::new(max_spend),
+                PPM_SCALE,
                 period,
                 TimePointSec { seconds: next_due },
                 TimePointSec { seconds: ends_at },
@@ -6794,6 +6852,7 @@ mod tests {
             usd,
             Quantity::new(100),
             Quantity::new(100),
+            0,
             100,
             now,
             never(),
@@ -6805,6 +6864,7 @@ mod tests {
             usd,
             Quantity::new(0),
             Quantity::new(100),
+            0,
             100,
             now,
             never(),
@@ -6816,6 +6876,7 @@ mod tests {
             usd,
             Quantity::new(100),
             Quantity::new(50),
+            0,
             100,
             now,
             never(),
@@ -6828,10 +6889,122 @@ mod tests {
             Quantity::new(100),
             Quantity::new(100),
             0,
+            0,
             now,
             never(),
         );
         assert!(rejected.get().is_err());
+
+        let over = Wrapper::push_from(&chain, alice)
+            .st_pay_ath(
+                bob,
+                usd,
+                Quantity::new(100),
+                Quantity::new(100),
+                PPM_SCALE + 1,
+                100,
+                now,
+                never(),
+            )
+            .get()
+            .expect_err("a rate above 100% is not a cap");
+        assert!(
+            over.to_string().contains("pay auth rate exceeds 100%"),
+            "{over}"
+        );
+        Ok(())
+    }
+
+    /// The payee submits the hops. Hop 0 is a raw draw, so the stored cap
+    /// has to cover that line whoever the creditor is. A 0% cap still pays
+    /// a 0% line.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_caps_first_hop_rate(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let carol = account!("carol");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        const START: i64 = 1_700_000_000;
+        pin(&chain, START);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        let zero = Wrapper::push_from(&chain, alice)
+            .st_pay_ath(
+                bob,
+                usd,
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+                100,
+                TimePointSec { seconds: START },
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .run_pay_ath(zero, vec![hop(bob, usd)])
+            .get()?;
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
+
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, PPM_SCALE, 0)
+            .get()?;
+        let capped = Wrapper::push_from(&chain, alice)
+            .st_pay_ath(
+                bob,
+                usd,
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+                100,
+                TimePointSec { seconds: START },
+                never(),
+            )
+            .get()?;
+        let own = Wrapper::push_from(&chain, bob)
+            .run_pay_ath(capped, vec![hop(bob, usd)])
+            .get()
+            .expect_err("the payee cannot raise the line and collect at 100%");
+        assert!(
+            own.to_string().contains("pay auth rate exceeds max"),
+            "{own}"
+        );
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
+        assert_eq!(pay_row(capped).next_due.seconds, START);
+
+        Wrapper::push_from(&chain, carol)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, PPM_SCALE, 0)
+            .get()?;
+        // The path still has to end at the payee. Hop 0 is the raw draw.
+        let third = Wrapper::push_from(&chain, bob)
+            .run_pay_ath(capped, vec![hop(carol, usd), hop(bob, usd)])
+            .get()
+            .expect_err("another account's 100% line is the same hole");
+        assert!(
+            third.to_string().contains("pay auth rate exceeds max"),
+            "{third}"
+        );
+        assert_eq!(exp(&chain, carol, alice, usd), 0);
+
+        Wrapper::push_from(&chain, carol)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(carol, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .st_fwd_ofr(bob, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .run_pay_ath(capped, vec![hop(carol, usd), hop(bob, usd)])
+            .get()?;
+        assert_eq!(exp(&chain, carol, alice, usd), 100);
+        assert_eq!(exp(&chain, bob, alice, usd), 100);
         Ok(())
     }
 
@@ -8085,6 +8258,85 @@ mod tests {
         Ok(())
     }
 
+    /// Exact-out through one relay twice, with a currency cap in front.
+    /// 1_024 comes back short of 1_400. 2_048 is over the cap. The payable
+    /// send, 1_401, is not a power of two.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_exact_out_between_short_output_and_policy_cap(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let net = relay_net(&chain);
+        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        let carol = account!("carol");
+        chain.new_account(carol).unwrap();
+        let eur = Asset::get_by_symbol_assert(account!("eur")).id;
+        Wrapper::push_from(&chain, net.brandon)
+            .st_crd_lne(net.bob, eur, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, net.brandon)
+            .st_cur_pol(
+                eur,
+                net.usd,
+                true,
+                Quantity::new(0),
+                RATE_SCALE,
+                0,
+                Quantity::new(1_500),
+                never(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, net.alice)
+            .st_glb_fwd(net.aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, net.john)
+            .st_glb_fwd(net.usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .st_crd_lne(net.john, net.usd, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        let hops = vec![
+            hop(net.brandon, eur),
+            hop(net.john, net.usd),
+            hop(net.alice, net.aud),
+            hop(net.john, net.aud),
+            hop(carol, net.usd),
+        ];
+        let id = Wrapper::push_from(&chain, carol)
+            .st_req(
+                PayRequest::INVOICE,
+                net.bob,
+                net.usd,
+                Quantity::new(1_400),
+                "usd".into(),
+                never(),
+            )
+            .get()?;
+        let short = Wrapper::push_from(&chain, net.bob)
+            .pay_inv(hops.clone(), Quantity::new(1_024), id)
+            .get()
+            .expect_err("1024 is below the send that delivers 1400");
+        assert!(
+            short.to_string().contains("max_spend below required send"),
+            "{short}"
+        );
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_000, 15_000));
+        assert!(PayRequest::get(id).is_some());
+
+        Wrapper::push_from(&chain, net.bob)
+            .pay_inv(hops, Quantity::new(1_500), id)
+            .get()?;
+        assert!(PayRequest::get(id).is_none());
+        assert_eq!(exp(&chain, carol, net.john, net.usd), 1_400);
+        assert_eq!(exp(&chain, net.brandon, net.bob, eur), 1_401);
+        assert_eq!(
+            CurrencyPolicy::get_assert(net.brandon, eur, net.usd, true)
+                .remaining
+                .value,
+            99
+        );
+        Ok(())
+    }
+
     struct WowBook {
         john: AccountNumber,
         aud: u16,
@@ -8698,6 +8950,80 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
 
+        Ok(())
+    }
+
+    /// Debtor takes the creditor's rebook quote. `min_to` is a floor on the
+    /// new to-asset debt, so a worse rate still clears it. Alice signed for
+    /// 50 USD (`test_currency_policy_convert`). Gary then posts 5.0. That
+    /// take must not land: she would owe 500 USD for the same 100 AUD.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_convert_debtor_min_to_rejects_worse_rate(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .path_pay(
+                vec![hop(gary, aud)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                true,
+                Quantity::new(0),
+                RATE_SCALE * 50 / 100,
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
+            .get()?;
+
+        // Same action Alice would send for the 0.50 quote. Gary has replaced it.
+        Wrapper::push_from(&chain, gary)
+            .st_cur_pol(
+                aud,
+                usd,
+                true,
+                Quantity::new(0),
+                RATE_SCALE * 5,
+                0,
+                Quantity::new(u64::MAX),
+                never(),
+            )
+            .get()?;
+        let taken = Wrapper::push_from(&chain, alice)
+            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(50))
+            .get();
+        assert!(
+            taken.is_err(),
+            "convert let a debtor-side take clear min_to=50 at 5.0 (new debt 500); \
+             the bound has to cap what the taker will owe, got {taken:?}"
+        );
+        assert_eq!(
+            exp(&chain, gary, alice, aud),
+            100,
+            "worse rate must leave the from-asset debt"
+        );
+        assert_eq!(
+            exp(&chain, gary, alice, usd),
+            0,
+            "worse rate must not book the unquoted to-asset debt"
+        );
         Ok(())
     }
 

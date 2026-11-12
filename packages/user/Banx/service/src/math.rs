@@ -138,6 +138,69 @@ pub fn try_apply_spread(amount_in: u64, fee_fixed: u64, spread_ppm: i32) -> Opti
     (out > 0).then_some(out)
 }
 
+/// Smallest positive input for which `probe` returns at least `target`.
+///
+/// `None` before any positive output means the input still rounds to nothing,
+/// so the search keeps growing. `None` after a short positive output is a
+/// ceiling (a currency-policy cap, or a swap that cannot price a larger
+/// input). The feasible send may sit strictly between those two probes, so
+/// the search does not require a power of two to succeed. `probe` is monotone
+/// up to that ceiling: a larger input does not start pricing again after `None`.
+pub fn smallest_input_for_output(
+    target: u64,
+    mut probe: impl FnMut(u64) -> Option<u64>,
+) -> Option<u64> {
+    if target == 0 {
+        return None;
+    }
+    let mut lo = 0u64;
+    let mut hi = 1u64;
+    let mut saw = false;
+    let mut bounded = false;
+    for _ in 0..64 {
+        match probe(hi) {
+            Some(out) if out >= target => {
+                bounded = true;
+                break;
+            }
+            Some(out) if out > 0 => {
+                saw = true;
+                if hi > u64::MAX / 2 {
+                    return None;
+                }
+                lo = hi;
+                hi *= 2;
+            }
+            _ if !saw => {
+                if hi > u64::MAX / 2 {
+                    return None;
+                }
+                hi *= 2;
+            }
+            // A short output already priced. This probe is past the cap.
+            _ => {
+                bounded = true;
+                break;
+            }
+        }
+    }
+    if !bounded {
+        return None;
+    }
+    while lo + 1 < hi {
+        let mid = lo + (hi - lo) / 2;
+        match probe(mid) {
+            Some(out) if out >= target => hi = mid,
+            Some(out) if out > 0 => lo = mid,
+            _ => hi = mid,
+        }
+    }
+    match probe(hi) {
+        Some(out) if out >= target => Some(hi),
+        _ => None,
+    }
+}
+
 /// Stripe-style hop fee: `out = in * (PPM_SCALE - percent) / PPM_SCALE - fixed`.
 pub fn try_apply_hop_fee(amount_in: u64, fee_fixed: u64, fee_percent_ppm: u32) -> Option<u64> {
     if fee_percent_ppm >= PPM_SCALE {

@@ -128,6 +128,11 @@ impl Connection {
     /// `add_fee` prices the poster's fee on top of `take` (they are owed the
     /// from-asset): `apply_rate` sees `take + fee` and a zero fee. Otherwise
     /// the fee is taken out of `take`. The claim still shrinks by `take`.
+    ///
+    /// `min_to` is the taker's signed bound. `add_fee` means the taker owes
+    /// the new amount, so a positive `min_to` caps it. Zero does not: a
+    /// take may leave the new debt unbounded. The other direction receives
+    /// the claim, and the same bound is a floor.
     pub fn rebook(
         self,
         take: Quantity,
@@ -150,7 +155,15 @@ impl Connection {
             (take, fee_fixed)
         };
         let to_qty = apply_rate(priced, fee, fx_rate);
-        assert!(to_qty.value >= min_to.value, "convert output below min_to");
+        if add_fee {
+            // A floor would accept a replaced higher rate: the taker owes more
+            // than they signed. Zero stays open so existing takes can pass it.
+            if min_to.value > 0 {
+                assert!(to_qty.value <= min_to.value, "convert output above min_to");
+            }
+        } else {
+            assert!(to_qty.value >= min_to.value, "convert output below min_to");
+        }
         Obligation::credit_pair(
             self.creditor,
             self.debtor,

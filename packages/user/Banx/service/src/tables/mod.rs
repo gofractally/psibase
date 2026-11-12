@@ -440,6 +440,8 @@ pub mod tables {
         pub amount: Quantity,
         /// Most the payer will be drawn for one period, same asset. At least `amount`.
         pub max_spend: Quantity,
+        /// Highest APR ppm the first hop's credit line may charge. 0 is 0% only.
+        pub max_interest_rate: u32,
         /// Length of one period. Greater than 0.
         pub period_seconds: u32,
         /// Start of the oldest period that has not been paid.

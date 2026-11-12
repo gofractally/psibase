@@ -700,7 +700,12 @@ pub mod service {
     /// Take the **counterparty's** [`CurrencyPolicy`] for the leftover
     /// `from_asset` debt. Only the side that matches that debt is used.
     /// Sender does not use their own policy. Nets `from_asset` first when
-    /// the quote exists; requires output ≥ `min_to`; auto-nets `to_asset`.
+    /// the quote exists and auto-nets `to_asset`.
+    ///
+    /// `min_to` bounds the new to-asset amount. When the sender owes the
+    /// from-asset, that amount is new debt: a positive `min_to` caps it
+    /// and zero does not. When the sender is owed the from-asset, `min_to`
+    /// is a floor on what they receive.
     #[action]
     fn convert(
         counterparty: AccountNumber,
@@ -859,8 +864,9 @@ pub mod service {
         assert!(!hops.is_empty(), "path_cash must include at least one hop");
         assert!(amount.value > 0, "path_cash amount must be positive");
         assert_account_exists(recipient);
+        let sender = get_sender();
         let last = hops[hops.len() - 1];
-        let banx_in = run_path(get_sender(), hops, amount, Quantity::new(1), 0, "");
+        let banx_in = run_path(sender, hops, amount, Quantity::new(1), 0, "");
         TokenRelay::pay_tokens_for_banx(
             last.account,
             last.asset_id,
@@ -906,6 +912,7 @@ pub mod service {
         asset_id: u16,
         amount: Quantity,
         max_spend: Quantity,
+        max_interest_rate: u32,
         period_seconds: u32,
         next_due: TimePointSec,
         ends_at: TimePointSec,
@@ -916,6 +923,7 @@ pub mod service {
             asset_id,
             amount,
             max_spend,
+            max_interest_rate,
             period_seconds,
             next_due,
             ends_at,

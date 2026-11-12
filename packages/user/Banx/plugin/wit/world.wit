@@ -344,13 +344,15 @@ interface api {
 
     /// Repeating path payment. Sender is the payer. Amounts are human
     /// decimals in `asset-id`. Times are unix seconds. `ends-at-seconds`
-    /// 0 means no scheduled end. The id is allocated on chain; refetch
-    /// `payAuths` after the transaction.
+    /// 0 means no scheduled end. `max-interest-rate-ppm` caps the first
+    /// hop's credit line (0 is 0% only, 1000000 is 100%). The id is
+    /// allocated on chain; refetch `payAuths` after the transaction.
     set-pay-auth: func(
         payee: string,
         asset-id: u16,
         amount: string,
         max-spend: string,
+        max-interest-rate-ppm: u32,
         period-seconds: u32,
         next-due-seconds: u32,
         ends-at-seconds: u32,

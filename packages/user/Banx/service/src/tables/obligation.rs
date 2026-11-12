@@ -166,9 +166,14 @@ impl Obligation {
             return;
         }
         let (principal, accrued) = self.live_parts_at(now);
+        // A floored balance that did not move must keep its epoch. Stamping
+        // now would drop a partial day that has not reached one unit yet, and
+        // the same checkpoint freezes a negative rate whose slice rounds to
+        // zero. Grace already returned above. An over-cap trim differs from
+        // the stored split, so it still writes and starts a new epoch.
         let unchanged =
             principal == self.remaining_principal.value && accrued == self.accrued_interest.value;
-        if unchanged && now.seconds <= self.last_interest_accrual.seconds {
+        if unchanged {
             return;
         }
         self.remaining_principal = principal.into();
@@ -199,6 +204,16 @@ impl Obligation {
         }
     }
 
+    /// New principal or stored interest landed on this row. Accrue has already
+    /// stored any whole units and, when the floored balance did not move, has
+    /// left the epoch in place so a no-op touch keeps a partial day. This
+    /// amount did not exist for that interval, so the clock starts now.
+    /// During grace that is the same stamp as [`Self::note_grace_change`].
+    fn note_addition(&mut self) {
+        self.note_grace_change();
+        self.last_interest_accrual = Self::now();
+    }
+
     fn pair_clear(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) -> bool {
         Self::obligations(creditor, debtor, asset_id)
             .iter()
@@ -210,8 +225,8 @@ impl Obligation {
     /// [`Self::pair_clear`] reads stored principal. A negative-rate row keeps
     /// that principal until accrue deletes it, so a later credit at another
     /// rate still looks occupied and posted grace does not open. Live rows
-    /// stay untouched: accruing them would move an epoch whose floored
-    /// balance did not change.
+    /// stay untouched. An unchanged floored balance does not move the epoch,
+    /// and only a row whose live balance is already zero is accrued here.
     fn delete_decayed(creditor: AccountNumber, debtor: AccountNumber, asset_id: u16) {
         let now = Self::now();
         if PairCycle::pair_in_grace(creditor, debtor, asset_id, now) {
@@ -416,7 +431,7 @@ impl Obligation {
             }
         }
         if changed {
-            dest.note_grace_change();
+            dest.note_addition();
         }
         dest.save();
     }
@@ -483,8 +498,10 @@ impl Obligation {
 
     /// Grow principal on this claim (shared by deposit and line draws).
     /// Decayed rows on the pair are removed first, then this bucket is
-    /// accrued, so new principal is not back-dated and occupancy is sampled
-    /// after a zero balance is gone.
+    /// accrued. Accrue does not move the epoch when the floored balance is
+    /// unchanged, so the addition itself starts the clock. Otherwise the
+    /// following net would compound the new principal over that open
+    /// interval. Occupancy is sampled after a zero balance is gone.
     fn credit(&mut self, amount: Quantity) {
         Self::delete_decayed(self.creditor, self.debtor, self.asset_id);
         // Accrue deleted this row on a copy. Drop the pre-decay principal
@@ -512,7 +529,7 @@ impl Obligation {
             "obligation balance overflow"
         );
         self.remaining_principal = next_principal.into();
-        self.note_grace_change();
+        self.note_addition();
         self.save();
         let after_clear = Self::pair_clear(self.creditor, self.debtor, self.asset_id);
         PairCycle::sync_cycle(

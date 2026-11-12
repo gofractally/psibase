@@ -1,7 +1,8 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table, TimePointSec};
 
 use super::{assert_account_exists, path_required_send, run_path};
-use crate::tables::tables::{Asset, InitRow, Obligation, PathHop, PayAuth, PayAuthTab};
+use crate::math::PPM_SCALE;
+use crate::tables::tables::{Asset, CreditLine, InitRow, Obligation, PathHop, PayAuth, PayAuthTab};
 
 impl PayAuth {
     fn save(&self) {
@@ -29,6 +30,7 @@ impl PayAuth {
         asset_id: u16,
         amount: Quantity,
         max_spend: Quantity,
+        max_interest_rate: u32,
         period_seconds: u32,
         next_due: TimePointSec,
         ends_at: TimePointSec,
@@ -40,6 +42,7 @@ impl PayAuth {
             max_spend.value >= amount.value,
             "pay auth max_spend below amount"
         );
+        assert!(max_interest_rate <= PPM_SCALE, "pay auth rate exceeds 100%");
         assert!(period_seconds > 0, "pay auth period must be positive");
         assert!(
             ends_at.seconds == 0 || ends_at.seconds > next_due.seconds,
@@ -54,6 +57,7 @@ impl PayAuth {
             asset_id,
             amount,
             max_spend,
+            max_interest_rate,
             period_seconds,
             next_due,
             ends_at,
@@ -86,6 +90,15 @@ impl PayAuth {
             hops.iter().all(|hop| hop.asset_id == row.asset_id),
             "pay auth hop asset must match"
         );
+        // Hop 0 is a raw draw. The payee chooses the hops, so the line they
+        // name — theirs or anyone else's — cannot charge more than the payer stored.
+        let first = hops[0];
+        if let Some(line) = CreditLine::get(first.account, row.payer, first.asset_id) {
+            assert!(
+                line.interest_rate <= row.max_interest_rate,
+                "pay auth rate exceeds max"
+            );
+        }
         let required = path_required_send(&hops, row.amount);
         assert!(
             required.value <= row.max_spend.value,

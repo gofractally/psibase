@@ -417,6 +417,8 @@ mod service {
         assetId: u16,
         amount: Decimal,
         maxSpend: Decimal,
+        /// Highest APR ppm the first hop may charge. 0 is 0% only.
+        maxInterestRatePpm: u32,
         periodSeconds: u32,
         nextDue: i64,
         endsAt: i64,
@@ -432,6 +434,7 @@ mod service {
                 assetId: row.asset_id,
                 amount: Decimal::new(row.amount, p),
                 maxSpend: Decimal::new(row.max_spend, p),
+                maxInterestRatePpm: row.max_interest_rate,
                 periodSeconds: row.period_seconds,
                 nextDue: time_sec(row.next_due),
                 endsAt: time_sec(row.ends_at),
