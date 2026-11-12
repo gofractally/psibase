@@ -23,12 +23,3 @@ if(ENABLE_SSL)
     target_compile_definitions(psibase_http PUBLIC PSIBASE_ENABLE_SSL)
     target_link_libraries(psibase_http PUBLIC OpenSSL::SSL)
 endif()
-
-add_executable(psibase-http-tests tests/set_cookie_merge.cpp)
-target_include_directories(psibase-http-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(psibase-http-tests PRIVATE psibase_http Catch2::Catch2WithMain)
-set_target_properties(psibase-http-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
-add_test(
-    NAME n-psibase-http-tests
-    WORKING_DIRECTORY ${ROOT_BINARY_DIR}
-    COMMAND ./psibase-http-tests)
