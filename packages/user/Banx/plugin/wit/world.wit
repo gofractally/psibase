@@ -211,23 +211,29 @@ interface api {
 
     /// Sell claims on `debtor` to `buyer` under buyer's **buy** offer.
     /// `amount` is face (human decimal); seller receives face after fees as a
-    /// claim on the buyer. New exposure needs the buyer's credit line to
+    /// claim on the buyer. `min-proceeds` is the floor you sign for that
+    /// claim. A positive bound rejects a replaced offer that pays less.
+    /// Zero does not floor. New exposure needs the buyer's credit line to
     /// `debtor` and is capped by that line.
     sell-claim: func(
         buyer: string,
         debtor: string,
         asset-id: u16,
         amount: string,
+        min-proceeds: string,
     ) -> result<_, error>;
 
     /// Buy claims on `debtor` from `seller` under seller's **sell** offer.
-    /// New exposure needs your credit line to `debtor` and is capped by
-    /// that line.
+    /// `max-cost` is the cap you sign on the claim you will owe the seller.
+    /// A positive bound rejects a replaced offer that costs more. Zero does
+    /// not cap. New exposure needs your credit line to `debtor` and is
+    /// capped by that line.
     buy-claim: func(
         seller: string,
         debtor: string,
         asset-id: u16,
         amount: string,
+        max-cost: string,
     ) -> result<_, error>;
 
     /// Post one side of a from→to quote. Others take it with `convert`.

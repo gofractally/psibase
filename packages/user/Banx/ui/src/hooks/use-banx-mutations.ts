@@ -785,7 +785,15 @@ export function useSellClaim() {
             debtor: string;
             assetId: number;
             amount: string;
-        }) => banxCall("sellClaim", [p.buyer, p.debtor, p.assetId, p.amount]),
+            minProceeds: string;
+        }) =>
+            banxCall("sellClaim", [
+                p.buyer,
+                p.debtor,
+                p.assetId,
+                p.amount,
+                p.minProceeds,
+            ]),
         onSuccess: () => {
             invalidate();
             toast.success("Claim sold");
@@ -802,7 +810,15 @@ export function useBuyClaim() {
             debtor: string;
             assetId: number;
             amount: string;
-        }) => banxCall("buyClaim", [p.seller, p.debtor, p.assetId, p.amount]),
+            maxCost: string;
+        }) =>
+            banxCall("buyClaim", [
+                p.seller,
+                p.debtor,
+                p.assetId,
+                p.amount,
+                p.maxCost,
+            ]),
         onSuccess: () => {
             invalidate();
             toast.success("Claim bought");

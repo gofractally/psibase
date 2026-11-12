@@ -294,6 +294,8 @@ One table, `side` in the primary key (`1` buy, `2` sell). `debtor = 0` is global
 
 `out = in × (1 − spread) − fee_fixed` after flipping sell so positive is the poster’s profit.
 
+The taker signs a bound. `sell_claim` rejects proceeds below `min_proceeds`. `buy_claim` rejects cost above `max_cost`. Zero does not bound.
+
 The offer’s face budget is separate from a credit line. Each take spends that face amount and leaves the row at 0 so the poster can top up by posting again. A zero post is rejected. A spent specific offer still blocks the global one until it is removed or topped up.
 
 The **debtor must know the buyer** (line to them, or a live claim). New exposure requires the **buyer’s credit line** to the debtor and is **capped** with the same capacity as a path hop (reverse claim + headroom). A depleting line’s own budget is spent only on **new_draw**. A take that only unwinds a reverse claim needs no buyer line. The offer is the rate and the face budget; the line is who and how much new exposure. Checks run at **take**, not at post.

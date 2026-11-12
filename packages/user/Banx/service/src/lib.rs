@@ -464,20 +464,49 @@ pub mod service {
     /// after the offer spread. The debtor must know the buyer (line or
     /// live claim). New exposure requires the buyer's credit line to the
     /// debtor and is capped by that line's capacity.
+    ///
+    /// `min_proceeds` is the floor the seller signs. A positive bound rejects
+    /// a replaced offer that pays less. Zero does not floor.
     #[action]
-    fn sell_claim(buyer: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
-        let seller = get_sender();
-        let mut offer = ClaimOffer::get_live(buyer, debtor, asset_id, ClaimOffer::BUY);
-        offer.execute(seller, buyer, debtor, amount, "sell_claim");
+    fn sell_claim(
+        buyer: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+        amount: Quantity,
+        min_proceeds: Quantity,
+    ) {
+        ClaimOffer::get_live(buyer, debtor, asset_id, ClaimOffer::BUY).execute(
+            get_sender(),
+            buyer,
+            debtor,
+            amount,
+            min_proceeds,
+            "sell_claim",
+        );
     }
 
     /// Buyer (sender) buys claims on `debtor` from `seller` under the seller's
     /// **sell** offer. Same books as `sell_claim`; the maker's ask applies.
+    ///
+    /// `max_cost` is the cap the buyer signs on the new claim they owe the
+    /// seller. A positive bound rejects a replaced offer that costs more.
+    /// Zero does not cap.
     #[action]
-    fn buy_claim(seller: AccountNumber, debtor: AccountNumber, asset_id: u16, amount: Quantity) {
-        let buyer = get_sender();
-        let mut offer = ClaimOffer::get_live(seller, debtor, asset_id, ClaimOffer::SELL);
-        offer.execute(seller, buyer, debtor, amount, "buy_claim");
+    fn buy_claim(
+        seller: AccountNumber,
+        debtor: AccountNumber,
+        asset_id: u16,
+        amount: Quantity,
+        max_cost: Quantity,
+    ) {
+        ClaimOffer::get_live(seller, debtor, asset_id, ClaimOffer::SELL).execute(
+            seller,
+            get_sender(),
+            debtor,
+            amount,
+            max_cost,
+            "buy_claim",
+        );
     }
 
     /// Poster posts one side of a from→to quote.
@@ -678,8 +707,11 @@ pub mod service {
         amount_banx: Quantity,
         min_tokens: Quantity,
     ) {
-        let mut quote = CashQuote::get_live(cashier, asset_id, token_id, true);
-        quote.cash_out(get_sender(), amount_banx, min_tokens);
+        CashQuote::get_live(cashier, asset_id, token_id, true).cash_out(
+            get_sender(),
+            amount_banx,
+            min_tokens,
+        );
     }
 
     /// Send tokens from the sender's `{sender}/{token_id}` vault at
@@ -693,8 +725,11 @@ pub mod service {
         amount_tokens: Quantity,
         min_banx: Quantity,
     ) {
-        let mut quote = CashQuote::get_live(cashier, asset_id, token_id, false);
-        quote.cash_in(get_sender(), amount_tokens, min_banx);
+        CashQuote::get_live(cashier, asset_id, token_id, false).cash_in(
+            get_sender(),
+            amount_tokens,
+            min_banx,
+        );
     }
 
     /// Take the **counterparty's** [`FxOffer`] for the leftover

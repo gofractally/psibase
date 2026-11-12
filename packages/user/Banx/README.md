@@ -92,9 +92,9 @@ One table, `side` in the primary key (`1` buy, `2` sell). Spread ppm is signed (
 
 ## Transferring a claim
 
-`sell_claim(buyer, debtor, asset, amount)`: you hold a claim on `debtor` and hit the buyer’s **buy** offer.
+`sell_claim(buyer, debtor, asset, amount, min_proceeds)`: you hold a claim on `debtor` and hit the buyer’s **buy** offer. A positive `min_proceeds` is the floor you sign.
 
-`buy_claim(seller, debtor, asset, amount)`: you buy the seller’s claim on `debtor` under their **sell** offer.
+`buy_claim(seller, debtor, asset, amount, max_cost)`: you buy the seller’s claim on `debtor` under their **sell** offer. A positive `max_cost` is the cap you sign.
 
 Same books either way: face moves to the buyer; seller holds a claim on the buyer for face after the **maker’s** spread. Not a path payment and not “paid in full” for grace.
 

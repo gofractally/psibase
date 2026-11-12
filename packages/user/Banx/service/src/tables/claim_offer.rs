@@ -138,12 +138,28 @@ impl ClaimOffer {
         buyer: AccountNumber,
         debtor: AccountNumber,
         amount: Quantity,
+        bound: Quantity,
         kind: &str,
     ) {
         assert!(seller != buyer, "cannot transfer claim to self");
         assert!(seller != debtor, "cannot transfer claim on self as debtor");
         assert!(buyer != debtor, "buyer cannot be the debtor");
         assert!(amount.value > 0, "claim transfer amount must be positive");
+        // Price before any book moves. A replaced offer is the only rate the
+        // chain sees, so the taker's signed bound is what stops a worse one.
+        // Zero is no bound: existing takes can pass it. A positive bound is a
+        // floor on sell proceeds and a cap on buy cost.
+        let proceeds = self.apply_fees(amount);
+        if bound.value > 0 {
+            if self.is_sell() {
+                assert!(proceeds.value <= bound.value, "claim cost above max_cost");
+            } else {
+                assert!(
+                    proceeds.value >= bound.value,
+                    "claim proceeds below min_proceeds"
+                );
+            }
+        }
         self.spend(amount);
 
         let take = Connection::get_live(buyer, debtor, self.asset_id);
@@ -154,7 +170,6 @@ impl ClaimOffer {
             );
         }
         take.accept_claim(seller, amount);
-        let proceeds = self.apply_fees(amount);
         Connection::get_live(seller, buyer, self.asset_id).deposit(proceeds, 0);
 
         // Memo is the debtor so the buyer's feed can name whose debt moved.

@@ -433,6 +433,20 @@ export function SellClaimDialog({
                 );
                 return;
             }
+            const proceedsRaw = applyTakeFee(
+                amountRaw,
+                humanToRaw(selected.offer.feeFixed || "0", target.precision),
+                selected.offer.feePercentPpm,
+                takingAsk,
+            );
+            if (proceedsRaw === null) {
+                toast.error("Fee would consume this amount.");
+                return;
+            }
+            const bound = formatRawAmount(
+                proceedsRaw.toString(),
+                target.precision,
+            );
             await new Promise<void>((resolve, reject) => {
                 const done = {
                     onSuccess: () => {
@@ -448,6 +462,7 @@ export function SellClaimDialog({
                             debtor: target.debtor,
                             assetId: target.assetId,
                             amount,
+                            maxCost: bound,
                         },
                         done,
                     );
@@ -458,6 +473,7 @@ export function SellClaimDialog({
                             debtor: target.debtor,
                             assetId: target.assetId,
                             amount,
+                            minProceeds: bound,
                         },
                         done,
                     );

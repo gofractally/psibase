@@ -620,7 +620,7 @@ mod tests {
             .st_crd_lne(cafe, aud, 90_0000.into(), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, pippa)
-            .buy_claim(john, cafe, aud, 90_0000.into())
+            .buy_claim(john, cafe, aud, 90_0000.into(), Quantity::new(0))
             .get()?;
 
         assert_eq!(exp(&chain, john, cafe, aud), 5_0000);
@@ -1093,8 +1093,9 @@ mod tests {
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
 
+        // Alice signs the 5% haircut she was shown. A later worse spread fails.
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(10_000))
+            .sell_claim(peter, bob, usd, Quantity::new(10_000), Quantity::new(9_500))
             .get()?;
 
         // Bob now owes Peter full face; Alice holds 9500 on Peter.
@@ -1139,14 +1140,114 @@ mod tests {
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
 
+        // Alice signs the 5% premium she was shown.
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(10_000))
+            .sell_claim(
+                peter,
+                bob,
+                usd,
+                Quantity::new(10_000),
+                Quantity::new(10_500),
+            )
             .get()?;
 
         assert_eq!(exp(&chain, alice, bob, usd), 0);
         assert_eq!(exp(&chain, peter, bob, usd), 10_000);
         assert_eq!(exp(&chain, alice, peter, usd), 10_500);
 
+        Ok(())
+    }
+
+    /// Alice signs the 5% haircut she was shown. Peter replaces it with 20%.
+    /// The take must not land: she would receive 8_000 for the same face.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_sell_claim_min_proceeds_rejects_worse_spread(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(10_000), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_glb_buy(
+                usd,
+                Quantity::new(0),
+                (PPM_SCALE * 20 / 100) as i32,
+                Quantity::new(u64::MAX),
+                never(),
+            )
+            .get()?;
+
+        let taken = Wrapper::push_from(&chain, alice)
+            .sell_claim(peter, bob, usd, Quantity::new(10_000), Quantity::new(9_500))
+            .get();
+        assert!(
+            taken.is_err(),
+            "worse haircut cleared a signed 9_500 floor, got {taken:?}"
+        );
+        assert_eq!(exp(&chain, alice, bob, usd), 10_000);
+        assert_eq!(exp(&chain, peter, bob, usd), 0);
+        assert_eq!(exp(&chain, alice, peter, usd), 0);
+        Ok(())
+    }
+
+    /// Pippa signs John's 0% ask. He replaces it with a 5% premium. The take
+    /// must not land: she would owe 105 for the same 100 face.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_buy_claim_max_cost_rejects_worse_premium(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let peter = account!("peter");
+        for a in [alice, bob, peter] {
+            chain.new_account(a).unwrap();
+        }
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+        Wrapper::push_from(&chain, bob)
+            .deposit(alice, usd, Quantity::new(100), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, peter)
+            .st_crd_lne(bob, usd, Quantity::new(100), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
+            .get()?;
+        // Positive on a sell post is the seller's profit.
+        Wrapper::push_from(&chain, alice)
+            .st_glb_sell(
+                usd,
+                Quantity::new(0),
+                (PPM_SCALE * 5 / 100) as i32,
+                Quantity::new(u64::MAX),
+                never(),
+            )
+            .get()?;
+
+        let taken = Wrapper::push_from(&chain, peter)
+            .buy_claim(alice, bob, usd, Quantity::new(100), Quantity::new(100))
+            .get();
+        assert!(
+            taken.is_err(),
+            "worse premium cleared a signed 100 cap, got {taken:?}"
+        );
+        assert_eq!(exp(&chain, alice, bob, usd), 100);
+        assert_eq!(exp(&chain, peter, bob, usd), 0);
+        assert_eq!(exp(&chain, alice, peter, usd), 0);
         Ok(())
     }
 
@@ -1387,7 +1488,7 @@ mod tests {
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(50))
+            .sell_claim(peter, bob, usd, Quantity::new(50), Quantity::new(0))
             .get()?;
         let line = CreditLine::get_assert(peter, bob, usd);
         assert_eq!(line.limit.value, 100);
@@ -1450,7 +1551,7 @@ mod tests {
         assert_eq!(CreditLine::get_assert(peter, bob, usd).remaining.value, 100);
 
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(50))
+            .sell_claim(peter, bob, usd, Quantity::new(50), Quantity::new(0))
             .get()?;
 
         // Wash: Peter's new claim on Bob nets against the 50 he owed.
@@ -1492,7 +1593,7 @@ mod tests {
             .get()?;
 
         assert!(Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000))
+            .sell_claim(peter, bob, usd, Quantity::new(1_000), Quantity::new(0))
             .get()
             .is_err());
 
@@ -1500,7 +1601,7 @@ mod tests {
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000))
+            .sell_claim(peter, bob, usd, Quantity::new(1_000), Quantity::new(0))
             .get()?;
         assert_eq!(exp(&chain, peter, bob, usd), 1_000);
         Ok(())
@@ -1533,7 +1634,7 @@ mod tests {
 
         assert!(
             Wrapper::push_from(&chain, steve)
-                .sell_claim(peter, carol, usd, Quantity::new(500))
+                .sell_claim(peter, carol, usd, Quantity::new(500), Quantity::new(0))
                 .get()
                 .is_err(),
             "global buy without a buyer line must not take new exposure"
@@ -1544,13 +1645,13 @@ mod tests {
             .get()?;
         assert!(
             Wrapper::push_from(&chain, steve)
-                .sell_claim(peter, carol, usd, Quantity::new(2_000))
+                .sell_claim(peter, carol, usd, Quantity::new(2_000), Quantity::new(0))
                 .get()
                 .is_err(),
             "cannot dump more than the buyer's empty line"
         );
         Wrapper::push_from(&chain, steve)
-            .sell_claim(peter, carol, usd, Quantity::new(500))
+            .sell_claim(peter, carol, usd, Quantity::new(500), Quantity::new(0))
             .get()?;
         assert_eq!(exp(&chain, peter, carol, usd), 500);
         assert_eq!(exp(&chain, steve, carol, usd), 1_500);
@@ -1583,7 +1684,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, steve)
-            .sell_claim(peter, carol, usd, Quantity::new(500))
+            .sell_claim(peter, carol, usd, Quantity::new(500), Quantity::new(0))
             .get()?;
         assert_eq!(exp(&chain, peter, carol, usd), 0);
         assert_eq!(exp(&chain, carol, peter, usd), 0);
@@ -1620,7 +1721,7 @@ mod tests {
 
         assert!(
             Wrapper::push_from(&chain, alice)
-                .sell_claim(mallory, bob, usd, Quantity::new(1_000))
+                .sell_claim(mallory, bob, usd, Quantity::new(1_000), Quantity::new(0))
                 .get()
                 .is_err(),
             "dust deposit must not make bob know mallory as buyer"
@@ -1926,7 +2027,7 @@ mod tests {
             .get()?;
         assert!(CreditLine::get(bob, peter, usd).is_none());
         assert!(Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000))
+            .sell_claim(peter, bob, usd, Quantity::new(1_000), Quantity::new(0))
             .get()
             .is_err());
         assert_eq!(exp(&chain, alice, bob, usd), 1_000);
@@ -3391,7 +3492,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000))
+            .sell_claim(peter, bob, usd, Quantity::new(1_000), Quantity::new(0))
             .get()?;
         assert_eq!(exp(&chain, alice, peter, usd), 1_000);
         Ok(())
@@ -3997,7 +4098,7 @@ mod tests {
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000_000))
+            .sell_claim(peter, bob, usd, Quantity::new(1_000_000), Quantity::new(0))
             .get()?;
 
         assert_eq!(exp(&chain, alice, bob, usd), 0);
@@ -4079,7 +4180,7 @@ mod tests {
         assert!(before.cycle_started_at.seconds != 0);
 
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1))
+            .sell_claim(peter, bob, usd, Quantity::new(1), Quantity::new(0))
             .get()?;
 
         assert_eq!(exp(&chain, peter, bob, usd), PETER_PRINCIPAL + 1);
@@ -4161,7 +4262,7 @@ mod tests {
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(aged))
+            .sell_claim(peter, bob, usd, Quantity::new(aged), Quantity::new(0))
             .get()?;
 
         let face = exp(&chain, peter, bob, usd);
@@ -4245,7 +4346,7 @@ mod tests {
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(src_face))
+            .sell_claim(peter, bob, usd, Quantity::new(src_face), Quantity::new(0))
             .get()?;
 
         assert_eq!(exp(&chain, alice, bob, usd), 0);
@@ -4343,7 +4444,13 @@ mod tests {
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(src_interest))
+            .sell_claim(
+                peter,
+                bob,
+                usd,
+                Quantity::new(src_interest),
+                Quantity::new(0),
+            )
             .get()?;
 
         let dest = Obligation::get_by_interest_rate(peter, bob, usd, RATE).expect("dest claim");
@@ -4434,7 +4541,7 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(0), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, carol)
-            .sell_claim(gary, bob, usd, Quantity::new(1_000))
+            .sell_claim(gary, bob, usd, Quantity::new(1_000), Quantity::new(0))
             .get()?;
         assert_eq!(exp(&chain, carol, gary, usd), 1_000);
         assert_eq!(exp(&chain, gary, bob, usd), 1_000);
@@ -6307,11 +6414,11 @@ mod tests {
             .get()?;
 
         assert!(Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(401))
+            .sell_claim(peter, bob, usd, Quantity::new(401), Quantity::new(0))
             .get()
             .is_err());
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(400))
+            .sell_claim(peter, bob, usd, Quantity::new(400), Quantity::new(0))
             .get()?;
         assert_eq!(
             ClaimOffer::get_assert(peter, ClaimOffer::GLOBAL, usd, ClaimOffer::BUY)
@@ -6320,7 +6427,7 @@ mod tests {
             0
         );
         assert!(Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1))
+            .sell_claim(peter, bob, usd, Quantity::new(1), Quantity::new(0))
             .get()
             .is_err());
 
@@ -6328,7 +6435,7 @@ mod tests {
             .st_glb_buy(usd, Quantity::new(0), 0, Quantity::new(600), never())
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(600))
+            .sell_claim(peter, bob, usd, Quantity::new(600), Quantity::new(0))
             .get()?;
         assert_eq!(exp(&chain, alice, bob, usd), 0);
         assert_eq!(exp(&chain, peter, bob, usd), 1_000);
@@ -7032,7 +7139,7 @@ mod tests {
             .st_crd_lne(peter, usd, Quantity::new(0), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .sell_claim(peter, bob, usd, Quantity::new(1_000_000))
+            .sell_claim(peter, bob, usd, Quantity::new(1_000_000), Quantity::new(0))
             .get()?;
 
         assert_eq!(exp(&chain, alice, bob, usd), 0);

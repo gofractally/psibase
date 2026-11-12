@@ -492,14 +492,17 @@ impl Api for BanxPlugin {
         debtor: String,
         asset_id: u16,
         amount: String,
+        min_proceeds: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::sell_claim)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
+        let min_proceeds = parse_amount(asset_id, &min_proceeds)?;
         let packed = banx::action_structs::sell_claim {
             buyer: parse_account(&buyer)?,
             debtor: parse_account(&debtor)?,
             asset_id,
             amount,
+            min_proceeds,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::sell_claim::ACTION_NAME, &packed)
@@ -570,14 +573,17 @@ impl Api for BanxPlugin {
         debtor: String,
         asset_id: u16,
         amount: String,
+        max_cost: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::buy_claim)?;
         let amount = parse_amount_nonzero(asset_id, &amount)?;
+        let max_cost = parse_amount(asset_id, &max_cost)?;
         let packed = banx::action_structs::buy_claim {
             seller: parse_account(&seller)?,
             debtor: parse_account(&debtor)?,
             asset_id,
             amount,
+            max_cost,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::buy_claim::ACTION_NAME, &packed)
