@@ -11,8 +11,8 @@ mod tests {
     use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
     use crate::tables::{
         Asset, BanxInvite, BanxInviteTable, BanxRelay, BookAuth, CashQuote, ClaimOffer, CreditLine,
-        FxOffer, InitTable, Obligation, ObligationTable, PairCycle, PathHop, PayAuth,
-        PayAuthTab, PayRequest, TokenRelay, PPM_SCALE, RATE_SCALE,
+        FxOffer, InitTable, Obligation, ObligationTable, PairCycle, PathHop, PayAuth, PayAuthTab,
+        PayRequest, TokenRelay, PPM_SCALE, RATE_SCALE,
     };
     use crate::Wrapper;
     use psibase::fracpack::Pack;
@@ -49,7 +49,7 @@ mod tests {
             chain,
             &format!(
                 r#"{{ activity(account: "{account}", last: 50) {{
-                    edges {{ node {{ kind amount netted }} }}
+                    edges {{ node {{ kind amount netted actor counterparty }} }}
                 }} }}"#
             ),
         )
@@ -727,9 +727,7 @@ mod tests {
     /// From-asset `remaining` caps path FX. A hop larger than what is left
     /// is rejected whole. Posting again replaces what is left.
     #[psibase::test_case(packages("Banx"))]
-    fn test_fx_offer_remaining_caps_path(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_fx_offer_remaining_caps_path(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let gary = account!("gary");
@@ -795,9 +793,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            FxOffer::get_assert(gary, aud, usd, true)
-                .remaining
-                .value,
+            FxOffer::get_assert(gary, aud, usd, true).remaining.value,
             500
         );
 
@@ -2113,10 +2109,7 @@ mod tests {
             )
             .get()
             .expect_err("a return to John would need Isabelle's rate");
-        assert!(
-            trade.to_string().contains("FxOffer not found"),
-            "{trade}"
-        );
+        assert!(trade.to_string().contains("FxOffer not found"), "{trade}");
         assert_eq!(exp(&chain, isabelle, john, weetbix), 0);
         assert_eq!(exp(&chain, michelle, isabelle, weetbix), 0);
 
@@ -2589,10 +2582,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            FxOffer::get(gary, aud, usd, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(gary, aud, usd, true).unwrap().remaining.value,
             1_000
         );
 
@@ -2628,10 +2618,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            FxOffer::get(gary, aud, usd, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(gary, aud, usd, true).unwrap().remaining.value,
             1_000
         );
 
@@ -2651,10 +2638,7 @@ mod tests {
             "the budget falls by the incoming 1_000, not by 1_000 − fee"
         );
         assert_eq!(
-            FxOffer::get(gary, aud, usd, false)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(gary, aud, usd, false).unwrap().remaining.value,
             9_000,
             "the debtor-side row is not the path rate"
         );
@@ -2757,10 +2741,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            FxOffer::get(gary, aud, usd, false)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(gary, aud, usd, false).unwrap().remaining.value,
             5_000
         );
 
@@ -2801,17 +2782,11 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 1_000);
         assert_eq!(exp(&chain, steve, gary, usd), 700);
         assert_eq!(
-            FxOffer::get(gary, aud, usd, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(gary, aud, usd, true).unwrap().remaining.value,
             1_000
         );
         assert_eq!(
-            FxOffer::get(gary, aud, usd, false)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(gary, aud, usd, false).unwrap().remaining.value,
             5_000
         );
 
@@ -2834,10 +2809,7 @@ mod tests {
         assert_eq!(exp(&chain, steve, gary, usd), 700);
         assert!(FxOffer::get(gary, aud, usd, true).is_none());
         assert_eq!(
-            FxOffer::get(gary, aud, usd, false)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(gary, aud, usd, false).unwrap().remaining.value,
             5_000
         );
 
@@ -8979,10 +8951,7 @@ mod tests {
         assert_eq!(exp(&chain, zac, dave, aud), 0);
         assert_eq!(exp(&chain, john, zac, aud), 0);
         assert_eq!(
-            FxOffer::get(john, aud, wow, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, aud, wow, true).unwrap().remaining.value,
             DEAL_AUD
         );
 
@@ -9000,10 +8969,7 @@ mod tests {
         assert_eq!(exp(&chain, dave, john, wow), DEAL_GOLD + GOLD_OUT);
         assert_eq!(exp(&chain, john, dave, wow), 0);
         assert_eq!(
-            FxOffer::get(john, aud, wow, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, aud, wow, true).unwrap().remaining.value,
             DEAL_AUD - PAY_AUD
         );
         Ok(())
@@ -9363,6 +9329,19 @@ mod tests {
         assert_eq!(exp(&chain, alice, gary, aud), 0);
         assert_eq!(exp(&chain, alice, gary, usd), 50);
         assert_eq!(exp(&chain, gary, alice, usd), 0);
+        // Actor is who owes the new asset, so each feed can say which way it faces.
+        let gary_row = activity_nodes(&chain, gary)
+            .into_iter()
+            .find(|n| n.get("kind").and_then(|k| k.as_str()) == Some("convert"))
+            .expect("gary convert row");
+        assert_eq!(gary_row["actor"], "gary");
+        assert_eq!(gary_row["counterparty"], "alice");
+        let alice_row = activity_nodes(&chain, alice)
+            .into_iter()
+            .find(|n| n.get("kind").and_then(|k| k.as_str()) == Some("convert"))
+            .expect("alice convert row");
+        assert_eq!(alice_row["actor"], "gary");
+        assert_eq!(alice_row["counterparty"], "gary");
         Ok(())
     }
 
@@ -9608,10 +9587,7 @@ mod tests {
         assert_eq!(exp(&chain, isabelle, john, kwh), ten_kwh);
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(
-            FxOffer::get(john, kwh, aud, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, kwh, aud, true).unwrap().remaining.value,
             ten_kwh
         );
 
@@ -9640,10 +9616,7 @@ mod tests {
         );
         assert!(FxOffer::get(john, kwh, aud, false).is_none());
         assert_eq!(
-            FxOffer::get(john, kwh, aud, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, kwh, aud, true).unwrap().remaining.value,
             ten_kwh,
             "the other side's budget stays"
         );
@@ -9702,10 +9675,7 @@ mod tests {
         assert_eq!(exp(&chain, john, isabelle, kwh), five_kwh);
         assert_eq!(exp(&chain, john, isabelle, aud), creditor_aud);
         assert_eq!(
-            FxOffer::get(john, kwh, aud, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, kwh, aud, true).unwrap().remaining.value,
             five_kwh,
             "budget falls by the 5 kWh converted, not by take plus fee"
         );
@@ -9742,17 +9712,11 @@ mod tests {
         assert_eq!(exp(&chain, isabelle, john, kwh), five_kwh);
         assert_eq!(exp(&chain, isabelle, john, aud), debtor_aud);
         assert_eq!(
-            FxOffer::get(john, kwh, aud, false)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, kwh, aud, false).unwrap().remaining.value,
             five_kwh
         );
         assert_eq!(
-            FxOffer::get(john, kwh, aud, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, kwh, aud, true).unwrap().remaining.value,
             five_kwh,
             "the creditor-side budget stays at the earlier partial take"
         );
@@ -9822,10 +9786,7 @@ mod tests {
         assert_eq!(exp(&chain, isabelle, john, kwh), ten_kwh);
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(
-            FxOffer::get(john, kwh, aud, false)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, kwh, aud, false).unwrap().remaining.value,
             ten_kwh
         );
 
@@ -9854,17 +9815,11 @@ mod tests {
         assert_eq!(exp(&chain, john, isabelle, kwh), 0);
         assert_eq!(exp(&chain, john, isabelle, aud), creditor_aud);
         assert_eq!(
-            FxOffer::get(john, kwh, aud, true)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, kwh, aud, true).unwrap().remaining.value,
             ten_kwh - one_kwh
         );
         assert_eq!(
-            FxOffer::get(john, kwh, aud, false)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, kwh, aud, false).unwrap().remaining.value,
             ten_kwh
         );
 
@@ -9969,10 +9924,7 @@ mod tests {
         assert_eq!(exp(&chain, john, isabelle, aud), 114_000);
         assert!(FxOffer::get(john, usd, aud, true).is_none());
         assert_eq!(
-            FxOffer::get(john, usd, aud, false)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, usd, aud, false).unwrap().remaining.value,
             ten
         );
 
@@ -10030,10 +9982,7 @@ mod tests {
         assert_eq!(exp(&chain, john, isabelle, usd), 79_166);
         assert!(FxOffer::get(john, aud, usd, true).is_none());
         assert_eq!(
-            FxOffer::get(john, aud, usd, false)
-                .unwrap()
-                .remaining
-                .value,
+            FxOffer::get(john, aud, usd, false).unwrap().remaining.value,
             ten
         );
 
@@ -10130,9 +10079,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 100);
         assert_eq!(exp(&chain, gary, alice, usd), 0);
         assert_eq!(
-            FxOffer::get_assert(gary, aud, usd, true)
-                .remaining
-                .value,
+            FxOffer::get_assert(gary, aud, usd, true).remaining.value,
             40
         );
 
@@ -10176,9 +10123,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 60);
         assert_eq!(exp(&chain, gary, alice, usd), 20);
         assert_eq!(
-            FxOffer::get_assert(gary, aud, usd, true)
-                .remaining
-                .value,
+            FxOffer::get_assert(gary, aud, usd, true).remaining.value,
             50
         );
 
@@ -10235,9 +10180,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            FxOffer::get_assert(gary, aud, usd, true)
-                .remaining
-                .value,
+            FxOffer::get_assert(gary, aud, usd, true).remaining.value,
             500
         );
 

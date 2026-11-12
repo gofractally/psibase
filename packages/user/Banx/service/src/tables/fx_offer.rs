@@ -1,6 +1,6 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table, TimePointSec};
 
-use super::{apply_rate, emit_pair_activity, expires_live, Connection};
+use super::{apply_rate, emit_pair_activity, emit_pair_activity_as, expires_live, Connection};
 use crate::math::PPM_SCALE;
 use crate::tables::tables::{Asset, FxOffer, FxOfferTab, Obligation};
 
@@ -15,12 +15,9 @@ impl FxOffer {
         to_asset: u16,
         poster_is_creditor: bool,
     ) -> Option<Self> {
-        FxOfferTab::read().get_index_pk().get(&(
-            poster,
-            from_asset,
-            to_asset,
-            poster_is_creditor,
-        ))
+        FxOfferTab::read()
+            .get_index_pk()
+            .get(&(poster, from_asset, to_asset, poster_is_creditor))
     }
 
     pub fn get_assert(
@@ -29,8 +26,7 @@ impl FxOffer {
         to_asset: u16,
         poster_is_creditor: bool,
     ) -> Self {
-        Self::get(poster, from_asset, to_asset, poster_is_creditor)
-            .expect("FxOffer not found")
+        Self::get(poster, from_asset, to_asset, poster_is_creditor).expect("FxOffer not found")
     }
 
     pub fn is_live(&self) -> bool {
@@ -75,10 +71,7 @@ impl FxOffer {
             to_interest_rate <= PPM_SCALE,
             "to_interest_rate exceeds 100% (PPM_SCALE)"
         );
-        assert!(
-            remaining.value > 0,
-            "fx offer remaining must be positive"
-        );
+        assert!(remaining.value > 0, "fx offer remaining must be positive");
         Self {
             poster,
             from_asset,
@@ -191,7 +184,11 @@ impl FxOffer {
             self.poster_is_creditor,
             self.to_interest_rate,
         );
-        emit_pair_activity(
+        // Actor is the debtor of the new claim, same as a take's actor is
+        // the one who owes the from-asset. The feed uses that to say which
+        // way the rebooked debt faces.
+        emit_pair_activity_as(
+            debtor,
             creditor,
             debtor,
             self.from_asset,
@@ -248,10 +245,7 @@ impl FxOffer {
 
         let mut pol = Self::get_assert(poster, from_asset, to_asset, true);
         let to_qty = pol.apply(amount_from);
-        assert!(
-            to_qty.value >= min_to.value,
-            "trade output below min_to"
-        );
+        assert!(to_qty.value >= min_to.value, "trade output below min_to");
         pol.spend(amount_from);
         let rate = pol.to_interest_rate as i32;
         Connection::get_live(poster, taker, from_asset).book_at_rate(amount_from, rate);

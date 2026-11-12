@@ -11,8 +11,8 @@ pub mod tables;
 pub mod service {
     use crate::tables::{
         assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BanxInvite,
-        BanxRelay, BookAuth, CashQuote, ClaimOffer, Connection, CreditLine, FxOffer,
-        ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayAuth, PayRequest, TokenRelay,
+        BanxRelay, BookAuth, CashQuote, ClaimOffer, Connection, CreditLine, ForwardOffer, FxOffer,
+        InitRow, InitTable, Obligation, PathHop, PayAuth, PayRequest, TokenRelay,
     };
     use psibase::{
         services::events,
@@ -1012,7 +1012,8 @@ pub mod service {
     ///   `please_book` | `fulfill` | `req_cancel` |
     ///   `forgive` | `cash_out` | `cash_in` | `relay` | `take`
     /// - `amount`: primary quantity (human decimal at `asset_id` precision)
-    /// - `netted`: auto-net cancelled; convert/`path_pay` output at `other_asset_id`
+    /// - `netted`: auto-net cancelled; convert/`path_pay` output at `other_asset_id`.
+    ///   On `convert` this is the new debt, and `actor` is who owes it.
     /// - `other_asset_id`: convert/`path_pay` destination asset; else same as `asset_id`
     /// - `request_id`: linked request (`0` = none)
     /// - `memo`: request memo when linked; debtor account on `sell_claim` /

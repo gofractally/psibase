@@ -185,11 +185,17 @@ export function describeEvent(
                 : `${actor} wrote off ${qty(e.amount, sym)}`;
             return { title, detail: `Claim on ${other}` };
         }
-        case "convert":
-            return {
-                title: `Converted ${qty(e.amount, sym)} → ${qty(e.netted, otherSym)}`,
-                detail: `Rebook · ${other}`,
-            };
+        case "convert": {
+            // amount is the from-asset that was rebooked. netted is the new
+            // to-asset debt. actor is the debtor of that new claim.
+            const title = you
+                ? `You owe ${other} ${qty(e.netted, otherSym)}`
+                : `${other} owes you ${qty(e.netted, otherSym)}`;
+            const detail = you
+                ? `Rebooked from ${qty(e.amount, sym)} you owed`
+                : `Rebooked from ${qty(e.amount, sym)} they owed you`;
+            return { title, detail };
+        }
         case "take": {
             // amount is from-asset the taker owes the poster. netted is
             // to-asset the poster owes the taker. actor is the taker.
