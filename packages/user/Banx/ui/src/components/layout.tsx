@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { ForwardNudge } from "@/components/forward-nudge";
 
 import {
     Breadcrumb,
@@ -99,6 +100,7 @@ export const Layout = () => {
                     <Outlet />
                 </div>
             </SidebarInset>
+            <ForwardNudge />
         </SidebarProvider>
     );
 };
