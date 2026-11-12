@@ -118,7 +118,7 @@ impl<'a> HostDbRequest<'a> {
         match Self::cookie_value(http, SESSION_COOKIE) {
             CookieLookup::Missing => SessionState::Absent,
             CookieLookup::Malformed => SessionState::Malformed,
-            CookieLookup::Value(value) => match parse_session_id(value) {
+            CookieLookup::Value(value) => match value.parse().ok() {
                 Some(id) => SessionState::Valid(id),
                 None => SessionState::Malformed,
             },
@@ -144,14 +144,6 @@ impl<'a> HostDbRequest<'a> {
             None => CookieLookup::Missing,
         }
     }
-}
-
-/// Decimal `u32` with no leading zeros.
-fn parse_session_id(value: &str) -> Option<u32> {
-    if value.len() > 1 && value.starts_with('0') {
-        return None;
-    }
-    value.parse().ok()
 }
 
 fn is_storage_path(path: &str) -> bool {
