@@ -12,6 +12,7 @@
 #include <services/user/tokenTables.hpp>
 #include <services/user/tokenTypes.hpp>
 
+
 namespace UserService
 {
    class Tokens : public psibase::Service
