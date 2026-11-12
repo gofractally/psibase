@@ -14,8 +14,8 @@ export const QueryKey = {
         ["banx", "claimOffers", account ?? ""] as const,
     buyClaimOffers: (account: string | null | undefined) =>
         ["banx", "claimOffers", account ?? ""] as const,
-    currencyPolicies: (account: string | null | undefined) =>
-        ["banx", "currencyPolicies", account ?? ""] as const,
+    fxOffers: (account: string | null | undefined) =>
+        ["banx", "fxOffers", account ?? ""] as const,
     cashQuotes: (poster: string | null | undefined) =>
         ["banx", "cashQuotes", poster ?? "*"] as const,
     banxRelays: (owner: string | null | undefined) =>

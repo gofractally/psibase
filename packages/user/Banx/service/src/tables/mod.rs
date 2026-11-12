@@ -5,7 +5,7 @@ mod cash_quote;
 mod claim_offer;
 mod connection;
 mod credit_line;
-mod currency_policy;
+mod fx_offer;
 mod forward_offer;
 mod helpers;
 mod init;
@@ -81,7 +81,7 @@ pub mod tables {
     /// One hop in [`crate::service::path_pay`]: draw on `account` in `asset_id`.
     ///
     /// Example: `[(Gary, AUD), (Steve, USD)]` — currency change implies convert
-    /// on the previous edge via [`CurrencyPolicy`], then same-asset routing.
+    /// on the previous edge via [`FxOffer`], then same-asset routing.
     #[derive(
         Default, Copy, Clone, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug,
     )]
@@ -199,9 +199,9 @@ pub mod tables {
     /// `path_pay` uses only the creditor-side row (`poster_is_creditor`).
     /// It sizes the next hop with the fee subtracted. It does not rebook:
     /// the payer still owes the middle man the full from-asset.
-    #[table(name = "CurrencyPolicyTab", index = 4)]
+    #[table(name = "FxOfferTab", index = 4)]
     #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct CurrencyPolicy {
+    pub struct FxOffer {
         /// Who posted the from→to offer.
         pub poster: AccountNumber,
         pub from_asset: u16,
@@ -219,13 +219,13 @@ pub mod tables {
         /// A path claim uses the credit line's APR instead.
         pub to_interest_rate: u32,
         /// From-asset still accepted. Convert and path FX spend it.
-        /// 0 means spent; the row stays so it can be topped up.
+        /// The last unit deletes the row. An empty offer is not a trade.
         pub remaining: Quantity,
         /// Absolute expiry (`seconds == 0` → never). Prefer short TTL for FX.
         pub expires_at: TimePointSec,
     }
 
-    impl CurrencyPolicy {
+    impl FxOffer {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u16, u16, bool) {
             (
@@ -453,7 +453,7 @@ pub mod tables {
     /// Constant-product curve between two Banx assets, posted by `owner`.
     ///
     /// Both reserves are virtual weights. A path that changes asset on
-    /// `owner` uses this curve instead of a [`CurrencyPolicy`] for the pair.
+    /// `owner` uses this curve instead of a [`FxOffer`] for the pair.
     /// One row prices both directions. `asset_lo` is the lower asset id.
     #[table(name = "BanxRelayTable", index = 13)]
     #[derive(

@@ -71,9 +71,9 @@ define_trust! {
             set_global_sell_claim_offer,
             remove_sell_claim_offer,
             remove_global_sell_claim_offer,
-            set_currency_policy,
+            set_fx_offer,
             set_exchange_quotes,
-            remove_currency_policy,
+            remove_fx_offer,
             create_request,
             cancel_request,
             set_pay_auth,
@@ -583,7 +583,7 @@ impl Api for BanxPlugin {
         add_action_to_transaction(banx::action_structs::buy_claim::ACTION_NAME, &packed)
     }
 
-    fn set_currency_policy(
+    fn set_fx_offer(
         from_asset: u16,
         to_asset: u16,
         poster_is_creditor: bool,
@@ -593,11 +593,11 @@ impl Api for BanxPlugin {
         remaining: String,
         expires_at_seconds: u32,
     ) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_currency_policy)?;
+        trust::assert_authorized(trust::FunctionName::set_fx_offer)?;
         let fee_fixed = parse_amount(from_asset, &fee_fixed)?;
         let fx_rate = human_to_fx_rate(from_asset, to_asset, &to_rate)?;
         let remaining = parse_amount_nonzero(from_asset, &remaining)?;
-        let packed = banx::action_structs::st_cur_pol {
+        let packed = banx::action_structs::st_fx_ofr {
             from_asset,
             to_asset,
             poster_is_creditor,
@@ -608,7 +608,7 @@ impl Api for BanxPlugin {
             expires_at: time_point(expires_at_seconds),
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::st_cur_pol::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::st_fx_ofr::ACTION_NAME, &packed)
     }
 
     fn set_exchange_quotes(
@@ -644,7 +644,7 @@ impl Api for BanxPlugin {
             (asset_b, asset_a, back, remaining_b, true),
             (asset_b, asset_a, back, remaining_b, false),
         ] {
-            let packed = banx::action_structs::st_cur_pol {
+            let packed = banx::action_structs::st_fx_ofr {
                 from_asset,
                 to_asset,
                 poster_is_creditor,
@@ -655,24 +655,24 @@ impl Api for BanxPlugin {
                 expires_at,
             }
             .packed();
-            add_action_to_transaction(banx::action_structs::st_cur_pol::ACTION_NAME, &packed)?;
+            add_action_to_transaction(banx::action_structs::st_fx_ofr::ACTION_NAME, &packed)?;
         }
         Ok(())
     }
 
-    fn remove_currency_policy(
+    fn remove_fx_offer(
         from_asset: u16,
         to_asset: u16,
         poster_is_creditor: bool,
     ) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::remove_currency_policy)?;
-        let packed = banx::action_structs::rm_cur_pol {
+        trust::assert_authorized(trust::FunctionName::remove_fx_offer)?;
+        let packed = banx::action_structs::rm_fx_ofr {
             from_asset,
             to_asset,
             poster_is_creditor,
         }
         .packed();
-        add_action_to_transaction(banx::action_structs::rm_cur_pol::ACTION_NAME, &packed)
+        add_action_to_transaction(banx::action_structs::rm_fx_ofr::ACTION_NAME, &packed)
     }
 
     fn create_request(

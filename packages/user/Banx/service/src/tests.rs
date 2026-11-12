@@ -11,7 +11,7 @@ mod tests {
     use crate::interest::{compound_amount, interest_for, SECONDS_PER_DAY, SECONDS_PER_YEAR};
     use crate::tables::{
         Asset, BanxInvite, BanxInviteTable, BanxRelay, BookAuth, CashQuote, ClaimOffer, CreditLine,
-        CurrencyPolicy, InitTable, Obligation, ObligationTable, PairCycle, PathHop, PayAuth,
+        FxOffer, InitTable, Obligation, ObligationTable, PairCycle, PathHop, PayAuth,
         PayAuthTab, PayRequest, TokenRelay, PPM_SCALE, RATE_SCALE,
     };
     use crate::Wrapper;
@@ -362,7 +362,7 @@ mod tests {
 
         // Gary (middle man / claim holder) posts AUD→USD (0.70).
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -468,7 +468,7 @@ mod tests {
             .get()?;
         // John (AUD creditor / middle man into USD) posts AUD→USD at 0.65
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -688,7 +688,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -727,7 +727,7 @@ mod tests {
     /// From-asset `remaining` caps path FX. A hop larger than what is left
     /// is rejected whole. Posting again replaces what is left.
     #[psibase::test_case(packages("Banx"))]
-    fn test_currency_policy_remaining_caps_path(
+    fn test_fx_offer_remaining_caps_path(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -744,7 +744,7 @@ mod tests {
             .st_crd_lne(alice, aud, Quantity::new(10_000), false, 0, 0)
             .get()?;
 
-        let zero = Wrapper::push_from(&chain, gary).st_cur_pol(
+        let zero = Wrapper::push_from(&chain, gary).st_fx_ofr(
             aud,
             usd,
             true,
@@ -756,10 +756,10 @@ mod tests {
         );
         let err = zero.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
-            err.contains("currency policy remaining must be positive"),
+            err.contains("fx offer remaining must be positive"),
             "zero remaining: {err}"
         );
-        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
+        assert!(FxOffer::get(gary, aud, usd, true).is_none());
 
         // 1000 AUD at 0.70 needs 1000 of budget. 500 delivers 350 USD.
         Wrapper::push_from(&chain, steve)
@@ -769,7 +769,7 @@ mod tests {
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -789,13 +789,13 @@ mod tests {
         );
         let err = too_big.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
-            err.contains("currency policy amount exceeds remaining"),
+            err.contains("fx offer amount exceeds remaining"),
             "path over remaining: {err}"
         );
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true)
+            FxOffer::get_assert(gary, aud, usd, true)
                 .remaining
                 .value,
             500
@@ -818,7 +818,7 @@ mod tests {
         );
         let err = inv.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
-            err.contains("currency policy amount exceeds remaining"),
+            err.contains("fx offer amount exceeds remaining"),
             "invoice over remaining: {err}"
         );
         assert_eq!(PayRequest::get_assert(id).remaining.value, 700);
@@ -834,7 +834,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 500);
         assert_eq!(exp(&chain, steve, gary, usd), 350);
-        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
+        assert!(FxOffer::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
                 vec![hop(gary, aud), hop(steve, usd)],
@@ -851,7 +851,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_rm_cur_pol_removes_offer(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_rm_fx_ofr_removes_offer(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let gary = account!("gary");
         chain.new_account(gary).unwrap();
@@ -859,7 +859,7 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -870,14 +870,14 @@ mod tests {
                 never(),
             )
             .get()?;
-        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_some());
+        assert!(FxOffer::get(gary, aud, usd, true).is_some());
 
         Wrapper::push_from(&chain, gary)
-            .rm_cur_pol(aud, usd, true)
+            .rm_fx_ofr(aud, usd, true)
             .get()?;
-        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
+        assert!(FxOffer::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, gary)
-            .rm_cur_pol(aud, usd, true)
+            .rm_fx_ofr(aud, usd, true)
             .get()
             .is_err());
         Ok(())
@@ -2012,7 +2012,7 @@ mod tests {
             .st_crd_lne(john, merlo, grams, false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, isabelle)
-            .st_cur_pol(
+            .st_fx_ofr(
                 merlo,
                 aud,
                 true,
@@ -2051,7 +2051,7 @@ mod tests {
         assert_eq!(exp(&chain, michelle, john, merlo), 0);
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(exp(&chain, michelle, isabelle, merlo), 0);
-        assert!(CurrencyPolicy::get(isabelle, merlo, aud, true).is_none());
+        assert!(FxOffer::get(isabelle, merlo, aud, true).is_none());
         Ok(())
     }
 
@@ -2092,7 +2092,7 @@ mod tests {
             .st_glb_fwd(weetbix, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, michelle)
-            .st_cur_pol(
+            .st_fx_ofr(
                 weetbix,
                 aud,
                 true,
@@ -2114,7 +2114,7 @@ mod tests {
             .get()
             .expect_err("a return to John would need Isabelle's rate");
         assert!(
-            trade.to_string().contains("CurrencyPolicy not found"),
+            trade.to_string().contains("FxOffer not found"),
             "{trade}"
         );
         assert_eq!(exp(&chain, isabelle, john, weetbix), 0);
@@ -2134,7 +2134,7 @@ mod tests {
         assert_eq!(exp(&chain, michelle, isabelle, aud), 0);
         assert_eq!(exp(&chain, john, isabelle, aud), 0);
         assert_eq!(
-            CurrencyPolicy::get(michelle, weetbix, aud, true)
+            FxOffer::get(michelle, weetbix, aud, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -2172,7 +2172,7 @@ mod tests {
         assert_eq!(exp(&chain, michelle, isabelle, aud), DOLLARS);
         assert_eq!(exp(&chain, isabelle, michelle, aud), 0);
         assert_eq!(exp(&chain, michelle, john, aud), 0);
-        assert!(CurrencyPolicy::get(michelle, weetbix, aud, true).is_none());
+        assert!(FxOffer::get(michelle, weetbix, aud, true).is_none());
         Ok(())
     }
 
@@ -2266,7 +2266,7 @@ mod tests {
         assert_eq!(exp(&chain, michelle, isabelle, kwh), CHARGE);
 
         Wrapper::push_from(&chain, michelle)
-            .st_cur_pol(
+            .st_fx_ofr(
                 kwh,
                 aud,
                 true,
@@ -2318,7 +2318,7 @@ mod tests {
         assert_eq!(exp(&chain, michelle, john, aud), 0);
         assert_eq!(exp(&chain, michelle, john, kwh), 0);
         assert_eq!(
-            CurrencyPolicy::get(michelle, kwh, aud, true)
+            FxOffer::get(michelle, kwh, aud, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -2344,7 +2344,7 @@ mod tests {
         assert_eq!(exp(&chain, michelle, john, aud), 0);
         assert_eq!(exp(&chain, isabelle, john, weetbix), BISCUITS);
         assert_eq!(exp(&chain, michelle, isabelle, weetbix), BISCUITS);
-        assert!(CurrencyPolicy::get(michelle, kwh, aud, true).is_none());
+        assert!(FxOffer::get(michelle, kwh, aud, true).is_none());
         Ok(())
     }
 
@@ -2404,7 +2404,7 @@ mod tests {
             .st_fwd_ofr(john, aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, michelle)
-            .st_cur_pol(
+            .st_fx_ofr(
                 kwh,
                 aud,
                 true,
@@ -2459,7 +2459,7 @@ mod tests {
         assert_eq!(exp(&chain, michelle, isabelle, aud), 0);
         assert_eq!(exp(&chain, john, isabelle, kwh), 0);
         assert_eq!(
-            CurrencyPolicy::get(michelle, kwh, aud, true)
+            FxOffer::get(michelle, kwh, aud, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -2488,7 +2488,7 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -2551,7 +2551,7 @@ mod tests {
 
         // Fee equal to the send. The hop prices nothing, and the books stay put.
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -2563,7 +2563,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 false,
@@ -2589,7 +2589,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get(gary, aud, usd, true)
+            FxOffer::get(gary, aud, usd, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -2597,7 +2597,7 @@ mod tests {
         );
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -2628,7 +2628,7 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get(gary, aud, usd, true)
+            FxOffer::get(gary, aud, usd, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -2647,11 +2647,11 @@ mod tests {
         assert_eq!(exp(&chain, steve, gary, usd), 630);
         assert_eq!(exp(&chain, gary, alice, usd), 0);
         assert!(
-            CurrencyPolicy::get(gary, aud, usd, true).is_none(),
+            FxOffer::get(gary, aud, usd, true).is_none(),
             "the budget falls by the incoming 1_000, not by 1_000 − fee"
         );
         assert_eq!(
-            CurrencyPolicy::get(gary, aud, usd, false)
+            FxOffer::get(gary, aud, usd, false)
                 .unwrap()
                 .remaining
                 .value,
@@ -2659,7 +2659,7 @@ mod tests {
             "the debtor-side row is not the path rate"
         );
         assert_eq!(
-            CurrencyPolicy::get(gary, aud, usd, false).unwrap().fx_rate,
+            FxOffer::get(gary, aud, usd, false).unwrap().fx_rate,
             RATE_SCALE * 50 / 100
         );
 
@@ -2667,7 +2667,7 @@ mod tests {
     }
 
     /// A debtor-side quote is not a path rate. pathGraph omits it.
-    /// currencyPolicies still lists it. Removing the creditor row makes
+    /// fxOffers still lists it. Removing the creditor row makes
     /// the path fail again while the debtor row remains.
     #[psibase::test_case(packages("Banx"))]
     fn test_fx_quote_path_ignores_debtor_side(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -2690,7 +2690,7 @@ mod tests {
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 false,
@@ -2723,22 +2723,22 @@ mod tests {
             sides.sort();
             sides
         }
-        let policies_q = r#"{ currencyPolicies(poster: "gary") {
+        let policies_q = r#"{ fxOffers(poster: "gary") {
             poster fromAsset toAsset posterIsCreditor
         } }"#;
         let graph_q = r#"{ pathGraph(from: "alice", to: "steve", maxHops: 4) {
-            currencyPolicies { poster fromAsset toAsset posterIsCreditor }
+            fxOffers { poster fromAsset toAsset posterIsCreditor }
         } }"#;
 
         let listed = banx_gql(&chain, policies_q)?;
         let graph = banx_gql(&chain, graph_q)?;
         assert_eq!(
-            gary_sides(&listed, "/data/currencyPolicies", aud, usd),
+            gary_sides(&listed, "/data/fxOffers", aud, usd),
             vec![false],
             "{listed}"
         );
         assert!(
-            gary_sides(&graph, "/data/pathGraph/currencyPolicies", aud, usd).is_empty(),
+            gary_sides(&graph, "/data/pathGraph/fxOffers", aud, usd).is_empty(),
             "{graph}"
         );
 
@@ -2753,11 +2753,11 @@ mod tests {
             .error
             .as_deref()
             .unwrap_or("(no error — path_pay succeeded)");
-        assert!(err.contains("CurrencyPolicy not found"), "{err}");
+        assert!(err.contains("FxOffer not found"), "{err}");
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get(gary, aud, usd, false)
+            FxOffer::get(gary, aud, usd, false)
                 .unwrap()
                 .remaining
                 .value,
@@ -2766,7 +2766,7 @@ mod tests {
 
         // More than the path spends, so Remove is what deletes the creditor row.
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -2780,12 +2780,12 @@ mod tests {
         let listed = banx_gql(&chain, policies_q)?;
         let graph = banx_gql(&chain, graph_q)?;
         assert_eq!(
-            gary_sides(&listed, "/data/currencyPolicies", aud, usd),
+            gary_sides(&listed, "/data/fxOffers", aud, usd),
             vec![false, true],
             "{listed}"
         );
         assert_eq!(
-            gary_sides(&graph, "/data/pathGraph/currencyPolicies", aud, usd),
+            gary_sides(&graph, "/data/pathGraph/fxOffers", aud, usd),
             vec![true],
             "{graph}"
         );
@@ -2801,14 +2801,14 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 1_000);
         assert_eq!(exp(&chain, steve, gary, usd), 700);
         assert_eq!(
-            CurrencyPolicy::get(gary, aud, usd, true)
+            FxOffer::get(gary, aud, usd, true)
                 .unwrap()
                 .remaining
                 .value,
             1_000
         );
         assert_eq!(
-            CurrencyPolicy::get(gary, aud, usd, false)
+            FxOffer::get(gary, aud, usd, false)
                 .unwrap()
                 .remaining
                 .value,
@@ -2816,7 +2816,7 @@ mod tests {
         );
 
         Wrapper::push_from(&chain, gary)
-            .rm_cur_pol(aud, usd, true)
+            .rm_fx_ofr(aud, usd, true)
             .get()?;
         let again = Wrapper::push_from(&chain, alice).path_pay(
             vec![hop(gary, aud), hop(steve, usd)],
@@ -2829,12 +2829,12 @@ mod tests {
             .error
             .as_deref()
             .unwrap_or("(no error — path_pay succeeded)");
-        assert!(err.contains("CurrencyPolicy not found"), "{err}");
+        assert!(err.contains("FxOffer not found"), "{err}");
         assert_eq!(exp(&chain, gary, alice, aud), 1_000);
         assert_eq!(exp(&chain, steve, gary, usd), 700);
-        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
+        assert!(FxOffer::get(gary, aud, usd, true).is_none());
         assert_eq!(
-            CurrencyPolicy::get(gary, aud, usd, false)
+            FxOffer::get(gary, aud, usd, false)
                 .unwrap()
                 .remaining
                 .value,
@@ -2844,12 +2844,12 @@ mod tests {
         let listed = banx_gql(&chain, policies_q)?;
         let graph = banx_gql(&chain, graph_q)?;
         assert_eq!(
-            gary_sides(&listed, "/data/currencyPolicies", aud, usd),
+            gary_sides(&listed, "/data/fxOffers", aud, usd),
             vec![false],
             "{listed}"
         );
         assert!(
-            gary_sides(&graph, "/data/pathGraph/currencyPolicies", aud, usd).is_empty(),
+            gary_sides(&graph, "/data/pathGraph/fxOffers", aud, usd).is_empty(),
             "{graph}"
         );
 
@@ -2876,7 +2876,7 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -2945,7 +2945,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -2958,7 +2958,7 @@ mod tests {
             .get()?;
         // Steve sits between USD and GBP.
         Wrapper::push_from(&chain, steve)
-            .st_cur_pol(
+            .st_fx_ofr(
                 usd,
                 gbp,
                 true,
@@ -3046,7 +3046,7 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -3106,7 +3106,7 @@ mod tests {
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -3128,11 +3128,11 @@ mod tests {
             .get();
         assert!(
             no_gary.is_err(),
-            "path_pay must fail without Gary's AUD→USD policy"
+            "path_pay must fail without Gary's AUD→USD offer"
         );
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -3272,7 +3272,7 @@ mod tests {
         let missing = crate::iso4217::SEEDED_ASSETS.len() as u16 + 1;
 
         let fx = Wrapper::push_from(&chain, alice)
-            .st_cur_pol(
+            .st_fx_ofr(
                 usd,
                 missing,
                 true,
@@ -3285,7 +3285,7 @@ mod tests {
             .get();
         assert!(fx.is_err());
         let fx_from = Wrapper::push_from(&chain, alice)
-            .st_cur_pol(
+            .st_fx_ofr(
                 missing,
                 usd,
                 true,
@@ -4715,7 +4715,7 @@ mod tests {
         Ok(())
     }
 
-    /// Expired FX must fail at invert (`currency policy expired`), not after
+    /// Expired FX must fail at invert (`fx offer expired`), not after
     /// sizing a send and hitting `max_spend below required send`.
     #[psibase::test_case(packages("Banx"))]
     fn test_pay_inv_expired_fx_fails_at_invert(
@@ -4741,7 +4741,7 @@ mod tests {
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -4771,7 +4771,7 @@ mod tests {
         );
         let err = failed.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
-            err.contains("currency policy expired"),
+            err.contains("fx offer expired"),
             "test_pay_inv_expired_fx_fails_at_invert: got {err}"
         );
         assert!(
@@ -5185,7 +5185,7 @@ mod tests {
             .st_crd_lne(gary, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -7585,7 +7585,7 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, bob)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -7983,11 +7983,11 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_relay_replaces_currency_policy(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_relay_replaces_fx_offer(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
         post_relay(&chain, net.john, net.usd, net.aud, 0);
         Wrapper::push_from(&chain, net.john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 net.usd,
                 net.aud,
                 true,
@@ -8002,12 +8002,12 @@ mod tests {
         let graph = banx_gql(
             &chain,
             r#"{ pathGraph(from: "bob", to: "alice", maxHops: 4) {
-                currencyPolicies { poster fromAsset toAsset }
+                fxOffers { poster fromAsset toAsset }
                 relays { owner assetLo assetHi feePpm }
             } }"#,
         )?;
         let policies = graph
-            .pointer("/data/pathGraph/currencyPolicies")
+            .pointer("/data/pathGraph/fxOffers")
             .and_then(|v| v.as_array())
             .expect("policies");
         assert!(
@@ -8566,7 +8566,7 @@ mod tests {
             .st_crd_lne(net.bob, eur, Quantity::new(100_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, net.brandon)
-            .st_cur_pol(
+            .st_fx_ofr(
                 eur,
                 net.usd,
                 true,
@@ -8621,7 +8621,7 @@ mod tests {
         assert_eq!(exp(&chain, carol, net.john, net.usd), 1_400);
         assert_eq!(exp(&chain, net.brandon, net.bob, eur), 1_401);
         assert_eq!(
-            CurrencyPolicy::get_assert(net.brandon, eur, net.usd, true)
+            FxOffer::get_assert(net.brandon, eur, net.usd, true)
                 .remaining
                 .value,
             99
@@ -8946,7 +8946,7 @@ mod tests {
             .deposit(dave, wow, Quantity::new(DEAL_GOLD), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 wow,
                 true,
@@ -8979,7 +8979,7 @@ mod tests {
         assert_eq!(exp(&chain, zac, dave, aud), 0);
         assert_eq!(exp(&chain, john, zac, aud), 0);
         assert_eq!(
-            CurrencyPolicy::get(john, aud, wow, true)
+            FxOffer::get(john, aud, wow, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -9000,7 +9000,7 @@ mod tests {
         assert_eq!(exp(&chain, dave, john, wow), DEAL_GOLD + GOLD_OUT);
         assert_eq!(exp(&chain, john, dave, wow), 0);
         assert_eq!(
-            CurrencyPolicy::get(john, aud, wow, true)
+            FxOffer::get(john, aud, wow, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -9058,7 +9058,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, dave, john, wow), WEIGHT_GOLD);
         assert_eq!(aud_wow(john, aud, wow), (WEIGHT_AUD, WEIGHT_GOLD));
-        assert!(CurrencyPolicy::get(john, aud, wow, true).is_none());
+        assert!(FxOffer::get(john, aud, wow, true).is_none());
 
         let buy = vec![hop(zac, aud), hop(john, aud), hop(dave, wow)];
         let no_line = Wrapper::push_from(&chain, dave)
@@ -9199,7 +9199,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_currency_policy_convert(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_fx_offer_convert(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
 
         let alice = account!("alice");
@@ -9223,7 +9223,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -9263,7 +9263,7 @@ mod tests {
             .st_crd_lne(gary, aud, Quantity::new(1_000), false, 100_000, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -9345,7 +9345,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -9389,7 +9389,7 @@ mod tests {
             .deposit(gary, aud, Quantity::new(1), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -9408,13 +9408,13 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
         assert_eq!(exp(&chain, alice, gary, usd), 0);
-        assert!(CurrencyPolicy::get(alice, aud, usd, false).is_none());
+        assert!(FxOffer::get(alice, aud, usd, false).is_none());
         Ok(())
     }
 
     /// Debtor takes the creditor's rebook quote. `min_to` is a floor on the
     /// new to-asset debt, so a worse rate still clears it. Alice signed for
-    /// 50 USD (`test_currency_policy_convert`). Gary then posts 5.0. That
+    /// 50 USD (`test_fx_offer_convert`). Gary then posts 5.0. That
     /// take must not land: she would owe 500 USD for the same 100 AUD.
     #[psibase::test_case(packages("Banx"))]
     fn test_convert_debtor_min_to_rejects_worse_rate(
@@ -9440,7 +9440,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -9454,7 +9454,7 @@ mod tests {
 
         // Same action Alice would send for the 0.50 quote. Gary has replaced it.
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -9519,7 +9519,7 @@ mod tests {
         assert_eq!(exp(&chain, john, isabelle, kwh), ten_kwh);
 
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 kwh,
                 aud,
                 true,
@@ -9577,7 +9577,7 @@ mod tests {
         assert_eq!(exp(&chain, isabelle, john, kwh), ten_kwh);
 
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 kwh,
                 aud,
                 true,
@@ -9602,13 +9602,13 @@ mod tests {
             .as_deref()
             .unwrap_or("(no error — convert succeeded)");
         assert!(
-            err.contains("CurrencyPolicy not found"),
+            err.contains("FxOffer not found"),
             "creditor-side quote must not rebook debt John owes, got {err}"
         );
         assert_eq!(exp(&chain, isabelle, john, kwh), ten_kwh);
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(
-            CurrencyPolicy::get(john, kwh, aud, true)
+            FxOffer::get(john, kwh, aud, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -9616,7 +9616,7 @@ mod tests {
         );
 
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 kwh,
                 aud,
                 false,
@@ -9638,9 +9638,9 @@ mod tests {
             owing_aud,
             "fee should favour John: 2.70 AUD"
         );
-        assert!(CurrencyPolicy::get(john, kwh, aud, false).is_none());
+        assert!(FxOffer::get(john, kwh, aud, false).is_none());
         assert_eq!(
-            CurrencyPolicy::get(john, kwh, aud, true)
+            FxOffer::get(john, kwh, aud, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -9683,7 +9683,7 @@ mod tests {
             .deposit(john, kwh, Quantity::new(ten_kwh), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 kwh,
                 aud,
                 true,
@@ -9702,7 +9702,7 @@ mod tests {
         assert_eq!(exp(&chain, john, isabelle, kwh), five_kwh);
         assert_eq!(exp(&chain, john, isabelle, aud), creditor_aud);
         assert_eq!(
-            CurrencyPolicy::get(john, kwh, aud, true)
+            FxOffer::get(john, kwh, aud, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -9724,7 +9724,7 @@ mod tests {
             .deposit(isabelle, kwh, Quantity::new(ten_kwh), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 kwh,
                 aud,
                 false,
@@ -9742,14 +9742,14 @@ mod tests {
         assert_eq!(exp(&chain, isabelle, john, kwh), five_kwh);
         assert_eq!(exp(&chain, isabelle, john, aud), debtor_aud);
         assert_eq!(
-            CurrencyPolicy::get(john, kwh, aud, false)
+            FxOffer::get(john, kwh, aud, false)
                 .unwrap()
                 .remaining
                 .value,
             five_kwh
         );
         assert_eq!(
-            CurrencyPolicy::get(john, kwh, aud, true)
+            FxOffer::get(john, kwh, aud, true)
                 .unwrap()
                 .remaining
                 .value,
@@ -9789,7 +9789,7 @@ mod tests {
             .deposit(isabelle, kwh, Quantity::new(ten_kwh), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 kwh,
                 aud,
                 false,
@@ -9822,7 +9822,7 @@ mod tests {
         assert_eq!(exp(&chain, isabelle, john, kwh), ten_kwh);
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(
-            CurrencyPolicy::get(john, kwh, aud, false)
+            FxOffer::get(john, kwh, aud, false)
                 .unwrap()
                 .remaining
                 .value,
@@ -9836,7 +9836,7 @@ mod tests {
         assert_eq!(exp(&chain, john, isabelle, kwh), one_kwh);
         assert_eq!(exp(&chain, isabelle, john, kwh), 0);
         Wrapper::push_from(&chain, john)
-            .st_cur_pol(
+            .st_fx_ofr(
                 kwh,
                 aud,
                 true,
@@ -9854,14 +9854,14 @@ mod tests {
         assert_eq!(exp(&chain, john, isabelle, kwh), 0);
         assert_eq!(exp(&chain, john, isabelle, aud), creditor_aud);
         assert_eq!(
-            CurrencyPolicy::get(john, kwh, aud, true)
+            FxOffer::get(john, kwh, aud, true)
                 .unwrap()
                 .remaining
                 .value,
             ten_kwh - one_kwh
         );
         assert_eq!(
-            CurrencyPolicy::get(john, kwh, aud, false)
+            FxOffer::get(john, kwh, aud, false)
                 .unwrap()
                 .remaining
                 .value,
@@ -9898,7 +9898,7 @@ mod tests {
         // Precision 4: 10.0000 of either asset.
         let ten = 100_000u64;
 
-        let same = Wrapper::push_from(&chain, john).st_cur_pol(
+        let same = Wrapper::push_from(&chain, john).st_fx_ofr(
             usd,
             usd,
             true,
@@ -9913,11 +9913,11 @@ mod tests {
             err.contains("currency convert requires different assets"),
             "{err}"
         );
-        assert!(CurrencyPolicy::get(john, usd, usd, true).is_none());
+        assert!(FxOffer::get(john, usd, usd, true).is_none());
 
         for side in [true, false] {
             Wrapper::push_from(&chain, john)
-                .st_cur_pol(
+                .st_fx_ofr(
                     usd,
                     aud,
                     side,
@@ -9947,7 +9947,7 @@ mod tests {
             .as_deref()
             .unwrap_or("(no error — convert succeeded)");
         assert!(
-            err.contains("CurrencyPolicy not found"),
+            err.contains("FxOffer not found"),
             "USD→AUD must not quote AUD→USD, got {err}"
         );
         assert_eq!(exp(&chain, john, isabelle, aud), 1);
@@ -9967,9 +9967,9 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, john, isabelle, usd), 0);
         assert_eq!(exp(&chain, john, isabelle, aud), 114_000);
-        assert!(CurrencyPolicy::get(john, usd, aud, true).is_none());
+        assert!(FxOffer::get(john, usd, aud, true).is_none());
         assert_eq!(
-            CurrencyPolicy::get(john, usd, aud, false)
+            FxOffer::get(john, usd, aud, false)
                 .unwrap()
                 .remaining
                 .value,
@@ -9990,7 +9990,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, isabelle, john, usd), 0);
         assert_eq!(exp(&chain, isabelle, john, aud), 114_000);
-        assert!(CurrencyPolicy::get(john, usd, aud, false).is_none());
+        assert!(FxOffer::get(john, usd, aud, false).is_none());
         Wrapper::push_from(&chain, isabelle)
             .deposit(john, aud, Quantity::new(114_000), 0, 0)
             .get()?;
@@ -9998,7 +9998,7 @@ mod tests {
 
         for side in [true, false] {
             Wrapper::push_from(&chain, john)
-                .st_cur_pol(
+                .st_fx_ofr(
                     aud,
                     usd,
                     side,
@@ -10010,10 +10010,10 @@ mod tests {
                 )
                 .get()?;
         }
-        assert!(CurrencyPolicy::get(john, usd, aud, true).is_none());
-        assert!(CurrencyPolicy::get(john, usd, aud, false).is_none());
+        assert!(FxOffer::get(john, usd, aud, true).is_none());
+        assert!(FxOffer::get(john, usd, aud, false).is_none());
         for side in [true, false] {
-            let row = CurrencyPolicy::get(john, aud, usd, side).unwrap();
+            let row = FxOffer::get(john, aud, usd, side).unwrap();
             assert_eq!(row.fee_fixed.value, 0);
             assert_eq!(row.fx_rate, back);
             assert_eq!(row.remaining.value, ten);
@@ -10028,9 +10028,9 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, john, isabelle, aud), 0);
         assert_eq!(exp(&chain, john, isabelle, usd), 79_166);
-        assert!(CurrencyPolicy::get(john, aud, usd, true).is_none());
+        assert!(FxOffer::get(john, aud, usd, true).is_none());
         assert_eq!(
-            CurrencyPolicy::get(john, aud, usd, false)
+            FxOffer::get(john, aud, usd, false)
                 .unwrap()
                 .remaining
                 .value,
@@ -10048,9 +10048,9 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(exp(&chain, isabelle, john, usd), 79_166);
-        assert!(CurrencyPolicy::get(john, aud, usd, false).is_none());
+        assert!(FxOffer::get(john, aud, usd, false).is_none());
         assert!(
-            CurrencyPolicy::get(john, usd, aud, true).is_none(),
+            FxOffer::get(john, usd, aud, true).is_none(),
             "the other direction stays gone after it was spent"
         );
 
@@ -10060,7 +10060,7 @@ mod tests {
     /// From-asset `remaining` caps convert and path FX. A take larger than
     /// what is left is rejected whole. Posting again replaces what is left.
     #[psibase::test_case(packages("Banx"))]
-    fn test_currency_policy_remaining_caps_convert_and_path(
+    fn test_fx_offer_remaining_caps_convert_and_path(
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -10085,7 +10085,7 @@ mod tests {
             )
             .get()?;
 
-        let zero = Wrapper::push_from(&chain, gary).st_cur_pol(
+        let zero = Wrapper::push_from(&chain, gary).st_fx_ofr(
             aud,
             usd,
             true,
@@ -10097,13 +10097,13 @@ mod tests {
         );
         let err = zero.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
-            err.contains("currency policy remaining must be positive"),
+            err.contains("fx offer remaining must be positive"),
             "zero remaining: {err}"
         );
-        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
+        assert!(FxOffer::get(gary, aud, usd, true).is_none());
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -10124,13 +10124,13 @@ mod tests {
         );
         let err = over.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
-            err.contains("currency policy amount exceeds remaining"),
+            err.contains("fx offer amount exceeds remaining"),
             "convert over remaining: {err}"
         );
         assert_eq!(exp(&chain, gary, alice, aud), 100);
         assert_eq!(exp(&chain, gary, alice, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true)
+            FxOffer::get_assert(gary, aud, usd, true)
                 .remaining
                 .value,
             40
@@ -10141,7 +10141,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 60);
         assert_eq!(exp(&chain, gary, alice, usd), 20);
-        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
+        assert!(FxOffer::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
             .convert(gary, aud, usd, Quantity::new(1), Quantity::new(0))
             .get()
@@ -10150,7 +10150,7 @@ mod tests {
 
         // 60 of exposure against a budget of 50 must not fill 50 and leave 10.
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -10170,20 +10170,20 @@ mod tests {
         );
         let err = partial.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
-            err.contains("currency policy amount exceeds remaining"),
+            err.contains("fx offer amount exceeds remaining"),
             "no partial fill: {err}"
         );
         assert_eq!(exp(&chain, gary, alice, aud), 60);
         assert_eq!(exp(&chain, gary, alice, usd), 20);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true)
+            FxOffer::get_assert(gary, aud, usd, true)
                 .remaining
                 .value,
             50
         );
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -10199,7 +10199,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
-        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
+        assert!(FxOffer::get(gary, aud, usd, true).is_none());
 
         // 1000 AUD at 0.70 needs 1000 of budget. 500 delivers 350 USD.
         Wrapper::push_from(&chain, steve)
@@ -10209,7 +10209,7 @@ mod tests {
             .st_glb_fwd(usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -10229,13 +10229,13 @@ mod tests {
         );
         let err = too_big.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
-            err.contains("currency policy amount exceeds remaining"),
+            err.contains("fx offer amount exceeds remaining"),
             "path over remaining: {err}"
         );
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, steve, gary, usd), 0);
         assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true)
+            FxOffer::get_assert(gary, aud, usd, true)
                 .remaining
                 .value,
             500
@@ -10258,7 +10258,7 @@ mod tests {
         );
         let err = inv.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
-            err.contains("currency policy amount exceeds remaining"),
+            err.contains("fx offer amount exceeds remaining"),
             "invoice over remaining: {err}"
         );
         assert_eq!(PayRequest::get_assert(id).remaining.value, 700);
@@ -10274,7 +10274,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 500);
         assert_eq!(exp(&chain, steve, gary, usd), 350);
-        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
+        assert!(FxOffer::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
                 vec![hop(gary, aud), hop(steve, usd)],
@@ -10322,7 +10322,7 @@ mod tests {
         assert_eq!(exp(&chain, alice, gary, aud), 0);
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -10372,7 +10372,7 @@ mod tests {
         assert_eq!(exp(&chain, alice, gary, usd), 80);
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -10419,7 +10419,7 @@ mod tests {
 
         // Alice owes Gary the AUD, so she posts that side of the quote.
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 false,
@@ -10431,7 +10431,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -10455,7 +10455,7 @@ mod tests {
     /// Convert uses the counterparty's quote, not the sender's. Alice cannot
     /// rebook at her own 1:1; she can take Gary's 0.50.
     #[psibase::test_case(packages("Banx"))]
-    fn test_convert_uses_counterparty_policy(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_convert_uses_counterparty_offer(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let gary = account!("gary");
@@ -10471,7 +10471,7 @@ mod tests {
             .path_pay(vec![hop(gary, aud)], 100.into(), 100.into(), 0)
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,
@@ -10491,8 +10491,8 @@ mod tests {
             .as_deref()
             .unwrap_or("(no error — convert succeeded)");
         assert!(
-            err.contains("CurrencyPolicy not found"),
-            "test_convert_uses_counterparty_policy: want policy missing, got {err}"
+            err.contains("FxOffer not found"),
+            "test_convert_uses_counterparty_offer: want offer missing, got {err}"
         );
         assert_eq!(exp(&chain, gary, alice, aud), 100);
         assert_eq!(exp(&chain, gary, alice, usd), 0);
@@ -10500,7 +10500,7 @@ mod tests {
         assert_eq!(still.remaining_principal.value, 100);
 
         Wrapper::push_from(&chain, gary)
-            .st_cur_pol(
+            .st_fx_ofr(
                 aud,
                 usd,
                 true,

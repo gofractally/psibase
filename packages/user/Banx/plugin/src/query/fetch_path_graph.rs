@@ -21,7 +21,7 @@ struct Data {
 struct PathGraph {
     credit_lines: Vec<GqlCreditLine>,
     forward_offers: Vec<GqlForward>,
-    currency_policies: Vec<GqlCurrency>,
+    fx_offers: Vec<GqlCurrency>,
     relays: Vec<GqlRelay>,
     now: i64,
 }
@@ -105,7 +105,7 @@ pub fn fetch_path_graph(
                     poster nextHop assetId feeFixed feePercentPpm maxLineAprPpm
                     expiresAt allowUnknown
                 }}
-                currencyPolicies {{
+                fxOffers {{
                     poster fromAsset toAsset feeFixed fxRate remaining expiresAt
                 }}
                 relays {{
@@ -152,7 +152,7 @@ pub fn fetch_path_graph(
         });
     }
 
-    let mut fx = Vec::with_capacity(g.currency_policies.len() + g.relays.len() * 2);
+    let mut fx = Vec::with_capacity(g.fx_offers.len() + g.relays.len() * 2);
     for r in &g.relays {
         fx.push(FxEdge {
             poster: r.owner,
@@ -179,7 +179,7 @@ pub fn fetch_path_graph(
             fee_ppm: r.fee_ppm,
         });
     }
-    for c in g.currency_policies {
+    for c in g.fx_offers {
         let (lo, hi) = if c.from_asset < c.to_asset {
             (c.from_asset, c.to_asset)
         } else {

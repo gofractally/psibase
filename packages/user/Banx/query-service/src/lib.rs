@@ -5,7 +5,7 @@ mod service {
     use banx::tables::{
         relay_sub, Asset, AssetTable, BanxInvite, BanxInviteTable, BanxRelay, BanxRelayTable,
         BookAuth, BookAuthTab, CashQuote, CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection,
-        CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab, ForwardOffer,
+        CreditLine, CreditLineTable, FxOffer, FxOfferTab, ForwardOffer,
         ForwardOfferTab, Obligation, ObligationTable, PairCycle, PayAuth, PayAuthTab, PayRequest,
         RequestTab, TokenRelayTable, PPM_SCALE, RATE_SCALE,
     };
@@ -227,7 +227,7 @@ mod service {
     }
 
     #[derive(SimpleObject)]
-    struct CurrencyPolicyView {
+    struct FxOfferView {
         poster: AccountNumber,
         /// Same as `poster` (old field name).
         debtor: AccountNumber,
@@ -245,8 +245,8 @@ mod service {
         expiresAt: i64,
     }
 
-    impl From<CurrencyPolicy> for CurrencyPolicyView {
-        fn from(p: CurrencyPolicy) -> Self {
+    impl From<FxOffer> for FxOfferView {
+        fn from(p: FxOffer) -> Self {
             Self {
                 poster: p.poster,
                 debtor: p.poster,
@@ -369,7 +369,7 @@ mod service {
         accounts: Vec<AccountNumber>,
         creditLines: Vec<CreditLineView>,
         forwardOffers: Vec<ForwardOfferView>,
-        currencyPolicies: Vec<CurrencyPolicyView>,
+        fxOffers: Vec<FxOfferView>,
         /// Constant-product Banx relays owned by an account on the path.
         relays: Vec<BanxRelayView>,
         /// Chain unix seconds at query time (offer / FX expiry).
@@ -761,19 +761,19 @@ mod service {
 
         /// FX quotes posted by `poster` (middle man / claim holder).
         /// `debtor` is accepted as an alias of `poster`.
-        async fn currencyPolicies(
+        async fn fxOffers(
             &self,
             poster: Option<AccountNumber>,
             debtor: Option<AccountNumber>,
-        ) -> Vec<CurrencyPolicyView> {
+        ) -> Vec<FxOfferView> {
             let Some(who) = poster.or(debtor) else {
                 return Vec::new();
             };
-            CurrencyPolicyTab::with_service(banx::SERVICE)
+            FxOfferTab::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|p| p.poster == who)
-                .map(CurrencyPolicyView::from)
+                .map(FxOfferView::from)
                 .collect()
         }
 
@@ -889,8 +889,8 @@ mod service {
                 .map(BanxRelayView::from_row)
                 .collect();
 
-            let currency_policies: Vec<CurrencyPolicyView> =
-                CurrencyPolicyTab::with_service(banx::SERVICE)
+            let fx_offers: Vec<FxOfferView> =
+                FxOfferTab::with_service(banx::SERVICE)
                     .get_index_pk()
                     .iter()
                     .filter(|p| {
@@ -904,7 +904,7 @@ mod service {
                         };
                         !relay_pairs.contains(&(p.poster, lo, hi))
                     })
-                    .map(CurrencyPolicyView::from)
+                    .map(FxOfferView::from)
                     .collect();
 
             let accounts = debtors.into_iter().collect();
@@ -913,7 +913,7 @@ mod service {
                 accounts,
                 creditLines: credit_lines,
                 forwardOffers: forward_offers,
-                currencyPolicies: currency_policies,
+                fxOffers: fx_offers,
                 relays,
                 now,
             }

@@ -24,7 +24,7 @@ The rest of Banx is machinery around that:
 | **Connection** | One directed pair in one asset: the line (if any) plus both claims. A path hop *is* a connection. Capacity = reverse claim + unused line headroom. |
 | **Path-forward offer** | “I will sit in the middle of a path.” Specific next hop, or **global**. |
 | **Claim offer** | Standing bid or ask to **transfer** a claim on a debtor (not a path payment). |
-| **Currency policy** | Posted from→to FX quote. Path pay uses it only to **size** the next hop. `convert` actually rebooks. |
+| **FX offer** | Posted from→to FX quote. Path pay uses it only to **size** the next hop. `convert` actually rebooks. |
 | **Request** | Invoice or please-book. Consent around who may write or pull. |
 
 Alice paying Carol $1 via Bob:
@@ -237,7 +237,7 @@ The current path debtor (the previous hop’s account) must have a **live path-f
 
 ### Currency change
 
-If hop *i*’s asset differs from hop *i−1*, the previous hop’s **creditor** (the middle man) applies their FX quote to **size** the next hop. That does **not** rebook the previous claim: the payer still owes the middle man in the from-asset; the middle man takes the to-asset liability onward. The sender’s FX policy is ignored.
+If hop *i*’s asset differs from hop *i−1*, the previous hop’s **creditor** (the middle man) applies their FX offer to **size** the next hop. That does **not** rebook the previous claim: the payer still owes the middle man in the from-asset; the middle man takes the to-asset liability onward. The sender’s FX offer is ignored.
 
 `min_return` is the final **amount_out** in the **last** hop’s asset.
 
@@ -326,7 +326,7 @@ After the window, daily compound runs from the last principal/rate change (origi
 
 ## Currency (FX)
 
-Anyone posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, `fx_rate` (`RATE_SCALE` fixed-point, `1_000_000` = 1:1), optional APR for the rebooked bucket, expiry.
+Anyone posts `st_fx_ofr`: from-asset → to-asset, fixed fee in from-asset, `fx_rate` (`RATE_SCALE` fixed-point, `1_000_000` = 1:1), optional APR for the rebooked bucket, expiry.
 
 `to = (from − fee_fixed) × fx_rate / RATE_SCALE`.
 

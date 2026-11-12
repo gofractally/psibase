@@ -63,8 +63,8 @@ import { useAccountGroups } from "@/hooks/use-account-groups";
 import { useBanxContacts } from "@/hooks/use-banx-contacts";
 import {
     useBookAuths,
-    useCurrencyPolicies,
-    usePosterCurrencyPolicies,
+    useFxOffers,
+    usePosterFxOffers,
 } from "@/hooks/use-banx-data";
 import {
     liveBookAuth,
@@ -85,7 +85,7 @@ import {
     REQUEST_PLEASE_BOOK,
     type BookAuth,
     type CreditLine,
-    type CurrencyPolicy,
+    type FxOffer,
 } from "@/lib/graphql";
 
 import { Avatar } from "@shared/components/avatar";
@@ -102,8 +102,8 @@ export function AccountDetailPage() {
     const { label } = useBanxContacts("/accounts");
     const { assets, symbolOf, precisionOf } = useAssetMap();
     const { data: bookAuths = [] } = useBookAuths();
-    const { data: myPolicies = [] } = useCurrencyPolicies();
-    const { data: theirPolicies = [] } = usePosterCurrencyPolicies(account);
+    const { data: myPolicies = [] } = useFxOffers();
+    const { data: theirPolicies = [] } = usePosterFxOffers(account);
     const nowSec = Math.floor(Date.now() / 1000);
 
     const savingsHere = useMemo(
@@ -154,14 +154,14 @@ export function AccountDetailPage() {
         owedRaw: string;
         /** True when they owe you the from-asset. */
         posterIsCreditor: boolean;
-        edit?: CurrencyPolicy;
+        edit?: FxOffer;
     } | null>(null);
     const [take, setTake] = useState<{
         fromAsset: number;
         fromSymbol: string;
         fromPrecision: number;
         claimRaw: string;
-        policies: CurrencyPolicy[];
+        policies: FxOffer[];
         /** True when you owe them and are taking their buy. */
         posterIsCreditor: boolean;
     } | null>(null);
@@ -170,11 +170,11 @@ export function AccountDetailPage() {
     const hasAnything = savingsHere.length > 0 || loansHere.length > 0;
     const canDeal = !!user && account !== user;
     const quoteNotes = (
-        policies: CurrencyPolicy[],
+        policies: FxOffer[],
         assetId: number,
         prefix: string,
         posterIsCreditor: boolean,
-        onEdit?: (policy: CurrencyPolicy) => void,
+        onEdit?: (policy: FxOffer) => void,
     ) =>
         liveFromPolicies(
             policies,

@@ -10,7 +10,7 @@ import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCashQuotes,
     useObligations,
-    usePosterCurrencyPolicies,
+    usePosterFxOffers,
     useTokenPrecisionMap,
 } from "@/hooks/use-banx-data";
 import { displayAmount, formatFxToRate } from "@/lib/amount";
@@ -45,7 +45,7 @@ export function AccountTrades({
         data: policies = [],
         isLoading: policiesLoading,
         isError: policiesError,
-    } = usePosterCurrencyPolicies(account);
+    } = usePosterFxOffers(account);
     const {
         data: quotes = [],
         isLoading: quotesLoading,

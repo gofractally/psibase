@@ -13,14 +13,14 @@ import {
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCashQuotes,
-    useCurrencyPolicies,
+    useFxOffers,
     useTokenPrecisionMap,
 } from "@/hooks/use-banx-data";
 import {
     useRemoveCashQuote,
-    useRemoveCurrencyPolicy,
+    useRemoveFxOffer,
     useSetCashQuote,
-    useSetCurrencyPolicy,
+    useSetFxOffer,
     useSetExchangeQuotes,
 } from "@/hooks/use-banx-mutations";
 import {
@@ -211,12 +211,12 @@ function LegKindToggle({
 export function PoliciesPage() {
     const { data: user } = useCurrentUser();
     const { assets, byId, symbolOf, precisionOf } = useAssetMap();
-    const { data: currency = [] } = useCurrencyPolicies();
+    const { data: currency = [] } = useFxOffers();
     const { data: cashQuotes = [] } = useCashQuotes(user ?? null);
-    const setCurrency = useSetCurrencyPolicy();
+    const setCurrency = useSetFxOffer();
     const setExchange = useSetExchangeQuotes();
     const setCash = useSetCashQuote();
-    const removeCurrency = useRemoveCurrencyPolicy();
+    const removeCurrency = useRemoveFxOffer();
     const removeCash = useRemoveCashQuote();
     const [moreOpen, setMoreOpen] = useState(false);
     const [orderOpen, setOrderOpen] = useState(false);

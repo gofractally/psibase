@@ -112,7 +112,7 @@ const zTokenRelay = z.object({
     feePpm: z.number(),
 });
 
-const zCurrencyPolicy = z.object({
+const zFxOffer = z.object({
     poster: z.string(),
     debtor: z.string().optional(),
     fromAsset: z.number(),
@@ -193,7 +193,7 @@ export type CashQuote = z.infer<typeof zCashQuote>;
 export type CashVault = z.infer<typeof zCashVault>;
 export type BanxRelay = z.infer<typeof zBanxRelay>;
 export type TokenRelay = z.infer<typeof zTokenRelay>;
-export type CurrencyPolicy = z.infer<typeof zCurrencyPolicy>;
+export type FxOffer = z.infer<typeof zFxOffer>;
 export type PayRequest = z.infer<typeof zPayRequest>;
 export type PayAuth = z.infer<typeof zPayAuth>;
 export type BanxInvite = z.infer<typeof zBanxInvite>;
@@ -367,15 +367,15 @@ export async function fetchTokenPrecision(tokenId: number): Promise<number> {
     return z.number().parse(data.tokenPrecision);
 }
 
-export async function fetchCurrencyPolicies(
+export async function fetchFxOffers(
     account: string,
-): Promise<CurrencyPolicy[]> {
-    const data = await gql<{ currencyPolicies: CurrencyPolicy[] }>(
-        `{ currencyPolicies(poster: "${account}") {
+): Promise<FxOffer[]> {
+    const data = await gql<{ fxOffers: FxOffer[] }>(
+        `{ fxOffers(poster: "${account}") {
             poster fromAsset toAsset posterIsCreditor feeFixed fxRate toInterestRatePpm remaining expiresAt
         } }`,
     );
-    return zCurrencyPolicy.array().parse(data.currencyPolicies);
+    return zFxOffer.array().parse(data.fxOffers);
 }
 
 const activityNodeFields = `

@@ -13,7 +13,7 @@ import {
     fetchCreditLines,
     fetchNetworkLines,
     fetchNetworkForwardOffers,
-    fetchCurrencyPolicies,
+    fetchFxOffers,
     fetchObligations,
     fetchForwardOffers,
     fetchPayAuths,
@@ -30,7 +30,7 @@ import {
     type TokenRelay,
     type ClaimOffer,
     type CreditLine,
-    type CurrencyPolicy,
+    type FxOffer,
     type ForwardOffer,
     type Obligation,
     type PayAuth,
@@ -275,21 +275,21 @@ export function useTokenPrecisionMap(tokenIds: number[]): {
     }, [queries, unique]);
 }
 
-export function useCurrencyPolicies(): UseQueryResult<
-    CurrencyPolicy[],
+export function useFxOffers(): UseQueryResult<
+    FxOffer[],
     Error
 > {
     const { data: user } = useCurrentUser();
-    return usePosterCurrencyPolicies(user);
+    return usePosterFxOffers(user);
 }
 
 /** FX quotes posted by `poster`, including another account's desk. */
-export function usePosterCurrencyPolicies(
+export function usePosterFxOffers(
     poster: string | null | undefined,
-): UseQueryResult<CurrencyPolicy[], Error> {
+): UseQueryResult<FxOffer[], Error> {
     return useQuery({
-        queryKey: QueryKey.currencyPolicies(poster),
-        queryFn: () => fetchCurrencyPolicies(poster!),
+        queryKey: QueryKey.fxOffers(poster),
+        queryFn: () => fetchFxOffers(poster!),
         enabled: !!poster,
     });
 }

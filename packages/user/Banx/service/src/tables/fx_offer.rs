@@ -2,11 +2,11 @@ use psibase::{services::tokens::Quantity, AccountNumber, Table, TimePointSec};
 
 use super::{apply_rate, emit_pair_activity, expires_live, Connection};
 use crate::math::PPM_SCALE;
-use crate::tables::tables::{Asset, CurrencyPolicy, CurrencyPolicyTab, Obligation};
+use crate::tables::tables::{Asset, FxOffer, FxOfferTab, Obligation};
 
-impl CurrencyPolicy {
+impl FxOffer {
     fn save(&self) {
-        CurrencyPolicyTab::read_write().put(self).unwrap();
+        FxOfferTab::read_write().put(self).unwrap();
     }
 
     pub fn get(
@@ -15,7 +15,7 @@ impl CurrencyPolicy {
         to_asset: u16,
         poster_is_creditor: bool,
     ) -> Option<Self> {
-        CurrencyPolicyTab::read().get_index_pk().get(&(
+        FxOfferTab::read().get_index_pk().get(&(
             poster,
             from_asset,
             to_asset,
@@ -30,7 +30,7 @@ impl CurrencyPolicy {
         poster_is_creditor: bool,
     ) -> Self {
         Self::get(poster, from_asset, to_asset, poster_is_creditor)
-            .expect("CurrencyPolicy not found")
+            .expect("FxOffer not found")
     }
 
     pub fn is_live(&self) -> bool {
@@ -38,7 +38,7 @@ impl CurrencyPolicy {
     }
 
     pub(crate) fn assert_live(&self) {
-        assert!(self.is_live(), "currency policy expired");
+        assert!(self.is_live(), "fx offer expired");
     }
 
     /// Path sizing. Fee is subtracted: the middle man owes less onward than
@@ -47,7 +47,7 @@ impl CurrencyPolicy {
         self.assert_live();
         assert!(
             self.poster_is_creditor,
-            "path fx requires the creditor-side policy"
+            "path fx requires the creditor-side offer"
         );
         apply_rate(amount_from, self.fee_fixed, self.fx_rate)
     }
@@ -77,7 +77,7 @@ impl CurrencyPolicy {
         );
         assert!(
             remaining.value > 0,
-            "currency policy remaining must be positive"
+            "fx offer remaining must be positive"
         );
         Self {
             poster,
@@ -99,7 +99,7 @@ impl CurrencyPolicy {
         self.assert_live();
         assert!(
             amount.value <= self.remaining.value,
-            "currency policy amount exceeds remaining"
+            "fx offer amount exceeds remaining"
         );
         self.remaining = self.remaining - amount;
         if self.remaining.value == 0 {
@@ -110,7 +110,7 @@ impl CurrencyPolicy {
     }
 
     pub fn remove(&self) {
-        CurrencyPolicyTab::read_write().erase(&(
+        FxOfferTab::read_write().erase(&(
             self.poster,
             self.from_asset,
             self.to_asset,
@@ -167,7 +167,7 @@ impl CurrencyPolicy {
         assert!(amount_from.value > 0, "convert amount must be positive");
         assert!(
             self.poster == party_a || self.poster == party_b,
-            "FX policy poster must be a party to the pair"
+            "FX offer poster must be a party to the pair"
         );
         assert!(party_a != party_b, "creditor must differ from debtor");
 
@@ -175,7 +175,7 @@ impl CurrencyPolicy {
             .expect("nothing to convert in from_asset");
         assert!(
             (conn.creditor == self.poster) == self.poster_is_creditor,
-            "currency policy is for the other debt direction"
+            "fx offer is for the other debt direction"
         );
         let take = amount_from.value.min(conn.forward().value);
         assert!(take > 0, "nothing to convert in from_asset");

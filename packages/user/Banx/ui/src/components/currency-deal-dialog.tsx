@@ -3,8 +3,8 @@ import { useEffect, useRef } from "react";
 import { AssetField } from "@/components/form-fields";
 import {
     useConvert,
-    useRemoveCurrencyPolicy,
-    useSetCurrencyPolicy,
+    useRemoveFxOffer,
+    useSetFxOffer,
 } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
@@ -15,7 +15,7 @@ import {
 } from "@/lib/amount";
 import { ppmToPercent } from "@/lib/constants";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
-import type { Asset, CurrencyPolicy } from "@/lib/graphql";
+import type { Asset, FxOffer } from "@/lib/graphql";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -29,12 +29,12 @@ import {
 
 /** Live quotes for one debt direction, with budget left. */
 export function liveFromPolicies(
-    policies: CurrencyPolicy[],
+    policies: FxOffer[],
     fromAsset: number,
     fromPrecision: number,
     nowSec: number,
     posterIsCreditor: boolean,
-): CurrencyPolicy[] {
+): FxOffer[] {
     return policies.filter(
         (p) =>
             p.fromAsset === fromAsset &&
@@ -45,7 +45,7 @@ export function liveFromPolicies(
 }
 
 export function quoteSummary(
-    policy: CurrencyPolicy,
+    policy: FxOffer,
     fromSymbol: string,
     fromPrecision: number,
     toSymbol: string,
@@ -65,11 +65,11 @@ export function quoteSummary(
 }
 
 function policyFor(
-    policies: CurrencyPolicy[],
+    policies: FxOffer[],
     fromAsset: number,
     toAsset: number | undefined,
     posterIsCreditor = false,
-): CurrencyPolicy | undefined {
+): FxOffer | undefined {
     if (toAsset === undefined) return undefined;
     return policies.find(
         (p) =>
@@ -81,7 +81,7 @@ function policyFor(
 
 function takeCapRaw(
     claimRaw: string,
-    policy: CurrencyPolicy,
+    policy: FxOffer,
     fromPrecision: number,
 ): bigint {
     const claim = BigInt(claimRaw || "0");
@@ -121,14 +121,14 @@ export function OfferRepayDialog({
     assets: Asset[];
     precisionOf: (id: number) => number;
     /** Quotes you have already posted. */
-    policies: CurrencyPolicy[];
+    policies: FxOffer[];
     /** Existing pair to change. The to-asset stays put. */
-    editPolicy?: CurrencyPolicy | null;
+    editPolicy?: FxOffer | null;
     /** True when they owe you the from-asset. */
     posterIsCreditor?: boolean;
 }) {
-    const post = useSetCurrencyPolicy();
-    const remove = useRemoveCurrencyPolicy();
+    const post = useSetFxOffer();
+    const remove = useRemoveFxOffer();
     const owedHuman = formatRawAmount(owedRaw, fromPrecision);
     const otherAssets = assets.filter((a) => a.id !== fromAsset);
     // useAppForm keeps the first onSubmit. The open offer changes after that.
@@ -442,7 +442,7 @@ export function TakeConvertDialog({
     fromPrecision: number;
     /** Raw units of the leftover from-asset claim. */
     claimRaw: string;
-    policies: CurrencyPolicy[];
+    policies: FxOffer[];
     assets: Asset[];
     precisionOf: (id: number) => number;
     /** True when the quote is the side where they are owed the from-asset. */

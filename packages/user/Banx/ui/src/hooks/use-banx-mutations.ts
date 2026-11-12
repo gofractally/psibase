@@ -29,7 +29,7 @@ export function useInvalidateLedger() {
             queryKey: QueryKey.claimOffers(user),
         });
         void qc.invalidateQueries({
-            queryKey: ["banx", "currencyPolicies"],
+            queryKey: ["banx", "fxOffers"],
         });
         void qc.invalidateQueries({
             queryKey: QueryKey.requests(user),
@@ -811,7 +811,7 @@ export function useBuyClaim() {
     });
 }
 
-export function useSetCurrencyPolicy() {
+export function useSetFxOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
@@ -827,7 +827,7 @@ export function useSetCurrencyPolicy() {
             remaining: string;
             expiresAtSeconds: number;
         }) =>
-            banxCall("setCurrencyPolicy", [
+            banxCall("setFxOffer", [
                 p.fromAsset,
                 p.toAsset,
                 p.posterIsCreditor,
@@ -839,7 +839,7 @@ export function useSetCurrencyPolicy() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Currency policy saved");
+            toast.success("FX offer saved");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -878,7 +878,7 @@ export function useSetExchangeQuotes() {
     });
 }
 
-export function useRemoveCurrencyPolicy() {
+export function useRemoveFxOffer() {
     const invalidate = useInvalidateBanx();
     return useMutation({
         mutationFn: async (p: {
@@ -886,14 +886,14 @@ export function useRemoveCurrencyPolicy() {
             toAsset: number;
             posterIsCreditor: boolean;
         }) =>
-            banxCall("removeCurrencyPolicy", [
+            banxCall("removeFxOffer", [
                 p.fromAsset,
                 p.toAsset,
                 p.posterIsCreditor,
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Currency policy removed");
+            toast.success("FX offer removed");
         },
         onError: (e: Error) => toast.error(e.message),
     });

@@ -20,7 +20,7 @@ import {
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import type {
     CashQuote,
-    CurrencyPolicy,
+    FxOffer,
     Obligation,
 } from "@/lib/graphql";
 
@@ -36,7 +36,7 @@ import {
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export type TakeTrade =
-    | { kind: "policy"; policy: CurrencyPolicy }
+    | { kind: "policy"; policy: FxOffer }
     | { kind: "cash"; quote: CashQuote };
 
 /** Sum of `creditor`'s live claim on `debtor` in one asset. */

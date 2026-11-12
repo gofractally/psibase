@@ -240,7 +240,7 @@ interface api {
     /// again replaces what is left. `to-rate` is how many **to-asset** units
     /// for 1 full **from-asset** unit (e.g. `"0.45"`). The plugin converts
     /// this to the chain `fx_rate` (RATE_SCALE fixed-point), including precisions.
-    set-currency-policy: func(
+    set-fx-offer: func(
         from-asset: u16,
         to-asset: u16,
         poster-is-creditor: bool,
@@ -269,7 +269,7 @@ interface api {
     ) -> result<_, error>;
 
     /// Remove one side of a from→to quote.
-    remove-currency-policy: func(
+    remove-fx-offer: func(
         from-asset: u16,
         to-asset: u16,
         poster-is-creditor: bool,
@@ -385,7 +385,7 @@ interface api {
     /// tokens, books Banx onto the poster.
     /// `fee-fixed` is a human decimal in Banx units (out) or token units (in).
     /// `to-rate` is how many **to** units per 1 **from** unit (same as
-    /// `set-currency-policy`).
+    /// `set-fx-offer`).
     set-cash-quote: func(
         asset-id: u16,
         token-id: u32,

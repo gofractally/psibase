@@ -10,7 +10,7 @@ A payment does not move coins. It **creates or shrinks obligations** along a pat
 - **Obligation** — the actual debt. One pair/asset can have several rows (different rates). **Exposure** is principal + live interest.
 - **Path-forward offer** — B’s standing terms for *sitting in the middle* of a `path_pay`. Specific next hop, or **global** (any next hop).
 - **Claim offer** — standing **buy** (`sell_claim` hits it) or **sell** (`buy_claim` hits it) **rate** for transferring a claim on a debtor. Specific debtor, or **global**. Who and how much come from the buyer’s credit line to that debtor.
-- **Currency policy** — a posted from→to FX offer. Others take it with `convert`. Path pay uses it to size a hop when the poster is in the middle.
+- **FX offer** — a posted from→to FX offer. Others take it with `convert`. Path pay uses it to size a hop when the poster is in the middle.
 
 Alice paying Carol $1 via Bob:
 
@@ -71,7 +71,7 @@ UI: `/requests` (Plus to create). An account-row Request button opens the same m
 
 - **Hop 0** — sender draws on the first account (line and/or reverse claim). No hop fee.
 - **Later hops** — the current path debtor must have a **live** path-forward offer. Specific next hop if live; otherwise a live global. Expired specific does **not** block the global. Buy-claim offers are not used here.
-- **Asset change** — the previous hop’s **creditor** (middle man) applies their FX quote to size the next hop. The payer’s claim stays in the from-asset; the middle man takes the to-asset liability. The sender’s policy is ignored.
+- **Asset change** — the previous hop’s **creditor** (middle man) applies their FX offer to size the next hop. The payer’s claim stays in the from-asset; the middle man takes the to-asset liability. The sender’s offer is ignored.
 - **min_return** — final **amount_out** in the last hop’s asset must be at least this.
 - **Invoice** — `pay_inv(hops, max_spend, request_id)`: remaining is exact, `max_spend` is the send budget.
 
@@ -127,7 +127,7 @@ Default in the UI is **7 days**. `0` means interest from the first second.
 
 ## Currency (FX)
 
-Anyone posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, rate (human “to per 1 from” in the plugin), optional new APR, expiry. That is an **offer**.
+Anyone posts `st_fx_ofr`: from-asset → to-asset, fixed fee in from-asset, rate (human “to per 1 from” in the plugin), optional new APR, expiry. That is an **offer**.
 
 `convert` is a take: sender uses the **counterparty’s** live quote, not their own. Nets `from_asset` first, rebooks the leftover at that offer, then auto-nets `to_asset`. Neither party can re-denominate a claim at a rate they set themselves.
 
@@ -167,7 +167,7 @@ On chain, quantities are raw integers. The plugin and GraphQL use **human decima
 | `st_req` / `rm_req` | Create / cancel invoice or please-book |
 | `net` | Explicit bilateral net (no UI; writers already auto-net) |
 | `forgive` | Creditor write-off of claims they hold (one-sided; UI on savings rows) |
-| `st_cur_pol` / `rm_cur_pol` | Post / remove a from→to FX offer |
+| `st_fx_ofr` / `rm_fx_ofr` | Post / remove a from→to FX offer |
 | `convert` | Take the counterparty’s FX offer and rebook |
 | `st_csh_qte` / `rm_csh_qte` | Post / remove a Banx↔Tokens cash quote (`is_out` true = out) |
 | `csh_fund` / `csh_wd` | Fund / withdraw Tokens sub-account `{poster}/{token_id}` on Banx |

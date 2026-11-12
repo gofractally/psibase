@@ -11,7 +11,7 @@ pub mod tables;
 pub mod service {
     use crate::tables::{
         assert_account_exists, emit_pair_activity, path_required_send, run_path, Asset, BanxInvite,
-        BanxRelay, BookAuth, CashQuote, ClaimOffer, Connection, CreditLine, CurrencyPolicy,
+        BanxRelay, BookAuth, CashQuote, ClaimOffer, Connection, CreditLine, FxOffer,
         ForwardOffer, InitRow, InitTable, Obligation, PathHop, PayAuth, PayRequest, TokenRelay,
     };
     use psibase::{
@@ -491,7 +491,7 @@ pub mod service {
     /// `remaining` is from-asset still accepted on this side. Posting again
     /// replaces what is left.
     #[action]
-    fn st_cur_pol(
+    fn st_fx_ofr(
         from_asset: u16,
         to_asset: u16,
         poster_is_creditor: bool,
@@ -501,7 +501,7 @@ pub mod service {
         remaining: Quantity,
         expires_at: TimePointSec,
     ) {
-        CurrencyPolicy::upsert(
+        FxOffer::upsert(
             get_sender(),
             from_asset,
             to_asset,
@@ -516,15 +516,15 @@ pub mod service {
 
     /// Remove one side of a from→to quote.
     #[action]
-    fn rm_cur_pol(from_asset: u16, to_asset: u16, poster_is_creditor: bool) {
-        CurrencyPolicy::get_assert(get_sender(), from_asset, to_asset, poster_is_creditor).remove();
+    fn rm_fx_ofr(from_asset: u16, to_asset: u16, poster_is_creditor: bool) {
+        FxOffer::get_assert(get_sender(), from_asset, to_asset, poster_is_creditor).remove();
     }
 
     /// Post a constant-product relay between two Banx assets.
     ///
     /// Both reserves are virtual weights, not a debt. One row prices both
     /// directions. Posting again replaces them. A path that changes asset
-    /// on the sender uses this curve instead of a currency policy for the pair.
+    /// on the sender uses this curve instead of an FX offer for the pair.
     #[action]
     fn st_relay(
         asset_a: u16,
@@ -697,9 +697,9 @@ pub mod service {
         quote.cash_in(get_sender(), amount_tokens, min_banx);
     }
 
-    /// Take the **counterparty's** [`CurrencyPolicy`] for the leftover
+    /// Take the **counterparty's** [`FxOffer`] for the leftover
     /// `from_asset` debt. Only the side that matches that debt is used.
-    /// Sender does not use their own policy. Nets `from_asset` first when
+    /// Sender does not use their own offer. Nets `from_asset` first when
     /// the quote exists and auto-nets `to_asset`.
     ///
     /// `min_to` bounds the new to-asset amount. When the sender owes the
@@ -714,7 +714,7 @@ pub mod service {
         amount_from: Quantity,
         min_to: Quantity,
     ) {
-        CurrencyPolicy::take(
+        FxOffer::take(
             get_sender(),
             counterparty,
             from_asset,
@@ -740,7 +740,7 @@ pub mod service {
         amount_from: Quantity,
         min_to: Quantity,
     ) {
-        CurrencyPolicy::take_order(
+        FxOffer::take_order(
             get_sender(),
             poster,
             from_asset,
@@ -851,7 +851,7 @@ pub mod service {
     ///    reverse claim that auto-nets).
     /// 2. **Currency change** — if the previous hop posted a [`BanxRelay`]
     ///    for the pair, the curve sizes the next hop. Otherwise apply their
-    ///    creditor-side [`CurrencyPolicy`]. Does **not** rebook the previous
+    ///    creditor-side [`FxOffer`]. Does **not** rebook the previous
     ///    claim: the payer still owes the middle man the full from-asset.
     /// 3. **Later hops** — intermediate's live [`ForwardOffer`] (fee + max
     ///    line APR); draw on next line.

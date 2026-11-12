@@ -142,7 +142,7 @@ pub fn try_apply_spread(amount_in: u64, fee_fixed: u64, spread_ppm: i32) -> Opti
 ///
 /// `None` before any positive output means the input still rounds to nothing,
 /// so the search keeps growing. `None` after a short positive output is a
-/// ceiling (a currency-policy cap, or a swap that cannot price a larger
+/// ceiling (an FX-offer cap, or a swap that cannot price a larger
 /// input). The feasible send may sit strictly between those two probes, so
 /// the search does not require a power of two to succeed. `probe` is monotone
 /// up to that ceiling: a larger input does not start pricing again after `None`.
