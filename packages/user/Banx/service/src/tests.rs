@@ -834,12 +834,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 500);
         assert_eq!(exp(&chain, steve, gary, usd), 350);
-        assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true)
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
                 vec![hop(gary, aud), hop(steve, usd)],
@@ -2056,13 +2051,7 @@ mod tests {
         assert_eq!(exp(&chain, michelle, john, merlo), 0);
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(exp(&chain, michelle, isabelle, merlo), 0);
-        assert_eq!(
-            CurrencyPolicy::get(isabelle, merlo, aud, true)
-                .unwrap()
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(isabelle, merlo, aud, true).is_none());
         Ok(())
     }
 
@@ -2183,13 +2172,7 @@ mod tests {
         assert_eq!(exp(&chain, michelle, isabelle, aud), DOLLARS);
         assert_eq!(exp(&chain, isabelle, michelle, aud), 0);
         assert_eq!(exp(&chain, michelle, john, aud), 0);
-        assert_eq!(
-            CurrencyPolicy::get(michelle, weetbix, aud, true)
-                .unwrap()
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(michelle, weetbix, aud, true).is_none());
         Ok(())
     }
 
@@ -2371,12 +2354,8 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 1_000);
         assert_eq!(exp(&chain, steve, gary, usd), 630);
         assert_eq!(exp(&chain, gary, alice, usd), 0);
-        assert_eq!(
-            CurrencyPolicy::get(gary, aud, usd, true)
-                .unwrap()
-                .remaining
-                .value,
-            0,
+        assert!(
+            CurrencyPolicy::get(gary, aud, usd, true).is_none(),
             "the budget falls by the incoming 1_000, not by 1_000 − fee"
         );
         assert_eq!(
@@ -2493,6 +2472,7 @@ mod tests {
             5_000
         );
 
+        // More than the path spends, so Remove is what deletes the creditor row.
         Wrapper::push_from(&chain, gary)
             .st_cur_pol(
                 aud,
@@ -2501,7 +2481,7 @@ mod tests {
                 Quantity::new(0),
                 RATE_SCALE * 70 / 100,
                 0,
-                Quantity::new(1_000),
+                Quantity::new(2_000),
                 never(),
             )
             .get()?;
@@ -2533,7 +2513,7 @@ mod tests {
                 .unwrap()
                 .remaining
                 .value,
-            0
+            1_000
         );
         assert_eq!(
             CurrencyPolicy::get(gary, aud, usd, false)
@@ -8818,13 +8798,7 @@ mod tests {
             owing_aud,
             "fee should favour John: 2.70 AUD"
         );
-        assert_eq!(
-            CurrencyPolicy::get(john, kwh, aud, false)
-                .unwrap()
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(john, kwh, aud, false).is_none());
         assert_eq!(
             CurrencyPolicy::get(john, kwh, aud, true)
                 .unwrap()
@@ -9153,13 +9127,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, john, isabelle, usd), 0);
         assert_eq!(exp(&chain, john, isabelle, aud), 114_000);
-        assert_eq!(
-            CurrencyPolicy::get(john, usd, aud, true)
-                .unwrap()
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(john, usd, aud, true).is_none());
         assert_eq!(
             CurrencyPolicy::get(john, usd, aud, false)
                 .unwrap()
@@ -9182,13 +9150,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, isabelle, john, usd), 0);
         assert_eq!(exp(&chain, isabelle, john, aud), 114_000);
-        assert_eq!(
-            CurrencyPolicy::get(john, usd, aud, false)
-                .unwrap()
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(john, usd, aud, false).is_none());
         Wrapper::push_from(&chain, isabelle)
             .deposit(john, aud, Quantity::new(114_000), 0, 0)
             .get()?;
@@ -9208,16 +9170,13 @@ mod tests {
                 )
                 .get()?;
         }
-        for (from, to, rate, side, left) in [
-            (usd, aud, forward, true, 0u64),
-            (usd, aud, forward, false, 0u64),
-            (aud, usd, back, true, ten),
-            (aud, usd, back, false, ten),
-        ] {
-            let row = CurrencyPolicy::get(john, from, to, side).unwrap();
+        assert!(CurrencyPolicy::get(john, usd, aud, true).is_none());
+        assert!(CurrencyPolicy::get(john, usd, aud, false).is_none());
+        for side in [true, false] {
+            let row = CurrencyPolicy::get(john, aud, usd, side).unwrap();
             assert_eq!(row.fee_fixed.value, 0);
-            assert_eq!(row.fx_rate, rate);
-            assert_eq!(row.remaining.value, left);
+            assert_eq!(row.fx_rate, back);
+            assert_eq!(row.remaining.value, ten);
         }
 
         // 10 AUD × 0.791666, truncated, is 7.9166 USD.
@@ -9229,13 +9188,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, john, isabelle, aud), 0);
         assert_eq!(exp(&chain, john, isabelle, usd), 79_166);
-        assert_eq!(
-            CurrencyPolicy::get(john, aud, usd, true)
-                .unwrap()
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(john, aud, usd, true).is_none());
         assert_eq!(
             CurrencyPolicy::get(john, aud, usd, false)
                 .unwrap()
@@ -9255,20 +9208,10 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(exp(&chain, isabelle, john, usd), 79_166);
-        assert_eq!(
-            CurrencyPolicy::get(john, aud, usd, false)
-                .unwrap()
-                .remaining
-                .value,
-            0
-        );
-        assert_eq!(
-            CurrencyPolicy::get(john, usd, aud, true)
-                .unwrap()
-                .remaining
-                .value,
-            0,
-            "the other direction's budget stays spent"
+        assert!(CurrencyPolicy::get(john, aud, usd, false).is_none());
+        assert!(
+            CurrencyPolicy::get(john, usd, aud, true).is_none(),
+            "the other direction stays gone after it was spent"
         );
 
         Ok(())
@@ -9358,12 +9301,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 60);
         assert_eq!(exp(&chain, gary, alice, usd), 20);
-        assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true)
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
             .convert(gary, aud, usd, Quantity::new(1), Quantity::new(0))
             .get()
@@ -9421,12 +9359,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
-        assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true)
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
 
         // 1000 AUD at 0.70 needs 1000 of budget. 500 delivers 350 USD.
         Wrapper::push_from(&chain, steve)
@@ -9501,12 +9434,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 500);
         assert_eq!(exp(&chain, steve, gary, usd), 350);
-        assert_eq!(
-            CurrencyPolicy::get_assert(gary, aud, usd, true)
-                .remaining
-                .value,
-            0
-        );
+        assert!(CurrencyPolicy::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
             .path_pay(
                 vec![hop(gary, aud), hop(steve, usd)],

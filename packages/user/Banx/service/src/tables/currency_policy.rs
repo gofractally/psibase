@@ -93,7 +93,8 @@ impl CurrencyPolicy {
         .save();
     }
 
-    /// Spend from-asset budget. Posting the policy again replaces what is left.
+    /// Spend from-asset budget. A later post replaces whatever is left.
+    /// The last unit deletes the row: an empty order is not a trade.
     pub(crate) fn spend(&mut self, amount: Quantity) {
         self.assert_live();
         assert!(
@@ -101,7 +102,11 @@ impl CurrencyPolicy {
             "currency policy amount exceeds remaining"
         );
         self.remaining = self.remaining - amount;
-        self.save();
+        if self.remaining.value == 0 {
+            self.remove();
+        } else {
+            self.save();
+        }
     }
 
     pub fn remove(&self) {
