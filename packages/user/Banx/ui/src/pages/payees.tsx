@@ -7,6 +7,10 @@ import { NewDepositLoanDialog } from "@/components/new-deposit-loan-dialog";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import { useBookAuths } from "@/hooks/use-banx-data";
+import {
+    profilesContactsGet,
+    profilesReadPermission,
+} from "@/hooks/use-banx-contacts";
 import type { BookAuth } from "@/lib/graphql";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -94,7 +98,10 @@ export function PayeesPage() {
     const { data: bookAuths = [] } = useBookAuths();
 
     const { data: hasPermission, isPending: permissionPending } =
-        useHasProfilesReadPermission({ enabled: !!user });
+        useHasProfilesReadPermission({
+            enabled: !!user,
+            call: profilesReadPermission,
+        });
 
     const {
         data: contacts = [],
@@ -103,7 +110,7 @@ export function PayeesPage() {
         error: contactsErr,
     } = useContacts(
         user,
-        { enabled: !!user && !!hasPermission },
+        { enabled: !!user && !!hasPermission, call: profilesContactsGet },
         { enabled: true, returnPath: "/payees" },
     );
 

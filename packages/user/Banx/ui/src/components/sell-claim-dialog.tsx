@@ -3,6 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { ArrowLeftRight, Loader2 } from "lucide-react";
 
+import {
+    profilesContactsGet,
+    profilesReadPermission,
+} from "@/hooks/use-banx-contacts";
 import { useBuyClaim, useSellClaim } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
@@ -259,10 +263,14 @@ export function SellClaimDialog({
     const takingAsk = mode === "buy";
     const { data: hasPermission } = useHasProfilesReadPermission({
         enabled: !!user && open,
+        call: profilesReadPermission,
     });
     const { data: contacts = [] } = useContacts(
         user,
-        { enabled: !!user && !!hasPermission && open },
+        {
+            enabled: !!user && !!hasPermission && open,
+            call: profilesContactsGet,
+        },
         { enabled: true, returnPath: "/accounts" },
     );
 
