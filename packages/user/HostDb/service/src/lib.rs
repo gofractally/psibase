@@ -33,9 +33,9 @@ mod service {
     /// | Cookie | Description |
     /// |--------|-------------|
     /// | `__Host-HOSTDB-DEVICE` | 32-byte device id (hex); minted when absent; scopes all keys |
-    /// | `__Host-HOSTDB-SESSION` | decimal session id from the device's counter; minted when absent on session-scoped routes; scopes session keys |
+    /// | `__Host-HOSTDB-SESSION` | `u32` session id; minted when absent on session-scoped routes; scopes session keys |
     ///
-    /// - A device cookie with bad hex or length, or a session cookie that is not a decimal integer without leading zeros, yields `400` on routes that use that cookie.
+    /// - An invalid device or session cookie yields `400` on routes that use that cookie.
     /// - A missing device cookie causes a new device id to be minted.
     /// - A missing session cookie is minted only for `GET /kv/session/...` or batch ops with `"duration":"session"`,
     /// - Accepted ids (valid cookie or freshly minted) are sent back in `Set-Cookie`.
