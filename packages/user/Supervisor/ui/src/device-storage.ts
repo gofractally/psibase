@@ -60,9 +60,20 @@ class HostCookieStorage implements DeviceStorage {
             body: JSON.stringify({ name, value, maxAge, httpOnly: false }),
         });
         if (!response.ok) {
+            const verb = maxAge === 0 ? "delete" : "set";
             throw new Error(
-                `Failed to set ${name} cookie: HTTP ${response.status}`,
+                `Failed to ${verb} ${name} cookie: HTTP ${response.status}`,
             );
+        }
+        const stored = await this.get(name);
+        const expected = maxAge === 0 ? undefined : value;
+        if (stored !== expected) {
+            const verb = maxAge === 0 ? "delete" : "set";
+            const detail =
+                maxAge === 0
+                    ? "cookie still present"
+                    : "stored value does not match";
+            throw new Error(`Failed to ${verb} ${name} cookie: ${detail}`);
         }
     }
 }
