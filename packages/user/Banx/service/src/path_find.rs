@@ -371,14 +371,7 @@ pub fn find_banx_path(
 
     let mut best_payee: Option<Label> = None;
     for label in &frontier {
-        note_payee(
-            &mut best_payee,
-            label,
-            payee,
-            to_asset,
-            sender,
-            from_asset,
-        );
+        note_payee(&mut best_payee, label, payee, to_asset, sender, from_asset);
     }
 
     // Later hops. Asset changes use the current debtor's FX quote.
@@ -425,14 +418,7 @@ pub fn find_banx_path(
             break;
         }
         for label in &next {
-            note_payee(
-                &mut best_payee,
-                label,
-                payee,
-                to_asset,
-                sender,
-                from_asset,
-            );
+            note_payee(&mut best_payee, label, payee, to_asset, sender, from_asset);
         }
         // Do not draw onward from the sender. The return is only a final hop.
         frontier = next
@@ -1876,14 +1862,32 @@ mod tests {
 
         assert!(
             find(
-                &lines, &routing, &fx, "alice", "alice", 1_000, usd, Some(usd), 4, 0,
+                &lines,
+                &routing,
+                &fx,
+                "alice",
+                "alice",
+                1_000,
+                usd,
+                Some(usd),
+                4,
+                0,
             )
             .is_none(),
             "same-asset return is not a path"
         );
         assert!(
             find(
-                &lines, &routing, &fx, "alice", "carol", 1_000, aud, Some(usd), 4, 0,
+                &lines,
+                &routing,
+                &fx,
+                "alice",
+                "carol",
+                1_000,
+                aud,
+                Some(usd),
+                4,
+                0,
             )
             .is_none(),
             "the path must not continue after Alice"

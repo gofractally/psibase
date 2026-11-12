@@ -3,22 +3,15 @@ use psibase::{
     AccountNumber, ServiceWrapper, Table,
 };
 
-use super::{cash_sub, emit_pair_activity, Connection};
+use super::{cash_sub, emit_pair_activity, relay_sub, Connection};
 use crate::math::{try_swap_out, PPM_SCALE};
 use crate::tables::tables::{Asset, CashQuote, TokenRelay, TokenRelayTable};
 
-fn token_reserve(owner: AccountNumber, token_id: u32) -> u64 {
+fn token_reserve(owner: AccountNumber, asset_id: u16, token_id: u32) -> u64 {
     Tokens::call()
-        .getSubBal(token_id, cash_sub(owner, token_id))
+        .getSubBal(token_id, relay_sub(owner, asset_id, token_id))
         .map(|q| q.value)
         .unwrap_or(0)
-}
-
-fn row_for_vault(owner: AccountNumber, token_id: u32) -> Option<TokenRelay> {
-    TokenRelayTable::read()
-        .get_index_pk()
-        .iter()
-        .find(|row| row.owner == owner && row.token_id == token_id)
 }
 
 impl TokenRelay {
@@ -38,51 +31,39 @@ impl TokenRelay {
         })
     }
 
-    pub(crate) fn vault_balance(owner: AccountNumber, token_id: u32) -> u64 {
-        token_reserve(owner, token_id)
+    fn pair_sub(&self) -> String {
+        relay_sub(self.owner, self.asset_id, self.token_id)
     }
 
-    /// True when this token vault is the live reserve of a relay.
-    pub(crate) fn vault_backs(owner: AccountNumber, token_id: u32) -> bool {
-        row_for_vault(owner, token_id).is_some()
-    }
-
-    /// A fund or withdraw changed the live token reserve outside a swap.
-    /// Scale the virtual Banx weight by the same ratio so the price stays put.
-    /// An empty vault has no ratio, whether it just emptied or is being filled.
-    /// The declared weight stays, so a later fund can sell again.
-    pub(crate) fn sync_vault(owner: AccountNumber, token_id: u32, before: u64, after: u64) {
-        if before == 0 || after == 0 || before == after {
-            return;
-        }
-        let Some(mut row) = row_for_vault(owner, token_id) else {
-            return;
-        };
-        let next = (row.reserve_banx.value as u128)
-            .checked_mul(after as u128)
-            .expect("relay reserve overflow")
-            / (before as u128);
-        let next = u64::try_from(next).expect("relay reserve overflow");
-        row.reserve_banx = Quantity::new(next);
-        row.save();
-    }
-
+    /// Pull `reserve_tokens` from the shared credit into this pair's sub-account.
+    /// A second post of the same pair is rejected: one owner, one pool.
     pub fn upsert(
         owner: AccountNumber,
         asset_id: u16,
         token_id: u32,
         reserve_banx: Quantity,
+        reserve_tokens: Quantity,
         fee_ppm: u32,
     ) {
         assert!(reserve_banx.value > 0, "relay reserve must be positive");
+        assert!(
+            reserve_tokens.value > 0,
+            "relay token reserve must be positive"
+        );
         assert!(fee_ppm < PPM_SCALE, "relay fee must be under 100%");
         let _ = Asset::get_assert(asset_id);
         let _ = Tokens::call().getToken(token_id);
-        let other = TokenRelayTable::read()
-            .get_index_pk()
-            .iter()
-            .find(|row| row.owner == owner && row.token_id == token_id && row.asset_id != asset_id);
-        assert!(other.is_none(), "token vault already backs another relay");
+        assert!(
+            Self::get(owner, asset_id, token_id).is_none(),
+            "relay already posted for this pair"
+        );
+        CashQuote::debit_into_named(
+            owner,
+            token_id,
+            relay_sub(owner, asset_id, token_id),
+            reserve_tokens,
+            "relay",
+        );
         Self {
             owner,
             asset_id,
@@ -93,13 +74,24 @@ impl TokenRelay {
         .save();
     }
 
+    /// Return whatever tokens are still in the pair, then erase the row.
     pub fn remove(&self) {
+        let left = token_reserve(self.owner, self.asset_id, self.token_id);
+        if left > 0 {
+            CashQuote::pay_named(
+                self.pair_sub(),
+                self.owner,
+                self.token_id,
+                Quantity::new(left),
+                "relay",
+            );
+        }
         TokenRelayTable::read_write().erase(&(self.owner, self.asset_id, self.token_id));
     }
 
     /// Banx in, tokens out. Moves the virtual Banx reserve. Caller pays the tokens.
     pub fn take_banx(&mut self, amount_banx: Quantity) -> Quantity {
-        let tokens = token_reserve(self.owner, self.token_id);
+        let tokens = token_reserve(self.owner, self.asset_id, self.token_id);
         let out = try_swap_out(
             self.reserve_banx.value,
             tokens,
@@ -118,9 +110,9 @@ impl TokenRelay {
     }
 
     /// Tokens in, Banx out. Does not move tokens. Caller deposits them first
-    /// only after this sizes the output from the vault as it stands now.
+    /// only after this sizes the output from the pair as it stands now.
     pub fn quote_banx_out(&self, amount_tokens: Quantity) -> Quantity {
-        let tokens = token_reserve(self.owner, self.token_id);
+        let tokens = token_reserve(self.owner, self.asset_id, self.token_id);
         let out = try_swap_out(
             tokens,
             self.reserve_banx.value,
@@ -140,6 +132,10 @@ impl TokenRelay {
         self.save();
     }
 
+    fn pay_tokens(&self, to: AccountNumber, amount: Quantity) {
+        CashQuote::pay_named(self.pair_sub(), to, self.token_id, amount, "relay");
+    }
+
     /// Path already drew `amount_banx` on `owner`. Pay the curve's tokens to `recipient`.
     pub fn pay_tokens_for_banx(
         owner: AccountNumber,
@@ -155,13 +151,13 @@ impl TokenRelay {
             tokens_out.value >= min_tokens.value,
             "relay tokens below min_tokens"
         );
-        CashQuote::pay_tokens(owner, recipient, token_id, tokens_out, "relay");
+        relay.pay_tokens(recipient, tokens_out);
         // The path already recorded the Banx draw. Recipient holds tokens,
         // not a claim on `owner`, so this is not another liability row.
         tokens_out
     }
 
-    /// Taker draws `amount_banx` on the owner and receives tokens from the vault.
+    /// Taker draws `amount_banx` on the owner and receives tokens from the pair.
     pub fn cash_out(
         owner: AccountNumber,
         taker: AccountNumber,
@@ -181,7 +177,7 @@ impl TokenRelay {
         // One relay row, with the amount the draw actually netted. `draw`
         // would also emit a path hop for a swap that is not a path.
         let netted = Connection::get_live(owner, taker, asset_id).apply_draw(amount_banx);
-        CashQuote::pay_tokens(owner, taker, token_id, tokens_out, "relay");
+        relay.pay_tokens(taker, tokens_out);
         emit_pair_activity(
             owner,
             taker,
@@ -196,7 +192,7 @@ impl TokenRelay {
         tokens_out
     }
 
-    /// Taker's vault sends tokens into the owner's vault. Owner owes the taker Banx.
+    /// Taker's cash vault sends tokens into the owner's pair. Owner owes the taker Banx.
     pub fn cash_in(
         owner: AccountNumber,
         taker: AccountNumber,
@@ -213,15 +209,11 @@ impl TokenRelay {
             banx_out.value >= min_banx.value,
             "relay banx below min_banx"
         );
-        let taker_before = token_reserve(taker, token_id);
-        CashQuote::move_vault(taker, owner, token_id, amount_tokens);
-        // The owner's reserve moves in `give_banx`. The taker's own relay, if
-        // any, lost inventory and keeps the same price.
-        Self::sync_vault(
-            taker,
+        CashQuote::move_named(
+            cash_sub(taker, token_id),
+            relay.pair_sub(),
             token_id,
-            taker_before,
-            token_reserve(taker, token_id),
+            amount_tokens,
         );
         relay.give_banx(banx_out);
         let netted = Connection::get_live(taker, owner, asset_id).deposit(banx_out, 0);

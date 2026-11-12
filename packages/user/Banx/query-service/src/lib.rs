@@ -3,11 +3,11 @@
 mod service {
     use async_graphql::*;
     use banx::tables::{
-        Asset, AssetTable, BanxInvite, BanxInviteTable, BanxRelay, BanxRelayTable, BookAuth,
-        BookAuthTab, CashQuote, CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection, CreditLine,
-        CreditLineTable, CurrencyPolicy, CurrencyPolicyTab, ForwardOffer, ForwardOfferTab,
-        Obligation, ObligationTable, PairCycle, PayAuth, PayAuthTab, PayRequest, RequestTab,
-        TokenRelayTable, PPM_SCALE, RATE_SCALE,
+        relay_sub, Asset, AssetTable, BanxInvite, BanxInviteTable, BanxRelay, BanxRelayTable,
+        BookAuth, BookAuthTab, CashQuote, CashQuoteTab, ClaimOffer, ClaimOfferTab, Connection,
+        CreditLine, CreditLineTable, CurrencyPolicy, CurrencyPolicyTab, ForwardOffer,
+        ForwardOfferTab, Obligation, ObligationTable, PairCycle, PayAuth, PayAuthTab, PayRequest,
+        RequestTab, TokenRelayTable, PPM_SCALE, RATE_SCALE,
     };
     use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
     use psibase::*;
@@ -266,8 +266,7 @@ mod service {
         Tokens::call().getToken(token_id).precision
     }
 
-    fn cash_vault_balance(poster: AccountNumber, token_id: u32) -> Quantity {
-        let name = format!("{poster}/{token_id}");
+    fn named_sub_balance(name: &str, token_id: u32) -> Quantity {
         let Some(sa) = SubAccountTable::with_service(Tokens::SERVICE)
             .get_index_pk()
             .iter()
@@ -739,7 +738,12 @@ mod service {
                 .iter()
                 .filter(|sa| sa.account == banx::SERVICE && sa.sub_account.starts_with(&prefix))
                 .filter_map(|sa| {
-                    let token_id: u32 = sa.sub_account.rsplit('/').next()?.parse().ok()?;
+                    // `{poster}/{token}` is the cash vault. A pool is `{poster}/{asset}/{token}`.
+                    let rest = sa.sub_account.strip_prefix(&prefix)?;
+                    if rest.contains('/') {
+                        return None;
+                    }
+                    let token_id: u32 = rest.parse().ok()?;
                     let bal = SubAccountBalanceTable::with_service(Tokens::SERVICE)
                         .get_index_pk()
                         .get(&(sa.id, token_id))?;
@@ -923,14 +927,15 @@ mod service {
         }
 
         /// Banx↔token relays. Omit `owner` for every relay.
-        /// `tokenReserve` is the live vault `{owner}/{token_id}`.
+        /// `tokenReserve` is the pair sub-account `{owner}/{asset}/{token}`.
         async fn tokenRelays(&self, owner: Option<AccountNumber>) -> Vec<TokenRelayView> {
             TokenRelayTable::with_service(banx::SERVICE)
                 .get_index_pk()
                 .iter()
                 .filter(|r| owner.map(|o| r.owner == o).unwrap_or(true))
                 .map(|r| {
-                    let tokens = cash_vault_balance(r.owner, r.token_id);
+                    let tokens =
+                        named_sub_balance(&relay_sub(r.owner, r.asset_id, r.token_id), r.token_id);
                     TokenRelayView {
                         owner: r.owner,
                         assetId: r.asset_id,

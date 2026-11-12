@@ -263,11 +263,11 @@ export function TakeTradeDialog({
     } else if (policy && buying && immediate) {
         description = `This rebooks ${fromSymbol} you already owe ${display} into ${toSymbol} at their price.`;
     } else if (buyLookupFailed) {
-        description = `Couldn't check ${display}'s relay or path forwarding.`;
+        description = `Couldn't check ${display}'s pool or path forwarding.`;
     } else if (buyWaiting) {
         description = "Checking this order.";
     } else if (policy && buying && relayBlocks) {
-        description = `A relay prices payments between ${fromSymbol} and ${toSymbol}, so this buy is not taken as a payment.`;
+        description = `A pool prices payments between ${fromSymbol} and ${toSymbol}, so this buy is not taken as a payment.`;
     } else if (policy && buying) {
         description = `You owe ${display} the ${fromSymbol} you take, and they owe you ${toSymbol}. This needs a ${fromSymbol} line from them, a ${toSymbol} line from you, and their path forwarding in ${toSymbol}.`;
         if (forwardMissing) {

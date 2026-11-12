@@ -1129,6 +1129,7 @@ impl Api for BanxPlugin {
         asset_id: u16,
         token_id: u32,
         reserve_banx: String,
+        reserve_tokens: String,
         fee_ppm: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_token_relay)?;
@@ -1136,6 +1137,7 @@ impl Api for BanxPlugin {
             asset_id,
             token_id,
             reserve_banx: parse_amount_nonzero(asset_id, &reserve_banx)?,
+            reserve_tokens: parse_token_amount_nonzero(token_id, &reserve_tokens)?,
             fee_ppm,
         }
         .packed();

@@ -428,19 +428,20 @@ interface api {
     remove-relay: func(asset-a: u16, asset-b: u16) -> result<_, error>;
 
     /// Post a Banx↔token relay. `reserve-banx` is the virtual Banx weight.
-    /// The token side is the sender's cash vault for `token-id`. One vault
-    /// backs one relay.
+    /// `reserve-tokens` is pulled from the sender's credit to Banx into
+    /// `{sender}/{asset-id}/{token-id}`. The same pair cannot be posted twice.
     set-token-relay: func(
         asset-id: u16,
         token-id: u32,
         reserve-banx: string,
+        reserve-tokens: string,
         fee-ppm: u32,
     ) -> result<_, error>;
 
-    /// Delete the sender's token relay. Tokens stay in the vault.
+    /// Delete the sender's token relay. Tokens still in the pair return to the sender.
     remove-token-relay: func(asset-id: u16, token-id: u32) -> result<_, error>;
 
-    /// Draw Banx on `owner`'s relay and receive tokens from their vault.
+    /// Draw Banx on `owner`'s relay and receive tokens from their pair.
     token-relay-out: func(
         owner: string,
         asset-id: u16,
@@ -449,8 +450,8 @@ interface api {
         min-tokens: string,
     ) -> result<_, error>;
 
-    /// Send tokens from the sender's vault into `owner`'s relay. `owner`
-    /// owes the sender the curve's Banx output. Fund the vault first.
+    /// Send tokens from the sender's cash vault into `owner`'s pair. `owner`
+    /// owes the sender the curve's Banx output. Fund the cash vault first.
     token-relay-in: func(
         owner: string,
         asset-id: u16,

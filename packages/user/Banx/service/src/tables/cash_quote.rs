@@ -4,7 +4,7 @@ use psibase::{
 };
 
 use super::{apply_rate, cash_sub, emit_pair_activity, expires_live, Connection};
-use crate::tables::tables::{Asset, CashQuote, CashQuoteTab, TokenRelay};
+use crate::tables::tables::{Asset, CashQuote, CashQuoteTab};
 
 impl CashQuote {
     fn save(&self) {
@@ -89,16 +89,35 @@ impl CashQuote {
         Tokens::call().fromSub(token_id, cash_sub(poster, token_id), amount);
     }
 
-    /// Move tokens from one cashier vault to another. Both are Banx sub-accounts.
-    pub(crate) fn move_vault(
+    /// Move tokens from one Banx sub-account to another.
+    pub(crate) fn move_named(from_sub: String, to_sub: String, token_id: u32, amount: Quantity) {
+        let tokens = Tokens::call();
+        tokens.fromSub(token_id, from_sub, amount);
+        tokens.toSub(token_id, to_sub, amount);
+    }
+
+    /// Shared(`from`, Banx) → `sub` on Banx.
+    pub(crate) fn debit_into_named(
         from: AccountNumber,
+        token_id: u32,
+        sub: String,
+        amount: Quantity,
+        memo: &str,
+    ) {
+        Self::tokens_debit(from, token_id, amount, memo);
+        Tokens::call().toSub(token_id, sub, amount);
+    }
+
+    /// `sub` → credit `to`. The recipient debits when they want the balance.
+    pub(crate) fn pay_named(
+        sub: String,
         to: AccountNumber,
         token_id: u32,
         amount: Quantity,
+        memo: &str,
     ) {
-        let tokens = Tokens::call();
-        tokens.fromSub(token_id, cash_sub(from, token_id), amount);
-        tokens.toSub(token_id, cash_sub(to, token_id), amount);
+        Tokens::call().fromSub(token_id, sub, amount);
+        Tokens::call().credit(token_id, to, amount, Self::token_memo(memo));
     }
 
     /// Shared(`from`, Banx) → poster's Tokens sub-account on Banx.
@@ -134,10 +153,6 @@ impl CashQuote {
         assert!(self.is_out, "cash quote is not out");
         assert!(taker != self.poster, "cannot cash_out with self");
         assert!(amount_banx.value > 0, "cash_out amount must be positive");
-        assert!(
-            !TokenRelay::vault_backs(self.poster, self.token_id),
-            "token vault backs a relay"
-        );
         self.spend(amount_banx);
         let tokens = self.apply(amount_banx);
         assert!(
@@ -168,11 +183,6 @@ impl CashQuote {
         assert!(!self.is_out, "cash quote is not in");
         assert!(taker != self.poster, "cannot cash_in with self");
         assert!(amount_tokens.value > 0, "cash_in amount must be positive");
-        assert!(
-            !TokenRelay::vault_backs(self.poster, self.token_id),
-            "token vault backs a relay"
-        );
-        let taker_before = TokenRelay::vault_balance(taker, self.token_id);
         self.spend(amount_tokens);
         let banx_amt = self.apply(amount_tokens);
         assert!(
@@ -185,12 +195,6 @@ impl CashQuote {
         );
         Self::from_sub(taker, self.token_id, amount_tokens);
         Self::to_sub(self.poster, self.token_id, amount_tokens);
-        TokenRelay::sync_vault(
-            taker,
-            self.token_id,
-            taker_before,
-            TokenRelay::vault_balance(taker, self.token_id),
-        );
         let netted = Connection::get_live(taker, self.poster, self.asset_id).deposit(banx_amt, 0);
         emit_pair_activity(
             taker,

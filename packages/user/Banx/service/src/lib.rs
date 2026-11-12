@@ -552,14 +552,27 @@ pub mod service {
     }
 
     /// Post a Banx↔token relay. `reserve_banx` is the virtual Banx weight.
-    /// The token side is the sender's cash vault `{sender}/{token_id}`.
-    /// One vault backs one relay.
+    /// `reserve_tokens` is pulled from shared(sender, Banx) into
+    /// `{sender}/{asset_id}/{token_id}`. The same pair cannot be posted twice.
     #[action]
-    fn st_tok_relay(asset_id: u16, token_id: u32, reserve_banx: Quantity, fee_ppm: u32) {
-        TokenRelay::upsert(get_sender(), asset_id, token_id, reserve_banx, fee_ppm);
+    fn st_tok_relay(
+        asset_id: u16,
+        token_id: u32,
+        reserve_banx: Quantity,
+        reserve_tokens: Quantity,
+        fee_ppm: u32,
+    ) {
+        TokenRelay::upsert(
+            get_sender(),
+            asset_id,
+            token_id,
+            reserve_banx,
+            reserve_tokens,
+            fee_ppm,
+        );
     }
 
-    /// Delete the sender's token relay. Tokens stay in the vault.
+    /// Delete the sender's token relay. Tokens still in the pair return to the sender.
     #[action]
     fn rm_tok_relay(asset_id: u16, token_id: u32) {
         TokenRelay::get_assert(get_sender(), asset_id, token_id).remove();
@@ -645,14 +658,7 @@ pub mod service {
         assert!(amount.value > 0, "csh_fund amount must be positive");
         let _ = Tokens::call().getToken(token_id);
         let poster = get_sender();
-        let before = TokenRelay::vault_balance(poster, token_id);
         CashQuote::take_tokens(poster, token_id, amount, "csh_fund");
-        TokenRelay::sync_vault(
-            poster,
-            token_id,
-            before,
-            TokenRelay::vault_balance(poster, token_id),
-        );
     }
 
     /// Return tokens from Banx's `{sender}/{token_id}` sub-account.
@@ -660,14 +666,7 @@ pub mod service {
     fn csh_wd(token_id: u32, amount: Quantity) {
         assert!(amount.value > 0, "csh_wd amount must be positive");
         let poster = get_sender();
-        let before = TokenRelay::vault_balance(poster, token_id);
         CashQuote::pay_tokens(poster, poster, token_id, amount, "csh_wd");
-        TokenRelay::sync_vault(
-            poster,
-            token_id,
-            before,
-            TokenRelay::vault_balance(poster, token_id),
-        );
     }
 
     /// Draw `amount_banx` on `cashier`'s line; receive tokens from their vault.

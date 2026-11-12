@@ -23,7 +23,7 @@ pub(crate) use helpers::{
     apply_hop_fee, apply_rate, apply_spread, expires_live, invert_hop_fee, invert_rate,
     live_specific_or_global,
 };
-pub use helpers::{assert_account_exists, cash_sub, emit_pair_activity, GLOBAL};
+pub use helpers::{assert_account_exists, cash_sub, emit_pair_activity, relay_sub, GLOBAL};
 pub use path::{path_required_send, run_path};
 
 #[psibase::service_tables]
@@ -477,8 +477,8 @@ pub mod tables {
     /// Constant-product curve between one Banx asset and one token.
     ///
     /// `reserve_banx` is the virtual Banx weight. The token reserve is the
-    /// owner's cash vault `{owner}/{token_id}` on Banx, not a second number.
-    /// One token vault backs one relay.
+    /// balance in `{owner}/{asset_id}/{token_id}`, filled when the pool is
+    /// posted. One owner has one pool per pair.
     #[table(name = "TokenRelayTable", index = 14)]
     #[derive(
         Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,

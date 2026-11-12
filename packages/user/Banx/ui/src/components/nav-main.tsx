@@ -33,7 +33,7 @@ const items: {
     { to: "/invites", label: "Invites", icon: UserPlus },
     { to: "/cash", label: "Cash", icon: Banknote },
     { to: "/policies", label: "Trade", icon: ArrowLeftRight },
-    { to: "/relays", label: "Relays", icon: Repeat },
+    { to: "/relays", label: "Pools", icon: Repeat },
 ];
 
 export function NavMain() {

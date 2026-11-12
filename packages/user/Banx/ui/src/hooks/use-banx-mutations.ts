@@ -942,21 +942,29 @@ export function useRemoveCashQuote() {
     });
 }
 
-async function tokensCredit(tokenId: number, amount: string) {
+async function tokensCredit(
+    tokenId: number,
+    amount: string,
+    memo = "csh_fund",
+) {
     await supervisor.functionCall({
         service: "tokens",
         intf: "user",
         method: "credit",
-        params: [tokenId, BANX_SERVICE, amount, "csh_fund"],
+        params: [tokenId, BANX_SERVICE, amount, memo],
     });
 }
 
-async function tokensUncredit(tokenId: number, amount: string) {
+async function tokensUncredit(
+    tokenId: number,
+    amount: string,
+    memo = "csh_fund",
+) {
     await supervisor.functionCall({
         service: "tokens",
         intf: "user",
         method: "uncredit",
-        params: [tokenId, BANX_SERVICE, amount, "csh_fund"],
+        params: [tokenId, BANX_SERVICE, amount, memo],
     });
 }
 
@@ -1161,7 +1169,7 @@ export function useSetRelay() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Relay posted");
+            toast.success("Pool posted");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -1174,7 +1182,7 @@ export function useRemoveRelay() {
             banxCall("removeRelay", [p.assetA, p.assetB]),
         onSuccess: () => {
             invalidate();
-            toast.success("Relay removed");
+            toast.success("Pool removed");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -1187,17 +1195,33 @@ export function useSetTokenRelay() {
             assetId: number;
             tokenId: number;
             reserveBanx: string;
+            reserveTokens: string;
             feePpm: number;
-        }) =>
-            banxCall("setTokenRelay", [
-                p.assetId,
-                p.tokenId,
-                p.reserveBanx,
-                p.feePpm,
-            ]),
+        }) => {
+            // The service debits this credit into `{sender}/{asset}/{token}`.
+            await tokensCredit(p.tokenId, p.reserveTokens, "relay");
+            try {
+                await banxCall("setTokenRelay", [
+                    p.assetId,
+                    p.tokenId,
+                    p.reserveBanx,
+                    p.reserveTokens,
+                    p.feePpm,
+                ]);
+            } catch (e) {
+                try {
+                    await tokensUncredit(p.tokenId, p.reserveTokens, "relay");
+                } catch {
+                    throw new Error(
+                        `The pool was not posted. Tokens are still credited to ${BANX_SERVICE} and the rollback failed.`,
+                    );
+                }
+                throw e;
+            }
+        },
         onSuccess: () => {
             invalidate();
-            toast.success("Token relay posted");
+            toast.success("Token pool posted");
         },
         onError: (e: Error) => toast.error(e.message),
     });
@@ -1210,7 +1234,7 @@ export function useRemoveTokenRelay() {
             banxCall("removeTokenRelay", [p.assetId, p.tokenId]),
         onSuccess: () => {
             invalidate();
-            toast.success("Token relay removed");
+            toast.success("Token pool removed");
         },
         onError: (e: Error) => toast.error(e.message),
     });

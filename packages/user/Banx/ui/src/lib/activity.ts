@@ -73,7 +73,7 @@ export function kindLabel(kind: string): string {
         case "cash_in":
             return "Cash in";
         case "relay":
-            return "Relay";
+            return "Pool";
         case "credit_line":
             return "Credit line";
         case "book":
@@ -203,8 +203,8 @@ export function describeEvent(
             };
         case "relay": {
             const title = you
-                ? `You swapped ${qty(e.amount, sym)} on the relay`
-                : `${actor} swapped ${qty(e.amount, sym)} on the relay`;
+                ? `You swapped ${qty(e.amount, sym)} on the pool`
+                : `${actor} swapped ${qty(e.amount, sym)} on the pool`;
             const detail =
                 nettedRaw > 0n
                     ? `Auto-netted ${qty(e.netted, sym)} · ${other}`

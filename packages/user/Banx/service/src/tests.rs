@@ -5153,6 +5153,50 @@ mod tests {
             .unwrap_or(0)
     }
 
+    /// Pair sub-account `{owner}/{asset}/{token}`.
+    fn pair_bal(chain: &psibase::Chain, owner: AccountNumber, asset_id: u16, token_id: u32) -> u64 {
+        psibase::services::tokens::Wrapper::push_from(chain, Wrapper::SERVICE)
+            .getSubBal(
+                token_id,
+                crate::tables::relay_sub(owner, asset_id, token_id),
+            )
+            .get()
+            .unwrap()
+            .map(|q| q.value)
+            .unwrap_or(0)
+    }
+
+    /// Credit Banx with memo "relay", then post. The service debits that credit
+    /// into the pair sub. A second post of the same pair is rejected.
+    fn post_token_pool(
+        chain: &psibase::Chain,
+        owner: AccountNumber,
+        asset_id: u16,
+        token_id: u32,
+        reserve_banx: u64,
+        reserve_tokens: u64,
+    ) {
+        psibase::services::tokens::Wrapper::push_from(chain, owner)
+            .credit(
+                token_id,
+                Wrapper::SERVICE,
+                Quantity::new(reserve_tokens),
+                "relay".to_string().try_into().unwrap(),
+            )
+            .get()
+            .unwrap();
+        Wrapper::push_from(chain, owner)
+            .st_tok_relay(
+                asset_id,
+                token_id,
+                Quantity::new(reserve_banx),
+                Quantity::new(reserve_tokens),
+                0,
+            )
+            .get()
+            .unwrap();
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_cash_out_and_in_gas_usd(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
@@ -7142,8 +7186,14 @@ mod tests {
             1,
             "a return to the sender is one payment: {pays:?}"
         );
-        assert_eq!(pays[0].get("amount").and_then(|v| v.as_str()), Some("0.1000"));
-        assert_eq!(pays[0].get("netted").and_then(|v| v.as_str()), Some("0.1000"));
+        assert_eq!(
+            pays[0].get("amount").and_then(|v| v.as_str()),
+            Some("0.1000")
+        );
+        assert_eq!(
+            pays[0].get("netted").and_then(|v| v.as_str()),
+            Some("0.1000")
+        );
         Ok(())
     }
 
@@ -7581,12 +7631,9 @@ mod tests {
         chain.new_account(john).unwrap();
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
         let gas = mint_gas(&chain, john, john, 20_000);
-        fund_vault(&chain, john, gas, 15_000);
+        post_token_pool(&chain, john, aud, gas, 10_000, 15_000);
         Wrapper::push_from(&chain, john)
             .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
-            .get()?;
-        Wrapper::push_from(&chain, john)
-            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
             .get()?;
 
         let tokens = Wrapper::push_from(&chain, alice)
@@ -7596,11 +7643,20 @@ mod tests {
         assert_eq!(exp(&chain, john, alice, aud), 1_000);
         assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
         assert_eq!(token_balance(&chain, gas, alice), 0);
-        assert_eq!(vault_bal(&chain, john, gas), 13_637);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 13_637);
+        assert_eq!(vault_bal(&chain, john, gas), 0);
         assert_eq!(
             TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
             11_000
         );
+
+        Wrapper::push_from(&chain, john)
+            .rm_tok_relay(aud, gas)
+            .get()?;
+        assert!(TokenRelay::get(john, aud, gas).is_none());
+        assert_eq!(pair_bal(&chain, john, aud, gas), 0);
+        assert_eq!(shared_from_banx(&chain, gas, john), 13_637);
+        assert_eq!(token_balance(&chain, gas, john), 5_000);
         Ok(())
     }
 
@@ -7616,7 +7672,7 @@ mod tests {
         }
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
         let gas = mint_gas(&chain, john, john, 20_000);
-        fund_vault(&chain, john, gas, 15_000);
+        post_token_pool(&chain, john, aud, gas, 10_000, 15_000);
         Wrapper::push_from(&chain, brandon)
             .st_crd_lne(bob, aud, Quantity::new(100_000), false, 0, 0)
             .get()?;
@@ -7625,9 +7681,6 @@ mod tests {
             .get()?;
         Wrapper::push_from(&chain, brandon)
             .st_glb_fwd(aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
-            .get()?;
-        Wrapper::push_from(&chain, john)
-            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
             .get()?;
 
         let ghost = account!("nobody");
@@ -7644,7 +7697,7 @@ mod tests {
         assert!(missing.to_string().contains("does not exist"), "{missing}");
         assert_eq!(exp(&chain, brandon, bob, aud), 0);
         assert_eq!(exp(&chain, john, brandon, aud), 0);
-        assert_eq!(vault_bal(&chain, john, gas), 15_000);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
         assert_eq!(
             TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
             10_000
@@ -7671,7 +7724,8 @@ mod tests {
         );
         assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
         assert_eq!(token_balance(&chain, gas, alice), 0);
-        assert_eq!(vault_bal(&chain, john, gas), 13_637);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 13_637);
+        assert_eq!(vault_bal(&chain, john, gas), 0);
         assert_eq!(
             TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
             11_000
@@ -7688,7 +7742,7 @@ mod tests {
         chain.new_account(john).unwrap();
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
         let gas = mint_gas(&chain, john, john, 20_000);
-        fund_vault(&chain, john, gas, 15_000);
+        post_token_pool(&chain, john, aud, gas, 10_000, 15_000);
         psibase::services::tokens::Wrapper::push_from(&chain, john)
             .credit(
                 gas,
@@ -7706,15 +7760,13 @@ mod tests {
             )
             .get()?;
         fund_vault(&chain, alice, gas, 1_000);
-        Wrapper::push_from(&chain, john)
-            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
-            .get()?;
 
         Wrapper::push_from(&chain, alice)
             .tok_relay_in(john, aud, gas, Quantity::new(1_000), Quantity::new(625))
             .get()?;
         assert_eq!(exp(&chain, alice, john, aud), 625);
-        assert_eq!(vault_bal(&chain, john, gas), 16_000);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 16_000);
+        assert_eq!(vault_bal(&chain, john, gas), 0);
         assert_eq!(vault_bal(&chain, alice, gas), 0);
         assert_eq!(
             TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
@@ -7734,10 +7786,7 @@ mod tests {
         chain.new_account(john).unwrap();
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
         let gas = mint_gas(&chain, john, john, 20_000);
-        fund_vault(&chain, john, gas, 15_000);
-        Wrapper::push_from(&chain, john)
-            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
-            .get()?;
+        post_token_pool(&chain, john, aud, gas, 10_000, 15_000);
         Wrapper::push_from(&chain, john)
             .deposit(alice, aud, Quantity::new(1_000), 0, 0)
             .get()?;
@@ -7781,7 +7830,6 @@ mod tests {
         chain.new_account(john).unwrap();
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
         let gas = mint_gas(&chain, john, john, 20_000);
-        fund_vault(&chain, john, gas, 15_000);
         Wrapper::push_from(&chain, john)
             .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
             .get()?;
@@ -7810,9 +7858,7 @@ mod tests {
             )
             .get()?;
         fund_vault(&chain, alice, gas, 1_000);
-        Wrapper::push_from(&chain, john)
-            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
-            .get()?;
+        post_token_pool(&chain, john, aud, gas, 10_000, 15_000);
 
         Wrapper::push_from(&chain, alice)
             .tok_relay_in(john, aud, gas, Quantity::new(1_000), Quantity::new(625))
@@ -7845,8 +7891,10 @@ mod tests {
         Ok(())
     }
 
+    /// One owner, one pool per Banx asset and token. A second IOU with the
+    /// same token is a different pair. Someone else can post the same pair.
     #[psibase::test_case(packages("Banx"))]
-    fn test_token_relay_one_vault(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_token_relay_one_pair_per_owner(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let john = account!("john");
@@ -7855,68 +7903,70 @@ mod tests {
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let gas = mint_gas(&chain, john, john, 20_000);
-        fund_vault(&chain, john, gas, 15_000);
-        Wrapper::push_from(&chain, john)
-            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
-            .get()?;
-        let err = Wrapper::push_from(&chain, john)
-            .st_tok_relay(usd, gas, Quantity::new(10_000), 0)
+        let zero = Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(1), Quantity::new(0), 0)
             .get()
-            .expect_err("one vault cannot back two relays");
+            .expect_err("token reserve must be positive");
         assert!(
-            err.to_string()
-                .contains("token vault already backs another relay"),
-            "{err}"
+            zero.to_string()
+                .contains("relay token reserve must be positive"),
+            "{zero}"
         );
 
-        Wrapper::push_from(&chain, john)
-            .csh_wd(gas, Quantity::new(15_000))
-            .get()?;
+        post_token_pool(&chain, john, aud, gas, 10_000, 15_000);
+        post_token_pool(&chain, john, usd, gas, 8_000, 1_000);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
+        assert_eq!(pair_bal(&chain, john, usd, gas), 1_000);
         assert_eq!(vault_bal(&chain, john, gas), 0);
-        assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
-            10_000
-        );
-        Wrapper::push_from(&chain, john)
-            .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
-            .get()?;
-        let empty = Wrapper::push_from(&chain, alice)
-            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1))
-            .get();
-        assert!(empty.is_err(), "an empty vault cannot pay the curve");
-        assert_eq!(exp(&chain, john, alice, aud), 0);
 
-        // Same posted weight. Refilling does not require posting the relay again.
-        take_from_banx(&chain, john, gas, 15_000);
-        fund_vault(&chain, john, gas, 15_000);
-        assert_eq!(vault_bal(&chain, john, gas), 15_000);
-        assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
-            10_000
+        let again = Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), Quantity::new(1), 0)
+            .get()
+            .expect_err("the same owner cannot post the pair twice");
+        assert!(
+            again
+                .to_string()
+                .contains("relay already posted for this pair"),
+            "{again}"
         );
-        Wrapper::push_from(&chain, alice)
-            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1_363))
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
+
+        psibase::services::tokens::Wrapper::push_from(&chain, john)
+            .credit(
+                gas,
+                alice,
+                Quantity::new(500),
+                "sell".to_string().try_into().unwrap(),
+            )
             .get()?;
-        assert_eq!(exp(&chain, john, alice, aud), 1_000);
-        assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
-        assert_eq!(vault_bal(&chain, john, gas), 13_637);
-        assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
-            11_000
-        );
+        psibase::services::tokens::Wrapper::push_from(&chain, alice)
+            .debit(
+                gas,
+                john,
+                Quantity::new(500),
+                "take".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        post_token_pool(&chain, alice, aud, gas, 100, 500);
+        assert_eq!(pair_bal(&chain, alice, aud, gas), 500);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
 
         Wrapper::push_from(&chain, john)
             .rm_tok_relay(aud, gas)
             .get()?;
         assert!(TokenRelay::get(john, aud, gas).is_none());
-        assert_eq!(vault_bal(&chain, john, gas), 13_637);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 0);
+        assert_eq!(shared_from_banx(&chain, gas, john), 15_000);
+        assert_eq!(pair_bal(&chain, john, usd, gas), 1_000);
+        assert!(TokenRelay::get(john, usd, gas).is_some());
+        assert_eq!(token_balance(&chain, gas, john), 3_500);
         Ok(())
     }
 
-    /// Withdrawing inventory scales the virtual Banx weight. A fixed cash
-    /// quote cannot move the same vault while the relay is posted.
+    /// The cash vault is a different sub-account. Funding it, withdrawing it,
+    /// and filling a cash quote do not move the pool or its weight.
     #[psibase::test_case(packages("Banx"))]
-    fn test_token_relay_withdraw_keeps_price(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_token_pool_ignores_cash_vault(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let john = account!("john");
@@ -7924,9 +7974,10 @@ mod tests {
         chain.new_account(john).unwrap();
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
         let gas = mint_gas(&chain, john, john, 20_000);
-        fund_vault(&chain, john, gas, 15_000);
+        post_token_pool(&chain, john, aud, gas, 10_000, 15_000);
+        fund_vault(&chain, john, gas, 2_000);
         Wrapper::push_from(&chain, john)
-            .st_tok_relay(aud, gas, Quantity::new(10_000), 0)
+            .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
             .get()?;
         Wrapper::push_from(&chain, john)
             .st_csh_qte(
@@ -7939,54 +7990,36 @@ mod tests {
                 never(),
             )
             .get()?;
-        let blocked = Wrapper::push_from(&chain, alice)
-            .cash_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1))
-            .get()
-            .expect_err("a cash quote cannot drain a relay vault");
-        assert!(
-            blocked.to_string().contains("token vault backs a relay"),
-            "{blocked}"
+
+        Wrapper::push_from(&chain, alice)
+            .cash_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1_000))
+            .get()?;
+        assert_eq!(vault_bal(&chain, john, gas), 1_000);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            10_000
         );
-        assert_eq!(vault_bal(&chain, john, gas), 15_000);
+        assert_eq!(shared_from_banx(&chain, gas, alice), 1_000);
+
+        Wrapper::push_from(&chain, john)
+            .csh_wd(gas, Quantity::new(1_000))
+            .get()?;
+        assert_eq!(vault_bal(&chain, john, gas), 0);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000);
         assert_eq!(
             TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
             10_000
         );
 
-        Wrapper::push_from(&chain, john)
-            .csh_wd(gas, Quantity::new(14_000))
-            .get()?;
-        assert_eq!(vault_bal(&chain, john, gas), 1_000);
-        assert_eq!(
-            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
-            666
-        );
-
-        psibase::services::tokens::Wrapper::push_from(&chain, john)
-            .credit(
-                gas,
-                alice,
-                Quantity::new(1_000),
-                "sell".to_string().try_into().unwrap(),
-            )
-            .get()?;
-        psibase::services::tokens::Wrapper::push_from(&chain, alice)
-            .debit(
-                gas,
-                john,
-                Quantity::new(1_000),
-                "take".to_string().try_into().unwrap(),
-            )
-            .get()?;
-        fund_vault(&chain, alice, gas, 1_000);
         Wrapper::push_from(&chain, alice)
-            .tok_relay_in(john, aud, gas, Quantity::new(1_000), Quantity::new(333))
+            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1_363))
             .get()?;
-        assert_eq!(exp(&chain, alice, john, aud), 333);
-        assert_eq!(vault_bal(&chain, john, gas), 2_000);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 13_637);
+        assert_eq!(vault_bal(&chain, john, gas), 0);
         assert_eq!(
             TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
-            333
+            11_000
         );
         Ok(())
     }
@@ -8384,7 +8417,12 @@ mod tests {
 
         let buy = vec![hop(zac, aud), hop(john, aud), hop(dave, wow)];
         let no_line = Wrapper::push_from(&chain, dave)
-            .path_pay(buy.clone(), Quantity::new(PAY_AUD), Quantity::new(GOLD_OUT), 0)
+            .path_pay(
+                buy.clone(),
+                Quantity::new(PAY_AUD),
+                Quantity::new(GOLD_OUT),
+                0,
+            )
             .get()
             .expect_err("the deposit is gold John already owes");
         assert!(
@@ -8480,7 +8518,12 @@ mod tests {
 
         let buy = vec![hop(zac, aud), hop(john, aud), hop(dave, wow)];
         let no_line = Wrapper::push_from(&chain, dave)
-            .path_pay(buy.clone(), Quantity::new(PAY_AUD), Quantity::new(GOLD_OUT), 0)
+            .path_pay(
+                buy.clone(),
+                Quantity::new(PAY_AUD),
+                Quantity::new(GOLD_OUT),
+                0,
+            )
             .get()
             .expect_err("virtual gold is not a line");
         assert!(
@@ -8496,7 +8539,14 @@ mod tests {
 
         // 10g already owed plus 5g from the curve.
         Wrapper::push_from(&chain, dave)
-            .st_crd_lne(john, wow, Quantity::new(WEIGHT_GOLD + GOLD_OUT), false, 0, 0)
+            .st_crd_lne(
+                john,
+                wow,
+                Quantity::new(WEIGHT_GOLD + GOLD_OUT),
+                false,
+                0,
+                0,
+            )
             .get()?;
         Wrapper::push_from(&chain, dave)
             .path_pay(buy, Quantity::new(PAY_AUD), Quantity::new(GOLD_OUT), 0)
@@ -8566,7 +8616,12 @@ mod tests {
 
         let pay = vec![hop(zac, wow), hop(john, wow), hop(mitchell, aud)];
         let no_line = Wrapper::push_from(&chain, dave)
-            .path_pay(pay.clone(), Quantity::new(PAY_GOLD), Quantity::new(AUD_OUT), 0)
+            .path_pay(
+                pay.clone(),
+                Quantity::new(PAY_GOLD),
+                Quantity::new(AUD_OUT),
+                0,
+            )
             .get()
             .expect_err("Mitchell has not lined John in AUD");
         assert!(

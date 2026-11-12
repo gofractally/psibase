@@ -116,6 +116,12 @@ pub fn cash_sub(poster: AccountNumber, token_id: u32) -> String {
     format!("{poster}/{token_id}")
 }
 
+/// Tokens sub-account for one owner's pool. The pair is the Banx asset and the token,
+/// so two IOUs do not share a balance.
+pub fn relay_sub(owner: AccountNumber, asset_id: u16, token_id: u32) -> String {
+    format!("{owner}/{asset_id}/{token_id}")
+}
+
 /// Emit history once for each party as `account`.
 ///
 /// `amount` / `netted` are stored as human decimals. `netted` uses
