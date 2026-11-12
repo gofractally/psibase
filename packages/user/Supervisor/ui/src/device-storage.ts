@@ -52,6 +52,12 @@ class HostCookieStorage implements DeviceStorage {
         value: string,
         maxAge: number,
     ): Promise<void> {
+        const deleting = maxAge === 0;
+        const verb = deleting ? "delete" : "set";
+        const fail = (detail: string) => {
+            throw new Error(`Failed to ${verb} ${name} cookie: ${detail}`);
+        };
+
         const url = siblingUrl(null, "supervisor", "/common/set-host-cookie");
         const response = await fetch(url, {
             method: "POST",
@@ -60,8 +66,15 @@ class HostCookieStorage implements DeviceStorage {
             body: JSON.stringify({ name, value, maxAge, httpOnly: false }),
         });
         if (!response.ok) {
-            throw new Error(
-                `Failed to set ${name} cookie: HTTP ${response.status}`,
+            fail(`HTTP ${response.status}`);
+        }
+        const stored = await this.get(name);
+        const expected = deleting ? undefined : value;
+        if (stored !== expected) {
+            fail(
+                deleting
+                    ? "cookie still present"
+                    : "stored value does not match",
             );
         }
     }
