@@ -5,6 +5,7 @@ import {
     assertTruthy,
 } from "@psibase/common-lib";
 
+import { isWasmJspiAvailable } from "../component-loading/loader";
 import {
     BridgeImports,
     HostInterface,
@@ -14,6 +15,7 @@ import {
 import { Supervisor } from "../supervisor";
 import { chainId, networkName } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
+import { performHttpRequest } from "./http-request";
 
 function convert(
     headers: { key: string; value: string }[],
@@ -122,11 +124,56 @@ export class PluginHost implements HostInterface {
         return bytes;
     }
 
-    // A synchronous web request.
-    // This allows the plugin to make http queries.
-    // It is a typescript-ified version of the wasip2 browser http shim
-    //    from BytecodeAlliance's JCO project.
-    private sendRequest(
+    private responseFromBytes(
+        status: number,
+        headers: Array<[string, string]>,
+        contentType: string,
+        bytes: Uint8Array | undefined,
+    ): HttpResponse {
+        const decodeText = (b: Uint8Array) => new TextDecoder().decode(b);
+        if (status >= 400 && bytes) {
+            console.error(decodeText(bytes));
+        }
+        if (status === 500) {
+            throw this.recoverableError(
+                `Http request error: ${bytes ? decodeText(bytes) : "No response body"}`,
+            );
+        }
+        if (!bytes || bytes.byteLength === 0) {
+            return {
+                status,
+                headers: convertBack(headers),
+                body: null,
+            };
+        }
+        const tag = this.getBodyTagFromContentType(contentType);
+        return {
+            status,
+            headers: convertBack(headers),
+            body: {
+                tag,
+                val: tag === "bytes" ? bytes : decodeText(bytes),
+            },
+        };
+    }
+
+    private wrapHttpError(err: unknown): never {
+        if (
+            err &&
+            typeof err === "object" &&
+            "message" in err &&
+            typeof (err as { message: unknown }).message === "string" &&
+            !(err as { message: string }).message.includes("Http request error")
+        ) {
+            throw this.recoverableError(
+                `Http request error: ${(err as { message: string }).message}`,
+            );
+        }
+        throw err;
+    }
+
+    // Sync XHR fallback for browsers without JSPI.
+    private sendRequestSync(
         req: HttpRequest,
         withCredentials: boolean = false,
     ): HttpResponse {
@@ -160,18 +207,6 @@ export class PluginHost implements HostInterface {
                 raw == null || raw === ""
                     ? undefined
                     : this.binaryStringToBytes(raw);
-            const decodeText = (b: Uint8Array) => new TextDecoder().decode(b);
-
-            if (xhr.status >= 400) {
-                if (bytes) {
-                    console.error(decodeText(bytes));
-                }
-            }
-            if (xhr.status === 500) {
-                throw this.recoverableError(
-                    `Http request error: ${bytes ? decodeText(bytes) : "No response body"}`,
-                );
-            }
             const headers: Array<[string, string]> = [];
             xhr.getAllResponseHeaders()
                 .trim()
@@ -183,37 +218,46 @@ export class PluginHost implements HostInterface {
                     const value = parts.join(": ");
                     headers.push([key, value]);
                 });
-            if (!bytes) {
-                return {
-                    status: xhr.status,
-                    headers: convertBack(headers),
-                    body: null,
-                };
-            }
-
-            const contentType = xhr.getResponseHeader("content-type") || "";
-            const tag = this.getBodyTagFromContentType(contentType);
-
-            return {
-                status: xhr.status,
-                headers: convertBack(headers),
-                body: {
-                    tag,
-                    val: tag === "bytes" ? bytes : decodeText(bytes),
-                },
-            };
-        } catch (err: any) {
-            if (
-                `message` in err &&
-                !err.message.includes("Http request error")
-            ) {
-                throw this.recoverableError(
-                    `Http request error: ${err.message}`,
-                );
-            }
-
-            throw err;
+            return this.responseFromBytes(
+                xhr.status,
+                headers,
+                xhr.getResponseHeader("content-type") || "",
+                bytes,
+            );
+        } catch (err: unknown) {
+            this.wrapHttpError(err);
         }
+    }
+
+    private async sendRequestAsync(
+        req: HttpRequest,
+        withCredentials: boolean = false,
+    ): Promise<HttpResponse> {
+        try {
+            const raw = await performHttpRequest(
+                req,
+                this.rewriteUriHook(req.uri),
+                withCredentials,
+            );
+            return this.responseFromBytes(
+                raw.status,
+                raw.headers,
+                raw.contentType,
+                raw.body.byteLength > 0 ? raw.body : undefined,
+            );
+        } catch (err: unknown) {
+            this.wrapHttpError(err);
+        }
+    }
+
+    private sendRequest(
+        req: HttpRequest,
+        withCredentials: boolean = false,
+    ): HttpResponse | Promise<HttpResponse> {
+        if (isWasmJspiAvailable()) {
+            return this.sendRequestAsync(req, withCredentials);
+        }
+        return this.sendRequestSync(req, withCredentials);
     }
 
     private dbGet(duration: number, key: string): Uint8Array | null {

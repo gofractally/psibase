@@ -218,15 +218,22 @@ export class Supervisor implements AppInterface {
     private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
         const context = this.getCallContext();
         context.stack.push("supervisor", "callFunction");
-
-        let ret: any;
         try {
-            ret = this.call(callArgs);
-        } finally {
+            const ret = this.call(callArgs);
+            if (
+                ret != null &&
+                typeof (ret as { then?: unknown }).then === "function"
+            ) {
+                return (ret as Promise<unknown>).finally(() =>
+                    context.stack.pop(),
+                );
+            }
             context.stack.pop();
+            return ret;
+        } catch (e) {
+            context.stack.pop();
+            throw e;
         }
-
-        return ret;
     }
 
     private supervisorResourceCall(callArgs: QualifiedResourceCallArgs): any {
@@ -337,14 +344,24 @@ export class Supervisor implements AppInterface {
         const p = this.plugins.getAssertPlugin({ service, plugin });
 
         this.context.stack.push(args.service, toString(args));
-        let ret: any;
         try {
-            ret = p.call(intf, method, params);
-        } finally {
+            const ret = p.call(intf, method, params);
+            // JSPI promising exports return a Promise; keep the call stack
+            // until it settles. Sync exports pop immediately.
+            if (
+                ret != null &&
+                typeof (ret as { then?: unknown }).then === "function"
+            ) {
+                return (ret as Promise<unknown>).finally(() =>
+                    this.context!.stack.pop(),
+                );
+            }
             this.context.stack.pop();
+            return ret;
+        } catch (e) {
+            this.context.stack.pop();
+            throw e;
         }
-
-        return ret;
     }
 
     callDyn(args: QualifiedDynCallArgs): any {
@@ -474,17 +491,21 @@ export class Supervisor implements AppInterface {
             this.context = this.getCallContext();
 
             // Starts the tx context.
-            this.supervisorCall(
-                getCallArgs("transact", "admin", "admin", "start-tx", []),
+            await Promise.resolve(
+                this.supervisorCall(
+                    getCallArgs("transact", "admin", "admin", "start-tx", []),
+                ),
             );
 
-            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
-            //   preloaded.
-            const result = this.call(args);
+            // Plugin call may return a Promise when the export is JSPI-promising
+            // (e.g. host:http after Phase 0). Sync plugins still return values.
+            const result = await Promise.resolve(this.call(args));
 
             // Closes the current tx context. If actions were added, tx is submitted.
-            const txResult = this.supervisorCall(
-                getCallArgs("transact", "admin", "admin", "finish-tx", []),
+            const txResult = await Promise.resolve(
+                this.supervisorCall(
+                    getCallArgs("transact", "admin", "admin", "finish-tx", []),
+                ),
             );
             if (txResult !== null && txResult !== undefined) {
                 console.warn(txResult);
