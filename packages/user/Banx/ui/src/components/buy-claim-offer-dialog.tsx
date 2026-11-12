@@ -339,7 +339,8 @@ export function BuyClaimOfferDialog({
                         validators={buyClaimSpreadValidators}
                         children={(field) => (
                             <field.TextField
-                                label="Spread %"
+                                label="Fee %"
+                                description="Positive takes a fee. Negative is a discount."
                                 inputMode="decimal"
                                 min={-MAX_HOP_FEE_PERCENT}
                                 max={MAX_HOP_FEE_PERCENT}
@@ -421,19 +422,16 @@ export function BuyClaimOfferDialog({
                             {isSell ? (
                                 <>
                                     Sell your claims on{" "}
-                                    <strong>{debtor}</strong>. Positive
-                                    spread is your profit (`1` = 1% over
-                                    face); negative is a discount. Buyers
-                                    hit this with buy-claim.
+                                    <strong>{debtor}</strong>. Take a fee,
+                                    or offer a discount. Buyers take this
+                                    offer.
                                 </>
                             ) : (
                                 <>
-                                    Buy claims on <strong>{debtor}</strong>
-                                    at this rate. Spread is signed: positive
-                                    haircuts the seller, negative is a
-                                    premium you pay. At take they must know
-                                    you, and new exposure needs your credit
-                                    line to them with enough capacity.
+                                    Buy claims on <strong>{debtor}</strong>.
+                                    Take a fee, or offer a discount. They
+                                    must already have lined you, with room
+                                    for the claim.
                                 </>
                             )}
                         </DialogDescription>
@@ -580,8 +578,8 @@ export function BuyClaimOfferDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {isSell
-                            ? `Sell claims you hold${lockedSymbol ? ` in ${lockedSymbol}` : " in this asset"}. Positive spread is your profit (1 = 1% over face); negative is a discount. Buyers hit this offer.`
-                            : `Buy claims${lockedSymbol ? ` in ${lockedSymbol}` : " in this asset"} at this rate. Spread is signed: positive haircuts the seller, negative is a premium. At take the debtor must know you, and new exposure needs your credit line to them with enough capacity.`}
+                            ? `Sell claims you hold${lockedSymbol ? ` in ${lockedSymbol}` : " in this asset"}. Take a fee, or offer a discount. Buyers take this offer.`
+                            : `Buy claims${lockedSymbol ? ` in ${lockedSymbol}` : " in this asset"}. Take a fee, or offer a discount. The person who owes the claim must already have lined you, with room for it.`}
                     </DialogDescription>
                 </DialogHeader>
                 <form

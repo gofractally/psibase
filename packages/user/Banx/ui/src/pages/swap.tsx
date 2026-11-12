@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useLocalStorage } from "usehooks-ts";
 
 import { ArrowDownUp } from "lucide-react";
@@ -14,6 +15,7 @@ import {
     type PathQuote,
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
+import { assetIdBySymbol } from "@/lib/transfer-url";
 import { amountFieldValidator } from "@/lib/form";
 import type { Asset } from "@/lib/graphql";
 
@@ -26,6 +28,19 @@ import { Separator } from "@shared/shadcn/ui/separator";
 
 /** A return through one middleman is 2 hops. Eight is search room under the plugin cap of 12. */
 const SWAP_MAX_HOPS = 8;
+
+/** `from` / `to` may be a symbol (`AUD`) or a numeric asset id. */
+function assetFromQuery(
+    raw: string | null,
+    assets: { id: number; symbol: string }[],
+): number | undefined {
+    if (!raw?.trim()) return undefined;
+    const bySymbol = assetIdBySymbol(raw, assets);
+    if (bySymbol !== undefined) return bySymbol;
+    const id = Number(raw);
+    if (!Number.isInteger(id) || id <= 0) return undefined;
+    return assets.some((a) => a.id === id) ? id : undefined;
+}
 
 function sanitizeAmount(raw: string): string {
     const cleaned = raw.replace(/[^\d.]/g, "");
@@ -100,6 +115,7 @@ export function SwapPage() {
     const { label } = useBanxContacts("/swap");
     const { mutate: quotePath, isPending: quoting } = useQuotePath();
     const pathPay = usePathPay();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [payAsset, setPayAsset] = useLocalStorage<number | null>(
         "banx.swap.fromAsset",
         null,
@@ -108,6 +124,30 @@ export function SwapPage() {
         "banx.swap.toAsset",
         null,
     );
+    const fromParam = searchParams.get("from");
+    const toParam = searchParams.get("to");
+    const fromQuery = assetFromQuery(fromParam, assets);
+    const toQuery = assetFromQuery(toParam, assets);
+
+    useEffect(() => {
+        if (fromQuery !== undefined && fromQuery !== payAsset) {
+            setPayAsset(fromQuery);
+        }
+        if (toQuery !== undefined && toQuery !== receiveAsset) {
+            setReceiveAsset(toQuery);
+        }
+    }, [fromQuery, toQuery, payAsset, receiveAsset, setPayAsset, setReceiveAsset]);
+
+    const writePair = (from: number | null, to: number | null) => {
+        const next = new URLSearchParams(searchParams);
+        const fromSymbol = from != null ? symbolOf(from) : "";
+        const toSymbol = to != null ? symbolOf(to) : "";
+        if (fromSymbol) next.set("from", fromSymbol);
+        else next.delete("from");
+        if (toSymbol) next.set("to", toSymbol);
+        else next.delete("to");
+        setSearchParams(next, { replace: true });
+    };
     const [payAmount, setPayAmount] = useState("");
     const [quote, setQuote] = useState<PathQuote | null>(null);
     const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -215,7 +255,10 @@ export function SwapPage() {
                         }
                         assets={assets}
                         assetId={payAsset ?? undefined}
-                        onAsset={setPayAsset}
+                        onAsset={(id) => {
+                            setPayAsset(id);
+                            writePair(id, receiveAsset);
+                        }}
                     />
                     {amountError ? (
                         <p className="text-destructive -mt-2 text-xs">
@@ -236,6 +279,7 @@ export function SwapPage() {
                             onClick={() => {
                                 setPayAsset(receiveAsset);
                                 setReceiveAsset(payAsset);
+                                writePair(receiveAsset, payAsset);
                                 if (quote) setPayAmount(quote.amountOut);
                             }}
                         >
@@ -250,7 +294,10 @@ export function SwapPage() {
                         placeholder={searching ? "Searching…" : "0.0"}
                         assets={assets}
                         assetId={receiveAsset ?? undefined}
-                        onAsset={setReceiveAsset}
+                        onAsset={(id) => {
+                            setReceiveAsset(id);
+                            writePair(payAsset, id);
+                        }}
                     />
                     {payAsset != null && payAsset === receiveAsset ? (
                         <p className="text-destructive text-sm">
