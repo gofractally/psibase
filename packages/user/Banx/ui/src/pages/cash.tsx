@@ -1,9 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useStore } from "@tanstack/react-form";
-import { ArrowDownUp } from "lucide-react";
 
-import { AssetField, ExpiresField } from "@/components/form-fields";
-import { formatExpiresAt } from "@/components/expires-at-picker";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
@@ -16,22 +13,14 @@ import {
     useCashIn,
     useCashOut,
     useCashWithdraw,
-    useRemoveCashQuote,
-    useSetCashQuote,
 } from "@/hooks/use-banx-mutations";
 import {
-    amountPlaceholder,
     applyQuotedRate,
-    convertAtQuotedRate,
-    flipLeftTyped,
-    keptOnFlip,
     displayAmount,
     humanToRaw,
     formatFxToRate,
-    formatToPrecision,
-    invertQuotedRate,
 } from "@/lib/amount";
-import { amountFieldValidator, useAppForm } from "@/lib/form";
+import { useAppForm } from "@/lib/form";
 import type { CashQuote } from "@/lib/graphql";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
@@ -40,20 +29,6 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { toast } from "@shared/shadcn/ui/sonner";
 import { Label } from "@shared/shadcn/ui/label";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@shared/shadcn/ui/table";
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from "@shared/shadcn/ui/tabs";
 
 function parseTokenId(raw: string): number | undefined {
     const n = Number(raw.trim());
@@ -114,13 +89,7 @@ function tradeLine(
 
 export function CashPage() {
     const { data: user } = useCurrentUser();
-    const { assets, byId, symbolOf, precisionOf } = useAssetMap();
-    const quoteCtxRef = useRef({
-        assetPrecision: (_id: number): number | undefined => undefined,
-        tokenPrecision: new Map<number, number>(),
-        tokenPending: new Set<number>() as ReadonlySet<number>,
-        tokenFailed: new Set<number>() as ReadonlySet<number>,
-    });
+    const { byId, symbolOf, precisionOf } = useAssetMap();
     const takeCtxRef = useRef({
         liveDesk: [] as CashQuote[],
         tokenPrecision: new Map<number, number>(),
@@ -129,69 +98,13 @@ export function CashPage() {
         assetPrecision: (_id: number): number | undefined => undefined,
         cashier: "",
     });
-    const { data: myQuotes = [] } = useCashQuotes(user ?? null);
     const { data: allQuotes = [] } = useCashQuotes();
     const { data: vault = [] } = useCashVault();
-    const setQuote = useSetCashQuote();
-    const removeQuote = useRemoveCashQuote();
     const fund = useCashFund();
     const withdraw = useCashWithdraw();
     const cashOut = useCashOut();
     const cashIn = useCashIn();
     const nowSec = Math.floor(Date.now() / 1000);
-
-    const quoteForm = useAppForm({
-        defaultValues: {
-            assetId: undefined as number | undefined,
-            tokenId: "",
-            isOut: true,
-            feeFixed: "0",
-            toRate: "1",
-            remaining: "",
-            expiresAtSeconds: 0,
-        },
-        onSubmit: async ({ value }) => {
-            const tokenId = parseTokenId(value.tokenId);
-            if (value.assetId === undefined || tokenId === undefined) return;
-            const ctx = quoteCtxRef.current;
-            const fromPrec = value.isOut
-                ? ctx.assetPrecision(value.assetId)
-                : ctx.tokenPrecision.get(tokenId);
-            const toPrec = value.isOut
-                ? ctx.tokenPrecision.get(tokenId)
-                : ctx.assetPrecision(value.assetId);
-            if (fromPrec === undefined || toPrec === undefined) {
-                toast.error(
-                    precisionGapMessage(
-                        tokenId,
-                        value.isOut
-                            ? toPrec === undefined
-                            : fromPrec === undefined,
-                        ctx.tokenPending,
-                        ctx.tokenFailed,
-                    ),
-                );
-                return;
-            }
-            await new Promise<void>((resolve, reject) => {
-                setQuote.mutate(
-                    {
-                        assetId: value.assetId!,
-                        tokenId,
-                        isOut: value.isOut,
-                        feeFixed: value.feeFixed.trim(),
-                        toRate: value.toRate.trim(),
-                        remaining: value.remaining.trim(),
-                        expiresAtSeconds: value.expiresAtSeconds,
-                    },
-                    {
-                        onSuccess: () => resolve(),
-                        onError: (e: Error) => reject(e),
-                    },
-                );
-            });
-        },
-    });
 
     const fundForm = useAppForm({
         defaultValues: { tokenId: "", amount: "" },
@@ -318,9 +231,8 @@ export function CashPage() {
         },
     });
 
-    const quoteTokenRaw = useStore(quoteForm.store, (s) => s.values.tokenId);
     const takeTokenRaw = useStore(takeForm.store, (s) => s.values.tokenId);
-    const editingTokenIds = [quoteTokenRaw, takeTokenRaw].flatMap((raw) => {
+    const editingTokenIds = [takeTokenRaw].flatMap((raw) => {
         const id = parseTokenId(raw);
         return id === undefined ? [] : [id];
     });
@@ -329,7 +241,6 @@ export function CashPage() {
         pending: tokenPending,
         failed: tokenFailed,
     } = useTokenPrecisionMap([
-        ...myQuotes.map((q) => q.tokenId),
         ...deskQuotes.map((q) => q.tokenId),
         ...vault.map((v) => v.tokenId),
         ...editingTokenIds,
@@ -338,12 +249,6 @@ export function CashPage() {
         id !== undefined && byId.has(id) ? precisionOf(id) : undefined;
     const tokPrec = (id: number | undefined): number | undefined =>
         id !== undefined ? tokenPrec.get(id) : undefined;
-    quoteCtxRef.current = {
-        assetPrecision: (id) => assetPrecision(id),
-        tokenPrecision: tokenPrec,
-        tokenPending,
-        tokenFailed,
-    };
     takeCtxRef.current = {
         liveDesk,
         tokenPrecision: tokenPrec,
@@ -351,72 +256,6 @@ export function CashPage() {
         tokenFailed,
         assetPrecision: (id) => assetPrecision(id),
         cashier,
-    };
-
-    const applyDirection = (nextIsOut: boolean) => {
-        const values = quoteForm.state.values;
-        if (values.isOut === nextIsOut) return;
-        const tokenId = parseTokenId(values.tokenId);
-        const banxPrec = assetPrecision(values.assetId);
-        const tokenP = tokPrec(tokenId);
-        const fromPrec = values.isOut ? banxPrec : tokenP;
-        const toPrec = values.isOut ? tokenP : banxPrec;
-        if (fromPrec === undefined || toPrec === undefined) {
-            const rate = values.toRate.trim();
-            const fee = values.feeFixed.trim();
-            const budget = values.remaining.trim();
-            const needsConvert =
-                (rate !== "" && rate !== "1") ||
-                (fee !== "" && fee !== "0") ||
-                budget !== "";
-            if (needsConvert) {
-                toast.error(
-                    tokenId !== undefined && tokenP === undefined
-                        ? precisionGapMessage(
-                              tokenId,
-                              true,
-                              tokenPending,
-                              tokenFailed,
-                          )
-                        : values.assetId !== undefined &&
-                            banxPrec === undefined
-                          ? "Asset precision isn't loaded yet."
-                          : "Pick both sides before flipping a rate.",
-                );
-                return;
-            }
-            quoteForm.setFieldValue("isOut", nextIsOut);
-            return;
-        }
-        quoteForm.setFieldValue("isOut", nextIsOut);
-        const inverted = invertQuotedRate(values.toRate, fromPrec, toPrec);
-        const fee = convertAtQuotedRate(
-            values.feeFixed,
-            values.toRate,
-            fromPrec,
-            toPrec,
-        );
-        const budget = convertAtQuotedRate(
-            values.remaining,
-            values.toRate,
-            fromPrec,
-            toPrec,
-        );
-        const nextRate = keptOnFlip(values.toRate, inverted, "");
-        const nextFee = keptOnFlip(values.feeFixed, fee, "0");
-        const nextBudget = keptOnFlip(values.remaining, budget, "");
-        if (
-            flipLeftTyped(values.toRate, inverted, nextRate) ||
-            flipLeftTyped(values.feeFixed, fee, nextFee) ||
-            flipLeftTyped(values.remaining, budget, nextBudget)
-        ) {
-            toast.error(
-                "That amount is too small to convert at this rate, so it was left as typed.",
-            );
-        }
-        quoteForm.setFieldValue("toRate", nextRate);
-        quoteForm.setFieldValue("feeFixed", nextFee);
-        quoteForm.setFieldValue("remaining", nextBudget);
     };
 
     const desks = useMemo(() => {
@@ -431,16 +270,9 @@ export function CashPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Cash"
-                description="Sell tokens for a Banx debt, or buy tokens by owing Banx."
+                description="Sell tokens for an IOU, or buy tokens by owing an IOU."
             />
 
-            <Tabs defaultValue="swap" className="gap-6">
-                <TabsList>
-                    <TabsTrigger value="swap">Swap</TabsTrigger>
-                    <TabsTrigger value="desk">Post rates</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="swap">
                     <form
                         className="mx-auto grid w-full max-w-md gap-4 rounded-xl border p-4"
                         onSubmit={(e) => {
@@ -486,8 +318,8 @@ export function CashPage() {
                         ) : null}
                         {!cashier && desks.length === 0 ? (
                             <p className="text-muted-foreground text-sm">
-                                No rates are posted yet. Someone posts a rate
-                                on Post rates, then you can swap here.
+                                No rates are posted yet. Someone posts an
+                                order on Trade, then you can swap here.
                             </p>
                         ) : !cashier ? (
                             <p className="text-muted-foreground text-sm">
@@ -658,8 +490,8 @@ export function CashPage() {
                                                 {!selected.isOut ? (
                                                     <p className="text-muted-foreground text-sm">
                                                         Tokens come from your
-                                                        own vault. Add them on
-                                                        Post rates.
+                                                        own vault. Add them
+                                                        below.
                                                     </p>
                                                 ) : null}
                                                 <div className="bg-muted/60 rounded-2xl p-3">
@@ -788,10 +620,6 @@ export function CashPage() {
                             }}
                         />
                     </form>
-                </TabsContent>
-
-                <TabsContent value="desk" className="grid gap-6">
-                    <div className="grid items-start gap-6 lg:grid-cols-2">
                         <section className="grid content-start gap-4 rounded-xl border p-4">
                             <div>
                                 <h2 className="font-medium">Tokens you hold</h2>
@@ -873,463 +701,6 @@ export function CashPage() {
                             )}
                         </section>
 
-                        <form
-                            className="grid content-start gap-4 rounded-xl border p-4"
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                void quoteForm.handleSubmit();
-                            }}
-                        >
-                            <div>
-                                <h2 className="font-medium">Post a rate</h2>
-                                <p className="text-muted-foreground mt-1 text-sm">
-                                    Sell tokens: they pay you in Banx and you
-                                    send tokens. Buy tokens: they pay you in
-                                    tokens and you owe them Banx.
-                                </p>
-                            </div>
-                            <quoteForm.Subscribe
-                                selector={(s) => s.values}
-                                children={(values) => {
-                                    const banxSym =
-                                        values.assetId !== undefined
-                                            ? symbolOf(values.assetId)
-                                            : "Banx";
-                                    const tokenId = parseTokenId(
-                                        values.tokenId,
-                                    );
-                                    const tokenLabel = tokenName(tokenId);
-                                    const ratePrecision = values.isOut
-                                        ? tokPrec(tokenId)
-                                        : assetPrecision(values.assetId);
-                                    const ratePending = values.isOut
-                                        ? tokenId !== undefined &&
-                                          ratePrecision === undefined
-                                        : values.assetId !== undefined &&
-                                          ratePrecision === undefined;
-                                    const rateShown = ratePending
-                                        ? "…"
-                                        : ratePrecision === undefined
-                                          ? values.toRate
-                                          : (formatToPrecision(
-                                                values.toRate,
-                                                ratePrecision,
-                                            ) ?? values.toRate);
-                                    const ready =
-                                        values.assetId !== undefined &&
-                                        tokenId !== undefined &&
-                                        rateShown.trim() !== "";
-                                    const feeOn =
-                                        values.feeFixed.trim() !== "" &&
-                                        values.feeFixed.trim() !== "0";
-                                    const budgetPrec = values.isOut
-                                        ? assetPrecision(values.assetId)
-                                        : tokPrec(tokenId);
-                                    return (
-                                        <>
-                                            <quoteForm.Field
-                                                name="isOut"
-                                                children={(field) => (
-                                                    <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-                                                        <button
-                                                            type="button"
-                                                            className={cn(
-                                                                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                                                                field.state
-                                                                    .value
-                                                                    ? "bg-background shadow-sm"
-                                                                    : "text-muted-foreground hover:text-foreground",
-                                                            )}
-                                                            onClick={() =>
-                                                                applyDirection(
-                                                                    true,
-                                                                )
-                                                            }
-                                                        >
-                                                            Sell tokens
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className={cn(
-                                                                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                                                                !field.state
-                                                                    .value
-                                                                    ? "bg-background shadow-sm"
-                                                                    : "text-muted-foreground hover:text-foreground",
-                                                            )}
-                                                            onClick={() =>
-                                                                applyDirection(
-                                                                    false,
-                                                                )
-                                                            }
-                                                        >
-                                                            Buy tokens
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            />
-                                            {(() => {
-                                                const banxControl = (
-                                                    <quoteForm.Field
-                                                        name="assetId"
-                                                        children={(field) => (
-                                                            <AssetField
-                                                                label="Banx"
-                                                                assets={
-                                                                    assets
-                                                                }
-                                                                value={
-                                                                    field.state
-                                                                        .value
-                                                                }
-                                                                onChange={(
-                                                                    id,
-                                                                ) =>
-                                                                    field.handleChange(
-                                                                        id,
-                                                                    )
-                                                                }
-                                                            />
-                                                        )}
-                                                    />
-                                                );
-                                                const tokenControl = (
-                                                    <quoteForm.AppField
-                                                        name="tokenId"
-                                                        children={(field) => (
-                                                            <field.TextField
-                                                                label="Token number"
-                                                                inputMode="numeric"
-                                                                placeholder="Token number"
-                                                            />
-                                                        )}
-                                                    />
-                                                );
-                                                const selling = values.isOut;
-                                                return (
-                                                    <>
-                                                        <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
-                                                            <div>
-                                                                <p className="text-sm font-medium">
-                                                                    {selling
-                                                                        ? "Tokens you send"
-                                                                        : "Banx you owe"}
-                                                                </p>
-                                                                <p className="text-muted-foreground text-xs">
-                                                                    {selling
-                                                                        ? "These leave your vault."
-                                                                        : "You take on this debt."}
-                                                                </p>
-                                                            </div>
-                                                            {selling
-                                                                ? tokenControl
-                                                                : banxControl}
-                                                        </div>
-                                                        <div className="relative z-10 -my-3 flex justify-center">
-                                                            <Button
-                                                                type="button"
-                                                                size="icon"
-                                                                variant="outline"
-                                                                className="bg-background size-9 rounded-full border-2"
-                                                                aria-label="Switch sell and buy"
-                                                                onClick={() =>
-                                                                    applyDirection(
-                                                                        !values.isOut,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <ArrowDownUp className="size-4" />
-                                                            </Button>
-                                                        </div>
-                                                        <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
-                                                            <div>
-                                                                <p className="text-sm font-medium">
-                                                                    {selling
-                                                                        ? "Banx they owe you"
-                                                                        : "Tokens you receive"}
-                                                                </p>
-                                                                <p className="text-muted-foreground text-xs">
-                                                                    {selling
-                                                                        ? "This is the debt they take on."
-                                                                        : "These are added to your vault."}
-                                                                </p>
-                                                            </div>
-                                                            {selling
-                                                                ? banxControl
-                                                                : tokenControl}
-                                                        </div>
-                                                    </>
-                                                );
-                                            })()}
-                                            <quoteForm.AppField
-                                                name="toRate"
-                                                children={(field) => (
-                                                    <field.TextField
-                                                        label={
-                                                            values.isOut
-                                                                ? `${tokenLabel} for each 1 ${banxSym}`
-                                                                : `${banxSym} for each 1 ${tokenLabel}`
-                                                        }
-                                                        description={
-                                                            values.isOut
-                                                                ? "How many tokens you send"
-                                                                : "How much Banx you owe"
-                                                        }
-                                                        inputMode="decimal"
-                                                        placeholder="1"
-                                                    />
-                                                )}
-                                            />
-                                            <p className="text-muted-foreground text-sm">
-                                                {ready ? (
-                                                    values.isOut ? (
-                                                        <>
-                                                            They pay 1{" "}
-                                                            {banxSym}. You send{" "}
-                                                            {rateShown}{" "}
-                                                            {tokenLabel}
-                                                            {feeOn
-                                                                ? ", before your fee"
-                                                                : ""}
-                                                            .
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            They pay 1{" "}
-                                                            {tokenLabel}. You
-                                                            owe them{" "}
-                                                            {rateShown}{" "}
-                                                            {banxSym}
-                                                            {feeOn
-                                                                ? ", before your fee"
-                                                                : ""}
-                                                            .
-                                                        </>
-                                                    )
-                                                ) : (
-                                                    "Choose the token, the Banx asset, and the rate."
-                                                )}
-                                            </p>
-                                            <div className="grid gap-3 sm:grid-cols-2">
-                                                <quoteForm.AppField
-                                                    name="feeFixed"
-                                                    children={(field) => (
-                                                        <field.TextField
-                                                            label="Fee"
-                                                            description={
-                                                                values.isOut
-                                                                    ? `Taken from the ${banxSym} they pay`
-                                                                    : "Taken from the tokens they pay"
-                                                            }
-                                                            inputMode="decimal"
-                                                            placeholder={
-                                                                values.isOut
-                                                                    ? values.assetId !==
-                                                                      undefined
-                                                                        ? amountPlaceholder(
-                                                                              assetPrecision(
-                                                                                  values.assetId,
-                                                                              ) ??
-                                                                                  0,
-                                                                          )
-                                                                        : "0"
-                                                                    : amountPlaceholder(
-                                                                          tokPrec(
-                                                                              tokenId,
-                                                                          ) ??
-                                                                              0,
-                                                                      )
-                                                            }
-                                                        />
-                                                    )}
-                                                />
-                                                <quoteForm.AppField
-                                                    name="remaining"
-                                                    validators={
-                                                        budgetPrec ===
-                                                        undefined
-                                                            ? undefined
-                                                            : {
-                                                                  onChange:
-                                                                      amountFieldValidator(
-                                                                          budgetPrec,
-                                                                          {
-                                                                              allowZero:
-                                                                                  false,
-                                                                          },
-                                                                      ),
-                                                                  onSubmit:
-                                                                      amountFieldValidator(
-                                                                          budgetPrec,
-                                                                          {
-                                                                              allowZero:
-                                                                                  false,
-                                                                          },
-                                                                      ),
-                                                              }
-                                                    }
-                                                    children={(field) => (
-                                                        <field.TextField
-                                                            label={
-                                                                values.isOut
-                                                                    ? `Most ${banxSym}`
-                                                                    : "Most tokens"
-                                                            }
-                                                            description="The most they can pay. Saving again replaces it."
-                                                            inputMode="decimal"
-                                                            placeholder={amountPlaceholder(
-                                                                budgetPrec ??
-                                                                    0,
-                                                            )}
-                                                        />
-                                                    )}
-                                                />
-                                            </div>
-                                        </>
-                                    );
-                                }}
-                            />
-                            <quoteForm.Field
-                                name="expiresAtSeconds"
-                                children={(field) => (
-                                    <ExpiresField
-                                        value={field.state.value}
-                                        onChange={(v) =>
-                                            field.handleChange(v)
-                                        }
-                                    />
-                                )}
-                            />
-                            <quoteForm.Subscribe
-                                selector={(s) => s.values}
-                                children={(values) => (
-                                    <quoteForm.AppForm>
-                                        <quoteForm.SubmitButton
-                                            labels={["Post rate", "Saving…"]}
-                                            loading={setQuote.isPending}
-                                            disabled={
-                                                values.assetId === undefined ||
-                                                parseTokenId(values.tokenId) ===
-                                                    undefined
-                                            }
-                                        />
-                                    </quoteForm.AppForm>
-                                )}
-                            />
-                        </form>
-                    </div>
-
-                    <section className="grid gap-3">
-                        <h2 className="font-medium">Your rates</h2>
-                        {myQuotes.length === 0 ? (
-                            <p className="text-muted-foreground text-sm">
-                                None posted yet.
-                            </p>
-                        ) : (
-                            <QuoteTable
-                                quotes={myQuotes}
-                                symbolOf={symbolOf}
-                                precisionOf={(id) => assetPrecision(id)}
-                                tokenPrecision={(id) => tokPrec(id)}
-                                onRemove={(q) =>
-                                    removeQuote.mutate({
-                                        assetId: q.assetId,
-                                        tokenId: q.tokenId,
-                                        isOut: q.isOut,
-                                    })
-                                }
-                                removing={removeQuote.isPending}
-                            />
-                        )}
-                    </section>
-                </TabsContent>
-            </Tabs>
-        </div>
-    );
-}
-
-function QuoteTable({
-    quotes,
-    symbolOf,
-    precisionOf,
-    tokenPrecision,
-    onRemove,
-    removing,
-}: {
-    quotes: CashQuote[];
-    symbolOf: (id: number) => string;
-    precisionOf: (id: number) => number | undefined;
-    tokenPrecision: (id: number) => number | undefined;
-    onRemove?: (q: CashQuote) => void;
-    removing?: boolean;
-}) {
-    return (
-        <div className="overflow-x-auto rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Trade</TableHead>
-                        <TableHead className="text-right">Fee</TableHead>
-                        <TableHead className="text-right">Open</TableHead>
-                        <TableHead className="text-right">Until</TableHead>
-                        {onRemove ? <TableHead /> : null}
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {quotes.map((q) => (
-                        <TableRow
-                            key={`${q.poster}-${q.isOut}-${q.assetId}-${q.tokenId}`}
-                        >
-                            <TableCell>
-                                <div className="font-medium">
-                                    {q.isOut ? "Sell tokens" : "Buy tokens"}
-                                </div>
-                                <div className="text-muted-foreground font-mono text-xs">
-                                    {tradeLine(
-                                        q,
-                                        symbolOf,
-                                        precisionOf(q.assetId),
-                                        tokenPrecision(q.tokenId),
-                                    )}
-                                </div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                                {displayAmount(q.feeFixed)}{" "}
-                                <span className="text-muted-foreground">
-                                    {q.isOut
-                                        ? symbolOf(q.assetId)
-                                        : tokenName(q.tokenId)}
-                                </span>
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                                {displayAmount(q.remaining)}{" "}
-                                <span className="text-muted-foreground">
-                                    {q.isOut
-                                        ? symbolOf(q.assetId)
-                                        : tokenName(q.tokenId)}
-                                </span>
-                            </TableCell>
-                            <TableCell className="text-right text-sm">
-                                {formatExpiresAt(q.expiresAt)}
-                            </TableCell>
-                            {onRemove ? (
-                                <TableCell className="text-right">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={removing}
-                                        onClick={() => onRemove(q)}
-                                    >
-                                        Remove
-                                    </Button>
-                                </TableCell>
-                            ) : null}
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
         </div>
     );
 }

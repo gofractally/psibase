@@ -826,6 +826,9 @@ pub mod service {
     ///    line APR); draw on next line.
     /// 4. **`min_return`** — final hop principal (in **last** asset) ≥ this.
     ///
+    /// The sender may be the last hop when that asset differs from the first.
+    /// A same-asset return, or any hop after the sender, is rejected.
+    ///
     /// Atomic: all legs succeed or none stick.
     ///
     /// Each draw **auto-nets** that pair/asset (via [`Connection::draw`]).
@@ -966,7 +969,8 @@ pub mod service {
         PayRequest::cancel(id, get_sender());
     }
 
-    /// Bilateral activity history (emitted once per party as `account`).
+    /// Activity history, one row per party as `account`. The same account
+    /// on both sides is one row.
     ///
     /// - `kind`: `path_draw` | `path_pay` | `deposit` | `book` | `net` |
     ///   `convert` | `credit_line` | `rm_credit_line` | `book_auth` |

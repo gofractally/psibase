@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { BANX_SERVICE } from "@/lib/constants";
 import { QueryKey } from "@/lib/query-keys";
@@ -423,6 +423,50 @@ type RawHop = {
     fxFromAsset?: number | null;
     fx_from_asset?: number | null;
 };
+
+/** Curve output or required input. The plugin calls the service math. */
+export function useCurveQuote(
+    reserveIn: bigint,
+    reserveOut: bigint,
+    amount: bigint,
+    feePpm: number,
+    exactOut: boolean,
+) {
+    const enabled =
+        reserveIn > 0n &&
+        reserveOut > 0n &&
+        amount > 0n &&
+        feePpm >= 0 &&
+        feePpm < 1_000_000;
+    return useQuery({
+        queryKey: [
+            "banx",
+            "curveQuote",
+            exactOut ? "in" : "out",
+            reserveIn.toString(),
+            reserveOut.toString(),
+            amount.toString(),
+            feePpm,
+        ],
+        enabled,
+        staleTime: Infinity,
+        queryFn: async (): Promise<bigint | null> => {
+            const res = await supervisor.functionCall({
+                service: BANX_SERVICE,
+                intf: "helpers",
+                method: exactOut ? "quoteCurveIn" : "quoteCurveOut",
+                params: [
+                    reserveIn.toString(),
+                    reserveOut.toString(),
+                    amount.toString(),
+                    feePpm,
+                ],
+            });
+            if (res == null || res === "") return null;
+            return BigInt(String(res));
+        },
+    });
+}
 
 /** Off-chain path discovery (scoped graph + TokenSwap-style search). */
 export function useQuotePath() {
@@ -999,7 +1043,7 @@ export function useCashIn() {
             ]),
         onSuccess: () => {
             invalidate();
-            toast.success("Banx received");
+            toast.success("IOU received");
         },
         onError: (e: Error) => toast.error(e.message),
     });

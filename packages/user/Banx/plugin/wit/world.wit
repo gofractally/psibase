@@ -50,6 +50,13 @@ interface helpers {
 
     /// Convert raw quantity units to a decimal string for `asset-id` (e.g. `14500` → `"1.4500"` at 4 dp).
     quantity-to-decimal: func(asset-id: u16, amount: u64) -> result<string, error>;
+
+    /// Constant-product output. Amounts are raw integer units. Returns none
+    /// when the curve cannot fill. The output is always less than `reserve-out`.
+    quote-curve-out: func(reserve-in: string, reserve-out: string, amount-in: string, fee-ppm: u32) -> result<option<string>, error>;
+
+    /// Smallest raw input such that `quote-curve-out` is at least `amount-out`.
+    quote-curve-in: func(reserve-in: string, reserve-out: string, amount-out: string, fee-ppm: u32) -> result<option<string>, error>;
 }
 
 interface api {
@@ -475,7 +482,8 @@ interface api {
     ///   `to-asset`); quote finds the minimum send so you absorb hop/FX fees.
     ///
     /// `to-asset` empty/none → any final asset (exact-in only); otherwise require
-    /// that asset on the last hop.
+    /// that asset on the last hop. `from-account` and `to-account` may be the
+    /// same when `to-asset` differs from `from-asset`: the sender is the last hop.
     quote-path: func(
         from-account: string,
         to-account: string,

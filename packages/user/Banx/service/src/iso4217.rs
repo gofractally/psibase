@@ -1,6 +1,6 @@
 use psibase::{account, AccountNumber};
 
-/// ISO 4217 list one currencies, published 2026-09-17, plus gold, silver, bitcoin, ether, electricity, and distance.
+/// ISO 4217 list one currencies, published 2026-09-17, plus gold, silver, bitcoin, ether, electricity, distance, World of Warcraft gold, and Weet-Bix.
 /// Currency precision is the minor-unit places plus two, capped at 8.
 /// Gold and silver are 1 gram at 6 decimals. Bitcoin and ether are 1 coin at 8 decimals.
 /// Electricity is 1 kilowatt-hour at 3 decimals, so the last place is 1 Wh.
@@ -157,6 +157,8 @@ pub const SEEDED_ASSETS: &[(AccountNumber, u8, &str)] = &[
     (account!("ves"), 4, "Bol\u{ed}var Soberano"),
     (account!("vnd"), 2, "Dong"),
     (account!("vuv"), 2, "Vatu"),
+    (account!("weetbix"), 0, "1 = 1 Weet-Bix biscuit"),
+    (account!("wow"), 4, "1.0000 = 1 World of Warcraft gold"),
     (account!("wst"), 4, "Tala"),
     (account!("xaf"), 2, "CFA Franc BEAC"),
     (account!("xcd"), 4, "East Caribbean Dollar"),

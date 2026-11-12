@@ -209,12 +209,14 @@ pub mod tables {
         /// True when this quote applies to debt the poster is owed.
         pub poster_is_creditor: bool,
 
-        /// Flat fee in **from_asset**. Added or subtracted per the side.
+        /// Flat fee in **from_asset**. On convert it is added when
+        /// `poster_is_creditor` and subtracted otherwise. Path subtracts it.
         pub fee_fixed: Quantity,
-        /// `to = (amount ± fee_fixed) * fx_rate / RATE_SCALE`. The fee is
-        /// added when `poster_is_creditor` and subtracted otherwise.
+        /// Convert: `to = (amount ± fee_fixed) * fx_rate / RATE_SCALE`.
+        /// Path: `to = (amount - fee_fixed) * fx_rate / RATE_SCALE`.
         pub fx_rate: u64,
-        /// Interest rate (ppm APR) for the new `to_asset` obligation bucket.
+        /// Interest rate (ppm APR) for the rebooked `to_asset` bucket.
+        /// A path claim uses the credit line's APR instead.
         pub to_interest_rate: u32,
         /// From-asset still accepted. Convert and path FX spend it.
         /// 0 means spent; the row stays so it can be topped up.

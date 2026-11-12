@@ -163,6 +163,29 @@ export function formatMoney(raw: bigint, precision: number, symbol: string): str
     return `${text} ${symbol}`;
 }
 
+/** Human decimal at exactly `precision` fraction digits, for a plugin amount. */
+export function rawToFixed(raw: bigint, precision: number): string {
+    const places = Math.min(Math.max(Math.trunc(precision) || 0, 0), 8);
+    const neg = raw < 0n;
+    const abs = neg ? -raw : raw;
+    const scale = 10n ** BigInt(places);
+    const whole = abs / scale;
+    const frac = (abs % scale).toString().padStart(places, "0");
+    const body = places > 0 ? `${whole.toString()}.${frac}` : whole.toString();
+    return neg ? `-${body}` : body;
+}
+
+/**
+ * Plugin amount. At most `precision` fraction digits, because
+ * Quantity::from_str rejects a longer fraction (`"0.40"` is not precision 1).
+ * Two places stay when the asset allows them, so 1.2 still reads 1.20.
+ */
+function formatChainAmount(raw: bigint, precision: number): string {
+    const places = Math.min(Math.max(Math.trunc(precision) || 0, 0), 8);
+    const minDigits = places === 0 ? 0 : Math.min(places, 2);
+    return withMinFraction(rawToFixed(raw, places), minDigits);
+}
+
 /** Format raw ledger units as a fixed-point decimal using asset precision. */
 export function formatRawAmount(raw: string | number, precision: number): string {
     const value =
@@ -322,7 +345,7 @@ export function invertQuotedRate(
     if (toRaw <= 0n) return null;
     const inverted = 10n ** BigInt(fromPrecision + toPrecision) / toRaw;
     if (inverted <= 0n) return null;
-    return formatRawAmount(inverted.toString(), fromPrecision);
+    return formatChainAmount(inverted, fromPrecision);
 }
 
 /**
@@ -346,7 +369,7 @@ export function convertAtQuotedRate(
     if (rate <= 0n) return null;
     const out = (inn * rate) / 10n ** BigInt(fromPrecision);
     if (out <= 0n) return null;
-    return formatRawAmount(out.toString(), toPrecision);
+    return formatChainAmount(out, toPrecision);
 }
 
 function isZeroText(amount: string): boolean {

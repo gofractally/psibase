@@ -31,10 +31,9 @@ define_trust! {
         ",
         Medium => "
             - Post or remove credit lines, book-auths, forward offers, claim offers, and currency policies
-            - Deposit, book an authorized expense, net, and forgive (write off) obligations
+            - Deposit, book an authorized expense, net, forgive, and convert obligations
             - Create or cancel invoices and please-book requests
             - Create or cancel a repeating payment
-            - Convert debt between assets
             - Buy or sell claims under a posted claim offer
             - Post cash quotes, fund/withdraw the cash vault, cash_in (from your vault)
             - Post or remove a Banx relay or a token relay
@@ -50,7 +49,7 @@ define_trust! {
         ",
     }
     functions {
-        None => [decimal_to_quantity, quantity_to_decimal],
+        None => [decimal_to_quantity, quantity_to_decimal, quote_curve_out, quote_curve_in],
         Low => [quote_path],
         Medium => [
             set_credit_line,
@@ -137,6 +136,13 @@ fn parse_amount(asset_id: u16, amount: &str) -> Result<Quantity, Error> {
         .map_err(|e| ErrorType::ConversionError(e.to_string()).into())
 }
 
+fn parse_raw(amount: &str) -> Result<u64, Error> {
+    amount
+        .trim()
+        .parse::<u64>()
+        .map_err(|_| ErrorType::ConversionError(amount.to_string()).into())
+}
+
 fn parse_amount_nonzero(asset_id: u16, amount: &str) -> Result<Quantity, Error> {
     let q = parse_amount(asset_id, amount)?;
     if q.value == 0 {
@@ -218,6 +224,36 @@ impl Helpers for BanxPlugin {
         let asset = query::fetch_asset::fetch_asset(asset_id)?;
         let precision = asset.precision()?;
         Ok(Decimal::new(Quantity::new(amount), precision).to_string())
+    }
+
+    fn quote_curve_out(
+        reserve_in: String,
+        reserve_out: String,
+        amount_in: String,
+        fee_ppm: u32,
+    ) -> Result<Option<String>, Error> {
+        let out = banx::math::try_swap_out(
+            parse_raw(&reserve_in)?,
+            parse_raw(&reserve_out)?,
+            parse_raw(&amount_in)?,
+            fee_ppm,
+        );
+        Ok(out.map(|n| n.to_string()))
+    }
+
+    fn quote_curve_in(
+        reserve_in: String,
+        reserve_out: String,
+        amount_out: String,
+        fee_ppm: u32,
+    ) -> Result<Option<String>, Error> {
+        let need = banx::math::try_swap_in(
+            parse_raw(&reserve_in)?,
+            parse_raw(&reserve_out)?,
+            parse_raw(&amount_out)?,
+            fee_ppm,
+        );
+        Ok(need.map(|n| n.to_string()))
     }
 }
 
@@ -860,7 +896,8 @@ impl Api for BanxPlugin {
         }
         let from = parse_account(from)?;
         let to = parse_account(to)?;
-        if from == to {
+        // A payment to yourself is the last hop of a path whose asset changed.
+        if from == to && to_asset == Some(from_asset) {
             return Err(ErrorType::NoPath("from and to are the same account".into()).into());
         }
         let max_hops = max_hops.clamp(1, 12);

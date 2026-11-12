@@ -1,19 +1,21 @@
 import { useRef, useState } from "react";
+import { useStore } from "@tanstack/react-form";
 
-import { ArrowDownUp, ChevronDown } from "lucide-react";
+import { ArrowDownUp, ChevronDown, Plus } from "lucide-react";
 
 import { AssetField, ExpiresField } from "@/components/form-fields";
 import { formatExpiresAt } from "@/components/expires-at-picker";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
+    useCashQuotes,
     useCurrencyPolicies,
-    useForwardOffers,
-    useBuyClaimOffers,
+    useTokenPrecisionMap,
 } from "@/hooks/use-banx-data";
 import {
-    useConvert,
+    useRemoveCashQuote,
     useRemoveCurrencyPolicy,
+    useSetCashQuote,
     useSetCurrencyPolicy,
     useSetExchangeQuotes,
 } from "@/hooks/use-banx-mutations";
@@ -41,6 +43,7 @@ import {
     useAppForm,
 } from "@/lib/form";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -48,6 +51,13 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@shared/shadcn/ui/collapsible";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@shared/shadcn/ui/dialog";
 import { toast } from "@shared/shadcn/ui/sonner";
 import {
     Table,
@@ -58,23 +68,164 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
+type LegKind = "banx" | "token";
+
+type Leg = { kind: LegKind; id: number };
+
+function parseTokenId(raw: string): number | undefined {
+    const n = Number(raw.trim());
+    if (!Number.isInteger(n) || n <= 0) return undefined;
+    return n;
+}
+
+function legOf(
+    kind: LegKind,
+    assetId: number | undefined,
+    tokenRaw: string,
+): Leg | undefined {
+    if (kind === "banx") {
+        return assetId === undefined ? undefined : { kind, id: assetId };
+    }
+    const id = parseTokenId(tokenRaw);
+    return id === undefined ? undefined : { kind, id };
+}
+
+function sameLegs(from: Leg, to: Leg): boolean {
+    return from.kind === to.kind && from.id === to.id;
+}
+
+/**
+ * A cash quote prices what the other person pays.
+ * A buy already states that side, so the typed price and quantity post as-is.
+ * A sell states what you give, so those amounts are turned into the payment first.
+ */
+function cashOrderArgs(args: {
+    buying: boolean;
+    from: Leg;
+    to: Leg;
+    price: string;
+    quantity: string;
+    fee: string;
+    fromPrec: number;
+    toPrec: number;
+}):
+    | {
+          assetId: number;
+          tokenId: number;
+          isOut: boolean;
+          feeFixed: string;
+          toRate: string;
+          remaining: string;
+      }
+    | string {
+    const banx = args.from.kind === "banx" ? args.from : args.to;
+    const token = args.from.kind === "token" ? args.from : args.to;
+    if (banx.kind !== "banx" || token.kind !== "token") {
+        return "A token trades against an IOU.";
+    }
+    if (args.buying) {
+        return {
+            assetId: banx.id,
+            tokenId: token.id,
+            isOut: args.from.kind === "banx",
+            feeFixed: args.fee.trim() || "0",
+            toRate: args.price.trim(),
+            remaining: args.quantity.trim(),
+        };
+    }
+    const rate = invertQuotedRate(args.price, args.fromPrec, args.toPrec);
+    const remaining = convertAtQuotedRate(
+        args.quantity,
+        args.price,
+        args.fromPrec,
+        args.toPrec,
+    );
+    const fee = convertAtQuotedRate(
+        args.fee.trim() || "0",
+        args.price,
+        args.fromPrec,
+        args.toPrec,
+    );
+    if (!rate || !remaining || !fee) {
+        return "That amount is too small to convert at this rate.";
+    }
+    return {
+        assetId: banx.id,
+        tokenId: token.id,
+        isOut: args.from.kind === "token",
+        feeFixed: fee,
+        toRate: rate,
+        remaining,
+    };
+}
+
+function LegKindToggle({
+    kind,
+    onChange,
+    tokenDisabled,
+}: {
+    kind: LegKind;
+    onChange: (kind: LegKind) => void;
+    /** The other leg is already a token. A token only trades against an IOU. */
+    tokenDisabled?: boolean;
+}) {
+    return (
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-0.5">
+            {(["banx", "token"] as const).map((next) => {
+                const blocked =
+                    next === "token" && !!tokenDisabled && kind !== "token";
+                return (
+                    <button
+                        key={next}
+                        type="button"
+                        disabled={blocked}
+                        title={
+                            blocked
+                                ? "A token trades against an IOU."
+                                : undefined
+                        }
+                        className={cn(
+                            "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                            kind === next
+                                ? "bg-background shadow-sm"
+                                : "text-muted-foreground hover:text-foreground",
+                            blocked &&
+                                "cursor-not-allowed opacity-40 hover:text-muted-foreground",
+                        )}
+                        onClick={() => {
+                            if (!blocked) onChange(next);
+                        }}
+                    >
+                        {next === "banx" ? "IOU" : "Token"}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 export function PoliciesPage() {
+    const { data: user } = useCurrentUser();
     const { assets, byId, symbolOf, precisionOf } = useAssetMap();
-    const { data: forwardOffers = [] } = useForwardOffers();
-    const { data: buyClaimOffers = [] } = useBuyClaimOffers();
     const { data: currency = [] } = useCurrencyPolicies();
+    const { data: cashQuotes = [] } = useCashQuotes(user ?? null);
     const setCurrency = useSetCurrencyPolicy();
     const setExchange = useSetExchangeQuotes();
+    const setCash = useSetCashQuote();
     const removeCurrency = useRemoveCurrencyPolicy();
-    const convert = useConvert();
-    const convertMinEdited = useRef(false);
-    const convertMinSynced = useRef("");
+    const removeCash = useRemoveCashQuote();
     const [moreOpen, setMoreOpen] = useState(false);
+    const [orderOpen, setOrderOpen] = useState(false);
+    const precRef = useRef<(leg: Leg) => number | undefined>(() => undefined);
 
     const currencyForm = useAppForm({
         defaultValues: {
+            fromKind: "banx" as LegKind,
+            toKind: "banx" as LegKind,
             fromAsset: undefined as number | undefined,
             toAsset: undefined as number | undefined,
+            fromToken: "",
+            toToken: "",
             quoteMode: "they" as "they" | "me" | "both",
             feeFixed: "0",
             toRate: "1",
@@ -85,13 +236,50 @@ export function PoliciesPage() {
             expiresAtSeconds: 0,
         },
         onSubmit: async ({ value }) => {
-            if (
-                value.fromAsset === undefined ||
-                value.toAsset === undefined ||
-                value.fromAsset === value.toAsset ||
-                !value.remaining.trim()
-            )
+            const from = legOf(value.fromKind, value.fromAsset, value.fromToken);
+            const to = legOf(value.toKind, value.toAsset, value.toToken);
+            if (!from || !to || sameLegs(from, to) || !value.remaining.trim()) {
                 return;
+            }
+            if (from.kind === "token" && to.kind === "token") {
+                toast.error("A token trades against an IOU.");
+                return;
+            }
+            const mixed = from.kind !== to.kind;
+            if (mixed) {
+                if (value.quoteMode === "both" || !value.toRate.trim()) return;
+                const fromPrec = precRef.current(from);
+                const toPrec = precRef.current(to);
+                if (fromPrec === undefined || toPrec === undefined) {
+                    toast.error("Precision isn't loaded yet.");
+                    return;
+                }
+                const order = cashOrderArgs({
+                    buying: value.quoteMode === "they",
+                    from,
+                    to,
+                    price: value.toRate,
+                    quantity: value.remaining,
+                    fee: value.feeFixed,
+                    fromPrec,
+                    toPrec,
+                });
+                if (typeof order === "string") {
+                    toast.error(order);
+                    return;
+                }
+                await new Promise<void>((resolve, reject) => {
+                    setCash.mutate(
+                        { ...order, expiresAtSeconds: value.expiresAtSeconds },
+                        {
+                            onSuccess: () => resolve(),
+                            onError: (e: Error) => reject(e),
+                        },
+                    );
+                });
+                setOrderOpen(false);
+                return;
+            }
             const toInterestRatePpm = percentStringToPpm(
                 value.aprPct,
                 PPM_SCALE,
@@ -105,8 +293,8 @@ export function PoliciesPage() {
                 await new Promise<void>((resolve, reject) => {
                     setExchange.mutate(
                         {
-                            assetA: value.fromAsset!,
-                            assetB: value.toAsset!,
+                            assetA: from.id,
+                            assetB: to.id,
                             marketRate: value.toRate.trim(),
                             spreadPpm,
                             remainingA: value.remaining.trim(),
@@ -120,13 +308,14 @@ export function PoliciesPage() {
                         },
                     );
                 });
+                setOrderOpen(false);
                 return;
             }
             await new Promise<void>((resolve, reject) => {
                 setCurrency.mutate(
                     {
-                        fromAsset: value.fromAsset!,
-                        toAsset: value.toAsset!,
+                        fromAsset: from.id,
+                        toAsset: to.id,
                         posterIsCreditor: value.quoteMode === "they",
                         feeFixed: value.feeFixed.trim(),
                         toRate: value.toRate.trim(),
@@ -140,94 +329,278 @@ export function PoliciesPage() {
                     },
                 );
             });
+            setOrderOpen(false);
         },
     });
 
-    const convertForm = useAppForm({
-        defaultValues: {
-            counterparty: "",
-            fromAsset: undefined as number | undefined,
-            toAsset: undefined as number | undefined,
-            amountFrom: "",
-            minTo: "",
-        },
-        onSubmit: async ({ value }) => {
-            if (
-                value.fromAsset === undefined ||
-                value.toAsset === undefined ||
-                value.fromAsset === value.toAsset ||
-                !value.counterparty.trim() ||
-                !value.amountFrom.trim() ||
-                !value.minTo.trim()
-            )
-                return;
-            await new Promise<void>((resolve, reject) => {
-                convert.mutate(
-                    {
-                        counterparty: value.counterparty.trim(),
-                        fromAsset: value.fromAsset!,
-                        toAsset: value.toAsset!,
-                        amountFrom: value.amountFrom.trim(),
-                        minTo: value.minTo.trim(),
-                    },
-                    {
-                        onSuccess: () => resolve(),
-                        onError: (e: Error) => reject(e),
-                    },
-                );
-            });
-        },
-    });
+    const fromTokenRaw = useStore(
+        currencyForm.store,
+        (s) => s.values.fromToken,
+    );
+    const toTokenRaw = useStore(currencyForm.store, (s) => s.values.toToken);
+    const tokenPrecisions = useTokenPrecisionMap([
+        parseTokenId(fromTokenRaw) ?? 0,
+        parseTokenId(toTokenRaw) ?? 0,
+        ...cashQuotes.map((q) => q.tokenId),
+    ]);
+
+    const legPrecision = (leg: Leg): number | undefined => {
+        if (leg.kind === "banx") {
+            return byId.has(leg.id) ? precisionOf(leg.id) : undefined;
+        }
+        return tokenPrecisions.precision.get(leg.id);
+    };
+    precRef.current = legPrecision;
 
     return (
         <div className="space-y-10">
             <PageHeader
-                title="Swaps"
-                description="Change a debt from one asset to another. Post a rate, or take someone else's."
+                title="Trade"
+                description="Orders you have posted."
+                action={
+                    <Button
+                        type="button"
+                        size="icon"
+                        className="size-11 shrink-0 rounded-full bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 sm:size-9"
+                        aria-label="Place an order"
+                        onClick={() => setOrderOpen(true)}
+                    >
+                        <Plus className="size-5" />
+                    </Button>
+                }
             />
 
-            <section className="max-w-xl">
-                <form
-                    className="grid gap-4 rounded-xl border p-4"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void currencyForm.handleSubmit();
-                    }}
-                >
-                    <div>
-                        <h2 className="font-medium">Post a rate</h2>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                            Offer a rate for one direction, or enter a market
-                            rate and a fee percent to post both directions.
-                        </p>
-                    </div>
+            <section>
+                <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Side</TableHead>
+                                <TableHead>Pair</TableHead>
+                                <TableHead className="text-right">
+                                    Price
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Quantity
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Fee
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Interest
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    Expires
+                                </TableHead>
+                                <TableHead />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {currency.length === 0 &&
+                            cashQuotes.length === 0 ? (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={8}
+                                        className="text-muted-foreground text-sm"
+                                    >
+                                        None yet.
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                currency.map((p) => (
+                                    <TableRow
+                                        key={`${p.fromAsset}-${p.toAsset}-${p.posterIsCreditor ? 1 : 0}`}
+                                    >
+                                        <TableCell>
+                                            {p.posterIsCreditor
+                                                ? "Buy"
+                                                : "Sell"}
+                                        </TableCell>
+                                        <TableCell>
+                                            {symbolOf(p.fromAsset)} /{" "}
+                                            {symbolOf(p.toAsset)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {formatFxToRate(
+                                                p.fxRate,
+                                                precisionOf(p.fromAsset),
+                                                precisionOf(p.toAsset),
+                                            )}{" "}
+                                            {symbolOf(p.toAsset)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {displayAmount(p.remaining)}{" "}
+                                            {symbolOf(p.fromAsset)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {displayAmount(p.feeFixed)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {ppmToPercent(p.toInterestRatePpm)}
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm">
+                                            {formatExpiresAt(p.expiresAt)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={
+                                                    removeCurrency.isPending
+                                                }
+                                                onClick={() =>
+                                                    removeCurrency.mutate({
+                                                        fromAsset: p.fromAsset,
+                                                        toAsset: p.toAsset,
+                                                        posterIsCreditor:
+                                                            p.posterIsCreditor,
+                                                    })
+                                                }
+                                            >
+                                                Remove
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                            {cashQuotes.map((q) => {
+                                const banxPrec = byId.has(q.assetId)
+                                    ? precisionOf(q.assetId)
+                                    : undefined;
+                                const tokenPrec = tokenPrecisions.precision.get(
+                                    q.tokenId,
+                                );
+                                const tokenLabel = `#${q.tokenId}`;
+                                const banxLabel = symbolOf(q.assetId);
+                                const price =
+                                    banxPrec === undefined ||
+                                    tokenPrec === undefined
+                                        ? "…"
+                                        : q.isOut
+                                          ? `${formatFxToRate(q.fxRate, banxPrec, tokenPrec)} ${tokenLabel}`
+                                          : `${formatFxToRate(q.fxRate, tokenPrec, banxPrec)} ${banxLabel}`;
+                                return (
+                                    <TableRow
+                                        key={`cash-${q.isOut ? 1 : 0}-${q.assetId}-${q.tokenId}`}
+                                    >
+                                        <TableCell>Buy</TableCell>
+                                        <TableCell>
+                                            {q.isOut
+                                                ? `${banxLabel} / ${tokenLabel}`
+                                                : `${tokenLabel} / ${banxLabel}`}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {price}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {displayAmount(q.remaining)}{" "}
+                                            {q.isOut ? banxLabel : tokenLabel}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                            {displayAmount(q.feeFixed)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            —
+                                        </TableCell>
+                                        <TableCell className="text-right text-sm">
+                                            {formatExpiresAt(q.expiresAt)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={removeCash.isPending}
+                                                onClick={() =>
+                                                    removeCash.mutate({
+                                                        assetId: q.assetId,
+                                                        tokenId: q.tokenId,
+                                                        isOut: q.isOut,
+                                                    })
+                                                }
+                                            >
+                                                Remove
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
+            </section>
+
+            <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
+                <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1.5rem)] flex-col overflow-y-auto sm:max-w-xl">
+                    <DialogHeader className="pr-8">
+                        <DialogTitle>Place an order</DialogTitle>
+                        <DialogDescription>
+                            A buy is filled when someone owes you that asset. A
+                            sell converts a debt you already owe. Pick a token
+                            on one side to trade it for an IOU.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form
+                        className="grid gap-4"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void currencyForm.handleSubmit();
+                        }}
+                    >
                     <currencyForm.Subscribe
                         selector={(s) => s.values}
                         children={(values) => {
-                            const fromSym =
-                                values.fromAsset !== undefined
-                                    ? symbolOf(values.fromAsset)
-                                    : "from";
-                            const toSym =
-                                values.toAsset !== undefined
-                                    ? symbolOf(values.toAsset)
-                                    : "to";
+                            const fromLeg = legOf(
+                                values.fromKind,
+                                values.fromAsset,
+                                values.fromToken,
+                            );
+                            const toLeg = legOf(
+                                values.toKind,
+                                values.toAsset,
+                                values.toToken,
+                            );
+                            const fromSym = fromLeg
+                                ? fromLeg.kind === "token"
+                                    ? `#${fromLeg.id}`
+                                    : symbolOf(fromLeg.id)
+                                : "from";
+                            const toSym = toLeg
+                                ? toLeg.kind === "token"
+                                    ? `#${toLeg.id}`
+                                    : symbolOf(toLeg.id)
+                                : "to";
+                            const fromPrec = fromLeg
+                                ? legPrecision(fromLeg)
+                                : undefined;
+                            const toPrec = toLeg
+                                ? legPrecision(toLeg)
+                                : undefined;
                             const rateShown =
-                                values.toAsset !== undefined
+                                toPrec !== undefined
                                     ? (formatToPrecision(
                                           values.toRate,
-                                          precisionOf(values.toAsset),
+                                          toPrec,
                                       ) ?? values.toRate)
                                     : values.toRate;
-                            const bothAssets =
-                                values.fromAsset !== undefined &&
-                                values.toAsset !== undefined;
+                            const bothChosen = !!fromLeg && !!toLeg;
+                            const mixed = values.fromKind !== values.toKind;
+                            const bothTokens =
+                                values.fromKind === "token" &&
+                                values.toKind === "token";
+                            const samePair =
+                                !!fromLeg && !!toLeg && sameLegs(fromLeg, toLeg);
+                            const banxPair =
+                                values.fromKind === "banx" &&
+                                values.toKind === "banx";
                             const feeText = values.feeFixed.trim();
                             const feeIsZero =
                                 feeText === "" || feeText === "0";
                             const theyOweMe = values.quoteMode === "they";
-                            const bothWays = values.quoteMode === "both";
+                            const bothWays =
+                                values.quoteMode === "both" && banxPair;
                             const spreadText = values.spreadPct.trim();
                             const spreadNumber =
                                 spreadText === "" ? 0 : Number(spreadText);
@@ -237,8 +610,10 @@ export function PoliciesPage() {
                                 spreadNumber <= MAX_HOP_FEE_PERCENT;
                             const exchange =
                                 bothWays &&
-                                bothAssets &&
-                                values.fromAsset !== values.toAsset &&
+                                bothChosen &&
+                                !samePair &&
+                                fromPrec !== undefined &&
+                                toPrec !== undefined &&
                                 spreadOk
                                     ? exchangeFxRates(
                                           values.toRate,
@@ -246,31 +621,57 @@ export function PoliciesPage() {
                                               spreadText || "0",
                                               MAX_HOP_FEE_PPM,
                                           ),
-                                          precisionOf(values.fromAsset!),
-                                          precisionOf(values.toAsset!),
+                                          fromPrec,
+                                          toPrec,
                                       )
                                     : null;
                             const forwardShown = exchange
                                 ? formatFxToRate(
                                       exchange.forwardFx.toString(),
-                                      precisionOf(values.fromAsset!),
-                                      precisionOf(values.toAsset!),
+                                      fromPrec!,
+                                      toPrec!,
                                   )
                                 : null;
                             const backShown = exchange
                                 ? formatFxToRate(
                                       exchange.backFx.toString(),
-                                      precisionOf(values.toAsset!),
-                                      precisionOf(values.fromAsset!),
+                                      toPrec!,
+                                      fromPrec!,
                                   )
                                 : null;
+                            const chooseKind = (
+                                field: "fromKind" | "toKind",
+                                kind: LegKind,
+                            ) => {
+                                const other =
+                                    field === "fromKind" ? "toKind" : "fromKind";
+                                currencyForm.setFieldValue(field, kind);
+                                if (kind !== "token") return;
+                                // A token has no quote against another token.
+                                if (values[other] === "token") {
+                                    currencyForm.setFieldValue(other, "banx");
+                                }
+                                if (values.quoteMode === "both") {
+                                    currencyForm.setFieldValue(
+                                        "quoteMode",
+                                        "they",
+                                    );
+                                }
+                            };
                             return (
                                 <>
                                     <div className="grid gap-2">
                                         <p className="text-sm font-medium">
-                                            Who owes this debt
+                                            Side
                                         </p>
-                                        <div className="grid grid-cols-3 gap-2">
+                                        <div
+                                            className={cn(
+                                                "grid gap-2",
+                                                banxPair
+                                                    ? "grid-cols-3"
+                                                    : "grid-cols-2",
+                                            )}
+                                        >
                                             <Button
                                                 type="button"
                                                 variant={
@@ -286,7 +687,7 @@ export function PoliciesPage() {
                                                     )
                                                 }
                                             >
-                                                They owe me
+                                                Buy
                                             </Button>
                                             <Button
                                                 type="button"
@@ -305,52 +706,83 @@ export function PoliciesPage() {
                                                     )
                                                 }
                                             >
-                                                I owe them
+                                                Sell
                                             </Button>
-                                            <Button
-                                                type="button"
-                                                variant={
-                                                    bothWays
-                                                        ? "default"
-                                                        : "outline"
-                                                }
-                                                aria-pressed={bothWays}
-                                                onClick={() =>
-                                                    currencyForm.setFieldValue(
-                                                        "quoteMode",
-                                                        "both",
-                                                    )
-                                                }
-                                            >
-                                                Both ways
-                                            </Button>
+                                            {banxPair ? (
+                                                <Button
+                                                    type="button"
+                                                    variant={
+                                                        bothWays
+                                                            ? "default"
+                                                            : "outline"
+                                                    }
+                                                    aria-pressed={bothWays}
+                                                    onClick={() =>
+                                                        currencyForm.setFieldValue(
+                                                            "quoteMode",
+                                                            "both",
+                                                        )
+                                                    }
+                                                >
+                                                    Two-sided
+                                                </Button>
+                                            ) : null}
                                         </div>
                                     </div>
                                     <div className="relative grid">
                                         <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
-                                            <currencyForm.Field
-                                                name="fromAsset"
-                                                children={(field) => (
-                                                    <AssetField
-                                                        label={
-                                                            bothWays
-                                                                ? "1 of this"
-                                                                : theyOweMe
-                                                                  ? "Their debt is in"
-                                                                  : "My debt is in"
-                                                        }
-                                                        assets={assets}
-                                                        value={
-                                                            field.state.value
-                                                        }
-                                                        onChange={(id) =>
-                                                            field.handleChange(
-                                                                id,
-                                                            )
-                                                        }
-                                                    />
-                                                )}
+                                            <LegKindToggle
+                                                kind={values.fromKind}
+                                                tokenDisabled={
+                                                    values.toKind === "token"
+                                                }
+                                                onChange={(kind) =>
+                                                    chooseKind("fromKind", kind)
+                                                }
                                             />
+                                            {values.fromKind === "banx" ? (
+                                                <currencyForm.Field
+                                                    name="fromAsset"
+                                                    children={(field) => (
+                                                        <AssetField
+                                                            label={
+                                                                bothWays
+                                                                    ? "Base"
+                                                                    : theyOweMe
+                                                                      ? "Buy"
+                                                                      : "Sell"
+                                                            }
+                                                            assets={assets}
+                                                            value={
+                                                                field.state
+                                                                    .value
+                                                            }
+                                                            onChange={(id) =>
+                                                                field.handleChange(
+                                                                    id,
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                />
+                                            ) : (
+                                                <currencyForm.AppField
+                                                    name="fromToken"
+                                                    children={(field) => (
+                                                        <field.TextField
+                                                            label={
+                                                                bothWays
+                                                                    ? "Base"
+                                                                    : theyOweMe
+                                                                      ? "Buy"
+                                                                      : "Sell"
+                                                            }
+                                                            inputMode="numeric"
+                                                            placeholder="Token number"
+                                                        />
+                                                    )}
+                                                />
+                                            )}
                                         </div>
 
                                         <div className="relative z-10 -my-3 flex justify-center">
@@ -359,21 +791,34 @@ export function PoliciesPage() {
                                                 size="icon"
                                                 variant="outline"
                                                 className="bg-background size-9 rounded-full border-2"
-                                                aria-label="Swap the two assets"
+                                                aria-label="Flip the pair"
                                                 onClick={() => {
-                                                    const from =
-                                                        values.fromAsset;
-                                                    const to = values.toAsset;
-                                                    const fromPrec =
-                                                        from !== undefined &&
-                                                        byId.has(from)
-                                                            ? precisionOf(from)
-                                                            : undefined;
-                                                    const toPrec =
-                                                        to !== undefined &&
-                                                        byId.has(to)
-                                                            ? precisionOf(to)
-                                                            : undefined;
+                                                    const swapLegs = () => {
+                                                        currencyForm.setFieldValue(
+                                                            "fromKind",
+                                                            values.toKind,
+                                                        );
+                                                        currencyForm.setFieldValue(
+                                                            "toKind",
+                                                            values.fromKind,
+                                                        );
+                                                        currencyForm.setFieldValue(
+                                                            "fromAsset",
+                                                            values.toAsset,
+                                                        );
+                                                        currencyForm.setFieldValue(
+                                                            "toAsset",
+                                                            values.fromAsset,
+                                                        );
+                                                        currencyForm.setFieldValue(
+                                                            "fromToken",
+                                                            values.toToken,
+                                                        );
+                                                        currencyForm.setFieldValue(
+                                                            "toToken",
+                                                            values.fromToken,
+                                                        );
+                                                    };
                                                     if (
                                                         fromPrec ===
                                                             undefined ||
@@ -397,23 +842,13 @@ export function PoliciesPage() {
                                                                     "0");
                                                         if (needsConvert) {
                                                             toast.error(
-                                                                from !==
-                                                                    undefined &&
-                                                                    to !==
-                                                                        undefined
+                                                                bothChosen
                                                                     ? "Asset precision isn't loaded yet."
                                                                     : "Pick both assets before flipping a rate.",
                                                             );
                                                             return;
                                                         }
-                                                        currencyForm.setFieldValue(
-                                                            "fromAsset",
-                                                            to,
-                                                        );
-                                                        currencyForm.setFieldValue(
-                                                            "toAsset",
-                                                            from,
-                                                        );
+                                                        swapLegs();
                                                         return;
                                                     }
                                                     if (bothWays) {
@@ -440,14 +875,7 @@ export function PoliciesPage() {
                                                                 "That amount is too small to convert at this rate, so it was left as typed.",
                                                             );
                                                         }
-                                                        currencyForm.setFieldValue(
-                                                            "fromAsset",
-                                                            to,
-                                                        );
-                                                        currencyForm.setFieldValue(
-                                                            "toAsset",
-                                                            from,
-                                                        );
+                                                        swapLegs();
                                                         currencyForm.setFieldValue(
                                                             "toRate",
                                                             nextRate,
@@ -462,14 +890,7 @@ export function PoliciesPage() {
                                                         );
                                                         return;
                                                     }
-                                                    currencyForm.setFieldValue(
-                                                        "fromAsset",
-                                                        to,
-                                                    );
-                                                    currencyForm.setFieldValue(
-                                                        "toAsset",
-                                                        from,
-                                                    );
+                                                    swapLegs();
                                                     const inverted =
                                                         invertQuotedRate(
                                                             values.toRate,
@@ -546,41 +967,84 @@ export function PoliciesPage() {
                                         </div>
 
                                         <div className="bg-muted/60 space-y-2 rounded-2xl p-3">
-                                            <currencyForm.Field
-                                                name="toAsset"
-                                                children={(field) => (
-                                                    <AssetField
-                                                        label={
-                                                            bothWays
-                                                                ? "Is worth"
-                                                                : theyOweMe
-                                                                  ? "Their debt becomes"
-                                                                  : "My debt becomes"
-                                                        }
-                                                        assets={assets}
-                                                        value={
-                                                            field.state.value
-                                                        }
-                                                        onChange={(id) =>
-                                                            field.handleChange(
-                                                                id,
-                                                            )
-                                                        }
-                                                    />
-                                                )}
+                                            <LegKindToggle
+                                                kind={values.toKind}
+                                                tokenDisabled={
+                                                    values.fromKind === "token"
+                                                }
+                                                onChange={(kind) =>
+                                                    chooseKind("toKind", kind)
+                                                }
                                             />
+                                            {values.toKind === "banx" ? (
+                                                <currencyForm.Field
+                                                    name="toAsset"
+                                                    children={(field) => (
+                                                        <AssetField
+                                                            label={
+                                                                bothWays
+                                                                    ? "Quote"
+                                                                    : "For"
+                                                            }
+                                                            assets={assets}
+                                                            value={
+                                                                field.state
+                                                                    .value
+                                                            }
+                                                            onChange={(id) =>
+                                                                field.handleChange(
+                                                                    id,
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                />
+                                            ) : (
+                                                <currencyForm.AppField
+                                                    name="toToken"
+                                                    children={(field) => (
+                                                        <field.TextField
+                                                            label={
+                                                                bothWays
+                                                                    ? "Quote"
+                                                                    : "For"
+                                                            }
+                                                            inputMode="numeric"
+                                                            placeholder="Token number"
+                                                        />
+                                                    )}
+                                                />
+                                            )}
                                             <currencyForm.AppField
                                                 name="toRate"
+                                                validators={
+                                                    toPrec === undefined
+                                                        ? undefined
+                                                        : {
+                                                              onChange:
+                                                                  amountFieldValidator(
+                                                                      toPrec,
+                                                                      {
+                                                                          allowEmpty:
+                                                                              true,
+                                                                      },
+                                                                  ),
+                                                              onSubmit:
+                                                                  amountFieldValidator(
+                                                                      toPrec,
+                                                                      {
+                                                                          allowEmpty:
+                                                                              true,
+                                                                      },
+                                                                  ),
+                                                          }
+                                                }
                                                 children={(field) => (
                                                     <field.TextField
                                                         label={
-                                                            bothWays
-                                                                ? bothAssets
-                                                                    ? `Market rate (${toSym} for each 1 ${fromSym})`
-                                                                    : "Market rate"
-                                                                : bothAssets
-                                                                  ? `${toSym} for each 1 ${fromSym}`
-                                                                  : "How much new debt"
+                                                            bothChosen
+                                                                ? `Price (${toSym} per 1 ${fromSym})`
+                                                                : "Price"
                                                         }
                                                         inputMode="decimal"
                                                         placeholder={
@@ -596,9 +1060,7 @@ export function PoliciesPage() {
 
                                     <p className="text-muted-foreground text-sm">
                                         {bothWays ? (
-                                            bothAssets &&
-                                            values.fromAsset ===
-                                                values.toAsset ? (
+                                            samePair ? (
                                                 <>Pick two different assets.</>
                                             ) : forwardShown && backShown ? (
                                                 <>
@@ -607,54 +1069,52 @@ export function PoliciesPage() {
                                                     </span>{" "}
                                                     becomes{" "}
                                                     <span className="text-foreground font-medium">
-                                                        {forwardShown} {toSym}
-                                                    </span>
-                                                    .{" "}
+                                                        {forwardShown} {toSym}.
+                                                    </span>{" "}
                                                     <span className="text-foreground font-medium">
                                                         1 {toSym}
                                                     </span>{" "}
                                                     becomes{" "}
                                                     <span className="text-foreground font-medium">
-                                                        {backShown} {fromSym}
-                                                    </span>
-                                                    . Your fee is already in
-                                                    these rates. Posted for
-                                                    debt they owe you and debt
-                                                    you owe them.
+                                                        {backShown} {fromSym}.
+                                                    </span>{" "}
+                                                    The fee is already in
+                                                    these prices. A payment
+                                                    uses the buy.
                                                 </>
                                             ) : (
                                                 <>
-                                                    Enter the market rate. A
-                                                    fee of 5 on 1.20 posts
-                                                    1.14, and the same fee off
-                                                    the other way. Leave the
-                                                    fee empty for none.
+                                                    Enter a price. A 5 percent
+                                                    fee on 1.20 posts 1.14
+                                                    each way. Leave the fee
+                                                    empty for none.
                                                 </>
                                             )
-                                        ) : bothAssets &&
-                                          values.fromAsset ===
-                                              values.toAsset ? (
+                                        ) : bothTokens ? (
+                                            <>
+                                                A token trades against an IOU.
+                                            </>
+                                        ) : samePair ? (
                                             <>Pick two different assets.</>
-                                        ) : bothAssets && rateShown ? (
+                                        ) : bothChosen && rateShown ? (
                                             <>
                                                 <span className="text-foreground font-medium">
                                                     1 {fromSym}
                                                 </span>{" "}
-                                                {theyOweMe
-                                                    ? "they owe you"
-                                                    : "you owe them"}{" "}
-                                                can become{" "}
+                                                {theyOweMe ? "buys " : "sells for "}
                                                 <span className="text-foreground font-medium">
-                                                    {rateShown} {toSym}
+                                                    {rateShown} {toSym}.
                                                 </span>
                                                 {feeIsZero
-                                                    ? "."
-                                                    : theyOweMe
-                                                      ? ". Your fee is added at this rate."
-                                                      : ". Your fee comes off first."}
+                                                    ? null
+                                                    : mixed
+                                                      ? " The fee comes off what they pay."
+                                                      : theyOweMe
+                                                        ? " The fee is added to the amount you buy."
+                                                        : " The fee comes off the amount you sell."}
                                             </>
                                         ) : (
-                                            <>Pick both assets and a rate.</>
+                                            <>Pick both assets and a price.</>
                                         )}
                                     </p>
 
@@ -676,7 +1136,7 @@ export function PoliciesPage() {
                                             children={(field) => (
                                                 <field.TextField
                                                     label="Your fee percent"
-                                                    description="Taken off the market rate in each direction. Leave empty for no fee."
+                                                    description="Taken off the price in each direction. Leave empty for no fee."
                                                     inputMode="decimal"
                                                     placeholder="0"
                                                     min={0}
@@ -689,22 +1149,20 @@ export function PoliciesPage() {
 
                                     {bothWays ? (
                                         <p className="text-muted-foreground text-sm">
-                                            Each number is the most that can
-                                            be changed. Saving again replaces
-                                            it.
+                                            Each quantity is how much of that
+                                            asset the order will take. Saving
+                                            again replaces it.
                                         </p>
                                     ) : null}
                                     <currencyForm.AppField
                                         name="remaining"
                                         validators={
-                                            values.fromAsset === undefined
+                                            fromPrec === undefined
                                                 ? undefined
                                                 : {
                                                       onChange:
                                                           amountFieldValidator(
-                                                              precisionOf(
-                                                                  values.fromAsset,
-                                                              ),
+                                                              fromPrec,
                                                               {
                                                                   allowZero:
                                                                       false,
@@ -712,9 +1170,7 @@ export function PoliciesPage() {
                                                           ),
                                                       onSubmit:
                                                           amountFieldValidator(
-                                                              precisionOf(
-                                                                  values.fromAsset,
-                                                              ),
+                                                              fromPrec,
                                                               {
                                                                   allowZero:
                                                                       false,
@@ -725,26 +1181,15 @@ export function PoliciesPage() {
                                         children={(field) => (
                                             <field.TextField
                                                 label={
-                                                    bothWays && bothAssets
-                                                        ? `Most ${fromSym} into ${toSym}`
-                                                        : values.fromAsset !==
-                                                            undefined
-                                                          ? `Most ${fromSym}`
-                                                          : "Most"
-                                                }
-                                                description={
-                                                    bothWays
-                                                        ? undefined
-                                                        : "Saving again replaces it."
+                                                    fromLeg
+                                                        ? `Quantity (${fromSym})`
+                                                        : "Quantity"
                                                 }
                                                 inputMode="decimal"
                                                 placeholder={
-                                                    values.fromAsset !==
-                                                    undefined
+                                                    fromPrec !== undefined
                                                         ? amountPlaceholder(
-                                                              precisionOf(
-                                                                  values.fromAsset,
-                                                              ),
+                                                              fromPrec,
                                                           )
                                                         : "0"
                                                 }
@@ -755,14 +1200,12 @@ export function PoliciesPage() {
                                         <currencyForm.AppField
                                             name="remainingOther"
                                             validators={
-                                                values.toAsset === undefined
+                                                toPrec === undefined
                                                     ? undefined
                                                     : {
                                                           onChange:
                                                               amountFieldValidator(
-                                                                  precisionOf(
-                                                                      values.toAsset,
-                                                                  ),
+                                                                  toPrec,
                                                                   {
                                                                       allowZero:
                                                                           false,
@@ -770,9 +1213,7 @@ export function PoliciesPage() {
                                                               ),
                                                           onSubmit:
                                                               amountFieldValidator(
-                                                                  precisionOf(
-                                                                      values.toAsset,
-                                                                  ),
+                                                                  toPrec,
                                                                   {
                                                                       allowZero:
                                                                           false,
@@ -783,21 +1224,15 @@ export function PoliciesPage() {
                                             children={(field) => (
                                                 <field.TextField
                                                     label={
-                                                        bothAssets
-                                                            ? `Most ${toSym} into ${fromSym}`
-                                                            : values.toAsset !==
-                                                                undefined
-                                                              ? `Most ${toSym}`
-                                                              : "Most"
+                                                        toLeg
+                                                            ? `Quantity (${toSym})`
+                                                            : "Quantity"
                                                     }
                                                     inputMode="decimal"
                                                     placeholder={
-                                                        values.toAsset !==
-                                                        undefined
+                                                        toPrec !== undefined
                                                             ? amountPlaceholder(
-                                                                  precisionOf(
-                                                                      values.toAsset,
-                                                                  ),
+                                                                  toPrec,
                                                               )
                                                             : "0"
                                                     }
@@ -815,9 +1250,11 @@ export function PoliciesPage() {
                                                 variant="ghost"
                                                 className="text-muted-foreground h-8 w-full justify-between px-2 text-sm font-medium"
                                             >
-                                                {bothWays
-                                                    ? "Interest and expiry"
-                                                    : "Fee, interest, and expiry"}
+                                                {mixed
+                                                    ? "Fee and expiry"
+                                                    : bothWays
+                                                      ? "Interest and expiry"
+                                                      : "Fee, interest, and expiry"}
                                                 <ChevronDown
                                                     className={cn(
                                                         "size-4 transition-transform duration-200",
@@ -828,36 +1265,59 @@ export function PoliciesPage() {
                                         </CollapsibleTrigger>
                                         <CollapsibleContent className="grid gap-4 pt-2">
                                             <p className="text-muted-foreground text-sm">
-                                                {bothWays
-                                                    ? "A payment through you uses these rates where they owe you. Your fee is already in the rate."
-                                                    : theyOweMe
-                                                      ? "A payment that changes asset while it goes through you uses this rate. The fee comes off what you owe onward."
-                                                      : "A payment through you does not use this side."}
+                                                {mixed
+                                                    ? "The fee comes off what they pay, before the price."
+                                                    : bothWays
+                                                      ? "A payment through you uses the buy. The fee is already in the price."
+                                                      : theyOweMe
+                                                        ? "A payment that changes asset while it goes through you uses this buy. The fee comes off what you owe onward."
+                                                        : "A payment does not use a sell. It converts a debt you already owe."}
                                             </p>
                                             {bothWays ? null : (
                                                 <currencyForm.AppField
                                                     name="feeFixed"
+                                                    validators={
+                                                        fromPrec === undefined
+                                                            ? undefined
+                                                            : {
+                                                                  onChange:
+                                                                      amountFieldValidator(
+                                                                          fromPrec,
+                                                                          {
+                                                                              allowEmpty:
+                                                                                  true,
+                                                                          },
+                                                                      ),
+                                                                  onSubmit:
+                                                                      amountFieldValidator(
+                                                                          fromPrec,
+                                                                          {
+                                                                              allowEmpty:
+                                                                                  true,
+                                                                          },
+                                                                      ),
+                                                              }
+                                                    }
                                                     children={(field) => (
                                                         <field.TextField
                                                             label={
-                                                                values.fromAsset !==
-                                                                undefined
+                                                                fromLeg
                                                                     ? `Fee (${fromSym})`
                                                                     : "Fee"
                                                             }
                                                             description={
-                                                                theyOweMe
-                                                                    ? "Added to what they owe you, then priced at this rate."
-                                                                    : "Taken off what you owe them, before the rate."
+                                                                mixed
+                                                                    ? "Taken off what they pay, before the price."
+                                                                    : theyOweMe
+                                                                      ? "On a convert, added to the amount you buy, then priced."
+                                                                      : "Taken off the amount you sell, before the price."
                                                             }
                                                             inputMode="decimal"
                                                             placeholder={
-                                                                values.fromAsset !==
+                                                                fromPrec !==
                                                                 undefined
                                                                     ? amountPlaceholder(
-                                                                          precisionOf(
-                                                                              values.fromAsset,
-                                                                          ),
+                                                                          fromPrec,
                                                                       )
                                                                     : "0"
                                                             }
@@ -865,6 +1325,7 @@ export function PoliciesPage() {
                                                     )}
                                                 />
                                             )}
+                                            {mixed ? null : (
                                             <currencyForm.AppField
                                                 name="aprPct"
                                                 validators={{
@@ -887,6 +1348,7 @@ export function PoliciesPage() {
                                                     />
                                                 )}
                                             />
+                                            )}
                                             <currencyForm.Field
                                                 name="expiresAtSeconds"
                                                 children={(field) => (
@@ -910,367 +1372,54 @@ export function PoliciesPage() {
                             <currencyForm.AppForm>
                                 <currencyForm.SubmitButton
                                     labels={
-                                        values.quoteMode === "both"
-                                            ? ["Post these rates", "Posting…"]
-                                            : ["Post rate", "Posting…"]
+                                        values.quoteMode === "both" &&
+                                        values.fromKind === "banx" &&
+                                        values.toKind === "banx"
+                                            ? ["Post orders", "Posting…"]
+                                            : ["Post order", "Posting…"]
                                     }
                                     loading={
                                         setCurrency.isPending ||
-                                        setExchange.isPending
+                                        setExchange.isPending ||
+                                        setCash.isPending
                                     }
-                                    disabled={
-                                        values.fromAsset === undefined ||
-                                        values.toAsset === undefined ||
-                                        values.fromAsset === values.toAsset ||
-                                        !values.remaining.trim() ||
-                                        (values.quoteMode === "both" &&
+                                    disabled={(() => {
+                                        const from = legOf(
+                                            values.fromKind,
+                                            values.fromAsset,
+                                            values.fromToken,
+                                        );
+                                        const to = legOf(
+                                            values.toKind,
+                                            values.toAsset,
+                                            values.toToken,
+                                        );
+                                        if (
+                                            !from ||
+                                            !to ||
+                                            sameLegs(from, to) ||
+                                            !values.remaining.trim() ||
+                                            (from.kind === "token" &&
+                                                to.kind === "token")
+                                        ) {
+                                            return true;
+                                        }
+                                        if (from.kind !== to.kind) {
+                                            return !values.toRate.trim();
+                                        }
+                                        return (
+                                            values.quoteMode === "both" &&
                                             (!values.remainingOther.trim() ||
-                                                !values.toRate.trim()))
-                                    }
+                                                !values.toRate.trim())
+                                        );
+                                    })()}
                                 />
                             </currencyForm.AppForm>
                         )}
                     />
-                </form>
-            </section>
-
-            <section className="grid max-w-xl gap-3 rounded-lg border p-4">
-                <h2 className="font-medium">Take their rate</h2>
-                <p className="text-muted-foreground text-sm">
-                    Swap using the rate they posted for the debt that is
-                    actually between you. Only that direction's rate is used.
-                </p>
-                <form
-                    className="grid gap-3"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void convertForm.handleSubmit();
-                    }}
-                >
-                    <convertForm.AppField
-                        name="counterparty"
-                        children={(field) => (
-                            <field.TextField
-                                label="Account"
-                                description="Who posted the rate."
-                                required
-                            />
-                        )}
-                    />
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <convertForm.Field
-                            name="fromAsset"
-                            children={(field) => (
-                                <AssetField
-                                    label="Debt is in"
-                                    assets={assets}
-                                    value={field.state.value}
-                                    onChange={(id) => field.handleChange(id)}
-                                />
-                            )}
-                        />
-                        <convertForm.Field
-                            name="toAsset"
-                            children={(field) => (
-                                <AssetField
-                                    label="Debt becomes"
-                                    assets={assets}
-                                    value={field.state.value}
-                                    onChange={(id) => field.handleChange(id)}
-                                />
-                            )}
-                        />
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <convertForm.AppField
-                            name="amountFrom"
-                            listeners={{
-                                onChange: ({ value }) => {
-                                    if (convertMinEdited.current) return;
-                                    const next = String(value ?? "");
-                                    convertMinSynced.current = next;
-                                    convertForm.setFieldValue("minTo", next);
-                                },
-                            }}
-                            children={(field) => (
-                                <field.TextField
-                                    label="How much to swap"
-                                    inputMode="decimal"
-                                />
-                            )}
-                        />
-                        <convertForm.AppField
-                            name="minTo"
-                            listeners={{
-                                onChange: ({ value }) => {
-                                    if (
-                                        String(value ?? "") !==
-                                        convertMinSynced.current
-                                    ) {
-                                        convertMinEdited.current = true;
-                                    }
-                                },
-                            }}
-                            children={(field) => (
-                                <field.TextField
-                                    label="New debt at least"
-                                    inputMode="decimal"
-                                />
-                            )}
-                        />
-                    </div>
-                    <convertForm.Subscribe
-                        selector={(s) => s.values}
-                        children={(values) => (
-                            <convertForm.AppForm>
-                                {values.fromAsset !== undefined &&
-                                values.toAsset !== undefined &&
-                                values.fromAsset === values.toAsset ? (
-                                    <p className="text-muted-foreground text-sm">
-                                        Pick two different assets.
-                                    </p>
-                                ) : null}
-                                <convertForm.SubmitButton
-                                    labels={["Swap", "Swapping…"]}
-                                    loading={convert.isPending}
-                                    disabled={
-                                        !values.counterparty.trim() ||
-                                        values.fromAsset === undefined ||
-                                        values.toAsset === undefined ||
-                                        values.fromAsset === values.toAsset ||
-                                        !values.amountFrom.trim() ||
-                                        !values.minTo.trim()
-                                    }
-                                />
-                            </convertForm.AppForm>
-                        )}
-                    />
-                </form>
-            </section>
-
-            <section className="space-y-4">
-                <h2 className="font-medium">Payments through you</h2>
-                {forwardOffers.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">
-                        None yet. On Accounts, turn on Forward if you want
-                        payments to pass through you.
-                    </p>
-                ) : (
-                    <div className="overflow-x-auto rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Next account</TableHead>
-                                    <TableHead>Asset</TableHead>
-                                    <TableHead className="text-right">
-                                        Fee
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Fee %
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Interest limit
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        New people
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Expires
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {forwardOffers.map((p) => (
-                                    <TableRow
-                                        key={`${p.isGlobal ? "g" : p.nextHop}-${p.assetId}`}
-                                    >
-                                        <TableCell>
-                                            {p.isGlobal ? "Anyone" : p.nextHop}
-                                        </TableCell>
-                                        <TableCell>
-                                            {symbolOf(p.assetId)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {displayAmount(p.feeFixed)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {ppmToPercent(p.feePercentPpm)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {ppmToPercent(p.maxLineAprPpm)}
-                                        </TableCell>
-                                        <TableCell className="text-right text-sm">
-                                            {p.allowUnknown
-                                                ? "Yes"
-                                                : "Only people you know"}
-                                        </TableCell>
-                                        <TableCell className="text-right text-sm">
-                                            {formatExpiresAt(p.expiresAt)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                )}
-            </section>
-
-            <section className="space-y-4">
-                <h2 className="font-medium">Buying and selling</h2>
-                {buyClaimOffers.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">
-                        None yet. On Accounts, use Buy claims.
-                    </p>
-                ) : (
-                    <div className="overflow-x-auto rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Buy or sell</TableHead>
-                                    <TableHead>Who owes</TableHead>
-                                    <TableHead>Asset</TableHead>
-                                    <TableHead className="text-right">
-                                        Fee
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Fee %
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Left
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Expires
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {buyClaimOffers.map((p) => (
-                                    <TableRow
-                                        key={`${p.side}-${p.isGlobal ? "g" : p.debtor}-${p.assetId}`}
-                                    >
-                                        <TableCell>
-                                            {p.isSell ? "Sell" : "Buy"}
-                                        </TableCell>
-                                        <TableCell>
-                                            {p.isGlobal ? "Anyone" : p.debtor}
-                                        </TableCell>
-                                        <TableCell>
-                                            {symbolOf(p.assetId)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {displayAmount(p.feeFixed)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {ppmToPercent(p.feePercentPpm)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {displayAmount(p.remaining)}
-                                        </TableCell>
-                                        <TableCell className="text-right text-sm">
-                                            {formatExpiresAt(p.expiresAt)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                )}
-            </section>
-
-            <section>
-                <h2 className="mb-2 font-medium">Your rates</h2>
-                {currency.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">
-                        None yet. Post a rate above.
-                    </p>
-                ) : (
-                    <div className="overflow-x-auto rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Who owes</TableHead>
-                                    <TableHead>Swap</TableHead>
-                                    <TableHead className="text-right">
-                                        Fee
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Becomes
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Interest
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Left
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Expires
-                                    </TableHead>
-                                    <TableHead />
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {currency.map((p) => (
-                                    <TableRow
-                                        key={`${p.fromAsset}-${p.toAsset}-${p.posterIsCreditor ? 1 : 0}`}
-                                    >
-                                        <TableCell>
-                                            {p.posterIsCreditor
-                                                ? "They owe you"
-                                                : "You owe them"}
-                                        </TableCell>
-                                        <TableCell>
-                                            {symbolOf(p.fromAsset)} →{" "}
-                                            {symbolOf(p.toAsset)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {displayAmount(p.feeFixed)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            1 →{" "}
-                                            {formatFxToRate(
-                                                p.fxRate,
-                                                precisionOf(p.fromAsset),
-                                                precisionOf(p.toAsset),
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {ppmToPercent(p.toInterestRatePpm)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                            {displayAmount(p.remaining)}{" "}
-                                            {symbolOf(p.fromAsset)}
-                                        </TableCell>
-                                        <TableCell className="text-right text-sm">
-                                            {formatExpiresAt(p.expiresAt)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={
-                                                    removeCurrency.isPending
-                                                }
-                                                onClick={() =>
-                                                    removeCurrency.mutate({
-                                                        fromAsset: p.fromAsset,
-                                                        toAsset: p.toAsset,
-                                                        posterIsCreditor:
-                                                            p.posterIsCreditor,
-                                                    })
-                                                }
-                                            >
-                                                Remove
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                )}
-            </section>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

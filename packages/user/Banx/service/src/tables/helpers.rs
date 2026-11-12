@@ -116,10 +116,11 @@ pub fn cash_sub(poster: AccountNumber, token_id: u32) -> String {
     format!("{poster}/{token_id}")
 }
 
-/// Emit bilateral history (once per party as `account`) via service events.
+/// Emit history once for each party as `account`.
 ///
-/// `amount` / `netted` are stored as human decimals at this asset's
-/// precision (`netted` uses `other_asset_id` for `convert`).
+/// `amount` / `netted` are stored as human decimals. `netted` uses
+/// `other_asset_id` when that amount is a different asset, as on a path hop.
+/// The same account on both sides is one row.
 pub fn emit_pair_activity(
     party_a: AccountNumber,
     party_b: AccountNumber,
@@ -166,7 +167,9 @@ pub(crate) fn emit_pair_activity_as(
     };
     let amount = Decimal::new(amount, asset_precision);
     let netted = Decimal::new(netted, other_asset_precision);
-    for (account, counterparty) in [(party_a, party_b), (party_b, party_a)] {
+    // A return to the sender names one account twice. The second order is
+    // the same row, so a sum of those payments would count one payment twice.
+    let write = |account: AccountNumber, counterparty: AccountNumber| {
         crate::Wrapper::emit().history().activity(
             account,
             counterparty,
@@ -179,5 +182,9 @@ pub(crate) fn emit_pair_activity_as(
             request_id,
             memo.to_string(),
         );
+    };
+    write(party_a, party_b);
+    if party_a != party_b {
+        write(party_b, party_a);
     }
 }

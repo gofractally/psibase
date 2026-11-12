@@ -224,8 +224,14 @@ fn note_payee(
     label: &Label,
     payee: AccountNumber,
     to_asset: Option<u16>,
+    sender: AccountNumber,
+    from_asset: u16,
 ) {
     if label.account != payee || label.amount == 0 {
+        return;
+    }
+    // A payment to yourself is only the last hop, and only in another asset.
+    if payee == sender && (label.hops.len() < 2 || label.asset == from_asset) {
         return;
     }
     if let Some(want) = to_asset {
@@ -316,7 +322,11 @@ pub fn find_banx_path(
     max_hops: u8,
     now: i64,
 ) -> Option<PathQuote> {
-    if amount_in == 0 || max_hops == 0 || sender == payee {
+    if amount_in == 0 || max_hops == 0 {
+        return None;
+    }
+    // One hop cannot draw the sender. A same-asset payment to yourself nets away.
+    if sender == payee && (max_hops < 2 || to_asset == Some(from_asset)) {
         return None;
     }
 
@@ -361,7 +371,14 @@ pub fn find_banx_path(
 
     let mut best_payee: Option<Label> = None;
     for label in &frontier {
-        note_payee(&mut best_payee, label, payee, to_asset);
+        note_payee(
+            &mut best_payee,
+            label,
+            payee,
+            to_asset,
+            sender,
+            from_asset,
+        );
     }
 
     // Later hops. Asset changes use the current debtor's FX quote.
@@ -408,9 +425,20 @@ pub fn find_banx_path(
             break;
         }
         for label in &next {
-            note_payee(&mut best_payee, label, payee, to_asset);
+            note_payee(
+                &mut best_payee,
+                label,
+                payee,
+                to_asset,
+                sender,
+                from_asset,
+            );
         }
-        frontier = next;
+        // Do not draw onward from the sender. The return is only a final hop.
+        frontier = next
+            .into_iter()
+            .filter(|label| label.account != sender)
+            .collect();
     }
 
     let best_payee = best_payee?;
@@ -535,7 +563,10 @@ pub fn find_banx_path_exact_out(
     max_hops: u8,
     now: i64,
 ) -> Option<PathQuote> {
-    if amount_out == 0 || max_hops == 0 || sender == payee {
+    if amount_out == 0 || max_hops == 0 {
+        return None;
+    }
+    if sender == payee && (max_hops < 2 || to_asset == Some(from_asset)) {
         return None;
     }
 
@@ -596,15 +627,20 @@ fn walk_exact_out(
     now: i64,
     best: &mut Option<PathQuote>,
 ) {
-    if account == payee && to_asset.map(|want| want == asset).unwrap_or(true) {
+    if account == payee
+        && to_asset.map(|want| want == asset).unwrap_or(true)
+        && !(payee == sender && (path.len() < 2 || asset == path[0].1))
+    {
         note_exact_sequence(
             path, amount_out, sender, lines, routing, fx, known, now, best,
         );
     }
-    if hops_left == 0 {
+    // The sender is only a final hop. Do not draw them and then continue.
+    if hops_left == 0 || account == sender {
         return;
     }
 
+    let first_asset = path[0].1;
     let mut nexts: Vec<(AccountNumber, u16)> = Vec::new();
     if let Some(out_lines) = lines_by_debtor.get(&account) {
         for line in out_lines {
@@ -618,6 +654,7 @@ fn walk_exact_out(
                     account,
                     line.creditor,
                     asset,
+                    first_asset,
                 );
             }
         }
@@ -646,6 +683,7 @@ fn walk_exact_out(
                 account,
                 line.creditor,
                 edge.to_asset,
+                first_asset,
             );
         }
     }
@@ -687,8 +725,13 @@ fn push_exact_hop(
     debtor: AccountNumber,
     creditor: AccountNumber,
     asset: u16,
+    first_asset: u16,
 ) {
-    if creditor == debtor || creditor == sender || visited.contains(&(creditor, asset)) {
+    if creditor == debtor || visited.contains(&(creditor, asset)) {
+        return;
+    }
+    // Same-asset return to the sender nets the draw away.
+    if creditor == sender && asset == first_asset {
         return;
     }
     if resolve_routing(routing, creditor, debtor, asset, now).is_none() {
@@ -923,7 +966,12 @@ fn expand_hops(
         if line.asset_id != hop_asset {
             continue;
         }
-        if line.creditor == debtor || line.creditor == sender {
+        if line.creditor == debtor {
+            continue;
+        }
+        // The sender may receive the last hop in another asset. The caller
+        // drops that label from the frontier so the path does not continue.
+        if line.creditor == sender && hop_asset == parent.hops[0].1 {
             continue;
         }
         if parent.visited.contains(&(line.creditor, hop_asset)) {
@@ -1780,6 +1828,82 @@ mod tests {
             q.amount_out, 700,
             "1000 AUD at 0.70 → 700 USD, not leftover"
         );
+    }
+
+    /// Alice can be quoted a return to herself in the other asset. Search must
+    /// not keep walking after that hop, and a same-asset return is no path.
+    #[test]
+    fn return_to_sender_only_as_last_hop_in_another_asset() {
+        let aud = 1u16;
+        let usd = 2u16;
+        let lines = vec![
+            line("bob", "alice", aud, 10_000),
+            line("bob", "alice", usd, 10_000),
+            line("alice", "bob", usd, 10_000),
+            line("carol", "alice", usd, 10_000),
+        ];
+        let routing = vec![global_rte("bob", usd, 0), global_rte("alice", usd, 0)];
+        let fx = vec![FxEdge {
+            poster: acct("bob"),
+            from_asset: aud,
+            to_asset: usd,
+            fee_fixed: 0,
+            fx_rate: RATE_SCALE,
+            remaining: u64::MAX,
+            expires_at: 0,
+            reserve_in: 0,
+            reserve_out: 0,
+            fee_ppm: 0,
+        }];
+        let q = find(
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "alice",
+            1_000,
+            aud,
+            Some(usd),
+            4,
+            0,
+        )
+        .expect("return quote");
+        assert_eq!(q.amount_out, 1_000);
+        assert_eq!(q.hops.len(), 2);
+        assert_eq!(q.hops[0].account, acct("bob"));
+        assert_eq!(q.hops[1].account, acct("alice"));
+        assert_eq!(q.hops[1].asset_id, usd);
+
+        assert!(
+            find(
+                &lines, &routing, &fx, "alice", "alice", 1_000, usd, Some(usd), 4, 0,
+            )
+            .is_none(),
+            "same-asset return is not a path"
+        );
+        assert!(
+            find(
+                &lines, &routing, &fx, "alice", "carol", 1_000, aud, Some(usd), 4, 0,
+            )
+            .is_none(),
+            "the path must not continue after Alice"
+        );
+
+        let exact = find_out(
+            &lines,
+            &routing,
+            &fx,
+            "alice",
+            "alice",
+            1_000,
+            aud,
+            Some(usd),
+            4,
+            0,
+        )
+        .expect("exact return");
+        assert_eq!(exact.amount_in, 1_000);
+        assert_eq!(exact.hops.last().unwrap().account, acct("alice"));
     }
 
     /// Unwind does not shrink the FX'd notional (1000 AUD → 700 USD).

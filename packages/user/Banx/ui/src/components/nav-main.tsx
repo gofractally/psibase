@@ -30,7 +30,7 @@ const items: {
     { to: "/payees", label: "Payees", icon: Contact },
     { to: "/invites", label: "Invites", icon: UserPlus },
     { to: "/cash", label: "Cash", icon: Banknote },
-    { to: "/policies", label: "Swaps", icon: ArrowLeftRight },
+    { to: "/policies", label: "Trade", icon: ArrowLeftRight },
     { to: "/relays", label: "Relays", icon: Repeat },
 ];
 

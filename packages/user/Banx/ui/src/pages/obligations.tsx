@@ -7,7 +7,6 @@ import {
     GitBranch,
     Handshake,
     History,
-    Landmark,
     Plus,
     Route,
     Scale,
@@ -353,7 +352,7 @@ export function ObligationsPage() {
                                     setCreditLineOpen(true);
                                 }}
                             >
-                                <Landmark className="size-5" />
+                                <Plus className="size-5" />
                             </Button>
                         </>
                     }
