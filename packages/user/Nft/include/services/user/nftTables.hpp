@@ -19,11 +19,11 @@ namespace UserService
    struct NftHolderRecord
    {
       psibase::AccountNumber account;
-      uint8_t                config;
+      bool                   autodebit;
 
       auto operator<=>(const NftHolderRecord&) const = default;
    };
-   PSIO_REFLECT(NftHolderRecord, account, config);
+   PSIO_REFLECT(NftHolderRecord, account, autodebit);
    using NftHolderTable = psibase::Table<NftHolderRecord, &NftHolderRecord::account>;
    PSIO_REFLECT_TYPENAME(NftHolderTable)
 

@@ -7,7 +7,7 @@ mod service {
     use nft::{
         service::NID,
         tables::{
-            CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftStatus, NftTable,
+            CreditRecord, CreditTable, Nft, NftHolder, NftStatus, NftTable,
             UserPending, UserPendingTable,
         },
     };
@@ -179,13 +179,7 @@ mod service {
 
         /// Current NFT holder settings for `user` (no history).
         async fn userConf(&self, user: AccountNumber) -> NftHolder {
-            NftHolderTable::with_service(psibase::services::nft::SERVICE)
-                .get_index_pk()
-                .get(&user)
-                .unwrap_or(NftHolder {
-                    account: user,
-                    config: 0,
-                })
+            NftHolder::get_or_new(user)
         }
 
         /// Pending NFT credits/debits for `user`.

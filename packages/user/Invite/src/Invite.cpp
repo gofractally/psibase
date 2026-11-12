@@ -70,7 +70,7 @@ void Invite::init()
    initTable.put(InitializedRecord{});
 
    // Configure auto debit for self on Token and NFT
-   to<Nft>().setUserConf(Nft::autoDebit, false);
+   to<Nft>().setAutoDebit(false);
    to<Tokens>().setUserConf(Tokens::autoDebit, false);
 
    // Register event indices
