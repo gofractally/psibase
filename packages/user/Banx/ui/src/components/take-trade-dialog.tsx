@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-banx-data";
 import {
     useCashIn,
-    use(CashOut),
+    useCashOut,
     useConvert,
     usePathPay,
 } from "@/hooks/use-banx-mutations";
@@ -44,18 +44,19 @@ export type TakeTrade =
     | { kind: "policy"; policy: CurrencyPolicy }
     | { kind: "cash"; quote: CashQuote };
 
-function owedToYou(
+/** Sum of `creditor`'s live claim on `debtor` in one asset. */
+export function directedDebt(
     rows: Obligation[],
-    taker: string,
-    poster: string,
+    creditor: string,
+    debtor: string,
     assetId: number,
     precision: number,
 ): bigint {
     let sum = 0n;
     for (const row of rows) {
         if (
-            row.creditor !== taker ||
-            row.debtor !== poster ||
+            row.creditor !== creditor ||
+            row.debtor !== debtor ||
             row.assetId !== assetId
         ) {
             continue;
@@ -105,8 +106,16 @@ function quotedRaw(
     fxRate: string,
     fromPrec: number,
     toPrec: number,
+    addFee = false,
 ): bigint | null {
-    const shown = applyQuotedRate(amount, fee, fxRate, fromPrec, toPrec);
+    const shown = applyQuotedRate(
+        amount,
+        fee,
+        fxRate,
+        fromPrec,
+        toPrec,
+        addFee,
+    );
     if (!shown) return null;
     const raw = humanToRaw(shown, toPrec);
     return raw > 0n ? raw : null;
@@ -188,13 +197,28 @@ export function TakeTradeDialog({
               : 0n;
     const claimRaw =
         selling && policy && fromPrec !== undefined
-            ? owedToYou(obligations, taker, poster, policy.fromAsset, fromPrec)
+            ? directedDebt(obligations, taker, poster, policy.fromAsset, fromPrec)
             : null;
+    // A buy the taker already owes is one rebook. No new draw, so convert.
+    // Anything else still buys by a path payment.
+    const owedByTaker =
+        buying && policy && fromPrec !== undefined
+            ? directedDebt(
+                  obligations,
+                  poster,
+                  taker,
+                  policy.fromAsset,
+                  fromPrec,
+              )
+            : 0n;
+    const debtReady = !obligationsLoading && !obligationsError;
+    const immediate = buying && debtReady && owedByTaker > 0n;
+    const directCap = immediate ? owedByTaker : claimRaw;
     const capRaw =
-        claimRaw === null
+        directCap === null
             ? remainingRaw
-            : claimRaw < remainingRaw
-              ? claimRaw
+            : directCap < remainingRaw
+              ? directCap
               : remainingRaw;
 
     const forward =
@@ -232,6 +256,12 @@ export function TakeTradeDialog({
             : "Loading this order.";
     } else if (expired) {
         description = "This order has expired.";
+    } else if (policy && buying && obligationsError) {
+        description = "Couldn't load what you already owe them.";
+    } else if (policy && buying && obligationsLoading) {
+        description = "Checking what you already owe them.";
+    } else if (policy && buying && immediate) {
+        description = `This rebooks ${fromSymbol} you already owe ${display} into ${toSymbol} at their price.`;
     } else if (buyLookupFailed) {
         description = `Couldn't check ${display}'s relay or path forwarding.`;
     } else if (buyWaiting) {
@@ -279,6 +309,39 @@ export function TakeTradeDialog({
     submitRef.current = async () => {
         const amount = String(form.state.values.amount ?? "").trim();
         if (!amount || fromPrec === undefined || toPrec === undefined) return;
+        if (policy && buying && immediate) {
+            const received = quotedRaw(
+                amount,
+                policy.feeFixed,
+                policy.fxRate,
+                fromPrec,
+                toPrec,
+                true,
+            );
+            if (!received) {
+                toast.error("That amount is too small at their rate.");
+                return;
+            }
+            await new Promise<void>((resolve, reject) => {
+                convert.mutate(
+                    {
+                        counterparty: poster,
+                        fromAsset: policy.fromAsset,
+                        toAsset: policy.toAsset,
+                        amountFrom: amount,
+                        minTo: rawToFixed(received, toPrec),
+                    },
+                    {
+                        onSuccess: () => {
+                            onOpenChange(false);
+                            resolve();
+                        },
+                        onError: (e: Error) => reject(e),
+                    },
+                );
+            });
+            return;
+        }
         if (policy && buying) {
             if (!forward || relayBlocks) return;
             const priced = quotedRaw(
@@ -404,12 +467,13 @@ export function TakeTradeDialog({
         !missingPrecision &&
         !expired &&
         capRaw === 0n &&
-        !(selling && (obligationsLoading || obligationsError || claimRaw === 0n));
+        !(selling && (obligationsLoading || obligationsError || claimRaw === 0n)) &&
+        !(buying && (obligationsLoading || obligationsError));
+    const pathTake = buying && !immediate;
     const blocked =
-        relayBlocks ||
-        forwardMissing ||
-        buyWaiting ||
-        buyLookupFailed ||
+        (pathTake &&
+            (relayBlocks || forwardMissing || buyWaiting || buyLookupFailed)) ||
+        (buying && (obligationsLoading || obligationsError)) ||
         expired ||
         nothingLeft ||
         (selling &&
@@ -433,7 +497,7 @@ export function TakeTradeDialog({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        {selling ? "Take sell" : "Take buy"}
+                        {policy && (immediate || selling) ? "Convert" : "Take buy"}
                     </DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
@@ -515,10 +579,11 @@ export function TakeTradeDialog({
                                                   "0",
                                               fromPrec,
                                               toPrec,
+                                              immediate,
                                           )
                                         : null;
                                 const received =
-                                    priced && buying && forward
+                                    priced && pathTake && forward
                                         ? hopFeeRaw(
                                               priced,
                                               humanToRaw(
@@ -537,9 +602,11 @@ export function TakeTradeDialog({
                                           );
                                 return (
                                     <p className="text-muted-foreground text-sm">
-                                        {selling
-                                            ? `You will be owed ${shown} ${toSymbol}.`
-                                            : `You receive ${shown} ${toSymbol}.`}
+                                        {immediate
+                                            ? `You will owe ${shown} ${toSymbol}.`
+                                            : selling
+                                              ? `You will be owed ${shown} ${toSymbol}.`
+                                              : `You receive ${shown} ${toSymbol}.`}
                                     </p>
                                 );
                             }}
@@ -554,7 +621,11 @@ export function TakeTradeDialog({
                             </Button>
                             <form.AppForm>
                                 <form.SubmitButton
-                                    labels={["Take", "Taking…"]}
+                                    labels={
+                                        immediate || selling
+                                            ? ["Convert", "Converting…"]
+                                            : ["Take", "Taking…"]
+                                    }
                                     loading={pending}
                                 />
                             </form.AppForm>

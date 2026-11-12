@@ -152,6 +152,8 @@ export function AccountDetailPage() {
         fromSymbol: string;
         fromPrecision: number;
         owedRaw: string;
+        /** True when they owe you the from-asset. */
+        posterIsCreditor: boolean;
         edit?: CurrencyPolicy;
     } | null>(null);
     const [take, setTake] = useState<{
@@ -160,6 +162,8 @@ export function AccountDetailPage() {
         fromPrecision: number;
         claimRaw: string;
         policies: CurrencyPolicy[];
+        /** True when you owe them and are taking their buy. */
+        posterIsCreditor: boolean;
     } | null>(null);
 
     const display = label(account);
@@ -423,6 +427,7 @@ export function AccountDetailPage() {
                 precisionOf={precisionOf}
                 policies={myPolicies}
                 editPolicy={offer?.edit}
+                posterIsCreditor={offer?.posterIsCreditor ?? false}
             />
             <TakeConvertDialog
                 open={!!take}
@@ -438,6 +443,7 @@ export function AccountDetailPage() {
                 policies={take?.policies ?? []}
                 assets={assets}
                 precisionOf={precisionOf}
+                posterIsCreditor={take?.posterIsCreditor ?? false}
             />
             <AccountTrades account={account} display={display} />
             {isLoading ? (
@@ -560,12 +566,52 @@ export function AccountDetailPage() {
                                               })()
                                             : undefined
                                     }
-                                    quoteNotes={quoteNotes(
-                                        theirPolicies,
-                                        g.assetId,
-                                        `${display} offers anyone who holds ${symbolOf(g.assetId)}:`,
-                                        false,
-                                    )}
+                                    quoteNotes={[
+                                        ...quoteNotes(
+                                            theirPolicies,
+                                            g.assetId,
+                                            `${display} offers anyone who holds ${symbolOf(g.assetId)}:`,
+                                            false,
+                                        ),
+                                        ...quoteNotes(
+                                            myPolicies,
+                                            g.assetId,
+                                            `You offer anyone who owes you ${symbolOf(g.assetId)}:`,
+                                            true,
+                                            (policy) =>
+                                                setOffer({
+                                                    fromAsset: g.assetId,
+                                                    fromSymbol: symbolOf(
+                                                        g.assetId,
+                                                    ),
+                                                    fromPrecision: precisionOf(
+                                                        g.assetId,
+                                                    ),
+                                                    owedRaw: g.total.toString(),
+                                                    posterIsCreditor: true,
+                                                    edit: policy,
+                                                }),
+                                        ),
+                                    ]}
+                                    onOfferRepay={
+                                        canDeal && g.total > 0n
+                                            ? () =>
+                                                  setOffer({
+                                                      fromAsset: g.assetId,
+                                                      fromSymbol: symbolOf(
+                                                          g.assetId,
+                                                      ),
+                                                      fromPrecision:
+                                                          precisionOf(
+                                                              g.assetId,
+                                                          ),
+                                                      owedRaw:
+                                                          g.total.toString(),
+                                                      posterIsCreditor: true,
+                                                  })
+                                            : undefined
+                                    }
+                                    offerTip="Post a rate so they can turn what they owe you into another asset. The budget is for everyone who owes you this asset."
                                     onConvert={
                                         canDeal &&
                                         g.total > 0n &&
@@ -598,6 +644,7 @@ export function AccountDetailPage() {
                                                               nowSec,
                                                               false,
                                                           ),
+                                                      posterIsCreditor: false,
                                                   })
                                             : undefined
                                     }
@@ -639,22 +686,69 @@ export function AccountDetailPage() {
                                         });
                                         setBookAuthOpen(true);
                                     }}
-                                    quoteNotes={quoteNotes(
-                                        myPolicies,
-                                        g.assetId,
-                                        `You offer anyone who holds ${symbolOf(g.assetId)}:`,
-                                        false,
-                                        (policy) =>
-                                            setOffer({
-                                                fromAsset: g.assetId,
-                                                fromSymbol: symbolOf(g.assetId),
-                                                fromPrecision: precisionOf(
-                                                    g.assetId,
-                                                ),
-                                                owedRaw: g.total.toString(),
-                                                edit: policy,
-                                            }),
-                                    )}
+                                    quoteNotes={[
+                                        ...quoteNotes(
+                                            theirPolicies,
+                                            g.assetId,
+                                            `${display} offers anyone who owes them ${symbolOf(g.assetId)}:`,
+                                            true,
+                                        ),
+                                        ...quoteNotes(
+                                            myPolicies,
+                                            g.assetId,
+                                            `You offer anyone who holds ${symbolOf(g.assetId)}:`,
+                                            false,
+                                            (policy) =>
+                                                setOffer({
+                                                    fromAsset: g.assetId,
+                                                    fromSymbol: symbolOf(
+                                                        g.assetId,
+                                                    ),
+                                                    fromPrecision: precisionOf(
+                                                        g.assetId,
+                                                    ),
+                                                    owedRaw: g.total.toString(),
+                                                    posterIsCreditor: false,
+                                                    edit: policy,
+                                                }),
+                                        ),
+                                    ]}
+                                    onConvert={
+                                        canDeal &&
+                                        g.total > 0n &&
+                                        liveFromPolicies(
+                                            theirPolicies,
+                                            g.assetId,
+                                            precisionOf(g.assetId),
+                                            nowSec,
+                                            true,
+                                        ).length > 0
+                                            ? () =>
+                                                  setTake({
+                                                      fromAsset: g.assetId,
+                                                      fromSymbol: symbolOf(
+                                                          g.assetId,
+                                                      ),
+                                                      fromPrecision:
+                                                          precisionOf(
+                                                              g.assetId,
+                                                          ),
+                                                      claimRaw:
+                                                          g.total.toString(),
+                                                      policies:
+                                                          liveFromPolicies(
+                                                              theirPolicies,
+                                                              g.assetId,
+                                                              precisionOf(
+                                                                  g.assetId,
+                                                              ),
+                                                              nowSec,
+                                                              true,
+                                                          ),
+                                                      posterIsCreditor: true,
+                                                  })
+                                            : undefined
+                                    }
                                     onOfferRepay={
                                         canDeal && g.total > 0n
                                             ? () =>
@@ -669,6 +763,7 @@ export function AccountDetailPage() {
                                                           ),
                                                       owedRaw:
                                                           g.total.toString(),
+                                                      posterIsCreditor: false,
                                                   })
                                             : undefined
                                     }
@@ -717,6 +812,7 @@ function AssetRelationCard({
     onEditBookAuth,
     quoteNotes,
     onOfferRepay,
+    offerTip,
     onConvert,
 }: {
     tone: "savings" | "loan";
@@ -738,6 +834,7 @@ function AssetRelationCard({
         onEdit?: () => void;
     }[];
     onOfferRepay?: () => void;
+    offerTip?: string;
     onConvert?: () => void;
 }) {
     const creditLine = g.creditLine;
@@ -887,7 +984,10 @@ function AssetRelationCard({
                 ) : null}
                 {onOfferRepay ? (
                     <AccountRowAction
-                        tip="Post a rate so they can turn this debt into another asset. The budget is for everyone who holds it on you."
+                        tip={
+                            offerTip ??
+                            "Post a rate so they can turn this debt into another asset. The budget is for everyone who holds it on you."
+                        }
                         icon={ArrowDownUp}
                         label="Offer to convert"
                         onClick={onOfferRepay}

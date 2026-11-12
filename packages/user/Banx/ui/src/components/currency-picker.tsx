@@ -33,12 +33,14 @@ export function CurrencyPicker({
     assetId,
     onAssetId,
     variant = "summary",
+    disabled = false,
 }: {
     assets: Asset[];
     assetId?: number;
     onAssetId: (id: number) => void;
-    /** `summary` is the accounts header. `field` matches a form control. */
-    variant?: "summary" | "field";
+    /** `summary` is the accounts header. `field` matches a form control. `pill` sits in an amount row. */
+    variant?: "summary" | "field" | "pill";
+    disabled?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
@@ -101,10 +103,13 @@ export function CurrencyPicker({
             <Button
                 type="button"
                 variant="outline"
+                disabled={disabled}
                 className={
-                    variant === "field"
-                        ? "h-9 w-full justify-between px-3 font-normal"
-                        : "h-auto w-full justify-between gap-3 px-3 py-2 text-left sm:w-56"
+                    variant === "pill"
+                        ? "h-8 w-auto shrink-0 gap-1 px-2.5 font-normal"
+                        : variant === "field"
+                          ? "h-9 w-full justify-between px-3 font-normal"
+                          : "h-auto w-full justify-between gap-3 px-3 py-2 text-left sm:w-56"
                 }
                 aria-haspopup="dialog"
                 aria-label={
@@ -114,17 +119,26 @@ export function CurrencyPicker({
                 }
                 onClick={() => setOpen(true)}
             >
-                {variant === "field" ? (
+                {variant === "field" || variant === "pill" ? (
                     <span className="flex min-w-0 items-center gap-1.5">
                         {glyph ? (
                             <span className="text-sm font-semibold" aria-hidden>
                                 {glyph}
                             </span>
                         ) : null}
-                        <span className="truncate font-mono text-sm font-medium">
+                        <span
+                            className={cn(
+                                "truncate font-mono text-sm font-medium",
+                                variant === "pill" &&
+                                    !selected &&
+                                    "text-muted-foreground italic",
+                            )}
+                        >
                             {selected
                                 ? selected.symbol.toUpperCase()
-                                : "Currency"}
+                                : variant === "pill"
+                                  ? "Select"
+                                  : "Currency"}
                         </span>
                     </span>
                 ) : (

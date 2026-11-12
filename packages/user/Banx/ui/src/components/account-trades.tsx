@@ -2,12 +2,14 @@ import { useState } from "react";
 
 import { formatExpiresAt } from "@/components/expires-at-picker";
 import {
+    directedDebt,
     TakeTradeDialog,
     type TakeTrade,
 } from "@/components/take-trade-dialog";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
     useCashQuotes,
+    useObligations,
     usePosterCurrencyPolicies,
     useTokenPrecisionMap,
 } from "@/hooks/use-banx-data";
@@ -49,7 +51,21 @@ export function AccountTrades({
         isLoading: quotesLoading,
         isError: quotesError,
     } = useCashQuotes(account);
+    const { data: obligations = [] } = useObligations();
     const tokenPrecisions = useTokenPrecisionMap(quotes.map((q) => q.tokenId));
+    const convertsDebt = (fromAsset: number, posterIsCreditor: boolean) => {
+        if (!posterIsCreditor) return true;
+        if (!canTake || !byId.has(fromAsset)) return false;
+        return (
+            directedDebt(
+                obligations,
+                account,
+                taker,
+                fromAsset,
+                precisionOf(fromAsset),
+            ) > 0n
+        );
+    };
     const loading = policiesLoading || quotesLoading;
     const error = policiesError || quotesError;
     const empty = policies.length === 0 && quotes.length === 0;
@@ -145,7 +161,12 @@ export function AccountTrades({
                                                     })
                                                 }
                                             >
-                                                Take
+                                                {convertsDebt(
+                                                    p.fromAsset,
+                                                    p.posterIsCreditor,
+                                                )
+                                                    ? "Convert"
+                                                    : "Take"}
                                             </Button>
                                         </TableCell>
                                     ) : null}

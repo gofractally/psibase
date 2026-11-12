@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { AssetField } from "@/components/form-fields";
 import {
@@ -90,8 +90,11 @@ function takeCapRaw(
 }
 
 /**
- * Debtor posts the from→to quote. Remaining starts as this claim and is
- * the budget for every taker, not only this counterparty.
+ * Post the from→to quote for one debt direction.
+ * `posterIsCreditor` false: you owe the from-asset.
+ * `posterIsCreditor` true: they owe you the from-asset.
+ * Remaining starts as this claim and is the budget for every taker, not only
+ * this counterparty.
  */
 export function OfferRepayDialog({
     open,
@@ -105,6 +108,7 @@ export function OfferRepayDialog({
     precisionOf,
     policies,
     editPolicy,
+    posterIsCreditor = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -112,7 +116,7 @@ export function OfferRepayDialog({
     fromAsset: number;
     fromSymbol: string;
     fromPrecision: number;
-    /** Raw units of what you owe them in `fromAsset`. */
+    /** Raw units of the from-asset claim this offer starts from. */
     owedRaw: string;
     assets: Asset[];
     precisionOf: (id: number) => number;
@@ -120,11 +124,20 @@ export function OfferRepayDialog({
     policies: CurrencyPolicy[];
     /** Existing pair to change. The to-asset stays put. */
     editPolicy?: CurrencyPolicy | null;
+    /** True when they owe you the from-asset. */
+    posterIsCreditor?: boolean;
 }) {
     const post = useSetCurrencyPolicy();
     const remove = useRemoveCurrencyPolicy();
     const owedHuman = formatRawAmount(owedRaw, fromPrecision);
     const otherAssets = assets.filter((a) => a.id !== fromAsset);
+    // useAppForm keeps the first onSubmit. The open offer changes after that.
+    const submitRef = useRef({
+        fromAsset,
+        posterIsCreditor,
+        editPolicy,
+    });
+    submitRef.current = { fromAsset, posterIsCreditor, editPolicy };
 
     const form = useAppForm({
         defaultValues: {
@@ -134,17 +147,19 @@ export function OfferRepayDialog({
         },
         onSubmit: async ({ value }) => {
             if (value.toAsset === undefined) return;
+            const current = submitRef.current;
             await new Promise<void>((resolve, reject) => {
                 post.mutate(
                     {
-                        fromAsset,
+                        fromAsset: current.fromAsset,
                         toAsset: value.toAsset!,
-                        posterIsCreditor: false,
-                        feeFixed: editPolicy?.feeFixed ?? "0",
+                        posterIsCreditor: current.posterIsCreditor,
+                        feeFixed: current.editPolicy?.feeFixed ?? "0",
                         toRate: value.toRate.trim(),
-                        toInterestRatePpm: editPolicy?.toInterestRatePpm ?? 0,
+                        toInterestRatePpm:
+                            current.editPolicy?.toInterestRatePpm ?? 0,
                         remaining: value.remaining.trim(),
-                        expiresAtSeconds: editPolicy?.expiresAt ?? 0,
+                        expiresAtSeconds: current.editPolicy?.expiresAt ?? 0,
                     },
                     {
                         onSuccess: () => {
@@ -195,12 +210,18 @@ export function OfferRepayDialog({
                     <DialogTitle>
                         {editPolicy
                             ? "Edit convert offer"
-                            : "Offer to repay in another asset"}
+                            : posterIsCreditor
+                              ? "Offer to convert"
+                              : "Offer to repay in another asset"}
                     </DialogTitle>
                     <DialogDescription>
                         {editPolicy
-                            ? `Change the rate or budget for this pair. The budget is still the cap for everyone who holds ${fromSymbol} on you.`
-                            : `${counterparty} can turn what you owe them in ${fromSymbol} into the asset you pick, at your rate. Remaining starts at this claim and is the cap for everyone who holds ${fromSymbol} on you. Posting replaces the rate you already have for debt you owe.`}
+                            ? posterIsCreditor
+                                ? `Change the rate or budget for this pair. The budget is still the cap for everyone who owes you ${fromSymbol}.`
+                                : `Change the rate or budget for this pair. The budget is still the cap for everyone who holds ${fromSymbol} on you.`
+                            : posterIsCreditor
+                              ? `${counterparty} can turn the ${fromSymbol} they owe you into the asset you pick, at your rate. Remaining starts at this claim and is the cap for everyone who owes you ${fromSymbol}. Posting replaces the rate you already have for debt you are owed.`
+                              : `${counterparty} can turn what you owe them in ${fromSymbol} into the asset you pick, at your rate. Remaining starts at this claim and is the cap for everyone who holds ${fromSymbol} on you. Posting replaces the rate you already have for debt you owe.`}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -212,7 +233,7 @@ export function OfferRepayDialog({
                     }}
                 >
                     <p className="text-muted-foreground text-sm">
-                        You owe{" "}
+                        {posterIsCreditor ? "They owe you " : "You owe "}
                         <span className="text-foreground font-mono tabular-nums">
                             {owedHuman} {fromSymbol}
                         </span>
@@ -221,7 +242,11 @@ export function OfferRepayDialog({
                         name="toAsset"
                         children={(field) => (
                             <AssetField
-                                label="They receive"
+                                label={
+                                    posterIsCreditor
+                                        ? "They will owe"
+                                        : "They receive"
+                                }
                                 assets={otherAssets}
                                 value={field.state.value}
                                 disabled={!!editPolicy}
@@ -235,6 +260,7 @@ export function OfferRepayDialog({
                                         policies,
                                         fromAsset,
                                         id,
+                                        posterIsCreditor,
                                     );
                                     if (!existing) return;
                                     form.setFieldValue(
@@ -261,6 +287,7 @@ export function OfferRepayDialog({
                                 policies,
                                 fromAsset,
                                 toAsset,
+                                posterIsCreditor,
                             );
                             return (
                                 <>
@@ -294,8 +321,10 @@ export function OfferRepayDialog({
                                                 existing.remaining,
                                                 fromPrecision,
                                             )}{" "}
-                                            {fromSymbol} of debt you owe. Posting
-                                            replaces that budget.
+                                            {fromSymbol}{" "}
+                                            {posterIsCreditor
+                                                ? "of debt owed to you. Posting replaces that budget."
+                                                : "of debt you owe. Posting replaces that budget."}
                                         </p>
                                     ) : null}
                                 </>
@@ -332,7 +361,8 @@ export function OfferRepayDialog({
                                         {
                                             fromAsset,
                                             toAsset: editPolicy.toAsset,
-                                            posterIsCreditor: false,
+                                            posterIsCreditor:
+                                                editPolicy.posterIsCreditor,
                                         },
                                         {
                                             onSuccess: () =>
@@ -381,8 +411,11 @@ export function OfferRepayDialog({
 }
 
 /**
- * Creditor takes the debtor's posted quote. Amount is capped at the
- * smaller of the claim and their remaining budget.
+ * Rebook leftover from-asset debt at the poster's quote. Amount is capped
+ * at the smaller of the claim and their remaining budget.
+ * `posterIsCreditor` false: they owe you, and you are taking their sell.
+ * `posterIsCreditor` true: you owe them, and you are taking their buy.
+ * The action is convert either way. A buy's Take stays a path payment.
  */
 export function TakeConvertDialog({
     open,
@@ -396,6 +429,7 @@ export function TakeConvertDialog({
     policies,
     assets,
     precisionOf,
+    posterIsCreditor = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -406,17 +440,36 @@ export function TakeConvertDialog({
     fromAsset: number;
     fromSymbol: string;
     fromPrecision: number;
-    /** Raw units they owe you in `fromAsset`. */
+    /** Raw units of the leftover from-asset claim. */
     claimRaw: string;
     policies: CurrencyPolicy[];
     assets: Asset[];
     precisionOf: (id: number) => number;
+    /** True when the quote is the side where they are owed the from-asset. */
+    posterIsCreditor?: boolean;
 }) {
     const convert = useConvert();
     const toChoices = assets.filter((a) =>
         policies.some((p) => p.toAsset === a.id),
     );
     const firstTo = policies[0]?.toAsset;
+    // useAppForm keeps the first onSubmit. The open claim changes after that.
+    const submitRef = useRef({
+        policies,
+        fromAsset,
+        fromPrecision,
+        counterparty,
+        posterIsCreditor,
+        precisionOf,
+    });
+    submitRef.current = {
+        policies,
+        fromAsset,
+        fromPrecision,
+        counterparty,
+        posterIsCreditor,
+        precisionOf,
+    };
 
     const form = useAppForm({
         defaultValues: {
@@ -424,22 +477,28 @@ export function TakeConvertDialog({
             amount: "",
         },
         onSubmit: async ({ value }) => {
-            const policy = policyFor(policies, fromAsset, value.toAsset);
+            const current = submitRef.current;
+            const policy = policyFor(
+                current.policies,
+                current.fromAsset,
+                value.toAsset,
+                current.posterIsCreditor,
+            );
             if (!policy || value.toAsset === undefined) return;
             const expected = applyQuotedRate(
                 value.amount.trim(),
                 policy.feeFixed,
                 policy.fxRate,
-                fromPrecision,
-                precisionOf(policy.toAsset),
+                current.fromPrecision,
+                current.precisionOf(policy.toAsset),
                 policy.posterIsCreditor,
             );
             if (!expected) return;
             await new Promise<void>((resolve, reject) => {
                 convert.mutate(
                     {
-                        counterparty,
-                        fromAsset,
+                        counterparty: current.counterparty,
+                        fromAsset: current.fromAsset,
                         toAsset: value.toAsset!,
                         amountFrom: value.amount.trim(),
                         minTo: expected,
@@ -458,7 +517,12 @@ export function TakeConvertDialog({
 
     useEffect(() => {
         if (!open || firstTo === undefined) return;
-        const policy = policyFor(policies, fromAsset, firstTo);
+        const policy = policyFor(
+            policies,
+            fromAsset,
+            firstTo,
+            posterIsCreditor,
+        );
         if (!policy) return;
         form.reset({
             toAsset: firstTo,
@@ -468,7 +532,7 @@ export function TakeConvertDialog({
             ),
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, fromAsset, claimRaw, firstTo, counterparty]);
+    }, [open, fromAsset, claimRaw, firstTo, counterparty, posterIsCreditor]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -477,8 +541,9 @@ export function TakeConvertDialog({
                     <DialogTitle>Convert this claim</DialogTitle>
                     <DialogDescription>
                         Take {counterpartyLabel ?? counterparty}&apos;s quote.
-                        This rebooks the {fromSymbol} they owe you into the
-                        asset they priced. The rate is theirs.
+                        This rebooks the {fromSymbol}{" "}
+                        {posterIsCreditor ? "you owe them" : "they owe you"}{" "}
+                        into the asset they priced. The rate is theirs.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -494,7 +559,11 @@ export function TakeConvertDialog({
                             name="toAsset"
                             children={(field) => (
                                 <AssetField
-                                    label="You receive"
+                                    label={
+                                        posterIsCreditor
+                                            ? "You will owe"
+                                            : "You receive"
+                                    }
                                     assets={toChoices}
                                     value={field.state.value}
                                     onChange={(id) => {
@@ -503,6 +572,7 @@ export function TakeConvertDialog({
                                             policies,
                                             fromAsset,
                                             id,
+                                            posterIsCreditor,
                                         );
                                         if (!policy) return;
                                         const current = String(
@@ -512,6 +582,7 @@ export function TakeConvertDialog({
                                             policies,
                                             fromAsset,
                                             field.state.value,
+                                            posterIsCreditor,
                                         );
                                         const previousDefault = previous
                                             ? formatRawAmount(
@@ -555,6 +626,7 @@ export function TakeConvertDialog({
                                 policies,
                                 fromAsset,
                                 toAsset,
+                                posterIsCreditor,
                             );
                             if (!policy) return null;
                             const toSymbol =
@@ -653,7 +725,9 @@ export function TakeConvertDialog({
                                         )}
                                     />
                                     <p className="text-muted-foreground text-sm">
-                                        You will be owed{" "}
+                                        {posterIsCreditor
+                                            ? "You will owe "
+                                            : "You will be owed "}
                                         <span className="text-foreground font-mono tabular-nums">
                                             {expected ?? "—"} {toSymbol}
                                         </span>

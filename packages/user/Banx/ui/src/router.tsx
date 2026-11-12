@@ -12,6 +12,7 @@ import { PayeesPage } from "@/pages/payees";
 import { PoliciesPage } from "@/pages/policies";
 import { RelaysPage } from "@/pages/relays";
 import { RequestsPage } from "@/pages/requests";
+import { SwapPage } from "@/pages/swap";
 
 function withGate(page: React.ReactNode) {
     return <LoginGate>{page}</LoginGate>;
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
         children: [
             { index: true, element: <Navigate to="/accounts" replace /> },
             { path: "accounts", element: withGate(<ObligationsPage />) },
+            { path: "swap", element: withGate(<SwapPage />) },
             { path: "network", element: withGate(<NetworkPage />) },
             {
                 path: "accounts/:account",

@@ -1,4 +1,5 @@
 import {
+    ArrowDownUp,
     ArrowLeftRight,
     Banknote,
     Repeat,
@@ -25,6 +26,7 @@ const items: {
     end?: boolean;
 }[] = [
     { to: "/accounts", label: "Accounts", icon: ScrollText },
+    { to: "/swap", label: "Swap", icon: ArrowDownUp },
     { to: "/network", label: "Network", icon: Waypoints },
     { to: "/requests", label: "Requests", icon: Inbox },
     { to: "/payees", label: "Payees", icon: Contact },
