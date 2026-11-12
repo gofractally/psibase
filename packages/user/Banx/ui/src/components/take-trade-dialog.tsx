@@ -2,16 +2,13 @@ import { useEffect, useRef } from "react";
 
 import { useAssetMap } from "@/hooks/use-assets";
 import {
-    useBanxRelays,
     useObligations,
-    usePosterForwardOffers,
     useTokenPrecisionMap,
 } from "@/hooks/use-banx-data";
 import {
     useCashIn,
     useCashOut,
-    useConvert,
-    usePathPay,
+    useTakeFx,
 } from "@/hooks/use-banx-mutations";
 import {
     amountPlaceholder,
@@ -20,12 +17,10 @@ import {
     humanToRaw,
     rawToFixed,
 } from "@/lib/amount";
-import { PPM_SCALE } from "@/lib/constants";
 import { amountFieldValidator, useAppForm } from "@/lib/form";
 import type {
     CashQuote,
     CurrencyPolicy,
-    ForwardOffer,
     Obligation,
 } from "@/lib/graphql";
 
@@ -68,38 +63,6 @@ export function directedDebt(
     return sum;
 }
 
-/** Stripe-style hop fee, in raw units of the hop asset. */
-function hopFeeRaw(
-    amount: bigint,
-    feeFixed: bigint,
-    feePpm: number,
-): bigint | null {
-    if (feePpm < 0 || feePpm >= PPM_SCALE || amount <= 0n) return null;
-    const after = (amount * BigInt(PPM_SCALE - feePpm)) / BigInt(PPM_SCALE);
-    if (feeFixed >= after) return null;
-    const out = after - feeFixed;
-    return out > 0n ? out : null;
-}
-
-function liveForward(
-    offers: ForwardOffer[],
-    taker: string,
-    assetId: number,
-    nowSec: number,
-): ForwardOffer | undefined {
-    const live = (offer: ForwardOffer) =>
-        offer.assetId === assetId &&
-        (offer.expiresAt === 0 || offer.expiresAt >= nowSec);
-    return (
-        offers.find(
-            (offer) =>
-                live(offer) &&
-                !offer.isGlobal &&
-                offer.nextHop.toLowerCase() === taker.toLowerCase(),
-        ) ?? offers.find((offer) => live(offer) && offer.isGlobal)
-    );
-}
-
 function quotedRaw(
     amount: string,
     fee: string,
@@ -137,22 +100,11 @@ export function TakeTradeDialog({
     const { byId, symbolOf, precisionOf } = useAssetMap();
     const cashOut = useCashOut();
     const cashIn = useCashIn();
-    const convert = useConvert();
-    const pathPay = usePathPay();
+    const takeFx = useTakeFx();
     const policy = trade?.kind === "policy" ? trade.policy : null;
     const quote = trade?.kind === "cash" ? trade.quote : null;
     const buying = policy?.posterIsCreditor === true;
     const selling = policy?.posterIsCreditor === false;
-    const {
-        data: relays = [],
-        isSuccess: relaysReady,
-        isError: relaysError,
-    } = useBanxRelays(buying ? poster : null);
-    const {
-        data: forwards = [],
-        isSuccess: forwardsReady,
-        isError: forwardsError,
-    } = usePosterForwardOffers(buying ? poster : null);
     const {
         data: obligations = [],
         isLoading: obligationsLoading,
@@ -166,15 +118,6 @@ export function TakeTradeDialog({
     const nowSec = Math.floor(Date.now() / 1000);
     const assetPrec = (id: number): number | undefined =>
         byId.has(id) ? precisionOf(id) : undefined;
-
-    const relayBlocks =
-        !!policy &&
-        buying &&
-        relays.some((relay) => {
-            const lo = Math.min(policy.fromAsset, policy.toAsset);
-            const hi = Math.max(policy.fromAsset, policy.toAsset);
-            return relay.assetLo === lo && relay.assetHi === hi;
-        });
 
     const fromPrec = policy
         ? assetPrec(policy.fromAsset)
@@ -199,8 +142,7 @@ export function TakeTradeDialog({
         selling && policy && fromPrec !== undefined
             ? directedDebt(obligations, taker, poster, policy.fromAsset, fromPrec)
             : null;
-    // A buy the taker already owes is one rebook. No new draw, so convert.
-    // Anything else still buys by a path payment.
+    // Debt already in this book is one rebook. Otherwise a buy opens both legs.
     const owedByTaker =
         buying && policy && fromPrec !== undefined
             ? directedDebt(
@@ -221,14 +163,6 @@ export function TakeTradeDialog({
               ? directCap
               : remainingRaw;
 
-    const forward =
-        buying && policy
-            ? liveForward(forwards, taker, policy.toAsset, nowSec)
-            : undefined;
-    const forwardMissing = buying && forwardsReady && !forward && !relayBlocks;
-    const buyLookupFailed = buying && (relaysError || forwardsError);
-    const buyWaiting =
-        buying && !relayBlocks && !buyLookupFailed && (!relaysReady || !forwardsReady);
     const expired =
         (!!policy && policy.expiresAt !== 0 && policy.expiresAt < nowSec) ||
         (!!quote && quote.expiresAt !== 0 && quote.expiresAt < nowSec);
@@ -262,17 +196,8 @@ export function TakeTradeDialog({
         description = "Checking what you already owe them.";
     } else if (policy && buying && immediate) {
         description = `This rebooks ${fromSymbol} you already owe ${display} into ${toSymbol} at their price.`;
-    } else if (buyLookupFailed) {
-        description = `Couldn't check ${display}'s pool or path forwarding.`;
-    } else if (buyWaiting) {
-        description = "Checking this order.";
-    } else if (policy && buying && relayBlocks) {
-        description = `A pool prices payments between ${fromSymbol} and ${toSymbol}, so this buy is not taken as a payment.`;
     } else if (policy && buying) {
-        description = `You owe ${display} the ${fromSymbol} you take, and they owe you ${toSymbol}. This needs a ${fromSymbol} line from them, a ${toSymbol} line from you, and their path forwarding in ${toSymbol}.`;
-        if (forwardMissing) {
-            description = `${description} They are not forwarding ${toSymbol}, so this take cannot land.`;
-        }
+        description = `You owe ${display} the ${fromSymbol} you take, and they owe you ${toSymbol}, both at their order rate. This needs a ${fromSymbol} line from them and a ${toSymbol} line from you.`;
     } else if (policy && selling && obligationsError) {
         description = "Couldn't load what they owe you.";
     } else if (policy && selling && obligationsLoading) {
@@ -309,98 +234,28 @@ export function TakeTradeDialog({
     submitRef.current = async () => {
         const amount = String(form.state.values.amount ?? "").trim();
         if (!amount || fromPrec === undefined || toPrec === undefined) return;
-        if (policy && buying && immediate) {
+        if (policy) {
+            // Existing from-debt adds the fee onto what the debtor will owe.
+            // A new book and a sell subtract it from what the taker receives.
             const received = quotedRaw(
                 amount,
                 policy.feeFixed,
                 policy.fxRate,
                 fromPrec,
                 toPrec,
-                true,
+                immediate,
             );
             if (!received) {
                 toast.error("That amount is too small at their rate.");
                 return;
             }
             await new Promise<void>((resolve, reject) => {
-                convert.mutate(
+                takeFx.mutate(
                     {
-                        counterparty: poster,
+                        poster,
                         fromAsset: policy.fromAsset,
                         toAsset: policy.toAsset,
-                        amountFrom: amount,
-                        minTo: rawToFixed(received, toPrec),
-                    },
-                    {
-                        onSuccess: () => {
-                            onOpenChange(false);
-                            resolve();
-                        },
-                        onError: (e: Error) => reject(e),
-                    },
-                );
-            });
-            return;
-        }
-        if (policy && buying) {
-            if (!forward || relayBlocks) return;
-            const priced = quotedRaw(
-                amount,
-                policy.feeFixed,
-                policy.fxRate,
-                fromPrec,
-                toPrec,
-            );
-            const received = priced
-                ? hopFeeRaw(
-                      priced,
-                      humanToRaw(forward.feeFixed || "0", toPrec),
-                      forward.feePercentPpm,
-                  )
-                : null;
-            if (!received) {
-                toast.error("That amount is too small at their rate.");
-                return;
-            }
-            await new Promise<void>((resolve, reject) => {
-                pathPay.mutate(
-                    {
-                        hops: [
-                            { account: poster, assetId: policy.fromAsset },
-                            { account: taker, assetId: policy.toAsset },
-                        ],
-                        amount,
-                        minReturn: rawToFixed(received, toPrec),
-                    },
-                    {
-                        onSuccess: () => {
-                            onOpenChange(false);
-                            resolve();
-                        },
-                        onError: (e: Error) => reject(e),
-                    },
-                );
-            });
-            return;
-        }
-        if (policy && selling) {
-            const received = quotedRaw(
-                amount,
-                policy.feeFixed,
-                policy.fxRate,
-                fromPrec,
-                toPrec,
-            );
-            if (!received) {
-                toast.error("That amount is too small at their rate.");
-                return;
-            }
-            await new Promise<void>((resolve, reject) => {
-                convert.mutate(
-                    {
-                        counterparty: poster,
-                        fromAsset: policy.fromAsset,
-                        toAsset: policy.toAsset,
+                        posterIsCreditor: policy.posterIsCreditor,
                         amountFrom: amount,
                         minTo: rawToFixed(received, toPrec),
                     },
@@ -469,10 +324,7 @@ export function TakeTradeDialog({
         capRaw === 0n &&
         !(selling && (obligationsLoading || obligationsError || claimRaw === 0n)) &&
         !(buying && (obligationsLoading || obligationsError));
-    const pathTake = buying && !immediate;
     const blocked =
-        (pathTake &&
-            (relayBlocks || forwardMissing || buyWaiting || buyLookupFailed)) ||
         (buying && (obligationsLoading || obligationsError)) ||
         expired ||
         nothingLeft ||
@@ -487,17 +339,14 @@ export function TakeTradeDialog({
             ? ""
             : formatRawAmount(capRaw.toString(), fromPrec);
     const pending =
-        cashOut.isPending ||
-        cashIn.isPending ||
-        convert.isPending ||
-        pathPay.isPending;
+        cashOut.isPending || cashIn.isPending || takeFx.isPending;
 
     return (
         <Dialog open={trade !== null} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        {policy && (immediate || selling) ? "Convert" : "Take buy"}
+                        {policy && (immediate || selling) ? "Convert" : "Take"}
                     </DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
@@ -567,7 +416,7 @@ export function TakeTradeDialog({
                         <form.Subscribe
                             selector={(s) => s.values.amount}
                             children={(amount) => {
-                                const priced =
+                                const received =
                                     policy || quote
                                         ? quotedRaw(
                                               String(amount ?? ""),
@@ -582,17 +431,6 @@ export function TakeTradeDialog({
                                               immediate,
                                           )
                                         : null;
-                                const received =
-                                    priced && pathTake && forward
-                                        ? hopFeeRaw(
-                                              priced,
-                                              humanToRaw(
-                                                  forward.feeFixed || "0",
-                                                  toPrec,
-                                              ),
-                                              forward.feePercentPpm,
-                                          )
-                                        : priced;
                                 const shown =
                                     received === null
                                         ? "—"

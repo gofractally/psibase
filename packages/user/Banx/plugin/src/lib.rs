@@ -42,6 +42,7 @@ define_trust! {
         ",
         High => "
             - Path-pay (draw on others' credit along a path)
+            - Take an FX order that can draw both lines
             - Pay an invoice along a path (max spend)
             - Run a repeating payment (draws the payer)
             - cash_out (draw Banx, receive tokens)
@@ -97,6 +98,7 @@ define_trust! {
             add_asset,
         ],
         High => [
+            take_fx,
             path_pay,
             pay_inv,
             run_pay_auth,
@@ -766,6 +768,29 @@ impl Api for BanxPlugin {
         }
         .packed();
         add_action_to_transaction(banx::action_structs::convert::ACTION_NAME, &packed)
+    }
+
+    fn take_fx(
+        poster: String,
+        from_asset: u16,
+        to_asset: u16,
+        poster_is_creditor: bool,
+        amount_from: String,
+        min_to: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::take_fx)?;
+        let amount_from = parse_amount_nonzero(from_asset, &amount_from)?;
+        let min_to = parse_amount(to_asset, &min_to)?;
+        let packed = banx::action_structs::take_fx {
+            poster: parse_account(&poster)?,
+            from_asset,
+            to_asset,
+            poster_is_creditor,
+            amount_from,
+            min_to,
+        }
+        .packed();
+        add_action_to_transaction(banx::action_structs::take_fx::ACTION_NAME, &packed)
     }
 
     fn path_pay(

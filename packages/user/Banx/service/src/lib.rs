@@ -724,6 +724,33 @@ pub mod service {
         );
     }
 
+    /// Take the clicked from→to order. `poster_is_creditor` selects the row.
+    ///
+    /// A buy rebooks from-asset the sender still owes the poster. If the poster
+    /// already owes the sender that asset, the two legs still open and that
+    /// claim nets as unwind. A sell only rebooks from-asset the poster owes
+    /// the sender. `min_to` is a floor on a new book and on a claim the sender
+    /// receives; a positive `min_to` caps new debt on a rebook the sender owes.
+    #[action]
+    fn take_fx(
+        poster: AccountNumber,
+        from_asset: u16,
+        to_asset: u16,
+        poster_is_creditor: bool,
+        amount_from: Quantity,
+        min_to: Quantity,
+    ) {
+        CurrencyPolicy::take_order(
+            get_sender(),
+            poster,
+            from_asset,
+            to_asset,
+            poster_is_creditor,
+            amount_from,
+            min_to,
+        );
+    }
+
     /// Book a **deposit**: sender receives value and credits `depositor`, then
     /// **auto-nets** mutual obligations for this asset.
     ///
@@ -983,7 +1010,7 @@ pub mod service {
     ///   `convert` | `credit_line` | `rm_credit_line` | `book_auth` |
     ///   `rm_book_auth` | `sell_claim` | `buy_claim` | `invoice` |
     ///   `please_book` | `fulfill` | `req_cancel` |
-    ///   `forgive` | `cash_out` | `cash_in` | `relay`
+    ///   `forgive` | `cash_out` | `cash_in` | `relay` | `take`
     /// - `amount`: primary quantity (human decimal at `asset_id` precision)
     /// - `netted`: auto-net cancelled; convert/`path_pay` output at `other_asset_id`
     /// - `other_asset_id`: convert/`path_pay` destination asset; else same as `asset_id`

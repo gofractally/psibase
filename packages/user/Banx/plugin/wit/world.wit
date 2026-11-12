@@ -321,6 +321,19 @@ interface api {
         min-to: string,
     ) -> result<_, error>;
 
+    /// Take the clicked from→to order. `poster-is-creditor` is that row.
+    /// A buy rebooks from-asset you already owe them. Their claim on you in
+    /// that asset does not switch this to the sell. `min-to` is a human
+    /// decimal in the to-asset.
+    take-fx: func(
+        poster: string,
+        from-asset: u16,
+        to-asset: u16,
+        poster-is-creditor: bool,
+        amount-from: string,
+        min-to: string,
+    ) -> result<_, error>;
+
     /// Multi-hop path payment. Each hop is (account, asset-id).
     /// Amounts are human decimal strings in the first/last hop assets respectively.
     /// `request-id` 0 = none; otherwise an invoice you are fulfilling (last hop

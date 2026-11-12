@@ -2176,6 +2176,298 @@ mod tests {
         Ok(())
     }
 
+    /// John ate 6 Weet-Bix and charged the car 12 kWh at Michelle's.
+    /// Both path-pays stay in the consumed asset and stop on Michelle,
+    /// so Isabelle is the debtor of both claims. Isabelle then books
+    /// the 4 kWh she owes John, which nets his charge down to 8 kWh.
+    /// That book does not touch what she still owes her mum.
+    ///
+    /// Michelle's kWh→AUD buy is a rebook of the from-asset the taker
+    /// still owes her. John does not owe her kWh, so he cannot take it.
+    /// Isabelle does. 12 kWh at $0.30 become $3.60 of AUD she owes mum.
+    /// John still owes Isabelle the leftover 8 kWh. The biscuits stay
+    /// where the path left them.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_isabelle_trades_mums_kwh_john_keeps_his(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let john = account!("john");
+        let isabelle = account!("isabelle");
+        let michelle = account!("michelle");
+        for a in [john, isabelle, michelle] {
+            chain.new_account(a).unwrap();
+        }
+        let weetbix = Asset::get_by_symbol_assert(account!("weetbix")).id;
+        let kwh = Asset::get_by_symbol_assert(account!("kwh")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        assert_eq!(Asset::get_assert(weetbix).precision.value(), 0);
+        assert_eq!(Asset::get_assert(kwh).precision.value(), 3);
+        assert_eq!(Asset::get_assert(aud).precision.value(), 4);
+
+        // kWh is precision 3, AUD is precision 4. $0.30 is 3_000 raw per 1_000 raw kWh.
+        const BISCUITS: u64 = 6;
+        const KWH: u64 = 1_000;
+        const CHARGE: u64 = 12 * KWH;
+        const ISABELLE_OWES_JOHN: u64 = 4 * KWH;
+        const JOHN_KEEPS: u64 = 8 * KWH;
+        const AUD_PER_KWH: u64 = 3_000;
+        let rate = AUD_PER_KWH * RATE_SCALE / KWH;
+        let quoted_aud = AUD_PER_KWH * 12;
+
+        Wrapper::push_from(&chain, isabelle)
+            .st_crd_lne(john, weetbix, Quantity::new(BISCUITS), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, michelle)
+            .st_crd_lne(isabelle, weetbix, Quantity::new(BISCUITS), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .st_crd_lne(john, kwh, Quantity::new(CHARGE), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, michelle)
+            .st_crd_lne(isabelle, kwh, Quantity::new(CHARGE), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .st_glb_fwd(weetbix, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .st_glb_fwd(kwh, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        Wrapper::push_from(&chain, john)
+            .path_pay(
+                vec![hop(isabelle, weetbix), hop(michelle, weetbix)],
+                Quantity::new(BISCUITS),
+                Quantity::new(BISCUITS),
+                0,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .path_pay(
+                vec![hop(isabelle, kwh), hop(michelle, kwh)],
+                Quantity::new(CHARGE),
+                Quantity::new(CHARGE),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, weetbix), BISCUITS);
+        assert_eq!(exp(&chain, michelle, isabelle, weetbix), BISCUITS);
+        assert_eq!(exp(&chain, isabelle, john, kwh), CHARGE);
+        assert_eq!(exp(&chain, michelle, isabelle, kwh), CHARGE);
+        assert_eq!(exp(&chain, michelle, john, kwh), 0);
+        assert_eq!(exp(&chain, michelle, john, weetbix), 0);
+
+        // Isabelle owes John 4 kWh. Debtor-signed, so it nets his claim to 8.
+        Wrapper::push_from(&chain, isabelle)
+            .deposit(john, kwh, Quantity::new(ISABELLE_OWES_JOHN), 0, 0)
+            .get()?;
+        assert_eq!(exp(&chain, isabelle, john, kwh), JOHN_KEEPS);
+        assert_eq!(exp(&chain, john, isabelle, kwh), 0);
+        assert_eq!(exp(&chain, michelle, isabelle, kwh), CHARGE);
+
+        Wrapper::push_from(&chain, michelle)
+            .st_cur_pol(
+                kwh,
+                aud,
+                true,
+                Quantity::new(0),
+                rate,
+                0,
+                Quantity::new(CHARGE),
+                never(),
+            )
+            .get()?;
+
+        let john_takes = Wrapper::push_from(&chain, john)
+            .take_fx(
+                michelle,
+                kwh,
+                aud,
+                true,
+                Quantity::new(CHARGE),
+                Quantity::new(quoted_aud),
+            )
+            .get()
+            .expect_err("John does not owe Michelle the kWh");
+        // A buy with no existing debt opens both legs. John has no AUD line
+        // to Michelle, so the from-leg cannot book.
+        assert!(
+            john_takes
+                .to_string()
+                .contains("insufficient path capacity (line + reverse claim)"),
+            "{john_takes}"
+        );
+        let john_converts = Wrapper::push_from(&chain, john)
+            .convert(
+                michelle,
+                kwh,
+                aud,
+                Quantity::new(CHARGE),
+                Quantity::new(quoted_aud),
+            )
+            .get()
+            .expect_err("John does not owe Michelle the kWh");
+        assert!(
+            john_converts
+                .to_string()
+                .contains("nothing to convert in from_asset"),
+            "{john_converts}"
+        );
+        assert_eq!(exp(&chain, isabelle, john, kwh), JOHN_KEEPS);
+        assert_eq!(exp(&chain, michelle, isabelle, kwh), CHARGE);
+        assert_eq!(exp(&chain, michelle, john, aud), 0);
+        assert_eq!(exp(&chain, michelle, john, kwh), 0);
+        assert_eq!(
+            CurrencyPolicy::get(michelle, kwh, aud, true)
+                .unwrap()
+                .remaining
+                .value,
+            CHARGE
+        );
+
+        Wrapper::push_from(&chain, isabelle)
+            .take_fx(
+                michelle,
+                kwh,
+                aud,
+                true,
+                Quantity::new(CHARGE),
+                Quantity::new(quoted_aud),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, michelle, isabelle, kwh), 0);
+        assert_eq!(exp(&chain, michelle, isabelle, aud), quoted_aud);
+        assert_eq!(exp(&chain, isabelle, michelle, aud), 0);
+        assert_eq!(exp(&chain, isabelle, john, kwh), JOHN_KEEPS);
+        assert_eq!(exp(&chain, john, isabelle, kwh), 0);
+        assert_eq!(exp(&chain, michelle, john, kwh), 0);
+        assert_eq!(exp(&chain, michelle, john, aud), 0);
+        assert_eq!(exp(&chain, isabelle, john, weetbix), BISCUITS);
+        assert_eq!(exp(&chain, michelle, isabelle, weetbix), BISCUITS);
+        assert!(CurrencyPolicy::get(michelle, kwh, aud, true).is_none());
+        Ok(())
+    }
+
+    /// John likes Michelle's $0.30 and wants the dollars back through Isabelle.
+    ///
+    /// The kWh lines are 50, not the 12 already drawn by the visit. Michelle
+    /// forwards AUD to Isabelle, Isabelle has lined her $100, Isabelle forwards
+    /// AUD to John, and John has lined her $100. Isabelle also forwards the
+    /// kWh on to mum, which the same-asset hop needs.
+    ///
+    /// The path draws new claims. It does not rebook anything John already
+    /// owes, and it does not make him owe Michelle the kWh. 20 kWh becomes
+    /// $6.00 of AUD that lands on him, with Isabelle holding both middle books.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_john_borrows_mums_kwh_rate_back_through_isabelle(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let john = account!("john");
+        let isabelle = account!("isabelle");
+        let michelle = account!("michelle");
+        for a in [john, isabelle, michelle] {
+            chain.new_account(a).unwrap();
+        }
+        let kwh = Asset::get_by_symbol_assert(account!("kwh")).id;
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+
+        // kWh precision 3, AUD precision 4. $0.30 is 3_000 raw per 1_000 raw kWh.
+        // $100 is 1_000_000 raw.
+        const KWH: u64 = 1_000;
+        const LINE: u64 = 50 * KWH;
+        const TRADE: u64 = 20 * KWH;
+        const AUD_LINE: u64 = 1_000_000;
+        const AUD_PER_KWH: u64 = 3_000;
+        let rate = AUD_PER_KWH * RATE_SCALE / KWH;
+        let quoted_aud = AUD_PER_KWH * 20;
+
+        Wrapper::push_from(&chain, isabelle)
+            .st_crd_lne(john, kwh, Quantity::new(LINE), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, michelle)
+            .st_crd_lne(isabelle, kwh, Quantity::new(LINE), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .st_crd_lne(michelle, aud, Quantity::new(AUD_LINE), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(isabelle, aud, Quantity::new(AUD_LINE), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .st_fwd_ofr(michelle, kwh, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, michelle)
+            .st_fwd_ofr(isabelle, aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, isabelle)
+            .st_fwd_ofr(john, aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, michelle)
+            .st_cur_pol(
+                kwh,
+                aud,
+                true,
+                Quantity::new(0),
+                rate,
+                0,
+                Quantity::new(LINE),
+                never(),
+            )
+            .get()?;
+
+        // Her rate is not a take he can sign. He does not owe her kWh, and she
+        // has not lined him, so opening both legs has no from-asset capacity.
+        let john_takes = Wrapper::push_from(&chain, john)
+            .take_fx(
+                michelle,
+                kwh,
+                aud,
+                true,
+                Quantity::new(TRADE),
+                Quantity::new(quoted_aud),
+            )
+            .get()
+            .expect_err("the buy is a rebook of debt John does not owe");
+        assert!(
+            john_takes
+                .to_string()
+                .contains("insufficient path capacity (line + reverse claim)"),
+            "{john_takes}"
+        );
+
+        Wrapper::push_from(&chain, john)
+            .path_pay(
+                vec![
+                    hop(isabelle, kwh),
+                    hop(michelle, kwh),
+                    hop(isabelle, aud),
+                    hop(john, aud),
+                ],
+                Quantity::new(TRADE),
+                Quantity::new(quoted_aud),
+                0,
+            )
+            .get()?;
+
+        assert_eq!(exp(&chain, isabelle, john, kwh), TRADE);
+        assert_eq!(exp(&chain, michelle, isabelle, kwh), TRADE);
+        assert_eq!(exp(&chain, isabelle, michelle, aud), quoted_aud);
+        assert_eq!(exp(&chain, john, isabelle, aud), quoted_aud);
+        assert_eq!(exp(&chain, michelle, john, kwh), 0);
+        assert_eq!(exp(&chain, michelle, john, aud), 0);
+        assert_eq!(exp(&chain, michelle, isabelle, aud), 0);
+        assert_eq!(exp(&chain, john, isabelle, kwh), 0);
+        assert_eq!(
+            CurrencyPolicy::get(michelle, kwh, aud, true)
+                .unwrap()
+                .remaining
+                .value,
+            LINE - TRADE
+        );
+        Ok(())
+    }
+
     #[psibase::test_case(packages("Banx"))]
     fn test_path_pay_fx_after_full_reverse_net(
         chain: psibase::Chain,
@@ -8950,6 +9242,173 @@ mod tests {
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
 
+        Ok(())
+    }
+
+    /// No from-asset debt. A buy books both legs at the order rate.
+    /// Lines are capacity. The line APR is not the claim rate. No forward offer.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_take_fx_books_both_legs_at_order_rate(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(gary, aud, Quantity::new(1_000), false, 100_000, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(
+                aud,
+                usd,
+                true,
+                Quantity::new(10),
+                RATE_SCALE / 2,
+                0,
+                Quantity::new(200),
+                never(),
+            )
+            .get()?;
+
+        let missing = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(45))
+            .get()
+            .expect_err("Gary has not lined Alice in USD");
+        assert!(
+            missing
+                .to_string()
+                .contains("insufficient path capacity (line + reverse claim)"),
+            "{missing}"
+        );
+        assert_eq!(exp(&chain, alice, gary, aud), 0);
+
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(1_000), false, 80_000, 0)
+            .get()?;
+        let short = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(46))
+            .get()
+            .expect_err("fee leaves 45, below the signed floor");
+        assert!(
+            short.to_string().contains("trade output below min_to"),
+            "{short}"
+        );
+
+        Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(45))
+            .get()?;
+        // 100 − 10 fee, then half. Order APR is 0, not either line's rate.
+        assert_eq!(exp(&chain, alice, gary, aud), 100);
+        assert_eq!(exp(&chain, gary, alice, usd), 45);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, alice, gary, usd), 0);
+        assert_eq!(
+            Obligation::get_by_interest_rate(alice, gary, aud, 0)
+                .unwrap()
+                .interest_rate,
+            0
+        );
+        assert_eq!(
+            Obligation::get_by_interest_rate(gary, alice, usd, 0)
+                .unwrap()
+                .interest_rate,
+            0
+        );
+        Ok(())
+    }
+
+    /// Leftover debt is a rebook, not a second pair of claims.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_take_fx_rebooks_existing_debt(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(gary, aud, Quantity::new(1_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .path_pay(
+                vec![hop(alice, aud)],
+                Quantity::new(100),
+                Quantity::new(100),
+                0,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(
+                aud,
+                usd,
+                true,
+                Quantity::new(0),
+                RATE_SCALE / 2,
+                0,
+                Quantity::new(100),
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(50))
+            .get()?;
+        assert_eq!(exp(&chain, alice, gary, aud), 0);
+        assert_eq!(exp(&chain, alice, gary, usd), 50);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
+        Ok(())
+    }
+
+    /// One unit the poster already owes must not turn a buy into a sell.
+    /// No sell row exists. The buy still opens, and that unit nets on the from-leg.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_take_fx_buy_nets_reverse_claim(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(gary, aud, Quantity::new(1_000), false, 100_000, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(1_000), false, 80_000, 0)
+            .get()?;
+        // Alice owes Gary 1 AUD. That must not select a sell.
+        Wrapper::push_from(&chain, alice)
+            .deposit(gary, aud, Quantity::new(1), 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_cur_pol(
+                aud,
+                usd,
+                true,
+                Quantity::new(0),
+                RATE_SCALE / 2,
+                0,
+                Quantity::new(200),
+                never(),
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(50))
+            .get()?;
+        assert_eq!(exp(&chain, alice, gary, aud), 99);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 50);
+        assert_eq!(exp(&chain, alice, gary, usd), 0);
+        assert!(CurrencyPolicy::get(alice, aud, usd, false).is_none());
         Ok(())
     }
 

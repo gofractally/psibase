@@ -122,6 +122,26 @@ impl Connection {
         self.credit_and_net(amount, interest_rate)
     }
 
+    /// Book `amount` on this directed pair at `interest_rate`, then auto-net.
+    ///
+    /// Same capacity rules as a path draw. The rate is the order's, not the
+    /// line's. Does not emit a path hop: the caller records the trade.
+    pub fn book_at_rate(mut self, amount: Quantity, interest_rate: i32) {
+        assert!(amount.value > 0, "trade amount must be positive");
+        assert!(
+            amount.value <= self.capacity(),
+            "insufficient path capacity (line + reverse claim)"
+        );
+        let new_draw = self.new_draw(amount);
+        if new_draw > 0 {
+            self.line
+                .as_mut()
+                .expect("credit line required for new trade draw")
+                .consume_remaining(Quantity::new(new_draw));
+        }
+        self.credit_and_net(amount, interest_rate);
+    }
+
     /// Reduce this leftover claim by `take` and credit the same pair in
     /// `to_asset`. Caller must already have netted `from_asset`.
     ///

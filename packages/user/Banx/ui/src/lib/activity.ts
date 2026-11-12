@@ -19,6 +19,7 @@ const PAYMENT_KINDS = new Set([
     "cash_out",
     "cash_in",
     "relay",
+    "take",
     "fulfill",
 ]);
 const CLAIM_KINDS = new Set(["sell_claim", "buy_claim"]);
@@ -68,6 +69,8 @@ export function kindLabel(kind: string): string {
             return "Write-off";
         case "convert":
             return "Convert";
+        case "take":
+            return "Trade";
         case "cash_out":
             return "Cash out";
         case "cash_in":
@@ -187,6 +190,17 @@ export function describeEvent(
                 title: `Converted ${qty(e.amount, sym)} → ${qty(e.netted, otherSym)}`,
                 detail: `Rebook · ${other}`,
             };
+        case "take": {
+            // amount is from-asset the taker owes the poster. netted is
+            // to-asset the poster owes the taker. actor is the taker.
+            const title = you
+                ? `You owe ${other} ${qty(e.amount, sym)}`
+                : `${other} owes you ${qty(e.amount, sym)}`;
+            const detail = you
+                ? `${other} owes you ${qty(e.netted, otherSym)}`
+                : `You owe ${other} ${qty(e.netted, otherSym)}`;
+            return { title, detail };
+        }
         case "cash_out":
             return {
                 title: you

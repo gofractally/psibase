@@ -1152,6 +1152,33 @@ export function useConvert() {
     });
 }
 
+export function useTakeFx() {
+    const invalidate = useInvalidateBanx();
+    return useMutation({
+        mutationFn: async (p: {
+            poster: string;
+            fromAsset: number;
+            toAsset: number;
+            posterIsCreditor: boolean;
+            amountFrom: string;
+            minTo: string;
+        }) =>
+            banxCall("takeFx", [
+                p.poster,
+                p.fromAsset,
+                p.toAsset,
+                p.posterIsCreditor,
+                p.amountFrom,
+                p.minTo,
+            ]),
+        onSuccess: () => {
+            invalidate();
+            toast.success("Trade taken");
+        },
+        onError: (e: Error) => toast.error(e.message),
+    });
+}
+
 export function useSetRelay() {
     const invalidate = useInvalidateBanx();
     return useMutation({

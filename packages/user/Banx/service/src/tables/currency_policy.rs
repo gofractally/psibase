@@ -204,4 +204,68 @@ impl CurrencyPolicy {
         );
         to_qty
     }
+
+    /// Take the clicked from→to order. `poster_is_creditor` is that row.
+    ///
+    /// A buy rebooks from-asset the taker still owes the poster. A reverse
+    /// claim (the poster already owes the taker) is not that order: the two
+    /// legs open, and [`Connection::book_at_rate`] nets it as unwind. A sell
+    /// only rebooks from-asset the poster owes the taker. It does not open a
+    /// book. Both new claims use the order's APR. Lines are capacity only.
+    pub fn take_order(
+        taker: AccountNumber,
+        poster: AccountNumber,
+        from_asset: u16,
+        to_asset: u16,
+        poster_is_creditor: bool,
+        amount_from: Quantity,
+        min_to: Quantity,
+    ) {
+        assert!(taker != poster, "cannot take an order with self");
+        assert!(amount_from.value > 0, "trade amount must be positive");
+        Obligation::net_pair(taker, poster, from_asset, u64::MAX.into());
+        let taker_owes = Obligation::exposure(poster, taker, from_asset).value;
+        let poster_owes = Obligation::exposure(taker, poster, from_asset).value;
+        if poster_is_creditor && taker_owes > 0 {
+            Self::get_assert(poster, from_asset, to_asset, true).convert(
+                taker,
+                poster,
+                amount_from,
+                min_to,
+            );
+            return;
+        }
+        if !poster_is_creditor {
+            assert!(poster_owes > 0, "nothing to convert in from_asset");
+            Self::get_assert(poster, from_asset, to_asset, false).convert(
+                taker,
+                poster,
+                amount_from,
+                min_to,
+            );
+            return;
+        }
+
+        let mut pol = Self::get_assert(poster, from_asset, to_asset, true);
+        let to_qty = pol.apply(amount_from);
+        assert!(
+            to_qty.value >= min_to.value,
+            "trade output below min_to"
+        );
+        pol.spend(amount_from);
+        let rate = pol.to_interest_rate as i32;
+        Connection::get_live(poster, taker, from_asset).book_at_rate(amount_from, rate);
+        Connection::get_live(taker, poster, to_asset).book_at_rate(to_qty, rate);
+        emit_pair_activity(
+            taker,
+            poster,
+            from_asset,
+            "take",
+            amount_from,
+            to_qty,
+            to_asset,
+            0,
+            "",
+        );
+    }
 }

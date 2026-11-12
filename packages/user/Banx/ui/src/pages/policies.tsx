@@ -607,9 +607,10 @@ export function PoliciesPage() {
                     <DialogHeader className="pr-8">
                         <DialogTitle>Place an order</DialogTitle>
                         <DialogDescription>
-                            A buy is filled when someone owes you that asset. A
-                            sell converts a debt you already owe. Pick a token
-                            on one side to trade it for an IOU.
+                            A buy is filled by someone who already owes you, or
+                            by opening both sides when you have lined each other.
+                            A sell only converts a debt you already owe. Pick a
+                            token on one side to trade it for an IOU.
                         </DialogDescription>
                     </DialogHeader>
                     <form

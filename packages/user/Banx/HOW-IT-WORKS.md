@@ -330,9 +330,11 @@ Anyone posts `st_cur_pol`: from-asset → to-asset, fixed fee in from-asset, `fx
 
 `to = (from − fee_fixed) × fx_rate / RATE_SCALE`.
 
-**`convert`** is a take: the other party uses the **counterparty’s** live quote (the poster must be one of the two parties). Nets `from_asset` first, rebooks leftover at that offer, then auto-nets `to_asset`. You cannot re-denominate a claim at a rate you set yourself.
+**`convert`** rebooks leftover from-asset debt at the counterparty’s live quote. You cannot re-denominate a claim at a rate you set yourself.
 
-**Path pay** does not call `convert`. It only uses the middle man’s quote to size the next hop.
+**`take_fx`** is the order take. Leftover from-asset debt is the same rebook. With none, a buy books both legs at the order’s APR: the taker owes the poster the from-asset, and the poster owes the taker the priced to-asset. Each leg needs that party’s line as capacity. No path and no hop fee. A pool for the pair does not price this take.
+
+**Path pay** does not call `convert` or `take_fx`. It only uses the middle man’s quote to size the next hop.
 
 ---
 
