@@ -213,8 +213,8 @@ impl FxOffer {
     ///
     /// `to_bound` is the taker's signed net in the to-asset. Positive floors
     /// a receipt and rejects any debt. Negative caps a debt; a receipt still
-    /// passes. Zero on a split is a wash: any debt is rejected. Zero on a
-    /// click that is only a rebook or only a new trade does not bound.
+    /// passes. Zero on a buy is a wash: any debt is rejected, including a
+    /// click that has become a pure rebook. Zero on a sell does not bound.
     pub fn take_order(
         taker: AccountNumber,
         poster: AccountNumber,
@@ -242,8 +242,9 @@ impl FxOffer {
             return;
         }
         if poster_is_creditor && taker_owes.value > 0 {
-            // A receipt floor cannot be met by a click that is only debt.
-            assert!(to_bound <= 0, "trade output below min_to");
+            // A pure rebook is all debt. A receipt floor and a signed wash
+            // both require net >= 0, so neither can pass here.
+            assert!(to_bound < 0, "trade output below min_to");
             Self::get_assert(poster, from_asset, to_asset, true).convert(
                 taker,
                 poster,

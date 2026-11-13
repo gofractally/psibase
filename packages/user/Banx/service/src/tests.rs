@@ -9575,6 +9575,28 @@ mod tests {
             "{wash}"
         );
         assert_eq!(exp(&chain, alice, gary, aud), 51);
+
+        // The wash has to hold after the debt covers the whole click. A pure
+        // rebook is debt, so 0 is not an open cap.
+        Wrapper::push_from(&chain, gary)
+            .path_pay(
+                vec![hop(alice, aud)],
+                Quantity::new(49),
+                Quantity::new(49),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, alice, gary, aud), 100);
+        let covered = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 0)
+            .get()
+            .expect_err("a signed wash cannot fill as a pure rebook");
+        assert!(
+            covered.to_string().contains("trade output below min_to"),
+            "{covered}"
+        );
+        assert_eq!(exp(&chain, alice, gary, aud), 100);
+        assert_eq!(exp(&chain, alice, gary, usd), 0);
         Ok(())
     }
 

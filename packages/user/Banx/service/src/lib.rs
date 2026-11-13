@@ -767,8 +767,8 @@ pub mod service {
     /// unwind. A sell only rebooks from-asset the poster owes the sender.
     /// `to_bound` is the sender's signed net in the to-asset. Positive floors
     /// a receipt and rejects any debt. Negative caps a debt; a receipt still
-    /// passes. Zero on a split is a wash: any debt is rejected. Zero on a
-    /// click that is only a rebook or only a new trade does not bound.
+    /// passes. Zero on a buy is a wash: any debt is rejected, including a
+    /// click that has become a pure rebook. Zero on a sell does not bound.
     #[action]
     fn take_fx(
         poster: AccountNumber,
