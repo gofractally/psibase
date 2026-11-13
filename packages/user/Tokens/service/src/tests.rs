@@ -552,4 +552,126 @@ mod tests {
 
         Ok(())
     }
+
+    fn get_icon_hash(
+        chain: &psibase::Chain,
+        token_id: u32,
+    ) -> Result<Option<Checksum256>, psibase::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct TokenIcon {
+            icon_hash: Option<Checksum256>,
+        }
+        #[derive(serde::Deserialize)]
+        struct TokenData {
+            token: TokenIcon,
+        }
+
+        let query = format!(r#"query {{ token(tokenId: "{token_id}") {{ iconHash }} }}"#);
+        let response: Response<TokenData> = chain.graphql(Wrapper::SERVICE, &query)?;
+        if let Some(errors) = response.errors {
+            return Err(anyhow!("GraphQL error: {}", errors[0].message).into());
+        }
+        Ok(response.data.unwrap().token.icon_hash)
+    }
+
+    /// PNG header with the given dimensions; enough for `setIcon`'s checks
+    fn png_header(width: u32, height: u32) -> Vec<u8> {
+        let mut data = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+        data.extend(width.to_be_bytes());
+        data.extend(height.to_be_bytes());
+        data.extend([8, 6, 0, 0, 0, 0, 0, 0, 0]);
+        data
+    }
+
+    /// Lossless WebP header with the given dimensions
+    fn webp_header(width: u32, height: u32) -> Vec<u8> {
+        // RIFF size 17 and chunk size 5 cover exactly the 5 bytes of VP8L data
+        let mut data = b"RIFF\x11\0\0\0WEBPVP8L\x05\0\0\0\x2F".to_vec();
+        data.extend(((width - 1) | (height - 1) << 14).to_le_bytes());
+        data
+    }
+
+    #[psibase::test_case(packages("Tokens"))]
+    fn test_icons(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        use psibase::image_content_type::{GIF, PNG, WEBP};
+        use psibase::services::tokens::{MAX_ICON_DIMENSION, MAX_ICON_SIZE};
+
+        Wrapper::push(&chain).init();
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        let a = Wrapper::push_from(&chain, alice);
+        let b = Wrapper::push_from(&chain, bob);
+
+        let tid = a.create(4.try_into().unwrap(), 80000.into()).get()?;
+        claim_token_nft(&chain, alice, tid);
+
+        let icon = png_header(MAX_ICON_DIMENSION, MAX_ICON_DIMENSION);
+        let target = format!("/icon/{tid}");
+
+        // Only the token owner can set or remove the icon
+        assert_error(
+            b.setIcon(tid, icon.clone().into(), PNG),
+            "Missing required authority",
+        );
+
+        assert_error(
+            a.setIcon(tid, vec![0; MAX_ICON_SIZE + 1].into(), PNG),
+            "Icon exceeds max size",
+        );
+        assert_error(
+            a.setIcon(tid, icon.clone().into(), GIF),
+            "Icon content type not allowed",
+        );
+        assert_error(
+            a.setIcon(tid, icon.clone().into(), 99),
+            "Icon content type not allowed",
+        );
+
+        // The bytes must be an image of the declared type, within the pixel limits
+        assert_error(
+            a.setIcon(tid, vec![1, 2, 3].into(), PNG),
+            "Icon is not a valid image",
+        );
+        assert_error(
+            a.setIcon(tid, icon.clone().into(), WEBP),
+            "Icon is not a valid image",
+        );
+        assert_error(
+            a.setIcon(tid, png_header(MAX_ICON_DIMENSION + 1, 1).into(), PNG),
+            "Icon exceeds max dimensions",
+        );
+        assert_error(
+            a.setIcon(tid, webp_header(16000, 16000).into(), WEBP),
+            "Icon exceeds max dimensions",
+        );
+        assert_error(a.removeIcon(tid), "Token has no icon");
+        assert_eq!(get_icon_hash(&chain, tid)?, None);
+
+        a.setIcon(tid, icon.clone().into(), PNG).get()?;
+        let reply = chain.get(Wrapper::SERVICE, &target)?;
+        assert_eq!(reply.status, 200);
+        assert_eq!(reply.contentType, "image/png");
+        assert_eq!(reply.body.0, icon);
+
+        assert_eq!(get_icon_hash(&chain, tid)?, Some(sha256(&icon)));
+
+        let replacement = webp_header(64, 32);
+        a.setIcon(tid, replacement.clone().into(), WEBP).get()?;
+        assert_eq!(
+            chain.get(Wrapper::SERVICE, &target)?.contentType,
+            "image/webp"
+        );
+        assert_eq!(get_icon_hash(&chain, tid)?, Some(sha256(&replacement)));
+
+        assert_error(b.removeIcon(tid), "Missing required authority");
+        a.removeIcon(tid).get()?;
+        assert_eq!(chain.get(Wrapper::SERVICE, &target)?.status, 404);
+        assert_eq!(get_icon_hash(&chain, tid)?, None);
+
+        Ok(())
+    }
 }

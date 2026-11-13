@@ -85,6 +85,8 @@ namespace SystemService
           * `data:` for generated identicons and inline app icons
           * `profiles.{{root}}/avatar/` (prefix match) for user avatars,
             served by the profiles service
+          * `tokens.{{root}}/icon/` (prefix match) for token icons,
+            served by the tokens service
           * `branding.{{root}}` for the network logo
         connect-src:
           * `'self'` covers the app's own /graphql and RPC endpoints, the
@@ -106,7 +108,7 @@ namespace SystemService
           "default-src 'self';"                             //
           "script-src 'self';"                              //
           "style-src 'self' 'unsafe-inline';"               //
-          "img-src 'self' data: profiles.{{root}}/avatar/ branding.{{root}};"  //
+          "img-src 'self' data: profiles.{{root}}/avatar/ tokens.{{root}}/icon/ branding.{{root}};"  //
           "font-src 'self';"                                //
           "connect-src 'self' profiles.{{root}} tokens.{{root}};"  //
           "frame-src supervisor.{{root}};"                  //

@@ -16,10 +16,12 @@ import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
 
 import { TokenBalances } from "./components/token-balances";
+import { TokenIconSettings } from "./components/token-icon-settings";
 import { AutoDebitSwitch } from "./components/transfer/auto-debit-switch";
 import { UntransferableTokenWarning } from "./components/transfer/untransferable-warning";
 import { WalletStats } from "./components/wallet-stats";
 import { useUserPendingBalance } from "./hooks/tokens-plugin/use-pending-balances";
+import { useTokenOwnerAccess } from "./hooks/use-token-owner-access";
 import { useTransferActions } from "./hooks/use-transfer-actions";
 
 export interface TokensOutletContext {
@@ -140,6 +142,11 @@ export const TokensLayout = () => {
         tokens.find((token) => token.id == Number(selectedTokenId)) ??
         (tokensReady ? tokens[0] : undefined);
 
+    const { data: ownerAccess } = useTokenOwnerAccess(
+        selectedToken?.owner,
+        currentUser,
+    );
+
     const pendingForToken = useMemo(
         () =>
             selectedToken
@@ -207,6 +214,19 @@ export const TokensLayout = () => {
                                     isLoading,
                                 }}
                             />
+                            {selectedToken &&
+                                ownerAccess &&
+                                ownerAccess.kind !== "none" && (
+                                    <TokenIconSettings
+                                        token={selectedToken}
+                                        currentUser={currentUser}
+                                        proposeAs={
+                                            ownerAccess.kind === "proposal"
+                                                ? ownerAccess.proposeAs
+                                                : undefined
+                                        }
+                                    />
+                                )}
                         </div>
                     </div>
                 </>

@@ -76,11 +76,37 @@ crate::define_flags!(BalanceFlags, u8, {
     keep_zero_balance,
 });
 
+/// Maximum size in bytes of a token icon
+pub const MAX_ICON_SIZE: usize = 32 * 1024;
+
+/// Maximum width and height in pixels of a token icon
+pub const MAX_ICON_DIMENSION: u32 = 256;
+
+/// Whether a token icon may be stored with this content type
+pub fn is_icon_content_type(content_type: crate::image_content_type::ImgContentType) -> bool {
+    use crate::image_content_type::{JPEG, PNG, WEBP};
+    matches!(content_type, PNG | JPEG | WEBP)
+}
+
+/// Path of a token's icon on the tokens subdomain
+pub fn icon_path(token_id: TID) -> String {
+    format!("/icon/{token_id}")
+}
+
+/// Content hash of a token's icon, or `None` if the token has no icon
+pub fn icon_hash(token_id: TID) -> Option<crate::Checksum256> {
+    use crate::ServiceWrapper;
+    crate::services::sites::Wrapper::call()
+        .getProps(Wrapper::SERVICE, icon_path(token_id))
+        .map(|props| props.contentHash)
+}
+
 #[crate::service(name = "tokens", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
 
     use super::{Quantity, TokenRecord, TID};
+    use crate::image_content_type::ImgContentType;
     use crate::{services::tokens::Precision, AccountNumber, Memo};
 
     #[action]
@@ -477,6 +503,28 @@ mod service {
     /// * 1: Unrecallable    - If enabled, the token cannot be recalled
     #[action]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
+        unimplemented!()
+    }
+
+    /// Sets the icon of a token. Only the token owner can set the icon.
+    ///
+    /// The icon is served at `/icon/<token_id>` on the tokens subdomain.
+    ///
+    /// # Arguments
+    /// * `token_id`    - Unique token identifier
+    /// * `image`       - Image bytes, at most `MAX_ICON_SIZE` bytes
+    /// * `contentType` - Image type (see `image_content_type`). PNG, JPEG, and WebP are allowed.
+    #[action]
+    fn setIcon(token_id: TID, image: crate::Hex<Vec<u8>>, contentType: ImgContentType) {
+        unimplemented!()
+    }
+
+    /// Removes the icon of a token. Only the token owner can remove the icon.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    #[action]
+    fn removeIcon(token_id: TID) {
         unimplemented!()
     }
 

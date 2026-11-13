@@ -21,6 +21,19 @@ fn assert_caller_self() {
     );
 }
 
+fn with_propose_latch(
+    account: Option<String>,
+    f: impl FnOnce() -> Result<(), Error>,
+) -> Result<(), Error> {
+    let Some(account) = account else {
+        return f();
+    };
+    transact::plugin::api::set_propose_latch(Some(&account))?;
+    let result = f();
+    transact::plugin::api::set_propose_latch(None)?;
+    result
+}
+
 struct HomepagePlugin;
 
 impl NameMarketApi for HomepagePlugin {
@@ -95,6 +108,24 @@ impl Tokens for HomepagePlugin {
     fn get_user_balances(user: String) -> Result<Vec<tokens::plugin::types::UserBalance>, Error> {
         assert_caller_self();
         tokens::plugin::helpers::get_user_balances(&user)
+    }
+
+    fn set_token_icon(
+        token_id: u32,
+        icon: tokens::plugin::types::Icon,
+        propose_as: Option<String>,
+    ) -> Result<(), Error> {
+        assert_caller_self();
+        with_propose_latch(propose_as, || {
+            tokens::plugin::issuer::set_token_icon(token_id, &icon)
+        })
+    }
+
+    fn remove_token_icon(token_id: u32, propose_as: Option<String>) -> Result<(), Error> {
+        assert_caller_self();
+        with_propose_latch(propose_as, || {
+            tokens::plugin::issuer::remove_token_icon(token_id)
+        })
     }
 
     fn graphql(query: String) -> Result<String, Error> {

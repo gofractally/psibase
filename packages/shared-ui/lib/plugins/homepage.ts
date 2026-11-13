@@ -1,5 +1,5 @@
 import type { MarketsOverview } from "./namemarket";
-import type { SystemTokenInfo, UserBalance } from "./tokens";
+import type { SystemTokenInfo, TokenIconImage, UserBalance } from "./tokens";
 import type { BillingConfig } from "./virtual-server";
 
 import { PluginInterface } from "@shared/hooks/plugin-function";
@@ -69,6 +69,22 @@ class Tokens extends PluginInterface {
 
     get getUserBalances() {
         return this._call<[user: string], UserBalance[]>("getUserBalances");
+    }
+
+    get setTokenIcon() {
+        return this._call<
+            [
+                tokenId: number,
+                icon: TokenIconImage,
+                proposeAs: string | undefined,
+            ]
+        >("setTokenIcon");
+    }
+
+    get removeTokenIcon() {
+        return this._call<[tokenId: number, proposeAs: string | undefined]>(
+            "removeTokenIcon",
+        );
     }
 
     get graphql() {
