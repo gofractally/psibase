@@ -1,0 +1,62 @@
+# @psibase/e2e
+
+Playwright end-to-end harness for psibase. This base provides the Playwright
+setup only (config, browser projects, CTest and CI wiring, binary and package
+resolution). Fixtures and specs are added by branches stacked on top of it.
+
+## Prerequisites
+
+Build psibase (or point the environment variables below at an unpacked psidk
+tree). Chromium and WebKit for the Playwright version pinned in `package.json`
+(`@playwright/test`) come from the environment — do not run `playwright install`:
+
+- **CI / Ubuntu builder images** ([image-builders](https://github.com/gofractally/image-builders)):
+  browsers under `PLAYWRIGHT_BROWSERS_PATH`
+- **Nix / NixOS:** `nix develop` sets the same (see `nix/README.md`)
+
+A browser that isn't available makes its CTest skip (exit code 77) rather than
+fail the build.
+
+## Environment variables
+
+When set, paths are relative to the repository root unless absolute. When
+unset, `psinode` and `psibase` are resolved from `PATH` (direnv adds
+`build/psidk/bin` and `build/rust/release`).
+
+| Variable | Purpose |
+| --- | --- |
+| `PSINODE_BIN` | psinode binary |
+| `PSIBASE_BIN` | psibase CLI binary |
+| `PSIBASE_PACKAGES` | optional directory of `.psi` packages (e.g. locally built ones); defaults to `share/psibase/packages` next to the psinode install prefix |
+
+The config fails immediately when a configured path is missing, when neither
+binary variable is set and the command is absent from `PATH`, or when no
+package directory can be found.
+
+## CTest
+
+From the build directory:
+
+```bash
+ctest -L e2e            # all e2e tests
+ctest -R e2e-chromium   # one browser
+ctest -R e2e-webkit
+```
+
+Each browser project is its own CTest entry, registered with
+`psibase_add_e2e_test(<name> <browser> [playwright args...])` in
+`CMakeLists.txt`; extra args can narrow a test to a spec folder. Excluded from
+CI container builds via `ctest -LE e2e`; the GitHub Actions `e2e` job runs the
+suite inside the Ubuntu 22.04 builder image (browsers already present).
+
+## Running the suite
+
+From this directory:
+
+```bash
+yarn test                      # all projects
+./run-ctest.sh webkit [args]   # one browser, as CTest runs it
+```
+
+With no specs yet, runs pass with no tests. Artifacts (traces, videos, HTML
+report) are written to `test-results/`.

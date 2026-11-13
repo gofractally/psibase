@@ -42,9 +42,12 @@
     nixpkgs-mdbook-pagetoc.url = "github:NixOS/nixpkgs/ac62194c3917d5f474c1a844b6fd6da2db95077d";
     #   nodejs 24.19.0 — rev-pinned so `nix flake update` does not bump Node
     nixpkgs-nodejs.url = "github:NixOS/nixpkgs/6aefcda9401be8acc2b74244fb3b37520ea1f0a8";
+    #   playwright-driver 1.64.1 — must match e2e/@playwright/test; nixos-26.05 is 1.59.1.
+    #   Rev-pinned so `nix flake update` does not drift the browser revision Playwright expects.
+    nixpkgs-playwright.url = "github:NixOS/nixpkgs/0bb2eedc20e4739f29e8045034f2828ad7054f8f";
   };
 
-  outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cursor-cli, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-mdbook-linkcheck, nixpkgs-mdbook-pagetoc, nixpkgs-nodejs }:
+  outputs = { self, nixpkgs, flake-utils, fenix, nixpkgs-cargo-component, nixpkgs-cargo-generate, nixpkgs-cursor-cli, nixpkgs-mdbook, nixpkgs-mdbook-mermaid, nixpkgs-mdbook-plugins, nixpkgs-mdbook-linkcheck, nixpkgs-mdbook-pagetoc, nixpkgs-nodejs, nixpkgs-playwright }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs {
@@ -70,6 +73,17 @@
         mdbookPagetoc = (import nixpkgs-mdbook-pagetoc { inherit system; }).mdbook-pagetoc;
         wasmPack = (import nixpkgs-mdbook { inherit system; }).wasm-pack;
         nodejs24 = (import nixpkgs-nodejs { inherit system; }).nodejs_24;
+        # Same Playwright version / browsers as image-builders Ubuntu builders
+        # (PLAYWRIGHT_VERSION / chromium+webkit+ffmpeg). Playwright's own
+        # `install --with-deps` expects apt/sudo and does not work on NixOS.
+        playwrightDriver = (import nixpkgs-playwright { inherit system; }).playwright-driver;
+        playwrightBrowsers = playwrightDriver.browsers.override {
+          withChromium = true;
+          withWebkit = true;
+          withFfmpeg = true; # e2e `video: retain-on-failure`
+          withFirefox = false;
+          withChromiumHeadlessShell = false;
+        };
 
         # Rust 1.98.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
         rustToolchain = fenix.packages.${system}.fromToolchainFile {
@@ -244,6 +258,7 @@
           bash-completion
           nixDevelopBash
           cursorCli
+          playwrightBrowsers
         ];
 
         linuxPackages = with pkgs; [
@@ -271,6 +286,13 @@
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
           # Loopback admin IP for Launch/Continue tasks and launch.sh (set automatically in psibase-contributor).
           HOST_IP = "127.0.0.1";
+
+          # Playwright e2e: same role as PLAYWRIGHT_BROWSERS_PATH in the Ubuntu
+          # builder images. Bump nixpkgs-playwright with e2e/@playwright/test
+          # and image-builders PLAYWRIGHT_VERSION.
+          PLAYWRIGHT_BROWSERS_PATH = "${playwrightBrowsers}";
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+          PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
 
           shellHook = ''
             export NIX_SHELL_DEPTH=$(("''${NIX_SHELL_DEPTH:-0}" + 1))
@@ -381,6 +403,7 @@
               echo "  cargo-generate:  $(cargo-generate --version 2>/dev/null | head -1)"
               echo "  cargo-edit:      0.13.7 (cargo-set-version)"
               echo "  cursor-agent:    $(cursor-agent --version 2>/dev/null | head -1)"
+              echo "  Playwright browsers: ${playwrightDriver.version} (chromium+webkit+ffmpeg; $PLAYWRIGHT_BROWSERS_PATH)"
               echo ""
             fi
 
