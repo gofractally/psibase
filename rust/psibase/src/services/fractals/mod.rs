@@ -221,7 +221,7 @@ pub mod Service {
     /// Exile a member, or end that exile.
     ///
     /// # Arguments
-    /// * `member` - The account to exile or admit again.
+    /// * `member` - The account to exile, or whose exile flag to clear.
     /// * `exile` - `true` to exile, `false` to clear an existing exile.
     #[action]
     fn exile_member(member: AccountNumber, exile: bool) {

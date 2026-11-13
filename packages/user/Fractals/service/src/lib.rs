@@ -133,7 +133,7 @@ pub mod service {
     /// only clears the flag. Recruitment adds them again, the same way as a new member.
     ///
     /// # Arguments
-    /// * `member` - The account to exile or admit again.
+    /// * `member` - The account to exile, or whose exile flag to clear.
     /// * `exile` - `true` to exile, `false` to clear an existing exile.
     #[action]
     fn exile_member(member: AccountNumber, exile: bool) {
@@ -203,11 +203,14 @@ pub mod service {
 
     /// Claim member rewards
     ///
-    /// Sends any vested token rewards to the fractal member after applying any pending levies.
+    /// Claim member rewards
+    ///
+    /// A member is paid the vested amount after levies. Anyone who is not a member
+    /// has that slice recycled into the fractal stream.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
-    /// * `member` - The fractal member claiming rewards.
+    /// * `member` - The account whose stream to claim.
     #[action]
     fn claim_rew(fractal: AccountNumber, member: AccountNumber) {
         let member = member.base();
@@ -221,8 +224,6 @@ pub mod service {
         if FractalMember::get(fractal, member).is_some() {
             Tokens::call().credit(token_id, member, claimed, "Reward claim".into());
         } else {
-            // Already vested to this stream. An exile does not keep it, and a judgment was
-            // taken inside claim. The rest goes back to the fractal stream.
             RewardStream::get_assert(fractal, fractal)
                 .deposit(claimed, "Exile recycle".into());
         }

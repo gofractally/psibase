@@ -66,17 +66,17 @@ impl Levy {
 
     /// Applies the configured levy to the given income, pays the payee, and returns the amount levied.
     ///
-    /// A permanent levy (`debt == 0`) is a membership cut. It is skipped while the person being
-    /// charged is exiled, and the row stays so it resumes if they return. A remaining balance is a
-    /// judgment and is still collected. An exiled payee does not receive a permanent cut; that slice
-    /// goes to the fractal treasury. A judgment owed to them is credited to their account, not into
-    /// a stream the next claim would recycle.
+    /// A permanent levy (`debt == 0`) is a membership cut. It is skipped until the person being
+    /// charged has a membership row again, including the gap after the exile flag is cleared.
+    /// A remaining balance is a judgment and is still collected. An exiled payee does not receive
+    /// a permanent cut; that slice goes to the fractal treasury. A judgment owed to them is credited
+    /// to their account, not into a stream the next claim would recycle.
     pub fn apply_levy(&mut self, gross_income: Quantity) -> Quantity {
         if gross_income.value == 0 {
             return 0.into();
         }
         let indefinite = self.debt.value == 0;
-        if indefinite && FractalExile::is_exiled(self.fractal, self.member) {
+        if indefinite && FractalMember::get(self.fractal, self.member).is_none() {
             return 0.into();
         }
 
