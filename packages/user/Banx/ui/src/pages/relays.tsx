@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useStore } from "@tanstack/react-form";
 import { Plus } from "lucide-react";
 
 import { AssetField } from "@/components/form-fields";
+import { PoolPriceFields } from "@/components/pool-price-fields";
 import { PageHeader } from "@/components/page-header";
 import { useAssetMap } from "@/hooks/use-assets";
 import {
@@ -18,7 +19,7 @@ import {
     useSetTokenRelay,
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
-import { ppmToPercent } from "@/lib/constants";
+import { ppmToPercent, ppmToPercentInput } from "@/lib/constants";
 import {
     MAX_HOP_FEE_PERCENT,
     MAX_HOP_FEE_PPM,
@@ -57,38 +58,42 @@ function poolKey(owner: string, lo: number, hi: number): string {
     return `${owner}:${lo}:${hi}`;
 }
 
-/** Price of one unit of each weight in the other. Both weights are one market value. */
-function poolUnitPrices(
-    reserveA: string,
-    reserveB: string,
-): { aInB: string; bInA: string } | null {
-    const a = Number(reserveA);
-    const b = Number(reserveB);
-    if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) {
-        return null;
-    }
-    return { aInB: (b / a).toFixed(4), bInA: (a / b).toFixed(4) };
+/** Form value for a stored reserve. Strips grouping and extra zeros past the asset's precision. */
+function prefillAmount(amount: string, precision: number): string {
+    const s = amount.trim().replaceAll(",", "");
+    if (!s) return "";
+    const [wholeRaw, fracRaw = ""] = s.split(".", 2);
+    const whole = wholeRaw.replace(/^0+(?=\d)/, "") || "0";
+    if (precision <= 0) return whole;
+    const frac = fracRaw.slice(0, precision).replace(/0+$/, "");
+    return frac ? `${whole}.${frac}` : whole;
 }
 
 function IouPoolForm({
     assets,
     symbolOf,
     precisionOf,
+    existing,
     onPosted,
 }: {
     assets: Asset[];
     symbolOf: (id: number) => string;
     precisionOf: (id: number) => number;
+    existing?: BanxRelay | null;
     onPosted: () => void;
 }) {
     const setRelay = useSetRelay();
     const form = useAppForm({
         defaultValues: {
-            assetA: undefined as number | undefined,
-            assetB: undefined as number | undefined,
-            reserveA: "",
-            reserveB: "",
-            feePct: "0",
+            assetA: existing?.assetLo as number | undefined,
+            assetB: existing?.assetHi as number | undefined,
+            reserveA: existing
+                ? prefillAmount(existing.reserveLo, precisionOf(existing.assetLo))
+                : "",
+            reserveB: existing
+                ? prefillAmount(existing.reserveHi, precisionOf(existing.assetHi))
+                : "",
+            feePct: existing ? ppmToPercentInput(existing.feePpm) : "0",
         },
         onSubmit: async ({ value }) => {
             if (
@@ -122,6 +127,27 @@ function IouPoolForm({
         },
     });
 
+    useEffect(() => {
+        if (!existing) return;
+        form.reset({
+            assetA: existing.assetLo,
+            assetB: existing.assetHi,
+            reserveA: prefillAmount(
+                existing.reserveLo,
+                precisionOf(existing.assetLo),
+            ),
+            reserveB: prefillAmount(
+                existing.reserveHi,
+                precisionOf(existing.assetHi),
+            ),
+            feePct: ppmToPercentInput(existing.feePpm),
+        });
+        // Prefill once per pool. form.reset identity is stable enough.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [existing?.assetLo, existing?.assetHi]);
+
+
+
     return (
         <form
             className="grid gap-4"
@@ -152,6 +178,7 @@ function IouPoolForm({
                                             label="Asset A"
                                             assets={assets}
                                             value={field.state.value}
+                                            disabled={!!existing}
                                             onChange={(id) =>
                                                 field.handleChange(id)
                                             }
@@ -165,6 +192,7 @@ function IouPoolForm({
                                             label="Asset B"
                                             assets={assets}
                                             value={field.state.value}
+                                            disabled={!!existing}
                                             onChange={(id) =>
                                                 field.handleChange(id)
                                             }
@@ -178,6 +206,31 @@ function IouPoolForm({
                                     Pick two different assets.
                                 </p>
                             ) : null}
+                            <PoolPriceFields
+                                symbolA={
+                                    values.assetA !== undefined
+                                        ? symbolOf(values.assetA).toUpperCase()
+                                        : "Asset A"
+                                }
+                                symbolB={
+                                    values.assetB !== undefined
+                                        ? symbolOf(values.assetB).toUpperCase()
+                                        : "Asset B"
+                                }
+                                precisionA={precA}
+                                precisionB={precB}
+                                reserveA={values.reserveA}
+                                reserveB={values.reserveB}
+                                disabled={
+                                    values.assetA === undefined ||
+                                    values.assetB === undefined ||
+                                    values.assetA === values.assetB
+                                }
+                                onReserves={(reserveA, reserveB) => {
+                                    form.setFieldValue("reserveA", reserveA);
+                                    form.setFieldValue("reserveB", reserveB);
+                                }}
+                            />
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <form.AppField
                                     name="reserveA"
@@ -191,7 +244,11 @@ function IouPoolForm({
                                     }}
                                     children={(field) => (
                                         <field.TextField
-                                            label="Reserve A"
+                                            label={
+                                                values.assetA !== undefined
+                                                    ? `${symbolOf(values.assetA).toUpperCase()} reserve`
+                                                    : "Reserve A"
+                                            }
                                             inputMode="decimal"
                                             placeholder={amountPlaceholder(
                                                 precA,
@@ -212,7 +269,11 @@ function IouPoolForm({
                                     }}
                                     children={(field) => (
                                         <field.TextField
-                                            label="Reserve B"
+                                            label={
+                                                values.assetB !== undefined
+                                                    ? `${symbolOf(values.assetB).toUpperCase()} reserve`
+                                                    : "Reserve B"
+                                            }
                                             inputMode="decimal"
                                             placeholder={amountPlaceholder(
                                                 precB,
@@ -222,39 +283,6 @@ function IouPoolForm({
                                     )}
                                 />
                             </div>
-                            {values.assetA !== undefined &&
-                            values.assetB !== undefined &&
-                            values.assetA !== values.assetB
-                                ? (() => {
-                                      const prices = poolUnitPrices(
-                                          values.reserveA,
-                                          values.reserveB,
-                                      );
-                                      if (!prices) return null;
-                                      const symA = symbolOf(
-                                          values.assetA,
-                                      ).toUpperCase();
-                                      const symB = symbolOf(
-                                          values.assetB,
-                                      ).toUpperCase();
-                                      return (
-                                          <div className="text-muted-foreground space-y-2 text-sm">
-                                              <div className="flex justify-between gap-4">
-                                                  <span>{symA} price</span>
-                                                  <span>
-                                                      {prices.aInB} {symB}
-                                                  </span>
-                                              </div>
-                                              <div className="flex justify-between gap-4">
-                                                  <span>{symB} price</span>
-                                                  <span>
-                                                      {prices.bInA} {symA}
-                                                  </span>
-                                              </div>
-                                          </div>
-                                      );
-                                  })()
-                                : null}
                             <form.AppField
                                 name="feePct"
                                 validators={{
@@ -269,14 +297,18 @@ function IouPoolForm({
                                     <field.TextField
                                         label="Fee %"
                                         inputMode="decimal"
-                                        description="Taken from the input before the curve. Under 100%."
+                                        description="Taken off what goes in, before the price. It stays in the pool as extra weight. It is not paid out."
                                         required
                                     />
                                 )}
                             />
                             <form.AppForm>
                                 <form.SubmitButton
-                                    labels={["Post pool", "Posting…"]}
+                                    labels={
+                                        existing
+                                            ? ["Save", "Saving…"]
+                                            : ["Post pool", "Posting…"]
+                                    }
                                     loading={setRelay.isPending}
                                     disabled={
                                         values.assetA === undefined ||
@@ -297,10 +329,12 @@ function IouPoolForm({
 
 function TokenPoolForm({
     assets,
+    symbolOf,
     precisionOf,
     onPosted,
 }: {
     assets: Asset[];
+    symbolOf: (id: number) => string;
     precisionOf: (id: number) => number;
     onPosted: () => void;
 }) {
@@ -441,6 +475,37 @@ function TokenPoolForm({
                                     )}
                                 />
                             </div>
+                            <PoolPriceFields
+                                symbolA={
+                                    values.assetId !== undefined
+                                        ? symbolOf(values.assetId).toUpperCase()
+                                        : "IOU"
+                                }
+                                symbolB={
+                                    tokenId !== undefined
+                                        ? `#${tokenId}`
+                                        : "Token"
+                                }
+                                precisionA={prec}
+                                precisionB={tokenPrecision ?? 0}
+                                reserveA={values.reserveBanx}
+                                reserveB={values.reserveTokens}
+                                disabled={
+                                    values.assetId === undefined ||
+                                    tokenId === undefined ||
+                                    tokenPrecision === undefined
+                                }
+                                onReserves={(reserveBanx, reserveTokens) => {
+                                    form.setFieldValue(
+                                        "reserveBanx",
+                                        reserveBanx,
+                                    );
+                                    form.setFieldValue(
+                                        "reserveTokens",
+                                        reserveTokens,
+                                    );
+                                }}
+                            />
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <form.AppField
                                     name="reserveBanx"
@@ -540,13 +605,18 @@ function TokenPoolForm({
 function IouPools({
     mine,
     loading,
+    assets,
     symbolOf,
+    precisionOf,
 }: {
     mine: BanxRelay[];
     loading: boolean;
+    assets: Asset[];
     symbolOf: (id: number) => string;
+    precisionOf: (id: number) => number;
 }) {
     const removeRelay = useRemoveRelay();
+    const [editing, setEditing] = useState<BanxRelay | null>(null);
     return (
         <section className="grid gap-3">
             <h2 className="font-medium">IOU pools</h2>
@@ -592,20 +662,30 @@ function IouPools({
                                         {ppmToPercent(row.feePpm)}
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            disabled={removeRelay.isPending}
-                                            onClick={() =>
-                                                removeRelay.mutate({
-                                                    assetA: row.assetLo,
-                                                    assetB: row.assetHi,
-                                                })
-                                            }
-                                        >
-                                            Remove
-                                        </Button>
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setEditing(row)}
+                                            >
+                                                Adjust
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={removeRelay.isPending}
+                                                onClick={() =>
+                                                    removeRelay.mutate({
+                                                        assetA: row.assetLo,
+                                                        assetB: row.assetHi,
+                                                    })
+                                                }
+                                            >
+                                                Remove
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -614,8 +694,40 @@ function IouPools({
                 </div>
             )}
             <p className="text-muted-foreground text-xs">
-                Removing a pool leaves claims already drawn.
+                Removing a pool leaves money already owed. Adjusting only
+                changes the reserves.
             </p>
+            <Dialog
+                open={editing !== null}
+                onOpenChange={(next) => {
+                    if (!next) setEditing(null);
+                }}
+            >
+                <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1.5rem)] flex-col overflow-y-auto sm:max-w-xl">
+                    <DialogHeader className="pr-8">
+                        <DialogTitle>Adjust pool</DialogTitle>
+                        <DialogDescription>
+                            Change the reserves so the price matches the market.
+                            The pair stays the same. Saving replaces the
+                            reserves. It does not pay anyone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {editing ? (
+                        <IouPoolForm
+                            key={poolKey(
+                                editing.owner,
+                                editing.assetLo,
+                                editing.assetHi,
+                            )}
+                            assets={assets}
+                            symbolOf={symbolOf}
+                            precisionOf={precisionOf}
+                            existing={editing}
+                            onPosted={() => setEditing(null)}
+                        />
+                    ) : null}
+                </DialogContent>
+            </Dialog>
         </section>
     );
 }
@@ -749,7 +861,9 @@ export function RelaysPage() {
             <IouPools
                 mine={mine}
                 loading={relaysLoading}
+                assets={assets}
                 symbolOf={symbolOf}
+                precisionOf={precisionOf}
             />
             <TokenPools
                 mine={myTokens}
@@ -762,12 +876,9 @@ export function RelaysPage() {
                         <DialogTitle>Post a pool</DialogTitle>
                         {kind === "iou" ? (
                             <DialogDescription>
-                                Both reserves are virtual weights of equal
-                                market value. Posting them creates no claim. A
-                                fill leaves you owed the input by the previous
-                                hop and owing the next hop only the curve
-                                output. Posting again replaces the weights. One
-                                pool per pair.
+                                Type a market price and the other reserve follows.
+                                You can also type both reserves. Posting creates
+                                no debt. One pool per pair.
                             </DialogDescription>
                         ) : (
                             <DialogDescription>
@@ -806,6 +917,7 @@ export function RelaysPage() {
                     ) : (
                         <TokenPoolForm
                             assets={assets}
+                            symbolOf={symbolOf}
                             precisionOf={precisionOf}
                             onPosted={() => setOpen(false)}
                         />
