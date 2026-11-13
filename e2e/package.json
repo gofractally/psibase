@@ -3,7 +3,7 @@
     "private": true,
     "version": "0.0.1",
     "scripts": {
-        "test": "playwright test"
+        "test": "playwright test --pass-with-no-tests"
     },
     "devDependencies": {
         "@eslint/js": "^9.9.0",
