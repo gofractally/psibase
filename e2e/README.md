@@ -7,21 +7,14 @@ resolution). Fixtures and specs are added by branches stacked on top of it.
 ## Prerequisites
 
 Build psibase (or point the environment variables below at an unpacked psidk
-tree). Install the browsers for the Playwright version pinned in
-`package.json` (`@playwright/test`) once:
+tree). Chromium and WebKit for the Playwright version pinned in `package.json`
+(`@playwright/test`) come from the environment — do not run `playwright install`:
 
-```bash
-yarn exec playwright install chromium webkit
-```
+- **CI / Ubuntu builder images** ([image-builders](https://github.com/gofractally/image-builders)):
+  browsers under `PLAYWRIGHT_BROWSERS_PATH`
+- **Nix / NixOS:** `nix develop` sets the same (see `nix/README.md`)
 
-> **NOTE (Nix / NixOS):** skip Playwright’s `install --with-deps` (it expects
-> apt/sudo). From the repo root, `nix develop` already sets
-> `PLAYWRIGHT_BROWSERS_PATH` to a matching `playwright-driver` and
-> `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`. Run tests from that shell; do not run
-> `yarn exec playwright install …` unless you intend to override the Nix
-> browsers. See `nix/README.md`.
-
-A browser that isn't installed makes its CTest skip (exit code 77) rather than
+A browser that isn't available makes its CTest skip (exit code 77) rather than
 fail the build.
 
 ## Environment variables
@@ -53,8 +46,8 @@ ctest -R e2e-webkit
 Each browser project is its own CTest entry, registered with
 `psibase_add_e2e_test(<name> <browser> [playwright args...])` in
 `CMakeLists.txt`; extra args can narrow a test to a spec folder. Excluded from
-CI container builds via `ctest -LE e2e`; the GitHub Actions `e2e` job installs
-Chromium and WebKit and runs the suite on the runner instead.
+CI container builds via `ctest -LE e2e`; the GitHub Actions `e2e` job runs the
+suite inside the Ubuntu 22.04 builder image (browsers already present).
 
 ## Running the suite
 

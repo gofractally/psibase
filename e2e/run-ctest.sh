@@ -20,7 +20,7 @@ code=$?
 set -e
 
 if [ "$code" -eq 77 ]; then
-    echo "Playwright $browser not installed; skipping (run: yarn exec playwright install $browser)" >&2
+    echo "Playwright $browser not available; skipping (use the Ubuntu builder image or nix develop)" >&2
     exit 77
 fi
 if [ "$code" -ne 0 ]; then

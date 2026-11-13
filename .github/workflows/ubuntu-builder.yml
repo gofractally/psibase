@@ -91,6 +91,10 @@ jobs:
     name: E2E
     needs: build
     runs-on: ubuntu-latest
+    env:
+      # Same pin as the build job; image must include Playwright browsers
+      # (image-builders PLAYWRIGHT_VERSION matching e2e/@playwright/test).
+      BUILDER_IMAGE_2204: 983d7b62457785036f381163a2e50039f304e517
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -105,33 +109,25 @@ jobs:
         run: |
           mkdir psidk-root
           tar xzf psidk-ubuntu-2204/psidk-ubuntu-2204.tar.gz -C psidk-root
-          psinode_bin=$(find psidk-root -name psinode -type f | head -1)
+          psinode_bin=$(find "$GITHUB_WORKSPACE/psidk-root" -name psinode -type f | head -1)
           psibase_bin=$(dirname "$psinode_bin")/psibase
           echo "PSINODE_BIN=${psinode_bin}" >> "$GITHUB_ENV"
           echo "PSIBASE_BIN=${psibase_bin}" >> "$GITHUB_ENV"
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Resolve Playwright version
-        id: playwright-version
-        run: echo "version=$(node -p "require('./e2e/package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
-      - name: Cache Playwright browsers
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ steps.playwright-version.outputs.version }}-${{ runner.os }}
-      - name: Enable Corepack
-        run: corepack enable
-      - name: Install E2E dependencies
-        working-directory: e2e
-        run: yarn install --immutable
-      - name: Install Playwright browsers
-        working-directory: e2e
-        run: yarn exec playwright install chromium webkit --with-deps
       - name: Run E2E suite
-        working-directory: e2e
-        run: yarn test
+        run: |
+          BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:$BUILDER_IMAGE_2204"
+          if ! docker image inspect "$BUILDER_IMAGE" >/dev/null 2>&1; then
+            docker pull "$BUILDER_IMAGE"
+          fi
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \
+            -w "${GITHUB_WORKSPACE}/e2e" \
+            -e PSINODE_BIN \
+            -e PSIBASE_BIN \
+            -e HOME="${GITHUB_WORKSPACE}/.caches/e2e-home" \
+            --user "$(id -u):$(id -g)" \
+            "$BUILDER_IMAGE" \
+            bash -c 'mkdir -p "$HOME" && yarn install --immutable && yarn test'
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v4

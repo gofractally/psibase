@@ -73,11 +73,17 @@
         mdbookPagetoc = (import nixpkgs-mdbook-pagetoc { inherit system; }).mdbook-pagetoc;
         wasmPack = (import nixpkgs-mdbook { inherit system; }).wasm-pack;
         nodejs24 = (import nixpkgs-nodejs { inherit system; }).nodejs_24;
-        # NixOS-compatible browser builds for e2e/ (Playwright's own
-        # `install --with-deps` expects apt/sudo and does not work here).
-        # Keep the default set (chromium + headless-shell + webkit + ffmpeg):
-        # e2e uses chromium/webkit and `video: retain-on-failure` needs ffmpeg.
+        # Same Playwright version / browsers as image-builders Ubuntu builders
+        # (PLAYWRIGHT_VERSION / chromium+webkit+ffmpeg). Playwright's own
+        # `install --with-deps` expects apt/sudo and does not work on NixOS.
         playwrightDriver = (import nixpkgs-playwright { inherit system; }).playwright-driver;
+        playwrightBrowsers = playwrightDriver.browsers.override {
+          withChromium = true;
+          withWebkit = true;
+          withFfmpeg = true; # e2e `video: retain-on-failure`
+          withFirefox = false;
+          withChromiumHeadlessShell = false;
+        };
 
         # Rust 1.98.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
         rustToolchain = fenix.packages.${system}.fromToolchainFile {
@@ -252,6 +258,7 @@
           bash-completion
           nixDevelopBash
           cursorCli
+          playwrightBrowsers
         ];
 
         linuxPackages = with pkgs; [
@@ -280,9 +287,10 @@
           # Loopback admin IP for Launch/Continue tasks and launch.sh (set automatically in psibase-contributor).
           HOST_IP = "127.0.0.1";
 
-          # Playwright e2e on NixOS: use nixpkgs browsers, skip download + host apt checks.
-          # Bump nixpkgs-playwright in lockstep with e2e/@playwright/test.
-          PLAYWRIGHT_BROWSERS_PATH = "${playwrightDriver.browsers}";
+          # Playwright e2e: same role as PLAYWRIGHT_BROWSERS_PATH in the Ubuntu
+          # builder images. Bump nixpkgs-playwright with e2e/@playwright/test
+          # and image-builders PLAYWRIGHT_VERSION.
+          PLAYWRIGHT_BROWSERS_PATH = "${playwrightBrowsers}";
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
           PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
 
@@ -395,7 +403,7 @@
               echo "  cargo-generate:  $(cargo-generate --version 2>/dev/null | head -1)"
               echo "  cargo-edit:      0.13.7 (cargo-set-version)"
               echo "  cursor-agent:    $(cursor-agent --version 2>/dev/null | head -1)"
-              echo "  Playwright browsers: ${playwrightDriver.version} ($PLAYWRIGHT_BROWSERS_PATH)"
+              echo "  Playwright browsers: ${playwrightDriver.version} (chromium+webkit+ffmpeg; $PLAYWRIGHT_BROWSERS_PATH)"
               echo ""
             fi
 
