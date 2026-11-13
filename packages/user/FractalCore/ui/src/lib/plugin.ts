@@ -51,11 +51,7 @@ class AdminFractal extends PluginInterface {
     }
 
     get exileMember() {
-        return this._call<[member: Account]>("exileMember");
-    }
-
-    get acceptReturn() {
-        return this._call<[applicant: Account]>("acceptReturn");
+        return this._call<[member: Account, exile: boolean]>("exileMember");
     }
 
     get initToken() {
@@ -76,14 +72,6 @@ class UserFractal extends PluginInterface {
 
     get join() {
         return this._call<[]>("join");
-    }
-
-    get applyReturn() {
-        return this._call<[fractal: Account]>("applyReturn");
-    }
-
-    get cancelReturn() {
-        return this._call<[fractal: Account]>("cancelReturn");
     }
 
     get distToken() {

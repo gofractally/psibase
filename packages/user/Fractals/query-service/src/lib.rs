@@ -3,10 +3,7 @@
 mod service {
 
     use async_graphql::{connection::Connection, *};
-    use fractals::tables::tables::{
-        Fractal, FractalExile, FractalExileTable, FractalMember, FractalMemberTable, FractalTable,
-        ReturnApplication, ReturnApplicationTable,
-    };
+    use fractals::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
     use psibase::{AccountNumber, *};
 
     struct Query;
@@ -60,36 +57,6 @@ mod service {
             FractalMemberTable::with_service(fractals::SERVICE)
                 .get_index_pk()
                 .get(&(fractal, member))
-        }
-
-        async fn exile(
-            &self,
-            fractal: AccountNumber,
-            member: AccountNumber,
-        ) -> Option<FractalExile> {
-            FractalExileTable::with_service(fractals::SERVICE)
-                .get_index_pk()
-                .get(&(fractal, member))
-        }
-
-        async fn return_applications(
-            &self,
-            fractal: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, ReturnApplication>> {
-            TableQuery::subindex::<AccountNumber>(
-                ReturnApplicationTable::with_service(fractals::SERVICE).get_index_pk(),
-                &(fractal),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
         }
 
         async fn memberships(

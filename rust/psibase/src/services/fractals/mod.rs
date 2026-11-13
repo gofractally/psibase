@@ -218,30 +218,13 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Exile a fractal member.
+    /// Exile a member, or end that exile.
     ///
     /// # Arguments
-    /// * `member` - The fractal member to be exiled.
+    /// * `member` - The account to exile or admit again.
+    /// * `exile` - `true` to exile, `false` to clear an existing exile.
     #[action]
-    fn exile_member(member: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Ask the judiciary to end an exile. Only the exiled account may apply.
-    #[action]
-    fn apply_return(fractal: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Withdraw a return application.
-    #[action]
-    fn cancel_return(fractal: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Accept a return application. Sender is the fractal, authorized by the judiciary.
-    #[action]
-    fn accept_return(applicant: AccountNumber) {
+    fn exile_member(member: AccountNumber, exile: bool) {
         unimplemented!()
     }
 

@@ -290,7 +290,7 @@ mod chain {
         pass_time(&chain, DEFAULT_MEMBER_DISTRIBUTION_INTERVAL as i64);
 
         chain.propose::<Wrapper>(ALICE, FRACTAL)
-            .exile_member(ALICE)
+            .exile_member(ALICE, true)
             .get()?;
 
         let member: serde_json::Value = chain

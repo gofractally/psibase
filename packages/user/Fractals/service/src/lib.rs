@@ -11,9 +11,7 @@ macro_rules! ban {
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::tables::tables::{
-        Fractal, FractalMember, Occupation, ReturnApplication, RewardStream, Role,
-    };
+    use crate::tables::tables::{Fractal, FractalExile, FractalMember, Occupation, RewardStream, Role};
 
     use psibase::{
         services::{
@@ -31,7 +29,6 @@ pub mod service {
     const ROLE_METHODS: &[(FractalRole, &str)] = &[
         (Recruitment, Actns::add_mem::ACTION_NAME),
         (Judiciary, Actns::exile_member::ACTION_NAME),
-        (Judiciary, Actns::accept_return::ACTION_NAME),
         (Legislature, Actns::set_r_occ::ACTION_NAME),
         (Legislature, Actns::set_dist_int::ACTION_NAME),
         (Legislature, Actns::set_gen_time::ACTION_NAME),
@@ -130,45 +127,23 @@ pub mod service {
         Fractal::by_sender().set_distribution_strategy(distribution_strategy.into());
     }
 
-    /// Exile a fractal member.
+    /// Exile a member, or end that exile.
+    ///
+    /// The sender is the fractal. The judiciary authorizes it. Ending an exile
+    /// only clears the flag. Recruitment adds them again, the same way as a new member.
     ///
     /// # Arguments
-    /// * `member` - The fractal member to be exiled.
+    /// * `member` - The account to exile or admit again.
+    /// * `exile` - `true` to exile, `false` to clear an existing exile.
     #[action]
-    fn exile_member(member: AccountNumber) {
-        FractalMember::get_assert(get_sender(), member.base()).exile();
-    }
-
-    /// Ask the judiciary to end an exile. Only the exiled account may apply.
-    ///
-    /// # Arguments
-    /// * `fractal` - The fractal to return to.
-    #[action]
-    fn apply_return(fractal: AccountNumber) {
-        ReturnApplication::add(fractal, get_sender());
-    }
-
-    /// Withdraw a return application.
-    ///
-    /// # Arguments
-    /// * `fractal` - The fractal the application was filed with.
-    #[action]
-    fn cancel_return(fractal: AccountNumber) {
-        ReturnApplication::get_assert(fractal, get_sender()).cancel();
-    }
-
-    /// Accept a return application. The sender is the fractal; the judiciary authorizes it.
-    ///
-    /// Clears the exile and adds the account as a member again. The old stream and any
-    /// permanent levy are kept.
-    ///
-    /// # Arguments
-    /// * `applicant` - The exiled account whose application to accept.
-    #[action]
-    fn accept_return(applicant: AccountNumber) {
+    fn exile_member(member: AccountNumber, exile: bool) {
         let fractal = get_sender();
-        ReturnApplication::get_assert(fractal, applicant).accept();
-        Wrapper::emit().history().joined_fractal(fractal, applicant.base());
+        let member = member.base();
+        if exile {
+            FractalMember::get_assert(fractal, member).exile();
+        } else {
+            FractalExile::get_assert(fractal, member).lift();
+        }
     }
 
     /// Distribute token for a fractal.
