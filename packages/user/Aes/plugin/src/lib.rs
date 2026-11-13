@@ -1,97 +1,67 @@
+mod aead;
 #[allow(warnings)]
 mod bindings;
-use bindings::*;
 
-use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes128Gcm, Aes256Gcm, Nonce,
-};
+use aead::{decrypt, encrypt};
+use aes_gcm::{Aes128Gcm, Aes256Gcm};
+use bindings::*;
 use exports::aes::plugin::types as AesTypes;
 use exports::aes::plugin::with_key::Guest as WithKey;
 use exports::aes::plugin::with_password::Guest as WithPassword;
 use host::types::types::{Error, PluginId};
 use kdf::plugin::api as Kdf;
 
-const NONCE_SIZE: usize = 12;
-
-fn encrypt_with_aes<C>(key: &[u8], data: &[u8]) -> Vec<u8>
-where
-    C: AeadCore + Aead + KeyInit,
-{
-    let cipher = <C>::new_from_slice(key).unwrap();
-    let nonce = <C>::generate_nonce(&mut OsRng);
-
-    let ciphertext = match cipher.encrypt(&nonce, data) {
-        Ok(ct) => ct,
-        Err(e) => {
-            panic!("Failed to encrypt data: {}", e.to_string());
-        }
-    };
-
-    let mut result = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
-    result.extend_from_slice(nonce.as_ref());
-    result.extend_from_slice(&ciphertext);
-    result
-}
-
-fn decrypt_with_aes<C>(key: &[u8], encrypted_data: &[u8]) -> Result<Vec<u8>, Error>
-where
-    C: AeadCore + Aead + KeyInit,
-{
-    if encrypted_data.len() < NONCE_SIZE {
-        panic!("Encrypted data too short");
-    }
-
-    // The first NONCE_SIZE bytes are the nonce, the rest is the ciphertext
-    let nonce_bytes = &encrypted_data[..NONCE_SIZE];
-    let mut nonce = Nonce::default();
-    nonce.copy_from_slice(nonce_bytes);
-    let cipher = <C>::new_from_slice(key).unwrap();
-
-    let ciphertext = &encrypted_data[NONCE_SIZE..];
-    let decrypted = match cipher.decrypt(&nonce, ciphertext) {
-        Ok(pt) => pt,
-        Err(_) => {
-            return Err(Error {
-                code: 0,
-                producer: PluginId {
-                    service: "aes".to_string(),
-                    plugin: "plugin".to_string(),
-                },
-                message: "Failed to decrypt data".to_string(),
-            });
-        }
-    };
-
-    Ok(decrypted)
-}
-
-impl WithKey for AesPlugin {
-    fn encrypt(key: AesTypes::Key, data: Vec<u8>) -> Vec<u8> {
-        match key.strength {
-            AesTypes::Strength::Aes128 => encrypt_with_aes::<Aes128Gcm>(&key.key_data, &data),
-            AesTypes::Strength::Aes256 => encrypt_with_aes::<Aes256Gcm>(&key.key_data, &data),
-        }
-    }
-
-    fn decrypt(key: AesTypes::Key, cipher: Vec<u8>) -> Result<Vec<u8>, Error> {
-        match key.strength {
-            AesTypes::Strength::Aes128 => decrypt_with_aes::<Aes128Gcm>(&key.key_data, &cipher),
-            AesTypes::Strength::Aes256 => decrypt_with_aes::<Aes256Gcm>(&key.key_data, &cipher),
-        }
+fn decrypt_error() -> Error {
+    Error {
+        code: 0,
+        producer: PluginId {
+            service: "aes".to_string(),
+            plugin: "plugin".to_string(),
+        },
+        message: "Failed to decrypt data".to_string(),
     }
 }
 
 struct AesPlugin;
+
+impl WithKey for AesPlugin {
+    fn encrypt(key: AesTypes::Key, data: Vec<u8>, associated_data: Vec<u8>) -> Vec<u8> {
+        match key.strength {
+            AesTypes::Strength::Aes128 => {
+                encrypt::<Aes128Gcm>(&key.key_data, &data, &associated_data)
+            }
+            AesTypes::Strength::Aes256 => {
+                encrypt::<Aes256Gcm>(&key.key_data, &data, &associated_data)
+            }
+        }
+    }
+
+    fn decrypt(
+        key: AesTypes::Key,
+        cipher: Vec<u8>,
+        associated_data: Vec<u8>,
+    ) -> Result<Vec<u8>, Error> {
+        let opened = match key.strength {
+            AesTypes::Strength::Aes128 => {
+                decrypt::<Aes128Gcm>(&key.key_data, &cipher, &associated_data)
+            }
+            AesTypes::Strength::Aes256 => {
+                decrypt::<Aes256Gcm>(&key.key_data, &cipher, &associated_data)
+            }
+        };
+        opened.map_err(|_| decrypt_error())
+    }
+}
+
 impl WithPassword for AesPlugin {
     fn encrypt(password: Vec<u8>, data: Vec<u8>, salt: String) -> Vec<u8> {
         let aes_key = Kdf::derive_key(Kdf::Keytype::Aes, &password, &salt);
-        encrypt_with_aes::<Aes256Gcm>(&aes_key, &data)
+        encrypt::<Aes256Gcm>(&aes_key, &data, &[])
     }
 
     fn decrypt(password: Vec<u8>, encrypted: Vec<u8>, salt: String) -> Result<Vec<u8>, Error> {
         let aes_key = Kdf::derive_key(Kdf::Keytype::Aes, &password, &salt);
-        Ok(decrypt_with_aes::<Aes256Gcm>(&aes_key, &encrypted)?)
+        decrypt::<Aes256Gcm>(&aes_key, &encrypted, &[]).map_err(|_| decrypt_error())
     }
 }
 
