@@ -8,7 +8,7 @@ const tokenSummaryFields = `
     id
     symbol
     precision
-    icon
+    iconHash
     owner
     settings {
         untransferable
@@ -145,7 +145,7 @@ export const zTokenSummarySchema = z.object({
     id: z.number(),
     symbol: z.string().nullable(),
     precision: z.number(),
-    icon: z.string().nullable(),
+    iconHash: z.string().nullable(),
     owner: zAccount.nullable(),
     settings: z.object({
         untransferable: z.boolean(),

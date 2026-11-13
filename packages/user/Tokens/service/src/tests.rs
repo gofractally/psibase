@@ -553,25 +553,26 @@ mod tests {
         Ok(())
     }
 
-    fn get_icon_url(
+    fn get_icon_hash(
         chain: &psibase::Chain,
         token_id: u32,
-    ) -> Result<Option<String>, psibase::Error> {
+    ) -> Result<Option<Checksum256>, psibase::Error> {
         #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
         struct TokenIcon {
-            icon: Option<String>,
+            icon_hash: Option<Checksum256>,
         }
         #[derive(serde::Deserialize)]
         struct TokenData {
             token: TokenIcon,
         }
 
-        let query = format!(r#"query {{ token(tokenId: "{token_id}") {{ icon }} }}"#);
+        let query = format!(r#"query {{ token(tokenId: "{token_id}") {{ iconHash }} }}"#);
         let response: Response<TokenData> = chain.graphql(Wrapper::SERVICE, &query)?;
         if let Some(errors) = response.errors {
             return Err(anyhow!("GraphQL error: {}", errors[0].message).into());
         }
-        Ok(response.data.unwrap().token.icon)
+        Ok(response.data.unwrap().token.icon_hash)
     }
 
     #[psibase::test_case(packages("Tokens"))]
@@ -613,7 +614,7 @@ mod tests {
             "Icon content type not allowed",
         );
         assert_error(a.removeIcon(tid), "Token has no icon");
-        assert_eq!(get_icon_url(&chain, tid)?, None);
+        assert_eq!(get_icon_hash(&chain, tid)?, None);
 
         a.setIcon(tid, icon.clone().into(), PNG).get()?;
         let reply = chain.get(Wrapper::SERVICE, &target)?;
@@ -621,21 +622,20 @@ mod tests {
         assert_eq!(reply.contentType, "image/png");
         assert_eq!(reply.body.0, icon);
 
-        let url = get_icon_url(&chain, tid)?.expect("token should have an icon");
-        assert!(url.starts_with(&format!("{target}?v=")), "{url}");
+        assert_eq!(get_icon_hash(&chain, tid)?, Some(sha256(&icon)));
 
-        // The versioned URL changes when the icon changes
-        a.setIcon(tid, vec![4, 5, 6].into(), WEBP).get()?;
+        let replacement = vec![4u8, 5, 6];
+        a.setIcon(tid, replacement.clone().into(), WEBP).get()?;
         assert_eq!(
             chain.get(Wrapper::SERVICE, &target)?.contentType,
             "image/webp"
         );
-        assert_ne!(get_icon_url(&chain, tid)?, Some(url));
+        assert_eq!(get_icon_hash(&chain, tid)?, Some(sha256(&replacement)));
 
         assert_error(b.removeIcon(tid), "Missing required authority");
         a.removeIcon(tid).get()?;
         assert_eq!(chain.get(Wrapper::SERVICE, &target)?.status, 404);
-        assert_eq!(get_icon_url(&chain, tid)?, None);
+        assert_eq!(get_icon_hash(&chain, tid)?, None);
 
         Ok(())
     }

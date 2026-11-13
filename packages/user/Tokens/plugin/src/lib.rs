@@ -167,7 +167,7 @@ impl Helpers for TokensPlugin {
                 symbol: balance.symbol,
                 precision: balance.precision,
                 account: balance.account,
-                icon: balance.icon,
+                icon_hash: balance.icon_hash,
             })
             .collect())
     }

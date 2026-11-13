@@ -66,7 +66,7 @@ export const TokenBalances = ({
                                     )}
                                     <TokenIcon
                                         tokenId={token.id}
-                                        icon={token.icon}
+                                        iconHash={token.iconHash}
                                         pair={poolPairs.get(token.id)}
                                         className="size-6"
                                     />

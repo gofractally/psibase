@@ -17,8 +17,9 @@ interface types {
         symbol: option<string>,
         precision: u8,
         account: string,
-        /// Versioned path of the token's icon on the tokens subdomain
-        icon: option<string>,
+        /// Content hash of the token's icon, if it has one. The icon is served at
+        /// `/icon/<token-id>` on the tokens subdomain.
+        icon-hash: option<string>,
     }
 
     /// A token icon image. Must be PNG, JPEG, or WebP, and no larger than 32 KB.

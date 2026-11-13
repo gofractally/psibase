@@ -18,7 +18,7 @@ export type UserBalance = {
     symbol: string | undefined;
     precision: number;
     account: string;
-    icon: string | undefined;
+    iconHash: string | undefined;
 };
 
 export type TokenIconImage = {

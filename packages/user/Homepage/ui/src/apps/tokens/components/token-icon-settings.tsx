@@ -51,13 +51,13 @@ export const TokenIconSettings = ({
             <div className="flex items-center gap-4 px-4 py-3">
                 <TokenIcon
                     tokenId={token.id}
-                    icon={token.icon}
+                    iconHash={token.iconHash}
                     className="size-12"
                     alt={`Icon of ${token.label}`}
                 />
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                     <p className="text-muted-foreground text-xs">
-                        {token.icon
+                        {token.iconHash
                             ? "Using your uploaded icon."
                             : "Using a generated icon. Upload an image to replace it; it is cropped to a centered square of at most 256×256."}
                     </p>
@@ -82,7 +82,7 @@ export const TokenIconSettings = ({
                             disabled={isPending}
                             className="hidden"
                         />
-                        {token.icon && (
+                        {token.iconHash && (
                             <Button
                                 type="button"
                                 size="sm"

@@ -9,8 +9,8 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export interface TokenIconSource {
     tokenId: number;
-    /** Versioned icon path from the GraphQL `icon` field */
-    icon?: string | null;
+    /** Content hash of the token's icon, from the GraphQL `iconHash` field */
+    iconHash?: string | null;
 }
 
 interface Props extends Partial<TokenIconSource> {
@@ -22,15 +22,17 @@ interface Props extends Partial<TokenIconSource> {
 
 const SingleTokenIcon = ({
     tokenId,
-    icon,
+    iconHash,
     className,
     alt = "",
 }: Partial<TokenIconSource> & { className?: string; alt?: string }) => {
     const { data: chainId } = useChainId();
-    const [failedIcon, setFailedIcon] = useState<string | null>(null);
+    const [failedHash, setFailedHash] = useState<string | null>(null);
+    // The query parameter is ignored by the server; it gives each icon version
+    // its own URL so browsers don't keep showing a replaced image.
     const iconUrl =
-        icon && icon !== failedIcon
-            ? siblingUrl(undefined, "tokens", icon)
+        tokenId !== undefined && iconHash && iconHash !== failedHash
+            ? siblingUrl(undefined, "tokens", `/icon/${tokenId}?v=${iconHash}`)
             : null;
 
     if (!iconUrl && (!chainId || tokenId === undefined)) {
@@ -43,7 +45,7 @@ const SingleTokenIcon = ({
                 iconUrl ??
                 createIdenticon(`${chainId}token:${tokenId}`, "glass")
             }
-            onError={() => setFailedIcon(icon ?? null)}
+            onError={() => setFailedHash(iconHash ?? null)}
             alt={alt}
             className={cn(
                 "aspect-square size-6 shrink-0 rounded-full object-cover",
@@ -53,12 +55,18 @@ const SingleTokenIcon = ({
     );
 };
 
-export const TokenIcon = ({ tokenId, icon, pair, className, alt }: Props) => {
+export const TokenIcon = ({
+    tokenId,
+    iconHash,
+    pair,
+    className,
+    alt,
+}: Props) => {
     if (!pair) {
         return (
             <SingleTokenIcon
                 tokenId={tokenId}
-                icon={icon}
+                iconHash={iconHash}
                 className={className}
                 alt={alt}
             />

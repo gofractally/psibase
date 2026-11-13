@@ -13,7 +13,7 @@ const zReserve = z.object({
     feePpm: zInt,
     balance: z.string(),
     symbol: zAccount.nullable(),
-    icon: z.string().nullable(),
+    iconHash: z.string().nullable(),
 });
 
 export const PoolSchema = z.object({
@@ -36,8 +36,8 @@ export type EnrichedPool = PoolInstance & {
     bBalance: string;
     tokenASymbol?: Account | null;
     tokenBSymbol?: Account | null;
-    tokenAIcon: string | null;
-    tokenBIcon: string | null;
+    tokenAIconHash: string | null;
+    tokenBIconHash: string | null;
 };
 
 export const PoolsResponseSchema = z.object({
@@ -66,7 +66,7 @@ export const usePools = (refetchInterval: number | false = 12000) => {
                                     feePpm
                                     balance
                                     symbol
-                                    icon
+                                    iconHash
                                 }
                                 reserveB {
                                     poolId
@@ -74,7 +74,7 @@ export const usePools = (refetchInterval: number | false = 12000) => {
                                     feePpm
                                     balance
                                     symbol
-                                    icon
+                                    iconHash
                                 }
                             }
                         }
@@ -100,8 +100,8 @@ export const usePools = (refetchInterval: number | false = 12000) => {
                     bBalance: resB.balance,
                     tokenASymbol: resA.symbol,
                     tokenBSymbol: resB.symbol,
-                    tokenAIcon: resA.icon,
-                    tokenBIcon: resB.icon,
+                    tokenAIconHash: resA.iconHash,
+                    tokenBIconHash: resB.iconHash,
                 } satisfies EnrichedPool;
             });
         },

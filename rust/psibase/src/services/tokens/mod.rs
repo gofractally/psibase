@@ -90,14 +90,12 @@ pub fn icon_path(token_id: TID) -> String {
     format!("/icon/{token_id}")
 }
 
-/// Path of a token's icon with a version query parameter that changes whenever
-/// the icon changes, or `None` if the token has no icon.
-pub fn icon_url(token_id: TID) -> Option<String> {
+/// Content hash of a token's icon, or `None` if the token has no icon
+pub fn icon_hash(token_id: TID) -> Option<crate::Checksum256> {
     use crate::ServiceWrapper;
-    let path = icon_path(token_id);
     crate::services::sites::Wrapper::call()
-        .getProps(Wrapper::SERVICE, path.clone())
-        .map(|props| format!("{path}?v={}", &props.contentHash.to_string()[..16]))
+        .getProps(Wrapper::SERVICE, icon_path(token_id))
+        .map(|props| props.contentHash)
 }
 
 #[crate::service(name = "tokens", dispatch = false, psibase_mod = "crate")]

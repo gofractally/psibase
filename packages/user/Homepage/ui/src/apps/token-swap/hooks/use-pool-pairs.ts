@@ -20,8 +20,14 @@ export const usePoolPairs = (): Map<number, PoolPair> => {
                 (pools ?? []).map((pool) => [
                     pool.liquidityToken,
                     [
-                        { tokenId: pool.tokenAId, icon: pool.tokenAIcon },
-                        { tokenId: pool.tokenBId, icon: pool.tokenBIcon },
+                        {
+                            tokenId: pool.tokenAId,
+                            iconHash: pool.tokenAIconHash,
+                        },
+                        {
+                            tokenId: pool.tokenBId,
+                            iconHash: pool.tokenBIconHash,
+                        },
                     ] as const,
                 ]),
             ),

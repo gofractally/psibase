@@ -60,7 +60,7 @@ export const CreatePoolModal = ({
                     <AmountSummary
                         amount={Number(firstDeposit?.amount).toString() || ""}
                         tokenId={firstDeposit?.tokenId}
-                        icon={firstDepositToken?.icon}
+                        iconHash={firstDepositToken?.iconHash}
                         label="Founding deposit #1"
                         title={firstDeposit?.tokenId.toString() ?? "?"}
                     />
@@ -72,7 +72,7 @@ export const CreatePoolModal = ({
                     <AmountSummary
                         amount={Number(secondDeposit?.amount).toString() || ""}
                         tokenId={secondDeposit?.tokenId}
-                        icon={secondDepositToken?.icon}
+                        iconHash={secondDepositToken?.iconHash}
                         label="Founding deposit #2"
                         title={secondDeposit?.tokenId?.toString() ?? "?"}
                     />

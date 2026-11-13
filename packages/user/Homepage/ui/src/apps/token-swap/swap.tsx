@@ -95,12 +95,12 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
                     {
                         id: pool.tokenAId,
                         symbol: pool.tokenASymbol,
-                        icon: pool.tokenAIcon,
+                        iconHash: pool.tokenAIconHash,
                     },
                     {
                         id: pool.tokenBId,
                         symbol: pool.tokenBSymbol,
-                        icon: pool.tokenBIcon,
+                        iconHash: pool.tokenBIconHash,
                     },
                 ])
                 .filter(

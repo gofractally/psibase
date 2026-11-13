@@ -83,7 +83,7 @@ export const ConfirmSwapModal = ({
                     <AmountSummary
                         amount={Number(fromAmount).toString() || ""}
                         tokenId={fromTokenId}
-                        icon={fromToken?.icon}
+                        iconHash={fromToken?.iconHash}
                         label="From"
                         title={fromToken?.symbol || `ID: ${fromTokenId}`}
                     />
@@ -97,7 +97,7 @@ export const ConfirmSwapModal = ({
                     <AmountSummary
                         amount={Number(expectedReturn).toString() ?? ""}
                         tokenId={toTokenId}
-                        icon={toToken?.icon}
+                        iconHash={toToken?.iconHash}
                         label="To"
                         title={toToken?.symbol || `ID: ${toTokenId}`}
                     />

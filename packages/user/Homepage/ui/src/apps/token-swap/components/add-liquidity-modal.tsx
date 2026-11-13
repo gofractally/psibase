@@ -63,7 +63,7 @@ export const AddLiquidityModal = ({
                     <AmountSummary
                         amount={Number(firstDeposit?.amount).toString() || ""}
                         tokenId={firstDeposit?.tokenId}
-                        icon={firstDepositToken?.icon}
+                        iconHash={firstDepositToken?.iconHash}
                         label="Deposit #1"
                         title={
                             firstDepositToken?.symbol ||
@@ -79,7 +79,7 @@ export const AddLiquidityModal = ({
                     <AmountSummary
                         amount={Number(secondDeposit?.amount).toString() ?? ""}
                         tokenId={secondDeposit?.tokenId}
-                        icon={secondDepositToken?.icon}
+                        iconHash={secondDepositToken?.iconHash}
                         label="Deposit #2"
                         title={
                             secondDepositToken?.symbol ||

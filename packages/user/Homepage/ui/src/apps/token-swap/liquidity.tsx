@@ -294,19 +294,19 @@ export const Liquidity = () => {
             {
                 id: pool.reserveA.tokenId,
                 symbol: pool.reserveA.symbol,
-                icon: pool.reserveA.icon,
+                iconHash: pool.reserveA.iconHash,
             },
             {
                 id: pool.reserveB.tokenId,
                 symbol: pool.reserveB.symbol,
-                icon: pool.reserveB.icon,
+                iconHash: pool.reserveB.iconHash,
             },
         ]);
 
     const userTokens = (userBalances || [])?.map((balance) => ({
         id: balance.id,
         symbol: balance.symbol,
-        icon: balance.icon,
+        iconHash: balance.iconHash,
         balance: balance.balance,
     }));
 

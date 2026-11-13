@@ -37,14 +37,14 @@ const formatReserve = (value: string) => {
 const TokenChip = ({
     symbol,
     id,
-    icon,
+    iconHash,
 }: {
     symbol?: string | null;
     id: number;
-    icon: string | null;
+    iconHash: string | null;
 }) => (
     <span className="inline-flex items-center gap-1">
-        <TokenIcon tokenId={id} icon={icon} className="size-4" />
+        <TokenIcon tokenId={id} iconHash={iconHash} className="size-4" />
         <span
             className={cn(
                 "font-mono",
@@ -119,7 +119,9 @@ const PoolsPanel = () => {
                                                 <TokenChip
                                                     symbol={pool.tokenASymbol}
                                                     id={pool.tokenAId}
-                                                    icon={pool.tokenAIcon}
+                                                    iconHash={
+                                                        pool.tokenAIconHash
+                                                    }
                                                 />
                                                 <span className="text-muted-foreground">
                                                     /
@@ -127,7 +129,9 @@ const PoolsPanel = () => {
                                                 <TokenChip
                                                     symbol={pool.tokenBSymbol}
                                                     id={pool.tokenBId}
-                                                    icon={pool.tokenBIcon}
+                                                    iconHash={
+                                                        pool.tokenBIconHash
+                                                    }
                                                 />
                                             </span>
                                         </Td>

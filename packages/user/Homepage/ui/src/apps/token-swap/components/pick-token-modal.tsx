@@ -11,7 +11,7 @@ import {
 interface Token {
     id: number;
     symbol: string | null | undefined;
-    icon?: string | null;
+    iconHash?: string | null;
     balance?: Quantity;
 }
 
@@ -59,7 +59,7 @@ export const PickTokenModal = ({
                                     <div className="flex items-center gap-2">
                                         <TokenIcon
                                             tokenId={token.id}
-                                            icon={token.icon}
+                                            iconHash={token.iconHash}
                                             className="size-5"
                                         />
                                         <span

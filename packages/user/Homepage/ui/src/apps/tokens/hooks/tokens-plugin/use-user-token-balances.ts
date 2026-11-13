@@ -23,7 +23,7 @@ export interface Token {
     label: string;
     precision: number;
     isTransferable: boolean;
-    icon: string | null;
+    iconHash: string | null;
     owner: string | null;
 }
 
@@ -37,7 +37,7 @@ export const zeroBalanceToken = (token: TokenSummary): Token => {
         label: balance.getDisplayLabel(),
         precision: token.precision,
         isTransferable: !token.settings.untransferable,
-        icon: token.icon,
+        iconHash: token.iconHash,
         owner: token.owner,
     };
 };
@@ -90,7 +90,7 @@ export const useUserTokenBalances = (
                     label: quan.getDisplayLabel(),
                     balance: quan,
                     isTransferable: meta?.settings.untransferable === false,
-                    icon: balance.icon ?? null,
+                    iconHash: balance.iconHash ?? null,
                     owner: meta?.owner ?? null,
                 };
             });

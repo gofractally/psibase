@@ -16,7 +16,7 @@ export interface UserTokenBalance {
     balance: Quantity;
     symbol: string | null;
     precision: number;
-    icon: string | null;
+    iconHash: string | null;
 }
 
 export function getSystemTokenBalance(
@@ -32,7 +32,7 @@ export function toUserTokenBalances(nodes: UserBalance[]): UserTokenBalance[] {
         id: node.tokenId,
         symbol: node.symbol ?? null,
         precision: node.precision,
-        icon: node.icon ?? null,
+        iconHash: node.iconHash ?? null,
         balance: new Quantity(
             node.balance,
             node.precision,
