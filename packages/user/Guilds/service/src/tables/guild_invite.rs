@@ -102,7 +102,6 @@ impl GuildInvite {
 
         tokens.debit(system_token, from.0, amount, from.1);
         tokens.credit(system_token, to.0, amount, to.1);
-        tokens.reject(system_token, from.0, "Unused amount".into());
     }
 
     fn remove(&self) {

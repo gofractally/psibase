@@ -173,8 +173,6 @@ pub mod service {
         let cost = current_price;
         Tokens::Wrapper::call().debit(sys_token_id, sender, cost, "".into());
 
-        Tokens::Wrapper::call().reject(sys_token_id, sender, "return change".into());
-
         crate::Wrapper::emit()
             .history()
             .nameMktEvent(sender, account, BOUGHT);

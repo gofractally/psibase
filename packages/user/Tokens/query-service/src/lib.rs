@@ -336,7 +336,7 @@ mod service {
         /// from this node) related to changes to the balances of the specified token for the
         /// specified user.
         /// Changes in the balance of at least one user happen when tokens are recalled, burned,
-        /// credited, debited, uncredited, rejected.
+        /// credited, debited, or uncredited.
         async fn balChanges(
             &self,
             token_id: TID,

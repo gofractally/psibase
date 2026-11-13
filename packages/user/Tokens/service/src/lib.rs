@@ -378,7 +378,6 @@ pub mod service {
     /// When in the shared balance, the tokens can be:
     /// * uncredited (transfer cancelled) by the creditor
     /// * debited (transfer accepted) by the debitor
-    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
@@ -409,7 +408,6 @@ pub mod service {
     /// When in the shared balance, the tokens can be:
     /// * uncredited (transfer cancelled) by the creditor
     /// * debited (transfer accepted) by the debitor
-    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
@@ -418,7 +416,10 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn uncredit(token_id: TID, debitor: AccountNumber, amount: Quantity, memo: Memo) {
-        SharedBalance::get_assert(get_sender(), debitor, token_id).uncredit(amount, memo);
+        // The row is gone once a debit takes the last of it.
+        if let Some(mut shared) = SharedBalance::get(get_sender(), debitor, token_id) {
+            shared.uncredit(amount, memo);
+        }
     }
 
     /// Debit tokens that were credited into a shared balance
@@ -430,7 +431,6 @@ pub mod service {
     /// When in the shared balance, the tokens can be:
     /// * uncredited (transfer cancelled) by the creditor
     /// * debited (transfer accepted) by the debitor
-    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
@@ -440,28 +440,6 @@ pub mod service {
     #[action]
     fn debit(token_id: TID, creditor: AccountNumber, amount: Quantity, memo: Memo) {
         SharedBalance::get_assert(creditor, get_sender(), token_id).debit(amount, memo);
-    }
-
-    /// Rejects the shared balance between a creditor and a debitor
-    ///
-    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
-    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
-    ///
-    /// # Shared balance mechanics
-    /// When in the shared balance, the tokens can be:
-    /// * uncredited (transfer cancelled) by the creditor
-    /// * debited (transfer accepted) by the debitor
-    /// * rejected (transfer rejected) by the debitor
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    /// * `creditor`  - User who credited the tokens
-    /// * `memo`     - Memo
-    #[action]
-    fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
-        if let Some(mut shared) = SharedBalance::get(creditor, get_sender(), token_id) {
-            shared.reject(memo);
-        }
     }
 
     /// Sends tokens from an account's primary balance into a "sub-account" balance

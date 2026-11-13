@@ -97,7 +97,6 @@ mod service {
     /// When in the shared balance, the tokens can be:
     /// * uncredited (transfer cancelled) by the creditor
     /// * debited (transfer accepted) by the debitor
-    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
@@ -118,7 +117,6 @@ mod service {
     /// When in the shared balance, the tokens can be:
     /// * uncredited (transfer cancelled) by the creditor
     /// * debited (transfer accepted) by the debitor
-    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
@@ -139,7 +137,6 @@ mod service {
     /// When in the shared balance, the tokens can be:
     /// * uncredited (transfer cancelled) by the creditor
     /// * debited (transfer accepted) by the debitor
-    /// * rejected (transfer rejected) by the debitor
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
@@ -346,26 +343,6 @@ mod service {
     /// Returns a `bool` indicating whether the specified configuration flag is enabled
     #[action]
     fn getTokenConf(token_id: TID, index: u8) -> bool {
-        unimplemented!()
-    }
-
-    /// Rejects the shared balance between a creditor and a debitor
-    ///
-    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
-    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
-    ///
-    /// # Shared balance mechanics
-    /// When in the shared balance, the tokens can be:
-    /// * uncredited (transfer cancelled) by the creditor
-    /// * debited (transfer accepted) by the debitor
-    /// * rejected (transfer rejected) by the debitor
-    ///
-    /// # Arguments
-    /// * `token_id` - Unique token identifier
-    /// * `creditor`  - User who credited the tokens
-    /// * `memo`     - Memo
-    #[action]
-    fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
         unimplemented!()
     }
 

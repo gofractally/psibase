@@ -13,7 +13,7 @@ use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
 use bindings::tokens::plugin::helpers::decimal_to_u64;
-use bindings::tokens::plugin::user::credit;
+use bindings::tokens::plugin::user::{credit, uncredit};
 use psibase::define_trust;
 use psibase::fracpack::Pack;
 
@@ -54,7 +54,7 @@ define_trust! {
 
 struct TokenSwapPlugin;
 
-fn reserve_amount_to_quantity(reserve_amount: TokenAmount) -> Result<Quantity, Error> {
+fn reserve_amount_to_quantity(reserve_amount: &TokenAmount) -> Result<Quantity, Error> {
     decimal_to_u64(reserve_amount.token_id, &reserve_amount.amount).map(|amount| amount.into())
 }
 
@@ -62,7 +62,7 @@ fn assert_authed(function: FunctionName) -> Result<(), Error> {
     assert_authorized_with_whitelist(function, vec!["homepage".into()])
 }
 
-fn credit_to_service(amount: TokenAmount, memo: &str) -> Result<Quantity, Error> {
+fn credit_to_service(amount: &TokenAmount, memo: &str) -> Result<Quantity, Error> {
     credit(
         amount.token_id,
         &token_swap::SERVICE.to_string(),
@@ -71,6 +71,15 @@ fn credit_to_service(amount: TokenAmount, memo: &str) -> Result<Quantity, Error>
     )?;
 
     reserve_amount_to_quantity(amount)
+}
+
+fn return_surplus(amount: &TokenAmount, memo: &str) -> Result<(), Error> {
+    uncredit(
+        amount.token_id,
+        &token_swap::SERVICE.to_string(),
+        &amount.amount,
+        memo,
+    )
 }
 
 impl From<GraphQLPool> for WitPool {
@@ -117,7 +126,7 @@ impl Swap for TokenSwapPlugin {
         let (pools, return_amount, slippage_ppm, path_was_found) = find_path(
             pools,
             from_amount.token_id,
-            reserve_amount_to_quantity(from_amount)?,
+            reserve_amount_to_quantity(&from_amount)?,
             to_token,
             max_hops,
         );
@@ -154,7 +163,7 @@ impl Swap for TokenSwapPlugin {
 
         let packed_args = token_swap::action_structs::swap {
             token_in: amount_in.token_id,
-            amount_in: credit_to_service(amount_in, "Swap start")?,
+            amount_in: credit_to_service(&amount_in, "Swap start")?,
             min_return: Decimal::from_str(&min_return).unwrap().quantity,
             pools: pools
                 .into_iter()
@@ -178,8 +187,8 @@ impl Liquidity for TokenSwapPlugin {
         let packed_args = token_swap::action_structs::new_pool {
             token_a: a_deposit.token_id,
             token_b: b_deposit.token_id,
-            token_a_amount: credit_to_service(a_deposit, "Initial liquidity deposit")?,
-            token_b_amount: credit_to_service(b_deposit, "Initial liquidity deposit")?,
+            token_a_amount: credit_to_service(&a_deposit, "Initial liquidity deposit")?,
+            token_b_amount: credit_to_service(&b_deposit, "Initial liquidity deposit")?,
             nft_id,
         }
         .packed();
@@ -187,7 +196,9 @@ impl Liquidity for TokenSwapPlugin {
         add_action_to_transaction(
             token_swap::action_structs::new_pool::ACTION_NAME,
             &packed_args,
-        )
+        )?;
+        return_surplus(&a_deposit, "Initial liquidity deposit")?;
+        return_surplus(&b_deposit, "Initial liquidity deposit")
     }
 
     fn add_liquidity(
@@ -201,15 +212,17 @@ impl Liquidity for TokenSwapPlugin {
             pool_id,
             token_a: first_deposit.token_id,
             token_b: second_deposit.token_id,
-            amount_a: credit_to_service(first_deposit, "Liquidity deposit")?,
-            amount_b: credit_to_service(second_deposit, "Liquidity deposit")?,
+            amount_a: credit_to_service(&first_deposit, "Liquidity deposit")?,
+            amount_b: credit_to_service(&second_deposit, "Liquidity deposit")?,
         }
         .packed();
 
         add_action_to_transaction(
             token_swap::action_structs::add_liquidity::ACTION_NAME,
             &packed_args,
-        )
+        )?;
+        return_surplus(&first_deposit, "Liquidity deposit")?;
+        return_surplus(&second_deposit, "Liquidity deposit")
     }
 
     fn quote_single_sided_remove(
@@ -234,7 +247,7 @@ impl Liquidity for TokenSwapPlugin {
             return Err(ErrorType::TokenDoesNotExist.into());
         };
 
-        let desired_qty = reserve_amount_to_quantity(desired_amount)?;
+        let desired_qty = reserve_amount_to_quantity(&desired_amount)?;
 
         if desired_qty > wanted_reserve.quantity {
             return Err(ErrorType::DesiredHigherThanReserve.into());
@@ -266,7 +279,7 @@ impl Liquidity for TokenSwapPlugin {
 
         let packed_args = token_swap::action_structs::remove_liquidity {
             pool_id: amount.token_id,
-            lp_amount: credit_to_service(amount, "Liquidity removal")?,
+            lp_amount: credit_to_service(&amount, "Liquidity removal")?,
         }
         .packed();
 
@@ -316,7 +329,7 @@ impl Liquidity for TokenSwapPlugin {
             return Err(ErrorType::TokenDoesNotExist.into());
         };
 
-        let quoting_amount = reserve_amount_to_quantity(amount)?;
+        let quoting_amount = reserve_amount_to_quantity(&amount)?;
 
         let pool = GraphPool::from(pool);
 

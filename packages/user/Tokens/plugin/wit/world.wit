@@ -108,14 +108,6 @@ interface user {
     /// * `memo`     - Memo describing the debit
     debit: func(token-id: u32, creditor: string, amount: decimal, memo: string) -> result<_, error>;
 
-    /// Reject all shared-balance tokens from a creditor.
-    ///
-    /// Arguments
-    /// * `token_id` - Unique token identifier
-    /// * `creditor` - Account that initiated the credit
-    /// * `memo`     - Memo describing the rejection
-    reject: func(token-id: u32, creditor: string, memo: string) -> result<_, error>;
-
     /// Burn tokens from the caller's balance.
     ///
     /// Arguments

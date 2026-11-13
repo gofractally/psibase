@@ -134,17 +134,29 @@ mod tests {
         }
 
         // Perform pre-credits if any
-        for (token_id, amount) in credits {
+        for (token_id, amount) in &credits {
             tokens_credit(
                 chain,
-                token_id,
+                *token_id,
                 sender,
                 account!("token-swap"),
-                amount.into(),
+                (*amount).into(),
             );
         }
 
         action();
+
+        for (token_id, amount) in &credits {
+            Tokens::push_from(chain, sender)
+                .uncredit(
+                    *token_id,
+                    account!("token-swap"),
+                    (*amount).into(),
+                    "Dust".to_string().try_into().unwrap(),
+                )
+                .get()
+                .unwrap();
+        }
 
         // Assert deltas
         for (i, &(token, exp_delta)) in expectations.iter().enumerate() {
@@ -287,7 +299,7 @@ mod tests {
             &chain,
             alice,
             vec![(token_a, 100), (token_b, 200)],
-            // Due to the pool having 1:1 reserve ratios, we expect the pool to only take 100 token_b tokens despite sending 200, the rest is rejected
+            // Due to the pool having 1:1 reserve ratios, we expect the pool to only take 100 token_b tokens despite sending 200, the rest is uncredited
             vec![(token_a, -100), (token_b, -100)],
             || {
                 Wrapper::push_from(&chain, alice)

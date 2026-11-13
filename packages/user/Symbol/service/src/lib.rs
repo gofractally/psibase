@@ -66,7 +66,6 @@ pub mod tables {
                     price,
                     "symbol purchase".to_string().try_into().unwrap(),
                 );
-                Tokens::call().reject(billing_token, sender, "Dust return".try_into().unwrap())
             }
         }
 

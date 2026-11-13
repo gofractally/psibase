@@ -77,9 +77,9 @@ export const AutoDebitSwitch = ({
                                     Turning auto debit off prevents direct token
                                     transfers to you. Incoming tokens will
                                     appear on the Pending page where you can
-                                    Accept or Reject them. These tokens won't be
-                                    added to your balance until accepted, and
-                                    senders can cancel them while pending.
+                                    accept them. These tokens won't be added to
+                                    your balance until accepted, and senders can
+                                    cancel them while pending.
                                 </>
                             ) : (
                                 <div className="space-y-2">

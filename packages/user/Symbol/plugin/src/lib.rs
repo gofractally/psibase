@@ -47,27 +47,37 @@ impl Api for SymbolPlugin {
         let billing_token = bindings::tokens::plugin::helpers::fetch_network_token()?
             .ok_or(ErrorType::BillingTokenNotSet)?;
 
-        bindings::tokens::plugin::user::credit(
+        let credited = match bindings::tokens::plugin::user::credit(
             billing_token,
             &symbol::Wrapper::SERVICE.to_string(),
             &deposit,
             "".into(),
-        )
-        .or_else(|error| {
-            if error.producer.service == tokens::SERVICE.to_string()
-                && error.code == error_codes::CREDITING_ZERO_QUANTITY
+        ) {
+            Ok(()) => true,
+            Err(error)
+                if error.producer.service == tokens::SERVICE.to_string()
+                    && error.code == error_codes::CREDITING_ZERO_QUANTITY =>
             {
-                Ok(())
-            } else {
-                Err(error)
+                false
             }
-        })?;
+            Err(error) => return Err(error),
+        };
 
         let packed_args = symbol::action_structs::create {
             symbol: symbol.parse().unwrap(),
         }
         .packed();
-        add_action_to_transaction(symbol::action_structs::create::ACTION_NAME, &packed_args)
+        add_action_to_transaction(symbol::action_structs::create::ACTION_NAME, &packed_args)?;
+
+        if credited {
+            bindings::tokens::plugin::user::uncredit(
+                billing_token,
+                &symbol::Wrapper::SERVICE.to_string(),
+                &deposit,
+                "Dust return",
+            )?;
+        }
+        Ok(())
     }
 
     fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {

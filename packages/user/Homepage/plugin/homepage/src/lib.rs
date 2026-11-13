@@ -77,11 +77,6 @@ impl Tokens for HomepagePlugin {
         tokens::plugin::user::debit(token_id, &creditor, &amount, &memo)
     }
 
-    fn reject(token_id: u32, creditor: String, memo: String) -> Result<(), Error> {
-        assert_caller_self();
-        tokens::plugin::user::reject(token_id, &creditor, &memo)
-    }
-
     fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
         assert_caller_self();
         tokens::plugin::user_config::enable_user_auto_debit(enable)
