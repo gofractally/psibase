@@ -84,6 +84,49 @@ function quotedRaw(
     return raw > 0n ? raw : null;
 }
 
+/**
+ * Signed to-asset of a buy. Old debt is rebooked (fee on top, a debt).
+ * The rest is a new claim (fee off, a receipt). Positive means the taker
+ * receives. Negative means they owe. Null when either slice cannot price.
+ */
+function buyNetRaw(
+    amount: string,
+    owedRaw: bigint,
+    fee: string,
+    fxRate: string,
+    fromPrec: number,
+    toPrec: number,
+): bigint | null {
+    const clicked = humanToRaw(amount, fromPrec);
+    if (clicked <= 0n) return null;
+    const rebook = clicked < owedRaw ? clicked : owedRaw;
+    const open = clicked - rebook;
+    const rebookTo =
+        rebook > 0n
+            ? quotedRaw(
+                  rawToFixed(rebook, fromPrec),
+                  fee,
+                  fxRate,
+                  fromPrec,
+                  toPrec,
+                  true,
+              )
+            : 0n;
+    const openTo =
+        open > 0n
+            ? quotedRaw(
+                  rawToFixed(open, fromPrec),
+                  fee,
+                  fxRate,
+                  fromPrec,
+                  toPrec,
+                  false,
+              )
+            : 0n;
+    if (rebookTo === null || openTo === null) return null;
+    return openTo - rebookTo;
+}
+
 export function TakeTradeDialog({
     trade,
     taker,
@@ -142,7 +185,8 @@ export function TakeTradeDialog({
         selling && policy && fromPrec !== undefined
             ? directedDebt(obligations, taker, poster, policy.fromAsset, fromPrec)
             : null;
-    // Debt already in this book is one rebook. Otherwise a buy opens both legs.
+    // Debt already in this book is rebooked. The rest of the click opens
+    // both legs. The cap is the order, not the old bill.
     const owedByTaker =
         buying && policy && fromPrec !== undefined
             ? directedDebt(
@@ -155,7 +199,7 @@ export function TakeTradeDialog({
             : 0n;
     const debtReady = !obligationsLoading && !obligationsError;
     const immediate = buying && debtReady && owedByTaker > 0n;
-    const directCap = immediate ? owedByTaker : claimRaw;
+    const directCap = selling ? claimRaw : null;
     const capRaw =
         directCap === null
             ? remainingRaw
@@ -195,7 +239,7 @@ export function TakeTradeDialog({
     } else if (policy && buying && obligationsLoading) {
         description = "Checking what you already owe them.";
     } else if (policy && buying && immediate) {
-        description = `This rebooks ${fromSymbol} you already owe ${display} into ${toSymbol} at their price.`;
+        description = `${fromSymbol} you already owe ${display} is rebooked at their price. Anything past that is a new ${fromSymbol} debt.`;
     } else if (policy && buying) {
         description = `You owe ${display} the ${fromSymbol} you take, and they owe you ${toSymbol}, both at their order rate. This needs a ${fromSymbol} line from them and a ${toSymbol} line from you.`;
     } else if (policy && selling && obligationsError) {
@@ -237,15 +281,25 @@ export function TakeTradeDialog({
         if (policy) {
             // Existing from-debt adds the fee onto what the debtor will owe.
             // A new book and a sell subtract it from what the taker receives.
-            const received = quotedRaw(
-                amount,
-                policy.feeFixed,
-                policy.fxRate,
-                fromPrec,
-                toPrec,
-                immediate,
-            );
-            if (!received) {
+            // A buy that does both signs the net of the two.
+            const received = buying
+                ? buyNetRaw(
+                      amount,
+                      owedByTaker,
+                      policy.feeFixed,
+                      policy.fxRate,
+                      fromPrec,
+                      toPrec,
+                  )
+                : quotedRaw(
+                      amount,
+                      policy.feeFixed,
+                      policy.fxRate,
+                      fromPrec,
+                      toPrec,
+                      false,
+                  );
+            if (received === null) {
                 toast.error("That amount is too small at their rate.");
                 return;
             }
@@ -257,7 +311,7 @@ export function TakeTradeDialog({
                         toAsset: policy.toAsset,
                         posterIsCreditor: policy.posterIsCreditor,
                         amountFrom: amount,
-                        minTo: rawToFixed(received, toPrec),
+                        toBound: rawToFixed(received, toPrec),
                     },
                     {
                         onSuccess: () => {
@@ -346,9 +400,7 @@ export function TakeTradeDialog({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>
-                        {policy && (immediate || selling)
-                            ? "Rebook"
-                            : "Open trade"}
+                        {policy && selling ? "Rebook" : "Take trade"}
                     </DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
@@ -409,11 +461,13 @@ export function TakeTradeDialog({
                                 <field.TextField
                                     label={`Amount (${fromSymbol})`}
                                     description={
-                                        policy && (immediate || selling)
-                                            ? `Up to ${capHuman} ${fromSymbol}. This becomes ${toSymbol} debt, same direction.`
-                                            : policy
-                                              ? `Up to ${capHuman} ${fromSymbol}. You will owe them that, and they will owe you ${toSymbol}.`
-                                              : `Up to ${capHuman} ${fromSymbol}.`
+                                        policy && immediate
+                                            ? `Up to ${capHuman} ${fromSymbol}. What you already owe is rebooked. The rest is a new trade.`
+                                            : policy && selling
+                                              ? `Up to ${capHuman} ${fromSymbol}. This becomes ${toSymbol} debt, same direction.`
+                                              : policy
+                                                ? `Up to ${capHuman} ${fromSymbol}. You will owe them that, and they will owe you ${toSymbol}.`
+                                                : `Up to ${capHuman} ${fromSymbol}.`
                                     }
                                     inputMode="decimal"
                                     required
@@ -424,35 +478,52 @@ export function TakeTradeDialog({
                         <form.Subscribe
                             selector={(s) => s.values.amount}
                             children={(amount) => {
-                                const received =
-                                    policy || quote
-                                        ? quotedRaw(
+                                const net = policy
+                                    ? buying
+                                        ? buyNetRaw(
                                               String(amount ?? ""),
-                                              policy?.feeFixed ??
-                                                  quote?.feeFixed ??
-                                                  "0",
-                                              policy?.fxRate ??
-                                                  quote?.fxRate ??
-                                                  "0",
+                                              owedByTaker,
+                                              policy.feeFixed,
+                                              policy.fxRate,
                                               fromPrec,
                                               toPrec,
-                                              immediate,
                                           )
-                                        : null;
+                                        : quotedRaw(
+                                              String(amount ?? ""),
+                                              policy.feeFixed,
+                                              policy.fxRate,
+                                              fromPrec,
+                                              toPrec,
+                                              false,
+                                          )
+                                    : quote
+                                      ? quotedRaw(
+                                            String(amount ?? ""),
+                                            quote.feeFixed,
+                                            quote.fxRate,
+                                            fromPrec,
+                                            toPrec,
+                                        )
+                                      : null;
                                 const shown =
-                                    received === null
+                                    net === null
                                         ? "—"
                                         : formatRawAmount(
-                                              received.toString(),
+                                              (net < 0n ? -net : net).toString(),
                                               toPrec,
                                           );
+                                const oweNet = net !== null && net < 0n;
+                                const line =
+                                    net === null
+                                        ? shown
+                                        : oweNet
+                                          ? `You will owe ${shown} ${toSymbol}.`
+                                          : selling
+                                            ? `You will be owed ${shown} ${toSymbol}.`
+                                            : `You receive ${shown} ${toSymbol}.`;
                                 return (
                                     <p className="text-muted-foreground text-sm">
-                                        {immediate
-                                            ? `You will owe ${shown} ${toSymbol}.`
-                                            : selling
-                                              ? `You will be owed ${shown} ${toSymbol}.`
-                                              : `You receive ${shown} ${toSymbol}.`}
+                                        {line}
                                     </p>
                                 );
                             }}
@@ -467,11 +538,10 @@ export function TakeTradeDialog({
                             </Button>
                             <form.AppForm>
                                 <form.SubmitButton
-                                    labels={
-                                        immediate || selling
-                                            ? ["Rebook", "Rebooking…"]
-                                            : ["Open trade", "Opening…"]
-                                    }
+                                    labels={[
+                                        "Take trade",
+                                        "Taking…",
+                                    ]}
                                     loading={pending}
                                 />
                             </form.AppForm>

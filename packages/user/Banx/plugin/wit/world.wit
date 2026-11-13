@@ -328,16 +328,17 @@ interface api {
     ) -> result<_, error>;
 
     /// Take the clicked from→to order. `poster-is-creditor` is that row.
-    /// A buy rebooks from-asset you already owe them. Their claim on you in
-    /// that asset does not switch this to the sell. `min-to` is a human
-    /// decimal in the to-asset.
+    /// A buy rebooks from-asset you already owe them, then opens the rest.
+    /// Their claim on you in that asset does not switch this to the sell.
+    /// `to-bound` is a signed human decimal in the to-asset. Positive floors
+    /// a receipt. Negative caps a debt. Zero on a split is a wash.
     take-fx: func(
         poster: string,
         from-asset: u16,
         to-asset: u16,
         poster-is-creditor: bool,
         amount-from: string,
-        min-to: string,
+        to-bound: string,
     ) -> result<_, error>;
 
     /// Multi-hop path payment. Each hop is (account, asset-id).

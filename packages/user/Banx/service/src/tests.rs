@@ -2379,7 +2379,7 @@ mod tests {
                 aud,
                 true,
                 Quantity::new(CHARGE),
-                Quantity::new(quoted_aud),
+                quoted_aud as i64,
             )
             .get()
             .expect_err("John does not owe Michelle the kWh");
@@ -2426,7 +2426,7 @@ mod tests {
                 aud,
                 true,
                 Quantity::new(CHARGE),
-                Quantity::new(quoted_aud),
+                quoted_aud as i64,
             )
             .get()?;
         assert_eq!(exp(&chain, michelle, isabelle, kwh), 0);
@@ -2519,7 +2519,7 @@ mod tests {
                 aud,
                 true,
                 Quantity::new(TRADE),
-                Quantity::new(quoted_aud),
+                quoted_aud as i64,
             )
             .get()
             .expect_err("the buy is a rebook of debt John does not owe");
@@ -9349,7 +9349,7 @@ mod tests {
             .get()?;
 
         let missing = Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(45))
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 45)
             .get()
             .expect_err("Gary has not lined Alice in USD");
         assert!(
@@ -9364,7 +9364,7 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(1_000), false, 80_000, 0)
             .get()?;
         let short = Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(46))
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 46)
             .get()
             .expect_err("fee leaves 45, below the signed floor");
         assert!(
@@ -9373,7 +9373,7 @@ mod tests {
         );
 
         Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(45))
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 45)
             .get()?;
         // 100 − 10 fee, then half. Order APR is 0, not either line's rate.
         assert_eq!(exp(&chain, alice, gary, aud), 100);
@@ -9431,7 +9431,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(50))
+            .take_fx(alice, aud, usd, true, Quantity::new(100), -50)
             .get()?;
         assert_eq!(exp(&chain, alice, gary, aud), 0);
         assert_eq!(exp(&chain, alice, gary, usd), 50);
@@ -9449,6 +9449,190 @@ mod tests {
             .expect("alice convert row");
         assert_eq!(alice_row["actor"], "gary");
         assert_eq!(alice_row["counterparty"], "gary");
+        Ok(())
+    }
+
+    /// A buy larger than the old bill rebooks that bill and opens the rest.
+    /// The signed bound is the net of the two to-asset results.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_take_fx_buy_fills_past_existing_debt(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(gary, aud, Quantity::new(1_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .path_pay(
+                vec![hop(alice, aud)],
+                Quantity::new(10),
+                Quantity::new(10),
+                0,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(1_000), false, 80_000, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_fx_ofr(
+                aud,
+                usd,
+                true,
+                Quantity::new(0),
+                RATE_SCALE / 2,
+                0,
+                Quantity::new(200),
+                never(),
+            )
+            .get()?;
+
+        // 10 rebooks to 5 of debt. 90 opens 45 of receipt. Net 40.
+        let short = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 41)
+            .get()
+            .expect_err("net receipt is 40, below the signed floor");
+        assert!(
+            short.to_string().contains("trade output below min_to"),
+            "{short}"
+        );
+        assert_eq!(exp(&chain, alice, gary, aud), 10);
+
+        Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 40)
+            .get()?;
+        assert_eq!(exp(&chain, alice, gary, aud), 90);
+        assert_eq!(exp(&chain, gary, alice, usd), 40);
+        assert_eq!(exp(&chain, alice, gary, usd), 0);
+        assert_eq!(exp(&chain, gary, alice, aud), 0);
+        Ok(())
+    }
+
+    /// A signed receipt must not fill as a debt of the same size when the
+    /// from-asset exposure crosses the preview. A signed wash is not unbounded.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_take_fx_bound_keeps_signed_side(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(gary, aud, Quantity::new(1_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(1_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .path_pay(
+                vec![hop(alice, aud)],
+                Quantity::new(51),
+                Quantity::new(51),
+                0,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_fx_ofr(
+                aud,
+                usd,
+                true,
+                Quantity::new(0),
+                RATE_SCALE / 2,
+                0,
+                Quantity::new(200),
+                never(),
+            )
+            .get()?;
+
+        // Preview at owed 49 signs a receipt of 1. Execution at owed 51 is a
+        // debt of 1. The same absolute bound must not pass.
+        let crossed = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 1)
+            .get()
+            .expect_err("a signed receipt cannot fill as a debt");
+        assert!(
+            crossed.to_string().contains("trade output below min_to"),
+            "{crossed}"
+        );
+        assert_eq!(exp(&chain, alice, gary, aud), 51);
+
+        // A previewed wash signs 0. A later debt is still rejected.
+        let wash = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 0)
+            .get()
+            .expect_err("a signed wash cannot fill as a debt");
+        assert!(
+            wash.to_string().contains("trade output below min_to"),
+            "{wash}"
+        );
+        assert_eq!(exp(&chain, alice, gary, aud), 51);
+        Ok(())
+    }
+
+    /// Fee is charged on each slice. A debt cap still rejects a larger debt.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_take_fx_split_fee_keeps_debt_cap(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(gary, aud, Quantity::new(1_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(1_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .path_pay(
+                vec![hop(alice, aud)],
+                Quantity::new(80),
+                Quantity::new(80),
+                0,
+            )
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_fx_ofr(
+                aud,
+                usd,
+                true,
+                Quantity::new(10),
+                RATE_SCALE / 2,
+                0,
+                Quantity::new(200),
+                never(),
+            )
+            .get()?;
+
+        // 80 + 10 rebooks to 45 of debt. 20 − 10 opens 5 of receipt. Net debt 40.
+        let over = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), -39)
+            .get()
+            .expect_err("net debt is 40, above the signed cap");
+        assert!(
+            over.to_string().contains("trade output above min_to"),
+            "{over}"
+        );
+        assert_eq!(exp(&chain, alice, gary, aud), 80);
+
+        Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), -40)
+            .get()?;
+        assert_eq!(exp(&chain, alice, gary, aud), 20);
+        assert_eq!(exp(&chain, alice, gary, usd), 40);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
         Ok(())
     }
 
@@ -9488,7 +9672,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), Quantity::new(50))
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 50)
             .get()?;
         assert_eq!(exp(&chain, alice, gary, aud), 99);
         assert_eq!(exp(&chain, gary, alice, aud), 0);

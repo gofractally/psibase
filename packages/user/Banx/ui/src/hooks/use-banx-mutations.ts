@@ -1177,7 +1177,8 @@ export function useTakeFx() {
             toAsset: number;
             posterIsCreditor: boolean;
             amountFrom: string;
-            minTo: string;
+            /** Signed human to-asset. Positive floors a receipt. Negative caps a debt. */
+            toBound: string;
         }) =>
             banxCall("takeFx", [
                 p.poster,
@@ -1185,7 +1186,7 @@ export function useTakeFx() {
                 p.toAsset,
                 p.posterIsCreditor,
                 p.amountFrom,
-                p.minTo,
+                p.toBound,
             ]),
         onSuccess: () => {
             invalidate();

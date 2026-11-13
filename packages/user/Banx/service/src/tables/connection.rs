@@ -142,6 +142,29 @@ impl Connection {
         self.credit_and_net(amount, interest_rate);
     }
 
+    /// To-asset a rebook of `take` would book, without moving claims.
+    ///
+    /// Same fee rule as [`Self::rebook`]. `add_fee` puts the fee on top of
+    /// `take`. Otherwise the fee comes out of `take`.
+    pub fn priced(
+        &self,
+        take: Quantity,
+        fee_fixed: Quantity,
+        fx_rate: u64,
+        add_fee: bool,
+    ) -> Quantity {
+        let (priced, fee) = if add_fee {
+            let gross = take
+                .value
+                .checked_add(fee_fixed.value)
+                .expect("rate conversion failed");
+            (Quantity::new(gross), Quantity::new(0))
+        } else {
+            (take, fee_fixed)
+        };
+        apply_rate(priced, fee, fx_rate)
+    }
+
     /// Reduce this leftover claim by `take` and credit the same pair in
     /// `to_asset`. Caller must already have netted `from_asset`.
     ///
@@ -165,16 +188,7 @@ impl Connection {
     ) -> Quantity {
         assert!(take.value > 0, "convert amount must be positive");
         Obligation::apply_reduction(self.creditor, self.debtor, self.asset_id, take.value);
-        let (priced, fee) = if add_fee {
-            let gross = take
-                .value
-                .checked_add(fee_fixed.value)
-                .expect("rate conversion failed");
-            (Quantity::new(gross), Quantity::new(0))
-        } else {
-            (take, fee_fixed)
-        };
-        let to_qty = apply_rate(priced, fee, fx_rate);
+        let to_qty = self.priced(take, fee_fixed, fx_rate, add_fee);
         if add_fee {
             // A floor would accept a replaced higher rate: the taker owes more
             // than they signed. Zero stays open so existing takes can pass it.

@@ -204,11 +204,17 @@ impl FxOffer {
 
     /// Take the clicked from→to order. `poster_is_creditor` is that row.
     ///
-    /// A buy rebooks from-asset the taker still owes the poster. A reverse
-    /// claim (the poster already owes the taker) is not that order: the two
-    /// legs open, and [`Connection::book_at_rate`] nets it as unwind. A sell
-    /// only rebooks from-asset the poster owes the taker. It does not open a
-    /// book. Both new claims use the order's APR. Lines are capacity only.
+    /// A buy rebooks from-asset the taker still owes the poster, then opens
+    /// both legs for the rest of the click. A reverse claim (the poster
+    /// already owes the taker) is not that order: the two legs open, and
+    /// [`Connection::book_at_rate`] nets it as unwind. A sell only rebooks
+    /// from-asset the poster owes the taker. It does not open a book. Both
+    /// new claims use the order's APR. Lines are capacity only.
+    ///
+    /// `to_bound` is the taker's signed net in the to-asset. Positive floors
+    /// a receipt and rejects any debt. Negative caps a debt; a receipt still
+    /// passes. Zero on a split is a wash: any debt is rejected. Zero on a
+    /// click that is only a rebook or only a new trade does not bound.
     pub fn take_order(
         taker: AccountNumber,
         poster: AccountNumber,
@@ -216,19 +222,33 @@ impl FxOffer {
         to_asset: u16,
         poster_is_creditor: bool,
         amount_from: Quantity,
-        min_to: Quantity,
+        to_bound: i64,
     ) {
         assert!(taker != poster, "cannot take an order with self");
         assert!(amount_from.value > 0, "trade amount must be positive");
         Obligation::net_pair(taker, poster, from_asset, u64::MAX.into());
-        let taker_owes = Obligation::exposure(poster, taker, from_asset).value;
+        let taker_owes = Obligation::exposure(poster, taker, from_asset);
         let poster_owes = Obligation::exposure(taker, poster, from_asset).value;
-        if poster_is_creditor && taker_owes > 0 {
+        if poster_is_creditor && taker_owes.value > 0 && taker_owes < amount_from {
+            Self::take_buy_split(
+                taker,
+                poster,
+                from_asset,
+                to_asset,
+                amount_from,
+                taker_owes,
+                to_bound,
+            );
+            return;
+        }
+        if poster_is_creditor && taker_owes.value > 0 {
+            // A receipt floor cannot be met by a click that is only debt.
+            assert!(to_bound <= 0, "trade output below min_to");
             Self::get_assert(poster, from_asset, to_asset, true).convert(
                 taker,
                 poster,
                 amount_from,
-                min_to,
+                Self::debt_cap(to_bound),
             );
             return;
         }
@@ -238,14 +258,98 @@ impl FxOffer {
                 taker,
                 poster,
                 amount_from,
-                min_to,
+                Self::receipt_floor(to_bound),
             );
             return;
         }
 
+        Self::open_buy(taker, poster, from_asset, to_asset, amount_from, to_bound);
+    }
+
+    /// Negative bound as a debt cap. Zero does not cap.
+    fn debt_cap(to_bound: i64) -> Quantity {
+        if to_bound < 0 {
+            Quantity::new((-to_bound) as u64)
+        } else {
+            Quantity::new(0)
+        }
+    }
+
+    /// Positive bound as a receipt floor. Zero does not floor.
+    fn receipt_floor(to_bound: i64) -> Quantity {
+        if to_bound > 0 {
+            Quantity::new(to_bound as u64)
+        } else {
+            Quantity::new(0)
+        }
+    }
+
+    /// Rebook the from-asset already owed, then open both legs for the rest.
+    ///
+    /// Both slices are priced before either book moves, so a bound failure
+    /// does not leave half a trade. The fee is charged on each slice, the
+    /// same as two clicks. The inner calls pass a zero bound: the signed
+    /// number is the net, and a cap written for the whole click must not
+    /// reject the old bill once the new receipt covers it.
+    fn take_buy_split(
+        taker: AccountNumber,
+        poster: AccountNumber,
+        from_asset: u16,
+        to_asset: u16,
+        amount_from: Quantity,
+        owed: Quantity,
+        to_bound: i64,
+    ) {
+        let open = amount_from - owed;
+        let pol = Self::get_assert(poster, from_asset, to_asset, true);
+        assert!(
+            amount_from.value <= pol.remaining.value,
+            "fx offer amount exceeds remaining"
+        );
+        let rebook_to = Connection::get_live(poster, taker, from_asset).priced(
+            owed,
+            pol.fee_fixed,
+            pol.fx_rate,
+            true,
+        );
+        let open_to = pol.apply(open);
+        // Receipt is positive. Debt is negative. The bound is the number the
+        // taker signed, not the sign of this execution. A floor rejects any
+        // debt, including a debt of the same size. A cap rejects only a larger
+        // debt. Zero is a wash: a receipt may pass, a debt may not.
+        let net = open_to.value as i128 - rebook_to.value as i128;
+        if to_bound > 0 {
+            assert!(net >= to_bound as i128, "trade output below min_to");
+        } else if to_bound < 0 {
+            assert!(net >= to_bound as i128, "trade output above min_to");
+        } else {
+            assert!(net >= 0, "trade output below min_to");
+        }
+        Self::get_assert(poster, from_asset, to_asset, true).convert(
+            taker,
+            poster,
+            owed,
+            Quantity::new(0),
+        );
+        Self::open_buy(taker, poster, from_asset, to_asset, open, 0);
+    }
+
+    /// Open both legs of a buy. A positive bound floors the receipt.
+    /// A negative bound is a debt cap, which a receipt always meets. Zero
+    /// does not bound.
+    fn open_buy(
+        taker: AccountNumber,
+        poster: AccountNumber,
+        from_asset: u16,
+        to_asset: u16,
+        amount_from: Quantity,
+        to_bound: i64,
+    ) {
         let mut pol = Self::get_assert(poster, from_asset, to_asset, true);
         let to_qty = pol.apply(amount_from);
-        assert!(to_qty.value >= min_to.value, "trade output below min_to");
+        if to_bound > 0 {
+            assert!(to_qty.value >= to_bound as u64, "trade output below min_to");
+        }
         pol.spend(amount_from);
         let rate = pol.to_interest_rate as i32;
         Connection::get_live(poster, taker, from_asset).book_at_rate(amount_from, rate);

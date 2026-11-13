@@ -138,6 +138,18 @@ fn parse_amount(asset_id: u16, amount: &str) -> Result<Quantity, Error> {
         .map_err(|e| ErrorType::ConversionError(e.to_string()).into())
 }
 
+/// Human to-amount with a sign. Positive floors a receipt. Negative caps a debt.
+fn parse_signed_amount(asset_id: u16, amount: &str) -> Result<i64, Error> {
+    let trimmed = amount.trim();
+    let neg = trimmed.starts_with('-');
+    let body = if neg { &trimmed[1..] } else { trimmed };
+    let q = parse_amount(asset_id, body)?;
+    let raw = i64::try_from(q.value).map_err(|_| -> Error {
+        ErrorType::ConversionError("signed amount does not fit".to_string()).into()
+    })?;
+    Ok(if neg { -raw } else { raw })
+}
+
 fn parse_raw(amount: &str) -> Result<u64, Error> {
     amount
         .trim()
@@ -782,18 +794,18 @@ impl Api for BanxPlugin {
         to_asset: u16,
         poster_is_creditor: bool,
         amount_from: String,
-        min_to: String,
+        to_bound: String,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::take_fx)?;
         let amount_from = parse_amount_nonzero(from_asset, &amount_from)?;
-        let min_to = parse_amount(to_asset, &min_to)?;
+        let to_bound = parse_signed_amount(to_asset, &to_bound)?;
         let packed = banx::action_structs::take_fx {
             poster: parse_account(&poster)?,
             from_asset,
             to_asset,
             poster_is_creditor,
             amount_from,
-            min_to,
+            to_bound,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::take_fx::ACTION_NAME, &packed)

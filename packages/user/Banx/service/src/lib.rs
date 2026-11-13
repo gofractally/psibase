@@ -761,11 +761,14 @@ pub mod service {
 
     /// Take the clicked from→to order. `poster_is_creditor` selects the row.
     ///
-    /// A buy rebooks from-asset the sender still owes the poster. If the poster
-    /// already owes the sender that asset, the two legs still open and that
-    /// claim nets as unwind. A sell only rebooks from-asset the poster owes
-    /// the sender. `min_to` is a floor on a new book and on a claim the sender
-    /// receives; a positive `min_to` caps new debt on a rebook the sender owes.
+    /// A buy rebooks from-asset the sender still owes the poster, then opens
+    /// both legs for the rest of the click. If the poster already owes the
+    /// sender that asset, the two legs still open and that claim nets as
+    /// unwind. A sell only rebooks from-asset the poster owes the sender.
+    /// `to_bound` is the sender's signed net in the to-asset. Positive floors
+    /// a receipt and rejects any debt. Negative caps a debt; a receipt still
+    /// passes. Zero on a split is a wash: any debt is rejected. Zero on a
+    /// click that is only a rebook or only a new trade does not bound.
     #[action]
     fn take_fx(
         poster: AccountNumber,
@@ -773,7 +776,7 @@ pub mod service {
         to_asset: u16,
         poster_is_creditor: bool,
         amount_from: Quantity,
-        min_to: Quantity,
+        to_bound: i64,
     ) {
         FxOffer::take_order(
             get_sender(),
@@ -782,7 +785,7 @@ pub mod service {
             to_asset,
             poster_is_creditor,
             amount_from,
-            min_to,
+            to_bound,
         );
     }
 
