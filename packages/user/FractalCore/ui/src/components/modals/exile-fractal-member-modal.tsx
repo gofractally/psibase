@@ -16,11 +16,9 @@ import {
 export const ExileFractalMemberModal = ({
     show,
     openChange,
-    exile = true,
 }: {
     show: boolean;
     openChange: (show: boolean) => void;
-    exile?: boolean;
 }) => {
     const { mutateAsync: exileMember } = useExile();
 
@@ -36,7 +34,7 @@ export const ExileFractalMemberModal = ({
                 exile: { member },
             },
         }) => {
-            await exileMember([member, exile]);
+            await exileMember([member, true]);
             openChange(false);
             formApi.reset();
         },
@@ -53,9 +51,7 @@ export const ExileFractalMemberModal = ({
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>
-                        {exile ? "Exile guild member" : "End exile"}
-                    </DialogTitle>
+                    <DialogTitle>Exile guild member</DialogTitle>
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -74,13 +70,7 @@ export const ExileFractalMemberModal = ({
                         />
 
                         <form.AppForm>
-                            <form.SubmitButton
-                                labels={
-                                    exile
-                                        ? ["Exile", "Exiling"]
-                                        : ["End exile", "Ending"]
-                                }
-                            />
+                            <form.SubmitButton labels={["Exile", "Exiling"]} />
                         </form.AppForm>
                     </form>
                 </DialogHeader>

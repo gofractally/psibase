@@ -4,7 +4,10 @@ import { useState } from "react";
 import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { ExileFractalMemberModal } from "@/components/modals/exile-fractal-member-modal";
 
+import { useExile } from "@/hooks/fractals/use-exile";
+import { useExiles } from "@/hooks/fractals/use-exiles";
 import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useGuild } from "@/hooks/use-guild";
 
 import { ErrorCard } from "@shared/components/error-card";
@@ -36,7 +39,10 @@ export const Judicial = () => {
 
     const { data: guild, error: guildError } = useGuild(role?.guild);
 
-    const [modal, setModal] = useState<"exile" | "end" | null>(null);
+    const [showExile, setShowExile] = useState(false);
+    const fractalAccount = useFractalAccount();
+    const { data: exiles } = useExiles(fractalAccount);
+    const { mutateAsync: exileMember, isPending: isEnding } = useExile(true);
 
     const { data: currentUser } = useCurrentUser();
 
@@ -53,9 +59,8 @@ export const Judicial = () => {
     return (
         <PageContainer className="space-y-6">
             <ExileFractalMemberModal
-                exile={modal !== "end"}
-                openChange={(open) => setModal(open ? modal : null)}
-                show={modal !== null}
+                openChange={setShowExile}
+                show={showExile}
             />
             <GlowingCard>
                 <CardHeader>
@@ -118,35 +123,60 @@ export const Judicial = () => {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setModal("exile")}
+                                    onClick={() => setShowExile(true)}
                                 >
                                     Exile member
                                 </Button>
                             </ItemActions>
                         </Item>
-                        <Item variant="muted">
-                            <ItemContent>
-                                <ItemTitle>End exile</ItemTitle>
-                                <ItemDescription>
-                                    Clear an exile so they can be recruited
-                                    again. You keep track of how long they have
-                                    been out.
-                                </ItemDescription>
-                            </ItemContent>
-                            <ItemActions>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setModal("end")}
-                                >
-                                    End exile
-                                </Button>
-                            </ItemActions>
-                        </Item>
-
                     </CardContent>
                 </GlowingCard>
             )}
+
+            <GlowingCard>
+                <CardHeader>
+                    <CardTitle>Exiled</CardTitle>
+                    <CardDescription>
+                        Accounts the judiciary has banned from this fractal.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {(exiles ?? []).length === 0 ? (
+                        <p className="text-muted-foreground text-sm">
+                            Nobody is exiled.
+                        </p>
+                    ) : (
+                        (exiles ?? []).map((row) => (
+                            <Item key={row.member} variant="muted">
+                                <ItemContent>
+                                    <ItemTitle>{row.member}</ItemTitle>
+                                    <ItemDescription>
+                                        Cannot be recruited until this is
+                                        cleared.
+                                    </ItemDescription>
+                                </ItemContent>
+                                {isAdministrativeUser && (
+                                    <ItemActions>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={isEnding}
+                                            onClick={() =>
+                                                exileMember([
+                                                    row.member,
+                                                    false,
+                                                ])
+                                            }
+                                        >
+                                            End exile
+                                        </Button>
+                                    </ItemActions>
+                                )}
+                            </Item>
+                        ))
+                    )}
+                </CardContent>
+            </GlowingCard>
         </PageContainer>
     );
 };
