@@ -18,5 +18,7 @@ jobs:
     uses: ./.github/workflows/ubuntu-builder.yml
     with:
       all-platforms: ${{ github.event_name == 'push' }} # Only on pushes to main/release
+      # Temporary: skip Ubuntu build + browsers; dump Playwright load stacks.
+      diagnose-e2e-load: true
     secrets:
       publish-package-login: ${{ github.ref == 'refs/heads/main' && secrets.PUBLISH_PACKAGE_LOGIN || null }}
