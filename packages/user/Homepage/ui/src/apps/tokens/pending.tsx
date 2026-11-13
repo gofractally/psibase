@@ -11,7 +11,6 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { AcceptButton } from "./components/pending/button-accept";
 import { CancelButton } from "./components/pending/button-cancel";
-import { RejectButton } from "./components/pending/button-reject";
 import {
     type PendingBalance,
     useUserPendingBalance,
@@ -135,22 +134,13 @@ export const PendingPageContents = () => {
                                         <Td className="text-right">
                                             <div className="inline-flex items-center gap-1">
                                                 {isIncoming ? (
-                                                    <>
-                                                        <AcceptButton
-                                                            currentUser={
-                                                                currentUser
-                                                            }
-                                                            pt={pb}
-                                                            counterParty={cp}
-                                                        />
-                                                        <RejectButton
-                                                            currentUser={
-                                                                currentUser
-                                                            }
-                                                            pt={pb}
-                                                            counterParty={cp}
-                                                        />
-                                                    </>
+                                                    <AcceptButton
+                                                        currentUser={
+                                                            currentUser
+                                                        }
+                                                        pt={pb}
+                                                        counterParty={cp}
+                                                    />
                                                 ) : (
                                                     <CancelButton
                                                         currentUser={

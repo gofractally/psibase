@@ -22,7 +22,6 @@ interface tokens {
     credit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
     uncredit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
     debit: func(token-id: u32, creditor: string, amount: decimal, memo: string) -> result<_, error>;
-    reject: func(token-id: u32, creditor: string, memo: string) -> result<_, error>;
     enable-user-auto-debit: func(enable: bool) -> result<_, error>;
     get-system-token: func() -> result<option<system-token-info>, error>;
     get-user-balances: func(user: string) -> result<list<user-balance>, error>;

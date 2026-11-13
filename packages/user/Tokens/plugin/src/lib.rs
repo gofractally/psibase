@@ -185,7 +185,7 @@ impl User for TokensPlugin {
         Ok(())
     }
 
-    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "namemarket", "token-swap", "symbol", "guilds"])]
     fn uncredit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();
@@ -198,16 +198,6 @@ impl User for TokensPlugin {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();
         Tokens::add_to_tx().debit(token_id, creditor.parse().unwrap(), amount, memo);
-        Ok(())
-    }
-
-    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
-    fn reject(token_id: u32, creditor: String, memo: String) -> Result<(), Error> {
-        Tokens::add_to_tx().reject(
-            token_id,
-            creditor.parse().unwrap(),
-            memo.try_into().unwrap(),
-        );
         Ok(())
     }
 

@@ -549,9 +549,10 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
          {
             CHECK(b.debit(tokenId, alice, 1e4, memo).failed(missingSharedBalance));
          }
-         THEN("Alice may not uncredit any tokens")
+         THEN("Alice uncrediting tokens changes nothing")
          {
-            CHECK(a.uncredit(tokenId, bob, 1e4, memo).failed(missingSharedBalance));
+            CHECK(a.uncredit(tokenId, bob, 1e4, memo).succeeded());
+            CHECK(a.getBalance(tokenId, alice).returnVal().value == 0e4);
          }
          THEN("Bob may credit Alice 10 tokens")
          {
@@ -610,10 +611,12 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
             CHECK(150e4 == b.getBalance(tokenId, bob).returnVal().value);
             CHECK(50e4 == a.getBalance(tokenId, alice).returnVal().value);
          }
-         THEN("Alice and Bob may not uncredit any tokens")
+         THEN("Alice and Bob uncrediting tokens changes nothing")
          {
-            CHECK(a.uncredit(tokenId, bob, 50e4, memo).failed(missingSharedBalance));
-            CHECK(b.uncredit(tokenId, alice, 50e4, memo).failed(missingSharedBalance));
+            CHECK(a.uncredit(tokenId, bob, 50e4, memo).succeeded());
+            CHECK(b.uncredit(tokenId, alice, 50e4, memo).succeeded());
+            CHECK(50e4 == a.getBalance(tokenId, alice).returnVal().value);
+            CHECK(150e4 == b.getBalance(tokenId, bob).returnVal().value);
          }
          THEN("Alice and Bob may not debit any tokens")
          {
@@ -650,9 +653,10 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
                {
                   CHECK(0e4 == b.getSharedBal(tokenId, bob, alice).returnVal().value);
 
-                  AND_THEN("Bob may not uncredit any tokens")
+                  AND_THEN("Bob uncrediting tokens changes nothing")
                   {
-                     CHECK(b.uncredit(tokenId, alice, 1e4, memo).failed(missingSharedBalance));
+                     CHECK(b.uncredit(tokenId, alice, 1e4, memo).succeeded());
+                     CHECK(0e4 == b.getSharedBal(tokenId, bob, alice).returnVal().value);
                   }
                }
             }
@@ -688,9 +692,10 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
             {
                CHECK(a.debit(tokenId, bob, 1e4, memo).failed(missingSharedBalance));
             }
-            AND_THEN("Bob may not uncredit any more tokens")
+            AND_THEN("Bob uncrediting more tokens changes nothing")
             {
-               CHECK(b.uncredit(tokenId, alice, 1e4, memo).failed(missingSharedBalance));
+               CHECK(b.uncredit(tokenId, alice, 1e4, memo).succeeded());
+               CHECK(50e4 == b.getBalance(tokenId, bob).returnVal().value);
             }
             AND_THEN("Bob may credit an additional 25 tokens")
             {

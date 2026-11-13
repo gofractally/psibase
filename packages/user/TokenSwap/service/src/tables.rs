@@ -124,7 +124,6 @@ pub mod tables {
             let sender = get_sender();
             let tokens = Tokens::call();
             tokens.debit(self.token_id, sender, amount, "".into());
-            tokens.reject(self.token_id, sender, "Dust".into());
         }
 
         pub fn pool_token_entitlement(

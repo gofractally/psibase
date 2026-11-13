@@ -246,6 +246,8 @@ impl Api for NameMarketPlugin {
 
         name_market::Wrapper::add_to_tx().buy(acct_name);
 
+        TokensUser::uncredit(sys_token_id, &service_account, &max_cost, "return change")?;
+
         Ok(())
     }
 

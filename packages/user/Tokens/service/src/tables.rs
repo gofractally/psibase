@@ -476,11 +476,7 @@ pub mod tables {
             }
         }
 
-        pub fn get(
-            creditor: AccountNumber,
-            debitor: AccountNumber,
-            token_id: TID,
-        ) -> Option<Self> {
+        pub fn get(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Option<Self> {
             let shared_creditor_bal_ids = UserPendingTable::read()
                 .get_index_pk()
                 .range((creditor, token_id, 0_u64)..(creditor, token_id, u64::MAX))
@@ -573,22 +569,6 @@ pub mod tables {
 
         pub fn recall(&mut self, quantity: Quantity) {
             self.sub_balance(quantity);
-        }
-
-        pub fn reject(&mut self, memo: Memo) {
-            if self.balance.value > 0 {
-                let balance = self.balance;
-                crate::Wrapper::emit().history().balChanged(
-                    self.token_id,
-                    self.creditor,
-                    self.debitor,
-                    "rejected".to_string(),
-                    fmt_amount(self.token_id, balance),
-                    memo,
-                );
-                self.sub_balance(balance);
-                Balance::get_or_new(self.creditor, self.token_id).add_balance(balance);
-            }
         }
 
         fn add_balance(&mut self, quantity: Quantity) {

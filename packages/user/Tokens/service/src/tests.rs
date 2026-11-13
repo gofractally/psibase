@@ -115,7 +115,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Tokens"))]
-    fn test_reject(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_uncredit_returns_credited_amount(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let memo = Memo::new("".to_string()).unwrap();
 
         let alice = account!("alice");
@@ -136,7 +136,7 @@ mod tests {
         a.credit(tid, bob, 100.into(), memo.clone()).get()?;
         assert_eq!(0, a.getBalance(tid, alice).get()?.value);
         assert_eq!(0, b.getBalance(tid, bob).get()?.value);
-        b.reject(tid, alice, memo.clone());
+        a.uncredit(tid, bob, 100.into(), memo.clone()).get()?;
         assert_eq!(100, a.getBalance(tid, alice).get()?.value);
         assert_eq!(0, b.getBalance(tid, bob).get()?.value);
 

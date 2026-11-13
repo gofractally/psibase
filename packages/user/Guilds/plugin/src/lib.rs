@@ -372,6 +372,16 @@ impl UserGuild for GuildsPlugin {
             pre_attest,
         );
 
+        if let Some(token_id) = bindings::tokens::plugin::helpers::fetch_network_token()? {
+            let amount = bindings::tokens::plugin::helpers::u64_to_decimal(token_id, u64::MAX)?;
+            bindings::tokens::plugin::user::uncredit(
+                token_id,
+                &psibase::services::guilds::SERVICE.to_string(),
+                &amount,
+                "Unused amount",
+            )?;
+        }
+
         Ok(d.invite_token)
     }
 

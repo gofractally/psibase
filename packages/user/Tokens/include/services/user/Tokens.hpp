@@ -120,7 +120,6 @@ namespace UserService
       /// When in the shared balance, the tokens can be:
       /// * uncredited (transfer cancelled) by the creditor
       /// * debited (transfer accepted) by the debitor
-      /// * rejected (transfer rejected) by the debitor
       ///
       /// # Arguments
       /// * `token_id` - Unique token identifier
@@ -138,7 +137,6 @@ namespace UserService
       /// When in the shared balance, the tokens can be:
       /// * uncredited (transfer cancelled) by the creditor
       /// * debited (transfer accepted) by the debitor
-      /// * rejected (transfer rejected) by the debitor
       ///
       /// # Arguments
       /// * `token_id` - Unique token identifier
@@ -146,23 +144,6 @@ namespace UserService
       /// * `amount`   - Amount to uncredit
       /// * `memo`     - Memo
       void uncredit(TID tokenId, psibase::AccountNumber debitor, Quantity amount, Memo memo);
-
-      /// Rejects the shared balance between a creditor and a debitor
-      ///
-      /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
-      /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
-      ///
-      /// # Shared balance mechanics
-      /// When in the shared balance, the tokens can be:
-      /// * uncredited (transfer cancelled) by the creditor
-      /// * debited (transfer accepted) by the debitor
-      /// * rejected (transfer rejected) by the debitor
-      ///
-      /// # Arguments
-      /// * `token_id` - Unique token identifier
-      /// * `creditor`  - User who credited the tokens
-      /// * `memo`     - Memo
-      void reject(TID tokenId, psibase::AccountNumber creditor, Memo memo);
 
       /// Debit tokens that were credited into a shared balance
       ///
@@ -173,7 +154,6 @@ namespace UserService
       /// When in the shared balance, the tokens can be:
       /// * uncredited (transfer cancelled) by the creditor
       /// * debited (transfer accepted) by the debitor
-      /// * rejected (transfer rejected) by the debitor
       ///
       /// # Arguments
       /// * `token_id` - Unique token identifier
@@ -401,7 +381,6 @@ namespace UserService
       method(setTokenConf, tokenId, index, enable),
       method(credit, tokenId, debitor, amount, memo),
       method(uncredit, tokenId, debitor, amount, memo),
-      method(reject, tokenId, creditor, memo),
       method(toSub, tokenId, subAccount, amount),
       method(fromSub, tokenId, subAccount, amount),
       method(createSub, subAccount),
