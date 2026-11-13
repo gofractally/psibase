@@ -41,14 +41,17 @@ impl HttpHeader {
 #[repr(u16)]
 pub enum HttpStatus {
     Ok = 200,
+    NoContent = 204,
     MovedPermanently = 301,
     Found = 302,
     NotModified = 304,
+    BadRequest = 400,
     Unauthorized = 401,
     Forbidden = 403,
     NotFound = 404,
     MethodNotAllowed = 405,
     NotAcceptable = 406,
+    Conflict = 409,
     UnsupportedMediaType = 415,
     InternalServerError = 500,
     ServiceUnavailable = 503,
@@ -104,6 +107,28 @@ impl HttpRequest {
             .find(|h| h.matches(name))
             .map(|h| h.value.as_str())
     }
+
+    /// Parses the first `Cookie` header into trimmed name/value pairs or [`CookieError`].
+    pub fn cookies(&self) -> impl Iterator<Item = Result<(&str, &str), CookieError>> + '_ {
+        self.get_header("cookie")
+            .into_iter()
+            .flat_map(|value| value.split(';').map(parse_cookie_segment))
+    }
+}
+
+/// A `Cookie` header segment that is not a cookie-pair.
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub struct CookieError;
+
+fn parse_cookie_segment(segment: &str) -> Result<(&str, &str), CookieError> {
+    let Some((name, value)) = segment.trim().split_once('=') else {
+        return Err(CookieError);
+    };
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(CookieError);
+    }
+    Ok((name, value.trim()))
 }
 
 pub struct HttpBody {
@@ -165,27 +190,27 @@ impl HttpReply {
     }
 }
 
-struct Origin {
-    scheme: String,
-    host: String,
+struct Origin<'a> {
+    scheme: &'a str,
+    host: &'a str,
 }
 
-impl Origin {
-    fn new(url: &str) -> Self {
-        let mut scheme = String::new();
-        let mut host = String::new();
+impl<'a> Origin<'a> {
+    fn new(url: &'a str) -> Self {
+        let mut scheme = "";
+        let mut host = "";
         if let Some(pos) = url.find("://") {
-            scheme = url[..pos].to_string();
+            scheme = &url[..pos];
             let after_scheme = &url[pos + 3..];
-            if let Some(colon_pos) = after_scheme.rfind(':') {
+            host = if let Some(colon_pos) = after_scheme.rfind(':') {
                 if !after_scheme[..colon_pos].contains(']') {
-                    host = after_scheme[..colon_pos].to_string();
+                    &after_scheme[..colon_pos]
                 } else {
-                    host = after_scheme.to_string();
+                    after_scheme
                 }
             } else {
-                host = after_scheme.to_string();
-            }
+                after_scheme
+            };
         }
         Origin { scheme, host }
     }
@@ -195,12 +220,24 @@ impl Origin {
     }
 
     fn is_service(&self, root_host: &str, account: AccountNumber) -> bool {
-        self.is_secure() && self.host == format!("{}.{}", account, root_host)
+        if !self.is_secure() {
+            return false;
+        }
+        let Some((prefix, suffix)) = self.host.split_once('.') else {
+            return false;
+        };
+        suffix == root_host && prefix.parse::<AccountNumber>().ok() == Some(account)
     }
 
     fn is_subdomain(&self, root_host: &str) -> bool {
-        self.is_secure()
-            && (self.host == root_host || self.host.ends_with(&format!(".{}", root_host)))
+        if !self.is_secure() {
+            return false;
+        }
+        self.host == root_host
+            || self
+                .host
+                .strip_suffix(root_host)
+                .is_some_and(|prefix| prefix.ends_with('.'))
     }
 }
 
@@ -213,28 +250,41 @@ pub fn root_host(req: &HttpRequest, host_is_subdomain: bool) -> &str {
     }
 }
 
+/// The `Origin` header when it is `account`'s service origin on `root_host`.
+pub fn service_origin<'a>(
+    req: &'a HttpRequest,
+    account: AccountNumber,
+    root_host: &str,
+) -> Option<&'a str> {
+    req.get_header("origin").and_then(|origin| {
+        Origin::new(origin)
+            .is_service(root_host, account)
+            .then_some(origin)
+    })
+}
+
+fn subdomain_origin<'a>(req: &'a HttpRequest, root_host: &str) -> Option<&'a str> {
+    req.get_header("origin").and_then(|origin| {
+        Origin::new(origin)
+            .is_subdomain(root_host)
+            .then_some(origin)
+    })
+}
+
 pub fn allow_cors_for_account(
     req: &HttpRequest,
     account: AccountNumber,
     host_is_subdomain: bool,
 ) -> Vec<HttpHeader> {
-    if let Some(o) = req.get_header("origin") {
-        let origin = Origin::new(o);
-        if origin.is_service(root_host(req, host_is_subdomain), account) {
-            return allow_cors_with_origin(o);
-        }
-    }
-    Vec::new()
+    service_origin(req, account, root_host(req, host_is_subdomain))
+        .map(allow_cors_with_origin)
+        .unwrap_or_default()
 }
 
 pub fn allow_cors_for_subdomains(req: &HttpRequest, host_is_subdomain: bool) -> Vec<HttpHeader> {
-    if let Some(origin) = req.get_header("origin") {
-        let origin_obj = Origin::new(origin);
-        if origin_obj.is_subdomain(root_host(req, host_is_subdomain)) {
-            return allow_cors_with_origin(origin);
-        }
-    }
-    Vec::new()
+    subdomain_origin(req, root_host(req, host_is_subdomain))
+        .map(allow_cors_with_origin)
+        .unwrap_or_default()
 }
 
 pub fn allow_cors_with_origin(origin: &str) -> Vec<HttpHeader> {
@@ -243,4 +293,45 @@ pub fn allow_cors_with_origin(origin: &str) -> Vec<HttpHeader> {
         HttpHeader::new("Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"),
         HttpHeader::new("Access-Control-Allow-Headers", "*"),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cookies() {
+        let cases = [
+            (
+                vec![HttpHeader::new("Cookie", "foo=10; bar=27; session=xxx")],
+                vec![Ok(("foo", "10")), Ok(("bar", "27")), Ok(("session", "xxx"))],
+            ),
+            (
+                vec![
+                    HttpHeader::new("CooKiE", "foo=10; bar=27"),
+                    HttpHeader::new("cookie", "bar=7"),
+                ],
+                vec![Ok(("foo", "10")), Ok(("bar", "27"))],
+            ),
+            (
+                vec![HttpHeader::new("cookie", "  foo = 10 ; ; bar=27  ")],
+                vec![Ok(("foo", "10")), Err(CookieError), Ok(("bar", "27"))],
+            ),
+            (
+                vec![HttpHeader::new("cookie", "foo=10; badsegment")],
+                vec![Ok(("foo", "10")), Err(CookieError)],
+            ),
+            (
+                vec![HttpHeader::new("cookie", "=foo;   =bar; baz=")],
+                vec![Err(CookieError), Err(CookieError), Ok(("baz", ""))],
+            ),
+        ];
+        for (headers, expected) in cases {
+            let request = HttpRequest {
+                headers,
+                ..Default::default()
+            };
+            assert_eq!(request.cookies().collect::<Vec<_>>(), expected);
+        }
+    }
 }

@@ -2,6 +2,54 @@ import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
+function calculateFileHashes(projectDir, dir) {
+  const fileHashes = new Map();
+
+  if (fs.existsSync(dir)) {
+    const items = fs.readdirSync(dir);
+    for (const item of items) {
+      const filePath = path.join(dir, item);
+      const stat = fs.statSync(filePath);
+
+      if (stat.isDirectory()) {
+        // Skip target and dist directories as they are build outputs
+        if (item === 'target' || item === '.tmp' || item === 'dist' || item === '.vite-cache' || item === '.svelte-kit') continue;
+        const subHashes = calculateFileHashes(projectDir, filePath);
+        for (const [subPath, hash] of subHashes) {
+          fileHashes.set(subPath, hash);
+        }
+      } else {
+        const hash = createHash('md5');
+        hash.update(fs.readFileSync(filePath));
+        fileHashes.set(path.relative(projectDir, filePath), hash.digest('hex'));
+      }
+    }
+  }
+
+  return fileHashes;
+}
+
+function collectSourceHashes(projectDir, buildDirs) {
+  const currentFileHashes = new Map();
+  for (const { source } of buildDirs) {
+    const sourceHashes = calculateFileHashes(projectDir, source);
+    for (const [filePath, hash] of sourceHashes) {
+      currentFileHashes.set(filePath, hash);
+    }
+  }
+  return currentFileHashes;
+}
+
+export function writeBuildCache(projectDir, buildDirs) {
+  const cacheFile = path.resolve(projectDir, '.vite-cache/hash.json');
+  const fileHashes = collectSourceHashes(projectDir, buildDirs);
+  fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+  fs.writeFileSync(
+    cacheFile,
+    JSON.stringify({ fileHashes: Object.fromEntries(fileHashes) }),
+  );
+}
+
 export function shouldSkipBuild(projectDir, buildDirs = []) {
   // Skip if PSIREBUILD is set to true
   if (process.env.PSIREBUILD === 'true') {
@@ -33,41 +81,7 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
     }
   }
 
-  function calculateFileHashes(dir) {
-    const fileHashes = new Map();
-    
-    if (fs.existsSync(dir)) {
-      const items = fs.readdirSync(dir);
-      for (const item of items) {
-        const filePath = path.join(dir, item);
-        const stat = fs.statSync(filePath);
-        
-        if (stat.isDirectory()) {
-          // Skip target and dist directories as they are build outputs
-          if (item === 'target' || item === '.tmp' || item === 'dist' || item === '.vite-cache' || item === '.svelte-kit') continue;
-          const subHashes = calculateFileHashes(filePath);
-          for (const [subPath, hash] of subHashes) {
-            fileHashes.set(subPath, hash);
-          }
-        } else {
-          const hash = createHash('md5');
-          hash.update(fs.readFileSync(filePath));
-          fileHashes.set(path.relative(projectDir, filePath), hash.digest('hex'));
-        }
-      }
-    }
-    
-    return fileHashes;
-  }
-
-  // Calculate hashes for all source directories
-  const currentFileHashes = new Map();
-  for (const { source } of buildDirs) {
-    const sourceHashes = calculateFileHashes(source);
-    for (const [filePath, hash] of sourceHashes) {
-      currentFileHashes.set(filePath, hash);
-    }
-  }
+  const currentFileHashes = collectSourceHashes(projectDir, buildDirs);
 
   const cacheFile = path.resolve(projectDir, '.vite-cache/hash.json');
   let previousFileHashes = new Map();
@@ -107,10 +121,5 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
     console.log(`  ${file}`);
   }
 
-  // Ensure cache directory exists
-  fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
-  fs.writeFileSync(cacheFile, JSON.stringify({
-    fileHashes: Object.fromEntries(currentFileHashes)
-  }));
   return false;
-} 
+}

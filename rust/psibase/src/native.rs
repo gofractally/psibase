@@ -328,6 +328,26 @@ pub fn set_max_cpu_time<T: Into<MicroSeconds>>(time: T) {
     unsafe { native_raw::setMaxCpuTime(time) }
 }
 
+/// Fills `buf` from the node RNG.
+///
+/// Subjective execution only (e.g. RPC / `runModeRpc`, or HTTP `serveSys`); aborts
+/// in deterministic contexts.
+pub fn fill_random(buf: &mut [u8]) {
+    if !buf.is_empty() {
+        unsafe { native_raw::getRandom(buf.as_mut_ptr(), buf.len()) };
+    }
+}
+
+/// Returns `len` bytes from the node RNG.
+///
+/// Subjective execution only (e.g. RPC / `runModeRpc`, or HTTP `serveSys`); aborts
+/// in deterministic contexts.
+pub fn random_bytes(len: usize) -> Vec<u8> {
+    let mut buf = vec![0u8; len];
+    fill_random(&mut buf);
+    buf
+}
+
 pub use scopeguard;
 
 pub fn checkout_subjective() {
