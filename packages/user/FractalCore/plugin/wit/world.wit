@@ -5,6 +5,7 @@ interface admin-fractal {
     use host:types/types.{error};
 
     exile-member: func(member: string) -> result<_, error>;
+    accept-return: func(applicant: string) -> result<_, error>;
     set-dist-interval: func(distribution-interval-sec: u32) -> result<_, error>;
     init-token: func() -> result<_, error>;
     set-ranked-guilds: func(guilds: list<string>) -> result<_, error>;
@@ -23,6 +24,8 @@ interface user-fractal {
     claim-rewards: func(member: string) -> result<_, error>;
 
     join: func() -> result<_, error>;
+    apply-return: func(fractal: string) -> result<_, error>;
+    cancel-return: func(fractal: string) -> result<_, error>;
 
     donate: func(token-id: u32, amount: string) -> result<_, error>;
 }

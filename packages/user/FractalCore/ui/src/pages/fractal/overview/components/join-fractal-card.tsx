@@ -1,9 +1,14 @@
+import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
+import { useApplyReturn } from "@/hooks/fractals/use-apply-return";
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
+import { getExile } from "@/lib/graphql/fractals/get-exile";
+import QueryKey from "@/lib/query-keys";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent } from "@shared/shadcn/ui/card";
 import { Spinner } from "@shared/shadcn/ui/spinner";
@@ -13,7 +18,15 @@ export const JoinFractalCard = ({
 }: {
     fractalAccount?: string;
 }) => {
+    const { data: currentUser } = useCurrentUser();
+    const { data: exiled } = useQuery({
+        queryKey: QueryKey.exile(fractalAccount, currentUser),
+        enabled: Boolean(fractalAccount && currentUser),
+        queryFn: () => getExile(fractalAccount!, currentUser!),
+    });
     const { mutateAsync: joinFractal, isPending, error } = useJoinFractal();
+    const { mutateAsync: applyReturn, isPending: isApplying } =
+        useApplyReturn();
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -27,23 +40,33 @@ export const JoinFractalCard = ({
                         <Plus className="text-muted-foreground h-6 w-6" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-semibold">Join fractal</h3>
+                        <h3 className="text-lg font-semibold">
+                            {exiled ? "Return to fractal" : "Join fractal"}
+                        </h3>
                         <p className="text-muted-foreground mt-1 text-sm">
-                            Become a member of this fractal.
+                            {exiled
+                                ? "The judiciary decides when you can come back."
+                                : "Become a member of this fractal."}
                         </p>
                     </div>
                     <Button
                         onClick={() => {
-                            joinFractal({
-                                fractal: fractalAccount!,
-                            });
+                            if (exiled) {
+                                applyReturn([fractalAccount!]);
+                            } else {
+                                joinFractal({
+                                    fractal: fractalAccount!,
+                                });
+                            }
                         }}
                         size="lg"
-                        disabled={!fractalAccount || isPending}
+                        disabled={!fractalAccount || isPending || isApplying}
                         className="w-full sm:w-auto"
                     >
-                        {isPending && <Spinner data-icon="inline-start" />}
-                        Join
+                        {(isPending || isApplying) && (
+                            <Spinner data-icon="inline-start" />
+                        )}
+                        {exiled ? "Apply to return" : "Join"}
                     </Button>
                 </div>
             </CardContent>

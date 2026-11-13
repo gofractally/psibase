@@ -227,6 +227,24 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Ask the judiciary to end an exile. Only the exiled account may apply.
+    #[action]
+    fn apply_return(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Withdraw a return application.
+    #[action]
+    fn cancel_return(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Accept a return application. Sender is the fractal, authorized by the judiciary.
+    #[action]
+    fn accept_return(applicant: AccountNumber) {
+        unimplemented!()
+    }
+
     /// Sets the occupation used to authorize the specified fractal role.
     ///
     /// # Arguments

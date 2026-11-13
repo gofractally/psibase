@@ -68,17 +68,23 @@ impl FractalMember {
         new_instance.save();
 
         RewardStream::add_member(fractal, account, Fractal::get_assert(fractal).token_id);
-        // If a recruiter is specified, levy them; otherwise, levy the fractal itself so there's no advantage or disadvantage to being recruited by an existing member vs. joining independently
-        let recruiter = recruiter.unwrap_or(fractal);
-        Levy::add(
-            fractal,
-            account,
-            recruiter,
-            DEFAULT_RECRUITMENT_PPM,
-            // 0 for unlimited
-            0.into(),
-            true,
-        );
+        // A return keeps the levy from the first join. A second permanent row would stack another cut.
+        let already_permanent = Levy::levies_of_member(fractal, account)
+            .iter()
+            .any(|levy| levy.debt.value == 0);
+        if !already_permanent {
+            // If a recruiter is specified, levy them; otherwise, levy the fractal itself so there's no advantage or disadvantage to being recruited by an existing member vs. joining independently
+            let recruiter = recruiter.unwrap_or(fractal);
+            Levy::add(
+                fractal,
+                account,
+                recruiter,
+                DEFAULT_RECRUITMENT_PPM,
+                // 0 for unlimited
+                0.into(),
+                true,
+            );
+        }
 
         new_instance
     }
@@ -95,9 +101,7 @@ impl FractalMember {
 
     pub fn exile(&self) {
         FractalExile::add(self.fractal, self.account);
-        for levy in Levy::levies_of_member(self.fractal, self.account) {
-            levy.delete_by_exile()
-        }
+        // Levies stay. A judgment still has a balance. A permanent cut resumes if they come back.
         self.remove();
     }
 

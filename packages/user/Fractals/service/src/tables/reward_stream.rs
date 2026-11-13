@@ -35,7 +35,9 @@ impl RewardStream {
     }
 
     pub fn add_member(fractal: AccountNumber, owner: AccountNumber, token_id: TID) -> Self {
-        assert!(Self::get(fractal, owner).is_none(), "stream already exists");
+        if let Some(existing) = Self::get(fractal, owner) {
+            return existing;
+        }
         let new_instance = Self::new_member(fractal, owner, token_id);
 
         new_instance.save();

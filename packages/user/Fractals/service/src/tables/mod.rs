@@ -5,6 +5,7 @@ pub mod fractal_member;
 mod levy;
 mod occupation;
 mod reward_stream;
+mod return_application;
 mod role;
 
 #[psibase::service_tables]
@@ -90,6 +91,21 @@ pub mod tables {
         #[secondary_key(1)]
         fn by_member(&self) -> (AccountNumber, AccountNumber) {
             (self.member, self.fractal)
+        }
+    }
+
+    #[table(name = "ReturnApplicationTable", index = 8)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct ReturnApplication {
+        pub fractal: AccountNumber,
+        pub applicant: AccountNumber,
+        pub created_at: TimePointSec,
+    }
+
+    impl ReturnApplication {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.applicant)
         }
     }
 

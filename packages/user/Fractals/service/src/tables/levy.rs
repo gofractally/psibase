@@ -2,7 +2,10 @@ use async_graphql::ComplexObject;
 use psibase::services::fractals::constants::PPM;
 use psibase::{services::tokens::Quantity, AccountNumber, ServiceWrapper, Table};
 
-use crate::tables::tables::{Config, Fractal, FractalMember, Levy, LevyTable, RewardStream};
+use crate::tables::tables::{
+    Config, Fractal, FractalExile, FractalMember, Levy, LevyTable, RewardStream,
+};
+use psibase::services::tokens::Wrapper as Tokens;
 
 impl Levy {
     fn new(
@@ -57,19 +60,26 @@ impl Levy {
             .collect()
     }
 
-    pub fn delete_by_exile(&self) {
-        self.remove();
-    }
-
     fn remove(&self) {
         LevyTable::read_write().remove(&self);
     }
 
     /// Applies the configured levy to the given income, pays the payee, and returns the amount levied.
+    ///
+    /// A permanent levy (`debt == 0`) is a membership cut. It is skipped while the person being
+    /// charged is exiled, and the row stays so it resumes if they return. A remaining balance is a
+    /// judgment and is still collected. An exiled payee does not receive a permanent cut; that slice
+    /// goes to the fractal treasury. A judgment owed to them is credited to their account, not into
+    /// a stream the next claim would recycle.
     pub fn apply_levy(&mut self, gross_income: Quantity) -> Quantity {
         if gross_income.value == 0 {
-            return gross_income;
+            return 0.into();
         }
+        let indefinite = self.debt.value == 0;
+        if indefinite && FractalExile::is_exiled(self.fractal, self.member) {
+            return 0.into();
+        }
+
         let uncapped_amount: Quantity = (((gross_income.value as u128)
             .saturating_mul(self.rate_ppm as u128)
             .saturating_div(PPM as u128)
@@ -77,7 +87,7 @@ impl Levy {
             .into();
 
         // Determine how much they can actually pay based on remaining amount.
-        let payment = if self.debt.value > 0 {
+        let payment = if !indefinite {
             let amount = self.debt.min(uncapped_amount);
             let balance_after = self.debt - amount;
 
@@ -94,15 +104,18 @@ impl Levy {
 
         if payment.value > 0 {
             let memo = "Levy payment".into();
-            if self.send_to_stream {
-                RewardStream::get_assert(self.fractal, self.payee).deposit(payment, memo);
-            } else {
-                psibase::services::tokens::Wrapper::call().credit(
+            let payee_exiled = FractalExile::is_exiled(self.fractal, self.payee);
+            if payee_exiled && indefinite {
+                RewardStream::get_assert(self.fractal, self.fractal).deposit(payment, memo);
+            } else if payee_exiled || !self.send_to_stream {
+                Tokens::call().credit(
                     Fractal::get_assert(self.fractal).token_id,
                     self.payee,
                     payment,
                     memo,
                 );
+            } else {
+                RewardStream::get_assert(self.fractal, self.payee).deposit(payment, memo);
             }
         }
         payment

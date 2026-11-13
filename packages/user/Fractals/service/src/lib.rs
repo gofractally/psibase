@@ -11,7 +11,9 @@ macro_rules! ban {
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::tables::tables::{Fractal, FractalMember, Occupation, RewardStream, Role};
+    use crate::tables::tables::{
+        Fractal, FractalMember, Occupation, ReturnApplication, RewardStream, Role,
+    };
 
     use psibase::{
         services::{
@@ -29,6 +31,7 @@ pub mod service {
     const ROLE_METHODS: &[(FractalRole, &str)] = &[
         (Recruitment, Actns::add_mem::ACTION_NAME),
         (Judiciary, Actns::exile_member::ACTION_NAME),
+        (Judiciary, Actns::accept_return::ACTION_NAME),
         (Legislature, Actns::set_r_occ::ACTION_NAME),
         (Legislature, Actns::set_dist_int::ACTION_NAME),
         (Legislature, Actns::set_gen_time::ACTION_NAME),
@@ -133,7 +136,39 @@ pub mod service {
     /// * `member` - The fractal member to be exiled.
     #[action]
     fn exile_member(member: AccountNumber) {
-        FractalMember::get_assert(get_sender(), member).exile();
+        FractalMember::get_assert(get_sender(), member.base()).exile();
+    }
+
+    /// Ask the judiciary to end an exile. Only the exiled account may apply.
+    ///
+    /// # Arguments
+    /// * `fractal` - The fractal to return to.
+    #[action]
+    fn apply_return(fractal: AccountNumber) {
+        ReturnApplication::add(fractal, get_sender());
+    }
+
+    /// Withdraw a return application.
+    ///
+    /// # Arguments
+    /// * `fractal` - The fractal the application was filed with.
+    #[action]
+    fn cancel_return(fractal: AccountNumber) {
+        ReturnApplication::get_assert(fractal, get_sender()).cancel();
+    }
+
+    /// Accept a return application. The sender is the fractal; the judiciary authorizes it.
+    ///
+    /// Clears the exile and adds the account as a member again. The old stream and any
+    /// permanent levy are kept.
+    ///
+    /// # Arguments
+    /// * `applicant` - The exiled account whose application to accept.
+    #[action]
+    fn accept_return(applicant: AccountNumber) {
+        let fractal = get_sender();
+        ReturnApplication::get_assert(fractal, applicant).accept();
+        Wrapper::emit().history().joined_fractal(fractal, applicant.base());
     }
 
     /// Distribute token for a fractal.
@@ -200,17 +235,21 @@ pub mod service {
     /// * `member` - The fractal member claiming rewards.
     #[action]
     fn claim_rew(fractal: AccountNumber, member: AccountNumber) {
+        let member = member.base();
         assert!(member != fractal, "cannot claim the fractal treasury");
         let mut reward_stream = RewardStream::get_assert(fractal, member);
         let (token_id, claimed) = reward_stream.claim();
 
-        if claimed.value > 0 {
-            psibase::services::tokens::Wrapper::call().credit(
-                token_id,
-                member,
-                claimed,
-                "Reward claim".into(),
-            );
+        if claimed.value == 0 {
+            return;
+        }
+        if FractalMember::get(fractal, member).is_some() {
+            Tokens::call().credit(token_id, member, claimed, "Reward claim".into());
+        } else {
+            // Already vested to this stream. An exile does not keep it, and a judgment was
+            // taken inside claim. The rest goes back to the fractal stream.
+            RewardStream::get_assert(fractal, fractal)
+                .deposit(claimed, "Exile recycle".into());
         }
     }
 

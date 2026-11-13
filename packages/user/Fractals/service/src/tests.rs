@@ -275,4 +275,44 @@ mod chain {
 
         Ok(())
     }
+
+    #[psibase::test_case(packages("Fractals", "AuthDyn", "TokenStream"))]
+    fn exile_claim_does_not_pay_the_exile(
+        mut chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let tid = setup(&mut chain);
+
+        credit(&chain, tid, 10_000);
+        donate(&chain, tid, 10_000);
+        pass_time(&chain, DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL as i64);
+        dist_token(&chain);
+        // A deposit does not vest in the same second. One member interval makes a slice claimable.
+        pass_time(&chain, DEFAULT_MEMBER_DISTRIBUTION_INTERVAL as i64);
+
+        chain.propose::<Wrapper>(ALICE, FRACTAL)
+            .exile_member(ALICE)
+            .get()?;
+
+        let member: serde_json::Value = chain
+            .graphql(
+                Wrapper::SERVICE,
+                &format!(
+                    r#"query {{ member(fractal: "{FRACTAL}", member: "{ALICE}") {{ account }} }}"#
+                ),
+            )
+            .unwrap();
+        assert!(member["data"]["member"].is_null(), "{member}");
+
+        let before = Tokens::push(&chain).getBalance(tid, ALICE).get()?.value;
+        Wrapper::push_from(&chain, ALICE)
+            .claim_rew(FRACTAL, ALICE)
+            .get()?;
+        let after = Tokens::push(&chain).getBalance(tid, ALICE).get()?.value;
+        assert_eq!(
+            before, after,
+            "an exile keeps nothing from a claim ({before} -> {after})",
+        );
+
+        Ok(())
+    }
 }

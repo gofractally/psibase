@@ -36,6 +36,10 @@ const QueryKey = {
         ["groupUsers", slug, groupNumber] as const,
     guildApplications: (guildAccount: OptionalAccount) =>
         ["guildApplications", guildAccount] as const,
+    returnApplications: (fractalAccount: OptionalAccount) =>
+        ["returnApplications", fractalAccount] as const,
+    exile: (fractal: OptionalAccount, member: OptionalAccount) =>
+        ["exile", fractal, member] as const,
     guildApplication: (
         guildAccount: OptionalAccount,
         applicant: OptionalAccount,

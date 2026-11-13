@@ -4,7 +4,10 @@ import { useState } from "react";
 import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { ExileFractalMemberModal } from "@/components/modals/exile-fractal-member-modal";
 
+import { useAcceptReturn } from "@/hooks/fractals/use-accept-return";
 import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useReturnApplications } from "@/hooks/fractals/use-return-applications";
 import { useGuild } from "@/hooks/use-guild";
 
 import { ErrorCard } from "@shared/components/error-card";
@@ -37,6 +40,10 @@ export const Judicial = () => {
     const { data: guild, error: guildError } = useGuild(role?.guild);
 
     const [showModal, setShowModal] = useState(false);
+    const fractalAccount = useFractalAccount();
+    const { data: returns } = useReturnApplications(fractalAccount);
+    const { mutateAsync: acceptReturn, isPending: isAccepting } =
+        useAcceptReturn();
 
     const { data: currentUser } = useCurrentUser();
 
@@ -123,6 +130,36 @@ export const Judicial = () => {
                                 </Button>
                             </ItemActions>
                         </Item>
+                        {(returns ?? []).map((application) => (
+                            <Item
+                                key={application.applicant}
+                                variant="muted"
+                            >
+                                <ItemContent>
+                                    <ItemTitle>
+                                        {application.applicant}
+                                    </ItemTitle>
+                                    <ItemDescription>
+                                        Applied to return. You decide when they
+                                        have been out long enough.
+                                    </ItemDescription>
+                                </ItemContent>
+                                <ItemActions>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isAccepting}
+                                        onClick={() =>
+                                            acceptReturn([
+                                                application.applicant,
+                                            ])
+                                        }
+                                    >
+                                        Accept
+                                    </Button>
+                                </ItemActions>
+                            </Item>
+                        ))}
                     </CardContent>
                 </GlowingCard>
             )}

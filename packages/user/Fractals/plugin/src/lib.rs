@@ -32,12 +32,14 @@ impl TrustConfig for FractallyPlugin {
             medium: &[
                 "Creating a new fractal",
                 "Claiming accrued fractal token rewards",
+                "Applying to return from exile",
             ],
             high: &[
                 "Setting the occupation service for a fractal role",
                 "Setting paid occupations for token distribution",
                 "Donating tokens to a fractal",
                 "Contributing income to a fractal token stream",
+                "Accepting a return application",
             ],
         }
     }
@@ -116,6 +118,12 @@ impl AdminFractal for FractallyPlugin {
     }
 
     #[psibase_plugin::authorized(High)]
+    fn accept_return(applicant: String) -> Result<(), Error> {
+        Fractals::add_to_tx().accept_return(applicant.parse().unwrap());
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High)]
     fn set_dist_interval(distribution_interval_secs: u32) -> Result<(), Error> {
         Fractals::add_to_tx().set_dist_int(distribution_interval_secs);
         Ok(())
@@ -132,6 +140,18 @@ impl UserFractal for FractallyPlugin {
     #[psibase_plugin::authorized(Low)]
     fn dist_token() -> Result<(), Error> {
         Fractals::add_to_tx().dist_token(get_sender_app()?);
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(Medium)]
+    fn apply_return(fractal: String) -> Result<(), Error> {
+        Fractals::add_to_tx().apply_return(fractal.parse().unwrap());
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(Medium)]
+    fn cancel_return(fractal: String) -> Result<(), Error> {
+        Fractals::add_to_tx().cancel_return(fractal.parse().unwrap());
         Ok(())
     }
 

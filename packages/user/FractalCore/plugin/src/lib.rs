@@ -35,6 +35,7 @@ define_trust! {
         ",
         Medium => "
             - Joining the fractal
+            - Applying to return from exile
             - Claiming accrued fractal token rewards
             - Applying to join a guild (including drafting and submitting the application)
             - Registering for or unregistering from a guild evaluation
@@ -47,6 +48,7 @@ define_trust! {
             - Proposing a ranking in an evaluation
             - Attesting a finalized ranking proposal
             - Exiling a member from the fractal
+            - Accepting a return application
             - Initialising the fractal token
             - Donating tokens to the fractal
             - Setting the fractal token distribution interval
@@ -64,8 +66,8 @@ define_trust! {
     functions {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
-        Medium => [apply_guild, claim_rewards, join_fractal, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
-        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, init_token, donate, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
+        Medium => [apply_guild, claim_rewards, join_fractal, apply_return, cancel_return, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
+        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, accept_return, init_token, donate, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
     }
 }
 
@@ -95,6 +97,13 @@ impl AdminFractal for FractalCorePlugin {
         propose::fractal()?;
 
         FractalsPlugin::admin_fractal::exile_member(&member_account)
+    }
+
+    fn accept_return(applicant: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::accept_return)?;
+        propose::fractal()?;
+
+        FractalsPlugin::admin_fractal::accept_return(&applicant)
     }
 
     fn set_role_mapping(role_id: u8, guild: String) -> Result<(), Error> {
@@ -262,6 +271,16 @@ impl UserFractal for FractalCorePlugin {
     fn join() -> Result<(), Error> {
         assert_authorized(FunctionName::join_fractal)?;
         GuildsPlugin::user_guild::join_fractal()
+    }
+
+    fn apply_return(fractal: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::apply_return)?;
+        FractalsPlugin::user_fractal::apply_return(&fractal)
+    }
+
+    fn cancel_return(fractal: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::cancel_return)?;
+        FractalsPlugin::user_fractal::cancel_return(&fractal)
     }
 
     fn donate(token_id: u32, amount: String) -> Result<(), Error> {
