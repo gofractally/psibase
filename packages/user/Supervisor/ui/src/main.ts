@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import {
     QualifiedFunctionCallArgs,
     buildMessageSupervisorInitialized,
+    buildMessageSupervisorStartupFailed,
     isFunctionCallRequest,
     isGetJsonRequest,
     isPreLoadPluginsRequest,
@@ -12,6 +13,8 @@ import { siblingUrl } from "@psibase/common-lib/rpc";
 
 import { AppInterface } from "./app-interface";
 import { camelToKebab } from "./case";
+import { loadClientKey } from "./client-key";
+import { createDeviceStorage } from "./device-storage";
 import { MainPage } from "./main-page";
 import { Supervisor } from "./supervisor";
 import { isEmbedded } from "./utils";
@@ -72,5 +75,19 @@ addCallHandler(callHandlers, isPreLoadPluginsRequest, (msg) =>
 addCallHandler(callHandlers, isGetJsonRequest, (msg) =>
     supervisor.getJson(msg.origin, msg.data.id, msg.data.payload.plugin),
 );
-registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
-window.parent.postMessage(buildMessageSupervisorInitialized(), "*");
+async function startup(): Promise<void> {
+    try {
+        await loadClientKey(createDeviceStorage());
+        registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
+        window.parent.postMessage(buildMessageSupervisorInitialized(), "*");
+    } catch (err) {
+        console.error("Supervisor startup failed:", err);
+        const message = err instanceof Error ? err.message : String(err);
+        window.parent.postMessage(
+            buildMessageSupervisorStartupFailed(message),
+            "*",
+        );
+    }
+}
+
+void startup();
