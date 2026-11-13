@@ -380,7 +380,7 @@ export function PoliciesPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Trade"
-                description="Orders you have posted. Swap is the other way: a payment that uses someone else's rate."
+                description="Orders you have posted. Swap uses someone else's rate instead."
                 action={
                     <Button
                         type="button"
