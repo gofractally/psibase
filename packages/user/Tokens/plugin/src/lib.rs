@@ -12,7 +12,7 @@ use Exports::{
 
 use psibase::image_content_type;
 use psibase::services::tokens::{
-    is_icon_content_type, Decimal, Precision, Quantity, MAX_ICON_SIZE,
+    is_icon_content_type, Decimal, Precision, Quantity, MAX_ICON_DIMENSION, MAX_ICON_SIZE,
 };
 use psibase::FlagsType;
 use psibase_plugin::{trust::*, *};
@@ -127,6 +127,12 @@ impl Issuer for TokensPlugin {
         let content_type = image_content_type::parse(&icon.content_type)
             .filter(|content_type| is_icon_content_type(*content_type))
             .ok_or_else(|| ErrorType::InvalidIconContentType(icon.content_type.clone()))?;
+
+        let (width, height) = image_content_type::dimensions(content_type, &icon.content)
+            .ok_or_else(|| ErrorType::InvalidIconImage(icon.content_type.clone()))?;
+        if width > MAX_ICON_DIMENSION || height > MAX_ICON_DIMENSION {
+            return Err(ErrorType::IconDimensionsTooLarge(MAX_ICON_DIMENSION).into());
+        }
 
         Tokens::add_to_tx().setIcon(token_id, icon.content.into(), content_type);
         Ok(())

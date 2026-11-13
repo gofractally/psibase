@@ -79,6 +79,9 @@ crate::define_flags!(BalanceFlags, u8, {
 /// Maximum size in bytes of a token icon
 pub const MAX_ICON_SIZE: usize = 32 * 1024;
 
+/// Maximum width and height in pixels of a token icon
+pub const MAX_ICON_DIMENSION: u32 = 256;
+
 /// Whether a token icon may be stored with this content type
 pub fn is_icon_content_type(content_type: crate::image_content_type::ImgContentType) -> bool {
     use crate::image_content_type::{JPEG, PNG, WEBP};

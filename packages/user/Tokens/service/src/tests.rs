@@ -575,10 +575,26 @@ mod tests {
         Ok(response.data.unwrap().token.icon_hash)
     }
 
+    /// PNG header with the given dimensions; enough for `setIcon`'s checks
+    fn png_header(width: u32, height: u32) -> Vec<u8> {
+        let mut data = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+        data.extend(width.to_be_bytes());
+        data.extend(height.to_be_bytes());
+        data.extend([8, 6, 0, 0, 0, 0, 0, 0, 0]);
+        data
+    }
+
+    /// Lossless WebP header with the given dimensions
+    fn webp_header(width: u32, height: u32) -> Vec<u8> {
+        let mut data = b"RIFF\0\0\0\0WEBPVP8L\0\0\0\0\x2F".to_vec();
+        data.extend(((width - 1) | (height - 1) << 14).to_le_bytes());
+        data
+    }
+
     #[psibase::test_case(packages("Tokens"))]
     fn test_icons(chain: psibase::Chain) -> Result<(), psibase::Error> {
         use psibase::image_content_type::{GIF, PNG, WEBP};
-        use psibase::services::tokens::MAX_ICON_SIZE;
+        use psibase::services::tokens::{MAX_ICON_DIMENSION, MAX_ICON_SIZE};
 
         Wrapper::push(&chain).init();
 
@@ -592,7 +608,7 @@ mod tests {
         let tid = a.create(4.try_into().unwrap(), 80000.into()).get()?;
         claim_token_nft(&chain, alice, tid);
 
-        let icon = vec![1u8, 2, 3];
+        let icon = png_header(MAX_ICON_DIMENSION, MAX_ICON_DIMENSION);
         let target = format!("/icon/{tid}");
 
         // Only the token owner can set or remove the icon
@@ -613,6 +629,24 @@ mod tests {
             a.setIcon(tid, icon.clone().into(), 99),
             "Icon content type not allowed",
         );
+
+        // The bytes must be an image of the declared type, within the pixel limits
+        assert_error(
+            a.setIcon(tid, vec![1, 2, 3].into(), PNG),
+            "Icon is not a valid image",
+        );
+        assert_error(
+            a.setIcon(tid, icon.clone().into(), WEBP),
+            "Icon is not a valid image",
+        );
+        assert_error(
+            a.setIcon(tid, png_header(MAX_ICON_DIMENSION + 1, 1).into(), PNG),
+            "Icon exceeds max dimensions",
+        );
+        assert_error(
+            a.setIcon(tid, webp_header(16000, 16000).into(), WEBP),
+            "Icon exceeds max dimensions",
+        );
         assert_error(a.removeIcon(tid), "Token has no icon");
         assert_eq!(get_icon_hash(&chain, tid)?, None);
 
@@ -624,7 +658,7 @@ mod tests {
 
         assert_eq!(get_icon_hash(&chain, tid)?, Some(sha256(&icon)));
 
-        let replacement = vec![4u8, 5, 6];
+        let replacement = webp_header(64, 32);
         a.setIcon(tid, replacement.clone().into(), WEBP).get()?;
         assert_eq!(
             chain.get(Wrapper::SERVICE, &target)?.contentType,
