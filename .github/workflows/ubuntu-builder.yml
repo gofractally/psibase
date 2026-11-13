@@ -7,6 +7,13 @@ on:
         type: boolean
         required: false
         default: true
+      # Skip the Ubuntu build and browser install; run a fast Playwright load
+      # probe with full error stacks. Temporary for diagnosing CI-only load
+      # TypeErrors on packages/**/e2e specs.
+      diagnose-e2e-load:
+        type: boolean
+        required: false
+        default: false
       ref:
         description: "Ref to build; defaults to the ref that triggered the run"
         type: string
@@ -30,6 +37,7 @@ jobs:
 
   build:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
+    if: ${{ !inputs.diagnose-e2e-load }}
     needs: ubuntu-versions
     runs-on: ubuntu-latest
     env:
@@ -89,7 +97,10 @@ jobs:
 
   e2e:
     name: E2E
-    needs: build
+    # needs build so the normal path waits for psidk; diagnose mode skips build, so
+    # also need ubuntu-versions and keep this job alive when build is skipped.
+    needs: [ubuntu-versions, build]
+    if: ${{ always() && !cancelled() && (inputs.diagnose-e2e-load || needs.build.result == 'success') }}
     runs-on: ubuntu-latest
     env:
       # Same pin as the build job; image must include Playwright browsers
@@ -99,6 +110,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Download psidk-ubuntu-2204
+        if: ${{ !inputs.diagnose-e2e-load }}
         uses: actions/download-artifact@v4
         with:
           name: psidk-ubuntu-2204
@@ -106,6 +118,7 @@ jobs:
           # below expects the artifact name as a directory.
           path: psidk-ubuntu-2204
       - name: Extract psidk
+        if: ${{ !inputs.diagnose-e2e-load }}
         run: |
           mkdir psidk-root
           tar xzf psidk-ubuntu-2204/psidk-ubuntu-2204.tar.gz -C psidk-root
@@ -113,7 +126,15 @@ jobs:
           psibase_bin=$(dirname "$psinode_bin")/psibase
           echo "PSINODE_BIN=${psinode_bin}" >> "$GITHUB_ENV"
           echo "PSIBASE_BIN=${psibase_bin}" >> "$GITHUB_ENV"
+      - name: Fake bins for load diagnose
+        if: ${{ inputs.diagnose-e2e-load }}
+        run: |
+          mkdir -p e2e/.ci-empty-packages
+          echo "PSINODE_BIN=/bin/true" >> "$GITHUB_ENV"
+          echo "PSIBASE_BIN=/bin/true" >> "$GITHUB_ENV"
+          echo "PSIBASE_PACKAGES=${GITHUB_WORKSPACE}/e2e/.ci-empty-packages" >> "$GITHUB_ENV"
       - name: Run E2E suite
+        if: ${{ !inputs.diagnose-e2e-load }}
         run: |
           BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:$BUILDER_IMAGE_2204"
           if ! docker image inspect "$BUILDER_IMAGE" >/dev/null 2>&1; then
@@ -128,8 +149,31 @@ jobs:
             --user "$(id -u):$(id -g)" \
             "$BUILDER_IMAGE" \
             bash -c 'mkdir -p "$HOME" && yarn install --immutable && yarn test'
+      - name: Run E2E load diagnose
+        if: ${{ inputs.diagnose-e2e-load }}
+        env:
+          # Unfiltered Playwright stacks (filterStackTrace otherwise strips frames).
+          PWDEBUGIMPL: "1"
+          DEBUG: "pw:test*"
+        run: |
+          BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:$BUILDER_IMAGE_2204"
+          if ! docker image inspect "$BUILDER_IMAGE" >/dev/null 2>&1; then
+            docker pull "$BUILDER_IMAGE"
+          fi
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \
+            -w "${GITHUB_WORKSPACE}/e2e" \
+            -e PSINODE_BIN \
+            -e PSIBASE_BIN \
+            -e PSIBASE_PACKAGES \
+            -e PWDEBUGIMPL \
+            -e DEBUG \
+            -e HOME="${GITHUB_WORKSPACE}/.caches/e2e-home" \
+            --user "$(id -u):$(id -g)" \
+            "$BUILDER_IMAGE" \
+            bash -c 'mkdir -p "$HOME" && yarn install --immutable && export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--trace-uncaught --enable-source-maps" && yarn test --project=chromium --workers=1 --reporter=./diagnose-load-reporter.cjs --reporter=list'
       - name: Upload Playwright artifacts
-        if: failure()
+        if: ${{ failure() && !inputs.diagnose-e2e-load }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-artifacts

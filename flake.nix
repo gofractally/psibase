@@ -235,6 +235,7 @@
           python3
           python3Packages.websockets
           python3Packages.requests
+          python3Packages.cryptography
           git
           gh
           curl

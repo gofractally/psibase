@@ -470,6 +470,28 @@ class TestPsibase(unittest.TestCase):
         packages = ['Minimal', 'Explorer']
         a.run_psibase(['boot'] + a.node_args() + ['-p', a.producer, '--block-key', keyfile, '--account-key', txkeyfile] + packages)
 
+    def _boot_with_account_key(self, node, packages):
+        '''ProdDefault/PrivDefault omit AuthAny; unsigned boot fails without --account-key.'''
+        txkey = PrivateKey()
+        txkeyfile = os.path.join(node.dir, 'txkey.pub')
+        with open(txkeyfile, 'w') as f:
+            f.write(txkey.spki())
+        node.run_psibase(
+            ['boot'] + node.node_args() + ['-p', node.producer, '--account-key', txkeyfile] + packages,
+            timeout=180,
+        )
+        node.wait(new_block(), timeout=60)
+
+    @testutil.psinode_test
+    def test_boot_prod_default(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1))
+        self._boot_with_account_key(a, ['ProdDefault'])
+
+    @testutil.psinode_test
+    def test_boot_priv_default(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1))
+        self._boot_with_account_key(a, ['PrivDefault'])
+
     @testutil.psinode_test
     def test_json_trace(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1));
