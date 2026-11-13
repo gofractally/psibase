@@ -64,12 +64,15 @@ SCENARIO("Buying a symbol")
 
       CHECK(issuance.succeeded());
 
-      CHECK(alice.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
-      CHECK(bob.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
-
       sysIssuer.credit(sysToken, alice, q(10'000, precision), memo);
       auto lastCredit = sysIssuer.credit(sysToken, bob, q(10'000, precision), memo);
       CHECK(lastCredit.succeeded());
+      CHECK(alice.to<Tokens>()
+                .debit(sysToken, Symbol::service, q(10'000, precision), memo)
+                .succeeded());
+      CHECK(bob.to<Tokens>()
+                .debit(sysToken, Symbol::service, q(10'000, precision), memo)
+                .succeeded());
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
@@ -203,8 +206,10 @@ SCENARIO("Measuring price increases")
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       REQUIRE(sysIssuer.mint(sysToken, aliceBalance, memo).succeeded());
-      REQUIRE(alice.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
-      sysIssuer.credit(sysToken, alice, aliceBalance, memo);
+      REQUIRE(sysIssuer.credit(sysToken, alice, aliceBalance, memo).succeeded());
+      REQUIRE(alice.to<Tokens>()
+                  .debit(sysToken, Symbol::service, aliceBalance, memo)
+                  .succeeded());
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
@@ -295,8 +300,10 @@ SCENARIO("Using symbol ownership NFT")
 
       sysIssuer.setTokenConf(sysToken, Tokens::untransferable, false);
       REQUIRE(sysIssuer.mint(sysToken, aliceBalance, memo).succeeded());
-      REQUIRE(alice.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
       REQUIRE(sysIssuer.credit(sysToken, alice, aliceBalance, memo).succeeded());
+      REQUIRE(alice.to<Tokens>()
+                  .debit(sysToken, Symbol::service, aliceBalance, memo)
+                  .succeeded());
 
       // Create the symbol and claim the owner NFT
       auto symbolCost = a.getPrice(3).returnVal();

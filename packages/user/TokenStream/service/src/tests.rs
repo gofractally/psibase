@@ -50,15 +50,6 @@ mod tests {
     fn setup_env(chain: &psibase::Chain) -> u32 {
         for account in [ALICE, BOB, CHARLIE] {
             chain.new_account(account).unwrap();
-
-            // For token balances
-            Tokens::push_from(&chain, account)
-                .setUserConf(
-                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
-                    true,
-                )
-                .get()
-                .unwrap();
         }
 
         let supply = Quantity::from(1000_0000);
@@ -104,6 +95,13 @@ mod tests {
             tokens_credit(&self.chain, self.token_id, creditor, debitor, amount);
         }
 
+        fn debit(&self, debitor: AccountNumber, creditor: AccountNumber, amount: u64) {
+            Tokens::push_from(&self.chain, debitor)
+                .debit(self.token_id, creditor, amount.into(), "".into())
+                .get()
+                .unwrap();
+        }
+
         fn get_balance(&self, account: AccountNumber) -> Quantity {
             get_balance(&self.chain, self.token_id, account)
         }
@@ -142,10 +140,16 @@ mod tests {
         }
 
         fn claim(&self, recipient: AccountNumber, stream_nft_id: u32) {
-            TokenStream::push_from(&self.chain, recipient)
+            let claimed = TokenStream::push_from(&self.chain, recipient)
                 .claim(stream_nft_id)
                 .get()
                 .unwrap();
+            if claimed.value > 0 {
+                Tokens::push_from(&self.chain, recipient)
+                    .debit(self.token_id, TOKEN_STREAM, claimed, "".into())
+                    .get()
+                    .unwrap();
+            }
         }
 
         fn pass_time(&self, seconds: i64) {
@@ -265,9 +269,11 @@ mod tests {
         let test = TestHelper::new(chain);
 
         test.credit(ALICE, BOB, 100_000);
+        test.debit(BOB, ALICE, 100_000);
         let stream1 = test.create_stream(BOB, 100_000);
 
         test.credit(ALICE, CHARLIE, 100_000);
+        test.debit(CHARLIE, ALICE, 100_000);
         let stream2 = test.create_stream(CHARLIE, 100_000);
 
         for _ in 0..8 {
