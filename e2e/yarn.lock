@@ -151,6 +151,7 @@ __metadata:
   dependencies:
     "@eslint/js": "npm:^9.9.0"
     "@playwright/test": "npm:1.64.1"
+    "@psibase/supervisor-e2e": "portal:../packages/user/Supervisor/e2e"
     "@types/node": "npm:^22.15.0"
     eslint: "npm:^9.15.0"
     globals: "npm:^16.2.0"
@@ -158,6 +159,14 @@ __metadata:
     typescript: "npm:^5.7.3"
     typescript-eslint: "npm:^8.33.1"
   languageName: unknown
+  linkType: soft
+
+"@psibase/supervisor-e2e@portal:../packages/user/Supervisor/e2e::locator=%40psibase%2Fe2e%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "@psibase/supervisor-e2e@portal:../packages/user/Supervisor/e2e::locator=%40psibase%2Fe2e%40workspace%3A."
+  dependencies:
+    "@playwright/test": "npm:1.64.1"
+  languageName: node
   linkType: soft
 
 "@types/estree@npm:^1.0.6":
