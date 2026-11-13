@@ -1,0 +1,8 @@
+package host:e2e-probe-user;
+
+world impl {
+    include host:e2e-probe/imports;
+    include host:types/imports;
+
+    export api;
+}

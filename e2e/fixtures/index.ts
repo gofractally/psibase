@@ -22,10 +22,44 @@ export interface SupervisorHandle {
     frame: Frame;
     /** Call any plugin function through the Supervisor. Throws on plugin/generic errors. */
     call: (args: CallArgs) => Promise<unknown>;
+    /**
+     * Like `call`, but returns the Supervisor's reply as-is (PluginErrorObject,
+     * RedirectErrorObject, ... included) instead of throwing. A reply that is a
+     * real Error (e.g. a trap or an unrecognized exception) comes back as
+     * `{ isError: true, name, message }`. Resolves to `{ noReply: true }` if no
+     * reply arrives within `timeoutMs` (e.g. the Supervisor could not
+     * postMessage what it caught).
+     */
+    callRaw: (args: CallArgs, timeoutMs?: number) => Promise<RawReply>;
+    /**
+     * Reload the harness page as a different calling app (same browser
+     * context, so the Supervisor origin's storage is kept) and point `frame`
+     * at the new Supervisor iframe.
+     */
+    switchApp: (app: string) => Promise<void>;
     /** Load (preload) plugins by service/plugin id. */
     loadPlugins: (
         plugins: { service: string; plugin?: string }[],
     ) => Promise<void>;
+}
+
+/** Object-shaped Supervisor reply (error objects, or the callRaw markers). */
+export interface ReplyObject {
+    /** Set by callRaw when the reply was a real Error. */
+    isError?: true;
+    /** Set by callRaw when no reply arrived in time. */
+    noReply?: true;
+    name?: string;
+    message?: string;
+    pluginId?: { service: string; plugin: string };
+}
+
+export type RawReply =
+    ReplyObject | string | number | boolean | null | undefined;
+
+/** The reply as an object ({} for primitive / empty replies). */
+export function replyObject(r: RawReply): ReplyObject {
+    return r !== null && typeof r === "object" ? r : {};
 }
 
 export interface ThrowawayAccount {
@@ -74,35 +108,40 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         page.on("requestfailed", (r) =>
             log.push(`[requestfailed] ${r.url()} ${r.failure()?.errorText}`),
         );
-        await page.goto(`${devnet.url(harnessApp)}/__e2e/harness.html`);
-        try {
-            await page.evaluate(() =>
-                Promise.race([
-                    (window as any).e2e.ready,
-                    new Promise((_, rej) =>
-                        setTimeout(
-                            () =>
-                                rej(
-                                    new Error(
-                                        "Supervisor did not initialize within 30 s",
+        // Load the harness page as `app` and wait for its Supervisor iframe.
+        const open = async (app: string): Promise<Frame> => {
+            await page.goto(`${devnet.url(app)}/__e2e/harness.html`);
+            try {
+                await page.evaluate(() =>
+                    Promise.race([
+                        (window as any).e2e.ready,
+                        new Promise((_, rej) =>
+                            setTimeout(
+                                () =>
+                                    rej(
+                                        new Error(
+                                            "Supervisor did not initialize within 30 s",
+                                        ),
                                     ),
-                                ),
-                            30_000,
+                                30_000,
+                            ),
                         ),
-                    ),
-                ]),
-            );
-        } catch (e) {
-            await testInfo.attach("browser-log", {
-                body: log.join("\n"),
-                contentType: "text/plain",
-            });
-            throw e;
-        }
-        const frame = page
-            .frames()
-            .find((f) => f.url().startsWith(`${devnet.url("supervisor")}`));
-        if (!frame) throw new Error("Supervisor iframe not found");
+                    ]),
+                );
+            } catch (e) {
+                await testInfo.attach("browser-log", {
+                    body: log.join("\n"),
+                    contentType: "text/plain",
+                });
+                throw e;
+            }
+            const f = page
+                .frames()
+                .find((f) => f.url().startsWith(`${devnet.url("supervisor")}`));
+            if (!f) throw new Error("Supervisor iframe not found");
+            return f;
+        };
+        const frame = await open(harnessApp);
 
         const call = async (args: CallArgs) => {
             const result: any = await page.evaluate(
@@ -119,6 +158,36 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
             }
             return result;
         };
+        const callRaw = (
+            args: CallArgs,
+            timeoutMs = 20_000,
+        ): Promise<RawReply> =>
+            page.evaluate<RawReply, { a: CallArgs; ms: number }>(
+                ({ a, ms }) =>
+                    Promise.race<RawReply>([
+                        (
+                            window as unknown as {
+                                e2e: {
+                                    call: (a: CallArgs) => Promise<unknown>;
+                                };
+                            }
+                        ).e2e
+                            .call(a)
+                            .then((r: unknown): RawReply =>
+                                r instanceof Error
+                                    ? {
+                                          isError: true,
+                                          name: r.name,
+                                          message: r.message,
+                                      }
+                                    : (r as RawReply),
+                            ),
+                        new Promise<RawReply>((res) =>
+                            setTimeout(() => res({ noReply: true }), ms),
+                        ),
+                    ]),
+                { a: args, ms: timeoutMs },
+            );
         const loadPlugins = async (
             plugins: { service: string; plugin?: string }[],
         ) => {
@@ -130,7 +199,17 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
                 })),
             );
         };
-        await use({ page, frame, call, loadPlugins });
+        const handle: SupervisorHandle = {
+            page,
+            frame,
+            call,
+            callRaw,
+            loadPlugins,
+            switchApp: async (app: string) => {
+                handle.frame = await open(app);
+            },
+        };
+        await use(handle);
         if (testInfo.status !== testInfo.expectedStatus)
             await testInfo.attach("browser-log", {
                 body: log.join("\n"),
@@ -173,6 +252,20 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         }
     },
 });
+
+/**
+ * True when the Supervisor frame's browser has WebAssembly JSPI
+ * (`WebAssembly.Suspending`), i.e. when the Supervisor takes the JSPI
+ * send-request path (same check as `isWasmJspiAvailable` in loader.ts).
+ * Specs that only make sense on that path skip when this is false.
+ */
+export async function jspiAvailable(frame: Frame): Promise<boolean> {
+    return frame.evaluate(
+        () =>
+            typeof (WebAssembly as unknown as { Suspending?: unknown })
+                .Suspending === "function",
+    );
+}
 
 export interface LoopStats {
     /** Longest gap between 10 ms setInterval ticks (task-queue blocking). */

@@ -1,0 +1,12 @@
+package host:e2e-probe;
+
+world impl {
+    include supervisor:bridge/imports;
+    include host:client/imports;
+    include host:db/imports;
+    include host:prompt/imports;
+    include host:types/imports;
+
+    export api;
+    export res;
+}
