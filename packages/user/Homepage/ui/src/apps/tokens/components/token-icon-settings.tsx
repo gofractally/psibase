@@ -3,6 +3,8 @@ import type { Token } from "../hooks/tokens-plugin/use-user-token-balances";
 import { Trash, Upload } from "lucide-react";
 import { useId } from "react";
 
+import { usePoolPairs } from "@/apps/token-swap/hooks/use-pool-pairs";
+
 import { Panel } from "@/components/page-header";
 
 import { TokenIcon } from "@shared/components/token-icon";
@@ -25,6 +27,7 @@ export const TokenIconSettings = ({
     proposeAs?: string;
 }) => {
     const inputId = useId();
+    const poolPairs = usePoolPairs();
     const { mutate: setIcon, isPending: isSetting } =
         useSetTokenIcon(currentUser);
     const { mutate: removeIcon, isPending: isRemoving } =
@@ -52,6 +55,7 @@ export const TokenIconSettings = ({
                 <TokenIcon
                     tokenId={token.id}
                     iconHash={token.iconHash}
+                    pair={poolPairs.get(token.id)}
                     className="size-12"
                     alt={`Icon of ${token.label}`}
                 />

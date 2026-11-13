@@ -14,7 +14,7 @@ export interface TokenIconSource {
 }
 
 interface Props extends Partial<TokenIconSource> {
-    /** Reserve tokens of a liquidity pool; renders both icons overlapping instead of this token's icon */
+    /** Reserve tokens of a liquidity pool; rendered overlapping when this token has no icon of its own */
     pair?: readonly [TokenIconSource, TokenIconSource] | null;
     className?: string;
     alt?: string;
@@ -62,7 +62,7 @@ export const TokenIcon = ({
     className,
     alt,
 }: Props) => {
-    if (!pair) {
+    if (!pair || iconHash) {
         return (
             <SingleTokenIcon
                 tokenId={tokenId}
