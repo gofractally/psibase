@@ -954,7 +954,7 @@ function AssetRelationCard({
                 ) : null}
                 {onRouting ? (
                     <AccountRowAction
-                        tip="Path-forward offer — let others hop through you to this party"
+                        tip="Let others pay through you to this person"
                         icon={Route}
                         onClick={onRouting}
                     />

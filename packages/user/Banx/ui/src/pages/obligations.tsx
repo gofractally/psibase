@@ -222,8 +222,8 @@ export function ObligationsPage() {
                                     )}
                                     aria-label={
                                         globalForwardOn
-                                            ? "Global path-forward offer is on — click to edit"
-                                            : "Global path-forward offer is off — click to post one"
+                                            ? "Forwarding is on — click to edit"
+                                            : "Forwarding is off — click to turn it on"
                                     }
                                     onClick={() =>
                                         openRouting(
@@ -239,8 +239,8 @@ export function ObligationsPage() {
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs">
                                 {globalForwardOn
-                                    ? "Path-forward on — friends can pay through you. Click to edit."
-                                    : "Path-forward is off. Friends cannot pay through you until you turn Forward on. Closed, 0% fee."}
+                                    ? "Forwarding is on. Friends can pay through you."
+                                    : "Forwarding is off. Friends cannot pay through you until you turn it on."}
                             </TooltipContent>
                         </Tooltip>
                         <Tooltip>

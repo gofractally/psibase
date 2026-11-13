@@ -321,7 +321,7 @@ export function ReciprocateLineForm({
                         <form.AppField
                             name="allowForward"
                             children={(field) => (
-                                <field.CheckboxField label={`Let friends path-pay through you in ${symbol} (closed, 0% fee, 0% max APR)`} />
+                                <field.CheckboxField label="Let friends pay through you" />
                             )}
                         />
                     )}
