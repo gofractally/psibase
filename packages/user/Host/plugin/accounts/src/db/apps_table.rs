@@ -1,6 +1,6 @@
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
-use crate::bindings::host::types::types::Error;
+use crate::bindings::host::types::types::{Claim, Error};
 use psibase::fracpack::{Pack, Unpack};
 
 // User logged into each app; persistent so the login survives page loads
@@ -63,11 +63,11 @@ impl AppsTable {
             .map(|a| String::from_utf8(a).unwrap())
     }
 
-    pub(crate) fn login(&self, user: &str) -> Result<(), Error> {
+    pub(crate) fn login(&self, user: &str, claim: Option<&Claim>) -> Result<(), Error> {
         logged_in_user_table().set(&self.app, user.as_bytes());
         self.connect(user);
 
-        let result = HostAuth::set_logged_in_user(user, &self.app);
+        let result = HostAuth::set_logged_in_user(user, &self.app, claim);
         if result.is_err() {
             self.logout();
         }

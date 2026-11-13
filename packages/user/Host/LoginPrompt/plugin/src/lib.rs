@@ -1,5 +1,6 @@
 #[allow(warnings)]
 mod bindings;
+mod auth_service;
 mod errors;
 mod interfaces;
 mod plugin;
@@ -15,7 +16,7 @@ psibase::define_trust! {
         High => "",
     }
     functions {
-        Max => [remove_account, get_all_accounts],
+        Max => [import_existing, remove_account, get_all_accounts],
     }
 }
 

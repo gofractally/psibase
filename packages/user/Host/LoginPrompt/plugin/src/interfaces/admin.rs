@@ -1,10 +1,18 @@
-use crate::bindings::exports::host::login_prompt::admin::Guest as Admin;
+use crate::auth_service;
+use crate::bindings::exports::host::login_prompt::admin::{Credential, Guest as Admin};
 use crate::bindings::host::accounts::admin as HostAccountsAdmin;
+use crate::bindings::host::types::types::Error;
 use crate::plugin::LoginPrompt;
 use crate::trust::*;
 use crate::HOST_APP;
 
 impl Admin for LoginPrompt {
+    fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
+        assert_authorized_with_whitelist(FunctionName::import_existing, vec!["homepage".into()])
+            .unwrap();
+        auth_service::import_existing(credentials)
+    }
+
     fn remove_account(account: String) {
         assert_authorized(FunctionName::remove_account).unwrap();
 

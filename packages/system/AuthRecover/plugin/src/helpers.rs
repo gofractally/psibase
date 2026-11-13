@@ -42,3 +42,7 @@ pub fn to_claim(pubkey: Vec<u8>) -> Claim {
 pub fn from_transact() -> bool {
     client::get_sender() == psibase::services::transact::SERVICE.to_string()
 }
+
+pub fn from_host() -> bool {
+    client::get_sender() == "host"
+}

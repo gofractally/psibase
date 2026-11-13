@@ -44,7 +44,7 @@ import { Progress } from "@shared/shadcn/ui/progress";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { Loader } from "./components/create-prompt/loader";
-import { useConnectAccount } from "./hooks/use-connect-account";
+import { useLogin } from "./hooks/use-login";
 import { loginPromptCall } from "./lib/login-prompt";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { usePurchaseAccount } from "./hooks/use-purchase-account";
@@ -148,7 +148,7 @@ export const CreatePrompt = () => {
             });
         },
     });
-    const connectAccountMutation = useConnectAccount();
+    const loginAccountMutation = useLogin();
 
     const accountValidator = offerPremium ? zAccount : zAccountFree;
 
@@ -460,7 +460,7 @@ export const CreatePrompt = () => {
                     expectedAccount={createdAccount}
                     onBack={() => setStep("2_SAVE")}
                     onImported={async (account) => {
-                        await connectAccountMutation.mutateAsync(account);
+                        await loginAccountMutation.mutateAsync(account);
                         prompt.finished();
                     }}
                 />

@@ -4,10 +4,11 @@ mod helpers;
 use helpers::*;
 
 use bindings::exports::auth_recover::plugin::{
-    actions::Guest as Actions, keyvault::Guest as KeyVault,
+    actions::Guest as Actions, keyvault::Guest as KeyVault, session::Guest as Session,
 };
 use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 
+use bindings::host::accounts::auth_svc as HostAccounts;
 use bindings::host::crypto::keyvault as HostCrypto;
 use bindings::transact::plugin::api as Transact;
 use psibase_plugin::types as HostTypes;
@@ -23,6 +24,10 @@ mod errors;
 use errors::ErrorType;
 
 struct AuthRecoverPlugin;
+
+fn resolve_credential(account_name: &str) -> Result<Claim, HostTypes::Error> {
+    Ok(to_claim(HostCrypto::to_der(&get_pubkey(account_name)?)?))
+}
 
 impl TrustConfig for AuthRecoverPlugin {
     fn capabilities() -> Capabilities {
@@ -43,9 +48,7 @@ impl HookUserAuth for AuthRecoverPlugin {
             return Err(ErrorType::Unauthorized("on_user_auth_claim").into());
         }
 
-        Ok(Some(to_claim(HostCrypto::to_der(&get_pubkey(
-            &account_name,
-        )?)?)))
+        Ok(Some(resolve_credential(&account_name)?))
     }
 
     fn on_user_auth_proof(
@@ -59,6 +62,34 @@ impl HookUserAuth for AuthRecoverPlugin {
         let public_key = HostCrypto::to_der(&get_pubkey(&account_name)?)?;
         let signature = HostCrypto::sign(&transaction_hash, &public_key)?;
         Ok(Some(Proof { signature }))
+    }
+}
+
+impl Session for AuthRecoverPlugin {
+    fn add_account(
+        account_name: String,
+        private_key: HostTypes::Pem,
+    ) -> Result<(), HostTypes::Error> {
+        if !from_host() {
+            return Err(ErrorType::Unauthorized("session::add_account").into());
+        }
+
+        if HostCrypto::pub_from_priv(&private_key)? != get_pubkey(&account_name)? {
+            return Err(ErrorType::AuthorizationFailed(&account_name).into());
+        }
+        HostCrypto::import_key(&private_key)?;
+        HostAccounts::add_account(&account_name)
+    }
+
+    fn login(account_name: String) -> Result<(), HostTypes::Error> {
+        if !from_host() {
+            return Err(ErrorType::Unauthorized("session::login").into());
+        }
+
+        // Pass the claim through for query-token minting only. User-tx
+        // claims still come from hook-user-auth at finish-tx.
+        let claim = resolve_credential(&account_name)?;
+        HostAccounts::login(&account_name, Some(&claim))
     }
 }
 

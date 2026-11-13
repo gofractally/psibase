@@ -10,11 +10,10 @@ mod open_tx_table;
 use open_tx_table::OpenTx;
 
 use transact::plugin::hook_handlers::*;
-use transact::plugin::types::{Action as ImportAction, Claim as ImportClaim};
-
 use host::client::api as Client;
+use host::crypto::keyvault as HostCrypto;
 use host::http::api as Server;
-use host::types::types::{self as HostTypes, BodyTypes, PluginRef};
+use host::types::types::{self as HostTypes, BodyTypes, Claim, PluginRef};
 
 use exports::transact::plugin::types::{Action as ExportAction, Claim as ExportClaim};
 use exports::transact::plugin::{
@@ -103,7 +102,7 @@ fn schedule_action(
     validate_action_name(&method_name)?;
     let sender = get_action_sender(service.as_str(), method_name.as_str())?;
 
-    let action = psibase::Action::from(ImportAction {
+    let action = psibase::Action::from(ExportAction {
         sender,
         service,
         method: method_name,
@@ -119,7 +118,7 @@ fn schedule_action(
     Ok(())
 }
 
-fn pack_staged_propose(actions: Vec<ImportAction>, auto_exec: bool) -> (String, String, Vec<u8>) {
+fn pack_staged_propose(actions: Vec<ExportAction>, auto_exec: bool) -> (String, String, Vec<u8>) {
     let inner: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
     (
         psibase::services::staged_tx::SERVICE.to_string(),
@@ -137,27 +136,8 @@ fn flush_propose_latch() -> Result<(), HostTypes::Error> {
         .map_err(|_| NotLoggedIn("flush_propose_latch").into())
 }
 
-fn user_auth_claim(user: &str) -> Result<Option<ImportClaim>, HostTypes::Error> {
-    let auth_service_acc = accounts::query::api::get_account(&user.to_string())?
-        .unwrap()
-        .auth_service;
-    let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
-    on_user_auth_claim(plugin_ref, user)
-}
-
-fn user_auth_proof(
-    user: &str,
-    tx_hash: &[u8; 32],
-) -> Result<Option<transact::plugin::types::Proof>, HostTypes::Error> {
-    let auth_service_acc = accounts::query::api::get_account(&user.to_string())?
-        .unwrap()
-        .auth_service;
-    let plugin_ref = PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
-    on_user_auth_proof(plugin_ref, user, tx_hash)
-}
-
-impl From<ImportAction> for psibase::Action {
-    fn from(action: ImportAction) -> Self {
+impl From<ExportAction> for psibase::Action {
+    fn from(action: ExportAction) -> Self {
         psibase::Action {
             sender: action.sender.parse().unwrap(),
             service: action.service.parse().unwrap(),
@@ -167,8 +147,8 @@ impl From<ImportAction> for psibase::Action {
     }
 }
 
-impl From<ImportClaim> for psibase::Claim {
-    fn from(claim: ImportClaim) -> Self {
+impl From<Claim> for psibase::Claim {
+    fn from(claim: Claim) -> Self {
         psibase::Claim {
             service: claim.verify_service.parse().unwrap(),
             rawData: Hex::from(claim.raw_data.clone()),
@@ -241,15 +221,6 @@ impl Api for TransactPlugin {
     fn propose(actions: Vec<ExportAction>, auto_exec: bool) -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::propose, vec!["packages".into()])?;
 
-        let actions: Vec<ImportAction> = actions
-            .into_iter()
-            .map(|a| ImportAction {
-                sender: a.sender,
-                service: a.service,
-                method: a.method,
-                raw_data: a.raw_data,
-            })
-            .collect();
         let (service, method, packed) = pack_staged_propose(actions, auto_exec);
         schedule_action(service, method, packed)
     }
@@ -276,21 +247,23 @@ struct LoginReply {
 }
 
 impl Auth for TransactPlugin {
-    fn get_query_token(app: String, user: String) -> Result<String, HostTypes::Error> {
+    fn get_query_token(
+        app: String,
+        user: String,
+        claim: Option<Claim>,
+    ) -> Result<String, HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::get_query_token, vec!["host".into()])?;
 
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
             .expect("Failed to deserialize rootdomain");
-        let actions = vec![ImportAction {
-            sender: user.clone(),
+        let actions = vec![ExportAction {
+            sender: user,
             service: app,
             method: "loginSys".to_string(),
             raw_data: (root_host,).packed(),
         }];
 
-        let claims: Vec<ImportClaim> = user_auth_claim(&user)?.into_iter().collect();
-
-        let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
+        let claims: Vec<psibase::Claim> = claim.into_iter().map(Into::into).collect();
         let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
 
         let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
@@ -306,11 +279,12 @@ impl Auth for TransactPlugin {
             actions,
             claims,
         };
-        let proofs: Vec<Hex<Vec<u8>>> =
-            user_auth_proof(&user, &Sha256::digest(&tx.packed()).into())?
-                .into_iter()
-                .map(|proof| Hex::from(proof.signature))
-                .collect();
+        let tx_hash = Sha256::digest(&tx.packed());
+        let proofs: Vec<Hex<Vec<u8>>> = tx
+            .claims
+            .iter()
+            .map(|c| HostCrypto::sign(&tx_hash, &c.rawData).map(Hex::from))
+            .collect::<Result<_, _>>()?;
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
             proofs,

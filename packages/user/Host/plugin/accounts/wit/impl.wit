@@ -7,10 +7,8 @@ world impl {
     include host:prompt/imports;
     include accounts:query/imports;
 
-    import auth-sig:plugin/api;
-    import auth-sig:plugin/keyvault;
-
     export api;
     export admin;
     export active-app;
+    export auth-svc;
 }

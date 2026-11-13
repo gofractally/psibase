@@ -23,6 +23,7 @@ export type ToastId = number | string;
 
 export abstract class PluginInterface {
     protected abstract readonly _intf: string;
+    protected readonly _plugin: string = "plugin";
     protected _service!: Account;
 
     protected _call<TParams extends unknown[] = [], TReturn = unknown>(
@@ -32,6 +33,7 @@ export abstract class PluginInterface {
             intf: this._intf,
             method,
             service: this._service,
+            plugin: this._plugin,
             _params: undefined,
             _return: undefined,
         } as const;

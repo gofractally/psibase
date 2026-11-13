@@ -7,4 +7,6 @@ pub enum ErrorType<'a> {
     JsonDecodeError(String),
     #[error("Invalid account name: {0}")]
     InvalidAccountName(&'a str),
+    #[error("Key cannot authorize account: {0}")]
+    AuthorizationFailed(&'a str),
 }
