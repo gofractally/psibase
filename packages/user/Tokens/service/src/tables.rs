@@ -512,7 +512,7 @@ pub mod tables {
             Self::get(creditor, debitor, token_id).unwrap_or(Self::new(creditor, debitor, token_id))
         }
 
-        pub fn credit(&mut self, quantity: Quantity, memo: Memo) {
+        pub fn credit(&mut self, quantity: Quantity) {
             assert!(quantity.value > 0, "credit quantity must be greater than 0");
 
             Balance::get_or_new(self.creditor, self.token_id).sub_balance(quantity);
@@ -523,14 +523,6 @@ pub mod tables {
             let is_untransferable = token.get_flag(TokenFlags::UNTRANSFERABLE);
             if is_untransferable {
                 assert_eq!(token.nft_holder(), get_sender(), "Token untradeable");
-            }
-
-            let is_auto_debit = BalanceConfig::get(self.debitor, self.token_id)
-                .map(|holder| holder.get_flag(BalanceFlags::AUTO_DEBIT))
-                .unwrap_or(UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::AUTO_DEBIT));
-
-            if is_auto_debit {
-                self.debit(quantity, memo);
             }
         }
 
@@ -731,9 +723,34 @@ pub mod tables {
         pub flags: u8,
     }
 
+    fn account_has_service(account: AccountNumber) -> bool {
+        let native = psibase::KvHandle::new(psibase::DbId::Native, &[], psibase::KvMode::Read);
+        let key = (
+            psibase::CODE_TABLE,
+            psibase::NATIVE_TABLE_PRIMARY_INDEX,
+            account,
+        );
+        psibase::kv_get::<psibase::CodeRow, _>(&native, &key)
+            .unwrap()
+            .is_some_and(|row| row.codeHash != psibase::Checksum256::default())
+    }
+
+    pub fn auto_debit_enabled(account: AccountNumber, token_id: TID) -> bool {
+        if let Some(cfg) = BalanceConfig::get(account, token_id) {
+            cfg.get_flag(BalanceFlags::AUTO_DEBIT)
+        } else {
+            UserConfig::get_or_new(account).get_flag(BalanceFlags::AUTO_DEBIT)
+        }
+    }
+
     impl UserConfig {
         fn new(account: AccountNumber) -> Self {
-            Self { account, flags: 0 }
+            let flags = if account_has_service(account) {
+                0
+            } else {
+                Flags::new(0u8).set(BalanceFlags::AUTO_DEBIT, true).value()
+            };
+            Self { account, flags }
         }
 
         fn get(account: AccountNumber) -> Option<Self> {
@@ -741,7 +758,7 @@ pub mod tables {
         }
 
         pub fn get_or_new(account: AccountNumber) -> Self {
-            Self::get(account).unwrap_or(Self::new(account))
+            Self::get(account).unwrap_or_else(|| Self::new(account))
         }
 
         pub fn set_flag(&mut self, flag: BalanceFlags, enabled: bool) {
@@ -753,20 +770,12 @@ pub mod tables {
             Flags::new(self.flags).get(flag)
         }
 
-        fn delete(&self) {
-            UserConfigTable::read_write().erase(&(self.get_primary_key()));
-        }
-
         fn put(&self) {
             UserConfigTable::read_write().put(&self).unwrap();
         }
 
         fn save(&mut self) {
-            if self.flags == 0 {
-                self.delete();
-            } else {
-                self.put();
-            }
+            self.put();
         }
     }
 

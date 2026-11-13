@@ -67,6 +67,11 @@ impl Tokens for HomepagePlugin {
         tokens::plugin::user::credit(token_id, &debitor, &amount, &memo)
     }
 
+    fn transfer(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
+        assert_caller_self();
+        tokens::plugin::user::transfer(token_id, &debitor, &amount, &memo)
+    }
+
     fn uncredit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         assert_caller_self();
         tokens::plugin::user::uncredit(token_id, &debitor, &amount, &memo)
