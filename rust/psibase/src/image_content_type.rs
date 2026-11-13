@@ -46,9 +46,13 @@ pub fn mime(content_type: ImgContentType) -> Option<&'static str> {
 /// `content_type`, or if either dimension is zero.
 ///
 /// Browsers allocate memory for an image based on these dimensions, so the
-/// parsing is strict: layouts that a decoder might read differently (e.g. JPEG
-/// fill bytes or stray data between segments) are rejected rather than
-/// interpreted.
+/// result must be the dimensions a browser's decoder reads. Each format is
+/// parsed exactly as its spec lays it out, up to and including the dimensions,
+/// and anything else is rejected: optional constructs the spec permits but a
+/// decoder could read differently (e.g. JPEG fill bytes), and malformed data
+/// that decoders tolerate (e.g. stray bytes between JPEG segments). Nothing
+/// after the dimensions (e.g. PNG chunk CRCs) is checked; a file malformed
+/// there fails to decode, which is harmless.
 pub fn dimensions(content_type: ImgContentType, data: &[u8]) -> Option<(u32, u32)> {
     match content_type {
         PNG => png_dimensions(data),
@@ -63,77 +67,103 @@ fn bytes<const N: usize>(data: &[u8], at: usize) -> Option<[u8; N]> {
     data.get(at..at.checked_add(N)?)?.try_into().ok()
 }
 
+/// PNG spec: the signature, then the IHDR chunk, which must come first. IHDR
+/// has 13 bytes of data, starting with the width and height, which as PNG
+/// four-byte unsigned integers are at most 2^31 - 1.
 fn png_dimensions(data: &[u8]) -> Option<(u32, u32)> {
-    // The IHDR chunk (13 bytes of data) must immediately follow the signature
     if bytes(data, 0)? != *b"\x89PNG\r\n\x1a\n"
         || u32::from_be_bytes(bytes(data, 8)?) != 13
         || bytes(data, 12)? != *b"IHDR"
     {
         return None;
     }
-    Some((
-        u32::from_be_bytes(bytes(data, 16)?),
-        u32::from_be_bytes(bytes(data, 20)?),
-    ))
+    let width = u32::from_be_bytes(bytes(data, 16)?);
+    let height = u32::from_be_bytes(bytes(data, 20)?);
+    (width <= i32::MAX as u32 && height <= i32::MAX as u32).then_some((width, height))
 }
 
+/// ITU-T T.81 Annex B (B.2.1): SOI, then any number of table/miscellaneous
+/// segments (B.2.4), then the frame header (B.2.2). Each segment is a 0xFF,
+/// a marker code, and a 2-byte length that counts itself but not the marker
+/// (B.1.1.4).
+///
+/// B.1.1.2 also allows any number of 0xFF fill bytes before a marker, and
+/// decoders additionally skip stray bytes between segments, which the spec
+/// forbids. Both are rejected: with either, a crafted file could show this
+/// parser a different frame header than the one a decoder reads.
 fn jpeg_dimensions(data: &[u8]) -> Option<(u32, u32)> {
     if bytes(data, 0)? != [0xFF, 0xD8] {
         return None;
     }
     let mut pos = 2;
     loop {
-        // Each segment must start exactly where the previous one ended, with a
-        // single 0xFF and a length. Decoders skip fill bytes, stray data, and
-        // length-less markers, so allowing them would let a crafted file show
-        // this parser a different frame header than a browser decodes.
         let [prefix, marker] = bytes(data, pos)?;
         if prefix != 0xFF {
             return None;
         }
         let len = u16::from_be_bytes(bytes(data, pos + 2)?) as usize;
-        if len < 2 {
-            return None;
-        }
+        let segment = data.get(pos + 4..pos + 2 + len)?;
         match marker {
-            // Start of frame: length, precision, height, width
+            // SOFn (B.2.2): precision, height, width, component count, then 3
+            // bytes per component. A height of 0 (defined later by a DNL
+            // marker) is rejected by `dimensions`.
             0xC0..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF => {
-                let height = u16::from_be_bytes(bytes(data, pos + 5)?);
-                let width = u16::from_be_bytes(bytes(data, pos + 7)?);
+                let [_, h1, h0, w1, w0, components] = bytes(segment, 0)?;
+                if components == 0 || segment.len() != 6 + 3 * components as usize {
+                    return None;
+                }
+                let width = u16::from_be_bytes([w1, w0]);
+                let height = u16::from_be_bytes([h1, h0]);
                 return Some((width.into(), height.into()));
             }
-            // Tables, restart interval, comments, and application data
+            // B.2.4: DHT, DAC, DQT, DRI, APPn, COM
             0xC4 | 0xCC | 0xDB | 0xDD | 0xE0..=0xEF | 0xFE => pos += 2 + len,
             _ => return None,
         }
     }
 }
 
+/// RFC 9649: a RIFF header whose size covers the rest of the file, then the
+/// first chunk, which is VP8 (lossy), VP8L (lossless), or VP8X (extended). The
+/// chunk's size must fit in the file, and its data starts with the dimensions.
 fn webp_dimensions(data: &[u8]) -> Option<(u32, u32)> {
-    if bytes(data, 0)? != *b"RIFF" || bytes(data, 8)? != *b"WEBP" {
+    let le32 = |at| bytes(data, at).map(u32::from_le_bytes);
+    if bytes(data, 0)? != *b"RIFF"
+        || le32(4)? as usize != data.len() - 8
+        || bytes(data, 8)? != *b"WEBP"
+    {
         return None;
     }
-    let u24 = |at| bytes::<3>(data, at).map(|[a, b, c]| u32::from_le_bytes([a, b, c, 0]));
+    let chunk = data.get(20..20usize.checked_add(le32(16)? as usize)?)?;
     match &bytes(data, 12)? {
-        // Lossy: frame tag, start code, then 14-bit width and height
+        // RFC 6386 9.1: the 3-byte frame tag of a key frame (bit 0 clear), the
+        // start code, then 14-bit width and height, each with 2 scaling bits
         b"VP8 " => {
-            if bytes(data, 23)? != [0x9D, 0x01, 0x2A] {
+            let [tag, _, _, 0x9D, 0x01, 0x2A, w0, w1, h0, h1] = bytes(chunk, 0)? else {
+                return None;
+            };
+            if tag & 1 != 0 {
                 return None;
             }
-            let width = u16::from_le_bytes(bytes(data, 26)?) & 0x3FFF;
-            let height = u16::from_le_bytes(bytes(data, 28)?) & 0x3FFF;
+            let width = u16::from_le_bytes([w0, w1]) & 0x3FFF;
+            let height = u16::from_le_bytes([h0, h1]) & 0x3FFF;
             Some((width.into(), height.into()))
         }
-        // Lossless: signature, then 14-bit width - 1 and height - 1
+        // Signature, then 14-bit width - 1, 14-bit height - 1, an alpha bit,
+        // and a 3-bit version, which must be 0
         b"VP8L" => {
-            if *data.get(20)? != 0x2F {
+            let [0x2F, b0, b1, b2, b3] = bytes(chunk, 0)? else {
                 return None;
-            }
-            let bits = u32::from_le_bytes(bytes(data, 21)?);
-            Some(((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1))
+            };
+            let bits = u32::from_le_bytes([b0, b1, b2, b3]);
+            (bits >> 29 == 0).then_some(((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1))
         }
-        // Extended: canvas width - 1 and height - 1, which bound every frame
-        b"VP8X" => Some((u24(24)? + 1, u24(27)? + 1)),
+        // Flags and 3 reserved bytes, then 24-bit canvas width - 1 and
+        // height - 1, which bound every frame
+        b"VP8X" if chunk.len() == 10 => {
+            let u24 = |at| bytes::<3>(chunk, at).map(|[a, b, c]| u32::from_le_bytes([a, b, c, 0]));
+            Some((u24(4)? + 1, u24(7)? + 1))
+        }
         _ => None,
     }
 }
@@ -174,11 +204,22 @@ pub(crate) mod test_images {
         data
     }
 
+    /// A WebP file containing one chunk
+    pub fn webp_file(fourcc: &[u8; 4], body: &[u8]) -> Vec<u8> {
+        let mut data = b"RIFF".to_vec();
+        data.extend((body.len() as u32 + 12).to_le_bytes());
+        data.extend(b"WEBP");
+        data.extend(fourcc);
+        data.extend((body.len() as u32).to_le_bytes());
+        data.extend(body);
+        data
+    }
+
     /// Header of a lossless WebP image
     pub fn webp(width: u32, height: u32) -> Vec<u8> {
-        let mut data = b"RIFF\0\0\0\0WEBPVP8L\0\0\0\0\x2F".to_vec();
-        data.extend(((width - 1) | (height - 1) << 14).to_le_bytes());
-        data
+        let mut body = vec![0x2F];
+        body.extend(((width - 1) | (height - 1) << 14).to_le_bytes());
+        webp_file(b"VP8L", &body)
     }
 }
 
@@ -190,12 +231,12 @@ fn reads_dimensions() {
     assert_eq!(dimensions(JPEG, &jpeg(100, 200)), Some((100, 200)));
     assert_eq!(dimensions(WEBP, &webp(16, 9)), Some((16, 9)));
 
-    let mut lossy = b"RIFF\0\0\0\0WEBPVP8 \0\0\0\0\0\0\0\x9D\x01\x2A".to_vec();
-    lossy.extend([0x40, 0x41, 0x20, 0x00]); // 320 | scale bits, 32
+    // 320 with scaling bits set, 32
+    let lossy = webp_file(b"VP8 ", b"\0\0\0\x9D\x01\x2A\x40\x41\x20\x00");
     assert_eq!(dimensions(WEBP, &lossy), Some((320, 32)));
 
-    let mut extended = b"RIFF\0\0\0\0WEBPVP8X\x0a\0\0\0\x10\0\0\0".to_vec();
-    extended.extend([0xFF, 0x00, 0x00, 0x3F, 0x00, 0x00]); // 256 x 64
+    // 256 x 64
+    let extended = webp_file(b"VP8X", b"\x10\0\0\0\xFF\0\0\x3F\0\0");
     assert_eq!(dimensions(WEBP, &extended), Some((256, 64)));
 }
 
@@ -214,6 +255,46 @@ fn rejects_mismatched_or_malformed_headers() {
     let mut png_data = png(1, 1);
     png_data[12..16].copy_from_slice(b"tEXt");
     assert_eq!(dimensions(PNG, &png_data), None);
+
+    // PNG dimensions above 2^31 - 1
+    assert_eq!(dimensions(PNG, &png(1 << 31, 1)), None);
+    assert_eq!(dimensions(PNG, &png(1, 1 << 31)), None);
+
+    // A JPEG frame header whose length doesn't match its component count, or
+    // with no components
+    let soi = [0xFF, 0xD8];
+    let short_frame = [&soi[..], &jpeg_segment(0xC0, &[8, 0, 1, 0, 1, 1])].concat();
+    assert_eq!(dimensions(JPEG, &short_frame), None);
+    let no_components = [&soi[..], &jpeg_segment(0xC0, &[8, 0, 1, 0, 1, 0])].concat();
+    assert_eq!(dimensions(JPEG, &no_components), None);
+    // A JPEG segment that runs past the end of the data
+    assert_eq!(dimensions(JPEG, &jpeg(1, 1)[..30]), None);
+    // A JPEG height of 0, defined later by a DNL marker
+    assert_eq!(dimensions(JPEG, &jpeg(1, 0)), None);
+
+    // A RIFF size that doesn't cover exactly the rest of the WebP file
+    let mut webp_data = webp(1, 1);
+    webp_data.push(0);
+    assert_eq!(dimensions(WEBP, &webp_data), None);
+    assert_eq!(dimensions(WEBP, &webp(1, 1)[..24]), None);
+
+    // A WebP chunk size that runs past the end of the file
+    let mut webp_data = webp(1, 1);
+    webp_data[16] = 6;
+    assert_eq!(dimensions(WEBP, &webp_data), None);
+
+    // A lossy WebP frame that isn't a key frame
+    let lossy = webp_file(b"VP8 ", b"\x01\0\0\x9D\x01\x2A\x01\0\x01\0");
+    assert_eq!(dimensions(WEBP, &lossy), None);
+
+    // A lossless WebP with a nonzero version
+    let mut lossless = webp(1, 1);
+    lossless[24] |= 0x20;
+    assert_eq!(dimensions(WEBP, &lossless), None);
+
+    // An extended WebP chunk that isn't 10 bytes
+    let extended = webp_file(b"VP8X", b"\x10\0\0\0\0\0\0\0\0\0\0\0");
+    assert_eq!(dimensions(WEBP, &extended), None);
 }
 
 #[test]

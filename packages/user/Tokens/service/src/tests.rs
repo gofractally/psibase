@@ -586,7 +586,8 @@ mod tests {
 
     /// Lossless WebP header with the given dimensions
     fn webp_header(width: u32, height: u32) -> Vec<u8> {
-        let mut data = b"RIFF\0\0\0\0WEBPVP8L\0\0\0\0\x2F".to_vec();
+        // RIFF size 17 and chunk size 5 cover exactly the 5 bytes of VP8L data
+        let mut data = b"RIFF\x11\0\0\0WEBPVP8L\x05\0\0\0\x2F".to_vec();
         data.extend(((width - 1) | (height - 1) << 14).to_le_bytes());
         data
     }
