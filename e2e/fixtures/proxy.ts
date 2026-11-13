@@ -7,6 +7,10 @@ import { HARNESS_HTML } from "./harness-page";
  *  - serves /__e2e/sleep?ms=N&tag=T: waits N ms, then returns JSON with server
  *    start/end timestamps. This is the "sleep-and-timestamp" fixture: it lets
  *    tests prove (or disprove) that fetches overlap without any real network.
+ *  - answers any path registered in `stubs` (exact pathname, any subdomain)
+ *    with a canned, optionally delayed or connection-reset response instead of
+ *    forwarding it. Used to hold a plugin fetch in flight (so a JSPI call is
+ *    provably suspended) and to make one fail on demand.
  *  - forwards everything else to this worker's psinode, Host header intact.
  */
 export interface SleepRecord {
@@ -16,11 +20,41 @@ export interface SleepRecord {
     end: number;
 }
 
+/** Canned response for a stubbed path. */
+export interface ProxyStub {
+    /** Delay before answering (default 0). */
+    ms?: number;
+    /** HTTP status (default 200). */
+    status?: number;
+    /** Response body (default `{}`). */
+    body?: string;
+    /** Content-Type (default application/json). */
+    contentType?: string;
+    /** Destroy the connection instead of answering, so the browser fetch rejects. */
+    reset?: boolean;
+}
+
+export interface StubHit {
+    path: string;
+    method: string;
+    body: string;
+    /** Host header subdomain-qualified, e.g. `tokens.psibase.localhost:28081`. */
+    host: string;
+    headers: http.IncomingHttpHeaders;
+}
+
 export interface E2eProxy {
     port: number;
     sleeps: SleepRecord[];
     /** Tags of /__e2e/sleep requests the server has received but not answered. */
     inflight: Set<string>;
+    /**
+     * pathname -> canned response. While a stubbed request is being held its
+     * pathname is in `inflight`. Tests must delete their entries when done.
+     */
+    stubs: Map<string, ProxyStub>;
+    /** Every non-preflight request answered from `stubs`, in arrival order. */
+    stubHits: StubHit[];
     close: () => Promise<void>;
 }
 
@@ -46,8 +80,36 @@ export function startProxy(
 ): Promise<E2eProxy> {
     const sleeps: SleepRecord[] = [];
     const inflight = new Set<string>();
+    const stubs = new Map<string, ProxyStub>();
+    const stubHits: StubHit[] = [];
     const server = http.createServer((req, res) => {
         const url = new URL(req.url ?? "/", "http://x");
+        const stub = stubs.get(url.pathname);
+        if (stub) {
+            cors(req, res);
+            if (req.method === "OPTIONS") return void res.writeHead(204).end();
+            const chunks: Buffer[] = [];
+            req.on("data", (c: Buffer) => chunks.push(c));
+            req.on("end", () => {
+                inflight.add(url.pathname);
+                setTimeout(() => {
+                    inflight.delete(url.pathname);
+                    stubHits.push({
+                        path: url.pathname,
+                        method: req.method ?? "",
+                        body: Buffer.concat(chunks).toString(),
+                        host: req.headers.host ?? "",
+                        headers: req.headers,
+                    });
+                    if (stub.reset) return void req.socket.destroy();
+                    res.writeHead(stub.status ?? 200, {
+                        "Content-Type": stub.contentType ?? "application/json",
+                    });
+                    res.end(stub.body ?? "{}");
+                }, stub.ms ?? 0);
+            });
+            return;
+        }
         if (url.pathname.startsWith("/__e2e/")) {
             cors(req, res);
             if (req.method === "OPTIONS") return void res.writeHead(204).end();
@@ -99,6 +161,8 @@ export function startProxy(
                 port,
                 sleeps,
                 inflight,
+                stubs,
+                stubHits,
                 close: () =>
                     new Promise<void>((r) => {
                         server.closeAllConnections();

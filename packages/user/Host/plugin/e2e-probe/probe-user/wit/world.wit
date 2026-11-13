@@ -1,0 +1,17 @@
+package host:e2e-probe-user;
+
+/// TEST ONLY. Uses host:e2e-probe's resources through the Supervisor's
+/// import-side resource proxies (loader.ts addResourceProxy).
+interface api {
+    use host:types/types.{error};
+
+    /// `lazy-probe(endpoint).fetch()`: the method suspends.
+    lazy-fetch: func(endpoint: string) -> result<string, error>;
+
+    /// `eager-probe(endpoint).body()`: the constructor suspends.
+    eager-body: func(endpoint: string) -> string;
+}
+
+world imports {
+    import api;
+}

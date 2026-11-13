@@ -1,0 +1,41 @@
+package host:e2e-probe;
+
+/// TEST ONLY. Probes for the Supervisor's JSPI (async send-request) paths.
+interface api {
+    use host:types/types.{error};
+
+    /// GET `endpoint` on the caller app's URL (suspends under JSPI), then,
+    /// after it resumed, request a prompt via host:prompt `prompt`.
+    /// Never returns normally when the prompt is raised.
+    fetch-then-prompt: func(endpoint: string) -> result<string, error>;
+
+    /// Create a host:db bucket, GET `endpoint` (suspends), then `set` and
+    /// `get` `key` on that same bucket. Returns what `get` read back.
+    bucket-across-fetch: func(endpoint: string, key: string, value: string) -> result<option<string>, error>;
+
+    /// The Supervisor service stack seen by this export, followed by
+    /// host:client `get-sender` as the last element.
+    whoami: func() -> list<string>;
+}
+
+/// TEST ONLY. Resources whose constructor or method suspends.
+interface res {
+    use host:types/types.{error};
+
+    /// The constructor only stores the endpoint; `fetch` does the GET.
+    resource lazy-probe {
+        constructor(endpoint: string);
+        fetch: func() -> result<string, error>;
+    }
+
+    /// The constructor does the GET; `body` returns what it got.
+    resource eager-probe {
+        constructor(endpoint: string);
+        body: func() -> string;
+    }
+}
+
+world imports {
+    import api;
+    import res;
+}
