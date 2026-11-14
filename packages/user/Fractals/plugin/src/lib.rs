@@ -131,11 +131,8 @@ impl AdminFractal for FractallyPlugin {
         if debt.is_empty() {
             return Err(ErrorType::InvalidDebt.into());
         }
-        let debt = if decimal_to_u64(token_id, debt)? == 0 {
-            0.into()
-        } else {
-            decimal_to_u64(token_id, debt)?.into()
-        };
+        let raw = decimal_to_u64(token_id, &debt.to_string())?;
+        let debt = if raw == 0 { 0.into() } else { raw.into() };
         Fractals::add_to_tx().add_levy(
             member.parse().unwrap(),
             payee.parse().unwrap(),

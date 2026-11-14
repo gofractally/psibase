@@ -457,4 +457,22 @@ mod chain {
 
         Ok(())
     }
+
+    #[psibase::test_case(packages("Fractals", "AuthDyn", "TokenStream"))]
+    fn cannot_levy_the_fractal_treasury(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
+        setup(&mut chain);
+
+        assert_error(
+            chain.propose::<Wrapper>(ALICE, FRACTAL).add_levy(
+                FRACTAL,
+                ALICE,
+                100_000,
+                0.into(),
+                true,
+            ),
+            "cannot levy the fractal treasury",
+        );
+
+        Ok(())
+    }
 }

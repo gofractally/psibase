@@ -36,6 +36,11 @@ impl Levy {
         send_to_stream: bool,
     ) -> Self {
         assert!(ppm > 0 && ppm <= PPM, "ppm must be between 1 - 1,000,000");
+        // The treasury is distributed, not claimed, so a cut on it would never be collected.
+        assert!(
+            member.base() != fractal.base(),
+            "cannot levy the fractal treasury",
+        );
         assert!(
             RewardStream::get(fractal, member).is_some(),
             "cannot levy an account with no reward stream",

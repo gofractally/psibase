@@ -153,7 +153,7 @@ pub mod service {
     /// Post a levy. The sender is the fractal. The judiciary authorizes it.
     ///
     /// A debt of zero does not end. The person charged must have a reward stream.
-    /// Paying a reward stream also requires the payee to have one.
+    /// The fractal account cannot be charged. Paying a reward stream also requires the payee to have one.
     ///
     /// # Arguments
     /// * `member` - Account being charged.
