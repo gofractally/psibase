@@ -22,6 +22,10 @@ const QueryKey = {
         ["members", fractalAccount] as const,
     exiles: (fractalAccount: OptionalAccount) =>
         ["exiles", fractalAccount] as const,
+    levies: (fractalAccount: OptionalAccount) =>
+        ["levies", fractalAccount] as const,
+    rewardStream: (fractal: OptionalAccount, owner: OptionalAccount) =>
+        ["rewardStream", fractal, owner] as const,
     scores: (guildAccount: OptionalAccount) =>
         ["scores", guildAccount] as const,
     membership: (fractal: OptionalAccount, user: OptionalAccount) =>

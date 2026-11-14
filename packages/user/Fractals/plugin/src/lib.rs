@@ -38,6 +38,7 @@ impl TrustConfig for FractallyPlugin {
                 "Setting paid occupations for token distribution",
                 "Donating tokens to a fractal",
                 "Contributing income to a fractal token stream",
+                "Posting or removing a levy",
             ],
         }
     }
@@ -112,6 +113,37 @@ impl AdminFractal for FractallyPlugin {
     #[psibase_plugin::authorized(High)]
     fn exile_member(member: String, exile: bool) -> Result<(), Error> {
         Fractals::add_to_tx().exile_member(member.parse().unwrap(), exile);
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High)]
+    fn add_levy(
+        member: String,
+        payee: String,
+        rate_ppm: u32,
+        debt: String,
+        send_to_stream: bool,
+    ) -> Result<(), Error> {
+        let fractal = get_sender_app()?;
+        let token_id = get_fractal(fractal.to_string())?.token_id;
+        let debt = if debt.is_empty() || decimal_to_u64(token_id, &debt)? == 0 {
+            0.into()
+        } else {
+            decimal_to_u64(token_id, &debt)?.into()
+        };
+        Fractals::add_to_tx().add_levy(
+            member.parse().unwrap(),
+            payee.parse().unwrap(),
+            rate_ppm,
+            debt,
+            send_to_stream,
+        );
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High)]
+    fn rm_levy(member: String, id: u32) -> Result<(), Error> {
+        Fractals::add_to_tx().rm_levy(member.parse().unwrap(), id);
         Ok(())
     }
 

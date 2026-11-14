@@ -3,7 +3,7 @@ use psibase::services::fractals::constants::PPM;
 use psibase::{services::tokens::Quantity, AccountNumber, ServiceWrapper, Table};
 
 use crate::tables::tables::{
-    Config, Fractal, FractalExile, FractalMember, Levy, LevyTable, RewardStream,
+    Config, Fractal, FractalMember, Levy, LevyTable, RewardStream,
 };
 use psibase::services::tokens::Wrapper as Tokens;
 
@@ -36,7 +36,17 @@ impl Levy {
         send_to_stream: bool,
     ) -> Self {
         assert!(ppm > 0 && ppm <= PPM, "ppm must be between 1 - 1,000,000");
-        FractalMember::get(fractal, member).expect("cannot levy a non-member");
+        assert!(
+            RewardStream::get(fractal, member).is_some(),
+            "cannot levy an account with no reward stream",
+        );
+        // A stream payout calls get_assert on the next claim. Missing here aborts every later claim.
+        if send_to_stream {
+            assert!(
+                RewardStream::get(fractal, payee).is_some(),
+                "payee has no reward stream",
+            );
+        }
 
         let total_existing_levy_ppm = Self::levies_of_member(fractal, member)
             .into_iter()
@@ -53,6 +63,16 @@ impl Levy {
         new_instance
     }
 
+    pub fn get(fractal: AccountNumber, member: AccountNumber, id: u32) -> Option<Self> {
+        LevyTable::read()
+            .get_index_pk()
+            .get(&(fractal, member.base(), id))
+    }
+
+    pub fn get_assert(fractal: AccountNumber, member: AccountNumber, id: u32) -> Self {
+        Self::get(fractal, member, id).expect("levy does not exist")
+    }
+
     pub fn levies_of_member(fractal: AccountNumber, member: AccountNumber) -> Vec<Self> {
         LevyTable::read()
             .get_index_pk()
@@ -60,25 +80,17 @@ impl Levy {
             .collect()
     }
 
-    fn remove(&self) {
+    pub fn remove(&self) {
         LevyTable::read_write().remove(&self);
     }
 
     /// Applies the configured levy to the given income, pays the payee, and returns the amount levied.
     ///
-    /// A permanent levy (`debt == 0`) is a membership cut. It is skipped until the person being
-    /// charged has a membership row again, including the gap after the exile flag is cleared.
-    /// A remaining balance is a judgment and is still collected. An exiled payee does not receive
-    /// a permanent cut; that slice goes to the fractal treasury. A judgment owed to them is credited
-    /// to their account, not into a stream the next claim would recycle.
     pub fn apply_levy(&mut self, gross_income: Quantity) -> Quantity {
         if gross_income.value == 0 {
             return 0.into();
         }
         let indefinite = self.debt.value == 0;
-        if indefinite && FractalMember::get(self.fractal, self.member).is_none() {
-            return 0.into();
-        }
 
         let uncapped_amount: Quantity = (((gross_income.value as u128)
             .saturating_mul(self.rate_ppm as u128)
@@ -86,7 +98,6 @@ impl Levy {
             .min(u64::MAX as u128)) as u64)
             .into();
 
-        // Determine how much they can actually pay based on remaining amount.
         let payment = if !indefinite {
             let amount = self.debt.min(uncapped_amount);
             let balance_after = self.debt - amount;
@@ -104,18 +115,15 @@ impl Levy {
 
         if payment.value > 0 {
             let memo = "Levy payment".into();
-            let payee_exiled = FractalExile::is_exiled(self.fractal, self.payee);
-            if payee_exiled && indefinite {
-                RewardStream::get_assert(self.fractal, self.fractal).deposit(payment, memo);
-            } else if payee_exiled || !self.send_to_stream {
+            if self.send_to_stream {
+                RewardStream::get_assert(self.fractal, self.payee).deposit(payment, memo);
+            } else {
                 Tokens::call().credit(
                     Fractal::get_assert(self.fractal).token_id,
                     self.payee,
                     payment,
                     memo,
                 );
-            } else {
-                RewardStream::get_assert(self.fractal, self.payee).deposit(payment, memo);
             }
         }
         payment
@@ -128,7 +136,7 @@ impl Levy {
 
 #[ComplexObject]
 impl Levy {
-    pub async fn fractal(&self) -> Fractal {
+    pub async fn fractal_details(&self) -> Fractal {
         Fractal::get_assert(self.fractal)
     }
 

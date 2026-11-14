@@ -113,10 +113,12 @@ mod chain {
     };
     use crate::helpers::donation_sub_account;
     use crate::Wrapper;
+    use psibase::services::staged_tx::Wrapper as Staged;
     use psibase::services::tokens::{BalanceFlags, Quantity, Wrapper as Tokens};
     use psibase::*;
 
     const ALICE: AccountNumber = account!("alice");
+    const BOB: AccountNumber = account!("bob");
     const FRACTAL: AccountNumber = account!("testfrac");
 
     fn assert_error(result: ChainEmptyResult, message: &str) {
@@ -277,9 +279,7 @@ mod chain {
     }
 
     #[psibase::test_case(packages("Fractals", "AuthDyn", "TokenStream"))]
-    fn exile_claim_does_not_pay_the_exile(
-        mut chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn exile_claim_does_not_pay_the_exile(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
         let tid = setup(&mut chain);
 
         credit(&chain, tid, 10_000);
@@ -289,7 +289,8 @@ mod chain {
         // A deposit does not vest in the same second. One member interval makes a slice claimable.
         pass_time(&chain, DEFAULT_MEMBER_DISTRIBUTION_INTERVAL as i64);
 
-        chain.propose::<Wrapper>(ALICE, FRACTAL)
+        chain
+            .propose::<Wrapper>(ALICE, FRACTAL)
             .exile_member(ALICE, true)
             .get()?;
 
@@ -312,6 +313,147 @@ mod chain {
             before, after,
             "an exile keeps nothing from a claim ({before} -> {after})",
         );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Fractals", "AuthDyn", "TokenStream"))]
+    fn judiciary_can_post_and_remove_a_levy(
+        mut chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        setup(&mut chain);
+
+        chain
+            .propose::<Wrapper>(ALICE, FRACTAL)
+            .add_levy(ALICE, FRACTAL, 100_000, 0.into(), true)
+            .get()?;
+
+        let levies: serde_json::Value = chain
+            .graphql(
+                Wrapper::SERVICE,
+                &format!(
+                    r#"query {{ levies(fractal: "{FRACTAL}") {{ nodes {{ id member payee ratePpm }} }} }}"#
+                ),
+            )
+            .unwrap();
+        let nodes = levies["data"]["levies"]["nodes"]
+            .as_array()
+            .expect(&format!("{levies}"));
+        assert!(nodes.len() >= 2, "{levies}");
+
+        // Recruitment also pays the fractal. The posted row is the 10% one, not the first.
+        let posted = nodes
+            .iter()
+            .find(|node| node["ratePpm"] == 100_000)
+            .expect(&format!("{levies}"));
+        let id = posted["id"].as_u64().unwrap() as u32;
+
+        chain
+            .propose::<Wrapper>(ALICE, FRACTAL)
+            .rm_levy(ALICE, id)
+            .get()?;
+
+        Ok(())
+    }
+
+    /// De-facto needs both members once there are two. Alice proposes, Bob accepts.
+    fn sign_both(chain: &Chain, action: Action) -> Result<(), psibase::Error> {
+        let id = Staged::push_from(chain, ALICE)
+            .propose(vec![action], true)
+            .get()?;
+        let txid = Staged::push(chain).get_staged_tx(id).get()?.txid;
+        Staged::push_from(chain, BOB).accept(id, txid).get()?;
+        Ok(())
+    }
+
+    fn levy_nodes(chain: &Chain) -> Vec<serde_json::Value> {
+        let levies: serde_json::Value = chain
+            .graphql(
+                Wrapper::SERVICE,
+                &format!(r#"query {{ levies(fractal: "{FRACTAL}") {{ nodes {{ id member payee debt {{ value }} }} }} }}"#),
+            )
+            .unwrap();
+        levies["data"]["levies"]["nodes"]
+            .as_array()
+            .expect(&format!("{levies}"))
+            .clone()
+    }
+
+    #[psibase::test_case(packages("Fractals", "AuthDyn", "TokenStream"))]
+    fn rejoin_does_not_repost_a_removed_recruitment_levy(
+        mut chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        setup(&mut chain);
+
+        // Remove the cut while Alice is the only member. One account meets the
+        // de-facto threshold. Two members need both signatures.
+        let recruitment = levy_nodes(&chain)
+            .into_iter()
+            .find(|node| {
+                node["payee"] == FRACTAL.to_string() && node["member"] == ALICE.to_string()
+            })
+            .expect("founder has a recruitment levy");
+        let id = recruitment["id"].as_u64().unwrap() as u32;
+        chain
+            .propose::<Wrapper>(ALICE, FRACTAL)
+            .rm_levy(ALICE, id)
+            .get()?;
+
+        chain.new_account(BOB).unwrap();
+        chain
+            .propose::<Wrapper>(ALICE, FRACTAL)
+            .add_mem(BOB, Some(ALICE))
+            .get()?;
+
+        sign_both(
+            &chain,
+            Wrapper::pack_from(FRACTAL).exile_member(ALICE, true),
+        )?;
+        sign_both(
+            &chain,
+            Wrapper::pack_from(FRACTAL).exile_member(ALICE, false),
+        )?;
+        sign_both(&chain, Wrapper::pack_from(FRACTAL).add_mem(ALICE, None))?;
+
+        let after = levy_nodes(&chain);
+        assert!(
+            !after.iter().any(|node| node["member"] == ALICE.to_string()),
+            "removing the first-join cut must stick across a return: {after:?}",
+        );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Fractals", "AuthDyn", "TokenStream"))]
+    fn stream_levy_requires_a_payee_stream(
+        mut chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        let tid = setup(&mut chain);
+        chain.new_account(BOB).unwrap();
+
+        assert_error(
+            chain
+                .propose::<Wrapper>(ALICE, FRACTAL)
+                .add_levy(ALICE, BOB, 100_000, 1.into(), true),
+            "payee has no reward stream",
+        );
+
+        // A balance payout does not need a stream. The claim must still complete.
+        // Alice already has the 5% recruitment cut, so this stays under 100%.
+        chain
+            .propose::<Wrapper>(ALICE, FRACTAL)
+            .add_levy(ALICE, BOB, 100_000, 0.into(), false)
+            .get()?;
+
+        credit(&chain, tid, 10_000);
+        donate(&chain, tid, 10_000);
+        pass_time(&chain, DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL as i64);
+        dist_token(&chain);
+        pass_time(&chain, DEFAULT_MEMBER_DISTRIBUTION_INTERVAL as i64);
+
+        Wrapper::push_from(&chain, ALICE)
+            .claim_rew(FRACTAL, ALICE)
+            .get()?;
 
         Ok(())
     }

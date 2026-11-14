@@ -12,7 +12,7 @@ macro_rules! ban {
 pub mod service {
 
     use crate::tables::tables::{
-        Fractal, FractalExile, FractalMember, Occupation, RewardStream, Role,
+        Fractal, FractalExile, FractalMember, Levy, Occupation, RewardStream, Role,
     };
 
     use psibase::{
@@ -31,6 +31,8 @@ pub mod service {
     const ROLE_METHODS: &[(FractalRole, &str)] = &[
         (Recruitment, Actns::add_mem::ACTION_NAME),
         (Judiciary, Actns::exile_member::ACTION_NAME),
+        (Judiciary, Actns::add_levy::ACTION_NAME),
+        (Judiciary, Actns::rm_levy::ACTION_NAME),
         (Legislature, Actns::set_r_occ::ACTION_NAME),
         (Legislature, Actns::set_dist_int::ACTION_NAME),
         (Legislature, Actns::set_gen_time::ACTION_NAME),
@@ -146,6 +148,45 @@ pub mod service {
         } else {
             FractalExile::get_assert(fractal, member).lift();
         }
+    }
+
+    /// Post a levy. The sender is the fractal. The judiciary authorizes it.
+    ///
+    /// A debt of zero does not end. The person charged must have a reward stream.
+    /// Paying a reward stream also requires the payee to have one.
+    ///
+    /// # Arguments
+    /// * `member` - Account being charged.
+    /// * `payee` - Account that receives the cut.
+    /// * `rate_ppm` - Share of each claim, in parts per million.
+    /// * `debt` - Remaining balance. Zero means it does not end.
+    /// * `send_to_stream` - Pay into the payee's reward stream instead of their balance.
+    #[action]
+    fn add_levy(
+        member: AccountNumber,
+        payee: AccountNumber,
+        rate_ppm: u32,
+        debt: Quantity,
+        send_to_stream: bool,
+    ) {
+        Levy::add(
+            get_sender(),
+            member.base(),
+            payee.base(),
+            rate_ppm,
+            debt,
+            send_to_stream,
+        );
+    }
+
+    /// Remove a levy. The sender is the fractal. The judiciary authorizes it.
+    ///
+    /// # Arguments
+    /// * `member` - Account being charged.
+    /// * `id` - Levy id.
+    #[action]
+    fn rm_levy(member: AccountNumber, id: u32) {
+        Levy::get_assert(get_sender(), member, id).remove();
     }
 
     /// Distribute token for a fractal.

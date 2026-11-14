@@ -67,12 +67,11 @@ impl FractalMember {
         let new_instance = Self::new(fractal, account);
         new_instance.save();
 
+        // A stream already here means this account joined before. Exile keeps it, and
+        // so does a judiciary that removed the first-join cut. Do not post another.
+        let returning = RewardStream::get(fractal, account).is_some();
         RewardStream::add_member(fractal, account, Fractal::get_assert(fractal).token_id);
-        // A return keeps the levy from the first join. A second permanent row would stack another cut.
-        let already_permanent = Levy::levies_of_member(fractal, account)
-            .iter()
-            .any(|levy| levy.debt.value == 0);
-        if !already_permanent {
+        if !returning {
             // If a recruiter is specified, levy them; otherwise, levy the fractal itself so there's no advantage or disadvantage to being recruited by an existing member vs. joining independently
             let recruiter = recruiter.unwrap_or(fractal);
             Levy::add(
@@ -101,7 +100,6 @@ impl FractalMember {
 
     pub fn exile(&self) {
         FractalExile::add(self.fractal, self.account);
-        // Levies stay. A judgment still has a balance. A permanent cut resumes if they come back.
         self.remove();
     }
 

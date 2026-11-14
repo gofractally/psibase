@@ -141,7 +141,8 @@ pub mod tables {
     }
 
     #[table(name = "LevyTable", index = 7)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct Levy {
         pub id: u32,
         pub fractal: AccountNumber,

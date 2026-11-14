@@ -228,6 +228,24 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Post a levy.
+    #[action]
+    fn add_levy(
+        member: AccountNumber,
+        payee: AccountNumber,
+        rate_ppm: u32,
+        debt: crate::services::tokens::Quantity,
+        send_to_stream: bool,
+    ) {
+        unimplemented!()
+    }
+
+    /// Remove a levy.
+    #[action]
+    fn rm_levy(member: AccountNumber, id: u32) {
+        unimplemented!()
+    }
+
     /// Sets the occupation used to authorize the specified fractal role.
     ///
     /// # Arguments

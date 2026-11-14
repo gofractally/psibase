@@ -54,6 +54,22 @@ class AdminFractal extends PluginInterface {
         return this._call<[member: Account, exile: boolean]>("exileMember");
     }
 
+    get addLevy() {
+        return this._call<
+            [
+                member: Account,
+                payee: Account,
+                ratePpm: number,
+                debt: string,
+                sendToStream: boolean,
+            ]
+        >("addLevy");
+    }
+
+    get rmLevy() {
+        return this._call<[member: Account, id: number]>("rmLevy");
+    }
+
     get initToken() {
         return this._call<[]>("initToken");
     }

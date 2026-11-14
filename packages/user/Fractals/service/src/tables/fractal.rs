@@ -107,6 +107,9 @@ impl Fractal {
             link_fractal_core_plugin_deps(fractal);
         });
 
+        // Founder recruitment pays the fractal. The stream row has to exist before that levy.
+        // init_token later mints into this same stream.
+        RewardStream::add_fractal(fractal, new_instance.token_id);
         FractalMember::add(fractal, get_sender(), None);
 
         new_instance
@@ -150,7 +153,8 @@ impl Fractal {
             0,
             "token already initialised",
         );
-        let stream = RewardStream::add_fractal(self.account, self.token_id);
+        let stream = RewardStream::get(self.account, self.account)
+            .unwrap_or_else(|| RewardStream::add_fractal(self.account, self.token_id));
         let supply = TOKEN_SUPPLY.into();
         tokens.mint(self.token_id, supply, "initial mint".into());
         stream.deposit(supply, "initial stream deposit".into());

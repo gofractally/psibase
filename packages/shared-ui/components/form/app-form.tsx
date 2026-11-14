@@ -4,6 +4,7 @@ import { CheckboxField } from "./internal/checkbox-field";
 import { DateTimePicker24h } from "./internal/date-time-picker";
 import { DurationSelect } from "./internal/duration-select";
 import { NumberField } from "./internal/number-field";
+import { PercentField } from "./internal/percent-field";
 import { SelectField } from "./internal/select-field";
 import { SubmitButton } from "./internal/submit-button";
 import { SwitchField } from "./internal/switch-field";
@@ -20,6 +21,7 @@ const { useAppForm, withForm, withFieldGroup } = createFormHook({
         TextArea,
         TextField,
         NumberField,
+        PercentField,
         SelectField,
         SwitchField,
         DateTimePickerField: DateTimePicker24h,

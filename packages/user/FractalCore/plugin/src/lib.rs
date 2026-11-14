@@ -47,6 +47,7 @@ define_trust! {
             - Proposing a ranking in an evaluation
             - Attesting a finalized ranking proposal
             - Exiling a member from the fractal
+            - Posting or removing a levy
             - Initialising the fractal token
             - Donating tokens to the fractal
             - Setting the fractal token distribution interval
@@ -65,7 +66,7 @@ define_trust! {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
         Medium => [apply_guild, claim_rewards, join_fractal, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
-        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, init_token, donate, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
+        High => [attest, set_role_mapping, create_guild, set_role_occupation, set_paid_occupations, exile_member, add_levy, rm_levy, init_token, donate, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
     }
 }
 
@@ -95,6 +96,24 @@ impl AdminFractal for FractalCorePlugin {
         propose::fractal()?;
 
         FractalsPlugin::admin_fractal::exile_member(&member_account, exile)
+    }
+
+    fn add_levy(
+        member: String,
+        payee: String,
+        rate_ppm: u32,
+        debt: String,
+        send_to_stream: bool,
+    ) -> Result<(), Error> {
+        assert_authorized(FunctionName::add_levy)?;
+        propose::fractal()?;
+        FractalsPlugin::admin_fractal::add_levy(&member, &payee, rate_ppm, &debt, send_to_stream)
+    }
+
+    fn rm_levy(member: String, id: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::rm_levy)?;
+        propose::fractal()?;
+        FractalsPlugin::admin_fractal::rm_levy(&member, id)
     }
 
     fn set_role_mapping(role_id: u8, guild: String) -> Result<(), Error> {

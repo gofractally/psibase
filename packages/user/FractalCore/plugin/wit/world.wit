@@ -5,6 +5,8 @@ interface admin-fractal {
     use host:types/types.{error};
 
     exile-member: func(member: string, exile: bool) -> result<_, error>;
+    add-levy: func(member: string, payee: string, rate-ppm: u32, debt: string, send-to-stream: bool) -> result<_, error>;
+    rm-levy: func(member: string, id: u32) -> result<_, error>;
     set-dist-interval: func(distribution-interval-sec: u32) -> result<_, error>;
     init-token: func() -> result<_, error>;
     set-ranked-guilds: func(guilds: list<string>) -> result<_, error>;

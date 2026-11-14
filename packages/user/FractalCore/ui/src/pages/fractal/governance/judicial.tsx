@@ -2,15 +2,20 @@ import { Gavel } from "lucide-react";
 import { useState } from "react";
 
 import { GuildOverviewCard } from "@/components/guild-overview-card";
+import { AddLevyModal } from "@/components/modals/add-levy-modal";
 import { ExileFractalMemberModal } from "@/components/modals/exile-fractal-member-modal";
 
 import { useExile } from "@/hooks/fractals/use-exile";
 import { useExiles } from "@/hooks/fractals/use-exiles";
+import { useLevies } from "@/hooks/fractals/use-levies";
+import { useRemoveLevy } from "@/hooks/fractals/use-levy";
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useGuild } from "@/hooks/use-guild";
 
 import { ErrorCard } from "@shared/components/error-card";
+import { ppmToPercent } from "@shared/lib/percent-ppm";
+import { formatRawAmount } from "@/lib/format-token";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
@@ -40,6 +45,7 @@ export const Judicial = () => {
     const { data: guild, error: guildError } = useGuild(role?.guild);
 
     const [showExile, setShowExile] = useState(false);
+    const [showLevy, setShowLevy] = useState(false);
     const fractalAccount = useFractalAccount();
     const {
         data: exiles,
@@ -47,6 +53,12 @@ export const Judicial = () => {
         isLoading: exilesLoading,
     } = useExiles(fractalAccount);
     const { mutateAsync: exileMember, isPending: isEnding } = useExile(true);
+    const {
+        data: levies,
+        error: leviesError,
+        isLoading: leviesLoading,
+    } = useLevies(fractalAccount);
+    const { mutateAsync: removeLevy, isPending: isRemoving } = useRemoveLevy();
 
     const { data: currentUser } = useCurrentUser();
 
@@ -55,7 +67,8 @@ export const Judicial = () => {
         (typeof currentUser == "string" &&
             guild?.council?.includes(currentUser));
 
-    const error = fractalError || guildError || roleError || exilesError;
+    const error =
+        fractalError || guildError || roleError || exilesError || leviesError;
     if (error) {
         return <ErrorCard error={error} />;
     }
@@ -66,6 +79,7 @@ export const Judicial = () => {
                 openChange={setShowExile}
                 show={showExile}
             />
+            <AddLevyModal openChange={setShowLevy} show={showLevy} />
             <GlowingCard>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -133,9 +147,79 @@ export const Judicial = () => {
                                 </Button>
                             </ItemActions>
                         </Item>
+                        <Item variant="muted">
+                            <ItemContent>
+                                <ItemTitle>Post a levy</ItemTitle>
+                                <ItemDescription>
+                                    Take a share of someone's claims. A debt of
+                                    0 does not end.
+                                </ItemDescription>
+                            </ItemContent>
+                            <ItemActions>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowLevy(true)}
+                                >
+                                    Post levy
+                                </Button>
+                            </ItemActions>
+                        </Item>
                     </CardContent>
                 </GlowingCard>
             )}
+
+            <GlowingCard>
+                <CardHeader>
+                    <CardTitle>Levies</CardTitle>
+                    <CardDescription>
+                        Cuts taken from a claim before the rest is paid.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {leviesLoading ? null : levies?.length === 0 ? (
+                        <p className="text-muted-foreground text-sm">
+                            No levies.
+                        </p>
+                    ) : (
+                        (levies ?? []).map((levy) => (
+                            <Item
+                                key={`${levy.member}-${levy.id}`}
+                                variant="muted"
+                            >
+                                <ItemContent>
+                                    <ItemTitle>
+                                        {levy.member} owes {levy.payee}
+                                    </ItemTitle>
+                                    <ItemDescription>
+                                        {ppmToPercent(levy.ratePpm)}%.
+                                        {levy.debt.value === "0"
+                                            ? " Does not end."
+                                            : ` Remaining ${formatRawAmount(levy.debt.value)}.`}
+                                    </ItemDescription>
+                                </ItemContent>
+                                {isAdministrativeUser && (
+                                    <ItemActions>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={isRemoving}
+                                            onClick={() =>
+                                                removeLevy([
+                                                    levy.member,
+                                                    levy.id,
+                                                ])
+                                            }
+                                        >
+                                            Remove
+                                        </Button>
+                                    </ItemActions>
+                                )}
+                            </Item>
+                        ))
+                    )}
+                </CardContent>
+            </GlowingCard>
 
             <GlowingCard>
                 <CardHeader>
