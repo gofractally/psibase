@@ -7,4 +7,6 @@ pub enum ErrorType {
     InvalidAccountNumber,
     #[error("Account name {0} invalid, must be at least {1} characters")]
     AccountNameTooShort(String, usize),
+    #[error("debt must be a number")]
+    InvalidDebt,
 }

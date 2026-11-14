@@ -20,6 +20,7 @@ use crate::bindings::guilds::plugin as Guilds;
 use crate::bindings::tokens::plugin::helpers::decimal_to_u64;
 use crate::bindings::tokens::plugin::user as TokensUser;
 use crate::bindings::transact::plugin::api::set_propose_latch;
+use crate::errors::ErrorType;
 use crate::graphql::fractal::get_fractal;
 use crate::helpers::{get_sender_app, validate_account_name};
 
@@ -126,10 +127,14 @@ impl AdminFractal for FractallyPlugin {
     ) -> Result<(), Error> {
         let fractal = get_sender_app()?;
         let token_id = get_fractal(fractal.to_string())?.token_id;
-        let debt = if debt.is_empty() || decimal_to_u64(token_id, &debt)? == 0 {
+        let debt = debt.trim();
+        if debt.is_empty() {
+            return Err(ErrorType::InvalidDebt.into());
+        }
+        let debt = if decimal_to_u64(token_id, debt)? == 0 {
             0.into()
         } else {
-            decimal_to_u64(token_id, &debt)?.into()
+            decimal_to_u64(token_id, debt)?.into()
         };
         Fractals::add_to_tx().add_levy(
             member.parse().unwrap(),

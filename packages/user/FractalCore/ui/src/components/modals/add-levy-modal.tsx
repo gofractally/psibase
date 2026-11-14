@@ -16,7 +16,6 @@ import {
     zPercent,
 } from "@shared/lib/percent-ppm";
 import { zAccount } from "@shared/lib/schemas/account";
-import { supervisor } from "@shared/lib/supervisor";
 import {
     Dialog,
     DialogContent,
@@ -65,7 +64,7 @@ const StreamPayout = ({
             label="Pay into their reward stream"
             description={
                 blocked
-                    ? "They have no reward stream. This would abort their claims."
+                    ? "They have no reward stream, so this cannot be posted."
                     : isFetching
                       ? "Checking their reward stream..."
                       : "Only if they already have one."
@@ -75,13 +74,11 @@ const StreamPayout = ({
     );
 };
 
-/** Empty or 0 means the levy does not end. Anything else is a token amount. */
-const zDebt = z
-    .string()
-    .refine(
-        (value) => value.trim() === "" || /^\d+(\.\d+)?$/.test(value.trim()),
-        "Enter a number, or 0 if it does not end",
-    );
+/** 0 means the levy does not end. Fractal tokens have 4 decimal places. */
+const zDebt = z.string().refine((value) => {
+    const trimmed = value.trim();
+    return /^\d+(\.\d{1,4})?$/.test(trimmed);
+}, "Enter 0 if it does not end, or an amount with at most 4 decimal places");
 
 export const AddLevyModal = ({
     show,
@@ -133,7 +130,13 @@ export const AddLevyModal = ({
                 toast.error("That account has no reward stream");
                 return;
             }
-            await addLevy([member, payee, ratePpm, debt, sendToStream]);
+            await addLevy([
+                member,
+                payee,
+                ratePpm,
+                debt.trim(),
+                sendToStream,
+            ]);
             openChange(false);
             formApi.reset();
         },
@@ -169,7 +172,7 @@ export const AddLevyModal = ({
                             description="Must have a reward stream."
                             placeholder="Account being charged"
                             disabled={false}
-                            supervisor={supervisor}
+                            onValidate={undefined}
                         />
                         <FieldAccountExisting
                             form={form}
@@ -178,7 +181,7 @@ export const AddLevyModal = ({
                             description={undefined}
                             placeholder="Account that receives the cut"
                             disabled={false}
-                            supervisor={supervisor}
+                            onValidate={undefined}
                         />
                         <form.Subscribe
                             selector={(state) => state.values.levy.member}
