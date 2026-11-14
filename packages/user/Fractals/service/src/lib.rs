@@ -11,7 +11,9 @@ macro_rules! ban {
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::tables::tables::{Fractal, FractalExile, FractalMember, Occupation, RewardStream, Role};
+    use crate::tables::tables::{
+        Fractal, FractalExile, FractalMember, Occupation, RewardStream, Role,
+    };
 
     use psibase::{
         services::{
@@ -201,9 +203,7 @@ pub mod service {
         Role::get_assert(get_sender(), role_id.into()).set_occupation(new_occupation);
     }
 
-    /// Claim member rewards
-    ///
-    /// Claim member rewards
+    /// Claim a reward stream.
     ///
     /// A member is paid the vested amount after levies. Anyone who is not a member
     /// has that slice recycled into the fractal stream.
@@ -218,14 +218,14 @@ pub mod service {
         let mut reward_stream = RewardStream::get_assert(fractal, member);
         let (token_id, claimed) = reward_stream.claim();
 
+        // Levies can take the whole vested amount. Credit and deposit both reject zero.
         if claimed.value == 0 {
             return;
         }
         if FractalMember::get(fractal, member).is_some() {
             Tokens::call().credit(token_id, member, claimed, "Reward claim".into());
         } else {
-            RewardStream::get_assert(fractal, fractal)
-                .deposit(claimed, "Exile recycle".into());
+            RewardStream::get_assert(fractal, fractal).deposit(claimed, "Exile recycle".into());
         }
     }
 

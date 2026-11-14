@@ -41,7 +41,11 @@ export const Judicial = () => {
 
     const [showExile, setShowExile] = useState(false);
     const fractalAccount = useFractalAccount();
-    const { data: exiles } = useExiles(fractalAccount);
+    const {
+        data: exiles,
+        error: exilesError,
+        isLoading: exilesLoading,
+    } = useExiles(fractalAccount);
     const { mutateAsync: exileMember, isPending: isEnding } = useExile(true);
 
     const { data: currentUser } = useCurrentUser();
@@ -51,7 +55,7 @@ export const Judicial = () => {
         (typeof currentUser == "string" &&
             guild?.council?.includes(currentUser));
 
-    const error = fractalError || guildError || roleError;
+    const error = fractalError || guildError || roleError || exilesError;
     if (error) {
         return <ErrorCard error={error} />;
     }
@@ -141,7 +145,7 @@ export const Judicial = () => {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {(exiles ?? []).length === 0 ? (
+                    {exilesLoading ? null : exiles?.length === 0 ? (
                         <p className="text-muted-foreground text-sm">
                             Nobody is exiled.
                         </p>
