@@ -140,7 +140,7 @@ impl Levy {
         Fractal::get_assert(self.fractal)
     }
 
-    pub async fn fractal_member(&self) -> FractalMember {
-        FractalMember::get_assert(self.fractal, self.member)
+    pub async fn fractal_member(&self) -> Option<FractalMember> {
+        FractalMember::get(self.fractal, self.member)
     }
 }
