@@ -91,7 +91,7 @@ mod chain {
         setup(&mut chain);
         chain
             .propose::<Wrapper>(ALICE, GUILD)
-            .create_thread(THREAD, "Cats".into(), false, 1_000, 86_400)
+            .create_thread(THREAD, "Cats".into(), false)
             .get()?;
 
         assert_error(
@@ -116,7 +116,7 @@ mod chain {
         setup(&mut chain);
         chain
             .propose::<Wrapper>(ALICE, GUILD)
-            .create_thread(THREAD, "Cats".into(), false, 1_000, 86_400)
+            .create_thread(THREAD, "Cats".into(), false)
             .get()?;
 
         chain

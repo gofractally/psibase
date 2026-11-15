@@ -87,6 +87,8 @@ pub mod tables {
         pub removed: bool,
         /// Set when the last bidder claims the post. That is the only claimed state.
         pub nft: Option<u32>,
+        /// Set when this post is a reply. The parent is another post in the same thread.
+        pub reply_to: Option<u32>,
     }
 
     impl Post {

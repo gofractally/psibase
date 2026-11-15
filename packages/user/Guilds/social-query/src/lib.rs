@@ -2,8 +2,9 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::connection::Connection;
-    use async_graphql::Object;
+    use async_graphql::{Object, SimpleObject};
     use psibase::*;
+    use serde::Deserialize;
     use social::tables::tables::{
         Config, ConfigTable, Moderator, ModeratorTable, Post, PostTable, Reader, ReaderTable, Thread,
         ThreadTable,
@@ -136,23 +137,70 @@ mod service {
             social::Wrapper::call().fee(fractal, thread)
         }
 
+        /// Tokens social has credited to this account and that have not been accepted yet.
+        async fn owed(&self, user: AccountNumber, token_id: u32) -> u64 {
+            tokens::Wrapper::call()
+                .getSharedBal(token_id, social::SERVICE, user)
+                .value
+        }
+
         async fn post(&self, id: u32) -> Option<Post> {
             PostTable::with_service(social::SERVICE)
                 .get_index_pk()
                 .get(&id)
         }
 
-        /// Newest posts that have not been removed. Removed rows do not take a slot.
+        /// Outbid notices for one account, oldest of the latest page first.
+        async fn notifications(
+            &self,
+            user: AccountNumber,
+            last: Option<i32>,
+        ) -> async_graphql::Result<EventConnection<OutbidNotice>> {
+            EventQuery::new("history.social.outbid")
+                .condition_with_params("account = ?", vec![user.to_string()])
+                .last(Some(last.unwrap_or(20)))
+                .query()
+        }
+
+        /// Newest top-level posts that have not been removed. Replies stay off this list.
         async fn feed(&self, fractal: AccountNumber, thread: AccountNumber) -> Vec<Post> {
             let mut rows: Vec<Post> = PostTable::with_service(social::SERVICE)
                 .get_index_by_thread()
                 .range((fractal, thread, 0)..=(fractal, thread, u32::MAX))
-                .filter(|post| !post.removed)
+                .filter(|post| !post.removed && post.reply_to.is_none())
                 .collect();
             rows.reverse();
             rows.truncate(50);
             rows
         }
+
+        /// Newest direct replies. Removed rows are left out.
+        async fn replies(&self, parent: u32) -> Vec<Post> {
+            let Some(post) = PostTable::with_service(social::SERVICE)
+                .get_index_pk()
+                .get(&parent)
+            else {
+                return Vec::new();
+            };
+            let mut rows: Vec<Post> = PostTable::with_service(social::SERVICE)
+                .get_index_by_thread()
+                .range((post.fractal, post.thread, 0)..=(post.fractal, post.thread, u32::MAX))
+                .filter(|row| !row.removed && row.reply_to == Some(parent))
+                .collect();
+            rows.reverse();
+            rows.truncate(50);
+            rows
+        }
+    }
+
+    #[derive(Deserialize, SimpleObject)]
+    struct OutbidNotice {
+        account: AccountNumber,
+        post: u32,
+        fractal: AccountNumber,
+        thread: AccountNumber,
+        bidder: AccountNumber,
+        returned: u64,
     }
 
     #[action]

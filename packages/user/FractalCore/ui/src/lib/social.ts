@@ -26,8 +26,6 @@ export const social = {
             account: string,
             title: string,
             public: boolean,
-            initialFee: number,
-            windowSeconds: number,
         ]
     >("threads", "createThread"),
     post: call<
@@ -40,8 +38,10 @@ export const social = {
             amount: string,
         ]
     >("posts", "post"),
+    reply: call<[parent: number, subject: string, body: string]>("posts", "reply"),
     bid: call<[id: number, tokenId: number, amount: string]>("posts", "bid"),
     claim: call<[id: number]>("posts", "claim"),
+    collect: call<[tokenId: number, amount: string]>("posts", "collect"),
 };
 
 const zThread = z.object({
@@ -65,6 +65,7 @@ const zPost = z.object({
     createdAt: z.union([z.string(), z.number()]).transform(String),
     removed: z.boolean(),
     nft: z.number().nullable(),
+    replyTo: z.number().nullable(),
 });
 
 export type SocialThread = z.infer<typeof zThread>;
@@ -120,6 +121,17 @@ export const getThreads = async (fractal: string): Promise<SocialThread[]> => {
         .parse(res).threads.nodes;
 };
 
+/** Raw units social has credited to this account and that have not been accepted. */
+export const getOwed = async (user: string, tokenId: number): Promise<string> => {
+    const res = await graphqlAuth(
+        social.graphql,
+        `{ owed(user: "${user}", tokenId: ${tokenId}) }`,
+    );
+    return z
+        .object({ owed: z.union([z.string(), z.number()]).transform(String) })
+        .parse(res).owed;
+};
+
 export const getFee = async (fractal: string, thread: string): Promise<string> => {
     const res = await graphqlAuth(
         social.graphql,
@@ -135,11 +147,53 @@ export const getPost = async (
 ): Promise<(SocialPost & { thread: string }) | null> => {
     const res = await graphqlAuth(
         social.graphql,
-        `{ post(id: ${id}) { id author subject body lastBid { value } bidder createdAt removed nft thread } }`,
+        `{ post(id: ${id}) { id author subject body lastBid { value } bidder createdAt removed nft replyTo thread } }`,
     );
     return z
         .object({ post: zPost.extend({ thread: zAccount }).nullable() })
         .parse(res).post;
+};
+
+export type OutbidNote = {
+    cursor: string;
+    post: number;
+    thread: string;
+    bidder: string;
+    returned: string;
+};
+
+/** Latest outbid events for this account, newest first. */
+export const getNotifications = async (user: string): Promise<OutbidNote[]> => {
+    const res = await graphqlAuth(
+        social.graphql,
+        `{ notifications(user: "${user}", last: 20) { edges { cursor node { post thread bidder returned } } } }`,
+    );
+    const edges = z
+        .object({
+            notifications: z.object({
+                edges: z
+                    .object({
+                        cursor: z.union([z.string(), z.number()]).transform(String),
+                        node: z.object({
+                            post: z.number(),
+                            thread: zAccount,
+                            bidder: zAccount,
+                            returned: z
+                                .union([z.string(), z.number()])
+                                .transform(String),
+                        }),
+                    })
+                    .array(),
+            }),
+        })
+        .parse(res).notifications.edges;
+    return edges.reverse().map((edge) => ({
+        cursor: edge.cursor,
+        post: edge.node.post,
+        thread: edge.node.thread,
+        bidder: edge.node.bidder,
+        returned: edge.node.returned,
+    }));
 };
 
 export const getPosts = async (
@@ -148,9 +202,21 @@ export const getPosts = async (
 ): Promise<SocialPost[]> => {
     const res = await graphqlAuth(
         social.graphql,
-        `{ feed(fractal: "${fractal}", thread: "${thread}") { id author subject body lastBid { value } bidder createdAt removed nft } }`,
+        `{ feed(fractal: "${fractal}", thread: "${thread}") { id author subject body lastBid { value } bidder createdAt removed nft replyTo } }`,
     );
     return z.object({ feed: zPost.array() }).parse(res).feed;
+};
+
+const POST_FIELDS =
+    "id author subject body lastBid { value } bidder createdAt removed nft replyTo";
+
+/** Direct replies, newest first. */
+export const getReplies = async (parent: number): Promise<SocialPost[]> => {
+    const res = await graphqlAuth(
+        social.graphql,
+        `{ replies(parent: ${parent}) { ${POST_FIELDS} } }`,
+    );
+    return z.object({ replies: zPost.array() }).parse(res).replies;
 };
 
 /** GraphQL TimePointSec is an RFC3339 string. A raw unix second is also accepted. */

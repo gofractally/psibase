@@ -11,11 +11,14 @@ use tables::tables::{
 use fractals::Wrapper as Fractals;
 use guilds::Wrapper as Guilds;
 use psibase::services::diff_adjust::Wrapper as Diff;
+use psibase::services::events::Wrapper as Events;
 use psibase::services::fractals::FractalRole;
 use psibase::services::nft::Wrapper as Nft;
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::services::transact::Wrapper as Transact;
-use psibase::{get_sender, AccountNumber, Memo, ServiceWrapper, Subaccount, Table};
+use psibase::{
+    get_sender, AccountNumber, EventDb, Memo, MethodNumber, ServiceWrapper, Subaccount, Table,
+};
 
 const PPM: u64 = 1_000_000;
 /// 130% of the last bid.
@@ -29,6 +32,9 @@ const MAX_SUBJECT: usize = 80;
 const MAX_SHORT: usize = 280;
 const MAX_ARTICLE: usize = 20_000;
 const DEFAULT_BID_SECONDS: u32 = 7 * 86_400;
+/// Fee curve aims for this many posts in a week, then climbs.
+const FEE_TARGET: u32 = 70;
+const WEEK: u32 = 7 * 86_400;
 
 fn now() -> psibase::TimePointSec {
     Transact::call().currentBlock().time.seconds()
@@ -75,6 +81,16 @@ fn pay(token: u32, to: AccountNumber, amount: Quantity, memo: &str) {
         return;
     }
     Tokens::call().credit(token, to, amount, memo.into());
+}
+
+/// Column 0 is the account that was outbid, so a notification query can filter on it.
+fn index_outbid(service: AccountNumber) {
+    Events::call().addIndex(
+        EventDb::HistoryEvent,
+        service,
+        MethodNumber::from("outbid"),
+        0,
+    );
 }
 
 impl Reader {
@@ -220,6 +236,16 @@ pub fn next_price(stake: u64) -> u64 {
     of_ppm(stake, NEXT_PPM).max(stake.saturating_add(1))
 }
 
+fn check_text(subject: &str, body: &str) {
+    assert!(!body.is_empty(), "post is empty");
+    if subject.is_empty() {
+        assert!(body.len() <= MAX_SHORT, "short post is too long");
+    } else {
+        assert!(subject.len() <= MAX_SUBJECT, "subject is too long");
+        assert!(body.len() <= MAX_ARTICLE, "article is too long");
+    }
+}
+
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
     use super::*;
@@ -238,16 +264,10 @@ pub mod service {
 
     /// A guild creates a thread in its fractal. It starts as a reader and a moderator.
     ///
-    /// The posting fee is a DiffAdjust difficulty, in fractal-token raw units. Social holds
-    /// the admin NFT and is the consumer. A moderator adjusts the curve through set_fee.
+    /// The posting fee starts at 0 and aims for 70 posts a week. Social holds the admin NFT
+    /// and is the consumer. A moderator adjusts the curve through set_fee.
     #[action]
-    fn create_thread(
-        account: AccountNumber,
-        title: Memo,
-        public: bool,
-        initial_fee: u64,
-        window_seconds: u32,
-    ) {
+    fn create_thread(account: AccountNumber, title: Memo, public: bool) {
         let fractal = guild_fractal(get_sender()).expect("sender is not a guild");
         let guild = get_sender().base();
         assert!(
@@ -265,18 +285,7 @@ pub mod service {
                 "fractal does not allow public threads",
             );
         }
-        assert!(initial_fee > 0, "posting fee must be greater than 0");
-        assert!(window_seconds > 0, "window must be greater than 0");
-
-        let fee_nft = Diff::call().create(
-            initial_fee,
-            window_seconds,
-            1,
-            8,
-            initial_fee,
-            100_000,
-            50_000,
-        );
+        let fee_nft = Diff::call().create(0, WEEK, FEE_TARGET, FEE_TARGET, 0, 100_000, 50_000);
         // DiffAdjust credits the admin NFT but keeps ownership. Take it, or set_fee cannot run.
         Nft::call().debit(fee_nft, "Thread fee".into());
 
@@ -383,7 +392,7 @@ pub mod service {
     ) {
         let row = Thread::get_assert(fractal, thread);
         assert_moderator(fractal, thread);
-        assert!(floor > 0, "posting fee floor must be greater than 0");
+
         Diff::call().set_window(row.fee_nft, window_seconds);
         Diff::call().set_targets(row.fee_nft, target_min, target_max);
         Diff::call().set_floor(row.fee_nft, floor);
@@ -421,20 +430,15 @@ pub mod service {
         let author = get_sender().base();
         let row = Thread::get_assert(fractal, thread);
         assert!(row.can_see(author), "thread is not visible to you");
-        assert!(!body.is_empty(), "post is empty");
-        if subject.is_empty() {
-            assert!(body.len() <= MAX_SHORT, "short post is too long");
-        } else {
-            assert!(subject.len() <= MAX_SUBJECT, "subject is too long");
-            assert!(body.len() <= MAX_ARTICLE, "article is too long");
-        }
+        check_text(&subject, &body);
 
         let fee = Diff::call().increment(row.fee_nft, 1);
-        assert!(fee > 0, "posting fee is 0");
         assert!(paid == fee, "paid amount is not the posting fee");
         let token = token_id(fractal);
-        take(token, author, fee.into(), "Thread post");
-        pay(token, row.creator, fee.into(), "Thread post");
+        if fee > 0 {
+            take(token, author, fee.into(), "Thread post");
+            pay(token, row.creator, fee.into(), "Thread post");
+        }
 
         Post {
             id: next_post_id(),
@@ -448,6 +452,37 @@ pub mod service {
             created_at: now(),
             removed: false,
             nft: None,
+            reply_to: None,
+        }
+        .save();
+    }
+
+    /// Reply to a post. The reply is itself a post, with no posting fee.
+    ///
+    /// The author is the first bidder at price 0. Later bids use the same 130% rule.
+    /// Replying does not move the thread's posting-fee curve.
+    #[action]
+    fn reply(parent: u32, subject: String, body: String) {
+        let author = get_sender().base();
+        let parent_post = Post::get(parent);
+        assert!(!parent_post.removed, "post was removed");
+        let row = Thread::get_assert(parent_post.fractal, parent_post.thread);
+        assert!(row.can_see(author), "thread is not visible to you");
+        check_text(&subject, &body);
+
+        Post {
+            id: next_post_id(),
+            fractal: parent_post.fractal,
+            thread: parent_post.thread,
+            author,
+            subject,
+            body,
+            last_bid: 0.into(),
+            bidder: author,
+            created_at: now(),
+            removed: false,
+            nft: None,
+            reply_to: Some(parent),
         }
         .save();
     }
@@ -486,12 +521,23 @@ pub mod service {
         let token = token_id(post.fractal);
         // Integer division leaves a remainder. Burn it with the 10% so nothing sits on social.
         let dust = price - returned - burned - author_cut;
+        let previous = post.bidder;
         take(token, bidder, price.into(), "Post bid");
-        pay(token, post.bidder, returned.into(), "Outbid");
+        pay(token, previous, returned.into(), "Outbid");
         pay(token, post.author, author_cut.into(), "Post bid");
         if burned + dust > 0 {
             Tokens::call().burn(token, (burned + dust).into(), "Post bid".into());
         }
+
+        index_outbid(SERVICE);
+        Wrapper::emit().history().outbid(
+            previous,
+            post.id,
+            post.fractal,
+            post.thread,
+            bidder,
+            returned,
+        );
 
         post.last_bid = price.into();
         post.bidder = bidder;
@@ -517,5 +563,17 @@ pub mod service {
         post.nft = Some(nft_id);
         post.save();
         nft_id
+    }
+
+    /// Previous holder of a bid. `account` is who was outbid.
+    #[event(history)]
+    pub fn outbid(
+        account: AccountNumber,
+        post: u32,
+        fractal: AccountNumber,
+        thread: AccountNumber,
+        bidder: AccountNumber,
+        returned: u64,
+    ) {
     }
 }

@@ -62,8 +62,6 @@ export const CreateThreadModal = ({
                 value.account,
                 value.title,
                 false,
-                1000,
-                86400,
             ]);
             openChange(false);
             formApi.reset();

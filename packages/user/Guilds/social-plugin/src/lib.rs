@@ -27,7 +27,9 @@ impl TrustConfig for SocialPlugin {
             low: &[],
             medium: &[
                 "Posting in a thread you can see",
+                "Replying to a post you can see",
                 "Bidding on a post you can see",
+                "Accepting tokens social credited you",
             ],
             high: &[
                 "Creating a thread",
@@ -76,8 +78,6 @@ impl Threads for SocialPlugin {
         account: String,
         title: String,
         public: bool,
-        initial_fee: u64,
-        window_seconds: u32,
     ) -> Result<(), Error> {
         stage(&guild)?;
         let account = thread_name(&account)?;
@@ -85,8 +85,6 @@ impl Threads for SocialPlugin {
             account,
             title.parse().map_err(|_| ErrorType::TitleTooLong)?,
             public,
-            initial_fee,
-            window_seconds,
         );
         Ok(())
     }
@@ -199,8 +197,10 @@ impl Posts for SocialPlugin {
         token_id: u32,
         amount: String,
     ) -> Result<(), Error> {
-        credit(token_id, &amount)?;
         let paid = decimal_to_u64(token_id, &amount)?;
+        if paid > 0 {
+            credit(token_id, &amount)?;
+        }
         Social::add_to_tx().post(
             fractal.parse().unwrap(),
             thread.parse().unwrap(),
@@ -208,6 +208,12 @@ impl Posts for SocialPlugin {
             body,
             paid,
         );
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(Medium)]
+    fn reply(parent: u32, subject: String, body: String) -> Result<(), Error> {
+        Social::add_to_tx().reply(parent, subject, body);
         Ok(())
     }
 
@@ -223,6 +229,16 @@ impl Posts for SocialPlugin {
     fn claim(id: u32) -> Result<(), Error> {
         Social::add_to_tx().claim(id);
         Ok(())
+    }
+
+    #[psibase_plugin::authorized(Medium)]
+    fn collect(token_id: u32, amount: String) -> Result<(), Error> {
+        TokensUser::debit(
+            token_id,
+            &Social::SERVICE.to_string(),
+            &amount,
+            &"Thread".to_string(),
+        )
     }
 }
 

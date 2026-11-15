@@ -4,7 +4,7 @@ interface threads {
     use host:types/types.{error};
 
     /// Guild creates a thread in its fractal. Staged as the guild.
-    create-thread: func(guild: string, account: string, title: string, public: bool, initial-fee: u64, window-seconds: u32) -> result<_, error>;
+    create-thread: func(guild: string, account: string, title: string, public: bool) -> result<_, error>;
     /// Staged as the fractal account. That account's auth is the legislature.
     set-open: func(fractal: string, open: bool) -> result<_, error>;
     /// Staged as the judiciary role account, not the fractal account.
@@ -22,10 +22,14 @@ interface posts {
 
     /// Pays `amount` of `token-id` as the posting fee. Caller becomes the first bidder.
     post: func(fractal: string, thread: string, subject: string, body: string, token-id: u32, amount: string) -> result<_, error>;
+    /// Reply to a post. No posting fee. The reply can still be bid on.
+    reply: func(parent: u32, subject: string, body: string) -> result<_, error>;
     /// Pays `amount` of `token-id`. That must be 130% of the current price.
     bid: func(id: u32, token-id: u32, amount: string) -> result<_, error>;
     /// After bidding closes, credits the post NFT to the last bidder. They still have to accept it.
     claim: func(id: u32) -> result<_, error>;
+    /// Accept tokens social credited into the caller's shared balance.
+    collect: func(token-id: u32, amount: string) -> result<_, error>;
 }
 
 interface authorized {

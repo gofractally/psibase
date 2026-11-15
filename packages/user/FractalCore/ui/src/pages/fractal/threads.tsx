@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { CreateThreadModal } from "@/components/modals/create-thread-modal";
@@ -10,6 +10,7 @@ import { formatRawAmount } from "@/lib/format-token";
 import {
     getFee,
     getFractalTokenId,
+    getOwed,
     getPosts,
     getThreads,
     nextBidRaw,
@@ -17,8 +18,14 @@ import {
     unixSeconds,
 } from "@/lib/social";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+
+import { Avatar } from "@shared/components/avatar";
+import { EmptyBlock } from "@shared/components/empty-block";
 import { Button } from "@shared/shadcn/ui/button";
 import { PageContainer } from "@shared/components/page-container";
+
+const SHORT_POST_BYTES = 280;
 
 const rawToDecimal = (raw: string) => {
     const negative = raw.startsWith("-");
@@ -28,15 +35,28 @@ const rawToDecimal = (raw: string) => {
     return `${negative ? "-" : ""}${padded.slice(0, split)}.${padded.slice(split)}`;
 };
 
+const utf8Bytes = (value: string) => new TextEncoder().encode(value).length;
+
+const ago = (value: string) => {
+    const seconds = unixSeconds(value);
+    if (!seconds) return "";
+    const delta = Math.max(0, Math.floor(Date.now() / 1000) - seconds);
+    if (delta < 60) return "now";
+    if (delta < 3600) return `${Math.floor(delta / 60)}m`;
+    if (delta < 86400) return `${Math.floor(delta / 3600)}h`;
+    return `${Math.floor(delta / 86400)}d`;
+};
+
 export const Threads = () => {
     const fractal = useFractalAccount();
+    const queryClient = useQueryClient();
     const navigate = useNavigate();
-    const { thread: routeThread } = useParams();
-    const [picked, setPicked] = useState<string | null>(null);
-    const name = routeThread ?? picked;
+    const { thread: name } = useParams();
     const [body, setBody] = useState("");
-    const [subject, setSubject] = useState("");
     const [showCreate, setShowCreate] = useState(false);
+    const composerRef = useRef<HTMLTextAreaElement>(null);
+    const bodyBytes = utf8Bytes(body);
+    const overLimit = bodyBytes > SHORT_POST_BYTES;
 
     const token = useQuery({
         queryKey: ["fractal-token", fractal],
@@ -59,37 +79,76 @@ export const Threads = () => {
         enabled: Boolean(fractal && name),
         queryFn: () => getFee(fractal!, name!),
     });
+    const { data: currentUser } = useCurrentUser();
+    const owed = useQuery({
+        queryKey: ["social-owed", currentUser, token.data],
+        enabled: Boolean(currentUser && token.data != null),
+        queryFn: () => getOwed(currentUser!, token.data!),
+    });
+    const owedRaw = owed.data ?? "0";
+    const hasCredit = owedRaw !== "0";
+    const feeAmount = fee.data == null ? null : formatRawAmount(fee.data);
 
     const post = usePluginFunctionCallMutation(social.post, {
         toast: { error: "Post failed", loading: "Posting", success: "Posted" },
         onSuccess: () => {
             setBody("");
-            setSubject("");
             void posts.refetch();
             void threads.refetch();
+            void owed.refetch();
         },
     });
     const bid = usePluginFunctionCallMutation(social.bid, {
         toast: { error: "Bid failed", loading: "Bidding", success: "Bid placed" },
-        onSuccess: () => void posts.refetch(),
+        onSuccess: () => {
+            void posts.refetch();
+            void owed.refetch();
+        },
+    });
+    const collect = usePluginFunctionCallMutation(social.collect, {
+        toast: { error: "Claim failed", loading: "Claiming", success: "Claimed" },
+        onSuccess: () => void owed.refetch(),
     });
 
+    useEffect(() => {
+        const field = composerRef.current;
+        if (!field) return;
+        field.style.height = "auto";
+        field.style.height = `${field.scrollHeight}px`;
+    }, [body, selected]);
+
     return (
-        <PageContainer className="space-y-6">
+        <div className="flex min-h-0 flex-1 flex-col bg-black">
+        <PageContainer className="relative z-[1] mx-auto box-border flex w-full max-w-[600px] min-h-0 min-w-0 shrink-0 grow flex-col content-start items-stretch space-y-0 border-x border-solid border-[#2f3336] bg-black p-0 font-[TwitterChirp,-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Helvetica,Arial,sans-serif] text-[15px] text-[#e7e9ea] [color-scheme:dark] [-webkit-text-size-adjust:100%] [scrollbar-color:rgb(62,65,68)_rgb(22,24,28)]">
             <CreateThreadModal
                 show={showCreate}
                 openChange={setShowCreate}
                 onCreated={(account) => {
                     void threads.refetch();
-                    setPicked(account);
+                    void queryClient.invalidateQueries({
+                        queryKey: ["social-ranked", fractal],
+                    });
                     navigate(`/threads/${account}`);
                 }}
             />
-            <div className="flex items-start justify-between gap-3">
+            {threads.isLoading ? (
+                <EmptyBlock isLoading title="No threads" />
+            ) : threads.data?.length === 0 ? (
+                <div className="p-4">
+                    <EmptyBlock
+                        title="No threads"
+                        description="No threads have been created in this fractal yet."
+                        buttonLabel="Create a thread"
+                        onButtonClick={() => setShowCreate(true)}
+                    />
+                </div>
+            ) : (
+            <>
+            <div className="flex items-start justify-between gap-3 px-4 py-3">
                 <div>
                     <h1 className="text-xl font-semibold">Threads</h1>
                     <p className="text-muted-foreground text-sm">
-                        A thread belongs to this fractal. A short post has no subject. A subject makes it an article.
+                        A thread belongs to this fractal.
                     </p>
                 </div>
                 <Button
@@ -100,72 +159,113 @@ export const Threads = () => {
                     <Plus />
                 </Button>
             </div>
-            {threads.isLoading && (
-                <p className="text-muted-foreground text-sm">Loading threads.</p>
-            )}
             {threads.error && (
                 <p className="text-sm text-red-600">{threads.error.message}</p>
             )}
-            <div className="flex flex-wrap gap-2">
-                {(threads.data ?? []).map((thread) => (
-                    <Button
-                        key={thread.account}
-                        variant={thread.account === name ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => {
-                            setPicked(thread.account);
-                            navigate(`/threads/${thread.account}`);
-                        }}
-                    >
-                        {thread.title}
-                    </Button>
-                ))}
-                {threads.data?.length === 0 && (
-                    <p className="text-muted-foreground text-sm">No threads yet.</p>
-                )}
-            </div>
             {selected && fractal && (
                 <form
-                    className="space-y-2"
+                    className="flex items-start gap-3 border-b border-[#2f3336] px-4 py-3"
                     onSubmit={(event) => {
                         event.preventDefault();
                         void post.mutateAsync([
                             fractal,
                             selected.account,
-                            subject,
+                            "",
                             body,
                             token.data ?? 0,
                             rawToDecimal(fee.data ?? "0"),
                         ]);
                     }}
                 >
-                    <input
-                        className="w-full rounded border px-3 py-2 text-sm"
-                        placeholder="Subject, only for an article"
-                        value={subject}
-                        onChange={(event) => setSubject(event.target.value)}
+                    <Avatar
+                        account={currentUser ?? null}
+                        className="mt-1 size-10 border-0 shadow-none"
                     />
-                    <textarea
-                        className="min-h-24 w-full rounded border px-3 py-2 text-sm"
-                        placeholder="Write a post"
-                        value={body}
-                        onChange={(event) => setBody(event.target.value)}
-                    />
-                    <Button
-                        type="submit"
-                        size="sm"
-                        disabled={!body.trim() || token.data == null || fee.data == null}
-                    >
-                        Post for {formatRawAmount(fee.data ?? "0")}
-                    </Button>
+                    <div className="min-w-0 flex-1">
+                        <textarea
+                            ref={composerRef}
+                            className="max-h-64 min-h-12 w-full resize-none overflow-y-auto border-0 bg-transparent py-2.5 text-xl leading-6 placeholder:text-muted-foreground focus:outline-none"
+                            placeholder="What's happening?"
+                            value={body}
+                            rows={1}
+                            onChange={(event) => setBody(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key !== "Enter" || !event.ctrlKey) return;
+                                event.preventDefault();
+                                if (
+                                    !body.trim() ||
+                                    overLimit ||
+                                    token.data == null ||
+                                    fee.data == null ||
+                                    post.isPending
+                                ) {
+                                    return;
+                                }
+                                event.currentTarget.form?.requestSubmit();
+                            }}
+                        />
+                        <div className="flex items-center justify-end gap-3 border-t border-border/70 pt-3">
+                            <div className="mr-auto flex items-center gap-3">
+                                {hasCredit && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-8 rounded-full px-3 text-sm"
+                                        disabled={token.data == null || collect.isPending}
+                                        onClick={() => {
+                                            if (token.data == null) return;
+                                            collect.mutate([
+                                                token.data,
+                                                rawToDecimal(owedRaw),
+                                            ]);
+                                        }}
+                                    >
+                                        Claim {formatRawAmount(owedRaw)}
+                                    </Button>
+                                )}
+                            </div>
+                            {bodyBytes > 0 && (
+                                <span
+                                    className={
+                                        overLimit
+                                            ? "text-[13px] font-medium text-red-500 tabular-nums"
+                                            : bodyBytes > SHORT_POST_BYTES - 20
+                                              ? "text-[13px] text-amber-500 tabular-nums"
+                                              : "text-muted-foreground text-[13px] tabular-nums"
+                                    }
+                                >
+                                    {SHORT_POST_BYTES - bodyBytes}
+                                </span>
+                            )}
+                            <Button
+                                type="submit"
+                                className="h-9 rounded-full px-4 text-[15px] font-bold hover:bg-primary/90"
+                                disabled={
+                                    !body.trim() ||
+                                    overLimit ||
+                                    token.data == null ||
+                                    fee.data == null ||
+                                    post.isPending
+                                }
+                            >
+                                {feeAmount == null
+                                    ? "Post"
+                                    : feeAmount === "0"
+                                      ? "Post (Free)"
+                                      : `Post (${feeAmount})`}
+                            </Button>
+                        </div>
+                    </div>
                 </form>
             )}
-            <div className="space-y-3">
+            <div className="flex w-full min-w-0 grow flex-col">
                 {posts.isLoading && (
-                    <p className="text-muted-foreground text-sm">Loading posts.</p>
+                    <p className="text-muted-foreground px-4 py-3 text-sm">
+                        Loading posts.
+                    </p>
                 )}
                 {posts.error && (
-                    <p className="text-sm text-red-600">{posts.error.message}</p>
+                    <p className="px-4 py-3 text-sm text-red-600">{posts.error.message}</p>
                 )}
                 {(posts.data ?? []).map((row) => {
                     const next = nextBidRaw(row.lastBid.value);
@@ -174,46 +274,84 @@ export const Threads = () => {
                         window != null &&
                         unixSeconds(row.createdAt) + window <=
                             Math.floor(Date.now() / 1000);
-                    const canBid = !closed && row.nft == null && !row.removed;
+                    const canBid =
+                        !closed &&
+                        row.nft == null &&
+                        !row.removed &&
+                        row.bidder !== currentUser;
                     return (
                         <article
                             key={row.id}
-                            className="cursor-pointer rounded border p-3"
+                            className="relative m-0 box-border flex min-h-0 min-w-0 shrink-0 cursor-pointer list-none flex-row content-start items-stretch gap-3 overflow-hidden border-x-0 border-t-0 border-b border-[#2f3336] bg-transparent px-4 py-3 text-[15px] leading-5 text-[#e7e9ea] no-underline outline-none transition-[background-color,box-shadow] duration-200 hover:bg-white/[0.03]"
+                            style={{
+                                fontFamily:
+                                    "TwitterChirp, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                                WebkitTextSizeAdjust: "100%",
+                                WebkitTapHighlightColor: "rgba(0,0,0,0)",
+                            }}
                             onClick={() => navigate(`/threads/${name}/post/${row.id}`)}
                         >
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    {row.subject ? (
-                                        <h2 className="font-medium">{row.subject}</h2>
-                                    ) : (
-                                        <p className="text-muted-foreground text-xs">Short post</p>
-                                    )}
-                                    <p className="text-muted-foreground text-xs">{row.author}</p>
+                            <Avatar
+                                account={row.author}
+                                className="size-10 border-0 shadow-none"
+                            />
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-baseline gap-2">
+                                    <span className="truncate text-[15px] font-bold">
+                                        {row.author}
+                                    </span>
+                                    <span className="text-muted-foreground text-[13px]">
+                                        {ago(row.createdAt)}
+                                    </span>
                                 </div>
-                                {canBid ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={fractal == null || token.data == null}
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            if (fractal == null || token.data == null) return;
-                                            bid.mutate([
-                                                row.id,
-                                                token.data,
-                                                rawToDecimal(next),
-                                            ]);
-                                        }}
-                                    >
-                                        Bid {formatRawAmount(next)}
-                                    </Button>
+                                {row.subject ? (
+                                    <p className="mt-0.5 font-semibold">{row.subject}</p>
                                 ) : null}
+                                <p className="mt-0.5 text-[15px] leading-5 whitespace-pre-wrap">
+                                    {row.body}
+                                </p>
+                                <div className="mt-2 flex items-center justify-between gap-3">
+                                    <span className="text-muted-foreground text-[13px]">
+                                        {formatRawAmount(row.lastBid.value)} · {row.bidder}
+                                    </span>
+                                    {canBid ? (
+                                        <Button
+                                            type="button"
+                                            className="h-8 rounded-full px-3 text-sm font-bold hover:bg-primary/90"
+                                            disabled={fractal == null || token.data == null}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                if (fractal == null || token.data == null) return;
+                                                bid.mutate([
+                                                    row.id,
+                                                    token.data,
+                                                    rawToDecimal(next),
+                                                ]);
+                                            }}
+                                        >
+                                            Bid {formatRawAmount(next)}
+                                        </Button>
+                                    ) : row.bidder === currentUser &&
+                                      row.nft == null &&
+                                      !row.removed ? (
+                                        <Button
+                                            type="button"
+                                            className="h-8 rounded-full px-3 text-sm font-bold"
+                                            disabled
+                                            onClick={(event) => event.stopPropagation()}
+                                        >
+                                            {closed ? "You won" : "Your bid"}
+                                        </Button>
+                                    ) : null}
+                                </div>
                             </div>
-                            <p className="mt-2 whitespace-pre-wrap text-sm">{row.body}</p>
                         </article>
                     );
                 })}
             </div>
+            </>
+            )}
         </PageContainer>
+        </div>
     );
 };
