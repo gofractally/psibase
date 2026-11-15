@@ -10,7 +10,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 package-name = "Guilds"
-services = ["guilds"]
+services = ["guilds", "social"]
 
 [package.metadata.psibase.dependencies]
 Accounts = "0.29.0"
@@ -21,6 +21,9 @@ Invite = "0.29.0"
 Permissions = "0.29.0"
 Sites = "0.29.0"
 Transact = "0.29.0"
+DiffAdjust = "0.29.0"
+Tokens = "0.29.0"
+Nft = "0.29.0"
 
 [lib]
 crate-type = ["rlib"]
@@ -29,3 +32,6 @@ crate-type = ["rlib"]
 guilds = { path = "service", version = "0.29.0" }
 r-guilds = { path = "query-service", version = "0.29.0" }
 guilds-plugin = { path = "plugin", version = "0.29.0" }
+social = { path = "social", version = "0.29.0" }
+r-social = { path = "social-query", version = "0.29.0" }
+social-plugin = { path = "social-plugin", version = "0.29.0" }

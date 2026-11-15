@@ -1,0 +1,6 @@
+#[derive(Debug, psibase_plugin::ErrorEnum, thiserror::Error)]
+#[repr(u32)]
+pub enum ErrorType {
+    #[error("title must be 80 bytes or less")]
+    TitleTooLong,
+}

@@ -1,4 +1,5 @@
 import { FractalMenu } from "@/components/nav/menu-fractal";
+import { SocialMenu } from "@/components/nav/menu-social";
 import { MyGuildMenu } from "@/components/nav/menu-my-guild";
 import { OtherGuildMenu } from "@/components/nav/menu-other-guild";
 
@@ -24,6 +25,13 @@ export function MainNavigation() {
                 <SidebarGroupLabel>Fractal</SidebarGroupLabel>
                 <SidebarMenu>
                     <FractalMenu />
+                </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Social</SidebarGroupLabel>
+                <SidebarMenu>
+                    <SocialMenu />
                 </SidebarMenu>
             </SidebarGroup>
 

@@ -137,7 +137,23 @@ pub mod Service {
     use crate::services::auth_dyn::policy::DynamicAuthPolicy;
     use crate::services::tokens::{Quantity, TID};
     use crate::services::transact::ServiceMethod;
-    use crate::AccountNumber;
+    use crate::{AccountNumber, TimePointSec};
+    use fracpack::{Pack, ToSchema, Unpack};
+    use serde::{Deserialize, Serialize};
+
+    /// Packed field order matches `fractals::tables::tables::Fractal`.
+    #[derive(Default, Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct Fractal {
+        pub account: AccountNumber,
+        pub created_at: TimePointSec,
+        pub name: String,
+        pub mission: String,
+        pub token_id: TID,
+        pub dist_strat: u8,
+        pub dist_interval_secs: u32,
+        pub genesis_time: TimePointSec,
+    }
 
     /// Creates a new account and fractal.
     ///
@@ -193,6 +209,11 @@ pub mod Service {
     /// * `member` - The account to check.
     #[action]
     fn is_member(fractal: AccountNumber, member: AccountNumber) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn get(fractal: AccountNumber) -> Option<Fractal> {
         unimplemented!()
     }
 

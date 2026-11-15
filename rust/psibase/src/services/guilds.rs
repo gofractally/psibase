@@ -41,8 +41,24 @@ pub mod Service {
             auth_dyn::{self},
             transact::ServiceMethod,
         },
-        AccountNumber, Memo,
+        AccountNumber, Memo, TimePointSec,
     };
+    use fracpack::{Pack, ToSchema, Unpack};
+    use serde::{Deserialize, Serialize};
+
+    /// Packed field order matches `guilds::tables::tables::GuildMember`.
+    #[derive(Default, Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct GuildMember {
+        pub guild: AccountNumber,
+        pub member: AccountNumber,
+        pub score: u32,
+        pub pending_level: Option<u8>,
+        pub created_at: TimePointSec,
+        pub is_candidate: bool,
+        pub candidacy_eligible_from: TimePointSec,
+        pub attendance: u16,
+    }
 
     /// Get scores for all guild members in a fractal.
     ///
@@ -125,6 +141,16 @@ pub mod Service {
     /// * `role_id` - Role ID to check.
     #[action]
     fn is_role_ok(fractal: AccountNumber, role_id: u8) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn guild_fractal(guild: AccountNumber) -> Option<AccountNumber> {
+        unimplemented!()
+    }
+
+    #[action]
+    fn get_member(guild: AccountNumber, member: AccountNumber) -> Option<GuildMember> {
         unimplemented!()
     }
 

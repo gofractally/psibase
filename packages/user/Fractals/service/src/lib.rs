@@ -295,6 +295,18 @@ pub mod service {
         FractalMember::get(fractal, member).is_some()
     }
 
+    /// The fractal row, if it exists.
+    #[action]
+    fn get(fractal: AccountNumber) -> Option<Fractal> {
+        Fractal::get(fractal)
+    }
+
+    /// Whether an account is exiled from a fractal.
+    #[action]
+    fn is_exiled(fractal: AccountNumber, member: AccountNumber) -> bool {
+        FractalExile::is_exiled(fractal, member)
+    }
+
     /// Set ordered occupations
     ///
     /// Payment for each ordered occupation will be according to the fractals payment strategy.

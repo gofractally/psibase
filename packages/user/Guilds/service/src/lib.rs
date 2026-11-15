@@ -100,6 +100,18 @@ pub mod service {
         RoleMap::get(fractal, role_id).is_some()
     }
 
+    /// Fractal a guild belongs to. None if the account is not a guild.
+    #[action]
+    fn guild_fractal(guild: AccountNumber) -> Option<AccountNumber> {
+        Guild::get(guild).map(|guild| guild.fractal)
+    }
+
+    /// The membership row, if this account is in the guild.
+    #[action]
+    fn get_member(guild: AccountNumber, member: AccountNumber) -> Option<GuildMember> {
+        GuildMember::get(guild, member.base())
+    }
+
     /// Set guild display name
     ///
     /// # Arguments

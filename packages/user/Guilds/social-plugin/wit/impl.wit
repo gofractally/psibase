@@ -1,0 +1,10 @@
+package social:plugin;
+
+world impl {
+    include transact:plugin/imports;
+    include tokens:plugin/imports;
+
+    export threads;
+    export posts;
+    export authorized;
+}

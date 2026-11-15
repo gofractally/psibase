@@ -1,6 +1,8 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import { Members } from "@/pages/fractal/members";
+import { Post } from "@/pages/fractal/post";
+import { Threads } from "@/pages/fractal/threads";
 import { ActiveAndUpcoming } from "@/pages/guilds/evaluations/active-and-upcoming";
 import { GuildEvaluationsLayout } from "@/pages/guilds/evaluations/layout";
 import { PastEvaluations } from "@/pages/guilds/evaluations/past";
@@ -62,6 +64,22 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <Members />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/threads/:thread?",
+                element: (
+                    <ProtectedRoute>
+                        <Threads />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/threads/:thread/post/:postId",
+                element: (
+                    <ProtectedRoute>
+                        <Post />
                     </ProtectedRoute>
                 ),
             },

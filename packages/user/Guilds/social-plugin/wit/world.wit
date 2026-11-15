@@ -1,0 +1,41 @@
+package social:plugin;
+
+interface threads {
+    use host:types/types.{error};
+
+    /// Guild creates a thread in its fractal. Staged as the guild.
+    create-thread: func(guild: string, account: string, title: string, public: bool, initial-fee: u64, window-seconds: u32) -> result<_, error>;
+    /// Staged as the fractal account. That account's auth is the legislature.
+    set-open: func(fractal: string, open: bool) -> result<_, error>;
+    /// Staged as the judiciary role account, not the fractal account.
+    set-reader: func(fractal: string, thread: string, guild: string, allow: bool) -> result<_, error>;
+    set-mod: func(fractal: string, thread: string, guild: string, allow: bool) -> result<_, error>;
+    /// Staged as `as-account`, a moderator guild or the fractal.
+    set-public: func(as-account: string, fractal: string, thread: string, public: bool) -> result<_, error>;
+    set-fee: func(as-account: string, fractal: string, thread: string, window-seconds: u32, target-min: u32, target-max: u32, floor: u64, increase-ppm: u32, decrease-ppm: u32) -> result<_, error>;
+    set-bid-secs: func(as-account: string, fractal: string, thread: string, seconds: u32) -> result<_, error>;
+    rm-post: func(as-account: string, id: u32) -> result<_, error>;
+}
+
+interface posts {
+    use host:types/types.{error};
+
+    /// Pays `amount` of `token-id` as the posting fee. Caller becomes the first bidder.
+    post: func(fractal: string, thread: string, subject: string, body: string, token-id: u32, amount: string) -> result<_, error>;
+    /// Pays `amount` of `token-id`. That must be 130% of the current price.
+    bid: func(id: u32, token-id: u32, amount: string) -> result<_, error>;
+    /// After bidding closes, the last bidder takes the post NFT.
+    claim: func(id: u32) -> result<_, error>;
+}
+
+interface authorized {
+    use host:types/types.{error};
+
+    graphql: func(query: string) -> result<string, error>;
+}
+
+world imports {
+    import threads;
+    import posts;
+    import authorized;
+}
