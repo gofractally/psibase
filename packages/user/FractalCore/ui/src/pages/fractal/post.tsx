@@ -7,9 +7,10 @@ import { formatRawAmount } from "@/lib/format-token";
 import {
     getFractalTokenId,
     getPost,
-    getThreads,
+    getThread,
     nextBidRaw,
     social,
+    unixSeconds,
 } from "@/lib/social";
 import type { PluginCall } from "@/lib/plugin";
 
@@ -17,20 +18,13 @@ import { PageContainer } from "@shared/components/page-container";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 
-const WEEK = 7 * 86_400;
+
 
 const rawToDecimal = (raw: string) => {
     const digits = raw.replace(/^0+/, "") || "0";
     const padded = digits.padStart(5, "0");
     const split = padded.length - 4;
     return `${padded.slice(0, split)}.${padded.slice(split)}`;
-};
-
-const seconds = (value: string) => {
-    const asNumber = Number(value);
-    if (Number.isFinite(asNumber) && asNumber > 1_000_000_000) return asNumber;
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? 0 : Math.floor(parsed / 1000);
 };
 
 export const Post = () => {
@@ -43,10 +37,10 @@ export const Post = () => {
         enabled: Number.isInteger(id),
         queryFn: () => getPost(id),
     });
-    const threads = useQuery({
-        queryKey: ["social-threads", fractal],
-        enabled: Boolean(fractal),
-        queryFn: () => getThreads(fractal!),
+    const threadQuery = useQuery({
+        queryKey: ["social-thread", fractal, post.data?.thread],
+        enabled: Boolean(fractal && post.data?.thread),
+        queryFn: () => getThread(fractal!, post.data!.thread),
     });
     const token = useQuery({
         queryKey: ["fractal-token", fractal],
@@ -78,11 +72,11 @@ export const Post = () => {
     );
 
     const row = post.data;
-    const thread = threads.data?.find((item) => item.account === row?.thread);
+    const thread = threadQuery.data;
     const closed =
         row != null &&
-        seconds(row.createdAt) + (thread?.bidSeconds ?? WEEK) <=
-            Math.floor(Date.now() / 1000);
+        thread != null &&
+        unixSeconds(row.createdAt) + thread.bidSeconds <= Math.floor(Date.now() / 1000);
     const next = row ? nextBidRaw(row.lastBid.value) : "0";
 
     return (

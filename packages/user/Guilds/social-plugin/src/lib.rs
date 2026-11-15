@@ -50,6 +50,18 @@ fn judiciary(fractal: &str) -> String {
         .to_string()
 }
 
+fn thread_name(name: &str) -> Result<AccountNumber, Error> {
+    // from_str never errors. A '+' suffix that is not a u8 panics inside the parser.
+    if name.contains('+') {
+        return Err(ErrorType::BadThreadName.into());
+    }
+    let account = AccountNumber::from_exact(name).map_err(|_| ErrorType::BadThreadName)?;
+    if account.value == 0 || account.is_subaccount() {
+        return Err(ErrorType::BadThreadName.into());
+    }
+    Ok(account)
+}
+
 fn credit(token_id: u32, amount: &str) -> Result<(), Error> {
     let amount = amount.to_string();
     let memo = "Thread".to_string();
@@ -68,8 +80,9 @@ impl Threads for SocialPlugin {
         window_seconds: u32,
     ) -> Result<(), Error> {
         stage(&guild)?;
+        let account = thread_name(&account)?;
         Social::add_to_tx().create_thread(
-            account.parse().unwrap(),
+            account,
             title.parse().map_err(|_| ErrorType::TitleTooLong)?,
             public,
             initial_fee,

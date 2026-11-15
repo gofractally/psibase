@@ -99,6 +99,17 @@ export const getRankedThreads = async (
         .parse(res).ranked;
 };
 
+export const getThread = async (
+    fractal: string,
+    account: string,
+): Promise<SocialThread | null> => {
+    const res = await graphqlAuth(
+        social.graphql,
+        `{ thread(fractal: "${fractal}", account: "${account}") { account title creator public feeNft bidSeconds } }`,
+    );
+    return z.object({ thread: zThread.nullable() }).parse(res).thread;
+};
+
 export const getThreads = async (fractal: string): Promise<SocialThread[]> => {
     const res = await graphqlAuth(
         social.graphql,
@@ -140,6 +151,14 @@ export const getPosts = async (
         `{ feed(fractal: "${fractal}", thread: "${thread}") { id author subject body lastBid { value } bidder createdAt removed nft } }`,
     );
     return z.object({ feed: zPost.array() }).parse(res).feed;
+};
+
+/** GraphQL TimePointSec is an RFC3339 string. A raw unix second is also accepted. */
+export const unixSeconds = (value: string): number => {
+    const asNumber = Number(value);
+    if (Number.isFinite(asNumber) && asNumber > 1_000_000_000) return asNumber;
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : Math.floor(parsed / 1000);
 };
 
 /** Next bid is 1,300,000 ppm of the current price, and at least 1 raw unit above it. */

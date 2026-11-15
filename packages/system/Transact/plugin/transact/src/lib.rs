@@ -35,7 +35,7 @@ psibase::define_trust! {
         Medium => "",
         High => "
             - alter which of your accounts is being used
-        
+
         Warning: This will grant the caller the ability to control which of your accounts takes requested actions, including the capability to make unintended use of any of your accounts! Make sure you completely trust the caller's legitimacy.
         ",
     }
@@ -218,10 +218,15 @@ impl Api for TransactPlugin {
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
-        // Whitelisting host so that the host login prompts can stage transactions even when host is not the active app
+        // Whitelisting host so that the host login prompts can stage transactions even when host is not the active app.
+        // social stages a guild, the judiciary, or a moderator while FractalCore is the active app.
         assert_authorized_with_whitelist(
             FunctionName::set_propose_latch,
-            vec![Client::get_active_app(), String::from("host")],
+            vec![
+                Client::get_active_app(),
+                String::from("host"),
+                String::from("social"),
+            ],
         )?;
 
         let Some(acct) = account else {

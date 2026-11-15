@@ -1,5 +1,14 @@
 #![allow(non_snake_case)]
 
+#[test]
+fn bid_split_is_110_10_10() {
+    use crate::{of_ppm, CUT_PPM, RETURN_PPM};
+    let last = 1_000_000u64;
+    assert_eq!(of_ppm(last, RETURN_PPM), 1_100_000);
+    assert_eq!(of_ppm(last, CUT_PPM), 100_000);
+    assert_eq!(crate::next_price(last), 1_300_000);
+}
+
 mod chain {
     use crate::next_price;
     use crate::Wrapper;

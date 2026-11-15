@@ -61,8 +61,7 @@ fn token_id(fractal: AccountNumber) -> u32 {
         .token_id
 }
 
-/// `amount * ppm / 1_000_000`, the same shape token swap uses for a fee.
-fn of_ppm(amount: u64, ppm: u64) -> u64 {
+pub(crate) fn of_ppm(amount: u64, ppm: u64) -> u64 {
     ((amount as u128).saturating_mul(ppm as u128) / PPM as u128) as u64
 }
 
@@ -252,8 +251,8 @@ pub mod service {
         let fractal = guild_fractal(get_sender()).expect("sender is not a guild");
         let guild = get_sender().base();
         assert!(
-            !account.is_subaccount(),
-            "thread name cannot be a subaccount"
+            account.value != 0 && !account.is_subaccount(),
+            "thread account is empty or a subaccount",
         );
         assert!(title.to_string().len() > 0, "title is empty");
         assert!(
@@ -410,7 +409,7 @@ pub mod service {
     /// Post. `paid` must be the live posting fee. The fee goes to the creating guild and is the opening price.
     ///
     /// An empty subject is a short post. A subject makes it an article.
-    /// The author is the first bidder. Bidding closes one week after the post.
+    /// The author is the first bidder. Bidding closes after the thread's bid_seconds.
     #[action]
     fn post(
         fractal: AccountNumber,

@@ -136,14 +136,13 @@ mod service {
             social::Wrapper::call().fee(fractal, thread)
         }
 
-        /// Newest posts that have not been removed. Removed rows do not take a slot.
-
         async fn post(&self, id: u32) -> Option<Post> {
             PostTable::with_service(social::SERVICE)
                 .get_index_pk()
                 .get(&id)
         }
 
+        /// Newest posts that have not been removed. Removed rows do not take a slot.
         async fn feed(&self, fractal: AccountNumber, thread: AccountNumber) -> Vec<Post> {
             let mut rows: Vec<Post> = PostTable::with_service(social::SERVICE)
                 .get_index_by_thread()
