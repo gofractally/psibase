@@ -139,7 +139,13 @@ pub mod tables {
                 !diff_as_f64.is_nan(),
                 "diffadjust increase computation resulted in NaN",
             );
-            diff_as_f64 as u64
+            let next = diff_as_f64 as u64;
+            // Integer truncation can leave the difficulty where it was, including at 0.
+            if next == difficulty {
+                difficulty.saturating_add(1)
+            } else {
+                next
+            }
         }
 
         fn apply_decrease(mut difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
