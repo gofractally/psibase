@@ -140,7 +140,7 @@ pub mod tables {
                 "diffadjust increase computation resulted in NaN",
             );
             let next = diff_as_f64 as u64;
-            // Integer truncation can leave the difficulty where it was, including at 0.
+            // Integer truncation can leave the difficulty where it was
             if next == difficulty {
                 difficulty.saturating_add(1)
             } else {
