@@ -140,12 +140,8 @@ pub mod tables {
                 "diffadjust increase computation resulted in NaN",
             );
             let next = diff_as_f64 as u64;
-            // Integer truncation can leave the difficulty where it was
-            if next == difficulty {
-                difficulty.saturating_add(1)
-            } else {
-                next
-            }
+            // Integer truncation can erase a small increase; always move by at least 1.
+            next.max(difficulty.saturating_add(1))
         }
 
         fn apply_decrease(mut difficulty: u64, factor: f64, times: u32, floor: u64) -> u64 {
