@@ -232,9 +232,12 @@
           yarnBerry
           eslint
           prettier
-          python3
-          python3Packages.websockets
-          python3Packages.requests
+          (python3.withPackages (ps: with ps; [
+            websockets
+            requests
+            urllib3
+            cryptography
+          ]))
           git
           gh
           curl
