@@ -23,6 +23,8 @@ export interface Token {
     label: string;
     precision: number;
     isTransferable: boolean;
+    iconHash: string | null;
+    owner: string | null;
 }
 
 /** A token the user has no balance in, e.g. one with only past or pending activity */
@@ -35,6 +37,8 @@ export const zeroBalanceToken = (token: TokenSummary): Token => {
         label: balance.getDisplayLabel(),
         precision: token.precision,
         isTransferable: !token.settings.untransferable,
+        iconHash: token.iconHash,
+        owner: token.owner,
     };
 };
 
@@ -75,15 +79,19 @@ export const useUserTokenBalances = (
                     balance.symbol,
                 );
 
+                const meta = tokensMeta.find(
+                    (meta) => meta.id === balance.tokenId,
+                );
+
                 return {
                     id: balance.tokenId,
                     symbol: balance.symbol ?? null,
                     precision: quan.precision,
                     label: quan.getDisplayLabel(),
                     balance: quan,
-                    isTransferable:
-                        tokensMeta.find((meta) => meta.id === balance.tokenId)
-                            ?.settings.untransferable === false,
+                    isTransferable: meta?.settings.untransferable === false,
+                    iconHash: balance.iconHash ?? null,
+                    owner: meta?.owner ?? null,
                 };
             });
 
