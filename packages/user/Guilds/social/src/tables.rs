@@ -22,6 +22,7 @@ pub mod tables {
         /// Account-shaped name, unique inside the fractal. Not a chain account.
         pub account: AccountNumber,
         pub title: Memo,
+        pub description: Memo,
         pub creator: AccountNumber,
         pub public: bool,
         pub fee_nft: u32,
@@ -78,7 +79,7 @@ pub mod tables {
         pub thread: AccountNumber,
         pub author: AccountNumber,
         /// Empty for a short post. Set for an article.
-        pub subject: String,
+        pub subject: Memo,
         pub body: String,
         /// Current bid. The next bid is 130% of this.
         pub last_bid: Quantity,
@@ -108,4 +109,5 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) {}
     }
+
 }

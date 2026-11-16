@@ -28,7 +28,6 @@ const RETURN_PPM: u64 = 1_100_000;
 /// 10% burns, and 10% pays the author.
 const CUT_PPM: u64 = 100_000;
 
-const MAX_SUBJECT: usize = 80;
 const MAX_SHORT: usize = 280;
 const MAX_ARTICLE: usize = 20_000;
 const DEFAULT_BID_SECONDS: u32 = 7 * 86_400;
@@ -236,12 +235,11 @@ pub fn next_price(stake: u64) -> u64 {
     of_ppm(stake, NEXT_PPM).max(stake.saturating_add(1))
 }
 
-fn check_text(subject: &str, body: &str) {
+fn check_text(subject: &Memo, body: &str) {
     assert!(!body.is_empty(), "post is empty");
-    if subject.is_empty() {
+    if subject.to_string().is_empty() {
         assert!(body.len() <= MAX_SHORT, "short post is too long");
     } else {
-        assert!(subject.len() <= MAX_SUBJECT, "subject is too long");
         assert!(body.len() <= MAX_ARTICLE, "article is too long");
     }
 }
@@ -267,7 +265,7 @@ pub mod service {
     /// The posting fee starts at 0 and aims for 70 posts a week. Social holds the admin NFT
     /// and is the consumer. A moderator adjusts the curve through set_fee.
     #[action]
-    fn create_thread(account: AccountNumber, title: Memo, public: bool) {
+    fn create_thread(account: AccountNumber, title: Memo, description: Memo, public: bool) {
         let fractal = guild_fractal(get_sender()).expect("sender is not a guild");
         let guild = get_sender().base();
         assert!(
@@ -293,6 +291,7 @@ pub mod service {
             fractal,
             account,
             title,
+            description,
             creator: guild,
             public,
             fee_nft,
@@ -423,7 +422,7 @@ pub mod service {
     fn post(
         fractal: AccountNumber,
         thread: AccountNumber,
-        subject: String,
+        subject: Memo,
         body: String,
         paid: u64,
     ) {
@@ -462,7 +461,7 @@ pub mod service {
     /// The author is the first bidder at price 0. Later bids use the same 130% rule.
     /// Replying does not move the thread's posting-fee curve.
     #[action]
-    fn reply(parent: u32, subject: String, body: String) {
+    fn reply(parent: u32, subject: Memo, body: String) {
         let author = get_sender().base();
         let parent_post = Post::get(parent);
         assert!(!parent_post.removed, "post was removed");

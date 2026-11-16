@@ -1,14 +1,18 @@
-import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Settings } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { CreateThreadModal } from "@/components/modals/create-thread-modal";
+import { useOpenCreateThread } from "@/components/create-thread-host";
+import { ThreadSettingsModal } from "@/components/modals/thread-settings-modal";
+import { BidLeft, PostedAt } from "@/components/relative-time";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useGuild } from "@/hooks/use-guild";
 import { usePluginFunctionCallMutation } from "@/hooks/use-plugin-function-call-mutation";
 import { formatRawAmount } from "@/lib/format-token";
 import {
     getFee,
+    getFractalPosts,
     getFractalTokenId,
     getOwed,
     getPosts,
@@ -16,14 +20,15 @@ import {
     nextBidRaw,
     social,
     unixSeconds,
+    type SocialThread,
 } from "@/lib/social";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 
 import { Avatar } from "@shared/components/avatar";
 import { EmptyBlock } from "@shared/components/empty-block";
-import { Button } from "@shared/shadcn/ui/button";
 import { PageContainer } from "@shared/components/page-container";
+import { Button } from "@shared/shadcn/ui/button";
 
 const SHORT_POST_BYTES = 280;
 
@@ -37,23 +42,35 @@ const rawToDecimal = (raw: string) => {
 
 const utf8Bytes = (value: string) => new TextEncoder().encode(value).length;
 
-const ago = (value: string) => {
-    const seconds = unixSeconds(value);
-    if (!seconds) return "";
-    const delta = Math.max(0, Math.floor(Date.now() / 1000) - seconds);
-    if (delta < 60) return "now";
-    if (delta < 3600) return `${Math.floor(delta / 60)}m`;
-    if (delta < 86400) return `${Math.floor(delta / 3600)}h`;
-    return `${Math.floor(delta / 86400)}d`;
+const ThreadCard = ({ thread }: { thread: SocialThread }) => {
+    const moderator = useGuild(thread.creator);
+    return (
+        <Link
+            to={`/threads/${thread.account}`}
+            className="block rounded-2xl border border-[#2f3336] px-4 py-3 no-underline transition-colors hover:bg-white/[0.03]"
+        >
+            <p className="text-muted-foreground text-[13px]">{thread.account}</p>
+            <p className="mt-0.5 text-[15px] font-bold">{thread.title}</p>
+            <p className="text-muted-foreground mt-0.5 text-[13px]">
+                Moderated by the {moderator.data?.displayName ?? thread.creator} guild
+            </p>
+            {thread.description ? (
+                <p className="text-muted-foreground mt-1 text-[15px] leading-5 whitespace-pre-wrap">
+                    {thread.description}
+                </p>
+            ) : null}
+        </Link>
+    );
 };
 
 export const Threads = () => {
     const fractal = useFractalAccount();
-    const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const openCreateThread = useOpenCreateThread();
     const { thread: name } = useParams();
+    const all = name === "~all";
     const [body, setBody] = useState("");
-    const [showCreate, setShowCreate] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
     const composerRef = useRef<HTMLTextAreaElement>(null);
     const bodyBytes = utf8Bytes(body);
     const overLimit = bodyBytes > SHORT_POST_BYTES;
@@ -69,11 +86,15 @@ export const Threads = () => {
         queryFn: () => getThreads(fractal!),
     });
     const posts = useQuery({
-        queryKey: ["social-posts", fractal, name],
+        queryKey: all
+            ? ["social-fractal-posts", fractal]
+            : ["social-posts", fractal, name],
         enabled: Boolean(fractal && name),
-        queryFn: () => getPosts(fractal!, name!),
+        queryFn: () =>
+            all ? getFractalPosts(fractal!) : getPosts(fractal!, name!),
     });
     const selected = threads.data?.find((thread) => thread.account === name);
+    const moderator = useGuild(selected?.creator);
     const fee = useQuery({
         queryKey: ["social-fee", fractal, name],
         enabled: Boolean(fractal && name),
@@ -120,45 +141,63 @@ export const Threads = () => {
     return (
         <div className="flex min-h-0 flex-1 flex-col bg-black">
         <PageContainer className="relative z-[1] mx-auto box-border flex w-full max-w-[600px] min-h-0 min-w-0 shrink-0 grow flex-col content-start items-stretch space-y-0 border-x border-solid border-[#2f3336] bg-black p-0 font-[TwitterChirp,-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Helvetica,Arial,sans-serif] text-[15px] text-[#e7e9ea] [color-scheme:dark] [-webkit-text-size-adjust:100%] [scrollbar-color:rgb(62,65,68)_rgb(22,24,28)]">
-            <CreateThreadModal
-                show={showCreate}
-                openChange={setShowCreate}
-                onCreated={(account) => {
-                    void threads.refetch();
-                    void queryClient.invalidateQueries({
-                        queryKey: ["social-ranked", fractal],
-                    });
-                    navigate(`/threads/${account}`);
-                }}
-            />
             {threads.isLoading ? (
                 <EmptyBlock isLoading title="No threads" />
-            ) : threads.data?.length === 0 ? (
+            ) : !all && threads.data?.length === 0 ? (
                 <div className="p-4">
                     <EmptyBlock
                         title="No threads"
                         description="No threads have been created in this fractal yet."
                         buttonLabel="Create a thread"
-                        onButtonClick={() => setShowCreate(true)}
+                        onButtonClick={openCreateThread}
                     />
                 </div>
             ) : (
             <>
-            <div className="flex items-start justify-between gap-3 px-4 py-3">
-                <div>
-                    <h1 className="text-xl font-semibold">Threads</h1>
+            {all && (
+                <div className="px-4 py-3">
+                    <h1 className="text-xl font-semibold">All</h1>
                     <p className="text-muted-foreground text-sm">
-                        A thread belongs to this fractal.
+                        Posts from every thread
                     </p>
                 </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCreate(true)}
-                >
-                    <Plus />
-                </Button>
-            </div>
+            )}
+            {!name && (
+                <div className="flex flex-col gap-3 p-4">
+                    <h1 className="text-xl font-semibold">Threads</h1>
+                    {(threads.data ?? []).map((thread) => (
+                        <ThreadCard key={thread.account} thread={thread} />
+                    ))}
+                </div>
+            )}
+            {selected && (
+                <div className="px-4 py-3">
+                    <h1 className="text-xl font-semibold">{selected.title}</h1>
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-muted-foreground min-w-0 text-sm">
+                            Moderated by the {moderator.data?.displayName ?? selected.creator} guild
+                        </p>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground shrink-0 rounded-full"
+                            aria-label="Thread settings"
+                            onClick={() => setShowSettings(true)}
+                        >
+                            <Settings />
+                        </Button>
+                    </div>
+                </div>
+            )}
+            {selected && (
+                <ThreadSettingsModal
+                    show={showSettings}
+                    openChange={setShowSettings}
+                    fractal={fractal}
+                    thread={selected}
+                />
+            )}
             {threads.error && (
                 <p className="text-sm text-red-600">{threads.error.message}</p>
             )}
@@ -184,7 +223,7 @@ export const Threads = () => {
                     <div className="min-w-0 flex-1">
                         <textarea
                             ref={composerRef}
-                            className="max-h-64 min-h-12 w-full resize-none overflow-y-auto border-0 bg-transparent py-2.5 text-xl leading-6 placeholder:text-muted-foreground focus:outline-none"
+                            className="block max-h-64 min-h-6 w-full resize-none overflow-y-auto border-0 bg-transparent p-0 py-2 text-xl leading-6 shadow-none ring-0 outline-none placeholder:text-muted-foreground focus:border-0 focus:shadow-none focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:outline-none"
                             placeholder="What's happening?"
                             value={body}
                             rows={1}
@@ -258,6 +297,7 @@ export const Threads = () => {
                     </div>
                 </form>
             )}
+            {name && (
             <div className="flex w-full min-w-0 grow flex-col">
                 {posts.isLoading && (
                     <p className="text-muted-foreground px-4 py-3 text-sm">
@@ -269,7 +309,10 @@ export const Threads = () => {
                 )}
                 {(posts.data ?? []).map((row) => {
                     const next = nextBidRaw(row.lastBid.value);
-                    const window = selected?.bidSeconds;
+                    const owner = all
+                        ? threads.data?.find((thread) => thread.account === row.thread)
+                        : selected;
+                    const window = owner?.bidSeconds;
                     const closed =
                         window != null &&
                         unixSeconds(row.createdAt) + window <=
@@ -279,6 +322,37 @@ export const Threads = () => {
                         row.nft == null &&
                         !row.removed &&
                         row.bidder !== currentUser;
+                    const held =
+                        row.bidder === currentUser &&
+                        row.nft == null &&
+                        !row.removed;
+                    const bidButton = canBid ? (
+                        <Button
+                            type="button"
+                            className="h-8 rounded-full px-3 text-sm font-bold hover:bg-primary/90"
+                            disabled={fractal == null || token.data == null}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                if (fractal == null || token.data == null) return;
+                                bid.mutate([
+                                    row.id,
+                                    token.data,
+                                    rawToDecimal(next),
+                                ]);
+                            }}
+                        >
+                            Bid {formatRawAmount(next)}
+                        </Button>
+                    ) : held ? (
+                        <Button
+                            type="button"
+                            className="h-8 rounded-full px-3 text-sm font-bold"
+                            disabled
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            {closed ? "You won" : "Your bid"}
+                        </Button>
+                    ) : null;
                     return (
                         <article
                             key={row.id}
@@ -289,66 +363,54 @@ export const Threads = () => {
                                 WebkitTextSizeAdjust: "100%",
                                 WebkitTapHighlightColor: "rgba(0,0,0,0)",
                             }}
-                            onClick={() => navigate(`/threads/${name}/post/${row.id}`)}
+                            onClick={() =>
+                                navigate(`/threads/${row.thread}/post/${row.id}`)
+                            }
                         >
                             <Avatar
                                 account={row.author}
                                 className="size-10 border-0 shadow-none"
                             />
                             <div className="min-w-0 flex-1">
-                                <div className="flex items-baseline gap-2">
-                                    <span className="truncate text-[15px] font-bold">
-                                        {row.author}
-                                    </span>
-                                    <span className="text-muted-foreground text-[13px]">
-                                        {ago(row.createdAt)}
-                                    </span>
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex min-w-0 items-baseline gap-2">
+                                        <span className="truncate text-[15px] font-bold">
+                                            {row.author}
+                                        </span>
+                                        <PostedAt value={row.createdAt} />
+                                    </div>
+                                    {bidButton && (
+                                        <div className="flex shrink-0 items-center gap-2">
+                                            {!closed && owner && (
+                                                <BidLeft
+                                                    createdAt={row.createdAt}
+                                                    bidSeconds={owner.bidSeconds}
+                                                />
+                                            )}
+                                            {bidButton}
+                                        </div>
+                                    )}
                                 </div>
+                                {all && (
+                                    <p className="text-muted-foreground text-[13px]">
+                                        {owner?.title ?? row.thread}
+                                    </p>
+                                )}
                                 {row.subject ? (
                                     <p className="mt-0.5 font-semibold">{row.subject}</p>
                                 ) : null}
                                 <p className="mt-0.5 text-[15px] leading-5 whitespace-pre-wrap">
                                     {row.body}
                                 </p>
-                                <div className="mt-2 flex items-center justify-between gap-3">
-                                    <span className="text-muted-foreground text-[13px]">
-                                        {formatRawAmount(row.lastBid.value)} · {row.bidder}
-                                    </span>
-                                    {canBid ? (
-                                        <Button
-                                            type="button"
-                                            className="h-8 rounded-full px-3 text-sm font-bold hover:bg-primary/90"
-                                            disabled={fractal == null || token.data == null}
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                if (fractal == null || token.data == null) return;
-                                                bid.mutate([
-                                                    row.id,
-                                                    token.data,
-                                                    rawToDecimal(next),
-                                                ]);
-                                            }}
-                                        >
-                                            Bid {formatRawAmount(next)}
-                                        </Button>
-                                    ) : row.bidder === currentUser &&
-                                      row.nft == null &&
-                                      !row.removed ? (
-                                        <Button
-                                            type="button"
-                                            className="h-8 rounded-full px-3 text-sm font-bold"
-                                            disabled
-                                            onClick={(event) => event.stopPropagation()}
-                                        >
-                                            {closed ? "You won" : "Your bid"}
-                                        </Button>
-                                    ) : null}
-                                </div>
+                                <p className="text-muted-foreground mt-2 text-[13px]">
+                                    {formatRawAmount(row.lastBid.value)} · {row.bidder}
+                                </p>
                             </div>
                         </article>
                     );
                 })}
             </div>
+            )}
             </>
             )}
         </PageContainer>

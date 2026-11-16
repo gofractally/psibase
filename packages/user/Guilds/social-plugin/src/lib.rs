@@ -77,6 +77,7 @@ impl Threads for SocialPlugin {
         guild: String,
         account: String,
         title: String,
+        description: String,
         public: bool,
     ) -> Result<(), Error> {
         stage(&guild)?;
@@ -84,6 +85,9 @@ impl Threads for SocialPlugin {
         Social::add_to_tx().create_thread(
             account,
             title.parse().map_err(|_| ErrorType::TitleTooLong)?,
+            description
+                .parse()
+                .map_err(|_| ErrorType::DescriptionTooLong)?,
             public,
         );
         Ok(())
@@ -204,7 +208,7 @@ impl Posts for SocialPlugin {
         Social::add_to_tx().post(
             fractal.parse().unwrap(),
             thread.parse().unwrap(),
-            subject,
+            subject.parse().map_err(|_| ErrorType::SubjectTooLong)?,
             body,
             paid,
         );
@@ -213,7 +217,11 @@ impl Posts for SocialPlugin {
 
     #[psibase_plugin::authorized(Medium)]
     fn reply(parent: u32, subject: String, body: String) -> Result<(), Error> {
-        Social::add_to_tx().reply(parent, subject, body);
+        Social::add_to_tx().reply(
+            parent,
+            subject.parse().map_err(|_| ErrorType::SubjectTooLong)?,
+            body,
+        );
         Ok(())
     }
 

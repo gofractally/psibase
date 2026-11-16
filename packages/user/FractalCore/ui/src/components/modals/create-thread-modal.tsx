@@ -24,6 +24,12 @@ const zCreateThread = z.object({
             (title) => new TextEncoder().encode(title).length <= 80,
             "Title must be 80 bytes or less",
         ),
+    description: z
+        .string()
+        .refine(
+            (description) => new TextEncoder().encode(description).length <= 80,
+            "Description must be 80 bytes or less",
+        ),
 });
 
 export const CreateThreadModal = ({
@@ -52,6 +58,7 @@ export const CreateThreadModal = ({
             guild: "",
             account: "",
             title: "",
+            description: "",
         },
         validators: {
             onChange: zCreateThread,
@@ -61,6 +68,7 @@ export const CreateThreadModal = ({
                 value.guild,
                 value.account,
                 value.title,
+                value.description,
                 false,
             ]);
             openChange(false);
@@ -112,6 +120,15 @@ export const CreateThreadModal = ({
                             name="title"
                             children={(field) => (
                                 <field.TextField label="Title" />
+                            )}
+                        />
+                        <form.AppField
+                            name="description"
+                            children={(field) => (
+                                <field.TextField
+                                    label="Description"
+                                    placeholder="Optional"
+                                />
                             )}
                         />
                         <form.AppForm>

@@ -19,14 +19,16 @@ const MenuSubItem = ({
     title,
     path,
     Icon,
+    end = true,
 }: {
     title: string;
     path: string;
     Icon: LucideIcon;
+    end?: boolean;
 }) => {
     return (
         <SidebarMenuSubItem key={path}>
-            <NavLink to={path} end>
+            <NavLink to={path} end={end}>
                 {({ isActive }) => (
                     <SidebarMenuButton tooltip={title} isActive={isActive}>
                         <Icon />
@@ -51,8 +53,10 @@ const MenuItem = ({
 }) => {
     // if menu item has children and the base path matches, open the collapsible
     // still allows the user to manually open and close it
-    const match = useMatch(path ? `${path}/*` : "NO_MATCH");
-    const [open, setOpen] = useState(false);
+    const nested = useMatch(path ? `${path}/*` : "NO_MATCH");
+    const exact = useMatch({ path: path ?? "NO_MATCH", end: true });
+    const match = path ? nested || exact : null;
+    const [open, setOpen] = useState(Boolean(match));
     useEffect(() => {
         if (children && match) {
             setOpen(true);

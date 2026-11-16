@@ -25,9 +25,29 @@ export const social = {
             guild: string,
             account: string,
             title: string,
+            description: string,
             public: boolean,
         ]
     >("threads", "createThread"),
+    setPublic: call<
+        [asAccount: string, fractal: string, thread: string, public: boolean]
+    >("threads", "setPublic"),
+    setFee: call<
+        [
+            asAccount: string,
+            fractal: string,
+            thread: string,
+            windowSeconds: number,
+            targetMin: number,
+            targetMax: number,
+            floor: bigint,
+            increasePpm: number,
+            decreasePpm: number,
+        ]
+    >("threads", "setFee"),
+    setBidSecs: call<
+        [asAccount: string, fractal: string, thread: string, seconds: number]
+    >("threads", "setBidSecs"),
     post: call<
         [
             fractal: string,
@@ -47,6 +67,7 @@ export const social = {
 const zThread = z.object({
     account: zAccount,
     title: z.string(),
+    description: z.string(),
     creator: zAccount,
     public: z.boolean(),
     feeNft: z.number(),
@@ -55,6 +76,7 @@ const zThread = z.object({
 
 const zPost = z.object({
     id: z.number(),
+    thread: zAccount,
     author: zAccount,
     subject: z.string(),
     body: z.string(),
@@ -106,7 +128,7 @@ export const getThread = async (
 ): Promise<SocialThread | null> => {
     const res = await graphqlAuth(
         social.graphql,
-        `{ thread(fractal: "${fractal}", account: "${account}") { account title creator public feeNft bidSeconds } }`,
+        `{ thread(fractal: "${fractal}", account: "${account}") { account title description creator public feeNft bidSeconds } }`,
     );
     return z.object({ thread: zThread.nullable() }).parse(res).thread;
 };
@@ -114,7 +136,7 @@ export const getThread = async (
 export const getThreads = async (fractal: string): Promise<SocialThread[]> => {
     const res = await graphqlAuth(
         social.graphql,
-        `{ threads(fractal: "${fractal}", first: 50) { nodes { account title creator public feeNft bidSeconds } } }`,
+        `{ threads(fractal: "${fractal}", first: 50) { nodes { account title description creator public feeNft bidSeconds } } }`,
     );
     return z
         .object({ threads: z.object({ nodes: zThread.array() }) })
@@ -130,6 +152,55 @@ export const getOwed = async (user: string, tokenId: number): Promise<string> =>
     return z
         .object({ owed: z.union([z.string(), z.number()]).transform(String) })
         .parse(res).owed;
+};
+
+export type FeeCurve = {
+    windowSeconds: number;
+    targetMin: number;
+    targetMax: number;
+    floor: string;
+    increasePpm: number;
+    decreasePpm: number;
+};
+
+/** Posting-fee curve. `floor` is the minimum, in raw token units. */
+export const getFeeCurve = async (
+    fractal: string,
+    thread: string,
+): Promise<FeeCurve | null> => {
+    const res = await graphqlAuth(
+        social.graphql,
+        `{ feeCurve(fractal: "${fractal}", thread: "${thread}") { windowSeconds targetMin targetMax floor increasePpm decreasePpm } }`,
+    );
+    return z
+        .object({
+            feeCurve: z
+                .object({
+                    windowSeconds: z.number().int(),
+                    targetMin: z.number().int(),
+                    targetMax: z.number().int(),
+                    floor: z.union([z.string(), z.number()]).transform(String),
+                    increasePpm: z.number().int(),
+                    decreasePpm: z.number().int(),
+                })
+                .nullable(),
+        })
+        .parse(res).feeCurve;
+};
+
+/** Legislature flag. A missing row means the fractal does not allow public threads. */
+export const getOpenToPublic = async (fractal: string): Promise<boolean> => {
+    const res = await graphqlAuth(
+        social.graphql,
+        `{ config(fractal: "${fractal}") { openToPublic } }`,
+    );
+    return (
+        z
+            .object({
+                config: z.object({ openToPublic: z.boolean() }).nullable(),
+            })
+            .parse(res).config?.openToPublic ?? false
+    );
 };
 
 export const getFee = async (fractal: string, thread: string): Promise<string> => {
@@ -202,13 +273,26 @@ export const getPosts = async (
 ): Promise<SocialPost[]> => {
     const res = await graphqlAuth(
         social.graphql,
-        `{ feed(fractal: "${fractal}", thread: "${thread}") { id author subject body lastBid { value } bidder createdAt removed nft replyTo } }`,
+        `{ feed(fractal: "${fractal}", thread: "${thread}") { id thread author subject body lastBid { value } bidder createdAt removed nft replyTo } }`,
     );
     return z.object({ feed: zPost.array() }).parse(res).feed;
 };
 
 const POST_FIELDS =
-    "id author subject body lastBid { value } bidder createdAt removed nft replyTo";
+    "id thread author subject body lastBid { value } bidder createdAt removed nft replyTo";
+
+/** Posts in every thread of the fractal, newest id first. Removed rows are left out. */
+export const getFractalPosts = async (fractal: string): Promise<SocialPost[]> => {
+    const res = await graphqlAuth(
+        social.graphql,
+        `{ fractalPosts(fractal: "${fractal}", first: 200) { nodes { ${POST_FIELDS} } } }`,
+    );
+    return z
+        .object({ fractalPosts: z.object({ nodes: zPost.array() }) })
+        .parse(res)
+        .fractalPosts.nodes.filter((row) => !row.removed)
+        .sort((left, right) => right.id - left.id);
+};
 
 /** Direct replies, newest first. */
 export const getReplies = async (parent: number): Promise<SocialPost[]> => {

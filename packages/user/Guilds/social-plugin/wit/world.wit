@@ -4,7 +4,7 @@ interface threads {
     use host:types/types.{error};
 
     /// Guild creates a thread in its fractal. Staged as the guild.
-    create-thread: func(guild: string, account: string, title: string, public: bool) -> result<_, error>;
+    create-thread: func(guild: string, account: string, title: string, description: string, public: bool) -> result<_, error>;
     /// Staged as the fractal account. That account's auth is the legislature.
     set-open: func(fractal: string, open: bool) -> result<_, error>;
     /// Staged as the judiciary role account, not the fractal account.

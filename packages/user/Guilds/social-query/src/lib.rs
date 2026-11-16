@@ -106,6 +106,27 @@ mod service {
             .await
         }
 
+        /// Every post in the fractal. `by_thread` is `(fractal, thread, id)`; only the fractal is fixed.
+        async fn fractal_posts(
+            &self,
+            fractal: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, Post>> {
+            TableQuery::subindex::<(AccountNumber, u32)>(
+                PostTable::with_service(social::SERVICE).get_index_by_thread(),
+                &fractal,
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
         /// Highest live posting fee first. That is the cost to open a post.
         async fn ranked(&self, fractal: AccountNumber) -> async_graphql::Result<Vec<RankedThread>> {
             let connection = TableQuery::subindex::<AccountNumber>(
@@ -135,6 +156,26 @@ mod service {
 
         async fn fee(&self, fractal: AccountNumber, thread: AccountNumber) -> u64 {
             social::Wrapper::call().fee(fractal, thread)
+        }
+
+        /// Stored posting-fee curve. `fee` is what a post costs right now.
+        async fn fee_curve(
+            &self,
+            fractal: AccountNumber,
+            thread: AccountNumber,
+        ) -> Option<FeeCurve> {
+            let row = ThreadTable::with_service(social::SERVICE)
+                .get_index_pk()
+                .get(&(fractal, thread))?;
+            let rate = psibase::services::diff_adjust::Wrapper::call().get(row.fee_nft)?;
+            Some(FeeCurve {
+                window_seconds: rate.window_seconds,
+                target_min: rate.target_min,
+                target_max: rate.target_max,
+                floor: rate.floor_difficulty,
+                increase_ppm: rate.increase_ppm,
+                decrease_ppm: rate.decrease_ppm,
+            })
         }
 
         /// Tokens social has credited to this account and that have not been accepted yet.
@@ -191,6 +232,16 @@ mod service {
             rows.truncate(50);
             rows
         }
+    }
+
+    #[derive(SimpleObject)]
+    struct FeeCurve {
+        window_seconds: u32,
+        target_min: u32,
+        target_max: u32,
+        floor: u64,
+        increase_ppm: u32,
+        decrease_ppm: u32,
     }
 
     #[derive(Deserialize, SimpleObject)]
