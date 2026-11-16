@@ -6,10 +6,10 @@
 
 pub mod bridge;
 
-use psibase_macros::{Pack, ToSchema, Unpack};
+use psibase_macros::{Pack, ToSchema, Unpack, View};
 
 // TODO: test reading variant with future index
-#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
+#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum Variant {
     ItemU32(u32),
@@ -17,7 +17,7 @@ pub enum Variant {
     // ItemOptStr(Option<String>),  TODO: broken in C++
 }
 
-#[derive(Pack, Unpack, ToSchema, PartialEq, Debug)]
+#[derive(Pack, Unpack, ToSchema, PartialEq, Debug, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct DefWontChangeInnerStruct {
@@ -40,7 +40,7 @@ pub struct DefWontChangeInnerStruct {
 #[derive(PartialEq, Eq, Debug, Default)]
 pub struct NotPackable;
 
-#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
+#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct InnerStruct {
     pub inner_u32: u32,
@@ -51,7 +51,7 @@ pub struct InnerStruct {
     pub inner_o_vec_o_u16: Option<Vec<Option<u16>>>,
 }
 
-#[derive(Pack, Unpack, ToSchema, PartialEq, Debug)]
+#[derive(Pack, Unpack, ToSchema, PartialEq, Debug, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct OuterStruct {
     pub field_u8: u8,
@@ -91,7 +91,7 @@ pub struct OuterStruct {
     pub skipped: NotPackable,
 }
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct SimpleWithNoString {
@@ -101,7 +101,7 @@ pub struct SimpleWithNoString {
     pub f: f32,
 }
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct SimpleWithString {
@@ -112,7 +112,7 @@ pub struct SimpleWithString {
     pub f: f32,
 }
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ParentStruct {
     pub oa: u32,
@@ -126,7 +126,7 @@ pub struct ParentStruct {
     pub s: String,
 }
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, Eq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, Eq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct OuterSimpleArray {
     pub oa: u32,
@@ -141,7 +141,7 @@ pub struct OuterSimpleArray {
 
 // TODO: check arrays, tuples, bool, char,
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct UnextensibleWithOptions {
@@ -157,7 +157,7 @@ pub struct UnextensibleWithOptions {
     pub opt_f: Option<f32>,
 }
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, Eq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, Eq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct ThreeElementsFixedStruct {
@@ -166,7 +166,7 @@ pub struct ThreeElementsFixedStruct {
     pub element_3: i16,
 }
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct MultipleTrailingOptions {
     pub a: u32,
@@ -177,7 +177,7 @@ pub struct MultipleTrailingOptions {
     pub opt_z: Option<u64>,
 }
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
 pub struct UnextensibleMultipleTrailingOptions {
@@ -189,7 +189,7 @@ pub struct UnextensibleMultipleTrailingOptions {
     pub opt_z: Option<u64>,
 }
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct OptionInTheMiddle {
     pub a: u32,
@@ -199,7 +199,7 @@ pub struct OptionInTheMiddle {
 
 type MyOpt<T> = Option<T>;
 
-#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq, View)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct TrailingWithAliasedOptionType {
     pub a: u32,

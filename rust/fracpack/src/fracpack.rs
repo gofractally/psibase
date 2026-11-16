@@ -6,7 +6,7 @@
 //!
 //! - Quickly pack and unpack data, making it suitable for service-to-service communication, node-to-node communication, blockchain-to-outside communication, and database storage.
 //! - Forwards and backwards compatibility; it supports adding new optional fields to the end of structs and tuples, even when they are embedded in variable-length vectors, fixed-length arrays, optional, and other structs and tuples.
-//! - Option to read without unpacking (almost zero-copy); helps to efficiently handle large data. TODO: this library doesn't implement this feature yet.
+//! - Option to read without unpacking (almost zero-copy); helps to efficiently handle large data.
 //! - Doesn't require a code generator to support either C++ or Rust; macros and metaprogramming handle it.
 //! - Efficient compression when combined with the compression algorithm from Cap 'n' Proto.
 //!
@@ -48,7 +48,7 @@
 //! for the two types.
 
 use custom_error::custom_error;
-pub use psibase_macros::{Pack, ToSchema, Unpack};
+pub use psibase_macros::{Pack, ToSchema, Unpack, View};
 use std::{cell::RefCell, hash::Hash, mem, rc::Rc, sync::Arc};
 
 mod schema;
@@ -56,6 +56,9 @@ pub use schema::*;
 
 mod nested;
 pub use nested::*;
+
+mod view;
+pub use view::*;
 
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
