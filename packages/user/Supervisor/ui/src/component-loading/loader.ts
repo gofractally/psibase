@@ -14,6 +14,52 @@ type GenerateOptions = Parameters<typeof generate>[1];
 
 type PluginImports = Record<string, Record<string, unknown>>;
 
+export function isWasmJspiAvailable(): boolean {
+    return (
+        typeof WebAssembly !== "undefined" &&
+        typeof (WebAssembly as typeof WebAssembly & { Suspending?: unknown })
+            .Suspending === "function"
+    );
+}
+
+/** Phase 0: only bridge HTTP is marked async. */
+const JSPI_BRIDGE_FUNCS = new Set(["send-request"]);
+
+export function collectJspiImportNames(importedFuncs: Functions): string[] {
+    const names: string[] = [];
+    for (const intf of importedFuncs.interfaces) {
+        if (intf.namespace !== "supervisor") continue;
+        const id = `${intf.namespace}:${intf.package}/${intf.name}`;
+        for (const func of intf.funcs) {
+            if (!JSPI_BRIDGE_FUNCS.has(func.name)) continue;
+            names.push(`${id}#${func.name}`);
+        }
+    }
+    return names;
+}
+
+function isConstructorFunc(name: string): boolean {
+    return isResourceMethod(name) && name.includes("[constructor]");
+}
+
+export function collectJspiExportNames(exportedFuncs: Functions): string[] {
+    const names: string[] = [];
+    for (const intf of exportedFuncs.interfaces) {
+        if (intf.namespace === "wasi") continue;
+        const id = `${intf.namespace}:${intf.package}/${intf.name}`;
+        for (const func of intf.funcs) {
+            if (isConstructorFunc(func.name)) continue;
+            names.push(`${id}#${func.name}`);
+            names.push(`${intf.name}#${func.name}`);
+        }
+    }
+    for (const func of exportedFuncs.funcs) {
+        if (isConstructorFunc(func.name)) continue;
+        names.push(func.name);
+    }
+    return names;
+}
+
 const cli = cliNs as any;
 const clocks = clocksNs as any;
 const filesystem = filesystemNs as any;
@@ -227,8 +273,17 @@ async function compileWasmComponent(
     wasmBytes: Uint8Array,
     imports: PluginImports,
     debugFileName: string,
+    jspi?: { imports: string[]; exports: string[] },
 ): Promise<CompiledPlugin> {
     const name = "component";
+    const useJspi =
+        jspi !== undefined &&
+        (jspi.imports.length > 0 || jspi.exports.length > 0);
+    if (useJspi && !isWasmJspiAvailable()) {
+        throw new Error(
+            `Cannot load ${debugFileName}: this browser cannot run plugins that need WebAssembly JSPI (WebAssembly.Suspending).`,
+        );
+    }
     const opts: GenerateOptions = {
         name,
         noTypescript: true,
@@ -238,6 +293,17 @@ async function compileWasmComponent(
         validLiftingOptimization: false,
         noNamespacedExports: true,
         tracing: false,
+        ...(useJspi
+            ? {
+                  asyncMode: {
+                      tag: "jspi" as const,
+                      val: {
+                          imports: jspi.imports,
+                          exports: jspi.exports,
+                      },
+                  },
+              }
+            : {}),
     };
 
     const { files: transpiledFiles } = await generate(wasmBytes, opts);
@@ -356,7 +422,20 @@ export async function compilePlugin(
         api.importedFuncs,
         imports,
     );
-    return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
+    const jspiImports = collectJspiImportNames(api.importedFuncs);
+    const jspi =
+        isWasmJspiAvailable() && jspiImports.length > 0
+            ? {
+                  imports: jspiImports,
+                  exports: collectJspiExportNames(api.exportedFuncs),
+              }
+            : undefined;
+    return compileWasmComponent(
+        wasmBytes,
+        imports,
+        `${service}.plugin.js`,
+        jspi,
+    );
 }
 
 // Loads a utility WASM component (not a plugin) with only WASI imports.
