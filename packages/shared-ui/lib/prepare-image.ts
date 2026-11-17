@@ -26,6 +26,12 @@ export const TOKEN_ICON_OPTIONS: PrepareImageOptions = {
     fit: "cover",
 };
 
+export const AVATAR_OPTIONS: PrepareImageOptions = {
+    maxBytes: 100 * 1024,
+    maxDimension: 512,
+    fit: "cover",
+};
+
 const WEBP_QUALITIES = [0.85, 0.75, 0.6];
 const JPEG_QUALITY = 0.85;
 /** Fallback sizes, as fractions of the first attempt's size */

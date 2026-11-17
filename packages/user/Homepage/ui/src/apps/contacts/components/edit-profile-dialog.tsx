@@ -4,7 +4,6 @@ import { FormProfile } from "@/components/form-profile";
 
 import { Avatar } from "@shared/components/avatar";
 import { useAvatar } from "@shared/hooks/use-avatar";
-import { useCacheBust } from "@shared/hooks/use-cache-bust";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Button } from "@shared/shadcn/ui/button";
@@ -12,7 +11,6 @@ import { DialogDescription } from "@shared/shadcn/ui/dialog";
 import { DialogTitle } from "@shared/shadcn/ui/dialog";
 import { DialogContent } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
-import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useRemoveAvatar } from "../hooks/use-remove-avatar";
 import { useSetProfile } from "../hooks/use-set-profile";
@@ -29,8 +27,6 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
     const { mutateAsync: removeAvatar, isPending: isRemovingAvatar } =
         useRemoveAvatar();
 
-    const { setBustedUser } = useCacheBust();
-
     const { data: currentUser } = useCurrentUser();
     const {
         data: profile,
@@ -39,28 +35,16 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
         isLoading,
         error,
     } = useProfile(currentUser, true, {});
-    const { mutateAsync: uploadAvatar, isPending: isUploadingAvatar } =
+    const { mutate: uploadAvatar, isPending: isUploadingAvatar } =
         useUploadAvatar();
 
     const isPending = isSettingProfile || isRemovingAvatar || isUploadingAvatar;
 
-    const handleImageChange = async (
-        e: React.ChangeEvent<HTMLInputElement>,
-    ) => {
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        e.target.value = "";
         if (file) {
-            const buffer = await file.arrayBuffer();
-            await uploadAvatar({
-                avatar: {
-                    contentType: file.type,
-                    content: new Uint8Array(buffer),
-                },
-            });
-            toast.success("Avatar uploaded");
-
-            if (currentUser) {
-                setBustedUser(currentUser);
-            }
+            uploadAvatar({ file });
         }
     };
 
@@ -96,6 +80,7 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
                             type="file"
                             accept="image/*"
                             onChange={handleImageChange}
+                            disabled={isPending}
                             className="hidden"
                         />
                     </div>

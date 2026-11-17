@@ -7,12 +7,10 @@ import { colorFor } from "@/lib/colors";
 
 import { Avatar } from "@shared/components/avatar";
 import { useAvatar } from "@shared/hooks/use-avatar";
-import { useCacheBust } from "@shared/hooks/use-cache-bust";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
-import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useRemoveAvatar } from "../../contacts/hooks/use-remove-avatar";
 import { useSetProfile } from "../../contacts/hooks/use-set-profile";
@@ -26,8 +24,6 @@ export const UserProfileSection = () => {
     const { mutateAsync: removeAvatar, isPending: isRemovingAvatar } =
         useRemoveAvatar();
 
-    const { setBustedUser } = useCacheBust();
-
     const { data: currentUser } = useCurrentUser();
     const {
         data: profile,
@@ -36,28 +32,16 @@ export const UserProfileSection = () => {
         isFetching,
         error,
     } = useProfile(currentUser, true, {});
-    const { mutateAsync: uploadAvatar, isPending: isUploadingAvatar } =
+    const { mutate: uploadAvatar, isPending: isUploadingAvatar } =
         useUploadAvatar();
 
     const isPending = isSettingProfile || isRemovingAvatar || isUploadingAvatar;
 
-    const handleImageChange = async (
-        e: React.ChangeEvent<HTMLInputElement>,
-    ) => {
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        e.target.value = "";
         if (file) {
-            const buffer = await file.arrayBuffer();
-            await uploadAvatar({
-                avatar: {
-                    contentType: file.type,
-                    content: new Uint8Array(buffer),
-                },
-            });
-            toast.success("Avatar uploaded");
-
-            if (currentUser) {
-                setBustedUser(currentUser);
-            }
+            uploadAvatar({ file });
         }
     };
 
@@ -88,7 +72,7 @@ export const UserProfileSection = () => {
                         <p className="text-muted-foreground text-xs">
                             {type === "uploaded"
                                 ? "Using your uploaded image."
-                                : "Using a generated identicon. Upload an image to replace it."}
+                                : "Using a generated identicon. Upload an image to replace it; it is cropped to a centered square."}
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -112,6 +96,7 @@ export const UserProfileSection = () => {
                             type="file"
                             accept="image/*"
                             onChange={handleImageChange}
+                            disabled={isPending}
                             className="hidden"
                         />
                         {type === "uploaded" && (
