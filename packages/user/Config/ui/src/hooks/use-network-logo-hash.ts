@@ -12,13 +12,15 @@ export const SiteConfigResponse = z.object({
             .object({
                 node: z.object({
                     path: z.string(),
+                    contentHash: z.string(),
                 }),
             })
             .array(),
     }),
 });
 
-export const useLogoUploaded = () =>
+/** Content hash of the uploaded network logo, or `null` if there is none */
+export const useNetworkLogoHash = () =>
     useQuery({
         queryKey: QueryKey.brandingFiles(),
         queryFn: async () => {
@@ -30,6 +32,7 @@ export const useLogoUploaded = () =>
                             edges {
                                 node {
                                     path
+                                    contentHash
                                 }
                             }
                         }
@@ -38,8 +41,9 @@ export const useLogoUploaded = () =>
             );
 
             const parsed = SiteConfigResponse.parse(res);
-            const paths =
-                parsed?.getContent.edges.map((edge) => edge.node.path) ?? [];
-            return paths.includes("/network_logo");
+            const logo = parsed.getContent.edges.find(
+                (edge) => edge.node.path === "/network_logo",
+            );
+            return logo?.node.contentHash ?? null;
         },
     });

@@ -7,7 +7,7 @@ import z from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { useLogoUploaded } from "@/hooks/use-logo-uploaded";
+import { useNetworkLogoHash } from "@/hooks/use-network-logo-hash";
 import { useSetLogo } from "@/hooks/use-set-logo";
 import { useSetNetworkName } from "@/hooks/use-set-network-name";
 
@@ -62,7 +62,7 @@ const LOGO_FORM_DEFAULTS: LogoFormValues = { logo: null };
 
 export const Branding = () => {
     const { data: networkName, isLoading: isBrandingLoading } = useBranding();
-    const { data: isLogoUploaded } = useLogoUploaded();
+    const { data: logoHash } = useNetworkLogoHash();
     const { mutateAsync: setLogo } = useSetLogo();
     const { mutateAsync: setNetworkName } = useSetNetworkName();
 
@@ -131,11 +131,11 @@ export const Branding = () => {
                             {(field) => {
                                 const previewSrc =
                                     field.state.value?.previewUrl ||
-                                    (isLogoUploaded
+                                    (logoHash
                                         ? siblingUrl(
                                               null,
                                               "branding",
-                                              "/network_logo",
+                                              `/network_logo?v=${logoHash}`,
                                           )
                                         : "");
                                 const hasDraft = !!field.state.value;
