@@ -31,7 +31,7 @@ export const NetworkLogo = ({
     const [logoFailed, setLogoFailed] = useState(false);
 
     const logoSrc = enableBranding
-        ? siblingUrl(null, "branding", "/network_logo.svg")
+        ? siblingUrl(null, "branding", "/network_logo")
         : undefined;
 
     let networkName = branding;

@@ -1,4 +1,5 @@
 import type { TxStatus } from "@/lib/check-staging";
+import type { PreparedImage } from "@shared/lib/prepare-image";
 
 import QueryKey from "@/lib/query-keys";
 import { CONFIG } from "@/lib/services";
@@ -8,7 +9,7 @@ import { queryClient } from "@shared/lib/query-client";
 import { usePluginMutation } from "./use-plugin-mutation";
 
 export const useSetLogo = () =>
-    usePluginMutation<[Uint8Array]>(
+    usePluginMutation<[logo: PreparedImage]>(
         {
             intf: "branding",
             service: CONFIG,

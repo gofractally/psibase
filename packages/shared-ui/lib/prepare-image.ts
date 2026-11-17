@@ -1,6 +1,6 @@
 export interface PreparedImage {
     contentType: string;
-    content: Uint8Array;
+    content: Uint8Array<ArrayBuffer>;
 }
 
 /**
@@ -38,6 +38,12 @@ export const TOKEN_ICON_OPTIONS: PrepareImageOptions = {
     fit: "cover",
 };
 
+export const NETWORK_LOGO_OPTIONS: PrepareImageOptions = {
+    maxBytes: 32 * 1024,
+    maxDimension: 256,
+    fit: "cover",
+};
+
 export const AVATAR_OPTIONS: PrepareImageOptions = {
     maxBytes: 100 * 1024,
     maxDimension: 512,
@@ -59,7 +65,7 @@ export class ImageTooLargeError extends Error {
 }
 
 // Load through a data: URL; the default CSP allows data: images but not blob:.
-const readAsDataUrl = (source: Blob) =>
+export const readAsDataUrl = (source: Blob) =>
     new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);

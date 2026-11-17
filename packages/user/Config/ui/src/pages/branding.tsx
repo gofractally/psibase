@@ -1,7 +1,8 @@
+import type { PreparedImage } from "@shared/lib/prepare-image";
 import type { ReactNode } from "react";
 
 import { CircleAlert, Save, Trash, Upload } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import z from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -13,28 +14,30 @@ import { useSetNetworkName } from "@/hooks/use-set-network-name";
 import { useAppForm } from "@shared/components/form/app-form";
 import { PageContainer } from "@shared/components/page-container";
 import { useBranding } from "@shared/hooks/use-branding";
+import {
+    NETWORK_LOGO_OPTIONS,
+    prepareImage,
+    readAsDataUrl,
+} from "@shared/lib/prepare-image";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-
-/** Decode a data URL (e.g. data:image/svg+xml;base64,...) to raw bytes */
-function dataUrlToBytes(dataUrl: string): Uint8Array {
-    const base64 = dataUrl.split(",")[1];
-    if (!base64) return new Uint8Array(0);
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-}
+import { toast } from "@shared/shadcn/ui/sonner";
 
 interface BrandingFormValues {
     networkName: string;
 }
 
+interface LogoDraft {
+    image: PreparedImage;
+    /** Data URL of `image` */
+    previewUrl: string;
+}
+
 interface LogoFormValues {
-    /** Data URL of the selected logo (empty string = no draft) */
-    logoDataUrl: string;
+    /** The prepared logo awaiting upload, if any */
+    logo: LogoDraft | null;
 }
 
 const Section = ({
@@ -55,14 +58,13 @@ const Section = ({
     </div>
 );
 
-const LOGO_FORM_DEFAULTS: LogoFormValues = { logoDataUrl: "" };
+const LOGO_FORM_DEFAULTS: LogoFormValues = { logo: null };
 
 export const Branding = () => {
     const { data: networkName, isLoading: isBrandingLoading } = useBranding();
     const { data: isLogoUploaded } = useLogoUploaded();
     const { mutateAsync: setLogo } = useSetLogo();
     const { mutateAsync: setNetworkName } = useSetNetworkName();
-    const logoFileInputRef = useRef<HTMLInputElement>(null);
 
     const defaultValues = useMemo<BrandingFormValues>(
         () => ({ networkName: networkName ?? "" }),
@@ -80,9 +82,8 @@ export const Branding = () => {
     const logoForm = useAppForm({
         defaultValues: LOGO_FORM_DEFAULTS,
         onSubmit: async (data: { value: LogoFormValues }) => {
-            if (!data.value.logoDataUrl) return;
-            const bytes = dataUrlToBytes(data.value.logoDataUrl);
-            await setLogo([bytes]);
+            if (!data.value.logo) return;
+            await setLogo([data.value.logo.image]);
             logoForm.reset(LOGO_FORM_DEFAULTS);
         },
     });
@@ -112,7 +113,7 @@ export const Branding = () => {
                             Displays on the homepage and other places
                         </div>
                         <div className="text-muted-foreground text-sm">
-                            Recommended size: 512x512px
+                            Cropped to a centered square of at most 256×256
                         </div>
                     </div>
                 }
@@ -126,38 +127,45 @@ export const Branding = () => {
                         }}
                         className="flex flex-col gap-2"
                     >
-                        <logoForm.AppField name="logoDataUrl">
+                        <logoForm.AppField name="logo">
                             {(field) => {
                                 const previewSrc =
-                                    field.state.value ||
+                                    field.state.value?.previewUrl ||
                                     (isLogoUploaded
                                         ? siblingUrl(
                                               null,
                                               "branding",
-                                              "/network_logo.svg",
+                                              "/network_logo",
                                           )
                                         : "");
                                 const hasDraft = !!field.state.value;
 
                                 const handleFileChange: React.ChangeEventHandler<
                                     HTMLInputElement
-                                > = (event) => {
+                                > = async (event) => {
                                     const file = event.target.files?.[0];
+                                    event.target.value = "";
                                     if (!file) return;
-                                    if (file.type !== "image/svg+xml") {
-                                        alert("Only SVGs are supported.");
-                                        return;
-                                    }
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => {
-                                        const result = reader.result;
-                                        if (typeof result === "string") {
-                                            field.handleChange(result);
-                                        }
-                                    };
-                                    reader.readAsDataURL(file);
-                                    if (logoFileInputRef.current) {
-                                        logoFileInputRef.current.value = "";
+                                    try {
+                                        const image = await prepareImage(
+                                            file,
+                                            NETWORK_LOGO_OPTIONS,
+                                        );
+                                        const previewUrl = await readAsDataUrl(
+                                            new Blob([image.content], {
+                                                type: image.contentType,
+                                            }),
+                                        );
+                                        field.handleChange({
+                                            image,
+                                            previewUrl,
+                                        });
+                                    } catch (error) {
+                                        toast.error(
+                                            error instanceof Error
+                                                ? error.message
+                                                : "Couldn't prepare image",
+                                        );
                                     }
                                 };
 
@@ -187,10 +195,9 @@ export const Branding = () => {
                                                 </div>
                                             </label>
                                             <Input
-                                                ref={logoFileInputRef}
                                                 id="icon-upload"
                                                 type="file"
-                                                accept=".svg"
+                                                accept="image/*"
                                                 onChange={handleFileChange}
                                                 className="hidden"
                                             />
@@ -219,7 +226,7 @@ export const Branding = () => {
                                                 size="icon"
                                                 disabled={!hasDraft}
                                                 onClick={() => {
-                                                    field.handleChange("");
+                                                    field.handleChange(null);
                                                 }}
                                             >
                                                 <Trash className="h-4 w-4" />

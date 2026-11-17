@@ -40,10 +40,6 @@ export const useLogoUploaded = () =>
             const parsed = SiteConfigResponse.parse(res);
             const paths =
                 parsed?.getContent.edges.map((edge) => edge.node.path) ?? [];
-            return paths.some(
-                (path) =>
-                    path === "/network_logo.svg" ||
-                    path.endsWith("network_logo.svg"),
-            );
+            return paths.includes("/network_logo");
         },
     });
