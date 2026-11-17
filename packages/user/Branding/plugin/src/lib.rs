@@ -7,7 +7,7 @@ use exports::branding::plugin::queries::Guest as Queries;
 use exports::branding::plugin::types::Logo;
 use host::http::api as CommonServer;
 use host::types::types::Error;
-use sites::plugin::api::{upload, File};
+use sites::plugin::api::{remove, upload, File};
 use transact::plugin::api::add_action_to_transaction;
 
 use branding::action_structs as Actions;
@@ -19,6 +19,7 @@ mod errors;
 use errors::ErrorType;
 
 const MAX_LOGO_SIZE: usize = 32 * 1024;
+const LOGO_PATH: &str = "/network_logo";
 
 fn assert_caller(allowed: &[&str], context: &str) {
     let sender = host::client::api::get_sender();
@@ -68,12 +69,18 @@ impl Api for BrandingPlugin {
         // Raster images are already compressed
         upload(
             &File {
-                path: "/network_logo".to_string(),
+                path: LOGO_PATH.to_string(),
                 content_type: content_type.to_string(),
                 content: logo.content,
             },
             0,
         )
+    }
+
+    fn remove_logo() -> Result<(), Error> {
+        assert_caller(&["config"], "remove_logo");
+
+        remove(LOGO_PATH)
     }
 }
 

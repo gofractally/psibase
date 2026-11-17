@@ -25,6 +25,9 @@ interface api {
 
     /// Sets the logo for the network, served at `/network_logo` on the branding subdomain
     set-logo: func(logo: logo) -> result<_, error>;
+
+    /// Removes the network logo
+    remove-logo: func() -> result<_, error>;
 }
 
 interface queries {

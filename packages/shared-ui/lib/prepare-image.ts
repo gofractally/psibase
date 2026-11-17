@@ -65,7 +65,7 @@ export class ImageTooLargeError extends Error {
 }
 
 // Load through a data: URL; the default CSP allows data: images but not blob:.
-export const readAsDataUrl = (source: Blob) =>
+const readAsDataUrl = (source: Blob) =>
     new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);

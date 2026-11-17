@@ -107,6 +107,12 @@ impl Branding for ConfigPlugin {
         branding::plugin::api::set_logo(&logo)
     }
 
+    fn remove_network_logo() -> Result<(), Error> {
+        set_propose_latch(Some("branding"))?;
+
+        branding::plugin::api::remove_logo()
+    }
+
     fn set_network_name(name: String) -> Result<(), Error> {
         set_propose_latch(Some("accounts"))?;
         accounts::plugin::admin::preapprove_account(&name);
