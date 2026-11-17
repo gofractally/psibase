@@ -1,3 +1,5 @@
+import type { ImageCrop } from "@shared/lib/prepare-image";
+
 import { useMutation } from "@tanstack/react-query";
 
 import { useCacheBust } from "@shared/hooks/use-cache-bust";
@@ -9,10 +11,18 @@ import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useUploadAvatar = () => {
     const { setBustedUser } = useCacheBust();
-    return useMutation<void, Error, { file: File }, string | number>({
+    return useMutation<
+        void,
+        Error,
+        { file: File; crop?: ImageCrop },
+        string | number
+    >({
         mutationKey: ["uploadAvatar"],
-        mutationFn: async ({ file }) => {
-            const avatar = await prepareImage(file, AVATAR_OPTIONS);
+        mutationFn: async ({ file, crop }) => {
+            const avatar = await prepareImage(file, {
+                ...AVATAR_OPTIONS,
+                crop,
+            });
             await callPluginFunction(homepage.contacts.uploadAvatar, [avatar]);
         },
         onMutate: () => toast.loading("Uploading avatar..."),

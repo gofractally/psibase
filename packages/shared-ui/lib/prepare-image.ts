@@ -11,6 +11,14 @@ export interface PreparedImage {
  */
 export type ImageFit = "cover" | "contain" | "fill";
 
+/** A region of the source image, as fractions of its width and height */
+export interface ImageCrop {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
 export interface PrepareImageOptions {
     /** Largest encoded size, in bytes */
     maxBytes: number;
@@ -18,7 +26,11 @@ export interface PrepareImageOptions {
     maxDimension: number;
     /** Defaults to `cover` */
     fit?: ImageFit;
+    /** The region of the source to keep, before fitting. Defaults to the whole image. */
+    crop?: ImageCrop;
 }
+
+const FULL_IMAGE: ImageCrop = { x: 0, y: 0, width: 1, height: 1 };
 
 export const TOKEN_ICON_OPTIONS: PrepareImageOptions = {
     maxBytes: 32 * 1024,
@@ -56,7 +68,7 @@ const readAsDataUrl = (source: Blob) =>
     });
 
 // An <img> element rather than createImageBitmap, so SVG sources decode in every browser.
-const loadImage = async (source: Blob) => {
+export const loadImage = async (source: Blob) => {
     const url = await readAsDataUrl(source);
     return new Promise<HTMLImageElement>((resolve, reject) => {
         const img = new Image();
@@ -71,10 +83,11 @@ const draw = (
     maxDimension: number,
     fit: ImageFit,
     isVector: boolean,
+    crop: ImageCrop,
 ) => {
     // SVGs without intrinsic dimensions report 0 (or the 150px default)
-    const width = img.naturalWidth || maxDimension;
-    const height = img.naturalHeight || maxDimension;
+    const width = (img.naturalWidth || maxDimension) * crop.width;
+    const height = (img.naturalHeight || maxDimension) * crop.height;
 
     // The source length that maps onto the square's side
     const governing =
@@ -90,13 +103,28 @@ const draw = (
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas is not supported");
 
+    // Draws the whole image, placed so the crop region lands on the given
+    // rect, and lets the canvas clip the rest. The 9-argument drawImage would
+    // need source coordinates, which SVGs without intrinsic dimensions lack.
+    const drawCrop = (x: number, y: number, w: number, h: number) => {
+        const fullWidth = w / crop.width;
+        const fullHeight = h / crop.height;
+        ctx.drawImage(
+            img,
+            x - crop.x * fullWidth,
+            y - crop.y * fullHeight,
+            fullWidth,
+            fullHeight,
+        );
+    };
+
     if (fit === "fill") {
-        ctx.drawImage(img, 0, 0, side, side);
+        drawCrop(0, 0, side, side);
     } else {
         const scale = side / governing;
         const w = width * scale;
         const h = height * scale;
-        ctx.drawImage(img, (side - w) / 2, (side - h) / 2, w, h);
+        drawCrop((side - w) / 2, (side - h) / 2, w, h);
     }
     return { canvas, ctx };
 };
@@ -130,9 +158,9 @@ const encode = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
 async function* candidates(
     img: HTMLImageElement,
     isVector: boolean,
-    { maxDimension, fit = "cover" }: PrepareImageOptions,
+    { maxDimension, fit = "cover", crop = FULL_IMAGE }: PrepareImageOptions,
 ): AsyncGenerator<Blob> {
-    const { canvas, ctx } = draw(img, maxDimension, fit, isVector);
+    const { canvas, ctx } = draw(img, maxDimension, fit, isVector, crop);
 
     const first = await encode(canvas, "image/webp", WEBP_QUALITIES[0]);
     yield first;
@@ -150,7 +178,7 @@ async function* candidates(
     for (const scale of FALLBACK_SCALES) {
         const dimension = Math.round(canvas.width * scale);
         if (dimension < 1) continue;
-        const smaller = draw(img, dimension, fit, isVector).canvas;
+        const smaller = draw(img, dimension, fit, isVector, crop).canvas;
         if (hasWebp) {
             yield await encode(
                 smaller,

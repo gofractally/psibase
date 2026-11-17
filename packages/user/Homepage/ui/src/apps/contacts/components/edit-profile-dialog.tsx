@@ -1,4 +1,5 @@
 import { Trash, Upload } from "lucide-react";
+import { useState } from "react";
 
 import { FormProfile } from "@/components/form-profile";
 
@@ -15,6 +16,7 @@ import { Input } from "@shared/shadcn/ui/input";
 import { useRemoveAvatar } from "../hooks/use-remove-avatar";
 import { useSetProfile } from "../hooks/use-set-profile";
 import { useUploadAvatar } from "../hooks/use-upload-avatar";
+import { AvatarCropDialog } from "./avatar-crop-dialog";
 
 interface Props {
     onClose: () => void;
@@ -40,11 +42,13 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
 
     const isPending = isSettingProfile || isRemovingAvatar || isUploadingAvatar;
 
+    const [fileToCrop, setFileToCrop] = useState<File | null>(null);
+
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         e.target.value = "";
         if (file) {
-            uploadAvatar({ file });
+            setFileToCrop(file);
         }
     };
 
@@ -118,6 +122,16 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
             )}
             {isError && (
                 <div className="text-destructive">{error?.message}</div>
+            )}
+            {fileToCrop && (
+                <AvatarCropDialog
+                    file={fileToCrop}
+                    onCancel={() => setFileToCrop(null)}
+                    onConfirm={(crop) => {
+                        uploadAvatar({ file: fileToCrop, crop });
+                        setFileToCrop(null);
+                    }}
+                />
             )}
         </DialogContent>
     );
