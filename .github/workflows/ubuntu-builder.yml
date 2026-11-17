@@ -63,9 +63,9 @@ jobs:
             $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
         env:
-          BUILDER_IMAGE_2204: 983d7b62457785036f381163a2e50039f304e517
-          BUILDER_IMAGE_2404: 983d7b62457785036f381163a2e50039f304e517
-          BUILDER_IMAGE_2604: 983d7b62457785036f381163a2e50039f304e517
+          BUILDER_IMAGE_2204: 5771e6951c8c154542f227642c71c4f35c789b9b
+          BUILDER_IMAGE_2404: 5771e6951c8c154542f227642c71c4f35c789b9b
+          BUILDER_IMAGE_2604: 5771e6951c8c154542f227642c71c4f35c789b9b
         run: |
           BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:$BUILDER_IMAGE_${{ matrix.ubuntu-version }}"
           echo $BUILDER_IMAGE
@@ -94,7 +94,7 @@ jobs:
     env:
       # Same pin as the build job; image must include Playwright browsers
       # (image-builders PLAYWRIGHT_VERSION matching e2e/@playwright/test).
-      BUILDER_IMAGE_2204: 983d7b62457785036f381163a2e50039f304e517
+      BUILDER_IMAGE_2204: 5771e6951c8c154542f227642c71c4f35c789b9b
     steps:
       - name: Checkout
         uses: actions/checkout@v3
