@@ -84,9 +84,11 @@ interface api {
     /// Returns configured name markets and current ask prices.
     get-markets-overview: func() -> result<markets-overview, error>;
 
-    /// Purchase an account name.
+    /// Buys a token representing a new network account.
     ///
-    /// Guesses a redemption NFT id, buys the name with that id, and debits the NFT to the buyer.
+    /// The buyer owns the token. The token can be transferred to transfer ownership
+    /// of the claim to the new account. Alternatively, the token can be redeemed (burned)
+    /// using `claim` which creates the purchased account on the network.
     /// * `account`: the account to purchase the name for
     /// * `max-cost`: maximum payment in network token
     buy: func(account: string, max-cost: string) -> result<_, error>;
