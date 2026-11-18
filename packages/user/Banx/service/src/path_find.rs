@@ -62,8 +62,6 @@ pub struct FxEdge {
     /// Both non-zero: this edge is a constant-product relay, not a fixed quote.
     pub reserve_in: u64,
     pub reserve_out: u64,
-    /// Relay fee in ppm. Ignored for a fixed quote.
-    pub fee_ppm: u32,
 }
 
 impl FxEdge {
@@ -73,7 +71,7 @@ impl FxEdge {
 
     fn convert(&self, amount_in: u64) -> Option<u64> {
         if self.is_relay() {
-            try_swap_out(self.reserve_in, self.reserve_out, amount_in, self.fee_ppm)
+            try_swap_out(self.reserve_in, self.reserve_out, amount_in, 0)
         } else if amount_in > self.remaining {
             None
         } else {
@@ -83,7 +81,7 @@ impl FxEdge {
 
     fn invert(&self, amount_out: u64) -> Option<u64> {
         if self.is_relay() {
-            try_swap_in(self.reserve_in, self.reserve_out, amount_out, self.fee_ppm)
+            try_swap_in(self.reserve_in, self.reserve_out, amount_out, 0)
         } else {
             let need = try_invert_rate(amount_out, self.fee_fixed, self.fx_rate)?;
             (need <= self.remaining).then_some(need)
@@ -106,9 +104,9 @@ impl RelayBook {
         let (lo, hi) = unordered_pair(edge.from_asset, edge.to_asset);
         let key = (edge.poster, lo, hi);
         let seeded = if edge.from_asset == lo {
-            (edge.reserve_in, edge.reserve_out, edge.fee_ppm)
+            (edge.reserve_in, edge.reserve_out, 0)
         } else {
-            (edge.reserve_out, edge.reserve_in, edge.fee_ppm)
+            (edge.reserve_out, edge.reserve_in, 0)
         };
         let (reserve_in, reserve_out, fee) = {
             let pool = self.pools.entry(key).or_insert(seeded);
@@ -497,19 +495,8 @@ fn simulate_path_fees(
                     && e.to_asset == asset_id
                     && fx_visible(e, fx, now)
             })?;
-            let before = forward;
             forward = book.convert(e, forward)?;
-            fx_fee = if e.is_relay() {
-                before.saturating_sub(
-                    (before as u128)
-                        .checked_mul((PPM_SCALE - e.fee_ppm) as u128)
-                        .and_then(|v| v.checked_div(PPM_SCALE as u128))
-                        .and_then(|v| u64::try_from(v).ok())
-                        .unwrap_or(before),
-                )
-            } else {
-                e.fee_fixed
-            };
+            fx_fee = if e.is_relay() { 0 } else { e.fee_fixed };
             fx_from_asset = Some(prev_asset);
         }
 
@@ -1454,7 +1441,6 @@ mod tests {
             expires_at: 0,
             reserve_in: 0,
             reserve_out: 0,
-            fee_ppm: 0,
         }];
         let q = find_out(
             &lines,
@@ -1493,7 +1479,6 @@ mod tests {
             expires_at: 0,
             reserve_in: 0,
             reserve_out: 0,
-            fee_ppm: 0,
         }];
         assert!(find_out(
             &lines,
@@ -1562,7 +1547,6 @@ mod tests {
             expires_at: 0,
             reserve_in: 0,
             reserve_out: 0,
-            fee_ppm: 0,
         }];
 
         let q = find(
@@ -1758,7 +1742,6 @@ mod tests {
             expires_at: 0,
             reserve_in: 0,
             reserve_out: 0,
-            fee_ppm: 0,
         }];
         let q = find(
             &lines,
@@ -1802,7 +1785,6 @@ mod tests {
             expires_at: 0,
             reserve_in: 0,
             reserve_out: 0,
-            fee_ppm: 0,
         }];
         let q = find(
             &lines,
@@ -1891,7 +1873,6 @@ mod tests {
             expires_at: 0,
             reserve_in: 0,
             reserve_out: 0,
-            fee_ppm: 0,
         }];
         let q = find(
             &lines,
@@ -1931,7 +1912,6 @@ mod tests {
             expires_at: 0,
             reserve_in: 0,
             reserve_out: 0,
-            fee_ppm: 0,
         }];
         let q = find(
             &lines,
@@ -1973,7 +1953,6 @@ mod tests {
                 expires_at: 0,
                 reserve_in: 0,
                 reserve_out: 0,
-                fee_ppm: 0,
             },
             FxEdge {
                 poster: acct("steve"),
@@ -1985,7 +1964,6 @@ mod tests {
                 expires_at: 0,
                 reserve_in: 0,
                 reserve_out: 0,
-                fee_ppm: 0,
             },
         ];
         let q = find(
@@ -2163,7 +2141,6 @@ mod tests {
                 expires_at: 0,
                 reserve_in: 0,
                 reserve_out: 0,
-                fee_ppm: 0,
             },
             FxEdge {
                 poster: acct("relay"),
@@ -2175,7 +2152,6 @@ mod tests {
                 expires_at: 0,
                 reserve_in: 0,
                 reserve_out: 0,
-                fee_ppm: 0,
             },
         ];
         let q = find(
@@ -2260,7 +2236,6 @@ mod tests {
                 expires_at: 0,
                 reserve_in: 0,
                 reserve_out: 0,
-                fee_ppm: 0,
             },
             FxEdge {
                 poster: acct("john"),
@@ -2272,7 +2247,6 @@ mod tests {
                 expires_at: 0,
                 reserve_in: 10_000,
                 reserve_out: 15_000,
-                fee_ppm: 0,
             },
         ];
         let q = find(
@@ -2317,7 +2291,6 @@ mod tests {
             expires_at: 0,
             reserve_in,
             reserve_out,
-            fee_ppm: 0,
         }
     }
 
@@ -2386,7 +2359,6 @@ mod tests {
                 expires_at: 0,
                 reserve_in: 0,
                 reserve_out: 0,
-                fee_ppm: 0,
             },
             relay_fx("john", usd, aud, 10_000, 15_000),
             relay_fx("john", aud, usd, 15_000, 10_000),

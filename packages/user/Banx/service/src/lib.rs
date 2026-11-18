@@ -921,7 +921,10 @@ pub mod service {
     /// The last hop must have posted a token relay for that asset and
     /// `token_id`. The path draws the Banx amount on them, then their vault
     /// pays `recipient`. They do not also owe `recipient` the Banx asset.
-    /// `min_tokens` floors the token output.
+    /// `min_tokens` floors the token output. The curve has no fee. A one-hop
+    /// path is a direct swap, so the owner's global forward is extra Banx the
+    /// sender owes, same as `tok_relay_out`. A longer path already paid the
+    /// previous hop's forward.
     #[action]
     fn path_cash(
         hops: Vec<PathHop>,
@@ -935,7 +938,14 @@ pub mod service {
         assert_account_exists(recipient);
         let sender = get_sender();
         let last = hops[hops.len() - 1];
-        let banx_in = run_path(sender, hops, amount, Quantity::new(1), 0, "");
+        let banx_in = if hops.len() == 1 {
+            assert!(last.account != sender, "path cannot draw on self");
+            let owed = TokenRelay::neighbor_owes(last.account, last.asset_id, amount);
+            Connection::get_live(last.account, sender, last.asset_id).draw(owed, sender);
+            amount
+        } else {
+            run_path(sender, hops, amount, Quantity::new(1), 0, "")
+        };
         TokenRelay::pay_tokens_for_banx(
             last.account,
             last.asset_id,

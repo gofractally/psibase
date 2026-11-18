@@ -163,7 +163,6 @@ pub fn fetch_path_graph(
             expires_at: 0,
             reserve_in: r.reserve_lo.quantity.value,
             reserve_out: r.reserve_hi.quantity.value,
-            fee_ppm: 0,
         });
         fx.push(FxEdge {
             poster: r.owner,
@@ -175,7 +174,6 @@ pub fn fetch_path_graph(
             expires_at: 0,
             reserve_in: r.reserve_hi.quantity.value,
             reserve_out: r.reserve_lo.quantity.value,
-            fee_ppm: 0,
         });
     }
     for c in g.fx_offers {
@@ -200,7 +198,6 @@ pub fn fetch_path_graph(
             expires_at: c.expires_at,
             reserve_in: 0,
             reserve_out: 0,
-            fee_ppm: 0,
         });
     }
 

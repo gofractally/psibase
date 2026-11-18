@@ -8548,6 +8548,46 @@ mod tests {
             TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
             11_000 - 751
         );
+
+        // A one-hop path_cash is the same swap. The curve prices 1,000 and
+        // pays every token. The 1,112 draw is extra Banx, not a token cut.
+        let tokens_before = shared_from_banx(&chain, gas, alice);
+        let pair_before = pair_bal(&chain, john, aud, gas);
+        let weight_before = TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value;
+        Wrapper::push_from(&chain, alice)
+            .path_cash(
+                vec![hop(john, aud)],
+                Quantity::new(1_000),
+                gas,
+                alice,
+                Quantity::new(1),
+            )
+            .get()?;
+        assert_eq!(exp(&chain, john, alice, aud), 437 + 1_112);
+        assert_eq!(shared_from_banx(&chain, gas, alice), tokens_before + 1_301);
+        assert_eq!(pair_bal(&chain, john, aud, gas), pair_before - 1_301);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            weight_before + 1_000
+        );
+
+        let self_hop = Wrapper::push_from(&chain, john).path_cash(
+            vec![hop(john, aud)],
+            Quantity::new(1),
+            gas,
+            john,
+            Quantity::new(1),
+        );
+        assert!(
+            self_hop
+                .trace
+                .error
+                .as_deref()
+                .unwrap_or("")
+                .contains("path cannot draw on self"),
+            "{}",
+            self_hop.trace.error.as_deref().unwrap_or("")
+        );
         Ok(())
     }
 

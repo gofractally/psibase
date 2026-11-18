@@ -475,8 +475,9 @@ interface api {
         min-tokens: string,
     ) -> result<_, error>;
 
-    /// Send tokens from the sender's cash vault into `owner`'s pair. `owner`
-    /// owes the sender the curve's Banx output. Fund the cash vault first.
+    /// Send tokens from the sender's cash vault into `owner`'s pair. The curve
+    /// prices the full amount. A live global forward on that IOU is taken off
+    /// the Banx `owner` owes. Fund the cash vault first.
     token-relay-in: func(
         owner: string,
         asset-id: u16,
@@ -488,8 +489,9 @@ interface api {
     /// Path-pay that ends by selling the last hop's Banx for that account's
     /// tokens. The last hop must have posted a token relay for that asset.
     /// They pay `recipient` the tokens and do not also owe them the Banx
-    /// asset. `amount` is a human decimal in the first hop's asset.
-    /// `min-tokens` floors the token output.
+    /// asset. A one-hop path is a direct swap: the last hop's global forward
+    /// is extra Banx the sender owes. `amount` is a human decimal in the first
+    /// hop's asset. `min-tokens` floors the token output.
     path-cash: func(
         hops: list<path-hop>,
         amount: string,

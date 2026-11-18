@@ -89,7 +89,11 @@ impl TokenRelay {
 
     /// Face the neighbor owes, if the owner posted a live global forward.
     /// A direct path pay does not call this.
-    fn neighbor_owes(owner: AccountNumber, asset_id: u16, face: Quantity) -> Quantity {
+    pub fn neighbor_owes(
+        owner: AccountNumber,
+        asset_id: u16,
+        face: Quantity,
+    ) -> Quantity {
         let Some(fwd) = ForwardOffer::get(owner, ForwardOffer::GLOBAL, asset_id) else {
             return face;
         };
