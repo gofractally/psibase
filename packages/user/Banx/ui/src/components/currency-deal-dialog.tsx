@@ -502,6 +502,7 @@ export function TakeConvertDialog({
                         toAsset: value.toAsset!,
                         amountFrom: value.amount.trim(),
                         minTo: expected,
+                        interestRatePpm: policy.toInterestRatePpm,
                     },
                     {
                         onSuccess: () => {

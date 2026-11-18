@@ -740,7 +740,8 @@ pub mod service {
     /// `min_to` bounds the new to-asset amount. When the sender owes the
     /// from-asset, that amount is new debt: a positive `min_to` caps it
     /// and zero does not. When the sender is owed the from-asset, `min_to`
-    /// is a floor on what they receive.
+    /// is a floor on what they receive. `interest_rate` is the APR they
+    /// read. A replaced rate fails. The amount bound does not see it.
     #[action]
     fn convert(
         counterparty: AccountNumber,
@@ -748,6 +749,7 @@ pub mod service {
         to_asset: u16,
         amount_from: Quantity,
         min_to: Quantity,
+        interest_rate: u32,
     ) {
         FxOffer::take(
             get_sender(),
@@ -756,6 +758,7 @@ pub mod service {
             to_asset,
             amount_from,
             min_to,
+            interest_rate,
         );
     }
 
@@ -767,8 +770,10 @@ pub mod service {
     /// unwind. A sell only rebooks from-asset the poster owes the sender.
     /// `to_bound` is the sender's signed net in the to-asset. Positive floors
     /// a receipt and rejects any debt. Negative caps a debt; a receipt still
-    /// passes. Zero on a buy is a wash: any debt is rejected, including a
+    /// Zero on a buy is a wash: any debt is rejected, including a
     /// click that has become a pure rebook. Zero on a sell does not bound.
+    /// `interest_rate` is the APR they read. A replaced rate fails, on a
+    /// buy and on a sell. The amount bound does not see it.
     #[action]
     fn take_fx(
         poster: AccountNumber,
@@ -777,6 +782,7 @@ pub mod service {
         poster_is_creditor: bool,
         amount_from: Quantity,
         to_bound: i64,
+        interest_rate: u32,
     ) {
         FxOffer::take_order(
             get_sender(),
@@ -786,6 +792,7 @@ pub mod service {
             poster_is_creditor,
             amount_from,
             to_bound,
+            interest_rate,
         );
     }
 

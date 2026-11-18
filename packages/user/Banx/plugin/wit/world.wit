@@ -325,6 +325,7 @@ interface api {
         to-asset: u16,
         amount-from: string,
         min-to: string,
+        interest-rate: u32,
     ) -> result<_, error>;
 
     /// Take the clicked from→to order. `poster-is-creditor` is that row.
@@ -339,6 +340,7 @@ interface api {
         poster-is-creditor: bool,
         amount-from: string,
         to-bound: string,
+        interest-rate: u32,
     ) -> result<_, error>;
 
     /// Multi-hop path payment. Each hop is (account, asset-id).

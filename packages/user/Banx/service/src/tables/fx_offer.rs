@@ -121,6 +121,7 @@ impl FxOffer {
         to_asset: u16,
         amount_from: Quantity,
         min_to: Quantity,
+        interest_rate: u32,
     ) -> Quantity {
         assert!(taker != poster, "cannot convert with self");
         assert!(amount_from.value > 0, "convert amount must be positive");
@@ -138,12 +139,18 @@ impl FxOffer {
         } else {
             poster_is_owed > 0
         };
-        Self::get_assert(poster, from_asset, to_asset, poster_is_creditor).convert(
-            taker,
-            poster,
-            amount_from,
-            min_to,
-        )
+        let mut offer = Self::get_assert(poster, from_asset, to_asset, poster_is_creditor);
+        offer.assert_signed_rate(interest_rate);
+        offer.convert(taker, poster, amount_from, min_to)
+    }
+
+    /// The APR the books will use. The amount bound does not see it, so the
+    /// taker signs the rate they read. A replaced offer fails here.
+    fn assert_signed_rate(&self, signed: u32) {
+        assert!(
+            self.to_interest_rate == signed,
+            "fx offer rate is not the signed rate"
+        );
     }
 
     /// Rebook leftover `from_asset` between the two parties into
@@ -223,9 +230,12 @@ impl FxOffer {
         poster_is_creditor: bool,
         amount_from: Quantity,
         to_bound: i64,
+        interest_rate: u32,
     ) {
         assert!(taker != poster, "cannot take an order with self");
         assert!(amount_from.value > 0, "trade amount must be positive");
+        Self::get_assert(poster, from_asset, to_asset, poster_is_creditor)
+            .assert_signed_rate(interest_rate);
         Obligation::net_pair(taker, poster, from_asset, u64::MAX.into());
         let taker_owes = Obligation::exposure(poster, taker, from_asset);
         let poster_owes = Obligation::exposure(taker, poster, from_asset).value;

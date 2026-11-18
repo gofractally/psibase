@@ -312,6 +312,7 @@ export function TakeTradeDialog({
                         posterIsCreditor: policy.posterIsCreditor,
                         amountFrom: amount,
                         toBound: rawToFixed(received, toPrec),
+                        interestRatePpm: policy.toInterestRatePpm,
                     },
                     {
                         onSuccess: () => {

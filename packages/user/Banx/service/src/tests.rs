@@ -2242,6 +2242,7 @@ mod tests {
                 aud,
                 Quantity::new(BISCUITS),
                 Quantity::new(DOLLARS),
+                0,
             )
             .get()
             .expect_err("John does not owe Michelle the biscuits");
@@ -2259,6 +2260,7 @@ mod tests {
                 aud,
                 Quantity::new(BISCUITS),
                 Quantity::new(DOLLARS),
+                0,
             )
             .get()?;
         assert_eq!(exp(&chain, isabelle, john, weetbix), BISCUITS);
@@ -2380,6 +2382,7 @@ mod tests {
                 true,
                 Quantity::new(CHARGE),
                 quoted_aud as i64,
+                0,
             )
             .get()
             .expect_err("John does not owe Michelle the kWh");
@@ -2398,6 +2401,7 @@ mod tests {
                 aud,
                 Quantity::new(CHARGE),
                 Quantity::new(quoted_aud),
+                0,
             )
             .get()
             .expect_err("John does not owe Michelle the kWh");
@@ -2427,6 +2431,7 @@ mod tests {
                 true,
                 Quantity::new(CHARGE),
                 quoted_aud as i64,
+                0,
             )
             .get()?;
         assert_eq!(exp(&chain, michelle, isabelle, kwh), 0);
@@ -2520,6 +2525,7 @@ mod tests {
                 true,
                 Quantity::new(TRADE),
                 quoted_aud as i64,
+                0,
             )
             .get()
             .expect_err("the buy is a rebook of debt John does not owe");
@@ -9309,7 +9315,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, alice)
-            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(50))
+            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(50), 0)
             .get()?;
 
         assert_eq!(exp(&chain, gary, alice, aud), 0);
@@ -9349,7 +9355,7 @@ mod tests {
             .get()?;
 
         let missing = Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), 45)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 45, 0)
             .get()
             .expect_err("Gary has not lined Alice in USD");
         assert!(
@@ -9364,7 +9370,7 @@ mod tests {
             .st_crd_lne(alice, usd, Quantity::new(1_000), false, 80_000, 0)
             .get()?;
         let short = Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), 46)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 46, 0)
             .get()
             .expect_err("fee leaves 45, below the signed floor");
         assert!(
@@ -9373,7 +9379,7 @@ mod tests {
         );
 
         Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), 45)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 45, 0)
             .get()?;
         // 100 − 10 fee, then half. Order APR is 0, not either line's rate.
         assert_eq!(exp(&chain, alice, gary, aud), 100);
@@ -9392,6 +9398,53 @@ mod tests {
                 .interest_rate,
             0
         );
+        Ok(())
+    }
+
+    /// The amount bound does not see the APR. The taker signs the rate they read.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_take_fx_rejects_a_replaced_rate(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let gary = account!("gary");
+        chain.new_account(alice).unwrap();
+        chain.new_account(gary).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, alice)
+            .st_crd_lne(gary, aud, Quantity::new(1_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, gary)
+            .st_crd_lne(alice, usd, Quantity::new(1_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, alice)
+            .st_fx_ofr(
+                aud,
+                usd,
+                true,
+                Quantity::new(0),
+                RATE_SCALE / 2,
+                1_000_000,
+                Quantity::new(200),
+                never(),
+            )
+            .get()?;
+
+        let replaced = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 50, 0)
+            .get()
+            .expect_err("Gary signed 0% and the live offer is 100%");
+        assert!(
+            replaced
+                .to_string()
+                .contains("fx offer rate is not the signed rate"),
+            "{replaced}"
+        );
+        assert_eq!(exp(&chain, alice, gary, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
         Ok(())
     }
 
@@ -9431,7 +9484,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), -50)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), -50, 0)
             .get()?;
         assert_eq!(exp(&chain, alice, gary, aud), 0);
         assert_eq!(exp(&chain, alice, gary, usd), 50);
@@ -9495,7 +9548,7 @@ mod tests {
 
         // 10 rebooks to 5 of debt. 90 opens 45 of receipt. Net 40.
         let short = Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), 41)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 41, 0)
             .get()
             .expect_err("net receipt is 40, below the signed floor");
         assert!(
@@ -9505,7 +9558,7 @@ mod tests {
         assert_eq!(exp(&chain, alice, gary, aud), 10);
 
         Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), 40)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 40, 0)
             .get()?;
         assert_eq!(exp(&chain, alice, gary, aud), 90);
         assert_eq!(exp(&chain, gary, alice, usd), 40);
@@ -9556,7 +9609,7 @@ mod tests {
         // Preview at owed 49 signs a receipt of 1. Execution at owed 51 is a
         // debt of 1. The same absolute bound must not pass.
         let crossed = Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), 1)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 1, 0)
             .get()
             .expect_err("a signed receipt cannot fill as a debt");
         assert!(
@@ -9567,7 +9620,7 @@ mod tests {
 
         // A previewed wash signs 0. A later debt is still rejected.
         let wash = Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), 0)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 0, 0)
             .get()
             .expect_err("a signed wash cannot fill as a debt");
         assert!(
@@ -9588,7 +9641,7 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, alice, gary, aud), 100);
         let covered = Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), 0)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 0, 0)
             .get()
             .expect_err("a signed wash cannot fill as a pure rebook");
         assert!(
@@ -9640,7 +9693,7 @@ mod tests {
 
         // 80 + 10 rebooks to 45 of debt. 20 − 10 opens 5 of receipt. Net debt 40.
         let over = Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), -39)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), -39, 0)
             .get()
             .expect_err("net debt is 40, above the signed cap");
         assert!(
@@ -9650,7 +9703,7 @@ mod tests {
         assert_eq!(exp(&chain, alice, gary, aud), 80);
 
         Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), -40)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), -40, 0)
             .get()?;
         assert_eq!(exp(&chain, alice, gary, aud), 20);
         assert_eq!(exp(&chain, alice, gary, usd), 40);
@@ -9694,7 +9747,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, gary)
-            .take_fx(alice, aud, usd, true, Quantity::new(100), 50)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), 50, 0)
             .get()?;
         assert_eq!(exp(&chain, alice, gary, aud), 99);
         assert_eq!(exp(&chain, gary, alice, aud), 0);
@@ -9758,7 +9811,7 @@ mod tests {
             )
             .get()?;
         let taken = Wrapper::push_from(&chain, alice)
-            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(50))
+            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(50), 0)
             .get();
         assert!(
             taken.is_err(),
@@ -9824,7 +9877,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, isabelle)
-            .convert(john, kwh, aud, Quantity::new(ten_kwh), Quantity::new(0))
+            .convert(john, kwh, aud, Quantity::new(ten_kwh), Quantity::new(0), 0)
             .get()?;
 
         assert_eq!(exp(&chain, john, isabelle, kwh), 0);
@@ -9887,6 +9940,7 @@ mod tests {
             aud,
             Quantity::new(ten_kwh),
             Quantity::new(0),
+            0,
         );
         let err = wrong_side
             .trace
@@ -9918,7 +9972,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, isabelle)
-            .convert(john, kwh, aud, Quantity::new(ten_kwh), Quantity::new(0))
+            .convert(john, kwh, aud, Quantity::new(ten_kwh), Quantity::new(0), 0)
             .get()?;
 
         assert_eq!(exp(&chain, isabelle, john, kwh), 0);
@@ -9982,7 +10036,7 @@ mod tests {
             .get()?;
 
         Wrapper::push_from(&chain, isabelle)
-            .convert(john, kwh, aud, Quantity::new(five_kwh), Quantity::new(0))
+            .convert(john, kwh, aud, Quantity::new(five_kwh), Quantity::new(0), 0)
             .get()?;
 
         assert_eq!(exp(&chain, john, isabelle, kwh), five_kwh);
@@ -10019,7 +10073,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, isabelle)
-            .convert(john, kwh, aud, Quantity::new(five_kwh), Quantity::new(0))
+            .convert(john, kwh, aud, Quantity::new(five_kwh), Quantity::new(0), 0)
             .get()?;
 
         assert_eq!(exp(&chain, isabelle, john, kwh), five_kwh);
@@ -10085,6 +10139,7 @@ mod tests {
                 aud,
                 Quantity::new(take),
                 Quantity::new(0),
+                0,
             );
             let err = rejected
                 .trace
@@ -10122,7 +10177,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, isabelle)
-            .convert(john, kwh, aud, Quantity::new(one_kwh), Quantity::new(0))
+            .convert(john, kwh, aud, Quantity::new(one_kwh), Quantity::new(0), 0)
             .get()?;
 
         assert_eq!(exp(&chain, john, isabelle, kwh), 0);
@@ -10208,6 +10263,7 @@ mod tests {
             usd,
             Quantity::new(1),
             Quantity::new(0),
+            0,
         );
         let err = missing
             .trace
@@ -10231,7 +10287,7 @@ mod tests {
             .deposit(john, usd, Quantity::new(ten), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, isabelle)
-            .convert(john, usd, aud, Quantity::new(ten), Quantity::new(0))
+            .convert(john, usd, aud, Quantity::new(ten), Quantity::new(0), 0)
             .get()?;
         assert_eq!(exp(&chain, john, isabelle, usd), 0);
         assert_eq!(exp(&chain, john, isabelle, aud), 114_000);
@@ -10251,7 +10307,7 @@ mod tests {
             .deposit(isabelle, usd, Quantity::new(ten), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, isabelle)
-            .convert(john, usd, aud, Quantity::new(ten), Quantity::new(0))
+            .convert(john, usd, aud, Quantity::new(ten), Quantity::new(0), 0)
             .get()?;
         assert_eq!(exp(&chain, isabelle, john, usd), 0);
         assert_eq!(exp(&chain, isabelle, john, aud), 114_000);
@@ -10289,7 +10345,7 @@ mod tests {
             .deposit(john, aud, Quantity::new(ten), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, isabelle)
-            .convert(john, aud, usd, Quantity::new(ten), Quantity::new(0))
+            .convert(john, aud, usd, Quantity::new(ten), Quantity::new(0), 0)
             .get()?;
         assert_eq!(exp(&chain, john, isabelle, aud), 0);
         assert_eq!(exp(&chain, john, isabelle, usd), 79_166);
@@ -10306,7 +10362,7 @@ mod tests {
             .deposit(isabelle, aud, Quantity::new(ten), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, isabelle)
-            .convert(john, aud, usd, Quantity::new(ten), Quantity::new(0))
+            .convert(john, aud, usd, Quantity::new(ten), Quantity::new(0), 0)
             .get()?;
         assert_eq!(exp(&chain, isabelle, john, aud), 0);
         assert_eq!(exp(&chain, isabelle, john, usd), 79_166);
@@ -10383,6 +10439,7 @@ mod tests {
             usd,
             Quantity::new(100),
             Quantity::new(0),
+            0,
         );
         let err = over.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
@@ -10397,13 +10454,13 @@ mod tests {
         );
 
         Wrapper::push_from(&chain, alice)
-            .convert(gary, aud, usd, Quantity::new(40), Quantity::new(20))
+            .convert(gary, aud, usd, Quantity::new(40), Quantity::new(20), 0)
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 60);
         assert_eq!(exp(&chain, gary, alice, usd), 20);
         assert!(FxOffer::get(gary, aud, usd, true).is_none());
         assert!(Wrapper::push_from(&chain, alice)
-            .convert(gary, aud, usd, Quantity::new(1), Quantity::new(0))
+            .convert(gary, aud, usd, Quantity::new(1), Quantity::new(0), 0)
             .get()
             .is_err());
         assert_eq!(exp(&chain, gary, alice, aud), 60);
@@ -10427,6 +10484,7 @@ mod tests {
             usd,
             Quantity::new(100),
             Quantity::new(0),
+            0,
         );
         let err = partial.trace.error.as_deref().unwrap_or("(no error)");
         assert!(
@@ -10453,7 +10511,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .convert(gary, aud, usd, Quantity::new(60), Quantity::new(30))
+            .convert(gary, aud, usd, Quantity::new(60), Quantity::new(30), 0)
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
@@ -10590,7 +10648,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(60))
+            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(60), 0)
             .get()?;
 
         assert_eq!(exp(&chain, gary, alice, aud), 0);
@@ -10640,7 +10698,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(100))
+            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(100), 0)
             .get()?;
 
         assert_eq!(exp(&chain, gary, alice, aud), 0);
@@ -10701,7 +10759,7 @@ mod tests {
 
         // Taker uses the maker's quote: Gary takes Alice's 0.50, not his 0.80.
         Wrapper::push_from(&chain, gary)
-            .convert(alice, aud, usd, Quantity::new(100), Quantity::new(50))
+            .convert(alice, aud, usd, Quantity::new(100), Quantity::new(50), 0)
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);
@@ -10740,7 +10798,7 @@ mod tests {
             .get()?;
 
         let no_offer =
-            Wrapper::push_from(&chain, alice).convert(gary, aud, usd, 100.into(), 100.into());
+            Wrapper::push_from(&chain, alice).convert(gary, aud, usd, 100.into(), 100.into(), 0);
         let err = no_offer
             .trace
             .error
@@ -10768,7 +10826,7 @@ mod tests {
             )
             .get()?;
         Wrapper::push_from(&chain, alice)
-            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(50))
+            .convert(gary, aud, usd, Quantity::new(100), Quantity::new(50), 0)
             .get()?;
         assert_eq!(exp(&chain, gary, alice, aud), 0);
         assert_eq!(exp(&chain, gary, alice, usd), 50);

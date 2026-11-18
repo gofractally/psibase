@@ -773,6 +773,7 @@ impl Api for BanxPlugin {
         to_asset: u16,
         amount_from: String,
         min_to: String,
+        interest_rate: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::convert)?;
         let amount_from = parse_amount_nonzero(from_asset, &amount_from)?;
@@ -783,6 +784,7 @@ impl Api for BanxPlugin {
             to_asset,
             amount_from,
             min_to,
+            interest_rate,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::convert::ACTION_NAME, &packed)
@@ -795,6 +797,7 @@ impl Api for BanxPlugin {
         poster_is_creditor: bool,
         amount_from: String,
         to_bound: String,
+        interest_rate: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::take_fx)?;
         let amount_from = parse_amount_nonzero(from_asset, &amount_from)?;
@@ -806,6 +809,7 @@ impl Api for BanxPlugin {
             poster_is_creditor,
             amount_from,
             to_bound,
+            interest_rate,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::take_fx::ACTION_NAME, &packed)

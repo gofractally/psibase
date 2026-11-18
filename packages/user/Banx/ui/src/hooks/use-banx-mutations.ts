@@ -1152,6 +1152,7 @@ export function useConvert() {
             toAsset: number;
             amountFrom: string;
             minTo: string;
+            interestRatePpm: number;
         }) =>
             banxCall("convert", [
                 p.counterparty,
@@ -1159,6 +1160,7 @@ export function useConvert() {
                 p.toAsset,
                 p.amountFrom,
                 p.minTo,
+                p.interestRatePpm,
             ]),
         onSuccess: () => {
             invalidate();
@@ -1179,6 +1181,7 @@ export function useTakeFx() {
             amountFrom: string;
             /** Signed human to-asset. Positive floors a receipt. Negative caps a debt. */
             toBound: string;
+            interestRatePpm: number;
         }) =>
             banxCall("takeFx", [
                 p.poster,
@@ -1187,6 +1190,7 @@ export function useTakeFx() {
                 p.posterIsCreditor,
                 p.amountFrom,
                 p.toBound,
+                p.interestRatePpm,
             ]),
         onSuccess: () => {
             invalidate();
