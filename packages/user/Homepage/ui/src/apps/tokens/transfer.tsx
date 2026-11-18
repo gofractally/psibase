@@ -16,7 +16,7 @@ import { toast } from "@shared/shadcn/ui/sonner";
 import { useCreateContact } from "../contacts/hooks/use-create-contact";
 import { CreditTable } from "./components/credit-table";
 import { FieldAccount } from "./components/transfer/account-field";
-import { useCredit } from "./hooks/tokens-plugin/use-credit";
+import { useTransfer } from "./hooks/tokens-plugin/use-transfer";
 import { useTransferActions } from "./hooks/use-transfer-actions";
 import {
     defaultTransferValues,
@@ -33,7 +33,7 @@ export const TransferPage = () => {
 const TransferPageContents = () => {
     const context = useOutletContext<TokensOutletContext>();
     const { selectedToken, currentUser, isLoading } = context;
-    const { mutateAsync: credit } = useCredit(currentUser);
+    const { mutateAsync: transfer } = useTransfer(currentUser);
     const { mutateAsync: createContact } = useCreateContact();
 
     const { setHandleSetMaxAmount, setClearAmountErrors } =
@@ -62,7 +62,7 @@ const TransferPageContents = () => {
             : value.amount.amount;
 
         try {
-            await credit({
+            await transfer({
                 tokenId: selectedTokenId,
                 receiver: value.to.account,
                 amount: paddedAmount,

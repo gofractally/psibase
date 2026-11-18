@@ -14,7 +14,6 @@ mod service {
         tables::tables::{
             Balance, BalanceTable, ConfigRow, ConfigTable, SubAccount, SubAccountBalance,
             SubAccountBalanceTable, SubAccountTable, Token, TokenTable, UserConfig,
-            UserConfigTable,
         },
     };
 
@@ -83,13 +82,7 @@ mod service {
         /// Given a user account, return a record that represents the user's
         /// configuration within the token service.
         async fn user_settings(&self, user: AccountNumber) -> UserConfig {
-            UserConfigTable::with_service(tokens::SERVICE)
-                .get_index_pk()
-                .get(&user)
-                .unwrap_or(UserConfig {
-                    account: user,
-                    flags: 0,
-                })
+            UserConfig::get_or_new(user)
         }
 
         /// Given a user account, return a list of records that represent the
