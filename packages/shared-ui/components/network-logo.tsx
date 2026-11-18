@@ -8,6 +8,8 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 interface Props extends React.ComponentProps<"div"> {
     producerName?: string;
     enableBranding?: boolean;
+    /** Content hash of the logo; changing it reloads the image */
+    logoHash?: string;
 }
 
 /** Intentionally crude placeholder — encourages networks to upload their own logo. */
@@ -23,15 +25,20 @@ const PlaceholderNetworkIcon = () => (
 export const NetworkLogo = ({
     producerName,
     enableBranding = true,
+    logoHash,
     ...props
 }: Props) => {
     const { data: branding, isLoading } = useBranding({
         enabled: enableBranding,
     });
-    const [logoFailed, setLogoFailed] = useState(false);
+    const [failedSrc, setFailedSrc] = useState<string>();
 
     const logoSrc = enableBranding
-        ? siblingUrl(null, "branding", "/network_logo.svg")
+        ? siblingUrl(
+              null,
+              "branding",
+              logoHash ? `/network_logo?v=${logoHash}` : "/network_logo",
+          )
         : undefined;
 
     let networkName = branding;
@@ -48,12 +55,12 @@ export const NetworkLogo = ({
             {...props}
         >
             <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg">
-                {logoSrc && !logoFailed ? (
+                {logoSrc && logoSrc !== failedSrc ? (
                     <img
                         src={logoSrc}
                         alt=""
                         className="size-full object-cover"
-                        onError={() => setLogoFailed(true)}
+                        onError={() => setFailedSrc(logoSrc)}
                     />
                 ) : (
                     <PlaceholderNetworkIcon />

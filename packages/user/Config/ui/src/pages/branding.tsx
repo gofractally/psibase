@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 
-import { CircleAlert, Save, Trash, Upload } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { CircleAlert, Trash, Upload } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import z from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { useLogoUploaded } from "@/hooks/use-logo-uploaded";
-import { useSetLogo } from "@/hooks/use-set-logo";
+import { useNetworkLogoHash } from "@/hooks/use-network-logo-hash";
+import { useRemoveLogo, useSetLogo } from "@/hooks/use-set-logo";
 import { useSetNetworkName } from "@/hooks/use-set-network-name";
 
 import { useAppForm } from "@shared/components/form/app-form";
@@ -18,23 +18,8 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-/** Decode a data URL (e.g. data:image/svg+xml;base64,...) to raw bytes */
-function dataUrlToBytes(dataUrl: string): Uint8Array {
-    const base64 = dataUrl.split(",")[1];
-    if (!base64) return new Uint8Array(0);
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-}
-
 interface BrandingFormValues {
     networkName: string;
-}
-
-interface LogoFormValues {
-    /** Data URL of the selected logo (empty string = no draft) */
-    logoDataUrl: string;
 }
 
 const Section = ({
@@ -55,14 +40,13 @@ const Section = ({
     </div>
 );
 
-const LOGO_FORM_DEFAULTS: LogoFormValues = { logoDataUrl: "" };
-
 export const Branding = () => {
     const { data: networkName, isLoading: isBrandingLoading } = useBranding();
-    const { data: isLogoUploaded } = useLogoUploaded();
-    const { mutateAsync: setLogo } = useSetLogo();
+    const { data: logoHash } = useNetworkLogoHash();
+    const { mutate: setLogo, isPending: isSettingLogo } = useSetLogo();
+    const { mutate: removeLogo, isPending: isRemovingLogo } = useRemoveLogo();
+    const isLogoPending = isSettingLogo || isRemovingLogo;
     const { mutateAsync: setNetworkName } = useSetNetworkName();
-    const logoFileInputRef = useRef<HTMLInputElement>(null);
 
     const defaultValues = useMemo<BrandingFormValues>(
         () => ({ networkName: networkName ?? "" }),
@@ -77,15 +61,17 @@ export const Branding = () => {
         },
     });
 
-    const logoForm = useAppForm({
-        defaultValues: LOGO_FORM_DEFAULTS,
-        onSubmit: async (data: { value: LogoFormValues }) => {
-            if (!data.value.logoDataUrl) return;
-            const bytes = dataUrlToBytes(data.value.logoDataUrl);
-            await setLogo([bytes]);
-            logoForm.reset(LOGO_FORM_DEFAULTS);
-        },
-    });
+    const logoSrc = logoHash
+        ? siblingUrl(null, "branding", `/network_logo?v=${logoHash}`)
+        : "";
+
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (file) {
+            setLogo([file]);
+        }
+    };
 
     useEffect(() => {
         if (!isBrandingLoading && networkName !== undefined) {
@@ -112,125 +98,61 @@ export const Branding = () => {
                             Displays on the homepage and other places
                         </div>
                         <div className="text-muted-foreground text-sm">
-                            Recommended size: 512x512px
+                            Cropped to a centered square of at most 256×256
                         </div>
                     </div>
                 }
             >
-                <logoForm.AppForm>
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            logoForm.handleSubmit();
-                        }}
-                        className="flex flex-col gap-2"
-                    >
-                        <logoForm.AppField name="logoDataUrl">
-                            {(field) => {
-                                const previewSrc =
-                                    field.state.value ||
-                                    (isLogoUploaded
-                                        ? siblingUrl(
-                                              null,
-                                              "branding",
-                                              "/network_logo.svg",
-                                          )
-                                        : "");
-                                const hasDraft = !!field.state.value;
-
-                                const handleFileChange: React.ChangeEventHandler<
-                                    HTMLInputElement
-                                > = (event) => {
-                                    const file = event.target.files?.[0];
-                                    if (!file) return;
-                                    if (file.type !== "image/svg+xml") {
-                                        alert("Only SVGs are supported.");
-                                        return;
-                                    }
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => {
-                                        const result = reader.result;
-                                        if (typeof result === "string") {
-                                            field.handleChange(result);
-                                        }
-                                    };
-                                    reader.readAsDataURL(file);
-                                    if (logoFileInputRef.current) {
-                                        logoFileInputRef.current.value = "";
-                                    }
-                                };
-
-                                return (
-                                    <div className="flex flex-col gap-2">
-                                        <div className="mx-auto">
-                                            {previewSrc ? (
-                                                <img
-                                                    src={previewSrc}
-                                                    alt="Icon preview"
-                                                    className="h-20 w-20 rounded-lg object-cover"
-                                                />
-                                            ) : (
-                                                <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                                                    <CircleAlert />
-                                                    No logo uploaded.
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <label
-                                                htmlFor="icon-upload"
-                                                className="cursor-pointer"
-                                            >
-                                                <div className="flex h-10 w-full items-center justify-center rounded-md border px-4 py-2 text-sm font-medium shadow-sm focus:outline-none">
-                                                    <Upload className="h-4 w-4" />
-                                                </div>
-                                            </label>
-                                            <Input
-                                                ref={logoFileInputRef}
-                                                id="icon-upload"
-                                                type="file"
-                                                accept=".svg"
-                                                onChange={handleFileChange}
-                                                className="hidden"
-                                            />
-                                            <logoForm.Subscribe
-                                                selector={(state) =>
-                                                    state.isSubmitting
-                                                }
-                                            >
-                                                {(isSubmitting) => (
-                                                    <Button
-                                                        type="submit"
-                                                        variant="outline"
-                                                        size="icon"
-                                                        disabled={
-                                                            !hasDraft ||
-                                                            isSubmitting
-                                                        }
-                                                    >
-                                                        <Save className="h-4 w-4" />
-                                                    </Button>
-                                                )}
-                                            </logoForm.Subscribe>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="icon"
-                                                disabled={!hasDraft}
-                                                onClick={() => {
-                                                    field.handleChange("");
-                                                }}
-                                            >
-                                                <Trash className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                );
-                            }}
-                        </logoForm.AppField>
-                    </form>
-                </logoForm.AppForm>
+                <div className="flex flex-col items-center gap-2">
+                    {logoSrc ? (
+                        <img
+                            src={logoSrc}
+                            alt="Network icon"
+                            className="h-20 w-20 rounded-lg object-cover"
+                        />
+                    ) : (
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                            <CircleAlert />
+                            No icon uploaded.
+                        </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            disabled={isLogoPending}
+                        >
+                            <label
+                                htmlFor="icon-upload"
+                                className="cursor-pointer"
+                            >
+                                <Upload className="h-4 w-4" />
+                                {logoHash ? "Replace" : "Upload"}
+                            </label>
+                        </Button>
+                        <Input
+                            id="icon-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoChange}
+                            disabled={isLogoPending}
+                            className="hidden"
+                        />
+                        {logoHash && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={isLogoPending}
+                                onClick={() => removeLogo([])}
+                            >
+                                <Trash className="h-4 w-4" />
+                                Remove
+                            </Button>
+                        )}
+                    </div>
+                </div>
             </Section>
 
             <div className="rounded-lg border p-4">

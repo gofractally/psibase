@@ -101,11 +101,16 @@ impl Producers for ConfigPlugin {
 }
 
 impl Branding for ConfigPlugin {
-    fn upload_network_logo(logo: Vec<u8>) -> Result<(), Error> {
+    fn upload_network_logo(logo: branding::plugin::types::Logo) -> Result<(), Error> {
         set_propose_latch(Some("branding"))?;
 
-        branding::plugin::api::set_logo(&logo);
-        Ok(())
+        branding::plugin::api::set_logo(&logo)
+    }
+
+    fn remove_network_logo() -> Result<(), Error> {
+        set_propose_latch(Some("branding"))?;
+
+        branding::plugin::api::remove_logo()
     }
 
     fn set_network_name(name: String) -> Result<(), Error> {

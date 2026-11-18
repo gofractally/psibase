@@ -2,9 +2,13 @@ package config:plugin;
 
 interface branding {
     use host:types/types.{error};
+    use branding:plugin/types.{logo};
 
     /// Change the network logo
-    upload-network-logo: func(logo: list<u8>) -> result<_, error>;
+    upload-network-logo: func(logo: logo) -> result<_, error>;
+
+    /// Remove the network logo
+    remove-network-logo: func() -> result<_, error>;
 
     /// Change the network name
     set-network-name: func(name: string) -> result<_, error>;

@@ -161,7 +161,10 @@ impl Sites for SitesPlugin {
     }
 
     fn remove(path: String) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::remove, vec!["workshop".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::remove,
+            vec!["workshop".into(), "branding".into()],
+        )?;
 
         Transact::add_action_to_transaction("remove", &Actions::remove { path }.packed())
     }

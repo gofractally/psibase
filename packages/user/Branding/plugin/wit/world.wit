@@ -1,6 +1,16 @@
 package branding:plugin;
 
+interface types {
+    /// A network logo image. Must be PNG, JPEG, or WebP, and no larger than 32 KB.
+    record logo {
+        content-type: string,
+        content: list<u8>,
+    }
+}
+
 interface api {
+    use host:types/types.{error};
+    use types.{logo};
 
     /// Sets the network name for the current network
     ///
@@ -13,8 +23,11 @@ interface api {
     /// homepage service.
     set-network-name: func(name: string);
 
-    /// Sets the logo for the network
-    set-logo: func(logo: list<u8>);
+    /// Sets the logo for the network, served at `/network_logo` on the branding subdomain
+    set-logo: func(logo: logo) -> result<_, error>;
+
+    /// Removes the network logo
+    remove-logo: func() -> result<_, error>;
 }
 
 interface queries {
@@ -25,6 +38,7 @@ interface queries {
 }
 
 world imports {
+    import types;
     import api;
     import queries;
 }

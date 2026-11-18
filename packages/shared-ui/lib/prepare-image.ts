@@ -1,6 +1,6 @@
 export interface PreparedImage {
     contentType: string;
-    content: Uint8Array;
+    content: Uint8Array<ArrayBuffer>;
 }
 
 /**
@@ -33,6 +33,12 @@ export interface PrepareImageOptions {
 const FULL_IMAGE: ImageCrop = { x: 0, y: 0, width: 1, height: 1 };
 
 export const TOKEN_ICON_OPTIONS: PrepareImageOptions = {
+    maxBytes: 32 * 1024,
+    maxDimension: 256,
+    fit: "cover",
+};
+
+export const NETWORK_LOGO_OPTIONS: PrepareImageOptions = {
     maxBytes: 32 * 1024,
     maxDimension: 256,
     fit: "cover",
