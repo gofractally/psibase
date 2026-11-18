@@ -343,16 +343,20 @@ fn schedule_buy(account: &str, max_cost: &String) -> Result<u32, Error> {
     Ok(nft_id)
 }
 
-/// Credits the caller's redemption NFT to namemarket, then claims.
-fn schedule_claim(account: &str, nft_id: u32) -> Result<(), Error> {
-    bindings::nft::plugin::user::credit(nft_id, &name_market::SERVICE.to_string(), "")?;
-    add_claim(account)
+fn to_acc_num(account: &str) -> Result<AccountNumber, Error> {
+    AccountNumber::from_exact(account)
+        .map_err(|_| Error::from(ErrorType::InvalidAccountName(account.to_string())))
 }
 
-fn add_claim(account: &str) -> Result<(), Error> {
-    let acct = AccountNumber::from_exact(account)
-        .map_err(|_| ErrorType::InvalidAccountName(account.to_string()))?;
-    name_market::Wrapper::add_to_tx().claim(acct);
+/// Credits the caller's redemption NFT to namemarket, then claims.
+fn schedule_claim(account: &str, nft_id: u32) -> Result<(), Error> {
+    let account = to_acc_num(account)?;
+    bindings::nft::plugin::user::credit(
+        nft_id,
+        &name_market::SERVICE.to_string(),
+        &format!("Claiming {account}"),
+    )?;
+    name_market::Wrapper::add_to_tx().claim(account);
     Ok(())
 }
 
