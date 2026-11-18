@@ -100,7 +100,6 @@ const zBanxRelay = z.object({
     assetHi: z.number(),
     reserveLo: z.string(),
     reserveHi: z.string(),
-    feePpm: z.number(),
 });
 
 const zTokenRelay = z.object({
@@ -109,7 +108,6 @@ const zTokenRelay = z.object({
     tokenId: z.number(),
     reserveBanx: z.string(),
     tokenReserve: z.string(),
-    feePpm: z.number(),
 });
 
 const zFxOffer = z.object({
@@ -333,7 +331,7 @@ export async function fetchCashQuotes(poster?: string): Promise<CashQuote[]> {
     return zCashQuote.array().parse(data.cashQuotes);
 }
 
-const banxRelayFields = `owner assetLo assetHi reserveLo reserveHi feePpm`;
+const banxRelayFields = `owner assetLo assetHi reserveLo reserveHi`;
 
 export async function fetchBanxRelays(owner?: string): Promise<BanxRelay[]> {
     const arg = owner?.trim() ? `(owner: "${owner.trim()}")` : "";
@@ -343,7 +341,7 @@ export async function fetchBanxRelays(owner?: string): Promise<BanxRelay[]> {
     return zBanxRelay.array().parse(data.banxRelays);
 }
 
-const tokenRelayFields = `owner assetId tokenId reserveBanx tokenReserve feePpm`;
+const tokenRelayFields = `owner assetId tokenId reserveBanx tokenReserve`;
 
 export async function fetchTokenRelays(owner?: string): Promise<TokenRelay[]> {
     const arg = owner?.trim() ? `(owner: "${owner.trim()}")` : "";

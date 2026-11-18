@@ -13,7 +13,11 @@ impl ForwardOffer {
         ForwardOfferTab::read_write().put(self).unwrap();
     }
 
-    fn get(poster: AccountNumber, next_hop: AccountNumber, asset_id: u16) -> Option<Self> {
+    pub(crate) fn get(
+        poster: AccountNumber,
+        next_hop: AccountNumber,
+        asset_id: u16,
+    ) -> Option<Self> {
         ForwardOfferTab::read()
             .get_index_pk()
             .get(&(poster, next_hop, asset_id))

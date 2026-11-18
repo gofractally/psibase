@@ -73,7 +73,6 @@ struct GqlRelay {
     asset_hi: u16,
     reserve_lo: Decimal,
     reserve_hi: Decimal,
-    fee_ppm: u32,
 }
 
 pub struct PathGraphSnapshot {
@@ -109,7 +108,7 @@ pub fn fetch_path_graph(
                     poster fromAsset toAsset feeFixed fxRate remaining expiresAt
                 }}
                 relays {{
-                    owner assetLo assetHi reserveLo reserveHi feePpm
+                    owner assetLo assetHi reserveLo reserveHi
                 }}
             }}
         }}"#
@@ -164,7 +163,7 @@ pub fn fetch_path_graph(
             expires_at: 0,
             reserve_in: r.reserve_lo.quantity.value,
             reserve_out: r.reserve_hi.quantity.value,
-            fee_ppm: r.fee_ppm,
+            fee_ppm: 0,
         });
         fx.push(FxEdge {
             poster: r.owner,
@@ -176,7 +175,7 @@ pub fn fetch_path_graph(
             expires_at: 0,
             reserve_in: r.reserve_hi.quantity.value,
             reserve_out: r.reserve_lo.quantity.value,
-            fee_ppm: r.fee_ppm,
+            fee_ppm: 0,
         });
     }
     for c in g.fx_offers {

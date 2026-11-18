@@ -5569,7 +5569,6 @@ mod tests {
                 token_id,
                 Quantity::new(reserve_banx),
                 Quantity::new(reserve_tokens),
-                0,
             )
             .get()
             .unwrap();
@@ -8081,15 +8080,9 @@ mod tests {
         }
     }
 
-    fn post_relay(chain: &psibase::Chain, john: AccountNumber, usd: u16, aud: u16, fee_ppm: u32) {
+    fn post_relay(chain: &psibase::Chain, john: AccountNumber, usd: u16, aud: u16) {
         Wrapper::push_from(chain, john)
-            .st_relay(
-                usd,
-                Quantity::new(10_000),
-                aud,
-                Quantity::new(15_000),
-                fee_ppm,
-            )
+            .st_relay(usd, Quantity::new(10_000), aud, Quantity::new(15_000))
             .get()
             .unwrap();
     }
@@ -8106,7 +8099,7 @@ mod tests {
     #[psibase::test_case(packages("Banx"))]
     fn test_relay_path_usd_to_aud(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
-        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        post_relay(&chain, net.john, net.usd, net.aud);
         assert_eq!(relay_sides(net.john, net.usd, net.aud), (10_000, 15_000));
 
         let carol = account!("carol");
@@ -8167,7 +8160,7 @@ mod tests {
     #[psibase::test_case(packages("Banx"))]
     fn test_relay_exact_out_inverts_curve(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
-        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        post_relay(&chain, net.john, net.usd, net.aud);
         let id = Wrapper::push_from(&chain, net.alice)
             .st_req(
                 PayRequest::INVOICE,
@@ -8207,7 +8200,7 @@ mod tests {
     #[psibase::test_case(packages("Banx"))]
     fn test_relay_replaces_fx_offer(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
-        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        post_relay(&chain, net.john, net.usd, net.aud);
         Wrapper::push_from(&chain, net.john)
             .st_fx_ofr(
                 net.usd,
@@ -8225,7 +8218,7 @@ mod tests {
             &chain,
             r#"{ pathGraph(from: "bob", to: "alice", maxHops: 4) {
                 fxOffers { poster fromAsset toAsset }
-                relays { owner assetLo assetHi feePpm }
+                relays { owner assetLo assetHi }
             } }"#,
         )?;
         let policies = graph
@@ -8247,7 +8240,6 @@ mod tests {
             relays[0].get("owner").and_then(|v| v.as_str()),
             Some("john")
         );
-        assert_eq!(relays[0].get("feePpm").and_then(|v| v.as_u64()), Some(0));
 
         Wrapper::push_from(&chain, net.bob)
             .path_pay(
@@ -8288,9 +8280,14 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Banx"))]
-    fn test_relay_fee_stays_in_the_input(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    /// The curve has no fee. John's 10% forward takes it off what Alice is owed.
+    /// A same-asset draw on John does not.
+    fn test_relay_fee_is_the_forward(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
-        post_relay(&chain, net.john, net.usd, net.aud, 100_000);
+        post_relay(&chain, net.john, net.usd, net.aud);
+        Wrapper::push_from(&chain, net.john)
+            .st_glb_fwd(net.aud, Quantity::new(0), PPM_SCALE / 10, PPM_SCALE, never(), true)
+            .get()?;
         Wrapper::push_from(&chain, net.bob)
             .path_pay(
                 vec![
@@ -8299,13 +8296,27 @@ mod tests {
                     hop(net.alice, net.aud),
                 ],
                 Quantity::new(1_000),
-                Quantity::new(1_238),
+                Quantity::new(1),
                 0,
             )
             .get()?;
-        assert_eq!(exp(&chain, net.alice, net.john, net.aud), 1_238);
+        // Curve of 1,000 is 1,363. John's forward keeps 10%.
+        assert_eq!(exp(&chain, net.alice, net.john, net.aud), 1_226);
         assert_eq!(exp(&chain, net.john, net.brandon, net.usd), 1_000);
-        assert_eq!(relay_sides(net.john, net.usd, net.aud), (11_000, 13_762));
+        assert_eq!(relay_sides(net.john, net.usd, net.aud), (11_000, 13_637));
+
+        Wrapper::push_from(&chain, net.john)
+            .st_crd_lne(net.bob, net.usd, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, net.bob)
+            .path_pay(
+                vec![hop(net.john, net.usd)],
+                Quantity::new(500),
+                Quantity::new(500),
+                0,
+            )
+            .get()?;
+        assert_eq!(exp(&chain, net.john, net.bob, net.usd), 500);
         Ok(())
     }
 
@@ -8462,6 +8473,84 @@ mod tests {
         Ok(())
     }
 
+    /// 10% of the tokens is John's. The curve prices the rest, and the Banx
+    /// debt is that output, not a second haircut.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_token_relay_fee_is_the_owners_tokens(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let john = account!("john");
+        chain.new_account(alice).unwrap();
+        chain.new_account(john).unwrap();
+        let aud = Asset::get_by_symbol_assert(account!("aud")).id;
+        let gas = mint_gas(&chain, john, john, 30_000);
+        psibase::services::tokens::Wrapper::push_from(&chain, john)
+            .credit(
+                gas,
+                Wrapper::SERVICE,
+                Quantity::new(15_000),
+                "relay".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), Quantity::new(15_000))
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_glb_fwd(aud, Quantity::new(0), PPM_SCALE / 10, PPM_SCALE, never(), true)
+            .get()?;
+        Wrapper::push_from(&chain, john)
+            .st_crd_lne(alice, aud, Quantity::new(100_000), false, 0, 0)
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .tok_relay_out(john, aud, gas, Quantity::new(1_000), Quantity::new(1))
+            .get()?;
+        // Curve prices 1,000 and pays 1,363 tokens. The forward is extra Banx Alice owes.
+        assert_eq!(exp(&chain, john, alice, aud), 1_112);
+        assert_eq!(shared_from_banx(&chain, gas, alice), 1_363);
+        assert_eq!(shared_from_banx(&chain, gas, john), 0);
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000 - 1_363);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            11_000
+        );
+
+        psibase::services::tokens::Wrapper::push_from(&chain, john)
+            .credit(
+                gas,
+                alice,
+                Quantity::new(1_000),
+                "sell".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        psibase::services::tokens::Wrapper::push_from(&chain, alice)
+            .debit(
+                gas,
+                john,
+                Quantity::new(1_000),
+                "take".to_string().try_into().unwrap(),
+            )
+            .get()?;
+        fund_vault(&chain, alice, gas, 1_000);
+        Wrapper::push_from(&chain, alice)
+            .tok_relay_in(john, aud, gas, Quantity::new(1_000), Quantity::new(1))
+            .get()?;
+        // Against the moved pool, 1,000 tokens price 751 Banx. Forward keeps 10%.
+        // 675 nets the 1,112 draw, so 437 remains.
+        assert_eq!(pair_bal(&chain, john, aud, gas), 15_000 - 1_363 + 1_000);
+        assert_eq!(shared_from_banx(&chain, gas, john), 0);
+        assert_eq!(vault_bal(&chain, alice, gas), 0);
+        assert_eq!(exp(&chain, alice, john, aud), 0);
+        assert_eq!(exp(&chain, john, alice, aud), 437);
+        assert_eq!(
+            TokenRelay::get(john, aud, gas).unwrap().reserve_banx.value,
+            11_000 - 751
+        );
+        Ok(())
+    }
+
     /// Selling Banx that John already owes is one relay row, netted in full.
     /// It is not a path hop plus a second row that pretends nothing netted.
     #[psibase::test_case(packages("Banx"))]
@@ -8591,7 +8680,7 @@ mod tests {
         let usd = Asset::get_by_symbol_assert(account!("usd")).id;
         let gas = mint_gas(&chain, john, john, 20_000);
         let zero = Wrapper::push_from(&chain, john)
-            .st_tok_relay(aud, gas, Quantity::new(1), Quantity::new(0), 0)
+            .st_tok_relay(aud, gas, Quantity::new(1), Quantity::new(0))
             .get()
             .expect_err("token reserve must be positive");
         assert!(
@@ -8607,7 +8696,7 @@ mod tests {
         assert_eq!(vault_bal(&chain, john, gas), 0);
 
         let again = Wrapper::push_from(&chain, john)
-            .st_tok_relay(aud, gas, Quantity::new(10_000), Quantity::new(1), 0)
+            .st_tok_relay(aud, gas, Quantity::new(10_000), Quantity::new(1))
             .get()
             .expect_err("the same owner cannot post the pair twice");
         assert!(
@@ -8716,7 +8805,7 @@ mod tests {
     #[psibase::test_case(packages("Banx"))]
     fn test_relay_round_trip_matches_quote(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
-        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        post_relay(&chain, net.john, net.usd, net.aud);
         let carol = account!("carol");
         chain.new_account(carol).unwrap();
         Wrapper::push_from(&chain, net.alice)
@@ -8780,7 +8869,7 @@ mod tests {
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         let net = relay_net(&chain);
-        post_relay(&chain, net.john, net.usd, net.aud, 0);
+        post_relay(&chain, net.john, net.usd, net.aud);
         let carol = account!("carol");
         chain.new_account(carol).unwrap();
         let eur = Asset::get_by_symbol_assert(account!("eur")).id;
@@ -8869,7 +8958,7 @@ mod tests {
         let aud = Asset::get_by_symbol_assert(account!("aud")).id;
         let wow = Asset::get_by_symbol_assert(account!("wow")).id;
         Wrapper::push_from(chain, john)
-            .st_relay(wow, Quantity::new(10_000), aud, Quantity::new(15_000), 0)
+            .st_relay(wow, Quantity::new(10_000), aud, Quantity::new(15_000))
             .get()
             .unwrap();
         WowBook { john, aud, wow }
@@ -9264,13 +9353,7 @@ mod tests {
             .deposit(dave, wow, Quantity::new(WEIGHT_GOLD), 0, 0)
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_relay(
-                aud,
-                Quantity::new(WEIGHT_AUD),
-                wow,
-                Quantity::new(WEIGHT_GOLD),
-                0,
-            )
+            .st_relay(aud, Quantity::new(WEIGHT_AUD), wow, Quantity::new(WEIGHT_GOLD))
             .get()?;
         assert_eq!(exp(&chain, dave, john, wow), WEIGHT_GOLD);
         assert_eq!(aud_wow(john, aud, wow), (WEIGHT_AUD, WEIGHT_GOLD));
@@ -9364,13 +9447,7 @@ mod tests {
             .st_glb_fwd(aud, Quantity::new(0), 0, PPM_SCALE, never(), true)
             .get()?;
         Wrapper::push_from(&chain, john)
-            .st_relay(
-                aud,
-                Quantity::new(WEIGHT_AUD),
-                wow,
-                Quantity::new(WEIGHT_GOLD),
-                0,
-            )
+            .st_relay(aud, Quantity::new(WEIGHT_AUD), wow, Quantity::new(WEIGHT_GOLD))
             .get()?;
         assert_eq!(aud_wow(john, aud, wow), (WEIGHT_AUD, WEIGHT_GOLD));
 

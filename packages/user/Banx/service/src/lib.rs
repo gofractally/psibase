@@ -563,22 +563,10 @@ pub mod service {
     /// Both reserves are virtual weights, not a debt. One row prices both
     /// directions. Posting again replaces them. A path that changes asset
     /// on the sender uses this curve instead of an FX offer for the pair.
+    /// The curve has no fee. A path that continues pays the forward fee.
     #[action]
-    fn st_relay(
-        asset_a: u16,
-        reserve_a: Quantity,
-        asset_b: u16,
-        reserve_b: Quantity,
-        fee_ppm: u32,
-    ) {
-        BanxRelay::upsert(
-            get_sender(),
-            asset_a,
-            reserve_a,
-            asset_b,
-            reserve_b,
-            fee_ppm,
-        );
+    fn st_relay(asset_a: u16, reserve_a: Quantity, asset_b: u16, reserve_b: Quantity) {
+        BanxRelay::upsert(get_sender(), asset_a, reserve_a, asset_b, reserve_b);
     }
 
     /// Delete the sender's relay for this pair. Claims already drawn stay.
@@ -592,22 +580,16 @@ pub mod service {
     /// Post a Banx↔token relay. `reserve_banx` is the virtual Banx weight.
     /// `reserve_tokens` is pulled from shared(sender, Banx) into
     /// `{sender}/{asset_id}/{token_id}`. The same pair cannot be posted twice.
+    /// The curve has no fee. A direct swap pays the owner's global forward
+    /// on `asset_id`. A path that only delivers tokens does not.
     #[action]
     fn st_tok_relay(
         asset_id: u16,
         token_id: u32,
         reserve_banx: Quantity,
         reserve_tokens: Quantity,
-        fee_ppm: u32,
     ) {
-        TokenRelay::upsert(
-            get_sender(),
-            asset_id,
-            token_id,
-            reserve_banx,
-            reserve_tokens,
-            fee_ppm,
-        );
+        TokenRelay::upsert(get_sender(), asset_id, token_id, reserve_banx, reserve_tokens);
     }
 
     /// Delete the sender's token relay. Tokens still in the pair return to the sender.
@@ -617,6 +599,7 @@ pub mod service {
     }
 
     /// Draw `amount_banx` on `owner` and receive tokens from their relay.
+    /// The draw is the full amount. The owner's token cut is credited to them.
     #[action]
     fn tok_relay_out(
         owner: AccountNumber,
@@ -636,7 +619,8 @@ pub mod service {
     }
 
     /// Send tokens from the sender's vault into `owner`'s relay.
-    /// `owner` owes the sender the curve's Banx output. Fund the vault first.
+    /// The owner's cut stays out of the pool. `owner` owes the curve output
+    /// of what remains. Fund the vault first.
     #[action]
     fn tok_relay_in(
         owner: AccountNumber,

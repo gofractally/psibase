@@ -11,33 +11,56 @@ pub const PPM_SCALE: u32 = 1_000_000;
 /// Equal to [`PPM_SCALE`]; `RATE_SCALE` = identity (1:1).
 pub const RATE_SCALE: u64 = PPM_SCALE as u64;
 
-/// Constant-product output. `fee_ppm` stays in the input reserve.
+/// Amount the curve prices. The rest of `amount_in` is the fee, and does
+/// not enter the reserve.
+pub fn priced_input(amount_in: u64, fee_ppm: u32) -> Option<u64> {
+    if amount_in == 0 || fee_ppm >= PPM_SCALE {
+        return None;
+    }
+    let keep = (PPM_SCALE - fee_ppm) as u128;
+    let priced = (amount_in as u128)
+        .checked_mul(keep)?
+        .checked_div(PPM_SCALE as u128)?;
+    let priced = u64::try_from(priced).ok()?;
+    (priced > 0).then_some(priced)
+}
+
+
+/// Constant-product output of the priced input.
 ///
-/// `out = reserve_out * in_after_fee / (reserve_in + in_after_fee)`.
-/// The output is always less than `reserve_out`.
+/// `out = reserve_out * priced / (reserve_in + priced)`.
+/// The output is always less than `reserve_out`. The fee is not added to
+/// `reserve_in`; that is a smaller trade, not extra weight.
 pub fn try_swap_out(
     reserve_in: u64,
     reserve_out: u64,
     amount_in: u64,
     fee_ppm: u32,
 ) -> Option<u64> {
-    if reserve_in == 0 || reserve_out == 0 || amount_in == 0 || fee_ppm >= PPM_SCALE {
+    if reserve_in == 0 || reserve_out == 0 {
         return None;
     }
-    let keep = (PPM_SCALE - fee_ppm) as u128;
-    let after_fee = (amount_in as u128)
-        .checked_mul(keep)?
-        .checked_div(PPM_SCALE as u128)?;
-    let after_fee = u64::try_from(after_fee).ok()?;
-    if after_fee == 0 {
-        return None;
-    }
-    let denom = reserve_in.checked_add(after_fee)?;
+    let priced = priced_input(amount_in, fee_ppm)?;
+    let denom = reserve_in.checked_add(priced)?;
     let out = (reserve_out as u128)
-        .checked_mul(after_fee as u128)?
+        .checked_mul(priced as u128)?
         .checked_div(denom as u128)?;
     let out = u64::try_from(out).ok()?;
     (out > 0 && out < reserve_out).then_some(out)
+}
+
+/// One constant-product trade. Input reserve grows by the priced amount only.
+pub fn move_curve(
+    reserve_in: u64,
+    reserve_out: u64,
+    amount_in: u64,
+    fee_ppm: u32,
+) -> Option<(u64, u64, u64)> {
+    let out = try_swap_out(reserve_in, reserve_out, amount_in, fee_ppm)?;
+    let priced = priced_input(amount_in, fee_ppm)?;
+    let reserve_in = reserve_in.checked_add(priced)?;
+    let reserve_out = reserve_out.checked_sub(out)?;
+    Some((out, reserve_in, reserve_out))
 }
 
 /// Smallest input such that [`try_swap_out`] is at least `amount_out`.
@@ -301,7 +324,7 @@ mod tests {
     }
 
     #[test]
-    fn constant_product_keeps_the_fee_in_the_input() {
+    fn constant_product_prices_the_input_after_the_fee() {
         assert_eq!(try_swap_out(10_000, 15_000, 1_000, 0), Some(1_363));
         assert_eq!(try_swap_in(10_000, 15_000, 1_363, 0), Some(1_000));
         assert_eq!(try_swap_out(10_000, 15_000, 1_000, 100_000), Some(1_238));

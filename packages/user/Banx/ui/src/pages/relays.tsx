@@ -19,13 +19,8 @@ import {
     useSetTokenRelay,
 } from "@/hooks/use-banx-mutations";
 import { amountPlaceholder, displayAmount } from "@/lib/amount";
-import { ppmToPercent, ppmToPercentInput } from "@/lib/constants";
 import {
-    MAX_HOP_FEE_PERCENT,
-    MAX_HOP_FEE_PPM,
     amountFieldValidator,
-    percentFieldValidator,
-    percentStringToPpm,
     useAppForm,
 } from "@/lib/form";
 import type { Asset, BanxRelay, TokenRelay } from "@/lib/graphql";
@@ -93,7 +88,6 @@ function IouPoolForm({
             reserveB: existing
                 ? prefillAmount(existing.reserveHi, precisionOf(existing.assetHi))
                 : "",
-            feePct: existing ? ppmToPercentInput(existing.feePpm) : "0",
         },
         onSubmit: async ({ value }) => {
             if (
@@ -112,10 +106,6 @@ function IouPoolForm({
                         assetB: value.assetB!,
                         reserveA: value.reserveA.trim(),
                         reserveB: value.reserveB.trim(),
-                        feePpm: percentStringToPpm(
-                            value.feePct,
-                            MAX_HOP_FEE_PPM,
-                        ),
                     },
                     {
                         onSuccess: () => resolve(),
@@ -140,7 +130,6 @@ function IouPoolForm({
                 existing.reserveHi,
                 precisionOf(existing.assetHi),
             ),
-            feePct: ppmToPercentInput(existing.feePpm),
         });
         // Prefill once per pool. form.reset identity is stable enough.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -283,25 +272,6 @@ function IouPoolForm({
                                     )}
                                 />
                             </div>
-                            <form.AppField
-                                name="feePct"
-                                validators={{
-                                    onChange: percentFieldValidator(
-                                        MAX_HOP_FEE_PERCENT,
-                                    ),
-                                    onSubmit: percentFieldValidator(
-                                        MAX_HOP_FEE_PERCENT,
-                                    ),
-                                }}
-                                children={(field) => (
-                                    <field.TextField
-                                        label="Fee %"
-                                        inputMode="decimal"
-                                        description="Taken off what goes in, before the price. It stays in the pool as extra weight. It is not paid out."
-                                        required
-                                    />
-                                )}
-                            />
                             <form.AppForm>
                                 <form.SubmitButton
                                     labels={
@@ -352,7 +322,6 @@ function TokenPoolForm({
             tokenId: "",
             reserveBanx: "",
             reserveTokens: "",
-            feePct: "0",
         },
         onSubmit: async ({ value }) => {
             const tokenId = parseTokenId(value.tokenId);
@@ -373,10 +342,6 @@ function TokenPoolForm({
                         tokenId,
                         reserveBanx: value.reserveBanx.trim(),
                         reserveTokens: value.reserveTokens.trim(),
-                        feePpm: percentStringToPpm(
-                            value.feePct,
-                            MAX_HOP_FEE_PPM,
-                        ),
                     },
                     {
                         onSuccess: () => resolve(),
@@ -551,25 +516,6 @@ function TokenPoolForm({
                                     )}
                                 />
                             </div>
-                            <form.AppField
-                                name="feePct"
-                                validators={{
-                                    onChange: percentFieldValidator(
-                                        MAX_HOP_FEE_PERCENT,
-                                    ),
-                                    onSubmit: percentFieldValidator(
-                                        MAX_HOP_FEE_PERCENT,
-                                    ),
-                                }}
-                                children={(field) => (
-                                    <field.TextField
-                                        label="Fee %"
-                                        inputMode="decimal"
-                                        description="Taken from the input before the curve. Under 100%."
-                                        required
-                                    />
-                                )}
-                            />
                             {tokenId !== undefined &&
                             tokenPrecision === undefined ? (
                                 <p
@@ -635,9 +581,6 @@ function IouPools({
                                 <TableHead className="text-right">
                                     Reserves
                                 </TableHead>
-                                <TableHead className="text-right">
-                                    Fee
-                                </TableHead>
                                 <TableHead />
                             </TableRow>
                         </TableHeader>
@@ -657,9 +600,6 @@ function IouPools({
                                     <TableCell className="text-right font-mono text-sm">
                                         {displayAmount(row.reserveLo)} /{" "}
                                         {displayAmount(row.reserveHi)}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {ppmToPercent(row.feePpm)}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
@@ -763,9 +703,6 @@ function TokenPools({
                                 <TableHead className="text-right">
                                     Token reserve
                                 </TableHead>
-                                <TableHead className="text-right">
-                                    Fee
-                                </TableHead>
                                 <TableHead />
                             </TableRow>
                         </TableHeader>
@@ -781,9 +718,6 @@ function TokenPools({
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-sm">
                                         {displayAmount(row.tokenReserve)}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {ppmToPercent(row.feePpm)}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Button

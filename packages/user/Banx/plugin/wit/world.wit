@@ -440,14 +440,13 @@ interface api {
 
     /// Post a constant-product relay between two Banx assets. Reserves are
     /// virtual weights, one row for both directions. Saving again replaces
-    /// them. `reserve-a` and `reserve-b` are human decimals. `fee-ppm` is
-    /// taken from the input before the curve (`10000` = 1%).
+    /// them. `reserve-a` and `reserve-b` are human decimals. The curve has
+    /// no fee. A path that continues pays the forward fee.
     set-relay: func(
         asset-a: u16,
         asset-b: u16,
         reserve-a: string,
         reserve-b: string,
-        fee-ppm: u32,
     ) -> result<_, error>;
 
     /// Delete the sender's relay for this pair. Claims already drawn stay.
@@ -456,12 +455,12 @@ interface api {
     /// Post a Banx↔token relay. `reserve-banx` is the virtual Banx weight.
     /// `reserve-tokens` is pulled from the sender's credit to Banx into
     /// `{sender}/{asset-id}/{token-id}`. The same pair cannot be posted twice.
+    /// The curve has no fee. A direct swap pays the owner's global forward.
     set-token-relay: func(
         asset-id: u16,
         token-id: u32,
         reserve-banx: string,
         reserve-tokens: string,
-        fee-ppm: u32,
     ) -> result<_, error>;
 
     /// Delete the sender's token relay. Tokens still in the pair return to the sender.

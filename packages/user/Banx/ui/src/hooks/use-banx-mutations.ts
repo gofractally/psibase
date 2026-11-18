@@ -1208,14 +1208,12 @@ export function useSetRelay() {
             assetB: number;
             reserveA: string;
             reserveB: string;
-            feePpm: number;
         }) =>
             banxCall("setRelay", [
                 p.assetA,
                 p.assetB,
                 p.reserveA,
                 p.reserveB,
-                p.feePpm,
             ]),
         onSuccess: () => {
             invalidate();
@@ -1246,7 +1244,6 @@ export function useSetTokenRelay() {
             tokenId: number;
             reserveBanx: string;
             reserveTokens: string;
-            feePpm: number;
         }) => {
             // The service debits this credit into `{sender}/{asset}/{token}`.
             await tokensCredit(p.tokenId, p.reserveTokens, "relay");
@@ -1256,7 +1253,6 @@ export function useSetTokenRelay() {
                     p.tokenId,
                     p.reserveBanx,
                     p.reserveTokens,
-                    p.feePpm,
                 ]);
             } catch (e) {
                 try {

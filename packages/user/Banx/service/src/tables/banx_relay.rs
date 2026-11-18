@@ -1,6 +1,6 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table};
 
-use crate::math::{try_swap_in, try_swap_out, PPM_SCALE};
+use crate::math::{move_curve, try_swap_in};
 use crate::tables::tables::{Asset, BanxRelay, BanxRelayTable};
 
 fn ordered(a: u16, b: u16) -> (u16, u16) {
@@ -27,12 +27,10 @@ impl BanxRelay {
         reserve_a: Quantity,
         asset_b: u16,
         reserve_b: Quantity,
-        fee_ppm: u32,
     ) {
         assert!(asset_a != asset_b, "relay assets must differ");
         assert!(reserve_a.value > 0, "relay reserve must be positive");
         assert!(reserve_b.value > 0, "relay reserve must be positive");
-        assert!(fee_ppm < PPM_SCALE, "relay fee must be under 100%");
         Asset::get_assert(asset_a);
         Asset::get_assert(asset_b);
         let (asset_lo, asset_hi, reserve_lo, reserve_hi) = if asset_a < asset_b {
@@ -46,7 +44,6 @@ impl BanxRelay {
             asset_hi,
             reserve_lo,
             reserve_hi,
-            fee_ppm,
         }
         .save();
     }
@@ -76,11 +73,11 @@ impl BanxRelay {
     }
 
     /// Move this copy's reserves. Does not save. `None` when the curve cannot pay.
+    ///
+    /// The fee is a smaller output debt. It is not added to the weight.
     pub(crate) fn apply_out(&mut self, from_asset: u16, amount_in: u64) -> Option<u64> {
         let (reserve_in, reserve_out) = self.reserves_for(from_asset);
-        let out = try_swap_out(reserve_in, reserve_out, amount_in, self.fee_ppm)?;
-        let reserve_in = reserve_in.checked_add(amount_in)?;
-        let reserve_out = reserve_out.checked_sub(out)?;
+        let (out, reserve_in, reserve_out) = move_curve(reserve_in, reserve_out, amount_in, 0)?;
         self.store(from_asset, reserve_in, reserve_out);
         Some(out)
     }
@@ -98,7 +95,7 @@ impl BanxRelay {
     /// Does not move reserves. `amount_out` is in the asset that is not `from_asset`.
     pub fn swap_in(&self, from_asset: u16, amount_out: Quantity) -> Quantity {
         let (reserve_in, reserve_out) = self.reserves_for(from_asset);
-        let amount_in = try_swap_in(reserve_in, reserve_out, amount_out.value, self.fee_ppm)
+        let amount_in = try_swap_in(reserve_in, reserve_out, amount_out.value, 0)
             .expect("relay cannot produce that output");
         amount_in.into()
     }

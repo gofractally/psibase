@@ -288,7 +288,6 @@ mod service {
         assetHi: u16,
         reserveLo: Decimal,
         reserveHi: Decimal,
-        feePpm: u32,
     }
 
     impl BanxRelayView {
@@ -299,7 +298,6 @@ mod service {
                 assetHi: r.asset_hi,
                 reserveLo: Decimal::new(r.reserve_lo, asset_precision(r.asset_lo)),
                 reserveHi: Decimal::new(r.reserve_hi, asset_precision(r.asset_hi)),
-                feePpm: r.fee_ppm,
             }
         }
     }
@@ -311,7 +309,6 @@ mod service {
         tokenId: u32,
         reserveBanx: Decimal,
         tokenReserve: Decimal,
-        feePpm: u32,
     }
 
     #[derive(SimpleObject)]
@@ -945,7 +942,6 @@ mod service {
                         tokenId: r.token_id,
                         reserveBanx: Decimal::new(r.reserve_banx, asset_precision(r.asset_id)),
                         tokenReserve: Decimal::new(tokens, token_precision(r.token_id)),
-                        feePpm: r.fee_ppm,
                     }
                 })
                 .collect()

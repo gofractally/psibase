@@ -9,7 +9,8 @@ use std::collections::{HashMap, HashSet};
 use psibase::AccountNumber;
 
 use crate::math::{
-    smallest_input_for_output, try_invert_hop_fee, try_invert_rate, try_swap_in, try_swap_out,
+    move_curve, smallest_input_for_output, try_invert_hop_fee, try_invert_rate, try_swap_in,
+    try_swap_out,
 };
 pub use crate::math::{
     try_apply_hop_fee as apply_hop_fee, try_apply_rate as apply_rate, PPM_SCALE, RATE_SCALE,
@@ -117,9 +118,7 @@ impl RelayBook {
                 (pool.1, pool.0, pool.2)
             }
         };
-        let out = try_swap_out(reserve_in, reserve_out, amount_in, fee)?;
-        let reserve_in = reserve_in.checked_add(amount_in)?;
-        let reserve_out = reserve_out.checked_sub(out)?;
+        let (out, reserve_in, reserve_out) = move_curve(reserve_in, reserve_out, amount_in, fee)?;
         let pool = self.pools.get_mut(&key).expect("relay pool");
         if edge.from_asset == lo {
             *pool = (reserve_in, reserve_out, fee);

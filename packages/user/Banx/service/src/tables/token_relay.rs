@@ -3,8 +3,9 @@ use psibase::{
     AccountNumber, ServiceWrapper, Table,
 };
 
-use super::{cash_sub, emit_pair_activity, relay_sub, Connection};
-use crate::math::{try_swap_out, PPM_SCALE};
+use super::{apply_hop_fee, cash_sub, emit_pair_activity, invert_hop_fee, relay_sub, Connection};
+use crate::math::try_swap_out;
+use crate::tables::tables::ForwardOffer;
 use crate::tables::tables::{Asset, CashQuote, TokenRelay, TokenRelayTable};
 
 fn token_reserve(owner: AccountNumber, asset_id: u16, token_id: u32) -> u64 {
@@ -43,14 +44,12 @@ impl TokenRelay {
         token_id: u32,
         reserve_banx: Quantity,
         reserve_tokens: Quantity,
-        fee_ppm: u32,
     ) {
         assert!(reserve_banx.value > 0, "relay reserve must be positive");
         assert!(
             reserve_tokens.value > 0,
             "relay token reserve must be positive"
         );
-        assert!(fee_ppm < PPM_SCALE, "relay fee must be under 100%");
         Asset::get_assert(asset_id);
         Tokens::call().getToken(token_id);
         assert!(
@@ -69,7 +68,6 @@ impl TokenRelay {
             asset_id,
             token_id,
             reserve_banx,
-            fee_ppm,
         }
         .save();
     }
@@ -89,16 +87,34 @@ impl TokenRelay {
         TokenRelayTable::read_write().erase(&(self.owner, self.asset_id, self.token_id));
     }
 
-    /// Banx in, tokens out. Moves the virtual Banx reserve. Caller pays the tokens.
+    /// Face the neighbor owes, if the owner posted a live global forward.
+    /// A direct path pay does not call this.
+    fn neighbor_owes(owner: AccountNumber, asset_id: u16, face: Quantity) -> Quantity {
+        let Some(fwd) = ForwardOffer::get(owner, ForwardOffer::GLOBAL, asset_id) else {
+            return face;
+        };
+        if !fwd.is_live() {
+            return face;
+        }
+        invert_hop_fee(face, fwd.fee_fixed, fwd.fee_percent)
+    }
+
+    /// Banx the owner owes after that same forward. The curve still prices face.
+    fn neighbor_receives(owner: AccountNumber, asset_id: u16, face: Quantity) -> Quantity {
+        let Some(fwd) = ForwardOffer::get(owner, ForwardOffer::GLOBAL, asset_id) else {
+            return face;
+        };
+        if !fwd.is_live() {
+            return face;
+        }
+        apply_hop_fee(face, fwd.fee_fixed, fwd.fee_percent)
+    }
+
+    /// Banx in, tokens out. No curve fee.
     pub fn take_banx(&mut self, amount_banx: Quantity) -> Quantity {
         let tokens = token_reserve(self.owner, self.asset_id, self.token_id);
-        let out = try_swap_out(
-            self.reserve_banx.value,
-            tokens,
-            amount_banx.value,
-            self.fee_ppm,
-        )
-        .expect("relay swap produced nothing");
+        let out = try_swap_out(self.reserve_banx.value, tokens, amount_banx.value, 0)
+            .expect("relay swap produced nothing");
         self.reserve_banx = Quantity::new(
             self.reserve_banx
                 .value
@@ -106,21 +122,20 @@ impl TokenRelay {
                 .expect("relay reserve overflow"),
         );
         self.save();
-        out.into()
+        Quantity::new(out)
     }
 
-    /// Tokens in, Banx out. Does not move tokens. Caller deposits them first
-    /// only after this sizes the output from the pair as it stands now.
+    /// Tokens in, Banx out. No curve fee. Does not move tokens.
     pub fn quote_banx_out(&self, amount_tokens: Quantity) -> Quantity {
         let tokens = token_reserve(self.owner, self.asset_id, self.token_id);
         let out = try_swap_out(
             tokens,
             self.reserve_banx.value,
             amount_tokens.value,
-            self.fee_ppm,
+            0,
         )
         .expect("relay swap produced nothing");
-        out.into()
+        Quantity::new(out)
     }
 
     pub fn give_banx(&mut self, amount_out: Quantity) {
@@ -133,7 +148,14 @@ impl TokenRelay {
     }
 
     fn pay_tokens(&self, to: AccountNumber, amount: Quantity) {
-        CashQuote::pay_named(self.pair_sub(), to, self.token_id, amount, "relay");
+        self.pay_tokens_from(self.pair_sub(), to, amount);
+    }
+
+    fn pay_tokens_from(&self, sub: String, to: AccountNumber, amount: Quantity) {
+        if amount.value == 0 {
+            return;
+        }
+        CashQuote::pay_named(sub, to, self.token_id, amount, "relay");
     }
 
     /// Path already drew `amount_banx` on `owner`. Pay the curve's tokens to `recipient`.
@@ -174,9 +196,9 @@ impl TokenRelay {
             tokens_out.value >= min_tokens.value,
             "relay tokens below min_tokens"
         );
-        // One relay row, with the amount the draw actually netted. `draw`
-        // would also emit a path hop for a swap that is not a path.
-        let netted = Connection::get_live(owner, taker, asset_id).apply_draw(amount_banx);
+        // Curve prices the face. The global forward is extra Banx the neighbor owes.
+        let owed = Self::neighbor_owes(owner, asset_id, amount_banx);
+        let netted = Connection::get_live(owner, taker, asset_id).apply_draw(owed);
         relay.pay_tokens(taker, tokens_out);
         emit_pair_activity(
             taker,
@@ -184,7 +206,7 @@ impl TokenRelay {
             taker,
             asset_id,
             "relay",
-            amount_banx,
+            owed,
             netted,
             asset_id,
             0,
@@ -205,9 +227,10 @@ impl TokenRelay {
         assert!(taker != owner, "cannot swap with self");
         assert!(amount_tokens.value > 0, "relay amount must be positive");
         let mut relay = Self::get_assert(owner, asset_id, token_id);
-        let banx_out = relay.quote_banx_out(amount_tokens);
+        let banx = relay.quote_banx_out(amount_tokens);
+        let owed = Self::neighbor_receives(owner, asset_id, banx);
         assert!(
-            banx_out.value >= min_banx.value,
+            owed.value >= min_banx.value,
             "relay banx below min_banx"
         );
         CashQuote::move_named(
@@ -216,11 +239,12 @@ impl TokenRelay {
             token_id,
             amount_tokens,
         );
-        relay.give_banx(banx_out);
-        let netted = Connection::get_live(taker, owner, asset_id).deposit(banx_out, 0);
+        // Weight moves by the curve. The forward keeps the rest.
+        relay.give_banx(banx);
+        let netted = Connection::get_live(taker, owner, asset_id).deposit(owed, 0);
         emit_pair_activity(
-            taker, taker, owner, asset_id, "relay", banx_out, netted, asset_id, 0, "",
+            taker, taker, owner, asset_id, "relay", owed, netted, asset_id, 0, "",
         );
-        banx_out
+        owed
     }
 }

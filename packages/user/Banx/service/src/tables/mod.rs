@@ -464,8 +464,6 @@ pub mod tables {
         pub asset_hi: u16,
         pub reserve_lo: Quantity,
         pub reserve_hi: Quantity,
-        /// Taken from the input before the curve. `10_000` = 1%. Must be `< PPM_SCALE`.
-        pub fee_ppm: u32,
     }
 
     impl BanxRelay {
@@ -489,7 +487,6 @@ pub mod tables {
         pub asset_id: u16,
         pub token_id: u32,
         pub reserve_banx: Quantity,
-        pub fee_ppm: u32,
     }
 
     impl TokenRelay {

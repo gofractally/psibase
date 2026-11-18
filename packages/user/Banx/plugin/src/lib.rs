@@ -1154,7 +1154,6 @@ impl Api for BanxPlugin {
         asset_b: u16,
         reserve_a: String,
         reserve_b: String,
-        fee_ppm: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_relay)?;
         let packed = banx::action_structs::st_relay {
@@ -1162,7 +1161,6 @@ impl Api for BanxPlugin {
             reserve_a: parse_amount_nonzero(asset_a, &reserve_a)?,
             asset_b,
             reserve_b: parse_amount_nonzero(asset_b, &reserve_b)?,
-            fee_ppm,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_relay::ACTION_NAME, &packed)
@@ -1179,7 +1177,6 @@ impl Api for BanxPlugin {
         token_id: u32,
         reserve_banx: String,
         reserve_tokens: String,
-        fee_ppm: u32,
     ) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_token_relay)?;
         let packed = banx::action_structs::st_tok_relay {
@@ -1187,7 +1184,6 @@ impl Api for BanxPlugin {
             token_id,
             reserve_banx: parse_amount_nonzero(asset_id, &reserve_banx)?,
             reserve_tokens: parse_token_amount_nonzero(token_id, &reserve_tokens)?,
-            fee_ppm,
         }
         .packed();
         add_action_to_transaction(banx::action_structs::st_tok_relay::ACTION_NAME, &packed)
