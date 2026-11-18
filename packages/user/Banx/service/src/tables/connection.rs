@@ -264,10 +264,8 @@ impl Connection {
         self.credit_and_net(amount, rate)
     }
 
-    /// Draw for `path_pay`. `payer` is the path debtor: the account that
-    /// started the path, on every hop. A middleman is not that account, and
-    /// a payee who submits a repeating payment is not either. The emit takes
-    /// that debtor as a required field, same as the `path_pay` summary.
+    /// Draw for `path_pay`. `payer` started the path. This connection's
+    /// debtor is the hop.
     pub fn draw(self, amount: Quantity, payer: AccountNumber) {
         let creditor = self.creditor;
         let debtor = self.debtor;

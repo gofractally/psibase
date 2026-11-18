@@ -1063,9 +1063,6 @@ pub mod service {
     /// Activity history, one row per party as `account`. The same account
     /// on both sides is one row.
     ///
-    /// `actor` is named by the action, not taken from the transaction sender.
-    /// A payee can submit a path, and an invite hook is not the inviter.
-    ///
     /// - `kind`: `path_draw` | `path_pay` | `deposit` | `book` | `net` |
     ///   `convert` | `credit_line` | `rm_credit_line` | `book_auth` |
     ///   `rm_book_auth` | `sell_claim` | `buy_claim` | `invoice` |

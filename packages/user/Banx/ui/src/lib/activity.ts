@@ -110,9 +110,16 @@ export function pathHopDebtor(e: ActivityEvent): string | undefined {
     return namedAccount(e.memo);
 }
 
-/** The viewer drew this hop: path payer, and the debtor of this connection. */
+/**
+ * The viewer drew this hop.
+ *
+ * A memo names the hop debtor. Without one (rows written before that), the
+ * actor was treated as the debtor, which is what those feeds already showed.
+ */
 export function viewerDrewHop(e: ActivityEvent, viewer: string): boolean {
-    return e.actor === viewer && pathHopDebtor(e) === viewer;
+    if (e.actor !== viewer) return false;
+    const debtor = pathHopDebtor(e);
+    return !debtor || debtor === viewer;
 }
 
 /**
@@ -161,11 +168,15 @@ export function describeEvent(
     switch (e.kind) {
         case "path_draw": {
             // Actor is the path payer on every hop, so a middleman is not you.
-            // "You drew" only when this viewer is also the hop debtor. A
-            // cross-asset return names the payer as creditor of that hop.
+            // Memo is the hop debtor. Creditor and debtor do not share a sentence.
+            const debtor = pathHopDebtor(e);
             const title = viewerDrewHop(e, viewer)
                 ? `You drew ${qty(e.amount, sym)} on ${other}`
-                : `Hop draw of ${qty(e.amount, sym)} between you and ${other}`;
+                : debtor === viewer
+                  ? `${actor}'s path drew ${qty(e.amount, sym)} on your line`
+                  : debtor
+                    ? `${nameOf(debtor)} drew ${qty(e.amount, sym)} on you`
+                    : `Hop draw of ${qty(e.amount, sym)} between you and ${other}`;
             const detail =
                 nettedRaw > 0n
                     ? `Path hop · auto-netted ${qty(e.netted, sym)}`
@@ -175,6 +186,18 @@ export function describeEvent(
         case "path_pay": {
             const same = e.otherAssetId === e.assetId;
             const gotSym = same ? sym : otherSym;
+            // A cross-asset return names the payer on both sides. That claim
+            // is what came back, not a payment to themselves.
+            if (e.account === e.counterparty) {
+                const title = same
+                    ? `Your ${qty(e.amount, sym)} came back to you`
+                    : `Your ${qty(e.amount, sym)} came back as ${qty(e.netted, gotSym)} owed to you`;
+                const bits = [
+                    "Claim from the path",
+                    memo?.startsWith("pay-auth ") ? "Repeating payment" : req,
+                ].filter(Boolean);
+                return { title, detail: bits.join(" · ") };
+            }
             const title = you
                 ? `You paid ${other} ${qty(e.netted, gotSym)}`
                 : `${actor} paid you ${qty(e.netted, gotSym)}`;

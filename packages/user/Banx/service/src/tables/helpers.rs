@@ -9,12 +9,7 @@ use psibase::{
 /// AccountNumber 0: global next-hop / debtor on standing offers.
 pub const GLOBAL: AccountNumber = AccountNumber::new(0);
 
-/// Spend `amount` from a posted budget. Returns what is left.
-///
-/// The caller keeps or deletes the row. An FX offer is not a trade once
-/// nothing remains, so it deletes. A claim or cash quote stays at zero until
-/// a later post replaces it. A credit line does not use this: deplete and the
-/// revolving cap are a different remaining.
+/// Returns what is left after `amount`, or panics with `over`.
 pub(crate) fn spend_budget(remaining: Quantity, amount: Quantity, over: &str) -> Quantity {
     assert!(amount.value <= remaining.value, "{over}");
     Quantity::new(remaining.value - amount.value)
@@ -135,9 +130,7 @@ pub fn relay_sub(owner: AccountNumber, asset_id: u16, token_id: u32) -> String {
 
 /// Emit history once for each party as `account`.
 ///
-/// `actor` is who the feed calls "you". It is not `get_sender()`: a payee,
-/// a hook, or a nested call can submit for someone else, and a default would
-/// stamp that submitter. The caller names the account the row is about.
+/// The caller passes `actor`. A `path_draw` is not "you" from `actor` alone.
 ///
 /// `amount` / `netted` are stored as human decimals. `netted` uses
 /// `other_asset_id` when that amount is a different asset, as on a path hop.
@@ -184,14 +177,9 @@ pub fn emit_pair_activity(
     }
 }
 
-/// One path hop. `debtor` is the account that started the path, on every hop.
-///
-/// A middleman is drawn, and a payee may submit the transaction. Neither is
-/// the debtor. The summary `path_pay` row names the same account. Memo is the
-/// hop debtor (`counterparty`): the account whose line this hop draws. On a
-/// cross-asset return that is the middleman, not the path debtor.
+/// One path hop. `payer` started the path. Memo is the hop debtor.
 pub(crate) fn emit_path_draw(
-    debtor: AccountNumber,
+    payer: AccountNumber,
     creditor: AccountNumber,
     counterparty: AccountNumber,
     asset_id: u16,
@@ -199,7 +187,7 @@ pub(crate) fn emit_path_draw(
     netted: Quantity,
 ) {
     emit_pair_activity(
-        debtor,
+        payer,
         creditor,
         counterparty,
         asset_id,
