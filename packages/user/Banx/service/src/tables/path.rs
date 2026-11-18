@@ -4,7 +4,7 @@ use psibase::{services::tokens::Quantity, AccountNumber};
 
 use super::{emit_pair_activity_as, invert_hop_fee, invert_rate, Connection};
 use crate::math::{smallest_input_for_output, try_apply_hop_fee, try_apply_rate};
-use crate::tables::tables::{BanxRelay, FxOffer, ForwardOffer, PathHop, PayRequest};
+use crate::tables::tables::{BanxRelay, ForwardOffer, FxOffer, PathHop, PayRequest};
 
 /// Exact-out send: walk hops backward from `target_out` at the last hop
 /// (undo hop fees, then FX). A relay used twice is priced forward, because
@@ -24,8 +24,7 @@ pub fn path_required_send(hops: &[PathHop], target_out: Quantity) -> Quantity {
             if let Some(relay) = BanxRelay::get(prev.account, prev.asset_id, hop.asset_id) {
                 need = relay.swap_in(prev.asset_id, need);
             } else {
-                let pol =
-                    FxOffer::get_assert(prev.account, prev.asset_id, hop.asset_id, true);
+                let pol = FxOffer::get_assert(prev.account, prev.asset_id, hop.asset_id, true);
                 pol.assert_live();
                 need = invert_rate(need, pol.fee_fixed, pol.fx_rate);
                 assert!(
@@ -78,8 +77,7 @@ fn forward_amount(hops: &[PathHop], amount: u64) -> Option<u64> {
                 let relay = pools.entry(key).or_insert(stored);
                 forward = relay.apply_out(prev.asset_id, forward)?;
             } else {
-                let pol =
-                    FxOffer::get_assert(prev.account, prev.asset_id, hop.asset_id, true);
+                let pol = FxOffer::get_assert(prev.account, prev.asset_id, hop.asset_id, true);
                 pol.assert_live();
                 let key = (prev.account, prev.asset_id, hop.asset_id);
                 let used = spent.get(&key).copied().unwrap_or(0);

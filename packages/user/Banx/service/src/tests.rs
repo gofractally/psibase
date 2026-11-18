@@ -2423,6 +2423,7 @@ mod tests {
             CHARGE
         );
 
+        // The whole click is debt she owes, so the bound is a cap.
         Wrapper::push_from(&chain, isabelle)
             .take_fx(
                 michelle,
@@ -2430,7 +2431,7 @@ mod tests {
                 aud,
                 true,
                 Quantity::new(CHARGE),
-                quoted_aud as i64,
+                -(quoted_aud as i64),
                 0,
             )
             .get()?;
@@ -9377,6 +9378,18 @@ mod tests {
             short.to_string().contains("trade output below min_to"),
             "{short}"
         );
+        // Nothing is owed, so the fill is a receipt. A debt cap is the
+        // other side and must not open the position.
+        let debt_side = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), -40, 0)
+            .get()
+            .expect_err("a fresh buy signed as debt");
+        assert!(
+            debt_side.to_string().contains("trade output below min_to"),
+            "{debt_side}"
+        );
+        assert_eq!(exp(&chain, alice, gary, aud), 0);
+        assert_eq!(exp(&chain, gary, alice, usd), 0);
 
         Wrapper::push_from(&chain, gary)
             .take_fx(alice, aud, usd, true, Quantity::new(100), 45, 0)
@@ -9403,9 +9416,7 @@ mod tests {
 
     /// The amount bound does not see the APR. The taker signs the rate they read.
     #[psibase::test_case(packages("Banx"))]
-    fn test_take_fx_rejects_a_replaced_rate(
-        chain: psibase::Chain,
-    ) -> Result<(), psibase::Error> {
+    fn test_take_fx_rejects_a_replaced_rate(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init().get()?;
         let alice = account!("alice");
         let gary = account!("gary");
@@ -9648,6 +9659,15 @@ mod tests {
             covered.to_string().contains("trade output below min_to"),
             "{covered}"
         );
+        // 100 at half becomes 50 of debt. A cap of 49 is the same miss.
+        let cap = Wrapper::push_from(&chain, gary)
+            .take_fx(alice, aud, usd, true, Quantity::new(100), -49, 0)
+            .get()
+            .expect_err("pure rebook debt is 50, below a cap of -49");
+        assert!(
+            cap.to_string().contains("trade output below min_to"),
+            "{cap}"
+        );
         assert_eq!(exp(&chain, alice, gary, aud), 100);
         assert_eq!(exp(&chain, alice, gary, usd), 0);
         Ok(())
@@ -9691,13 +9711,13 @@ mod tests {
             )
             .get()?;
 
-        // 80 + 10 rebooks to 45 of debt. 20 − 10 opens 5 of receipt. Net debt 40.
+        // 80 + 10 rebooks to 45 of debt. 20 − 10 opens 5 of receipt. Net is -40.
         let over = Wrapper::push_from(&chain, gary)
             .take_fx(alice, aud, usd, true, Quantity::new(100), -39, 0)
             .get()
-            .expect_err("net debt is 40, above the signed cap");
+            .expect_err("net is -40, below a cap of -39");
         assert!(
-            over.to_string().contains("trade output above min_to"),
+            over.to_string().contains("trade output below min_to"),
             "{over}"
         );
         assert_eq!(exp(&chain, alice, gary, aud), 80);

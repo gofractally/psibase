@@ -331,8 +331,10 @@ interface api {
     /// Take the clicked from→to order. `poster-is-creditor` is that row.
     /// A buy rebooks from-asset you already owe them, then opens the rest.
     /// Their claim on you in that asset does not switch this to the sell.
-    /// `to-bound` is a signed human decimal in the to-asset. Positive floors
-    /// a receipt. Negative caps a debt. Zero on a split is a wash.
+    /// `to-bound` is the taker's to-asset net for this call, as a signed
+    /// human decimal. It is not stored. Positive floors a receipt, negative
+    /// caps a debt, and zero rejects finishing in debt. A buy with nothing
+    /// already owed rejects a debt cap.
     take-fx: func(
         poster: string,
         from-asset: u16,

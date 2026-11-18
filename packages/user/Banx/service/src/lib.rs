@@ -768,10 +768,11 @@ pub mod service {
     /// both legs for the rest of the click. If the poster already owes the
     /// sender that asset, the two legs still open and that claim nets as
     /// unwind. A sell only rebooks from-asset the poster owes the sender.
-    /// `to_bound` is the sender's signed net in the to-asset. Positive floors
-    /// a receipt and rejects any debt. Negative caps a debt; a receipt still
-    /// Zero on a buy is a wash: any debt is rejected, including a
-    /// click that has become a pure rebook. Zero on a sell does not bound.
+    /// `to_bound` is the sender's to-asset net for this call: receipt minus
+    /// debt. It is checked and dropped. Positive floors a receipt, negative
+    /// caps a debt, and zero rejects finishing in debt, including a buy that
+    /// has become a pure rebook. A fresh buy only receives, so a debt cap
+    /// fails. A sell receives, so zero and a debt cap both pass.
     /// `interest_rate` is the APR they read. A replaced rate fails, on a
     /// buy and on a sell. The amount bound does not see it.
     #[action]

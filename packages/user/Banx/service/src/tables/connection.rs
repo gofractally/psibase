@@ -172,10 +172,10 @@ impl Connection {
     /// from-asset): `apply_rate` sees `take + fee` and a zero fee. Otherwise
     /// the fee is taken out of `take`. The claim still shrinks by `take`.
     ///
-    /// `min_to` is the taker's signed bound. `add_fee` means the taker owes
-    /// the new amount, so a positive `min_to` caps it. Zero does not: a
-    /// take may leave the new debt unbounded. The other direction receives
-    /// the claim, and the same bound is a floor.
+    /// `min_to` is an unsigned quantity. `add_fee` means the taker owes the
+    /// new amount, so a positive `min_to` caps it and zero leaves that debt
+    /// uncapped. The other direction receives the claim, and `min_to` is a
+    /// floor.
     pub fn rebook(
         self,
         take: Quantity,
