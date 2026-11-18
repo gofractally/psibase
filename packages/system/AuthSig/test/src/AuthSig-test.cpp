@@ -45,39 +45,6 @@ namespace
                            "GjyjVxTbjHHHyq96f3lqGlbApIe9u1CUDng/qlj0jGbuz5sOeeIY/DWJ\n"
                            "-----END PRIVATE KEY-----\n")};
 
-   //{"data": {"nfts":{"edges":[{"node":{"id":2,"issuer":"alice","owner":"alice"}}]}}}
-   struct Node
-   {
-      uint32_t      id;
-      AccountNumber issuer;
-      AccountNumber owner;
-   };
-   PSIO_REFLECT(Node, id, issuer, owner);
-
-   struct Edge
-   {
-      Node node;
-   };
-   PSIO_REFLECT(Edge, node);
-
-   struct UserNfts
-   {
-      std::vector<Edge> edges;
-   };
-   PSIO_REFLECT(UserNfts, edges);
-
-   struct Data
-   {
-      UserNfts nfts;
-   };
-   PSIO_REFLECT(Data, nfts);
-
-   struct QueryRoot
-   {
-      Data data;
-   };
-   PSIO_REFLECT(QueryRoot, data);
-
 }  // namespace
 
 // Tx can be staged on behalf of an account using auth-sig
@@ -112,25 +79,20 @@ SCENARIO("AuthSig")
              .rawData = psio::to_frac(std::tuple(nftId, receiver, psibase::Memo{"Memo"}))};
       };
 
+      // nfts() requires the holder. root uses auth-any, so it can read getNft.
       auto getNfts = [](DefaultTestChain& t, AccountNumber acc) -> std::vector<uint32_t>
       {
-         std::string query_str = "query Nfts { nfts( user: \"" + acc.str() +
-                                 "\" ) { edges { node { id issuer owner } } } "
-                                 "}";
-         std::string_view query_sv = query_str;
-
-         auto query = GraphQLBody{query_sv};
-
-         std::cout << "Querying: " << std::string(query_sv) << "\n";
-         auto res = t.post(Nft::service, "/graphql", query);
-
-         auto body = std::string(res.body.begin(), res.body.end());
-         std::cout << "Response: " << body << "\n";
-         auto response_root = psio::convert_from_json<QueryRoot>(body);
-
-         return response_root.data.nfts.edges |
-                std::views::transform([](auto edge) { return edge.node.id; }) |
-                std::ranges::to<std::vector>();
+         std::vector<uint32_t> ids;
+         auto                  reader = t.from("root"_a);
+         for (NID id = 1;; ++id)
+         {
+            auto nft = reader.to<Nft>().getNft(id).returnVal();
+            if (!nft.has_value())
+               break;
+            if (nft->owner == acc)
+               ids.push_back(id);
+         }
+         return ids;
       };
 
       THEN("Alice has not minted any NFTs")
