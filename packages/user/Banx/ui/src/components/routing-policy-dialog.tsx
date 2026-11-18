@@ -424,6 +424,7 @@ export function RoutingPolicyDialog({
                                                     <field.TextField
                                                         label="Fee %"
                                                         inputMode="decimal"
+                                                        description="Kept when a payment goes through you to this person."
                                                         min={0}
                                                         max={
                                                             MAX_HOP_FEE_PERCENT
@@ -714,6 +715,7 @@ export function RoutingPolicyDialog({
                                                 <field.TextField
                                                     label="Fee %"
                                                     inputMode="decimal"
+                                                    description="Kept when a payment goes through you, and on a direct swap with your token pool."
                                                     min={0}
                                                     max={MAX_HOP_FEE_PERCENT}
                                                     step={MIN_PERCENT_STEP}

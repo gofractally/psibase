@@ -634,8 +634,8 @@ function IouPools({
                 </div>
             )}
             <p className="text-muted-foreground text-xs">
-                Removing a pool leaves money already owed. Adjusting only
-                changes the reserves.
+                Removing a pool leaves money already owed. The fee is your
+                forward, not this pool.
             </p>
             <Dialog
                 open={editing !== null}
@@ -742,8 +742,8 @@ function TokenPools({
                 </div>
             )}
             <p className="text-muted-foreground text-xs">
-                Removing a token pool returns the tokens still in it. Claims
-                already drawn stay.
+                Removing a token pool returns the tokens still in it. A direct
+                swap pays your forward fee on that IOU.
             </p>
         </section>
     );
@@ -771,7 +771,7 @@ export function RelaysPage() {
         <div className="space-y-10">
             <PageHeader
                 title="Pools"
-                description="Constant-product pools you have posted."
+                description="Pools set a price. They have no fee of their own."
                 action={
                     <Button
                         type="button"
@@ -812,14 +812,15 @@ export function RelaysPage() {
                             <DialogDescription>
                                 Type a market price and the other reserve follows.
                                 You can also type both reserves. Posting creates
-                                no debt. One pool per pair.
+                                no debt. A path through you pays your forward fee.
                             </DialogDescription>
                         ) : (
                             <DialogDescription>
                                 The IOU reserve is a virtual weight. You deposit
-                                the token reserve into this pool. The same pair
-                                cannot be posted twice. Removing the pool
-                                returns the tokens still in it.
+                                the token reserve into this pool. A direct swap
+                                with you pays your forward fee on that IOU. A
+                                path that only delivers the tokens does not pay
+                                it again.
                             </DialogDescription>
                         )}
                     </DialogHeader>
