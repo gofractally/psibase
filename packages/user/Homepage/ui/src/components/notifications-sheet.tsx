@@ -138,7 +138,7 @@ const TransferItem = ({
     return (
         <li>
             <Link
-                to="/tokens/Pending"
+                to={`/tokens/Pending?token=${transfer.token.id}`}
                 onClick={onNavigate}
                 className={itemClass}
             >

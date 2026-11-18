@@ -74,7 +74,8 @@ export const RemoveLiquidityModal = ({
                         amount={
                             Number(firstWithdrawal?.amount).toString() || ""
                         }
-                        avatarSeed={firstWithdrawal?.tokenId?.toString() ?? "?"}
+                        tokenId={firstWithdrawal?.tokenId}
+                        iconHash={firstWithdrawalSymbol?.iconHash}
                         label="Withdrawal #1"
                         title={
                             firstWithdrawalSymbol?.symbol ||
@@ -90,9 +91,8 @@ export const RemoveLiquidityModal = ({
                         amount={
                             Number(secondWithdrawal?.amount).toString() ?? ""
                         }
-                        avatarSeed={
-                            secondWithdrawal?.tokenId?.toString() ?? "?"
-                        }
+                        tokenId={secondWithdrawal?.tokenId}
+                        iconHash={secondWithdrawalSymbol?.iconHash}
                         label="Withdrawal #2"
                         title={
                             secondWithdrawalSymbol?.symbol ||

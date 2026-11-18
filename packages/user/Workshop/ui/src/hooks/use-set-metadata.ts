@@ -37,7 +37,6 @@ export const useSetMetadata = () =>
                         if (oldData) {
                             return {
                                 accountId: oldData.accountId,
-                                status: oldData.status,
                                 createdAt: oldData.createdAt,
                                 ...metadata,
                             };

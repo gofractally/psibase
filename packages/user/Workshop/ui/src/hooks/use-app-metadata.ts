@@ -5,8 +5,6 @@ import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { registry } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
-export const Status = z.enum(["draft", "published", "unpublished"]);
-
 export const MetadataResponse = z.object({
     appMetadata: z
         .object({
@@ -16,7 +14,6 @@ export const MetadataResponse = z.object({
             longDesc: z.string(),
             icon: z.string(),
             iconMimeType: z.string(),
-            status: z.string(),
             createdAt: z.string(),
             tags: z.array(z.string()),
         })
@@ -42,7 +39,6 @@ export const fetchMetadata = async (account: string) => {
             longDesc
             icon
             iconMimeType
-            status
             createdAt
             tags
           }

@@ -163,6 +163,26 @@ class Transact extends PluginInterface {
     }
 }
 
+class Accounts extends PluginInterface {
+    protected override readonly _intf = "accounts" as const;
+
+    get freeze() {
+        return this._call<[accounts: string[], memo: string | undefined]>(
+            "freeze",
+        );
+    }
+
+    get unfreeze() {
+        return this._call<[accounts: string[], memo: string | undefined]>(
+            "unfreeze",
+        );
+    }
+
+    get graphql() {
+        return this._call<[query: string], string>("graphql");
+    }
+}
+
 export class Plugin {
     readonly nameMarket: NameMarket;
     readonly packaging: Packaging;
@@ -172,6 +192,7 @@ export class Plugin {
     readonly sites: Sites;
     readonly transact: Transact;
     readonly tokens: Tokens;
+    readonly accounts: Accounts;
 
     constructor(readonly service: Account) {
         this.nameMarket = new NameMarket();
@@ -182,6 +203,7 @@ export class Plugin {
         this.sites = new Sites();
         this.transact = new Transact();
         this.tokens = new Tokens();
+        this.accounts = new Accounts();
 
         const instances = [
             this.nameMarket,
@@ -192,6 +214,7 @@ export class Plugin {
             this.sites,
             this.transact,
             this.tokens,
+            this.accounts,
         ] as PluginInterface[];
 
         for (const instance of instances) {

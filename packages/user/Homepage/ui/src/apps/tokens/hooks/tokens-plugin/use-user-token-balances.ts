@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { fetchTokenMeta } from "@/apps/tokens/lib/graphql/ui";
+import {
+    type TokenSummary,
+    fetchTokenMeta,
+    fetchUserTokensWithActivity,
+} from "@/apps/tokens/lib/graphql/ui";
 
 import QueryKey from "@/lib/query-keys";
 
@@ -19,7 +23,32 @@ export interface Token {
     label: string;
     precision: number;
     isTransferable: boolean;
+    iconHash: string | null;
+    owner: string | null;
 }
+
+/** A token the user has no balance in, e.g. one with only past or pending activity */
+export const zeroBalanceToken = (token: TokenSummary): Token => {
+    const balance = new Quantity("0", token.precision, token.id, token.symbol);
+    return {
+        id: token.id,
+        balance,
+        symbol: token.symbol,
+        label: balance.getDisplayLabel(),
+        precision: token.precision,
+        isTransferable: !token.settings.untransferable,
+        iconHash: token.iconHash,
+        owner: token.owner,
+    };
+};
+
+/** Tokens with balance history for the user, including those now at zero */
+export const useUserTokensWithActivity = (username?: Account | null) =>
+    useQuery<TokenSummary[]>({
+        queryKey: QueryKey.userTokensWithActivity(username),
+        enabled: !!username,
+        queryFn: () => fetchUserTokensWithActivity(zAccount.parse(username)),
+    });
 
 export const useUserTokenBalances = (
     optionalUsername?: Account | undefined | null,
@@ -50,15 +79,19 @@ export const useUserTokenBalances = (
                     balance.symbol,
                 );
 
+                const meta = tokensMeta.find(
+                    (meta) => meta.id === balance.tokenId,
+                );
+
                 return {
                     id: balance.tokenId,
                     symbol: balance.symbol ?? null,
                     precision: quan.precision,
                     label: quan.getDisplayLabel(),
                     balance: quan,
-                    isTransferable:
-                        tokensMeta.find((meta) => meta.id === balance.tokenId)
-                            ?.settings.untransferable === false,
+                    isTransferable: meta?.settings.untransferable === false,
+                    iconHash: balance.iconHash ?? null,
+                    owner: meta?.owner ?? null,
                 };
             });
 

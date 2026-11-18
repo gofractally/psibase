@@ -107,6 +107,7 @@ namespace SystemService
                                                      "ETag",
                                                      "Location",
                                                      "Set-Cookie",
+                                                     "Vary",
                                                      "X-Content-Type-Options"};
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)

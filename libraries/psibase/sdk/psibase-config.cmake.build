@@ -49,19 +49,32 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/libraries/psibase/common/include
         @ROOT_SOURCE_DIR@/libraries/psibase/wasm32-psibase
         @ROOT_SOURCE_DIR@/packages/system/Accounts/include
+        @ROOT_SOURCE_DIR@/packages/system/AuthDelegate/include
         @ROOT_SOURCE_DIR@/packages/system/AuthAny/include
+        @ROOT_SOURCE_DIR@/packages/system/AuthNone/include
         @ROOT_SOURCE_DIR@/packages/system/AuthSig/include
-        @ROOT_SOURCE_DIR@/packages/system/Producers/include
+        @ROOT_SOURCE_DIR@/packages/system/CpuLimit/include
+        @ROOT_SOURCE_DIR@/packages/system/Credentials/service/cpp/include
+        @ROOT_SOURCE_DIR@/packages/system/Db/include
         @ROOT_SOURCE_DIR@/packages/system/HttpServer/include
+        @ROOT_SOURCE_DIR@/packages/system/Producers/include
         @ROOT_SOURCE_DIR@/packages/system/SetCode/include
+        @ROOT_SOURCE_DIR@/packages/system/StagedTx/service/cpp/include
         @ROOT_SOURCE_DIR@/packages/system/Transact/include
+        @ROOT_SOURCE_DIR@/packages/system/VerifySig/include
+        @ROOT_SOURCE_DIR@/packages/system/VirtualServer/service/cpp/include
+        @ROOT_SOURCE_DIR@/packages/system/WsAuth/service/cpp/include
         @ROOT_SOURCE_DIR@/packages/user/CommonApi/include
+        @ROOT_SOURCE_DIR@/packages/user/DynLd/include
+        @ROOT_SOURCE_DIR@/packages/user/Events/include
         @ROOT_SOURCE_DIR@/packages/user/Explorer/include
+        @ROOT_SOURCE_DIR@/packages/user/Invite/include
         @ROOT_SOURCE_DIR@/packages/user/Nft/include
+        @ROOT_SOURCE_DIR@/packages/user/Nop/include
+        @ROOT_SOURCE_DIR@/packages/user/Packages/include
         @ROOT_SOURCE_DIR@/packages/user/Sites/include
         @ROOT_SOURCE_DIR@/packages/user/Symbol/include
         @ROOT_SOURCE_DIR@/packages/user/Tokens/include
-        @ROOT_SOURCE_DIR@/packages/user/Invite/include
     )
     target_link_libraries(psibase${suffix} INTERFACE
         -L@ROOT_BINARY_DIR@/wasm/libraries/psibase

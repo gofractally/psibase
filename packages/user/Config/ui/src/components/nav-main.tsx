@@ -1,4 +1,5 @@
 import {
+    Ban,
     DollarSign,
     FolderUp,
     Handshake,
@@ -68,6 +69,11 @@ export const appMenus: Menu[] = [
         title: "Account Marketplace",
         icon: Store,
         path: "account-marketplace",
+    },
+    {
+        title: "Freeze accounts",
+        icon: Ban,
+        path: "freeze",
     },
     {
         title: "Settings",

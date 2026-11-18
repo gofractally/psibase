@@ -48,6 +48,11 @@ export {
 } from "./supervisor-initialized";
 
 export {
+    isSupervisorStartupFailed,
+    buildMessageSupervisorStartupFailed,
+} from "./supervisor-startup-failed";
+
+export {
     type GetJsonRequest,
     isGetJsonRequest,
     buildGetJsonRequest,

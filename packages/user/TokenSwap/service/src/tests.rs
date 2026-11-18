@@ -7,16 +7,6 @@ mod tests {
     use psibase::services::tokens::{BalanceFlags, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
 
-    fn enable_nft_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
-        psibase::services::nft::Wrapper::push_from(chain, account)
-            .setUserConf(
-                psibase::services::nft::NftHolderFlags::AUTO_DEBIT.index(),
-                true,
-            )
-            .get()
-            .unwrap();
-    }
-
     fn enable_token_auto_debit(chain: &psibase::Chain, account: AccountNumber) {
         Tokens::push_from(chain, account)
             .setUserConf(BalanceFlags::AUTO_DEBIT.index(), true)
@@ -26,7 +16,6 @@ mod tests {
 
     fn setup_user(chain: &psibase::Chain, account: AccountNumber) {
         chain.new_account(account).unwrap();
-        enable_nft_auto_debit(chain, account);
         enable_token_auto_debit(chain, account);
     }
 
@@ -38,6 +27,15 @@ mod tests {
     ) -> u32 {
         let token_id = Tokens::push_from(&chain, sender)
             .create(4.try_into().unwrap(), u64::MAX.into())
+            .get()
+            .unwrap();
+        let nft_id = Tokens::push(&chain)
+            .getToken(token_id)
+            .get()
+            .unwrap()
+            .nft_id;
+        psibase::services::nft::Wrapper::push_from(chain, sender)
+            .debit(nft_id, "".into())
             .get()
             .unwrap();
 
@@ -64,10 +62,18 @@ mod tests {
         token_b_amount: Quantity,
         nft_id: Option<u32>,
     ) -> (u32, u32) {
-        Wrapper::push_from(&chain, sender)
+        let (pool_id, admin_nft) = Wrapper::push_from(&chain, sender)
             .new_pool(token_a, token_b, token_a_amount, token_b_amount, nft_id)
             .get()
-            .unwrap()
+            .unwrap();
+        // A newly minted admin NFT is only credited. Claim it.
+        if nft_id.is_none() {
+            psibase::services::nft::Wrapper::push_from(chain, sender)
+                .debit(admin_nft, "".into())
+                .get()
+                .unwrap();
+        }
+        (pool_id, admin_nft)
     }
 
     #[track_caller]

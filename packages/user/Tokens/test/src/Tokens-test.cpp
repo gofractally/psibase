@@ -25,6 +25,13 @@ namespace
 
    const psibase::Memo memo{"memo"};
 
+   template <typename Account>
+   void claimIssuedNft(Account& account, uint32_t tokenId)
+   {
+      auto nftId = account.template to<Tokens>().getToken(tokenId).returnVal().nft_id;
+      CHECK(account.template to<Nft>().debit(nftId, memo).succeeded());
+   }
+
 }  // namespace
 
 SCENARIO("Using system token")
@@ -155,8 +162,8 @@ SCENARIO("Minting tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
+      claimIssuedNft(alice, tokenId);
 
       THEN("Bob may not mint them")
       {
@@ -213,8 +220,8 @@ SCENARIO("Recalling tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
+      claimIssuedNft(alice, tokenId);
       auto token   = a.getToken(tokenId).returnVal();
       a.mint(tokenId, 1'000e4, memo);
       a.setUserConf(Tokens::autoDebit, true);
@@ -268,10 +275,8 @@ SCENARIO("Interactions with the Issuer NFT")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
-      bob.to<Nft>().setUserConf(Nft::autoDebit, true);
-
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
+      claimIssuedNft(alice, tokenId);
       auto token   = a.getToken(tokenId).returnVal();
       auto nft     = alice.to<Nft>().getNft(token.nft_id).returnVal().value();
 
@@ -285,6 +290,7 @@ SCENARIO("Interactions with the Issuer NFT")
       WHEN("Alice credits the issuer NFT to Bob")
       {
          alice.to<Nft>().credit(nft.id, bob, memo);
+         CHECK(bob.to<Nft>().debit(nft.id, memo).succeeded());
 
          THEN("The NFT is owned by Bob")
          {
@@ -361,8 +367,8 @@ SCENARIO("Burning tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
+      claimIssuedNft(alice, tokenId);
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
 
@@ -507,8 +513,8 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
+      claimIssuedNft(alice, tokenId);
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
       a.setUserConf(Tokens::autoDebit, true);
@@ -579,9 +585,9 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       b.setUserConf(Tokens::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
+      claimIssuedNft(alice, tokenId);
       auto token   = a.getToken(tokenId).returnVal();
 
       a.mint(tokenId, 200e4, memo);
@@ -713,8 +719,6 @@ SCENARIO("Mapping a symbol to a token")
       auto userBalance = 1'000'000e4;
       aliceTokens.setUserConf(Tokens::autoDebit, true);
       bobTokens.setUserConf(Tokens::autoDebit, true);
-      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
-      bob.to<Nft>().setUserConf(Nft::autoDebit, true);
 
       auto sysToken = sysIssuer.create(Precision{4}, userBalance).returnVal();
 
@@ -731,6 +735,7 @@ SCENARIO("Mapping a symbol to a token")
 
       // Mint a second token
       auto newToken = aliceTokens.create(Precision{4}, userBalance).returnVal();
+      claimIssuedNft(alice, newToken);
       aliceTokens.mint(newToken, userBalance, memo);
 
       auto symbolCtx = t.from("symbol"_a);
@@ -743,6 +748,7 @@ SCENARIO("Mapping a symbol to a token")
       CHECK(create.succeeded());
       auto symbolRecord = alice.to<Symbol>().getSymbol(symbolId).returnVal();
       auto nftId        = symbolRecord.ownerNft;
+      CHECK(alice.to<Nft>().debit(nftId, memo).succeeded());
 
       THEN("Bob is unable to map the symbol to the token")
       {
@@ -804,6 +810,7 @@ SCENARIO("Mapping a symbol to a token")
             auto newSymbol = "bcd"_a;
             alice.to<Symbol>().create(newSymbol);
             auto newNft = alice.to<Symbol>().getSymbol(newSymbol).returnVal().ownerNft;
+            CHECK(alice.to<Nft>().debit(newNft, memo).succeeded());
 
             CHECK(alice.to<Nft>().credit(newNft, Symbol::service, memo).succeeded());
             CHECK(aliceSymbol.mapSymbol(newToken, newSymbol).succeeded());
@@ -849,7 +856,6 @@ TEST_CASE("GraphQL Queries")
 
    a.setUserConf(Tokens::autoDebit, true);
    bob.to<Tokens>().setUserConf(Tokens::autoDebit, true);
-   alice.to<Nft>().setUserConf(Nft::autoDebit, true);
 
    auto sysIssuer = t.from(Symbol::service).to<Tokens>();
    auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();

@@ -3,6 +3,7 @@ members = [
     "system/Accounts/plugin/accounts/",
     "system/Accounts/plugin/query/",
     "system/AuthAny/plugin/",
+    "system/AuthNone/plugin/",
     "system/AuthDelegate/plugin/",
     "system/AuthSig/plugin/",
     "system/Transact/plugin/transact/",

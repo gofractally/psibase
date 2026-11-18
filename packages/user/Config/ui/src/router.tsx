@@ -6,6 +6,7 @@ import { Layout } from "./components/layout";
 import { NameMarketConfig } from "./pages/account-marketplace";
 import { BlockProduction } from "./pages/block-production";
 import { Branding } from "./pages/branding";
+import { FreezeAccounts } from "./pages/freeze-accounts";
 import { Loader } from "./pages/loader";
 import { Packages } from "./pages/packages";
 import { PendingTransaction } from "./pages/pending-transaction";
@@ -93,6 +94,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <NameMarketConfig />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "freeze",
+                element: (
+                    <ProtectedRoute>
+                        <FreezeAccounts />
                     </ProtectedRoute>
                 ),
             },

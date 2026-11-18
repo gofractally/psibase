@@ -8,6 +8,14 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 # Additional design notes
 
+## Default account page
+
+Every subdomain for valid account names is reachable, even for accounts that never upload any content or don't exist. When a browser requests a page that matches none of an account's content, and the account has no `/index.html` and no proxy, the `sites` service serves a default page with a `404 Not Found` status. The page tells visitors there's nothing at that address yet, and links the account's owner to the Workshop app (when installed) and to the developer docs.
+
+The default page is uploaded by the `common-api` service at `/common/default-pages/index.html`, along with the stylesheet and script it loads from the same directory. Since every `/common/` path is served by `common-api` on every subdomain, these files are always available and can't conflict with an account's own files.
+
+The account's own content always takes precedence. Other requests that match nothing, such as subresource loads (e.g. `/style.css` or a plugin's `.wasm`), `fetch()` calls, and CLI tools, get a plain `404 Not Found`, because their `Accept` header doesn't prefer HTML. An account that has an `/index.html` or a proxy never gets the default page; its misses are looked up in its proxy's content, if it has one, and otherwise get a plain `404 Not Found`. Sites in SPA mode are the exception: they serve their own `/index.html` for every path without a file extension, so they can render their own not-found view.
+
 ## CSP header baseline
 
 The `Content-Security-Policy` header aids security efforts, as modern browsers restrict the capabilities of the document on the client-side according to the policy expressed in this header. The sites server uses a strict baseline CSP header; apps with additional requirements (e.g. the supervisor, prompt pages, or sites built with tooling that emits inline scripts) override it with the `setCsp` action.
@@ -19,7 +27,7 @@ Host sources are written scheme-relative (no `http://`/`https://` prefix), so th
 | `default-src`     | `'self'`                                                     |
 | `script-src`      | `'self'`                                                     |
 | `style-src`       | `'self' 'unsafe-inline'`                                     |
-| `img-src`         | `'self' data: profiles.{{root}}/avatar/ branding.{{root}}`   |
+| `img-src`         | `'self' data: profiles.{{root}}/avatar/ tokens.{{root}}/icon/ branding.{{root}}` |
 | `font-src`        | `'self'`                                                     |
 | `connect-src`     | `'self' profiles.{{root}} tokens.{{root}}`                   |
 | `frame-src`       | `supervisor.{{root}}`                                        |
@@ -34,7 +42,7 @@ Notable consequences of the strict baseline:
 - Pages may only be embedded same-origin (`frame-ancestors 'self'`). Pages designed to be embedded by the supervisor (e.g. plugin prompt pages) need to widen `frame-ancestors` to include the supervisor's origin.
 - The supervisor is the only origin a page may embed. This covers the hidden supervisor iframe used by apps that make plugin calls; apps that don't (e.g. static sites) simply never mount a frame.
 - `fetch` and WebSocket connections are limited to the app's own origin plus the `profiles` and `tokens` services. `'self'` covers an app's own `/graphql` and RPC endpoints and the `/common/*` endpoints (served same-origin on every subdomain). `profiles.{{root}}` and `tokens.{{root}}` are granted because the shared UI hooks (`useProfile`, `useSystemToken`) fetch them from nearly every app; both expose only public data, and writes require signed transactions.
-- Cross-subdomain image loads are limited to user avatars (served by the `profiles` service at `profiles.{{root}}/avatar/<account>`) and the network logo (served from `branding.{{root}}`).
+- Cross-subdomain image loads are limited to user avatars (served by the `profiles` service at `profiles.{{root}}/avatar/<account>`), token icons (served by the `tokens` service at `tokens.{{root}}/icon/<token-id>`), and the network logo (served from `branding.{{root}}`).
 
 ### Dynamic CSP
 

@@ -2,10 +2,12 @@ import type { Token } from "../hooks/tokens-plugin/use-user-token-balances";
 
 import { Lock } from "lucide-react";
 
+import { usePoolPairs } from "@/apps/token-swap/hooks/use-pool-pairs";
+
 import { EmptyState } from "@/components/empty-state";
 import { Panel } from "@/components/page-header";
 
-import { Avatar } from "@shared/components/avatar";
+import { TokenIcon } from "@shared/components/token-icon";
 import { cn } from "@shared/lib/utils";
 import {
     Tooltip,
@@ -14,22 +16,31 @@ import {
 } from "@shared/shadcn/ui/tooltip";
 
 export const TokenBalances = ({
+    title,
+    emptyLabel,
     tokens,
     selectedToken,
+    incomingTokenIds,
     onSelect,
 }: {
+    title: string;
+    emptyLabel: string;
     tokens: Token[];
     selectedToken?: Token;
+    /** Tokens with an incoming transfer waiting to be accepted */
+    incomingTokenIds?: ReadonlySet<number>;
     onSelect: (tokenId: string) => void;
 }) => {
+    const poolPairs = usePoolPairs();
+
     return (
         <Panel
-            title="Balances"
+            title={title}
             description={`${tokens.length} token${tokens.length === 1 ? "" : "s"}`}
             className="self-start"
         >
             {tokens.length === 0 ? (
-                <EmptyState className="min-h-24">No tokens held</EmptyState>
+                <EmptyState className="min-h-24">{emptyLabel}</EmptyState>
             ) : (
                 <ul className="flex flex-col">
                     {tokens.map((token) => {
@@ -53,10 +64,11 @@ export const TokenBalances = ({
                                     {selected && (
                                         <span className="bg-primary absolute inset-y-1.5 left-0 w-0.5 rounded-r" />
                                     )}
-                                    <Avatar
-                                        account={token.label}
-                                        type="glass"
-                                        className="size-6 shrink-0 border-0 shadow-none"
+                                    <TokenIcon
+                                        tokenId={token.id}
+                                        iconHash={token.iconHash}
+                                        pair={poolPairs.get(token.id)}
+                                        className="size-6"
                                     />
                                     <span className="flex min-w-0 flex-1 flex-col leading-tight">
                                         <span className="flex items-center gap-1.5">
@@ -78,6 +90,13 @@ export const TokenBalances = ({
                                                         Not transferable
                                                     </TooltipContent>
                                                 </Tooltip>
+                                            )}
+                                            {incomingTokenIds?.has(
+                                                token.id,
+                                            ) && (
+                                                <span className="rounded bg-amber-500/15 px-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                                                    Pending
+                                                </span>
                                             )}
                                         </span>
                                         <span className="text-muted-foreground text-[11px]">

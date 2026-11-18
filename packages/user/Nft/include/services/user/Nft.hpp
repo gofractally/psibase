@@ -22,8 +22,7 @@ namespace UserService
                                             UserPendingTable,
                                             BurnedTable>;
 
-      static constexpr auto         service   = psibase::AccountNumber("nft");
-      static constexpr std::uint8_t autoDebit = 0;
+      static constexpr auto service = psibase::AccountNumber("nft");
 
       Nft(psio::shared_view_ptr<psibase::Action> action);
 
@@ -31,17 +30,19 @@ namespace UserService
       NID  mint(std::optional<NID> nftId);
       void burn(NID nftId);
       void credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
+      void transfer(NID                             nftId,
+                    psibase::AccountNumber          receiver,
+                    psio::view<const psibase::Memo> memo);
       void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
       void debit(NID nftId, psio::view<const psibase::Memo> memo);
-      void setUserConf(std::uint8_t flag, bool enable);
+      void setAutoDebit(std::optional<bool> autodebit);
 
       // Read-only:
-      std::optional<NftRecord> getNft(NID nftId);
-      std::vector<NID>         getHeldIds(psibase::AccountNumber issuer, psibase::AccountNumber owner);
-      NftHolderRecord          getNftHolder(psibase::AccountNumber account);
+      std::optional<NftRecord>    getNft(NID nftId);
+      std::vector<NID>            getHeldIds(psibase::AccountNumber issuer, psibase::AccountNumber owner);
+      NftHolderRecord             getNftHolder(psibase::AccountNumber account);
       std::optional<CreditRecord> getCredRecord(NID nftId);
-      bool                     exists(NID nftId);
-      bool                     getUserConf(psibase::AccountNumber account, std::uint8_t flag);
+      bool                        exists(NID nftId);
 
      public:
       struct Events
@@ -63,16 +64,16 @@ namespace UserService
       method(mint, nftId),
       method(burn, nftId),
       method(credit, nftId, receiver, memo),
+      method(transfer, nftId, receiver, memo),
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
-      method(setUserConf, flag, enable),
+      method(setAutoDebit, autodebit),
 
       method(getNft, nftId),
       method(getHeldIds, issuer, owner),
       method(getNftHolder, account),
       method(getCredRecord, nftId),
-      method(exists, nftId),
-      method(getUserConf, account, flag)
+      method(exists, nftId)
    );
    PSIBASE_REFLECT_HISTORY_EVENTS(Nft,
       method(ownerChange, nftId, action, account, counter_party, memo),

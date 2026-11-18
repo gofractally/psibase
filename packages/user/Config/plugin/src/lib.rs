@@ -5,6 +5,7 @@ use bindings::*;
 use host::types::types::Error;
 
 use exports::config::plugin::{
+    accounts::Guest as AccountsGuest,
     branding::Guest as Branding,
     name_market::{Guest as NameMarket, MarketConfig},
     packaging::Guest as Packaging,
@@ -292,6 +293,23 @@ impl VirtualServer for ConfigPlugin {
     fn unreg_res_provider() -> Result<(), Error> {
         assert_caller_self();
         virtual_server::plugin::admin::unreg_res_provider()
+    }
+}
+
+impl AccountsGuest for ConfigPlugin {
+    fn freeze(accounts: Vec<String>, memo: Option<String>) -> Result<(), Error> {
+        set_propose_latch(Some("accounts"))?;
+        accounts::plugin::admin::freeze(&accounts, memo.as_deref())
+    }
+
+    fn unfreeze(accounts: Vec<String>, memo: Option<String>) -> Result<(), Error> {
+        set_propose_latch(Some("accounts"))?;
+        accounts::plugin::admin::unfreeze(&accounts, memo.as_deref())
+    }
+
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_caller_self();
+        accounts::plugin::api::graphql(&query)
     }
 }
 

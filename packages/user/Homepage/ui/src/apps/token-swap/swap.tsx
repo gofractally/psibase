@@ -92,8 +92,16 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
         () =>
             pools
                 ?.flatMap((pool) => [
-                    { id: pool.tokenAId, symbol: pool.tokenASymbol },
-                    { id: pool.tokenBId, symbol: pool.tokenBSymbol },
+                    {
+                        id: pool.tokenAId,
+                        symbol: pool.tokenASymbol,
+                        iconHash: pool.tokenAIconHash,
+                    },
+                    {
+                        id: pool.tokenBId,
+                        symbol: pool.tokenBSymbol,
+                        iconHash: pool.tokenBIconHash,
+                    },
                 ])
                 .filter(
                     (item, index, arr) =>

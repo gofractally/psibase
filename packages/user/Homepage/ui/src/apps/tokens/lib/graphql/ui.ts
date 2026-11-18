@@ -4,10 +4,22 @@ import { graphqlAuth } from "@shared/lib/graphql/graphql-auth";
 import { homepage } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 
+const tokenSummaryFields = `
+    id
+    symbol
+    precision
+    iconHash
+    owner
+    settings {
+        untransferable
+    }
+`;
+
 const qs = {
     tokenMeta: (tokenId: string) => `
         token(tokenId: "${tokenId}") {
             id
+            owner
             settings {
                 untransferable
                 unrecallable
@@ -31,9 +43,7 @@ const qs = {
             nodes {
                 sharedBal {
                     token {
-                        id
-                        symbol
-                        precision
+                        ${tokenSummaryFields}
                     }
                     balance
                     creditor
@@ -76,6 +86,7 @@ export {
 
 const zTokenMetaNodeSchema = z.object({
     id: z.number(),
+    owner: zAccount.nullable(),
     settings: z.object({
         untransferable: z.boolean(),
         unrecallable: z.boolean(),
@@ -130,13 +141,39 @@ export const fetchUserTokenBalanceChanges = async (
     return parsed.balChanges.nodes;
 };
 
+export const zTokenSummarySchema = z.object({
+    id: z.number(),
+    symbol: z.string().nullable(),
+    precision: z.number(),
+    iconHash: z.string().nullable(),
+    owner: zAccount.nullable(),
+    settings: z.object({
+        untransferable: z.boolean(),
+    }),
+});
+
+export type TokenSummary = z.infer<typeof zTokenSummarySchema>;
+
+// Tokens with balance history
+const zUserTokensWithActivityResSchema = z.object({
+    userTokensWithActivity: z.array(zTokenSummarySchema),
+});
+
+export const fetchUserTokensWithActivity = async (username: string) => {
+    const query = `{
+        userTokensWithActivity(user: "${username}") {
+            ${tokenSummaryFields}
+        }
+    }`;
+    const res = await graphqlAuth<
+        z.infer<typeof zUserTokensWithActivityResSchema>
+    >(homepage.tokens.graphql, query);
+    return zUserTokensWithActivityResSchema.parse(res).userTokensWithActivity;
+};
+
 // Open Lines of Credit
 export const zSharedBalSchema = z.object({
-    token: z.object({
-        id: z.number(),
-        symbol: z.string().nullable(),
-        precision: z.number(),
-    }),
+    token: zTokenSummarySchema,
     balance: z.string(),
     creditor: zAccount,
     debitor: zAccount,

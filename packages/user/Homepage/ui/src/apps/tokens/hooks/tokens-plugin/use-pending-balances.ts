@@ -16,6 +16,7 @@ export interface PendingBalance {
     debitor: Account;
     id: number;
     label: string;
+    token: SharedBalNode["token"];
 }
 
 export const useUserPendingBalance = (
@@ -44,6 +45,7 @@ export const useUserPendingBalance = (
                     debitor: sbn.debitor,
                     id: sbn.token.id,
                     label: sbn.token.symbol ?? "ID:" + sbn.token.id,
+                    token: sbn.token,
                 };
             };
 

@@ -174,6 +174,11 @@ pub mod tables {
                 .map(|s| s.symbolId)
         }
 
+        /// Content hash of the token's icon, or null if it has no icon
+        pub async fn icon_hash(&self) -> Option<psibase::Checksum256> {
+            psibase::services::tokens::icon_hash(self.token_id)
+        }
+
         pub async fn pool(&self) -> Pool {
             Pool::get_assert(self.pool_id)
         }
