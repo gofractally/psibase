@@ -5,6 +5,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/fileUtil.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/package.hpp>
 #include <psibase/trace.hpp>
 #include <psio/to_hex.hpp>
 #include <services/system/Accounts.hpp>
@@ -492,6 +493,11 @@ namespace psibase
        * Boots the chain.
        */
       void boot(const std::vector<std::string>& names, bool installUI);
+
+      /**
+       * Installs a packages to the chain
+       */
+      void install(const PackagedService& package, bool installUI = true);
 
       /**
        * By default, the TestChain will automatically advance blocks.
