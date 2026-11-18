@@ -33,8 +33,8 @@ impl BanxRelay {
         assert!(reserve_a.value > 0, "relay reserve must be positive");
         assert!(reserve_b.value > 0, "relay reserve must be positive");
         assert!(fee_ppm < PPM_SCALE, "relay fee must be under 100%");
-        let _ = Asset::get_assert(asset_a);
-        let _ = Asset::get_assert(asset_b);
+        Asset::get_assert(asset_a);
+        Asset::get_assert(asset_b);
         let (asset_lo, asset_hi, reserve_lo, reserve_hi) = if asset_a < asset_b {
             (asset_a, asset_b, reserve_a, reserve_b)
         } else {

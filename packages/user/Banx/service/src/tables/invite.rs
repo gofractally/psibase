@@ -62,7 +62,7 @@ impl BanxInvite {
             interest_rate <= PPM_SCALE,
             "interest_rate exceeds 100% (PPM_SCALE)"
         );
-        let _ = Asset::get_assert(asset_id);
+        Asset::get_assert(asset_id);
 
         let inviter = get_sender();
         let cost = Self::invite_cost(num_accounts);
@@ -125,7 +125,9 @@ impl BanxInvite {
                 self.interest_rate,
                 self.grace_seconds,
             );
+            // The hook sender is the invite service. The line is the inviter's.
             emit_pair_activity(
+                self.inviter,
                 self.inviter,
                 accepter,
                 self.asset_id,

@@ -91,6 +91,7 @@ pub mod service {
         );
         emit_pair_activity(
             creditor,
+            creditor,
             debitor,
             asset_id,
             "credit_line",
@@ -176,6 +177,7 @@ pub mod service {
         );
         emit_pair_activity(
             debtor,
+            debtor,
             creditor,
             asset_id,
             "book_auth",
@@ -193,6 +195,7 @@ pub mod service {
         let debtor = get_sender();
         BookAuth::get_assert(debtor, creditor, asset_id).remove();
         emit_pair_activity(
+            debtor,
             debtor,
             creditor,
             asset_id,
@@ -223,6 +226,7 @@ pub mod service {
         let netted = BookAuth::get_assert(debtor, creditor, asset_id).book(amount, interest_rate);
         emit_pair_activity(
             creditor,
+            creditor,
             debtor,
             asset_id,
             "book",
@@ -241,6 +245,7 @@ pub mod service {
         let creditor = get_sender();
         CreditLine::get_assert(creditor, debitor, asset_id).remove();
         emit_pair_activity(
+            creditor,
             creditor,
             debitor,
             asset_id,
@@ -475,8 +480,10 @@ pub mod service {
         amount: Quantity,
         min_proceeds: Quantity,
     ) {
+        let seller = get_sender();
         ClaimOffer::get_live(buyer, debtor, asset_id, ClaimOffer::BUY).execute(
-            get_sender(),
+            seller,
+            seller,
             buyer,
             debtor,
             amount,
@@ -499,9 +506,11 @@ pub mod service {
         amount: Quantity,
         max_cost: Quantity,
     ) {
+        let buyer = get_sender();
         ClaimOffer::get_live(seller, debtor, asset_id, ClaimOffer::SELL).execute(
+            buyer,
             seller,
-            get_sender(),
+            buyer,
             debtor,
             amount,
             max_cost,
@@ -685,7 +694,7 @@ pub mod service {
     #[action]
     fn csh_fund(token_id: u32, amount: Quantity) {
         assert!(amount.value > 0, "csh_fund amount must be positive");
-        let _ = Tokens::call().getToken(token_id);
+        Tokens::call().getToken(token_id);
         let poster = get_sender();
         CashQuote::take_tokens(poster, token_id, amount, "csh_fund");
     }
@@ -829,8 +838,8 @@ pub mod service {
         let netted =
             Connection::get_live(depositor, receiver, asset_id).deposit(amount, interest_rate);
         emit_pair_activity(
-            depositor, receiver, asset_id, "deposit", amount, netted, asset_id, request_id,
-            &req_memo,
+            receiver, depositor, receiver, asset_id, "deposit", amount, netted, asset_id,
+            request_id, &req_memo,
         );
     }
 
@@ -847,6 +856,7 @@ pub mod service {
         let cancelled = Obligation::net_pair(sender, counterparty, asset_id, max_amount);
         if cancelled.value > 0 {
             emit_pair_activity(
+                sender,
                 sender,
                 counterparty,
                 asset_id,
@@ -876,6 +886,7 @@ pub mod service {
             return;
         }
         emit_pair_activity(
+            creditor,
             creditor,
             debtor,
             asset_id,
@@ -1052,6 +1063,9 @@ pub mod service {
     /// Activity history, one row per party as `account`. The same account
     /// on both sides is one row.
     ///
+    /// `actor` is named by the action, not taken from the transaction sender.
+    /// A payee can submit a path, and an invite hook is not the inviter.
+    ///
     /// - `kind`: `path_draw` | `path_pay` | `deposit` | `book` | `net` |
     ///   `convert` | `credit_line` | `rm_credit_line` | `book_auth` |
     ///   `rm_book_auth` | `sell_claim` | `buy_claim` | `invoice` |
@@ -1063,7 +1077,7 @@ pub mod service {
     /// - `other_asset_id`: convert/`path_pay` destination asset; else same as `asset_id`
     /// - `request_id`: linked request (`0` = none)
     /// - `memo`: request memo when linked; debtor account on `sell_claim` /
-    ///   `buy_claim`
+    ///   `buy_claim`; hop debtor on `path_draw` (not the path payer)
     #[event(history)]
     pub fn activity(
         account: AccountNumber,

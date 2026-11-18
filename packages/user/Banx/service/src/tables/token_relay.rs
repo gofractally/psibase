@@ -51,8 +51,8 @@ impl TokenRelay {
             "relay token reserve must be positive"
         );
         assert!(fee_ppm < PPM_SCALE, "relay fee must be under 100%");
-        let _ = Asset::get_assert(asset_id);
-        let _ = Tokens::call().getToken(token_id);
+        Asset::get_assert(asset_id);
+        Tokens::call().getToken(token_id);
         assert!(
             Self::get(owner, asset_id, token_id).is_none(),
             "relay already posted for this pair"
@@ -179,6 +179,7 @@ impl TokenRelay {
         let netted = Connection::get_live(owner, taker, asset_id).apply_draw(amount_banx);
         relay.pay_tokens(taker, tokens_out);
         emit_pair_activity(
+            taker,
             owner,
             taker,
             asset_id,
@@ -218,7 +219,7 @@ impl TokenRelay {
         relay.give_banx(banx_out);
         let netted = Connection::get_live(taker, owner, asset_id).deposit(banx_out, 0);
         emit_pair_activity(
-            taker, owner, asset_id, "relay", banx_out, netted, asset_id, 0, "",
+            taker, taker, owner, asset_id, "relay", banx_out, netted, asset_id, 0, "",
         );
         banx_out
     }

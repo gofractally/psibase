@@ -49,7 +49,7 @@ mod tests {
             chain,
             &format!(
                 r#"{{ activity(account: "{account}", last: 50) {{
-                    edges {{ node {{ kind amount netted actor counterparty }} }}
+                    edges {{ node {{ kind amount netted actor counterparty memo assetId }} }}
                 }} }}"#
             ),
         )
@@ -6028,6 +6028,15 @@ mod tests {
         assert_eq!(line.limit.value, limit.value);
         assert!(!line.deplete_on_debit);
         assert_eq!(line.interest_rate, 0);
+        // The hook sender is invite. The row still names Alice, who lined Bob.
+        let lines = activity_nodes(&chain, alice)
+            .into_iter()
+            .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("credit_line"))
+            .collect::<Vec<_>>();
+        assert!(
+            !lines.is_empty() && lines.iter().all(|row| row.get("actor").and_then(|a| a.as_str()) == Some("alice")),
+            "invite hook recorded the submitter, not the inviter: {lines:?}"
+        );
         let stored = BanxInvite::get_assert(invite_id);
         assert_eq!(stored.claimed_by, Some(bob));
         assert_eq!(BanxInvite::list_by_inviter(alice).len(), 1);
@@ -7542,8 +7551,85 @@ mod tests {
             .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("path_draw"))
             .collect::<Vec<_>>();
         assert!(
+            !draws.is_empty(),
+            "payee-run emitted no path_draw rows"
+        );
+        assert!(
             draws.iter().all(|row| row.get("actor").and_then(|a| a.as_str()) == Some("alice")),
             "path_draw recorded the submitter, not the payer: {draws:?}"
+        );
+        Ok(())
+    }
+
+    /// Bob runs Alice's payment through Carol. Alice's feed only has hop 0.
+    /// Carol's copy is the hop that drew her line, and that row still names Alice.
+    #[psibase::test_case(packages("Banx"))]
+    fn test_pay_auth_payee_runs_later_hop_names_payer(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let carol = account!("carol");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
+        let usd = Asset::get_by_symbol_assert(account!("usd")).id;
+
+        Wrapper::push_from(&chain, carol)
+            .st_crd_lne(alice, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, bob)
+            .st_crd_lne(carol, usd, Quantity::new(10_000), false, 0, 0)
+            .get()?;
+        Wrapper::push_from(&chain, carol)
+            .st_fwd_ofr(bob, usd, Quantity::new(0), 0, PPM_SCALE, never(), true)
+            .get()?;
+
+        const START: i64 = 1_700_000_000;
+        pin(&chain, START);
+        let id = schedule(&chain, alice, bob, usd, 100, 100, 100, START, 0);
+
+        Wrapper::push_from(&chain, bob)
+            .run_pay_ath(id, vec![hop(carol, usd), hop(bob, usd)])
+            .get()?;
+        assert_eq!(exp(&chain, carol, alice, usd), 100);
+        assert_eq!(exp(&chain, bob, carol, usd), 100);
+        assert_eq!(exp(&chain, bob, alice, usd), 0);
+
+        let mut draws = Vec::new();
+        for who in [alice, carol, bob] {
+            draws.extend(
+                activity_nodes(&chain, who)
+                    .into_iter()
+                    .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("path_draw")),
+            );
+        }
+        assert!(
+            !draws.is_empty(),
+            "payee-run through a middle hop emitted no path_draw rows"
+        );
+        assert!(
+            draws
+                .iter()
+                .all(|row| row.get("actor").and_then(|a| a.as_str()) == Some("alice")),
+            "a later hop named the middleman or the submitter, not the payer: {draws:?}"
+        );
+        let carol_hops = activity_nodes(&chain, carol)
+            .into_iter()
+            .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("path_draw"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            carol_hops.len(),
+            2,
+            "Carol should see both hops: {carol_hops:?}"
+        );
+        assert!(
+            carol_hops.iter().any(|row| {
+                row.get("counterparty").and_then(|c| c.as_str()) == Some("bob")
+                    && row.get("actor").and_then(|a| a.as_str()) == Some("alice")
+            }),
+            "the hop that drew Carol named someone else: {carol_hops:?}"
         );
         Ok(())
     }
@@ -7753,6 +7839,47 @@ mod tests {
         assert_eq!(
             pays[0].get("netted").and_then(|v| v.as_str()),
             Some("0.1000")
+        );
+        // Actor stays Alice on both hops. Memo is the hop debtor. The return
+        // credits Alice, so that hop's debtor is Bob, not her.
+        let draws = activity_nodes(&chain, alice)
+            .into_iter()
+            .filter(|n| n.get("kind").and_then(|k| k.as_str()) == Some("path_draw"))
+            .collect::<Vec<_>>();
+        assert_eq!(draws.len(), 2, "return path has two hops: {draws:?}");
+        assert!(
+            draws
+                .iter()
+                .all(|n| n.get("actor").and_then(|a| a.as_str()) == Some("alice")),
+            "path_draw actor must stay the payer: {draws:?}"
+        );
+        assert!(
+            draws.iter().any(|n| {
+                n.get("memo").and_then(|m| m.as_str()) == Some("alice")
+                    && n["assetId"].as_u64() == Some(u64::from(aud))
+            }),
+            "hop 0 should name Alice as the debtor: {draws:?}"
+        );
+        assert!(
+            draws.iter().any(|n| {
+                n.get("memo").and_then(|m| m.as_str()) == Some("bob")
+                    && n["assetId"].as_u64() == Some(u64::from(usd))
+            }),
+            "the return hop should name Bob as the debtor, not Alice: {draws:?}"
+        );
+        let bob_return = activity_nodes(&chain, bob)
+            .into_iter()
+            .filter(|n| {
+                n.get("kind").and_then(|k| k.as_str()) == Some("path_draw")
+                    && n.get("memo").and_then(|m| m.as_str()) == Some("bob")
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            !bob_return.is_empty()
+                && bob_return
+                    .iter()
+                    .all(|n| n.get("actor").and_then(|a| a.as_str()) == Some("alice")),
+            "middleman hop named the hop debtor as actor: {bob_return:?}"
         );
         Ok(())
     }

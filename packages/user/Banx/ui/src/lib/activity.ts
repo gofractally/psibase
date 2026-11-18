@@ -104,6 +104,27 @@ export function kindLabel(kind: string): string {
     }
 }
 
+/** Hop debtor on a path_draw row. Empty on older rows and other kinds. */
+export function pathHopDebtor(e: ActivityEvent): string | undefined {
+    if (e.kind !== "path_draw") return undefined;
+    return namedAccount(e.memo);
+}
+
+/** The viewer drew this hop: path payer, and the debtor of this connection. */
+export function viewerDrewHop(e: ActivityEvent, viewer: string): boolean {
+    return e.actor === viewer && pathHopDebtor(e) === viewer;
+}
+
+/**
+ * A new row worth a toast. path_draw toasts unless the viewer drew that hop.
+ * A return that credits the payer is not a draw they made, so it still toasts.
+ * Every other kind toasts when someone else is the actor.
+ */
+export function isIncomingActivity(e: ActivityEvent, viewer: string): boolean {
+    if (e.kind === "path_draw") return !viewerDrewHop(e, viewer);
+    return e.actor !== viewer;
+}
+
 function namedAccount(s: string | undefined): string | undefined {
     const t = s?.trim();
     if (!t || t === "0") return undefined;
@@ -139,9 +160,10 @@ export function describeEvent(
 
     switch (e.kind) {
         case "path_draw": {
-            // The actor is the path payer on every hop row. Only their own
-            // row is a draw they made; the other side is not a payment.
-            const title = you
+            // Actor is the path payer on every hop, so a middleman is not you.
+            // "You drew" only when this viewer is also the hop debtor. A
+            // cross-asset return names the payer as creditor of that hop.
+            const title = viewerDrewHop(e, viewer)
                 ? `You drew ${qty(e.amount, sym)} on ${other}`
                 : `Hop draw of ${qty(e.amount, sym)} between you and ${other}`;
             const detail =

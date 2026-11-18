@@ -1,6 +1,6 @@
 use psibase::{services::tokens::Quantity, AccountNumber, Table, TimePointSec};
 
-use super::{apply_rate, emit_pair_activity, emit_pair_activity_as, expires_live, Connection};
+use super::{apply_rate, emit_pair_activity, expires_live, Connection};
 use crate::math::PPM_SCALE;
 use crate::tables::tables::{Asset, FxOffer, FxOfferTab, Obligation};
 
@@ -64,8 +64,8 @@ impl FxOffer {
             from_asset != to_asset,
             "currency convert requires different assets"
         );
-        let _ = Asset::get_assert(from_asset);
-        let _ = Asset::get_assert(to_asset);
+        Asset::get_assert(from_asset);
+        Asset::get_assert(to_asset);
         assert!(fx_rate > 0, "fx_rate must be positive");
         assert!(
             to_interest_rate <= PPM_SCALE,
@@ -90,11 +90,11 @@ impl FxOffer {
     /// The last unit deletes the row: an empty order is not a trade.
     pub(crate) fn spend(&mut self, amount: Quantity) {
         self.assert_live();
-        assert!(
-            amount.value <= self.remaining.value,
-            "fx offer amount exceeds remaining"
+        self.remaining = super::helpers::spend_budget(
+            self.remaining,
+            amount,
+            "fx offer amount exceeds remaining",
         );
-        self.remaining = self.remaining - amount;
         if self.remaining.value == 0 {
             self.remove();
         } else {
@@ -194,7 +194,7 @@ impl FxOffer {
         // Actor is the debtor of the new claim, same as a take's actor is
         // the one who owes the from-asset. The feed uses that to say which
         // way the rebooked debt faces.
-        emit_pair_activity_as(
+        emit_pair_activity(
             debtor,
             creditor,
             debtor,
@@ -347,6 +347,7 @@ impl FxOffer {
         Connection::get_live(poster, taker, from_asset).book_at_rate(amount_from, rate);
         Connection::get_live(taker, poster, to_asset).book_at_rate(to_qty, rate);
         emit_pair_activity(
+            taker,
             taker,
             poster,
             from_asset,

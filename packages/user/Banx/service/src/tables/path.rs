@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use psibase::{services::tokens::Quantity, AccountNumber};
 
-use super::{emit_pair_activity_as, invert_hop_fee, invert_rate, Connection};
+use super::{emit_pair_activity, invert_hop_fee, invert_rate, Connection};
 use crate::math::{smallest_input_for_output, try_apply_hop_fee, try_apply_rate};
 use crate::tables::tables::{BanxRelay, ForwardOffer, FxOffer, PathHop, PayRequest};
 
@@ -130,7 +130,7 @@ pub(crate) fn execute_path(
         seen.push((next_creditor, asset_id));
 
         if i == 0 {
-            Connection::get_live(next_creditor, path_debtor, asset_id).draw(forward);
+            Connection::get_live(next_creditor, path_debtor, asset_id).draw(forward, sender);
             prev_asset = asset_id;
             path_debtor = next_creditor;
             continue;
@@ -147,7 +147,7 @@ pub(crate) fn execute_path(
         }
         assert!(forward.value > 0, "path hop produced nothing to forward");
         forward = ForwardOffer::get_live(path_debtor, next_creditor, asset_id)
-            .path_draw(next_creditor, forward);
+            .path_draw(next_creditor, forward, sender);
         prev_asset = asset_id;
         path_debtor = next_creditor;
     }
@@ -187,7 +187,7 @@ pub fn run_path(
         );
     }
     if hop_count >= 2 || !memo.is_empty() {
-        emit_pair_activity_as(
+        emit_pair_activity(
             sender,
             sender,
             last_hop.account,

@@ -60,7 +60,7 @@ impl PayRequest {
             assert_account_exists(counterparty);
         }
         assert!(amount.value > 0, "request amount must be positive");
-        let _ = Asset::get_assert(asset_id);
+        Asset::get_assert(asset_id);
         let id = InitRow::alloc_request_id();
         let row = Self {
             id,
@@ -82,6 +82,7 @@ impl PayRequest {
         };
         emit_pair_activity(
             poster,
+            poster,
             counterparty,
             asset_id,
             kind_s,
@@ -99,6 +100,7 @@ impl PayRequest {
         assert!(row.poster == sender, "only the poster can cancel a request");
         assert!(row.remaining.value > 0, "request already fulfilled");
         emit_pair_activity(
+            sender,
             row.poster,
             row.counterparty,
             row.asset_id,
@@ -154,6 +156,7 @@ impl PayRequest {
         row.remaining = (row.remaining.value - take.value).into();
         row.persist_or_erase();
         emit_pair_activity(
+            payer,
             row.poster,
             payer,
             row.asset_id,

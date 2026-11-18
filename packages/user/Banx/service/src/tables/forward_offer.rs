@@ -78,7 +78,7 @@ impl ForwardOffer {
             "max_line_apr exceeds 100% (PPM_SCALE)"
         );
         assert!(fee_percent < PPM_SCALE, "fee must be under 100%");
-        let _ = Asset::get_assert(asset_id);
+        Asset::get_assert(asset_id);
         if next_hop != Self::GLOBAL {
             assert_account_exists(next_hop);
         }
@@ -115,7 +115,12 @@ impl ForwardOffer {
     }
 
     /// Fee then debit next hop's line to poster.
-    pub fn path_draw(&self, next_creditor: AccountNumber, amount_in: Quantity) -> Quantity {
+    pub fn path_draw(
+        &self,
+        next_creditor: AccountNumber,
+        amount_in: Quantity,
+        payer: AccountNumber,
+    ) -> Quantity {
         self.assert_live();
         let creditor = if self.is_global() {
             next_creditor
@@ -139,7 +144,7 @@ impl ForwardOffer {
                 );
             }
         }
-        conn.draw(draw);
+        conn.draw(draw, payer);
         draw
     }
 }

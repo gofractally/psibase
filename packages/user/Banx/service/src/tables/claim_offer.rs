@@ -79,7 +79,7 @@ impl ClaimOffer {
         expires_at: TimePointSec,
     ) {
         Self::assert_side(side);
-        let _ = Asset::get_assert(asset_id);
+        Asset::get_assert(asset_id);
         if debtor != Self::GLOBAL {
             assert_account_exists(debtor);
         }
@@ -124,16 +124,17 @@ impl ClaimOffer {
     /// Move `amount` of seller's claim on `debtor` to `buyer`; seller
     /// receives face after this offer's spread as a claim on buyer.
     fn spend(&mut self, amount: Quantity) {
-        assert!(
-            amount.value <= self.remaining.value,
-            "claim amount exceeds offer remaining"
+        self.remaining = super::helpers::spend_budget(
+            self.remaining,
+            amount,
+            "claim amount exceeds offer remaining",
         );
-        self.remaining = (self.remaining.value - amount.value).into();
         self.save();
     }
 
     pub fn execute(
         &mut self,
+        actor: AccountNumber,
         seller: AccountNumber,
         buyer: AccountNumber,
         debtor: AccountNumber,
@@ -173,7 +174,9 @@ impl ClaimOffer {
         Connection::get_live(seller, buyer, self.asset_id).deposit(proceeds, 0);
 
         // Memo is the debtor so the buyer's feed can name whose debt moved.
+        // Actor is the taker: seller on sell_claim, buyer on buy_claim.
         emit_pair_activity(
+            actor,
             seller,
             buyer,
             self.asset_id,

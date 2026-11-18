@@ -1,6 +1,6 @@
 use psibase::{services::tokens::Quantity, AccountNumber};
 
-use super::{apply_rate, emit_pair_activity_as};
+use super::{apply_rate, emit_path_draw};
 use crate::tables::tables::{CreditLine, Obligation};
 
 /// Directed pair in one asset: the creditor's line to the debtor (if any)
@@ -264,24 +264,15 @@ impl Connection {
         self.credit_and_net(amount, rate)
     }
 
-    /// Draw for `path_pay`. The actor is this path debtor, not whoever
-    /// submitted the transaction. A payee can run a repeating payment.
-    pub fn draw(self, amount: Quantity) {
+    /// Draw for `path_pay`. `payer` is the path debtor: the account that
+    /// started the path, on every hop. A middleman is not that account, and
+    /// a payee who submits a repeating payment is not either. The emit takes
+    /// that debtor as a required field, same as the `path_pay` summary.
+    pub fn draw(self, amount: Quantity, payer: AccountNumber) {
         let creditor = self.creditor;
         let debtor = self.debtor;
         let asset_id = self.asset_id;
         let netted = self.apply_draw(amount);
-        emit_pair_activity_as(
-            debtor,
-            creditor,
-            debtor,
-            asset_id,
-            "path_draw",
-            amount,
-            netted,
-            asset_id,
-            0,
-            "",
-        );
+        emit_path_draw(payer, creditor, debtor, asset_id, amount, netted);
     }
 }

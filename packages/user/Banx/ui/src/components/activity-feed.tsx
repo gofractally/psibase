@@ -11,6 +11,7 @@ import {
     eventKey,
     eventTouchesAsset,
     formatWhen,
+    isIncomingActivity,
     kindLabel,
     type ActivityFilter,
 } from "@/lib/activity";
@@ -88,7 +89,7 @@ export function ActivityFeed({
         for (const e of events) {
             if (eventKey(e) === seenKey.current) break;
             anyNew = true;
-            if (!counterparty && e.actor !== user) incoming.push(e);
+            if (!counterparty && isIncomingActivity(e, user)) incoming.push(e);
         }
         seenKey.current = newest;
         if (anyNew) refreshLedger();
@@ -148,7 +149,10 @@ export function ActivityFeed({
                                 precisionOf,
                                 label,
                             );
-                            const incoming = e.actor !== user;
+                            const incoming = isIncomingActivity(
+                                e,
+                                user ?? "",
+                            );
                             const amountAssetId =
                                 e.kind === "path_pay"
                                     ? e.otherAssetId
@@ -222,7 +226,10 @@ export function ActivityFeed({
                                         precisionOf,
                                         label,
                                     );
-                                    const incoming = e.actor !== user;
+                                    const incoming = isIncomingActivity(
+                                        e,
+                                        user ?? "",
+                                    );
                                     const amountAssetId =
                                         e.kind === "path_pay"
                                             ? e.otherAssetId

@@ -9,6 +9,17 @@ use psibase::{
 /// AccountNumber 0: global next-hop / debtor on standing offers.
 pub const GLOBAL: AccountNumber = AccountNumber::new(0);
 
+/// Spend `amount` from a posted budget. Returns what is left.
+///
+/// The caller keeps or deletes the row. An FX offer is not a trade once
+/// nothing remains, so it deletes. A claim or cash quote stays at zero until
+/// a later post replaces it. A credit line does not use this: deplete and the
+/// revolving cap are a different remaining.
+pub(crate) fn spend_budget(remaining: Quantity, amount: Quantity, over: &str) -> Quantity {
+    assert!(amount.value <= remaining.value, "{over}");
+    Quantity::new(remaining.value - amount.value)
+}
+
 /// Abort unless `who` is a live chain account (not the reserved 0).
 pub fn assert_account_exists(who: AccountNumber) {
     assert!(Accounts::call().exists(who), "account {who} does not exist");
@@ -124,36 +135,14 @@ pub fn relay_sub(owner: AccountNumber, asset_id: u16, token_id: u32) -> String {
 
 /// Emit history once for each party as `account`.
 ///
+/// `actor` is who the feed calls "you". It is not `get_sender()`: a payee,
+/// a hook, or a nested call can submit for someone else, and a default would
+/// stamp that submitter. The caller names the account the row is about.
+///
 /// `amount` / `netted` are stored as human decimals. `netted` uses
 /// `other_asset_id` when that amount is a different asset, as on a path hop.
 /// The same account on both sides is one row.
 pub fn emit_pair_activity(
-    party_a: AccountNumber,
-    party_b: AccountNumber,
-    asset_id: u16,
-    kind: &str,
-    amount: Quantity,
-    netted: Quantity,
-    other_asset_id: u16,
-    request_id: u32,
-    memo: &str,
-) {
-    emit_pair_activity_as(
-        psibase::get_sender(),
-        party_a,
-        party_b,
-        asset_id,
-        kind,
-        amount,
-        netted,
-        other_asset_id,
-        request_id,
-        memo,
-    );
-}
-
-/// Same as [`emit_pair_activity`], with `actor` stored instead of `get_sender()`.
-pub(crate) fn emit_pair_activity_as(
     actor: AccountNumber,
     party_a: AccountNumber,
     party_b: AccountNumber,
@@ -193,4 +182,32 @@ pub(crate) fn emit_pair_activity_as(
     if party_a != party_b {
         write(party_b, party_a);
     }
+}
+
+/// One path hop. `debtor` is the account that started the path, on every hop.
+///
+/// A middleman is drawn, and a payee may submit the transaction. Neither is
+/// the debtor. The summary `path_pay` row names the same account. Memo is the
+/// hop debtor (`counterparty`): the account whose line this hop draws. On a
+/// cross-asset return that is the middleman, not the path debtor.
+pub(crate) fn emit_path_draw(
+    debtor: AccountNumber,
+    creditor: AccountNumber,
+    counterparty: AccountNumber,
+    asset_id: u16,
+    amount: Quantity,
+    netted: Quantity,
+) {
+    emit_pair_activity(
+        debtor,
+        creditor,
+        counterparty,
+        asset_id,
+        "path_draw",
+        amount,
+        netted,
+        asset_id,
+        0,
+        &counterparty.to_string(),
+    );
 }

@@ -37,7 +37,7 @@ impl BookAuth {
     ) {
         assert!(debtor != creditor, "cannot book-auth self");
         assert_account_exists(creditor);
-        let _ = Asset::get_assert(asset_id);
+        Asset::get_assert(asset_id);
         assert!(remaining.value > 0, "book-auth remaining must be positive");
         assert!(
             max_interest_rate <= PPM_SCALE,

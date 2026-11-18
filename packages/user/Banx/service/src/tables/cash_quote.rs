@@ -46,8 +46,8 @@ impl CashQuote {
         remaining: Quantity,
         expires_at: TimePointSec,
     ) {
-        let _ = Asset::get_assert(asset_id);
-        let _ = Tokens::call().getToken(token_id);
+        Asset::get_assert(asset_id);
+        Tokens::call().getToken(token_id);
         assert!(fx_rate > 0, "fx_rate must be positive");
         assert!(remaining.value > 0, "cash-quote remaining must be positive");
         Self {
@@ -145,11 +145,11 @@ impl CashQuote {
     }
 
     fn spend(&mut self, amount: Quantity) {
-        assert!(
-            amount.value <= self.remaining.value,
-            "cash amount exceeds quote remaining"
+        self.remaining = super::helpers::spend_budget(
+            self.remaining,
+            amount,
+            "cash amount exceeds quote remaining",
         );
-        self.remaining = (self.remaining.value - amount.value).into();
         self.save();
     }
 
@@ -171,6 +171,7 @@ impl CashQuote {
         let netted = Connection::get_live(creditor, debtor, asset_id).apply_draw(amount_banx);
         Self::pay_tokens(creditor, taker, self.token_id, tokens, "cash_out");
         emit_pair_activity(
+            taker,
             creditor,
             debtor,
             asset_id,
@@ -203,6 +204,7 @@ impl CashQuote {
         Self::to_sub(self.poster, self.token_id, amount_tokens);
         let netted = Connection::get_live(taker, self.poster, self.asset_id).deposit(banx_amt, 0);
         emit_pair_activity(
+            taker,
             taker,
             self.poster,
             self.asset_id,

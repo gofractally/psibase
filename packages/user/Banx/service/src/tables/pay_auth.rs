@@ -48,7 +48,7 @@ impl PayAuth {
             ends_at.seconds == 0 || ends_at.seconds > next_due.seconds,
             "pay auth ends before it starts"
         );
-        let _ = Asset::get_assert(asset_id);
+        Asset::get_assert(asset_id);
         let id = InitRow::alloc_pay_auth_id();
         Self {
             id,

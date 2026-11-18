@@ -66,7 +66,7 @@ impl CreditLine {
     ) {
         assert!(creditor != debtor, "cannot set credit line to self");
         assert_account_exists(debtor);
-        let _ = Asset::get_assert(asset_id);
+        Asset::get_assert(asset_id);
         assert!(
             interest_rate <= PPM_SCALE,
             "interest_rate exceeds 100% (PPM_SCALE)"
