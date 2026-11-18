@@ -1,6 +1,7 @@
 import type { MarketsOverview } from "./namemarket";
 import type { SystemTokenInfo, TokenIconImage, UserBalance } from "./tokens";
 import type { BillingConfig } from "./virtual-server";
+import type { PreparedImage } from "@shared/lib/prepare-image";
 
 import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
@@ -29,6 +30,10 @@ class Contacts extends PluginInterface {
 
     get hasReadPermission() {
         return this._call<[], boolean>("hasReadPermission");
+    }
+
+    get uploadAvatar() {
+        return this._call<[avatar: PreparedImage]>("uploadAvatar");
     }
 }
 
