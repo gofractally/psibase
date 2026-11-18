@@ -599,7 +599,8 @@ pub mod service {
     }
 
     /// Draw `amount_banx` on `owner` and receive tokens from their relay.
-    /// The draw is the full amount. The owner's token cut is credited to them.
+    /// The curve prices that amount. A live global forward on `asset_id`
+    /// is extra Banx the sender owes. It is not taken from the tokens.
     #[action]
     fn tok_relay_out(
         owner: AccountNumber,
@@ -619,8 +620,8 @@ pub mod service {
     }
 
     /// Send tokens from the sender's vault into `owner`'s relay.
-    /// The owner's cut stays out of the pool. `owner` owes the curve output
-    /// of what remains. Fund the vault first.
+    /// The curve prices the full amount. A live global forward on `asset_id`
+    /// is taken off the Banx `owner` owes. Fund the vault first.
     #[action]
     fn tok_relay_in(
         owner: AccountNumber,
