@@ -21,7 +21,7 @@
     };
 
     # Fragile cargo tools, each pinned to the exact nixpkgs revision that packages
-    # the required version (chosen for Rust 1.86.0 / psibase compatibility). These
+    # the required version (chosen for Rust / psibase compatibility). These
     # MUST stay at their pinned versions, so they deliberately do NOT `follow`
     # nixpkgs — the frozen revision is the whole point. No single nixpkgs rev
     # carries all required versions at once, hence one input per tool (cargo-generate
@@ -44,8 +44,9 @@
     #   mdbook-pagetoc 0.2.0 — DIVERGES from psibase-contributor (0.2.2): no nixpkgs rev
     #   ships 0.2.2 while keeping mdbook 0.4.x compatibility (0.3.0 breaks mdbook 0.4.x).
     nixpkgs-mdbook-pagetoc.url = "github:NixOS/nixpkgs/ac62194c3917d5f474c1a844b6fd6da2db95077d";
-    #   nodejs 20.11.0
-    nixpkgs-nodejs.url = "github:NixOS/nixpkgs/fea57dc5b57285d33918813d2f3695024d8fc9e8";
+    #   nodejs 24.22.1 — rev-pinned to nixos-26.05 tip (substitutable; not master bump)
+    #   Same pin as mcp-server-on-chain / psibase-contributor.
+    nixpkgs-nodejs.url = "github:NixOS/nixpkgs/ac588ef1c914865dad517b337ea0eb9694a4021c";
   };
 
   outputs =

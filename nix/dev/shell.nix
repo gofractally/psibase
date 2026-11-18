@@ -33,12 +33,13 @@ let
   mdbookLinkcheck = (import nixpkgs-mdbook-linkcheck { inherit system; }).mdbook-linkcheck;
   mdbookPagetoc = (import nixpkgs-mdbook-pagetoc { inherit system; }).mdbook-pagetoc;
   wasmPack = (import nixpkgs-mdbook { inherit system; }).wasm-pack;
-  nodejs20 = (import nixpkgs-nodejs { inherit system; }).nodejs_20;
+  # Same pin as monorepo (nodejs 24.22.1 CVE release; see flake.nix nixpkgs-nodejs).
+  nodejs = (import nixpkgs-nodejs { inherit system; }).nodejs_24;
 
-  # Rust 1.86.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
+  # Rust 1.98.0 toolchain with WASM targets (see nix/rust-toolchain.toml)
   rustToolchain = fenix.packages.${system}.fromToolchainFile {
     file = ../rust-toolchain.toml;
-    sha256 = "sha256-X/4ZBHO3iW0fOenQ3foEvscgAPJYl2abspaBThDOukI=";
+    sha256 = "sha256-P30Tm3O7vQAE725YtDCDHGjNrSsfZO4us11UwJGZSJo=";
   };
 
   llvmPackages = pkgs.llvmPackages_18;
@@ -92,7 +93,7 @@ let
       runHook preInstall
       mkdir -p $out/lib/yarn $out/bin
       cp -r . $out/lib/yarn/
-      makeWrapper ${nodejs20}/bin/node $out/bin/yarn \
+      makeWrapper ${nodejs}/bin/node $out/bin/yarn \
         --add-flags "$out/lib/yarn/packages/yarnpkg-cli/bin/yarn.js"
       runHook postInstall
     '';
@@ -129,7 +130,7 @@ let
     wabt
     wasmPack
     wasmTools
-    nodejs20
+    nodejs
     yarnBerry
     eslint
     prettier

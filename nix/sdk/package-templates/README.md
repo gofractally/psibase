@@ -17,7 +17,7 @@ From an SDK workspace root (directory that contains `packages/Cargo.toml`):
 psiapp new my-app
 # or:
 cargo generate -p "$PSIBASE_PACKAGE_TEMPLATES" --destination ./packages --init \
-  -v --allow-commands --name my-app --define version=0.23.0
+  -v --allow-commands --name my-app --define version=0.29.0
 ```
 
 Then:

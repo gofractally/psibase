@@ -3,7 +3,7 @@
 
   inputs = {
     # Pin to a release tag when available, e.g.:
-    #   psibase.url = "github:gofractally/psibase/v0.23.0";
+    #   psibase.url = "github:gofractally/psibase/v0.29.0-pre";
     # While developing against a local checkout:
     #   nix flake lock --override-input psibase path:/path/to/psibase
     # Use a release tag when available. Until SDK lands on main:

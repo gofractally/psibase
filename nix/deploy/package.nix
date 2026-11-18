@@ -40,65 +40,10 @@ in
     dontConfigure = true;
     dontBuild = true;
 
-    installPhase = ''
-      runHook preInstall
-
-      for prog in psinode psibase psitest; do
-        install -Dm755 "bin/$prog" "$out/bin/$prog"
-      done
-
-      mkdir -p $out/share/psibase
-      install -Dm644 share/psibase/config.in $out/share/psibase/config.in
-      cp -a share/psibase/packages $out/share/psibase/packages
-      cp -a share/psibase/wasm $out/share/psibase/wasm
-      # Drop this line when bumping past 0.23 (services/ removed in 0.24).
-      cp -a share/psibase/services $out/share/psibase/services
-
-      if [ -d share/psibase/licenses ]; then
-        cp -a share/psibase/licenses $out/share/psibase/licenses
-      fi
-      if [ -d share/man ]; then
-        cp -a share/man $out/share/man
-      fi
-
-      runHook postInstall
-    '';
+    installPhase = builtins.readFile ./install.sh;
 
     doInstallCheck = true;
-    installCheckPhase = ''
-      runHook preInstallCheck
-
-      $out/bin/psibase --version
-      # psinode --version writes to stderr and exits 1.
-      psinodeVersion=$($out/bin/psinode --version 2>&1 || true)
-      echo "psinode --version: $psinodeVersion"
-      case "$psinodeVersion" in
-        "psinode "*) ;;
-        *)
-          echo "unexpected psinode --version output" >&2
-          exit 1
-          ;;
-      esac
-
-      for p in \
-        bin/psinode bin/psibase bin/psitest \
-        share/psibase/config.in \
-        share/psibase/packages \
-        share/psibase/packages/index.json \
-        share/psibase/wasm; do
-        if [ ! -e "$out/$p" ]; then
-          echo "missing from layout: $p" >&2
-          exit 1
-        fi
-      done
-
-      if [ ! -e "$out/share/psibase/services/x-admin/packages" ]; then
-        echo "share/psibase/services/x-admin/packages does not resolve" >&2
-        exit 1
-      fi
-
-      runHook postInstallCheck
-    '';
+    installCheckPhase = builtins.readFile ./install-check.sh;
 
     meta = with lib; {
       description = "Psibase node and client (psinode, psibase)";

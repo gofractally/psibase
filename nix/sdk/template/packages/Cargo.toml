@@ -5,16 +5,16 @@ members = [
 ]
 
 [workspace.package]
-version = "0.23.0"
+version = "0.29.0"
 edition = "2021"
-rust-version = "1.86"
+rust-version = "1.98"
 license = "MIT"
 publish = false
 
 [workspace.dependencies]
 # Pin to the SDK train (see nix/release.nix psibaseCrateVersion).
-psibase = "=0.23.0"
-psibase_macros = "=0.23.0"
+psibase = "=0.29.0"
+psibase_macros = "=0.29.0"
 async-graphql = "=7.0.17"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
