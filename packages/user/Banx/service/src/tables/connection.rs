@@ -1,6 +1,6 @@
 use psibase::{services::tokens::Quantity, AccountNumber};
 
-use super::{apply_rate, emit_pair_activity};
+use super::{apply_rate, emit_pair_activity_as};
 use crate::tables::tables::{CreditLine, Obligation};
 
 /// Directed pair in one asset: the creditor's line to the debtor (if any)
@@ -264,13 +264,15 @@ impl Connection {
         self.credit_and_net(amount, rate)
     }
 
-    /// Draw for `path_pay`.
+    /// Draw for `path_pay`. The actor is this path debtor, not whoever
+    /// submitted the transaction. A payee can run a repeating payment.
     pub fn draw(self, amount: Quantity) {
         let creditor = self.creditor;
         let debtor = self.debtor;
         let asset_id = self.asset_id;
         let netted = self.apply_draw(amount);
-        emit_pair_activity(
+        emit_pair_activity_as(
+            debtor,
             creditor,
             debtor,
             asset_id,

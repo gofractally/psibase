@@ -7536,6 +7536,15 @@ mod tests {
             .get()?;
         assert_eq!(exp(&chain, bob, alice, usd), 100);
         assert_eq!(exp(&chain, alice, bob, usd), 0);
+        // Bob submitted. The hop still names Alice, who was drawn.
+        let draws = activity_nodes(&chain, alice)
+            .into_iter()
+            .filter(|row| row.get("kind").and_then(|k| k.as_str()) == Some("path_draw"))
+            .collect::<Vec<_>>();
+        assert!(
+            draws.iter().all(|row| row.get("actor").and_then(|a| a.as_str()) == Some("alice")),
+            "path_draw recorded the submitter, not the payer: {draws:?}"
+        );
         Ok(())
     }
 
