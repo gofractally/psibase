@@ -383,18 +383,6 @@ mod tests {
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
 
-        let auto_debit_user = |account| {
-            psibase::services::tokens::Wrapper::push_from(&chain, account)
-                .setUserConf(
-                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
-                    true,
-                )
-                .get()
-                .unwrap();
-        };
-        auto_debit_user(alice);
-        auto_debit_user(bob);
-
         let token_a = chain.login(account!("alice"), Wrapper::SERVICE)?;
         let token_b = chain.login(account!("bob"), Wrapper::SERVICE)?;
 
@@ -406,6 +394,7 @@ mod tests {
         a.mint(tid, 10_0000.into(), "".into()).get()?;
         assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
         a.credit(tid, bob, 10_0000.into(), "".into()).get()?;
+        b.debit(tid, alice, 10_0000.into(), "".into()).get()?;
         a.mint(tid, 10_0000.into(), "".into()).get()?;
 
         let checking = "checking".to_string();
