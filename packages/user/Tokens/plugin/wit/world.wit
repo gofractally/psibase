@@ -79,26 +79,26 @@ interface user {
     use host:types/types.{error};
     use types.{decimal};
 
-    /// Credit tokens to a recipient.
+    /// Send tokens to a debitor (recipient).
+    ///
+    /// The tokens must be manually debited by the debitor.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `debitor` - Debitor / recipient account
     /// * `amount`   - Amount to credit. Must be greater than zero.
     /// * `memo`     - Memo describing the credit
-    ///
-    /// Places funds in the shared balance until they are debited
     credit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
 
-    /// Transfer tokens to a recipient.
+    /// Send tokens to a debitor (recipient).
+    ///
+    /// The tokens may or may not be automatically debited by the debitor.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `debitor`  - Debitor / recipient account
     /// * `amount`   - Amount to transfer. Must be greater than zero.
     /// * `memo`     - Memo describing the transfer
-    ///
-    /// Credits the tokens, then debits them when the recipient has auto-debit enabled
     transfer: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
 
     /// Cancel a pending shared-balance credit.

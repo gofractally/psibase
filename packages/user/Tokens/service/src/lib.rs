@@ -365,10 +365,9 @@ pub mod service {
         );
     }
 
-    /// Credit tokens to a debitor (recipient).
+    /// Send tokens to a debitor (recipient).
     ///
-    /// On credit, tokens are placed in the shared balance until the debitor debits them.
-    /// `transfer` debits them automatically when the debitor has `auto_debit` enabled.
+    /// The tokens must be manually debited by the debitor.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
@@ -396,9 +395,9 @@ pub mod service {
         );
     }
 
-    /// Transfer tokens to a debitor (recipient).
+    /// Send tokens to a debitor (recipient).
     ///
-    /// Credits the tokens, then debits them when the recipient has auto-debit enabled.
+    /// The tokens may or may not be automatically debited by the debitor.
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
@@ -410,18 +409,17 @@ pub mod service {
         let creditor = get_sender();
         let mut shared = SharedBalance::get_or_new(creditor, debitor, token_id);
         shared.credit(amount);
-        if auto_debit_enabled(debitor, token_id) {
-            shared.debit(amount, memo.clone());
-        }
-
         Wrapper::emit().history().balChanged(
             token_id,
             creditor,
             debitor,
             "credited".to_string(),
             fmt_amount(token_id, amount),
-            memo,
+            memo.clone(),
         );
+        if auto_debit_enabled(debitor, token_id) {
+            shared.debit(amount, memo);
+        }
     }
 
     /// Uncredit tokens that were credited into a shared balance

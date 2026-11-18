@@ -110,10 +110,9 @@ namespace UserService
       /// * 1: Unrecallable    - If enabled, the token cannot be recalled
       void setTokenConf(TID tokenId, uint8_t index, bool enable);
 
-      /// Credit tokens to a debitor (recipient).
+      /// Send tokens to a debitor (recipient).
       ///
-      /// On credit, tokens are placed in the shared balance until the debitor debits them.
-      /// `transfer` debits them automatically when the debitor has `auto_debit` enabled.
+      /// The tokens must be manually debited by the debitor.
       ///
       /// # Shared balance mechanics
       /// When in the shared balance, the tokens can be:
@@ -128,9 +127,9 @@ namespace UserService
       /// * `memo`     - Memo
       void credit(TID tokenId, psibase::AccountNumber debitor, Quantity amount, Memo memo);
 
-      /// Transfer tokens to a debitor (recipient).
+      /// Send tokens to a debitor (recipient).
       ///
-      /// Credits the tokens, then debits them when the recipient has auto-debit enabled.
+      /// The tokens may or may not be automatically debited by the debitor.
       ///
       /// # Arguments
       /// * `token_id` - Unique token identifier
