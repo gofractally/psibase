@@ -39,13 +39,13 @@ pub mod tables {
     pub struct PurchasedAccount {
         #[primary_key]
         pub account: AccountNumber,
-        pub owner: AccountNumber,
+        pub nft_id: u32,
     }
 
     impl PurchasedAccount {
         #[secondary_key(1)]
-        fn by_owner(&self) -> (AccountNumber, AccountNumber) {
-            (self.owner, self.account)
+        fn by_nft(&self) -> u32 {
+            self.nft_id
         }
     }
 }
@@ -131,12 +131,14 @@ pub mod service {
         );
     }
 
-    /// Buy a premium account name
+    /// Buy a premium account name.
     ///
-    /// # Arguments
-    /// * `account` - The account to purchase
+    /// Credits the buyer a redemption NFT and leaves the account with this
+    /// service. `claim` succeeds only for a credit between this service and
+    /// the sender, then burns the NFT. `nft_id` is minted when set;
+    /// otherwise the next free id is used.
     #[action]
-    fn buy(account: AccountNumber) {
+    fn buy(account: AccountNumber, nft_id: Option<u32>) {
         let length = account.to_string().len() as u8;
 
         let sys_token_id: TID = Tokens::Wrapper::call()
@@ -163,15 +165,16 @@ pub mod service {
             Accounts::NewAccountMode::REQUIRE_NEW,
         );
 
+        let nft_id = Nfts::Wrapper::call().mint(nft_id);
+        Nfts::Wrapper::call().credit(nft_id, sender, "".into());
+
         PurchasedAccountsTable::new()
-            .put(&PurchasedAccount {
-                account: account,
-                owner: sender,
-            })
+            .put(&PurchasedAccount { account, nft_id })
             .unwrap();
 
-        let cost = current_price;
-        Tokens::Wrapper::call().debit(sys_token_id, sender, cost, "".into());
+        if current_price.value > 0 {
+            Tokens::Wrapper::call().debit(sys_token_id, sender, current_price, "".into());
+        }
 
         Tokens::Wrapper::call().reject(sys_token_id, sender, "return change".into());
 
@@ -180,6 +183,9 @@ pub mod service {
             .nameMktEvent(sender, account, BOUGHT);
     }
 
+    /// Claim a purchased account.
+    ///
+    /// Takes the redemption credit, burns the NFT, and transfers the account.
     #[action]
     fn claim(account: AccountNumber) {
         let purchased_accounts_table = PurchasedAccountsTable::new();
@@ -189,19 +195,36 @@ pub mod service {
             .get(&account)
             .expect("account not purchased");
 
-        assert_eq!(
-            purchased_account.owner,
-            get_sender(),
-            "account not purchased by sender",
-        );
+        let sender = get_sender();
+        let nft_id = purchased_account.nft_id;
 
-        AuthDelegate::Wrapper::call_as(account).setOwner(get_sender());
+        take(nft_id, sender);
+        Nfts::Wrapper::call().burn(nft_id);
+
+        AuthDelegate::Wrapper::call_as(account).setOwner(sender);
 
         purchased_accounts_table.remove(&purchased_account);
 
         crate::Wrapper::emit()
             .history()
-            .nameMktEvent(get_sender(), account.clone(), CLAIMED);
+            .nameMktEvent(sender, account, CLAIMED);
+    }
+
+    fn take(nft_id: u32, other_party: AccountNumber) {
+        let service = get_service();
+        let Some(credit) = Nfts::Wrapper::call().getCredRecord(nft_id) else {
+            abort_message("Nothing to uncredit. Must first credit.");
+        };
+        if credit.creditor == service && credit.debitor == other_party {
+            Nfts::Wrapper::call().uncredit(nft_id, "".into());
+        } else if credit.creditor == other_party && credit.debitor == service {
+            Nfts::Wrapper::call().debit(nft_id, "".into());
+        } else {
+            abort_message(&format!(
+                "credit record not found with account {}",
+                other_party
+            ));
+        }
     }
 
     /// Create a new name-length market.

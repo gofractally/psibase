@@ -8,6 +8,11 @@ interface issuer {
     ///
     /// Returns the id of NFT.
     mint: func() -> result<u32, error>;
+
+    /// Return an NFT id that is available at the time of the call.
+    ///
+    /// Does not schedule a mint.
+    get-available-id: func() -> result<u32, error>;
 }
 
 

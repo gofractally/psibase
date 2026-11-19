@@ -38,46 +38,64 @@ function mapNameEventEdges(edges: Array<{ cursor?: string; node?: unknown }>) {
         });
 }
 
+const PURCHASED_NAMES_FIELDS = `
+    edges {
+        node {
+            account
+        }
+    }
+    pageInfo {
+        hasNextPage
+        endCursor
+    }
+`;
+
+function accountNames(
+    connection: {
+        edges: Array<{ node?: { account: string } | null }>;
+    } | null | undefined,
+) {
+    return (connection?.edges ?? [])
+        .map((edge) => edge.node?.account)
+        .filter((account): account is string => !!account);
+}
+
+function nextPage(
+    connection: {
+        pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+    } | null | undefined,
+) {
+    const endCursor = connection?.pageInfo?.endCursor;
+    return {
+        more: !!connection?.pageInfo?.hasNextPage && !!endCursor,
+        after: endCursor ? `, after: "${endCursor}"` : "",
+    };
+}
+
 export async function fetchAllUnclaimedNames() {
     const allNames: string[] = [];
-    let hasNextPage = true;
-    let cursorArg = "";
+    let unclaimedAfter = "";
+    let unclaimedMore = true;
 
-    while (hasNextPage) {
+    while (unclaimedMore) {
         const page = zUnclaimedNamesPageData.parse(
             await nameMarketAuthorizedGraphql(
                 `
                     {
-                        unclaimedNames(first: ${FETCH_BATCH_SIZE}${cursorArg}) {
-                            edges {
-                                node {
-                                    account
-                                }
-                            }
-                            pageInfo {
-                                hasNextPage
-                                endCursor
-                            }
+                        unclaimedNames(first: ${FETCH_BATCH_SIZE}${unclaimedAfter}) {
+                            ${PURCHASED_NAMES_FIELDS}
                         }
                     }
                 `,
             ),
         );
 
-        const connection = page.unclaimedNames;
-        if (!connection) {
-            break;
+        allNames.push(...accountNames(page.unclaimedNames));
+        const next = nextPage(page.unclaimedNames);
+        unclaimedMore = next.more;
+        if (next.after) {
+            unclaimedAfter = next.after;
         }
-
-        for (const edge of connection.edges) {
-            if (edge.node) {
-                allNames.push(edge.node.account);
-            }
-        }
-
-        hasNextPage = connection.pageInfo?.hasNextPage ?? false;
-        const endCursor = connection.pageInfo?.endCursor;
-        cursorArg = endCursor ? `, after: "${endCursor}"` : "";
     }
 
     return allNames;

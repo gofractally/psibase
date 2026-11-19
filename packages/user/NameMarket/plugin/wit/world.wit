@@ -84,12 +84,21 @@ interface api {
     /// Returns configured name markets and current ask prices.
     get-markets-overview: func() -> result<markets-overview, error>;
 
-    /// Purchase an account name
+    /// Buys a token representing a new network account.
+    ///
+    /// The buyer owns the token. The token can be transferred to transfer ownership
+    /// of the claim to the new account. Alternatively, the token can be redeemed (burned)
+    /// using `claim` which creates the purchased account on the network.
     /// * `account`: the account to purchase the name for
-    /// * `max-cost`: maximum payment in network token (Quantity string)
+    /// * `max-cost`: maximum payment in network token
     buy: func(account: string, max-cost: string) -> result<_, error>;
 
-    /// Claim an account name
+    /// Buy an account name and claim it in this transaction.
+    /// * `account`: the account to purchase and claim
+    /// * `max-cost`: maximum payment in network token
+    buy-and-claim: func(account: string, max-cost: string) -> result<_, error>;
+
+    /// Claim an account name.
     /// * `account`: the account to claim the name for
     claim: func(account: string) -> result<_, error>;
 }
