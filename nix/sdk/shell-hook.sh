@@ -45,9 +45,21 @@ export CARGO_TARGET_WASM32_WASIP1_RUSTFLAGS="${CARGO_TARGET_WASM32_WASIP1_RUSTFL
 
 # Prefer tarball cargo-psibase when the Release ships it; otherwise install
 # the crates.io build matching nix/release.nix cargoPsibaseVersion.
+#
+# That install builds from source. build.rs nests `cargo rustc --target
+# wasm32-wasip1` for service_wasi_polyfill. Cargo strips RUSTFLAGS from the
+# build-script env, so rust-lld 1.98+ fails on undefined host imports unless we
+# inject --allow-undefined via RUSTC_WRAPPER (inherited by build scripts).
+# Keep CARGO_TARGET_DIR under $HOME so hard_link from ~/.cargo/registry does
+# not CrossesDevices when the sandbox puts targets on /tmp.
 _psibase_sdk_ensure_cargo_psibase() {
   local want="@cargoPsibaseVersion@"
   local have=""
+  local install_root="${CARGO_INSTALL_ROOT:-$HOME/.cargo}"
+  local cps_target_dir="$HOME/.cache/psibase-nix/cargo-target"
+  local wrapper_dir="$HOME/.cache/psibase-nix"
+  local wrapper="$wrapper_dir/rustc-wasm-allow-undefined"
+
   if [ -x "@psidk@/bin/cargo-psibase" ]; then
     return 0
   fi
@@ -57,10 +69,45 @@ _psibase_sdk_ensure_cargo_psibase() {
       return 0
     fi
   fi
+
+  mkdir -p "$cps_target_dir" "$wrapper_dir"
+  cat >"$wrapper" <<'EOF'
+#!/bin/bash
+# RUSTC_WRAPPER: $1 is the real rustc. Add --allow-undefined for wasm32-wasip1.
+real="$1"
+shift
+target_wasm=
+prev=
+for a in "$@"; do
+  if [ "$prev" = "--target" ] && [ "$a" = "wasm32-wasip1" ]; then
+    target_wasm=1
+  fi
+  case "$a" in
+    --target=wasm32-wasip1) target_wasm=1 ;;
+  esac
+  prev=$a
+done
+if [ -n "$target_wasm" ]; then
+  exec "$real" "$@" -C link-arg=--allow-undefined
+fi
+exec "$real" "$@"
+EOF
+  chmod +x "$wrapper"
+
   echo "Installing cargo-psibase $want from crates.io (matches SDK pin)…"
-  cargo install cargo-psibase --version "$want" --locked --force
+  # Force target dir under $HOME: sandbox CARGO_TARGET_DIR on /tmp + hard_link
+  # from ~/.cargo/registry → CrossesDevices in build.rs.
+  if ! CARGO_TARGET_DIR="$cps_target_dir" RUSTC_WRAPPER="$wrapper" \
+    cargo install cargo-psibase \
+    --version "$want" --locked --force --root "$install_root"; then
+    echo "error: failed to install cargo-psibase $want" >&2
+    echo "  (psidk tarball has no cargo-psibase; SDK shell needs this crates.io build)" >&2
+    return 1
+  fi
 }
-_psibase_sdk_ensure_cargo_psibase
+if ! _psibase_sdk_ensure_cargo_psibase; then
+  echo "warning: cargo-psibase @cargoPsibaseVersion@ is not available; package builds will fail" >&2
+fi
 
 if [ "$NIX_SHELL_DEPTH" -eq 1 ]; then
   echo ""

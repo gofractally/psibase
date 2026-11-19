@@ -22,7 +22,10 @@ psiapp chain down
 
 - Prebuilt `psinode` / `psibase` / `psitest` from `packages.psidk`
 - `cargo-psibase` from the Release tarball when present; otherwise **installed from
-  crates.io** at `nix/release.nix` → `cargoPsibaseVersion` (currently `0.29.0`)
+  crates.io** at `nix/release.nix` → `cargoPsibaseVersion` (currently `0.29.0`).
+  The install builds locally with `CARGO_TARGET_DIR` under `$HOME` (same FS as the
+  registry) and a short-lived `RUSTC_WRAPPER` so the nested wasm polyfill link gets
+  `--allow-undefined` (Cargo strips `RUSTFLAGS` from build-script env; rust-lld 1.98+)
 - Rust 1.98 + wasm targets, cargo-component / cargo-generate / cargo-edit
 - Node 24.22.1 + Yarn, wasm-pack / wasm-tools / binaryen
 - Flake `wasi-sdk`, mkcert, SoftHSM
