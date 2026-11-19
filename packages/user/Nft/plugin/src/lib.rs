@@ -33,7 +33,7 @@ define_trust! {
         ",
     }
     functions {
-        None => [guess_id],
+        None => [get_available_id],
         Medium => [mint],
         High => [uncredit, debit, enable_user_auto_debit, credit, transfer, burn, graphql],
     }
@@ -82,8 +82,8 @@ impl Issuer for NftPlugin {
         Ok(id)
     }
 
-    fn guess_id() -> Result<u32, Error> {
-        trust::assert_authorized(trust::FunctionName::guess_id)?;
+    fn get_available_id() -> Result<u32, Error> {
+        trust::assert_authorized(trust::FunctionName::get_available_id)?;
         choose_id()
     }
 }

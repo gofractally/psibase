@@ -323,7 +323,7 @@ struct PurchasedAccountFields {
 fn schedule_buy(account: &str, max_cost: &String) -> Result<u32, Error> {
     let acct_name = AccountNumber::from_exact(account)
         .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
-    let nft_id = bindings::nft::plugin::issuer::guess_id()?;
+    let nft_id = bindings::nft::plugin::issuer::get_available_id()?;
 
     let service_account = name_market::SERVICE.to_string();
     let sys_token_id =
