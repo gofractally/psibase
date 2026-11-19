@@ -164,7 +164,7 @@ pub mod Service {
 
     /// Claim member rewards
     ///
-    /// Sends any vested token rewards to the fractal member after applying any pending levies.
+    /// Transfers any vested token rewards to the fractal member after applying any pending levies.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
