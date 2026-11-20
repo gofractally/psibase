@@ -393,5 +393,17 @@
 
         packages.wasi-sdk = wasiSdk;
       }
-    );
+    )
+    // {
+      # Package-dev scaffold: nix flake init -t .#package
+      # (or github:gofractally/psibase#package). Consumer flake pulls the Package
+      # SDK shell from psibase-dev-tools.
+      templates = {
+        package = {
+          path = ./nix/sdk/template;
+          description = "Standalone Rust psibase package workspace (packages/<app>)";
+        };
+        default = self.templates.package;
+      };
+    };
 }

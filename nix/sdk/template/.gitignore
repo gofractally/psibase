@@ -1,0 +1,6 @@
+/target
+**/*.rs.bk
+.psibase-devnet/
+.direnv/
+result
+result-*
