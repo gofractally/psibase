@@ -338,24 +338,43 @@ namespace
                                         std::make_shared<psibase::WatchdogManager>(),
                                         std::make_shared<psibase::Sockets>(database)};
       psibase::BlockContext      block{system, database.getHead(), database.createWriter(), true};
-      psibase::AccountNumber     service{"psizam-test"};
+      psibase::AccountNumber     service{"vm-test"};
+      psibase::AccountNumber     peer{"vm-peer"};
       psibase::SignedTransaction signedTransaction;
       psibase::TransactionTrace  trace;
 
       NativeService()
       {
+         REQUIRE(service.str() == "vm-test");
+         REQUIRE(peer.str() == "vm-peer");
+         REQUIRE(service != peer);
          static const bool registered = []
          {
             psibase::ExecutionContext::registerHostFunctions();
             return true;
          }();
          (void)registered;
-         auto             code = psizam::read_wasm(PSIBASE_PSIZAM_SERVICE_WASM);
-         psibase::CodeRow row{.codeNum = service};
-         block.db.kvPut(row.db, row.key(), row);
-         psibase::setCode(
-             block.db, service, 0, 0,
-             psio::input_stream(reinterpret_cast<const char*>(code.data()), code.size()));
+         auto code = psizam::read_wasm(PSIBASE_PSIZAM_SERVICE_WASM);
+         // Pass the same SDK-produced Action bytes through the real WASM host
+         // span ABI, without teaching the fixture the serialization layout.
+         auto nested = psio::to_frac(psibase::Action{.sender = service, .service = peer});
+         constexpr std::string_view marker = "PSIZAM_NESTED_ACTION";
+         auto slot = std::search(code.begin(), code.end(), marker.begin(), marker.end());
+         REQUIRE(slot != code.end());
+         REQUIRE(code.end() - slot >= 64);
+         REQUIRE(nested.size() + 4 <= 64);
+         std::fill_n(slot, 64, 0);
+         auto size = static_cast<std::uint32_t>(nested.size());
+         std::memcpy(std::addressof(*slot), &size, sizeof(size));
+         std::memcpy(std::addressof(*(slot + 4)), nested.data(), nested.size());
+         for (auto account : {service, peer})
+         {
+            psibase::CodeRow row{.codeNum = account};
+            block.db.kvPut(row.db, row.key(), row);
+            psibase::setCode(
+                block.db, account, 0, 0,
+                psio::input_stream(reinterpret_cast<const char*>(code.data()), code.size()));
+         }
       }
       psibase::Action action(std::uint64_t sender = 0) const
       {
@@ -365,6 +384,15 @@ namespace
       {
          psibase::ActionTrace result;
          transaction.execNonTrxAction(0, action(sender), result);
+         return result;
+      }
+      psibase::ActionTrace called(psibase::TransactionContext& transaction,
+                                  psibase::AccountNumber       account)
+      {
+         auto request    = action();
+         request.service = account;
+         psibase::ActionTrace result;
+         transaction.execCalledAction(0, request, result);
          return result;
       }
       static std::uint32_t value(const psibase::ActionTrace& trace)
@@ -384,7 +412,7 @@ TEST_CASE("Node execution owns cached backends exclusively and resets each trans
       psibase::TransactionContext first{fixture.block, fixture.signedTransaction, fixture.trace,
                                         psibase::DbMode::transaction()};
       CHECK(NativeService::value(fixture.run(first)) == 8);
-      CHECK(NativeService::value(fixture.run(first)) == 9);
+      CHECK(NativeService::value(fixture.called(first, fixture.service)) == 9);
       CHECK(fixture.cache.span().empty());
       {
          psibase::TransactionContext second{fixture.block, fixture.signedTransaction, fixture.trace,
@@ -479,4 +507,23 @@ TEST_CASE("Preverified proof tokens skip only the matching verification request"
                                           nullptr, token));
    CHECK(changed.error.has_value());
    CHECK_FALSE(psizam::detail::timed_run_has_timed_out.load());
+}
+
+TEST_CASE("Native cross-service calls preserve caller state stack and host span results")
+{
+   NativeService               fixture;
+   psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction, fixture.trace,
+                                           psibase::DbMode::transaction()};
+   auto                        result = fixture.run(transaction, 4);
+   CHECK(NativeService::value(result) == 8);
+   REQUIRE(result.innerTraces.size() == 1);
+   auto& inner = std::get<psibase::ActionTrace>(result.innerTraces.front().inner);
+   CHECK(inner.action.sender == fixture.service);
+   CHECK(inner.action.service == fixture.peer);
+   CHECK(NativeService::value(inner) == 8);
+   CHECK(transaction.remainingStack == transaction.getWasmConfig().vmOptions.max_stack_bytes);
+   // Calling the peer used its separate memory/global state, then restored the
+   // outer host action context and result transport before returning to WASM.
+   CHECK(NativeService::value(fixture.called(transaction, fixture.service)) == 8);
+   CHECK(NativeService::value(fixture.called(transaction, fixture.peer)) == 9);
 }
