@@ -32,5 +32,10 @@ if(IS_WASM)
     # think that it doesn't need the one from libCatch2Main.a.
     target_link_libraries(catch2 INTERFACE -Wl,--whole-archive Catch2::Catch2WithMain -Wl,--no-whole-archive Catch2::Catch2)
 else()
+    # Catch2's per-case fatal handlers replace the VM's process-wide handlers.
+    # Native trap tests must leave SIGSEGV/FPE under psizam ownership; CTest
+    # still reports uncaught process crashes without Catch2 intercepting them.
+    set(CATCH_CONFIG_POSIX_SIGNALS OFF CACHE BOOL "VM owns native trap signals" FORCE)
+    set(CATCH_CONFIG_NO_POSIX_SIGNALS ON CACHE BOOL "VM owns native trap signals" FORCE)
     add_subdirectory(Catch2)
 endif()
