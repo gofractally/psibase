@@ -10,7 +10,6 @@ add_executable(psinode main.cpp init.cpp)
 target_link_libraries(psinode
     services_system
     psibase_http
-    debug_eos_vm
     psibase_net
 )
 target_link_directories( psinode PUBLIC ${ICU_LIBRARY_DIR} )

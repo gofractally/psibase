@@ -76,9 +76,11 @@ The current checkout's defaults are:
   production admission under billing.
 - `libraries/psibase/common/include/psibase/block.hpp::VMOptions`: default
   linear memory **32 MiB**, and total WASM stack **1 MiB**.
-- `libraries/psibase/native/src/ExecutionContext.cpp`: x86-64 uses
-  `eosio::vm::jit_profile`; other architectures use `eosio::vm::interpreter`.
-  Psitest makes the same architecture selection. This machine is arm64.
+- At the time of this benchmark, native execution used EOS VM with JIT on
+  x86-64 and the interpreter on arm64. The psizam migration changes node and
+  psitest execution to `psizam::jit_profile` on both architectures. These
+  historical timings must be measured again before using them for admission
+  decisions; the proof-admission budget remains 200 ms.
 
 An oversized one-transaction BLS verifier cannot be fixed merely by submitting
 updates less often: its peak cost still must fit one transaction/block. The

@@ -2,7 +2,7 @@
 
 All WebAssembly modules must execute in a highly performant and fully deterministic WebAssembly virtual machine. The WebAssembly specification has made some [non-deterministic design choices](https://github.com/WebAssembly/design/blob/main/Nondeterminism.md), because of which the default runtimes are insufficient for a blockchain use-case.
 
-Psibase therefore defines a custom WebAssembly run-time based on a battle-tested and deterministic runtime called [EOS VM](https://github.com/AntelopeIO/eos-vm). The psibase VM specification adds further requirements above and beyond the EOS VM implementation.
+Psibase uses the native execution core of [psizam](https://github.com/gofractally/psizam) for node and test execution. Browser plugins use the browser WebAssembly runtime. The node applies an explicit policy to the low-level psizam backend rather than inheriting the general runtime facade defaults.
 
 # Goals
 
@@ -16,4 +16,12 @@ Psibase therefore defines a custom WebAssembly run-time based on a battle-tested
 
 # Reference implementation
 
-The reference implementation for the custom Psibase WebAssembly runtime currently satisfies all goals. It can be found [here](https://github.com/gofractally/eos-vm).
+The pinned source is the `external/psizam` submodule. Native node, tester and schema execution use `jit_profile` on x86-64 and AArch64, guarded memory and deterministic software floating point. The existing transaction CPU watchdog remains authoritative; psizam gas metering is disabled for this policy. The default proof-admission CPU budget remains 200 ms.
+
+`NativeVMOptions` forwards every serialized chain `VMOptions` field: mutable global bytes, memory pages, table elements and stack bytes. The adapter rejects shared memory, memory64, imported resources, multiple memories or tables, exception tags, and tables other than funcref. It clamps table growth to the same configured limit as the initial table. Invalid policies fail explicitly.
+
+Cached backends have exclusive transaction ownership and reset linear memory, mutable globals and table state before reuse. The transaction removes its watchdog before returning backends to the shared cache. Native host spans and unaligned pointer proxies preserve their WASM32 ABI and validate access inside guarded memory.
+
+The native target links the engine core and standalone debugger only. The psizam component/runtime facade, which imports the new psio serialization headers, is excluded from the legacy-wire node during this checkpoint. This boundary allows the runtime and serialization migrations to be validated independently.
+
+`PsizamTests` checks the actual registered host ABI, chain resource policy, nested execution, deterministic floating point, traps and live backtraces, watchdog cancellation, transaction cleanup and cache reuse. `WatchdogTests` remains a separate CPU-accounting gate. The complete migration also requires Linux execution and the fresh application/relay regression suite; passing these focused runtime tests alone does not qualify the full migration.

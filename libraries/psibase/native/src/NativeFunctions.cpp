@@ -486,7 +486,7 @@ namespace psibase
       }
    }  // namespace
 
-   uint32_t NativeFunctions::getResult(eosio::vm::span<char> dest, uint32_t offset)
+   uint32_t NativeFunctions::getResult(std::span<char> dest, uint32_t offset)
    {
       if (offset < result_value.size() && dest.size())
          memcpy(dest.data(), result_value.data() + offset,
@@ -494,14 +494,14 @@ namespace psibase
       return result_value.size();
    }
 
-   uint32_t NativeFunctions::getKey(eosio::vm::span<char> dest)
+   uint32_t NativeFunctions::getKey(std::span<char> dest)
    {
       if (!result_key.empty())
          memcpy(dest.data(), result_key.data(), std::min(result_key.size(), dest.size()));
       return result_key.size();
    }
 
-   void NativeFunctions::writeConsole(eosio::vm::span<const char> str)
+   void NativeFunctions::writeConsole(std::span<const char> str)
    {
       // TODO: limit total console size across all executions within transaction
       if (currentActContext->actionTrace.innerTraces.empty() ||
@@ -513,13 +513,14 @@ namespace psibase
       console.append(str.begin(), str.end());
    }
 
-   void NativeFunctions::abortMessage(eosio::vm::span<const char> str)
+   void NativeFunctions::abortMessage(std::span<const char> str)
    {
       throw std::runtime_error("service '" + code.codeNum.str() +
                                "' aborted with message: " + std::string(str.data(), str.size()));
    }
 
-   int32_t NativeFunctions::clockTimeGet(uint32_t id, eosio::vm::argument_proxy<uint64_t*> time)
+   int32_t NativeFunctions::clockTimeGet(uint32_t                                  id,
+                                         psizam::detail::argument_proxy<uint64_t*> time)
    {
       check(isSubjectiveContext(*this), "clockGetTime cannot be called in a deterministic context");
       clearResult(*this);
@@ -544,7 +545,7 @@ namespace psibase
       return 0;
    }
 
-   void NativeFunctions::getRandom(eosio::vm::span<char> dest)
+   void NativeFunctions::getRandom(std::span<char> dest)
    {
       check(isSubjectiveContext(*this), "getRandom cannot be called in a deterministic context");
       std::random_device rng;
@@ -568,7 +569,7 @@ namespace psibase
       return setResult(*this, psio::convert_to_frac(currentActContext->action));
    }
 
-   uint32_t NativeFunctions::call(eosio::vm::span<const char> data, std::uint64_t flagsRaw)
+   uint32_t NativeFunctions::call(std::span<const char> data, std::uint64_t flagsRaw)
    {
       auto saved          = currentActContext->transactionContext.remainingStack;
       auto remainingStack = currentExecContext->remainingStack();
@@ -608,15 +609,13 @@ namespace psibase
       return result_value.size();
    }
 
-   void NativeFunctions::setRetval(eosio::vm::span<const char> data)
+   void NativeFunctions::setRetval(std::span<const char> data)
    {
       currentActContext->actionTrace.rawRetval.assign(data.begin(), data.end());
       clearResult(*this);
    }
 
-   uint32_t NativeFunctions::kvOpen(uint32_t                    dbRaw,
-                                    eosio::vm::span<const char> prefix,
-                                    uint32_t                    mode)
+   uint32_t NativeFunctions::kvOpen(uint32_t dbRaw, std::span<const char> prefix, uint32_t mode)
    {
       check(prefix.size() <= transactionContext.config.maxKeySize, "key is too big");
 
@@ -682,9 +681,7 @@ namespace psibase
                        transactionContext.getWasmConfig().maxHandles));
    }
 
-   uint32_t NativeFunctions::kvOpenAt(uint32_t                    handle,
-                                      eosio::vm::span<const char> prefix,
-                                      uint32_t                    mode)
+   uint32_t NativeFunctions::kvOpenAt(uint32_t handle, std::span<const char> prefix, uint32_t mode)
    {
       const auto& bucket    = buckets[static_cast<KvHandle>(handle)];
       auto        newPrefix = bucket.key(prefix);
@@ -702,7 +699,7 @@ namespace psibase
       buckets.close(static_cast<KvHandle>(handle));
    }
 
-   void NativeFunctions::exportHandles(eosio::vm::span<const char> data)
+   void NativeFunctions::exportHandles(std::span<const char> data)
    {
       using Handles = std::vector<KvHandle>;
       check(psio::fracpack_validate_strict<Handles>(data), "Expected list of handles");
@@ -724,9 +721,9 @@ namespace psibase
                                                  transactionContext.getWasmConfig().maxHandles)));
    }
 
-   void NativeFunctions::kvPut(uint32_t                    handle,
-                               eosio::vm::span<const char> key,
-                               eosio::vm::span<const char> value)
+   void NativeFunctions::kvPut(uint32_t              handle,
+                               std::span<const char> key,
+                               std::span<const char> value)
    {
       timeDbVoid(
           *this,
@@ -785,7 +782,7 @@ namespace psibase
           });
    }
 
-   void NativeFunctions::kvRemove(uint32_t handle, eosio::vm::span<const char> key)
+   void NativeFunctions::kvRemove(uint32_t handle, std::span<const char> key)
    {
       timeDbVoid(*this,
                  [&]
@@ -818,7 +815,7 @@ namespace psibase
                  });
    }
 
-   uint32_t NativeFunctions::kvGet(uint32_t handle, eosio::vm::span<const char> key)
+   uint32_t NativeFunctions::kvGet(uint32_t handle, std::span<const char> key)
    {
       return timeDb(  //
           *this,
@@ -832,9 +829,9 @@ namespace psibase
           });
    }
 
-   uint32_t NativeFunctions::kvGreaterEqual(uint32_t                    handle,
-                                            eosio::vm::span<const char> key,
-                                            uint32_t                    matchKeySize)
+   uint32_t NativeFunctions::kvGreaterEqual(uint32_t              handle,
+                                            std::span<const char> key,
+                                            uint32_t              matchKeySize)
    {
       return timeDb(  //
           *this,
@@ -851,9 +848,9 @@ namespace psibase
           });
    }
 
-   uint32_t NativeFunctions::kvLessThan(uint32_t                    handle,
-                                        eosio::vm::span<const char> key,
-                                        uint32_t                    matchKeySize)
+   uint32_t NativeFunctions::kvLessThan(uint32_t              handle,
+                                        std::span<const char> key,
+                                        uint32_t              matchKeySize)
    {
       return timeDb(  //
           *this,
@@ -870,7 +867,7 @@ namespace psibase
           });
    }
 
-   uint32_t NativeFunctions::kvMax(uint32_t handle, eosio::vm::span<const char> key)
+   uint32_t NativeFunctions::kvMax(uint32_t handle, std::span<const char> key)
    {
       return timeDb(  //
           *this,
@@ -906,7 +903,7 @@ namespace psibase
       database.abortSubjective();
    }
 
-   int32_t NativeFunctions::socketOpen(eosio::vm::span<const char> args)
+   int32_t NativeFunctions::socketOpen(std::span<const char> args)
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to open sockets");
@@ -937,9 +934,7 @@ namespace psibase
       return -static_cast<std::int32_t>(wasi_errno_nosys);
    }
 
-   int32_t NativeFunctions::socketSend(int32_t                     fd,
-                                       eosio::vm::span<const char> msg,
-                                       std::uint32_t               flags)
+   int32_t NativeFunctions::socketSend(int32_t fd, std::span<const char> msg, std::uint32_t flags)
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
@@ -960,7 +955,7 @@ namespace psibase
                                      transactionContext.ownedSockets);
    }
 
-   std::uint32_t NativeFunctions::readFile(eosio::vm::span<const char> filename)
+   std::uint32_t NativeFunctions::readFile(std::span<const char> filename)
    {
       check(isSubjectiveContext(*this), "Files are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to read files");

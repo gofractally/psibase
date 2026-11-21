@@ -5,13 +5,11 @@ add_executable(psitest main.cpp)
 if(APPLE)
     target_link_libraries(psitest
         psibase
-        debug_eos_vm
         ${Boost_LIBRARIES}
     )
 elseif(UNIX)
     target_link_libraries(psitest
         psibase
-        debug_eos_vm
         ${Boost_LIBRARIES}
         -static-libgcc
         -static-libstdc++

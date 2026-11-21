@@ -20,14 +20,7 @@ if(IS_NATIVE)
     set(Boost_USE_STATIC_LIBS   ON)
     find_package(Boost 1.70 CONFIG REQUIRED COMPONENTS date_time filesystem chrono iostreams)
 
-    option(ENABLE_INSTALL "enable this library to be installed" OFF)
-    option(ENABLE_TOOLS "enable building of tools" OFF)
-    # Hack to prevent softfloat from being installed
-    set(PREV_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-    set(CMAKE_CURRENT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/eos-vm/external)
-    include(eos-vm/external/softfloat.cmake)
-    set(CMAKE_CURRENT_SOURCE_DIR ${PREV_SOURCE_DIR})
-    add_subdirectory(eos-vm)
+    include(psizam-core.cmake)
 
 endif()
 

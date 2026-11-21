@@ -1,12 +1,12 @@
 #include <psibase/TransactionContext.hpp>
 
 #include <condition_variable>
-#include <eosio/vm/execution_context.hpp>
 #include <mutex>
 #include <psibase/ActionContext.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
+#include <psizam/detail/execution_context.hpp>
 #include <thread>
 
 namespace psibase
@@ -23,7 +23,7 @@ namespace psibase
    struct TransactionContextImpl
    {
       explicit TransactionContextImpl(SystemContext& context)
-          : vmTimedOut(eosio::vm::timed_run_has_timed_out),
+          : vmTimedOut(psizam::detail::timed_run_has_timed_out),
             watchdog(*context.watchdogManager, [this] { asyncTimeout(); })
       {
       }
@@ -35,7 +35,7 @@ namespace psibase
       std::mutex                                mutex    = {};
       bool                                      timedOut = false;
       std::atomic<bool>&                        vmTimedOut;
-      eosio::vm::stack_manager                  altStack;
+      psizam::detail::stack_manager             altStack;
       std::map<AccountNumber, ExecutionContext> executionContexts = {};
       // alt execution contexts are used when executing in a different
       // run mode. They are always run in a subjective mode, and
@@ -450,7 +450,7 @@ namespace psibase
       return impl->wasmConfig;
    }
 
-   eosio::vm::stack_manager& TransactionContext::getAltStack()
+   psizam::detail::stack_manager& TransactionContext::getAltStack()
    {
       return impl->altStack;
    }

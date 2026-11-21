@@ -200,7 +200,7 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.70 CONFIG REQUIRED COMPONENTS filesystem log)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent Boost::filesystem Boost::log debug_eos_vm -ldl)
+        target_link_libraries(psibase${suffix} PUBLIC psibase-psizam triedent Boost::filesystem Boost::log -ldl)
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)
@@ -214,6 +214,7 @@ function(add suffix)
             native/src/LogSocket.cpp
             native/src/Mount.cpp
             native/src/NativeFunctions.cpp
+            native/src/PsizamPolicy.cpp
             native/src/OpenSSLProver.cpp
             native/src/pkcs11.cpp
             native/src/PKCS11Prover.cpp
