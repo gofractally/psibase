@@ -1,0 +1,6 @@
+package transact:plugin;
+interface intf {
+    use host:types/types.{error};
+    add-action-to-transaction: func(method-name:string, packed-args:list<u8>) -> result<_,error>;
+}
+world imports { import intf; }

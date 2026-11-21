@@ -1,0 +1,9 @@
+package favor:plugin;
+world impl {
+    include host:client/imports;
+    include host:http/imports;
+    include transact:plugin/imports;
+    include permissions:plugin/imports;
+    export api;
+    export authorized;
+}

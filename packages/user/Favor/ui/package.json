@@ -1,0 +1,27 @@
+{
+    "name": "@psibase/favor-ui",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite --host 127.0.0.1",
+        "build": "tsc --noEmit && vite build",
+        "test": "node --test test/*.test.mjs"
+    },
+    "dependencies": {
+        "@fontsource-variable/dm-sans": "^5.3.0",
+        "@fontsource-variable/manrope": "^5.3.0",
+        "qrcode": "^1.5.4",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "@types/qrcode": "^1.5.6",
+        "@types/react": "^19.1.0",
+        "@types/react-dom": "^19.1.0",
+        "prettier": "^3.6.2",
+        "typescript": "^5.7.3",
+        "vite": "^5.4.21"
+    }
+}

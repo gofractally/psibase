@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
+    "Favor",
+    "Favor/service",
+    "Favor/query-service",
+    "Favor/plugin",
+    "Favor/plugin-legacy",
     "EthBridge/plugin",
     "EthBridge",
     "EthBridge/core",
