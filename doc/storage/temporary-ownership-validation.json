@@ -1,0 +1,20 @@
+{
+  "status": "Reviewed adapter temporary-ownership fix; Linux and integrated requalification pending",
+  "behavior": "Temporary databases reserve a new 0700 directory with mkdtemp. Existing sibling stores are never adopted. Cleanup begins as soon as reservation succeeds and removes only the owned temporary directory, including initialization failure. Native engine fsync and sidecar write/file+directory fsync policy are unchanged.",
+  "before": "Deterministic precreated valid legacy pid/serial store reproduced adoption and deletion on old adapter; retained failure: artifacts/psibase-migration/psitri-stage3/20261121T220239Z-temp-collision-before.",
+  "qualification": {
+    "platform": "macOS arm64",
+    "component_tests": "13/13 passed",
+    "regressions": [
+      "Precreated valid legacy name is not adopted; fresh root has no stale key; stale store survives close and reopens with original value.",
+      "Four terminal sidecar I/O failures (zero write, write EIO, file fsync EIO, directory fsync EIO) reject construction and remove the reserved temporary directory, preserving unrelated sibling bytes."
+    ],
+    "evidence": "artifacts/psibase-migration/psitri-stage3/20261121T220413Z-temp-io-cleanup-mac"
+  },
+  "persistent_initialization": "A rejected persistent-store initialization is not automatically deleted or repaired. Native manifest publication and durable identity-sidecar creation are separate operations; interrupted/incomplete identity is rejected on reopen. Operators must preserve such a directory for diagnosis and use a fresh directory. A fully valid identity may reopen normally after an earlier failed acknowledgement; constructor failure never acknowledges durability. No cleanup of a pre-existing store is authorized.",
+  "source_sha256": {
+    "libraries/psibase/native/src/psitriStorage.cpp": "097c6fc770f24c7844f430d24080f672f38ef40b19d7fec9642b5fa3cc3ddc2d",
+    "libraries/psibase/native/tests/storage/storage_contract.cpp": "1905479ab0b1f1c2d8e0c776e54fcfd7bb83d659474a74d0f356b796fa31e4af",
+    "libraries/psibase/native/tests/storage/identity_io_contract.cpp": "b329025326f23d2944ceffa9f53ea1989fb4fe3ee66784f802c6a757b6ad5ddc"
+  }
+}

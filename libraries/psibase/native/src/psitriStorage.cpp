@@ -15,6 +15,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <type_traits>
 #include <utility>
@@ -620,10 +621,24 @@ namespace psibase::storage
                             .lexically_normal();
       if (mode == open_mode::temporary)
       {
-         static std::atomic<unsigned> serial = 0;
-         path /= std::string("psibase-temporary-") + std::to_string(::getpid()) + "-" +
-                 std::to_string(serial++);
+         std::filesystem::create_directories(path);
+         auto pattern = (path / "psibase-temporary-XXXXXX").string();
+         if (!::mkdtemp(pattern.data()))
+            throw std::system_error(errno, std::generic_category(),
+                                    "create temporary psibase database directory");
+         // mkdtemp owns a new, empty, private directory. Install cleanup before
+         // opening the engine; never adopt or remove a pre-existing store.
+         try
+         {
+            state->path = pattern;
+         }
+         catch (...)
+         {
+            ::rmdir(pattern.c_str());
+            throw;
+         }
          state->temporary = true;
+         path             = state->path;
       }
       const bool directoryExists = std::filesystem::exists(path);
       const bool nonempty        = directoryExists && !std::filesystem::is_empty(path);

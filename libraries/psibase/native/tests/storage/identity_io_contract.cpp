@@ -160,7 +160,36 @@ int main(int argc, char** argv)
          std::cout << "identity mode=" << unsigned(mode) << " accepted=" << accepted
                    << " writes=" << fault.writes << " syncs=" << fault.syncs << '\n';
       }
+      for (auto mode :
+           {Mode::zeroWrite, Mode::writeError, Mode::fileSyncError, Mode::directorySyncError})
+      {
+         const auto parent = root / ("temporary-" + std::to_string(unsigned(mode)));
+         std::filesystem::create_directory(parent);
+         std::ofstream(parent / "preserved") << "another owner's data";
+         Fault fault{mode};
+         bool  rejected = false;
+         current        = &fault;
+         try
+         {
+            psibase::storage::database temporary(parent, {1, 1, 1, 1},
+                                                 psibase::storage::open_mode::temporary);
+         }
+         catch (const std::runtime_error&)
+         {
+            rejected = true;
+         }
+         current = nullptr;
+         require(rejected && fault.injected, "temporary identity failure was not rejected");
+         require(std::distance(std::filesystem::directory_iterator(parent),
+                               std::filesystem::directory_iterator{}) == 1,
+                 "failed temporary initialization leaked its owned directory");
+         std::ifstream preserved(parent / "preserved");
+         require(
+             std::string(std::istreambuf_iterator<char>(preserved), {}) == "another owner's data",
+             "temporary cleanup removed unrelated data");
+      }
       std::cout << "identity initialization: 9 cases passed\n";
+      std::cout << "temporary initialization cleanup: 4 terminal I/O failures passed\n";
    }
    catch (const std::exception& error)
    {

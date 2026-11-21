@@ -107,6 +107,35 @@ int main(int argc, char** argv)
    };
    try
    {
+      test("temporary stores never adopt a stale same-process name",
+           [&]
+           {
+              // Reproduce the first legacy pid/serial name deterministically,
+              // before this process opens any temporary database.
+              const auto stale = base / ("psibase-temporary-" + std::to_string(::getpid()) + "-0");
+              {
+                 database db(stale, config, open_mode::create_new);
+                 auto     w   = db.start_write_session();
+                 auto     top = w->get_top_root();
+                 put(*w, top, "stale", "must survive");
+                 w->set_top_root(top);
+              }
+              std::filesystem::path temporary;
+              {
+                 database db(base, config, open_mode::temporary);
+                 temporary = db.directory();
+                 require(temporary != stale, "temporary adopted a stale database name");
+                 auto w = db.start_write_session();
+                 require(get(*w, w->get_top_root(), "stale") == "<missing>",
+                         "temporary database inherited stale data");
+              }
+              require(!std::filesystem::exists(temporary), "temporary directory was not removed");
+              require(std::filesystem::exists(stale), "temporary cleanup removed another store");
+              database db(stale, config, open_mode::read_write);
+              auto     w = db.start_write_session();
+              require(get(*w, w->get_top_root(), "stale") == "must survive",
+                      "stale store data was changed");
+           });
       test("diagnostic path boundaries and unavailable pressure",
            [&]
            {
