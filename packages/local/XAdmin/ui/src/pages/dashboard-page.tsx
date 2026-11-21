@@ -21,6 +21,7 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { usePerformance } from "../hooks/use-performance";
 import { useStatuses } from "../hooks/use-statuses";
 import { useTransactStats } from "../hooks/use-transact-stats";
+import { databaseMemoryNotice } from "../lib/storage-diagnostics";
 
 const chartConfig = {
     database: {
@@ -79,7 +80,7 @@ export function DashboardPage() {
         () => [
             {
                 memType: "database",
-                usage: bytesToMb(data?.memory.database || 0),
+                usage: bytesToMb(data?.memory.database ?? 0),
                 fill: "var(--color-database)",
             },
             {
@@ -107,7 +108,7 @@ export function DashboardPage() {
                 usage: bytesToMb(data?.memory.unclassified || 0),
                 fill: "var(--color-unclassified)",
             },
-        ],
+        ].filter((entry) => entry.memType !== "database" || data?.memory.database != null),
         [data],
     );
 
@@ -143,6 +144,8 @@ export function DashboardPage() {
                         <CardTitle>RAM usage</CardTitle>
                         <CardDescription>
                             Memory consumed by this node process.
+                            {" "}
+                            {databaseMemoryNotice(data?.memory.database, data?.memory.databaseAttribution)}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex items-center justify-center">

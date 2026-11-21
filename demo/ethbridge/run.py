@@ -25,7 +25,7 @@ def prepare():
  (PACKAGES/'index.json').write_text(json.dumps(index))
 def base():
  (STATE/'chain').mkdir(parents=True,exist_ok=True);conf=STATE/'chain/config'
- if not conf.exists():conf.write_text(f'p2p = off\nproducer = psibase\nhost = psibase.localhost\nlisten = 127.0.0.1:{NODE_PORT}\nmount = {PACKAGES}\ndatabase-cache-size = 256MiB\nservice-threads = 4\nhttp-timeout = 120s\n\n[logger.stderr]\ntype = console\nfilter = Severity >= warning\nformat = [{{Severity}}] {{Message}}\n')
+ if not conf.exists():conf.write_text(f'p2p = off\nproducer = psibase\nhost = psibase.localhost\nlisten = 127.0.0.1:{NODE_PORT}\nmount = {PACKAGES}\ndatabase-cache-policy = disabled\nservice-threads = 4\nhttp-timeout = 120s\n\n[logger.stderr]\ntype = console\nfilter = Severity >= warning\nformat = [{{Severity}}] {{Message}}\n')
  proc('node',[ROOT/'build/psinode',STATE/'chain','--proof-timeout-ms','30000'])
  def ready():
   try:urllib.request.urlopen(f'http://127.0.0.1:{NODE_PORT}/',timeout=1)

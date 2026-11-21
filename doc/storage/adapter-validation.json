@@ -1,0 +1,80 @@
+{
+  "status": "owner-thread correctness checkpoint; performance and full application qualification pending",
+  "architecture": "One maintained Large Engine writer session per physical database, all native operations and native-handle destruction serialized on a synchronous owner executor. Opaque shared facade roots retain database lifetime. Clones share storage but cannot publish physical root 0.",
+  "pins": {
+    "psitri": "e4d23be469c7a246536431b2abb72859c6d1b014",
+    "ucc": "2c124eba978e7bcf20e252eec7fd5b2ea3635295",
+    "reference_triedent_tree": "0015ca9ed4e9e12b722edc62161e4a940cd5a029"
+  },
+  "payloads": "Legacy opaque fracpack bytes and EOS VM execution retained in this checkpoint. No new psio headers or symbols are linked through storage.",
+  "persistence": {
+    "manifest": "psibase.psitri.big.manifest.v1",
+    "physical_root": 0,
+    "durability": "fsync",
+    "read_only": "True maintained read_only engine open, no writer session, no repair. Compatibility writer proxy rejects mutation. Sidecar plus native identity validated before writable open.",
+    "transactions": "All revision roots, head metadata and persistent subjective roots are atomically reachable through one manifest commit. Session roots remain detached; clones never publish. Proposed cached roots update only after accepted native publication.",
+    "cancellation": "Expensive COW/OCC scans remain cancellable. Accepted root/fsync/socket/callback effects finish synchronously before deferred cancellation is reported."
+  },
+  "configuration": {
+    "node_option": "database-cache-policy=disabled",
+    "removed_option": "database-cache-size is rejected with a replacement diagnostic",
+    "enable_read_cache": false,
+    "max_pinned_cache_size_mb": 0,
+    "tester_four_argument_abi": "Validated compatibility hints only; neither independent tiers nor an enforced aggregate cache budget.",
+    "engine_environment": "Rejects HEART_PAGE_BYTES, HEART_PINNED_MB, HEART_READ_CACHE, HEART_READ_CACHE_SEC before opening a store. Node owns initialization of the maintained engine environment.",
+    "qualification": "Disabled-cache candidate remains performance-unqualified."
+  },
+  "diagnostics": {
+    "pressure": "unknown; optional/null or storage-pressure-unavailable status; no fabricated false",
+    "linux_memory": "Actual /proc/self/smaps pathname-attributed file mappings under canonical database directory. Exact path boundary; anonymous allocator memory remains unclassified.",
+    "mac_memory": "Database attribution explicitly null/unavailable.",
+    "consumers": "XAdmin accepts nullable memory, omits unknown database chart segment, and explains unavailable diagnostics."
+  },
+  "evidence": {
+    "mac_standalone": "build-storage-contract/evidence/20261121T191239Z",
+    "mac_native": "build-native-psitri/evidence/20261121T191315Z",
+    "native_database_cases": 7,
+    "native_database_assertions": 58,
+    "watchdog_repetitions": 3,
+    "watchdog_cases_per_run": 13,
+    "watchdog_assertions_per_run": 197,
+    "linux_standalone": "build-storage-accounting-linux/evidence/20261121T185854Z",
+    "linux_final_environment_contracts": "queued under shared 4-worker qualification lock",
+    "mac_baseline_benchmark": "build-storage-performance-triedent/evidence/20261121T191101Z",
+    "linux_queue_benchmark": "build-storage-performance-linux/evidence/20261121T190042Z",
+    "ui_helper_tests": 2,
+    "full_ui_build": "pending shared workspace dependencies"
+  },
+  "measured_median_ns": {
+    "mac_triedent_read": 388.9167,
+    "mac_triedent_update": 375.021,
+    "mac_psitri_direct_read": 350.63335,
+    "mac_psitri_direct_update": 1899.6665,
+    "mac_owner_facade_read": 4786.67085,
+    "mac_owner_facade_update": 11208.9375,
+    "linux_psitri_direct_read": 270.75415,
+    "linux_owner_facade_read": 24097.014,
+    "linux_psitri_direct_update": 4794.8985,
+    "linux_owner_facade_update": 50915.3105
+  },
+  "pending_gates": [
+    "Same-fixture Linux triedent comparison",
+    "Application transaction throughput and bridge/Favor/full component matrix",
+    "Full XAdmin build/typecheck in shared Yarn/WASM environment",
+    "Public cache policy performance qualification or measured disabled policy acceptance",
+    "Serialized-caller prototype based on explicit SAL strand-style contract; preserve this owner-thread baseline separately"
+  ],
+  "source_sha256": {
+    "CMakeLists.txt": "2d5b789ddb87c33605ef9dbec0954876c1f235a2e01226572cd3df6238f3910d",
+    "cmake/psitri.cmake": "686672a5141472505ef8998730461f52cd758ba18df361b3300645ab3babe8f7",
+    "libraries/psibase/CMakeLists.txt": "c8aeeb64ee8a92d9a1ed6ad5f747824c411a0de5a0ce5037cbb9b2a2f1b04b40",
+    "libraries/psibase/native/include/psibase/storage.hpp": "9fece8f7f112c28b710dd23f58fe252e9606dda32431e25f1a5473519e1ea968",
+    "libraries/psibase/native/include/psibase/storageDiagnostics.hpp": "efd30349667c1ec42b29817d46130eb8794fac8eceee8454c99e6a0c2af81146",
+    "libraries/psibase/native/include/psibase/db.hpp": "f602e4a38fde8cc9ff6cf719e629d122f038923e82fb389270b36642f5de287d",
+    "libraries/psibase/native/src/psitriStorage.cpp": "e63e7bdd2dc1351d7e0d586d63c35a7d132b0a9dccb1ffa4c17302d1e6513765",
+    "libraries/psibase/native/src/usePsitri.cpp": "2a58ab3e1f33cfd23fdb8c878b53353535c7f35d51578b795cd70bc64bd206bb",
+    "libraries/psibase/native/tests/PsitriDatabaseTests.cpp": "6f901c7418d11593f6313c9cbe5254eee4d8b84ad339c8f84fb7864b8a0db13d",
+    "programs/psinode/main.cpp": "582a7298ef5262407364232f8cf3e74b0b12554890d89f18a965468bae98a53d",
+    "programs/psinode/config.in": "c713d48c4b9d0acd170617b9c787cc78f7188f371c51218e2aaf429fadd4b7b9"
+  }
+}

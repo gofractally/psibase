@@ -9,6 +9,7 @@
 #include <boost/type_erasure/callable.hpp>
 #include <chrono>
 #include <filesystem>
+#include <optional>
 #include <psibase/SystemContext.hpp>
 #include <psibase/trace.hpp>
 #include <shared_mutex>
@@ -56,7 +57,7 @@ namespace psibase::http
 
    struct http_status
    {
-      unsigned    slow : 1;
+      std::optional<bool> slow;
       unsigned    startup : 1;
       unsigned    shutdown : 1;
       unsigned    needgenesis : 1;
@@ -78,7 +79,12 @@ namespace psibase::http
             stream.write(',');
          }
       };
-      if (obj.slow)
+      if (!obj.slow.has_value())
+      {
+         maybe_comma();
+         to_json("storage-pressure-unavailable", stream);
+      }
+      else if (*obj.slow)
       {
          maybe_comma();
          to_json("slow", stream);

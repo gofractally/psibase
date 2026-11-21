@@ -5,7 +5,7 @@
 #include <psibase/blob.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/to_key.hpp>
-#include <triedent/cow_ptr.hpp>
+#include <psibase/storage.hpp>
 #include <triedent/file_fwd.hpp>
 
 #include <array>
@@ -34,10 +34,10 @@ namespace psibase
    struct Revision;
    using ConstRevisionPtr = std::shared_ptr<const Revision>;
 
-   using Writer    = triedent::write_session;
+   using Writer    = storage::write_session;
    using WriterPtr = std::shared_ptr<Writer>;
 
-   using DbPtr = triedent::cow_ptr<triedent::root>;
+   using DbPtr = storage::shared_root;
 
    struct DbChangeSet
    {
@@ -151,10 +151,11 @@ namespace psibase
                                            IndependentChangeSet&& changes,
                                            SocketChangeSet&&      socketChanges,
                                            Sockets&               sockets,
-                                           SocketAutoCloseSet&    closing);
+                                           SocketAutoCloseSet&    closing,
+                                           const std::function<void()>& afterPublish = {});
 
-      bool                               isSlow() const;
-      std::vector<std::span<const char>> span() const;
+      std::optional<bool>                isSlow() const;
+      std::filesystem::path             directory() const;
 
       void               setCallbacks(DatabaseCallbacks*);
       DatabaseCallbacks* getCallbacks() const;

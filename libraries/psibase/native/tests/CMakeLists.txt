@@ -20,6 +20,12 @@ target_compile_definitions(SecretsTests PUBLIC -DCATCH_CONFIG_ENABLE_ALL_STRINGM
 target_link_libraries(SecretsTests psibase Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME SecrestsTests COMMAND SecretsTests)
 
+add_executable(PsitriDatabaseTests PsitriDatabaseTests.cpp)
+target_compile_definitions(PsitriDatabaseTests PRIVATE PSIBASE_STORAGE_TEST_ROOT="${ROOT_BINARY_DIR}/storage-contract-databases")
+target_link_directories(PsitriDatabaseTests PRIVATE ${ICU_LIBRARY_DIR})
+target_link_libraries(PsitriDatabaseTests PRIVATE psibase Catch2::Catch2WithMain Threads::Threads)
+add_test(NAME PsitriDatabaseTests COMMAND PsitriDatabaseTests)
+
 if(APPLE)
   add_executable(DarwinCpuVmTrapTests DarwinCpuVmTrapTests.cpp)
   target_link_directories(DarwinCpuVmTrapTests PRIVATE ${ICU_LIBRARY_DIR})

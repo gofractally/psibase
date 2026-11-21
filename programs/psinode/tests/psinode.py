@@ -452,7 +452,7 @@ def _init_softhsm(dir, pin):
     return env
 
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True, softhsm=None, trustfile=None, env={}):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_policy=None, start=True, softhsm=None, trustfile=None, env={}):
         '''
         Create a new psinode server
         If dir is not specified, the server will reside in a temporary directory
@@ -481,10 +481,10 @@ class Node(API):
         self.listen = listen
         self.p2p = p2p
         if start:
-            self.start(database_cache_size=database_cache_size)
+            self.start(database_cache_policy=database_cache_policy)
     def node_args(self):
         return ['-a', self.url, '--proxy', 'unix:' + self.socketpath]
-    def start(self, database_cache_size=None):
+    def start(self, database_cache_policy=None):
         args = [self.executable, self.dir, "-l", self.socketpath]
         for interface in self.listen:
             args.extend(['-l', interface])
@@ -495,8 +495,8 @@ class Node(API):
         args.extend(['--host', 'psibase.localhost'])
         if self.p2p:
             args.append('--p2p')
-        if database_cache_size is not None:
-            args.extend(['--database-cache-size', str(database_cache_size)])
+        if database_cache_policy is not None:
+            args.extend(['--database-cache-policy', str(database_cache_policy)])
         kw = {}
         if len(self.env) != 0:
             env = dict(os.environ)

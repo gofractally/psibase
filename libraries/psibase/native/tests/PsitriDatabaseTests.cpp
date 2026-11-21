@@ -1,0 +1,318 @@
+#include <unistd.h>
+#include <atomic>
+#include <catch2/catch_test_macros.hpp>
+#include <filesystem>
+#include <psibase/CpuAccounting.hpp>
+#include <psibase/Socket.hpp>
+#include <psibase/api.hpp>
+#include <psibase/db.hpp>
+#include <psibase/nativeTables.hpp>
+#include <psio/to_key.hpp>
+#include <thread>
+#include <triedent/file_fwd.hpp>
+using namespace psibase;
+namespace
+{
+   const triedent::database_config config{1 << 27, 1 << 27, 1 << 27, 1 << 27};
+   std::filesystem::path           directory(std::string_view name)
+   {
+      static std::atomic<unsigned> count = 0;
+      auto                         path =
+          std::filesystem::path(PSIBASE_STORAGE_TEST_ROOT) /
+          (std::string(name) + "-" + std::to_string(::getpid()) + "-" + std::to_string(count++));
+      if (std::filesystem::exists(path))
+         throw std::runtime_error("test directory already exists");
+      return path;
+   }
+   std::span<const char> span(std::string_view s)
+   {
+      return {s.data(), s.size()};
+   }
+   std::string value(Database& db, DbId id, std::string_view key = "contract")
+   {
+      auto v = db.kvGetRaw(id, span(key));
+      return v ? std::string(v->pos, v->end) : "<missing>";
+   }
+   void put(Database& db, DbId id, std::string_view v, std::string_view key = "contract")
+   {
+      db.kvPutRaw(id, span(key), span(v));
+   }
+   Checksum256 blockId(std::uint32_t number, unsigned fork = 0)
+   {
+      Checksum256 id{};
+      for (unsigned i = 0; i < 4; ++i)
+         id[i] = number >> (24 - 8 * i);
+      id.back() = fork;
+      return id;
+   }
+   ConstRevisionPtr revision(SharedDatabase&    shared,
+                             WriterPtr          writer,
+                             const Checksum256& id,
+                             const Checksum256& previous,
+                             std::string_view   v)
+   {
+      Database db(shared, shared.emptyRevision());
+      auto     session = db.startWrite(writer);
+      put(db, DbId::service, v);
+      StatusRow status{};
+      status.head                  = BlockInfo{};
+      status.head->header.previous = previous;
+      db.kvPut(StatusRow::db, statusKey(), status);
+      return session.writeRevision(id);
+   }
+   struct TestSocket : AutoCloseSocket
+   {
+      unsigned   closedCallbacks = 0;
+      void       send(Writer&, std::span<const char>, std::uint32_t) override {}
+      SocketInfo info() const override { return HttpSocketInfo{}; }
+      void       onClose(const std::optional<std::string>&) noexcept override { ++closedCallbacks; }
+   };
+}  // namespace
+
+TEST_CASE("psitri native database preserves complete nested root frames", "[storage][psitri]")
+{
+   auto path = directory("nested");
+   {
+      SharedDatabase shared(path, config, triedent::open_mode::create_new);
+      auto           writer = shared.createWriter();
+      Database       db(shared, shared.emptyRevision());
+      auto           outer = db.startWrite(writer);
+      for (unsigned i = 0; i < numChainDatabases; ++i)
+         put(db, DbId(i), "outer");
+      {
+         auto inner = db.startWrite(writer);
+         for (unsigned i = 0; i < numChainDatabases; ++i)
+            put(db, DbId(i), "inner");
+         inner.commit();
+      }
+      {
+         auto aborted = db.startWrite(writer);
+         for (unsigned i = 0; i < numChainDatabases; ++i)
+            put(db, DbId(i), "must-abort");
+      }
+      for (unsigned i = 0; i < numChainDatabases; ++i)
+         REQUIRE(value(db, DbId(i)) == "inner");
+      auto retained = outer.writeRevision(blockId(1));
+      shared.setHead(*writer, retained);
+      {
+         Database branch(shared, retained);
+         auto     aborted = branch.startWrite(writer);
+         {
+            auto inner = branch.startWrite(writer);
+            put(branch, DbId::service, "nested-commit");
+            inner.commit();
+         }
+      }
+      Database read(shared, retained);
+      auto     session = read.startRead();
+      for (unsigned i = 0; i < numChainDatabases; ++i)
+         REQUIRE(value(read, DbId(i)) == "inner");
+   }
+   {
+      SharedDatabase reopened(path, config, triedent::open_mode::read_only);
+      Database       db(reopened, reopened.getHead());
+      auto           session = db.startRead();
+      for (unsigned i = 0; i < numChainDatabases; ++i)
+         REQUIRE(value(db, DbId(i)) == "inner");
+   }
+}
+
+TEST_CASE("psitri subjective OCC retries preserve callbacks and independent writes",
+          "[storage][psitri]")
+{
+   SharedDatabase    shared(directory("occ"), config, triedent::open_mode::create_new);
+   auto              writer = shared.createWriter();
+   DatabaseCallbacks callbacks;
+   unsigned          called  = 0;
+   callbacks.nextTransaction = [&] { ++called; };
+   shared.setCallbacks(&callbacks);
+   Sockets            sockets(shared);
+   SocketAutoCloseSet closing;
+   Database           first(shared, shared.emptyRevision()), second(shared, shared.emptyRevision());
+   auto               s1 = first.startWrite(writer);
+   auto               s2 = second.startWrite(writer);
+   first.checkoutSubjective();
+   second.checkoutSubjective();
+   REQUIRE(value(first, DbId::subjective, "a") == "<missing>");
+   put(first, DbId::subjective, "first", "b");
+   first.setCallbackFlags(DatabaseCallbacks::nextTransactionFlag);
+   put(second, DbId::subjective, "second", "a");
+   REQUIRE(second.commitSubjective(sockets, closing));
+   REQUIRE_FALSE(first.commitSubjective(sockets, closing));
+   REQUIRE(called == 0);
+   REQUIRE(value(first, DbId::subjective, "a") == "second");
+   put(first, DbId::subjective, "retry", "b");
+   REQUIRE(first.commitSubjective(sockets, closing));
+   REQUIRE(called == 1);
+   shared.setCallbacks(nullptr);
+   auto a = shared.kvGetSubjective(*writer, DbId::subjective, span("a"));
+   auto b = shared.kvGetSubjective(*writer, DbId::subjective, span("b"));
+   REQUIRE(a);
+   REQUIRE(b);
+   REQUIRE(std::string(a->begin(), a->end()) == "second");
+   REQUIRE(std::string(b->begin(), b->end()) == "retry");
+}
+
+TEST_CASE("psitri persistent subjective survives while session databases reset",
+          "[storage][psitri]")
+{
+   auto path = directory("subjective");
+   {
+      SharedDatabase     shared(path, config, triedent::open_mode::create_new);
+      auto               writer = shared.createWriter();
+      Sockets            sockets(shared);
+      SocketAutoCloseSet closing;
+      Database           db(shared, shared.emptyRevision());
+      auto               session = db.startWrite(writer);
+      db.checkoutSubjective();
+      for (unsigned i = unsigned(DbId::beginIndependent); i < unsigned(DbId::endIndependent); ++i)
+         put(db, DbId(i), "committed");
+      {
+         db.checkoutSubjective();
+         put(db, DbId::subjective, "must-abort");
+         db.abortSubjective();
+      }
+      REQUIRE(value(db, DbId::subjective) == "committed");
+      REQUIRE(db.commitSubjective(sockets, closing));
+   }
+   {
+      SharedDatabase shared(path, config, triedent::open_mode::read_only);
+      Database       db(shared, shared.getHead());
+      auto           session = db.startRead();
+      db.checkoutSubjective();
+      REQUIRE(value(db, DbId::subjective) == "committed");
+      REQUIRE(value(db, DbId::nativeSubjective) == "committed");
+      REQUIRE(value(db, DbId::session) == "<missing>");
+      REQUIRE(value(db, DbId::nativeSession) == "<missing>");
+      db.abortSubjective();
+   }
+}
+
+TEST_CASE("psitri clones isolate metadata, head, subjective and writer ownership",
+          "[storage][psitri]")
+{
+   SharedDatabase shared(directory("clone"), config, triedent::open_mode::create_new);
+   auto           writer = shared.createWriter();
+   auto           parent = revision(shared, writer, blockId(1), {}, "parent");
+   shared.setHead(*writer, parent);
+   shared.kvPutSubjective(*writer, DbId::subjective, span("key"), span("parent"));
+   auto clone = shared.clone();
+   auto cw    = clone.createWriter();
+   auto fork  = revision(clone, cw, blockId(2), blockId(1), "clone");
+   clone.setHead(*cw, fork);
+   clone.kvPutSubjective(*cw, DbId::subjective, span("key"), span("clone"));
+   REQUIRE_FALSE(shared.getRevision(*writer, blockId(2)));
+   auto parentValue = shared.kvGetSubjective(*writer, DbId::subjective, span("key"));
+   REQUIRE(parentValue);
+   REQUIRE(std::string(parentValue->begin(), parentValue->end()) == "parent");
+   REQUIRE_THROWS(clone.setHead(*writer, parent));
+   Database invalid(clone, clone.getHead());
+   REQUIRE_THROWS(invalid.startWrite(writer));
+   auto next = revision(shared, writer, blockId(3), blockId(1), "new-parent");
+   shared.setHead(*writer, next);
+   Database cloneRead(clone, clone.getHead());
+   auto     read = cloneRead.startRead();
+   REQUIRE(value(cloneRead, DbId::service) == "clone");
+}
+
+TEST_CASE("psitri retained revision pruning preserves valid descendants", "[storage][psitri]")
+{
+   SharedDatabase shared(directory("prune"), config, triedent::open_mode::create_new);
+   auto           writer = shared.createWriter();
+   auto           first  = revision(shared, writer, blockId(1), {}, "first");
+   auto           second = revision(shared, writer, blockId(2), blockId(1), "second");
+   auto           third  = revision(shared, writer, blockId(3), blockId(2), "third");
+   auto           orphan = revision(shared, writer, blockId(3, 1), blockId(1), "orphan");
+   shared.setHead(*writer, third);
+   shared.removeRevisions(*writer, blockId(2));
+   REQUIRE_FALSE(shared.getRevision(*writer, blockId(1)));
+   REQUIRE(shared.getRevision(*writer, blockId(2)));
+   REQUIRE(shared.getRevision(*writer, blockId(3)));
+   REQUIRE_FALSE(shared.getRevision(*writer, blockId(3, 1)));
+   Database retained(shared, first);
+   auto     read = retained.startRead();
+   REQUIRE(value(retained, DbId::service) == "first");
+}
+
+TEST_CASE("cancelled requests cannot publish cached roots, sockets or callbacks",
+          "[storage][psitri][accounting]")
+{
+   SharedDatabase shared(directory("cancelled"), config, triedent::open_mode::create_new);
+   auto           writer = shared.createWriter();
+   auto           parent = revision(shared, writer, blockId(1), {}, "parent");
+   shared.setHead(*writer, parent);
+   auto pending = revision(shared, writer, blockId(2), blockId(1), "pending");
+   auto request = std::make_shared<accounting::Request>([] { return true; });
+   {
+      accounting::Scope scope(request);
+      request->cancel();
+      REQUIRE_THROWS_AS(shared.setHead(*writer, pending), accounting::Cancelled);
+   }
+   {
+      Database db(shared, shared.getHead());
+      auto     read = db.startRead();
+      REQUIRE(value(db, DbId::service) == "parent");
+   }
+   auto sockets = std::make_shared<Sockets>(shared);
+   auto socket  = std::make_shared<TestSocket>();
+   sockets->add(*writer, socket);
+   SocketAutoCloseSet closing;
+   unsigned           callbacks = 0;
+   DatabaseCallbacks  functions;
+   functions.nextTransaction = [&] { ++callbacks; };
+   shared.setCallbacks(&functions);
+   Database db(shared, shared.getHead());
+   auto     session = db.startWrite(writer);
+   db.checkoutSubjective();
+   const auto flag = static_cast<std::uint32_t>(SocketFlags::notifyClose);
+   REQUIRE(db.socketSetFlags(socket->id, flag, flag, *sockets, closing) == 0);
+   db.setCallbackFlags(DatabaseCallbacks::nextTransactionFlag);
+   auto cancelled = std::make_shared<accounting::Request>([] { return true; });
+   {
+      accounting::Scope scope(cancelled);
+      cancelled->cancel();
+      REQUIRE_THROWS_AS(db.commitSubjective(*sockets, closing), accounting::Cancelled);
+   }
+   REQUIRE_FALSE(socket->notifyClose);
+   REQUIRE(callbacks == 0);
+   db.abortSubjective();
+   shared.setCallbacks(nullptr);
+}
+
+TEST_CASE("accepted subjective effects finish before deferred cancellation is reported",
+          "[storage][psitri][accounting]")
+{
+   SharedDatabase shared(directory("accepted"), config, triedent::open_mode::create_new);
+   auto           writer  = shared.createWriter();
+   auto           sockets = std::make_shared<Sockets>(shared);
+   auto           socket  = std::make_shared<TestSocket>();
+   sockets->add(*writer, socket);
+   SocketAutoCloseSet closing;
+   auto               request   = std::make_shared<accounting::Request>([] { return true; });
+   unsigned           callbacks = 0;
+   DatabaseCallbacks  functions;
+   functions.nextTransaction = [&]
+   {
+      ++callbacks;
+      request->cancel();
+   };
+   shared.setCallbacks(&functions);
+   Database db(shared, shared.emptyRevision());
+   auto     session = db.startWrite(writer);
+   db.checkoutSubjective();
+   const auto flag = static_cast<std::uint32_t>(SocketFlags::notifyClose);
+   REQUIRE(db.socketSetFlags(socket->id, flag, flag, *sockets, closing) == 0);
+   put(db, DbId::subjective, "accepted");
+   db.setCallbackFlags(DatabaseCallbacks::nextTransactionFlag);
+   {
+      accounting::Scope scope(request);
+      REQUIRE_THROWS_AS(db.commitSubjective(*sockets, closing), accounting::Cancelled);
+   }
+   REQUIRE(socket->notifyClose);
+   REQUIRE(callbacks == 1);
+   auto committed = shared.kvGetSubjective(*writer, DbId::subjective, span("contract"));
+   REQUIRE(committed);
+   REQUIRE(std::string(committed->begin(), committed->end()) == "accepted");
+   db.abortSubjective();
+   shared.setCallbacks(nullptr);
+}

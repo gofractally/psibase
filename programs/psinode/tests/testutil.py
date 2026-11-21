@@ -15,7 +15,7 @@ MIN_ACCOUNT_LENGTH = 10
 
 def psinode_test(f):
     def result(self):
-        with Cluster(executable=args.psinode, log_filter=args.log_filter, log_format=args.log_format, database_cache_size=256*1024*1024) as cluster:
+        with Cluster(executable=args.psinode, log_filter=args.log_filter, log_format=args.log_format, database_cache_policy='disabled') as cluster:
             try:
                 try:
                     result = f(self, cluster)

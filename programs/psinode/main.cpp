@@ -12,6 +12,7 @@
 #include <psibase/node.hpp>
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psibase/storageDiagnostics.hpp>
 #include <psibase/version.hpp>
 #include <psio/finally.hpp>
 #include <psio/from_json/map.hpp>
@@ -483,14 +484,15 @@ PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
 
 struct MemStats
 {
-   uint64_t database;
+   std::optional<uint64_t> database;
+   std::string databaseAttribution = "unavailable";
    uint64_t code;
    uint64_t data;
    uint64_t wasmMemory;
    uint64_t wasmCode;
    uint64_t unclassified;
 };
-PSIO_REFLECT(MemStats, database, code, data, wasmMemory, wasmCode, unclassified)
+PSIO_REFLECT(MemStats, database, databaseAttribution, code, data, wasmMemory, wasmCode, unclassified)
 
 struct Perf
 {
@@ -542,7 +544,8 @@ void write_om_mem(std::string_view name, std::int64_t v, auto& stream)
 void write_om_mem(const Perf& perf, auto& stream)
 {
    write_om_descriptor("psinode_memory_bytes", "gauge", "bytes", "Resident Memory", stream);
-   write_om_mem("database", perf.memory.database, stream);
+   if (perf.memory.database)
+      write_om_mem("database", *perf.memory.database, stream);
    write_om_mem("code", perf.memory.code, stream);
    write_om_mem("data", perf.memory.data, stream);
    write_om_mem("wasm_code", perf.memory.wasmCode, stream);
@@ -709,6 +712,7 @@ struct MappingInfo
    bool           executable;
    bool           anonymous;
    bool           special;
+   std::string    pathname;
 };
 
 bool parse_map_line(const char* begin, const char* end, MappingInfo& mapping)
@@ -743,7 +747,9 @@ bool parse_map_line(const char* begin, const char* end, MappingInfo& mapping)
    auto offset        = read_field();
    auto dev           = read_field();
    auto inode         = read_field();
-   auto pathname      = read_field();
+   while (begin != end && *begin == ' ') ++begin;
+   const auto pathname = std::string_view(begin, end);
+   mapping.pathname = pathname;
    mapping.anonymous  = pathname == "";
    mapping.special    = pathname.starts_with('[') && pathname.ends_with(']');
    return true;
@@ -826,10 +832,7 @@ struct RegionInfo
 MemStats getMemStats(const SharedState& state)
 {
    RegionInfo regions;
-   for (auto span : state.dbSpan())
-   {
-      regions.add(span, RegionGroup::database);
-   }
+   const auto directory = std::filesystem::weakly_canonical(state.databaseDirectory());
    for (auto span : state.codeSpan())
    {
       regions.add(span, RegionGroup::wasmCode);
@@ -842,13 +845,21 @@ MemStats getMemStats(const SharedState& state)
    MemStats result = {};
    {
       std::ifstream in("/proc/self/smaps");
+      if (in)
+      {
+         result.database = 0;
+         result.databaseAttribution = "file-backed";
+      }
       MappingInfo   info;
       while (in >> info)
       {
-         switch (regions.get(info.begin, info.end))
+         auto group = regions.get(info.begin, info.end);
+         if (group == RegionGroup::unknown && psibase::storage::databaseMapping(info.pathname, directory))
+            group = RegionGroup::database;
+         switch (group)
          {
             case RegionGroup::database:
-               result.database += info.rss;
+               if (result.database) *result.database += info.rss;
                break;
             case RegionGroup::wasmCode:
                result.wasmCode += info.rss;
@@ -905,15 +916,17 @@ inline constexpr std::size_t ceil_log2(std::size_t v)
 
 struct DbConfig
 {
-   DbConfig(byte_size cache)
+   DbConfig(const std::string& policy)
    {
-      cool_bytes = warm_bytes = hot_bytes = cache.value / 2;
-      cold_bytes                          = 64 * 1024 * 1024;
+      if (policy != "disabled")
+         throw std::runtime_error("Unsupported database-cache-policy; this candidate supports only disabled");
    }
-   uint64_t hot_bytes;
-   uint64_t warm_bytes;
-   uint64_t cool_bytes;
-   uint64_t cold_bytes;
+   // Compatibility sizing arguments for the tester-era SharedDatabase API.
+   // They do not reserve RAM or configure independent psitri storage tiers.
+   uint64_t hot_bytes = 32 * 1024 * 1024;
+   uint64_t warm_bytes = 32 * 1024 * 1024;
+   uint64_t cool_bytes = 32 * 1024 * 1024;
+   uint64_t cold_bytes = 32 * 1024 * 1024;
 };
 
 struct TLSConfig
@@ -1016,7 +1029,7 @@ struct PsinodeConfig
       constexpr std::string_view opts[] = {
           "producer", "pkcs11-modules",      "listen",       "tls-key",
           "tls-cert", "tls-trustfile",       "http-timeout", "service-threads",
-          "key",      "database-cache-size", "mount",        "passphrase-file"};
+          "key",      "database-cache-policy", "mount",        "passphrase-file"};
       return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
              name.starts_with("service.");
    }
@@ -1085,7 +1098,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    // because it's probably a bad idea to reveal the
    // private keys.
    file.keep("", "key");
-   file.keep("", "database-cache-size");
+   file.keep("", "database-cache-policy");
    file.keep("", "mount");
    file.keep("", "passphrase-file");
    //
@@ -1205,9 +1218,19 @@ void run(const std::string&              db_path,
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
 
+   PSIBASE_LOG(psibase::loggers::generic::get(), info)
+       << "Storage engine=psitri.big sync=fsync read-cache=false pinned-cache-MiB=0 "
+          "cache-policy=disabled (performance qualification pending)";
+
    Secrets secrets{std::filesystem::path(db_path) / "secrets", passphrase};
 
-   if (system->sharedDatabase.isSlow())
+   const auto storagePressure = system->sharedDatabase.isSlow();
+   if (!storagePressure)
+   {
+      PSIBASE_LOG(psibase::loggers::generic::get(), info)
+          << "Storage pressure diagnostics are unavailable for the generic psitri engine";
+   }
+   else if (*storagePressure)
    {
       PSIBASE_LOG(psibase::loggers::generic::get(), warning)
           << "unable to lock memory for " << db_path
@@ -1907,7 +1930,7 @@ int main(int argc, char* argv[])
    std::vector<std::string> root_ca;
    std::string              tls_cert;
    std::string              tls_key;
-   byte_size                db_cache_size;
+   std::string              db_cache_policy;
    byte_size                db_size;
    Timeout                  http_timeout;
    std::size_t              service_threads;
@@ -1962,11 +1985,15 @@ int main(int argc, char* argv[])
        "Makes files available to services");
    opt("database-template", po::value(&db_template)->default_value("XDefault", ""),
        "Template to install when initializing a new database");
-   opt("database-cache-size",
-       po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
-       "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: "
-       "If this is reduced, it may cause a significant delay on startup as the database is "
-       "reorganized. This option is subject to change.");
+   opt("database-cache-policy",
+       po::value(&db_cache_policy)->default_value("disabled")->notifier(
+           [](const std::string& policy)
+           {
+              if (policy != "disabled")
+                 throw std::runtime_error("Unsupported database-cache-policy; this candidate supports only disabled");
+           }),
+       "Generic psitri cache policy. This candidate supports disabled: read promotion off, "
+       "pinned-cache budget 0 MiB. Performance qualification is pending.");
 #ifdef PSIBASE_ENABLE_SSL
    opt("tls-trustfile", po::value(&root_ca)->default_value({}, "")->value_name("path"),
        "A list of trusted Certification Authorities in PEM format");
@@ -1993,6 +2020,16 @@ int main(int argc, char* argv[])
    po::options_description cfg_opts("psinode");
    cfg_opts.add(common_opts);
    cfg_opts.add_options()("logger.*", po::value<std::string>(), "Log configuration");
+   // Parse removed controls only to give existing configuration files a useful
+   // migration error. They are not advertised as functioning psitri settings.
+   po::options_description legacy_opts;
+   legacy_opts.add_options()("database-cache-size", po::value<std::string>()->notifier(
+       [](const std::string&)
+       {
+          throw std::runtime_error("database-cache-size is a removed triedent control; replace it with database-cache-policy=disabled (psitri read promotion off, pinned-cache budget 0 MiB)");
+       }));
+   desc.add(legacy_opts);
+   cfg_opts.add(legacy_opts);
 
    std::optional<std::string_view> database;
    std::vector<std::string>        args;
@@ -2083,7 +2120,7 @@ int main(int argc, char* argv[])
       while (true)
       {
          restart.args.reset();
-         run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
+         run(db_path, db_template, DbConfig{db_cache_policy}, AccountNumber{producer}, keys,
              passphrase, pkcs11_modules, listen, mountpoints, http_timeout, service_threads,
              proof_timeout_ms,
              root_ca, tls_cert, tls_key, extra_options, restart);

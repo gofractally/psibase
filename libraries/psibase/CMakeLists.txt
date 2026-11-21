@@ -224,10 +224,15 @@ function(add suffix)
             native/src/Socket.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
-            native/src/useTriedent.cpp
+            native/src/usePsitri.cpp
+            native/src/psitriStorage.cpp
             native/src/VerifyProver.cpp
             native/src/Watchdog.cpp
         )
+
+        include(${ROOT_SOURCE_DIR}/cmake/psitri.cmake)
+        psibase_add_psitri()
+        target_link_libraries(psibase${suffix} PRIVATE psibase::storage_engine)
 
         add_subdirectory(native/tests)
         add_subdirectory(common/tests)
