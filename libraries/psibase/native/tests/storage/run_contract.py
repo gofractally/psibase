@@ -16,8 +16,8 @@ p.add_argument('--cxx',required=True)
 p.add_argument('--build-dir',default='build-storage-contract')
 p.add_argument('--jobs',default='4')
 p.add_argument('--tsan',action='store_true')
-p.add_argument('--psitri-source',type=Path,required=True)
-p.add_argument('--ucc-source',type=Path,required=True)
+p.add_argument('--psitri-source',type=Path)
+p.add_argument('--ucc-source',type=Path)
 a=p.parse_args()
 root=Path(__file__).resolve().parents[5]
 build=root/a.build_dir
@@ -56,10 +56,13 @@ try:
     sanitizer = ['-DCMAKE_C_FLAGS=-fsanitize=thread -fno-omit-frame-pointer',
                  '-DCMAKE_CXX_FLAGS=-fsanitize=thread -fno-omit-frame-pointer',
                  '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread'] if a.tsan else []
+    overrides = []
+    for name, source in [('PSITRI', a.psitri_source), ('UCC', a.ucc_source)]:
+        if source is not None:
+            overrides.append('-DFETCHCONTENT_SOURCE_DIR_'+name+'='+str(source.resolve()))
     run('configure',['cmake','-S','libraries/psibase/native/tests/storage','-B',build,'-G','Ninja',
                      '-DCMAKE_BUILD_TYPE=Debug','-DCMAKE_C_COMPILER='+a.cc,'-DCMAKE_CXX_COMPILER='+a.cxx,
-                     '-DFETCHCONTENT_SOURCE_DIR_PSIBASE_PSITRI='+str(a.psitri_source.resolve()),
-                     '-DFETCHCONTENT_SOURCE_DIR_PSIBASE_UCC='+str(a.ucc_source.resolve()),*sanitizer])
+                     *overrides,*sanitizer])
     run('build',['cmake','--build',build,'--parallel',a.jobs])
     run('tests',['ctest','--test-dir',build,'--verbose','--output-on-failure'])
     symbols=run('symbols',['nm','-C',build/'storage_contract']).stdout

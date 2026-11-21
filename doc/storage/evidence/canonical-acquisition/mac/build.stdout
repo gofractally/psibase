@@ -1,0 +1,22 @@
+[0/2] Re-checking globbed directories...
+[1/22] Building CXX object storage-deps/sal/CMakeFiles/sal.dir/src/mapping.cpp.o
+[2/22] Building CXX object storage-deps/sal/CMakeFiles/sal.dir/src/block_allocator.cpp.o
+[3/22] Building CXX object storage-deps/sal/CMakeFiles/sal.dir/src/control_block_alloc.cpp.o
+[4/22] Building CXX object storage-deps/sal/CMakeFiles/sal.dir/src/segment_thread.cpp.o
+[5/22] Building CXX object storage-deps/sal/CMakeFiles/sal.dir/src/allocator.cpp.o
+[6/22] Building CXX object storage-deps/sal/CMakeFiles/sal.dir/src/allocator_session.cpp.o
+[7/22] Linking CXX static library storage-deps/sal/libsal.a
+[8/22] Building CXX object CMakeFiles/psibase_cpu_clock.dir/Users/dlarimer/psibase-foundation-psitri/libraries/psibase/native/src/Watchdog.cpp.o
+[9/22] Building CXX object CMakeFiles/storage_contract.dir/storage_contract.cpp.o
+[10/22] Linking CXX static library libpsibase_cpu_clock.a
+[11/22] Building CXX object CMakeFiles/serialized_contract.dir/serialized_contract.cpp.o
+[12/22] Building CXX object CMakeFiles/psibase_storage.dir/Users/dlarimer/psibase-foundation-psitri/libraries/psibase/native/src/psitriStorage.cpp.o
+[13/22] Linking CXX static library libpsibase_storage.a
+[14/22] Linking CXX executable storage_contract
+[15/22] Building CXX object CMakeFiles/cpu_accounting_contract.dir/cpu_accounting_contract.cpp.o
+[16/22] Linking CXX executable cpu_accounting_contract
+[17/22] Building CXX object CMakeFiles/engine_dependency_smoke.dir/engine_dependency_smoke.cpp.o
+[18/22] Linking CXX executable serialized_contract
+[19/22] Linking CXX executable engine_dependency_smoke
+[20/22] Building CXX object CMakeFiles/darwin_cpu_contract.dir/darwin_cpu_contract.cpp.o
+[21/22] Linking CXX executable darwin_cpu_contract

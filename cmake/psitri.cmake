@@ -1,7 +1,7 @@
 # Maintained generic Large Engine only. Never evaluate psitri's top-level
 # CMakeLists: that file has floating FetchContent and HOME co-development paths.
 include_guard(GLOBAL)
-include(FetchContent)
+include("${CMAKE_CURRENT_LIST_DIR}/PsibaseDependencies.cmake")
 
 function(psibase_check_dependency_tree source manifest)
     file(STRINGS "${manifest}" expected)
@@ -49,20 +49,11 @@ function(psibase_add_psitri)
     if(TARGET sal OR TARGET ucc OR TARGET adb OR TARGET psitri::big)
         message(FATAL_ERROR "psibase storage must own its pinned engine dependency targets")
     endif()
-    FetchContent_Declare(psibase_psitri
-        GIT_REPOSITORY git@github.com:gofractally/psitri.git
-        GIT_TAG 6cff821fdf341cc6512ba214dd4da8318ecb59a4
-        GIT_SHALLOW FALSE
-        SOURCE_SUBDIR .psibase-no-top-level-cmake)
-    FetchContent_Declare(psibase_ucc
-        GIT_REPOSITORY git@github.com:gofractally/ucc.git
-        GIT_TAG cd2e2e305363588e8c9c8eb8b23572cd56952ce7
-        GIT_SHALLOW FALSE
-        SOURCE_SUBDIR .psibase-no-top-level-cmake)
-    FetchContent_MakeAvailable(psibase_psitri psibase_ucc)
-    psibase_check_dependency_tree("${psibase_psitri_SOURCE_DIR}"
+    psibase_acquire_dependency(psitri)
+    psibase_acquire_dependency(ucc)
+    psibase_check_dependency_tree("${psitri_SOURCE_DIR}"
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/dependencies/psitri-files.sha256")
-    psibase_check_dependency_tree("${psibase_ucc_SOURCE_DIR}"
+    psibase_check_dependency_tree("${ucc_SOURCE_DIR}"
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/dependencies/ucc-files.sha256")
     set(BUILD_TESTS OFF)
     set(SAL_BUILD_TESTS OFF)
@@ -70,12 +61,12 @@ function(psibase_add_psitri)
     set(START_REF_BUILD_TESTS OFF)
     set(ADB_ENABLE_TESTS OFF)
     set(UCC_ENABLE_TESTS OFF)
-    add_subdirectory("${psibase_ucc_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/storage-deps/ucc")
-    add_subdirectory("${psibase_psitri_SOURCE_DIR}/libraries/adb" "${CMAKE_BINARY_DIR}/storage-deps/adb")
-    add_subdirectory("${psibase_psitri_SOURCE_DIR}/libraries/sal" "${CMAKE_BINARY_DIR}/storage-deps/sal")
-    add_subdirectory("${psibase_psitri_SOURCE_DIR}/libraries/sal_art_ref" "${CMAKE_BINARY_DIR}/storage-deps/sal-art-ref")
-    add_subdirectory("${psibase_psitri_SOURCE_DIR}/libraries/start_ref" "${CMAKE_BINARY_DIR}/storage-deps/start-ref")
-    add_subdirectory("${psibase_psitri_SOURCE_DIR}/libraries/psitri_api" "${CMAKE_BINARY_DIR}/storage-deps/api")
+    add_subdirectory("${ucc_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/storage-deps/ucc")
+    add_subdirectory("${psitri_SOURCE_DIR}/libraries/adb" "${CMAKE_BINARY_DIR}/storage-deps/adb")
+    add_subdirectory("${psitri_SOURCE_DIR}/libraries/sal" "${CMAKE_BINARY_DIR}/storage-deps/sal")
+    add_subdirectory("${psitri_SOURCE_DIR}/libraries/sal_art_ref" "${CMAKE_BINARY_DIR}/storage-deps/sal-art-ref")
+    add_subdirectory("${psitri_SOURCE_DIR}/libraries/start_ref" "${CMAKE_BINARY_DIR}/storage-deps/start-ref")
+    add_subdirectory("${psitri_SOURCE_DIR}/libraries/psitri_api" "${CMAKE_BINARY_DIR}/storage-deps/api")
     add_library(psibase_storage_engine INTERFACE)
     add_library(psibase::storage_engine ALIAS psibase_storage_engine)
     target_link_libraries(psibase_storage_engine INTERFACE psitri::big)

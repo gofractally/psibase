@@ -1,0 +1,18 @@
+{
+  "psitri": {
+    "source": "/Users/dlarimer/psibase-foundation-psitri/external/psitri",
+    "head": "6cff821fdf341cc6512ba214dd4da8318ecb59a4",
+    "status": "",
+    "override": false
+  },
+  "ucc": {
+    "source": "/Users/dlarimer/psibase-foundation-psitri/external/ucc",
+    "head": "cd2e2e305363588e8c9c8eb8b23572cd56952ce7",
+    "status": "",
+    "override": false
+  },
+  "unacquired": {
+    "psio": true,
+    "psizam": true
+  }
+}
