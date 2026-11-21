@@ -1,0 +1,20 @@
+{
+  "kind": "actual-chain WASM financial bug reproductions, not fixes",
+  "command": "python3 demo/verify_exchange.py test review_reproduction",
+  "tests_passed": [
+    "tests::review_reproduction_tests::review_reproduction_funded_101st_market_missing_from_snapshot",
+    "tests::review_reproduction_tests::review_reproduction_unarmed_zero_output_consumes_input",
+    "tests::review_reproduction_tests::review_reproduction_unrelated_stop_changes_sublot_routing"
+  ],
+  "native_physical_escrow_audit": "passed after every reproduction",
+  "total_fixture_wall_seconds": 176.96,
+  "timing_note": "Includes setup, boot, funding, 101 book creations and full audits; not per-transaction CPU or a matcher benchmark.",
+  "log_sha256": "b9548b1f6c7e412d7ad9d2b8f1338dc0005da49219d2df31ed255101446ec1db",
+  "source_sha256": {
+    "packages/user/Exchange/service/src/review_reproduction_tests.rs": "363be24a8c63c087c60ac273a8e5d056415b2e1fa8304b8755af157e0a9d1669",
+    "packages/user/Exchange/service/src/lib.rs": "6a04dc276d3cb1fcc30043838151210d5197276f0b7855b97219363dbac21f22",
+    "packages/user/Exchange/service/src/stops.rs": "a8f2377891605590f38957bebd0e76f2918fb7d7f226a604167e8d56b02dfb58",
+    "packages/user/Exchange/service/src/snapshot.rs": "532616f85c6ccf2ed72047881202923fcf515158ea4021708599f73c130029e5"
+  },
+  "financial_service_behavior_changed": false
+}

@@ -11,6 +11,9 @@ the integer execution lot without capturing an exclusive token-pair namespace.
 provides read-only market/catalog/snapshot endpoints. `ui/` is the browser app;
 the repository's `demo/` scripts boot and seed a local development chain.
 
+See [PAGINATION.md](PAGINATION.md) for bounded public/owner reads, exact market
+and asset lookups, snapshot coverage, and explicit receipt-scan continuations.
+
 ## Token ownership and settlement
 
 Deposits are native `tokens.credit(token, exchange, amount)` calls. Uncommitted
@@ -277,3 +280,19 @@ released pre-version packages need the explicit compatibility preparation in
 `demo/prepare_packages.py`. The demo is not a production deployment or a
 completed external audit. See `docs/exchange/SECURITY.md` for the independent
 implementation review, assumptions and remaining deployment work.
+
+## Native execution candles
+
+Candles support 5 seconds, 15 seconds, 1 minute, 1 hour and 1 UTC day. The service
+keeps one current nonempty candle for each market and interval; completed candles
+are public native history events and may be pruned. It never stores historical
+candles in objective tables or synthesizes bars for empty intervals. Coverage
+starts when this version is deployed; old execution events are not presented as
+a completed historical candle backfill.
+
+Prices are stored as exact base/quote atom ratios. The public chart DTO uses
+`quoteAtoms * 10^18 / baseAtoms` integer prices with page-level `price_precision =
+quotePrecision + 18 - basePrecision`, preserving positive prices even for native
+assets whose whole-token price is below one quote atom. Display conversion floors
+only this high-precision DTO; stored OHLC ratios remain exact. Volume uses real
+base-token atoms. See [candle storage and API](../../../docs/exchange/CANDLES.md).

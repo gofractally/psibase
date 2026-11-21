@@ -512,6 +512,8 @@ namespace SystemService
                return HttpReply{
                    .status  = HttpStatus::notModified,
                    .headers = {{"ETag", etag},
+                               {"Content-Security-Policy", cspHeader},
+                               {"Cache-Control", "no-cache"},
                                {"Access-Control-Allow-Origin", "*"},
                                {"Access-Control-Allow-Methods", "GET, OPTIONS, HEAD"},
                                {"Access-Control-Allow-Headers", "*"}},

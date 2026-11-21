@@ -2056,6 +2056,14 @@ namespace psibase
 
       bool isProducing() const { return !!blockContext; }
 
+      // Admission policy only; never changes consensus proof verification.
+      void setProofWatchdogLimit(std::chrono::microseconds limit)
+      {
+         check(limit.count() > 0, "proof watchdog limit must be positive");
+         proofWatchdogLimit = limit;
+      }
+
+
       auto& getLogger() { return logger; }
       auto& getBlockLogger() { return blockLogger; }
 

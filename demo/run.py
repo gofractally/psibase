@@ -72,8 +72,6 @@ def main():
             raise RuntimeError("Initialize the fresh chain first; see docs/exchange/RUNNING.md")
         start("node", [str(programs["node"]), str(ROOT / "demo/chain")], programs["node"])
         wait_http("http://127.0.0.1:8089/")
-        start("bridge", [sys.executable, str(programs["bridge"])], programs["bridge"])
-        wait_http("http://127.0.0.1:8090/api/health")
         print("Exchange: http://exchange.psibase.localhost:8089/")
     else:
         programs["market-activity"] = ROOT / "demo/market_activity.py"

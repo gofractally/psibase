@@ -4,19 +4,19 @@ use psibase::{AccountNumber, KvHandle, KvMode, Table, TableRecord, ToKey};
 use serde_json::{json, Value};
 // Used only by the authenticated READ-ONLY query service, never the financial
 // action snapshot. Db.open intentionally forbids arbitrary foreign prefixes.
-fn foreign<R: TableRecord, T: Table<R>>(service: AccountNumber) -> T {
+pub(crate) fn foreign<R: TableRecord, T: Table<R>>(service: AccountNumber) -> T {
     let prefix = (service, T::TABLE_INDEX).to_key();
     T::from_handle(KvHandle::open_direct(R::DB, &prefix, KvMode::Read))
 }
 const MAX_JS_INTEGER: u128 = (1_u128 << 53) - 1;
-fn integer(value: u128) -> Value {
+pub(crate) fn integer(value: u128) -> Value {
     if value <= MAX_JS_INTEGER {
         json!(value as u64)
     } else {
         Value::String(value.to_string())
     }
 }
-fn preserve_integers(value: &mut Value) {
+pub(crate) fn preserve_integers(value: &mut Value) {
     match value {
         Value::Array(items) => {
             for item in items {
@@ -39,7 +39,7 @@ fn preserve_integers(value: &mut Value) {
     }
 }
 
-fn order_view(position: &Maker, generation: &Pool, market: &Market) -> Value {
+pub(crate) fn order_view(position: &Maker, generation: &Pool, market: &Market) -> Value {
     let remaining =
         position.shares as u128 * generation.outgoing as u128 / generation.shares as u128;
     let proceeds =
@@ -96,7 +96,7 @@ fn stop_view(position: &StopPosition, pool: &StopPool, batch: Option<&StopBatch>
 /// A private position view, not a serialized shared Loan row. Legacy ratio
 /// fields below describe this owner's units and exact rounded entitlement so
 /// existing wallet claim construction never needs another borrower's totals.
-fn loan_view(position: &Borrower, generation: &Loan) -> Value {
+pub(crate) fn loan_view(position: &Borrower, generation: &Loan) -> Value {
     let claim = if generation.active {
         0
     } else {
@@ -111,7 +111,7 @@ fn loan_view(position: &Borrower, generation: &Loan) -> Value {
         "claimable_surplus":integer(claim),"original_units":position.units,
         "original_surplus":integer(claim),"surplus":integer(claim)})
 }
-fn stored_stop_view(position: &StopPosition) -> Value {
+pub(crate) fn stored_stop_view(position: &StopPosition) -> Value {
     let pool = StopPoolTable::with_service(crate::SERVICE)
         .get_index_pk()
         .get(&position.generation)
@@ -139,7 +139,11 @@ fn stored_stop_view(position: &StopPosition) -> Value {
     });
     value
 }
-fn stop_page(owner: AccountNumber, before: Option<u64>, limit: usize) -> (Vec<Value>, Option<u64>) {
+pub(crate) fn stop_page(
+    owner: AccountNumber,
+    before: Option<u64>,
+    limit: usize,
+) -> (Vec<Value>, Option<u64>) {
     use std::ops::Bound::{Excluded, Included};
     let table = StopPositionTable::with_service(crate::SERVICE);
     let index = table.get_index_pk();
@@ -165,7 +169,12 @@ fn stop_page(owner: AccountNumber, before: Option<u64>, limit: usize) -> (Vec<Va
 pub fn read_stops(owner: AccountNumber, before: Option<u64>, limit: u32) -> String {
     assert!((1..=200).contains(&limit), "stop position page size");
     let (positions, next) = stop_page(owner, before, limit as usize);
-    let mut page = json!({"owner":owner,"stop_positions":positions,"next_before":next});
+    let (markets, tokens) = crate::pages::related(
+        positions.iter().map(|p| p["market"].as_u64().unwrap()),
+        true,
+    )
+    .expect("stop metadata");
+    let mut page = json!({"owner":owner,"stop_positions":positions,"next_before":next,"markets":markets,"tokens":tokens});
     preserve_integers(&mut page);
     page.to_string()
 }
@@ -194,18 +203,21 @@ pub fn read_stop(owner: AccountNumber, generation: u64) -> String {
         }
         view
     });
-    let mut value = json!({"owner":owner,"stop_position":view});
+    let (markets, tokens) =
+        crate::pages::related(view.iter().map(|r| r["market"].as_u64().unwrap()), true)
+            .expect("stop metadata");
+    let mut value = json!({"owner":owner,"stop_position":view,"markets":markets,"tokens":tokens});
     preserve_integers(&mut value);
     value.to_string()
 }
-fn metadata(t: &tokens::tables::tables::Token) -> Value {
+pub(crate) fn metadata(t: &tokens::tables::tables::Token) -> Value {
     let sym = foreign::<_, symbol::tables::MappingTable>(symbol::SERVICE)
         .get_index_pk()
         .get(&t.id)
         .map(|m| m.symbolId.to_string());
     json!({"id":t.id,"precision":t.precision.value(),"symbol":sym,"settings":t.settings_value})
 }
-fn escrow_view(market: u64, token: u32, include_native: bool) -> Value {
+pub(crate) fn escrow_view(market: u64, token: u32, include_native: bool) -> Value {
     use tokens::tables::tables::{SubAccountBalanceTable, SubAccountTable};
     let expected = EscrowTable::with_service(crate::SERVICE)
         .get_index_pk()
@@ -246,137 +258,33 @@ pub fn token_catalog(after: u32, limit: u32) -> String {
     json!({"tokens":tokens,"next":next}).to_string()
 }
 pub fn read_public() -> String {
-    let value: Value = serde_json::from_str(&read(AccountNumber::default())).unwrap();
-    json!({"markets":value["markets"],"levels":value["levels"],"tokens":value["tokens"]})
-        .to_string()
+    let mut page = crate::pages::markets(0, 200, true).expect("market discovery");
+    if let Some(id) = page["markets"]
+        .as_array()
+        .unwrap()
+        .first()
+        .and_then(|m| m["id"].as_u64())
+    {
+        let bid = crate::pages::book(id, true, None, 200).unwrap();
+        let ask = crate::pages::book(id, false, None, 200).unwrap();
+        page["levels"] = json!([
+            bid["levels"].as_array().unwrap().as_slice(),
+            ask["levels"].as_array().unwrap().as_slice()
+        ]
+        .concat());
+        page["levels_market"] = json!(id);
+        page["book_continuations"] = json!({"bid":bid["next_after"],"ask":ask["next_after"]});
+    }
+    crate::pages::text(page)
 }
 pub fn read(owner: AccountNumber) -> String {
-    build(owner, true)
+    crate::pages::text(crate::pages::snapshot(owner, None, true).expect("bounded snapshot"))
 }
-/// Safe for the unprivileged financial action: no foreign-prefix access.
+/// Financial actions cannot open native foreign prefixes.
 pub fn read_exchange(owner: AccountNumber) -> String {
-    build(owner, false)
-}
-fn build(owner: AccountNumber, include_native: bool) -> String {
-    let service = crate::SERVICE;
-    let markets: Vec<_> = MarketTable::with_service(service)
-        .get_index_pk()
-        .iter()
-        .take(100)
-        .collect();
-    let levels:Vec<_>=BookTable::with_service(service).get_index_pk().iter().take(1000).filter_map(|r|PoolTable::with_service(service).get_index_pk().get(&r.generation)).map(|p|json!({"market":p.market,"bid":p.bid,"price":p.price,"outgoing":p.outgoing,"active":p.active})).collect();
-    let positions: Vec<_> = MakerTable::with_service(service)
-        .get_index_pk()
-        .range((owner, 0, false, 0)..=(owner, u64::MAX, true, u64::MAX))
-        .take(1000)
-        .map(|position| {
-            let generation = PoolTable::with_service(service)
-                .get_index_pk()
-                .get(&position.generation)
-                .unwrap();
-            let market = MarketTable::with_service(service)
-                .get_index_pk()
-                .get(&position.market)
-                .unwrap();
-            order_view(&position, &generation, &market)
-        })
-        .collect();
-    let loan_positions: Vec<_> = BorrowerTable::with_service(service)
-        .get_index_pk()
-        .range((owner, 0, false, 0)..=(owner, u64::MAX, true, u64::MAX))
-        .take(1000)
-        .collect();
-    let (stop_positions, stop_positions_next) = stop_page(owner, None, 1000);
-    let loans: Vec<_> = loan_positions
-        .iter()
-        .filter_map(|position| {
-            LoanTable::with_service(service)
-                .get_index_pk()
-                .get(&position.generation)
-                .map(|generation| loan_view(position, &generation))
-        })
-        .collect();
-    let lenders: Vec<_> = LenderTable::with_service(service)
-        .get_index_pk()
-        .range((owner, 0, false)..=(owner, u64::MAX, true))
-        .take(1000)
-        .collect();
-    let relay_shares: Vec<_> = LiquidityTable::with_service(service)
-        .get_index_pk()
-        .range((owner, 0)..=(owner, u64::MAX))
-        .take(1000)
-        .collect();
-    let mut tids = std::collections::BTreeSet::new();
-    for m in &markets {
-        tids.insert(m.base);
-        tids.insert(m.quote);
-    }
-    let mut token_data = vec![];
-    let mut balances = vec![];
-    if include_native {
-        for t in foreign::<_, tokens::tables::tables::TokenTable>(tokens::SERVICE)
-            .get_index_pk()
-            .iter()
-            .take(1000)
-        {
-            tids.insert(t.id);
-        }
-        for row in foreign::<_, tokens::tables::tables::BalanceTable>(tokens::SERVICE)
-            .get_index_pk()
-            .range((owner, 0)..=(owner, u32::MAX))
-            .take(1000)
-        {
-            tids.insert(row.token_id);
-        }
-        for row in foreign::<_, tokens::tables::tables::UserPendingTable>(tokens::SERVICE)
-            .get_index_pk()
-            .range((owner, 0, 0)..=(owner, u32::MAX, u64::MAX))
-            .take(1000)
-        {
-            tids.insert(row.token_id);
-        }
-        for token in tids {
-            use tokens::tables::tables::{
-                BalanceConfigTable, BalanceTable, SharedBalanceTable, TokenTable, UserConfigTable,
-            };
-            let native = tokens::SERVICE;
-            let Some(t) = foreign::<_, TokenTable>(native).get_index_pk().get(&token) else {
-                continue;
-            };
-            token_data.push(metadata(&t));
-            let outgoing = foreign::<_, SharedBalanceTable>(native)
-                .get_index_by_creditor_debitor_token()
-                .get(&(owner, service, token))
-                .map(|b| b.balance.value)
-                .unwrap_or(0);
-            let incoming = foreign::<_, SharedBalanceTable>(native)
-                .get_index_by_creditor_debitor_token()
-                .get(&(service, owner, token))
-                .map(|b| b.balance.value)
-                .unwrap_or(0);
-            let wallet = foreign::<_, BalanceTable>(native)
-                .get_index_pk()
-                .get(&(owner, token))
-                .map(|b| b.balance.value)
-                .unwrap_or(0);
-            let flags = foreign::<_, BalanceConfigTable>(native)
-                .get_index_pk()
-                .get(&(owner, token))
-                .map(|r| r.flags)
-                .unwrap_or_else(|| {
-                    foreign::<_, UserConfigTable>(native)
-                        .get_index_pk()
-                        .get(&owner)
-                        .map(|r| r.flags)
-                        .unwrap_or(0)
-                });
-            balances.push(json!({"token":token,"wallet":integer(wallet as u128),"incoming":integer(incoming as u128),"outgoing":integer(outgoing as u128),"spendable":integer(outgoing as u128+incoming as u128),"auto_debit":flags&1!=0}));
-        }
-    }
-    let ms:Vec<Value>=markets.iter().map(|m|json!({"id":m.id,"base":m.base,"quote":m.quote,"base_lot":m.base_lot,"quote_tick":m.quote_tick,"x":m.x,"y":m.y,"k":m.k.to_string(),"lp_supply":m.lp_supply,"vault_base":m.vault_base,"vault_quote":m.vault_quote,"debt_base":m.debt_base,"debt_quote":m.debt_quote,"lending_base":m.lending_base,"lending_quote":m.lending_quote,"maturity":m.maturity,"margin_enabled":m.margin_enabled==Some(true),"legacy_unsupported":m.margin_enabled.is_none(),"escrow_base":escrow_view(m.id,m.base,include_native),"escrow_quote":escrow_view(m.id,m.quote,include_native)})).collect();
-    let mut result = json!({"owner":owner,"markets":ms,"levels":levels,"positions":positions,"stop_positions":stop_positions,"stop_positions_next":stop_positions_next,"loans":loans,"loan_positions":loan_positions,"lenders":lenders,"relay_shares":relay_shares,"balances":balances,"tokens":token_data});
-    preserve_integers(&mut result);
-    result.to_string()
+    crate::pages::text(
+        crate::pages::snapshot(owner, None, false).expect("bounded exchange snapshot"),
+    )
 }
 
 #[cfg(test)]

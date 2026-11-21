@@ -1,0 +1,7 @@
+/node_modules/
+/state/
+/__pycache__/
+
+/build.log
+/*-build.log
+/check.log

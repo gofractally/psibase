@@ -1,0 +1,37 @@
+{
+  "owner_read": "alice",
+  "checks": [
+    {
+      "method": "OPTIONS",
+      "origin": "http://supervisor.psibase.localhost:8089",
+      "status": 204,
+      "allow_origin": "http://supervisor.psibase.localhost:8089",
+      "allow_headers": "Authorization, Content-Type, Accept",
+      "credentials": "true"
+    },
+    {
+      "method": "GET",
+      "origin": "http://supervisor.psibase.localhost:8089",
+      "status": 403,
+      "allow_origin": "http://supervisor.psibase.localhost:8089",
+      "allow_headers": "Authorization, Content-Type, Accept",
+      "credentials": "true"
+    },
+    {
+      "method": "OPTIONS",
+      "origin": "http://otherapp.psibase.localhost:8089",
+      "status": 204,
+      "allow_origin": null,
+      "allow_headers": null,
+      "credentials": null
+    },
+    {
+      "method": "OPTIONS",
+      "origin": "http://supervisor.psibase.localhost:8090",
+      "status": 204,
+      "allow_origin": null,
+      "allow_headers": null,
+      "credentials": null
+    }
+  ]
+}

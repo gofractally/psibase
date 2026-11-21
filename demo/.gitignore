@@ -9,3 +9,7 @@ seed.json
 market-activity.json
 market-activity-status.json
 market-activity.lock
+btcbridge/bin/
+btcbridge/state/
+btcbridge/artifacts/
+btcbridge/test-state/

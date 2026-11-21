@@ -641,6 +641,7 @@ pub fn execute(
                 d,
                 g.original_surplus,
             );
+            crate::candles::record(m.id, g.long, c, d + g.original_surplus, native::now());
         }
     }
     for side in 0..2 {
@@ -688,6 +689,7 @@ pub fn execute(
                 p.margin_first,
                 p.work,
             );
+            crate::candles::record(m.id, side == 0, p.used[side], p.output[side], native::now());
         }
     }
     if let Some(seed) = &seed {
@@ -713,6 +715,7 @@ pub fn execute(
                 p.seed_used,
                 p.seed_output,
             );
+            crate::candles::record(m.id, seed.sell, p.seed_used, p.seed_output, native::now());
         }
     }
     *m = p.model.market;

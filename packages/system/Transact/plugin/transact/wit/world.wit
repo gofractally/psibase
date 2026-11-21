@@ -1,6 +1,12 @@
 package transact:plugin;
 
 interface types {
+    /// Minimal signed action scope passed to optional publication guards. No
+    /// action arguments, methods, memos or private transaction data are exposed.
+    record action-scope {
+        sender: string,
+        service: string,
+    }
     /// A list of `claim` objects is added to every submitted transaction.
     /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
     record claim {
@@ -31,6 +37,12 @@ interface types {
 }
 
 interface hooks {
+    use host:types/types.{error};
+
+    /// Registers the authenticated caller's `plugin/transact-hook-pre-publish`
+    /// callback for this transaction only. At most 16 services may register;
+    /// duplicate registrations are harmless. No caller identity is supplied.
+    register-pre-publish-hook: func() -> result<_, error>;
     /// Allows the caller plugin to manage the sender of any subsequent actions added to this
     /// transaction.
     hook-actions-sender: func();
@@ -64,6 +76,12 @@ interface api {
     ///
     /// May be called any number of times during transaction construction.
     add-signature: func(claim: claim) -> result<_, error>;
+
+    /// Append a supplied context-free evidence proof, not a keystore signature.
+    /// Account authentication remains first and signs the complete claims/actions.
+    /// Bounded to 8 evidence entries and 1 MiB total. No changes during publication.
+    add-evidence: func(claim: claim, proof: list<u8>) -> result<_, error>;
+
 
     /// Set or clear the propose-latch.
     ///
@@ -157,5 +175,16 @@ world hook-actions-sender {
         /// Sets the sender of the specified action when added to this transaction.
         /// Return `None` if the default sender should be used.
         on-actions-sender: func(service: string, method: string) -> result<option<string>, error>;
+    }
+}
+
+world hook-pre-publish {
+    import hooks;
+    export transact-hook-pre-publish: interface {
+        use host:types/types.{error};
+        use types.{action-scope};
+        /// Called only by native Transact, after proofs and before broadcast.
+        /// A rejection aborts publication; callbacks must not add actions.
+        on-pre-publish: func(actions: list<action-scope>) -> result<_, error>;
     }
 }

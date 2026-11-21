@@ -1,0 +1,360 @@
+{
+  "machine": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+  "host": "aarch64-apple-darwin",
+  "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+  "psitest": "/Users/dlarimer/psibase-exchange/build/psitest",
+  "psitest_sha256": "ee94376b8f9af0a2aac148f5569e9651b9d63b60ca1e831efe21291eef535bce",
+  "blst": "0.3.17",
+  "wasm_bytes": 237026,
+  "public_fixture_sha256": "9180b61081385c377a5bed08d5b92258c4ed2709393ea4d40f89d11e667a105e",
+  "default_block_cpu_us": 196000,
+  "default_linear_memory_bytes": 33554432,
+  "two_serialized_sync_committees_bytes": 49248,
+  "runs": {
+    "native": {
+      "checks": {
+        "infinity_rejected": true,
+        "invalid_encoding_rejected": true,
+        "valid_signatures": true,
+        "wrong_domain_rejected": true,
+        "wrong_message_rejected": true
+      },
+      "measurements": [
+        {
+          "cpu_us": 1043,
+          "participants": 342,
+          "repeat": 0,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 1043
+        },
+        {
+          "cpu_us": 1035,
+          "participants": 342,
+          "repeat": 1,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 1034
+        },
+        {
+          "cpu_us": 1028,
+          "participants": 342,
+          "repeat": 2,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 1028
+        },
+        {
+          "cpu_us": 5495,
+          "decode_cpu_us": 4466,
+          "individual_subgroup_checks": false,
+          "participants": 342,
+          "repeat": 0,
+          "scenario": "committee_and_signature",
+          "wall_us": 5496
+        },
+        {
+          "cpu_us": 4969,
+          "decode_cpu_us": 4045,
+          "individual_subgroup_checks": false,
+          "participants": 342,
+          "repeat": 1,
+          "scenario": "committee_and_signature",
+          "wall_us": 4969
+        },
+        {
+          "cpu_us": 4711,
+          "decode_cpu_us": 3791,
+          "individual_subgroup_checks": false,
+          "participants": 342,
+          "repeat": 2,
+          "scenario": "committee_and_signature",
+          "wall_us": 4711
+        },
+        {
+          "cpu_us": 14648,
+          "decode_cpu_us": 13869,
+          "individual_subgroup_checks": true,
+          "participants": 342,
+          "repeat": 0,
+          "scenario": "committee_and_signature",
+          "wall_us": 14648
+        },
+        {
+          "cpu_us": 13066,
+          "decode_cpu_us": 12339,
+          "individual_subgroup_checks": true,
+          "participants": 342,
+          "repeat": 1,
+          "scenario": "committee_and_signature",
+          "wall_us": 13065
+        },
+        {
+          "cpu_us": 12153,
+          "decode_cpu_us": 11469,
+          "individual_subgroup_checks": true,
+          "participants": 342,
+          "repeat": 2,
+          "scenario": "committee_and_signature",
+          "wall_us": 12153
+        },
+        {
+          "cpu_us": 595,
+          "participants": 512,
+          "repeat": 0,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 595
+        },
+        {
+          "cpu_us": 592,
+          "participants": 512,
+          "repeat": 1,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 593
+        },
+        {
+          "cpu_us": 596,
+          "participants": 512,
+          "repeat": 2,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 596
+        },
+        {
+          "cpu_us": 4767,
+          "decode_cpu_us": 4067,
+          "individual_subgroup_checks": false,
+          "participants": 512,
+          "repeat": 0,
+          "scenario": "committee_and_signature",
+          "wall_us": 4767
+        },
+        {
+          "cpu_us": 4727,
+          "decode_cpu_us": 4028,
+          "individual_subgroup_checks": false,
+          "participants": 512,
+          "repeat": 1,
+          "scenario": "committee_and_signature",
+          "wall_us": 4727
+        },
+        {
+          "cpu_us": 4725,
+          "decode_cpu_us": 4002,
+          "individual_subgroup_checks": false,
+          "participants": 512,
+          "repeat": 2,
+          "scenario": "committee_and_signature",
+          "wall_us": 4725
+        },
+        {
+          "cpu_us": 15980,
+          "decode_cpu_us": 15313,
+          "individual_subgroup_checks": true,
+          "participants": 512,
+          "repeat": 0,
+          "scenario": "committee_and_signature",
+          "wall_us": 15979
+        },
+        {
+          "cpu_us": 15733,
+          "decode_cpu_us": 15045,
+          "individual_subgroup_checks": true,
+          "participants": 512,
+          "repeat": 1,
+          "scenario": "committee_and_signature",
+          "wall_us": 15750
+        },
+        {
+          "cpu_us": 15989,
+          "decode_cpu_us": 15309,
+          "individual_subgroup_checks": true,
+          "participants": 512,
+          "repeat": 2,
+          "scenario": "committee_and_signature",
+          "wall_us": 15995
+        }
+      ],
+      "median_cpu_us": {
+        "preaggregated_signature_only:342:na": 1035,
+        "committee_and_signature:342:False": 4969,
+        "committee_and_signature:342:True": 13066,
+        "preaggregated_signature_only:512:na": 595,
+        "committee_and_signature:512:False": 4727,
+        "committee_and_signature:512:True": 15980
+      }
+    },
+    "psitest": {
+      "checks": {
+        "infinity_rejected": true,
+        "invalid_encoding_rejected": true,
+        "valid_signatures": true,
+        "wrong_domain_rejected": true,
+        "wrong_message_rejected": true
+      },
+      "measurements": [
+        {
+          "cpu_us": 523938,
+          "participants": 342,
+          "repeat": 0,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 524244
+        },
+        {
+          "cpu_us": 520310,
+          "participants": 342,
+          "repeat": 1,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 521498
+        },
+        {
+          "cpu_us": 523743,
+          "participants": 342,
+          "repeat": 2,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 524187
+        },
+        {
+          "cpu_us": 1906851,
+          "decode_cpu_us": 1326925,
+          "individual_subgroup_checks": false,
+          "participants": 342,
+          "repeat": 0,
+          "scenario": "committee_and_signature",
+          "wall_us": 1909212
+        },
+        {
+          "cpu_us": 1922226,
+          "decode_cpu_us": 1344056,
+          "individual_subgroup_checks": false,
+          "participants": 342,
+          "repeat": 1,
+          "scenario": "committee_and_signature",
+          "wall_us": 1924300
+        },
+        {
+          "cpu_us": 1902474,
+          "decode_cpu_us": 1325207,
+          "individual_subgroup_checks": false,
+          "participants": 342,
+          "repeat": 2,
+          "scenario": "committee_and_signature",
+          "wall_us": 1905846
+        },
+        {
+          "cpu_us": 8256568,
+          "decode_cpu_us": 7679367,
+          "individual_subgroup_checks": true,
+          "participants": 342,
+          "repeat": 0,
+          "scenario": "committee_and_signature",
+          "wall_us": 8268175
+        },
+        {
+          "cpu_us": 8282006,
+          "decode_cpu_us": 7699116,
+          "individual_subgroup_checks": true,
+          "participants": 342,
+          "repeat": 1,
+          "scenario": "committee_and_signature",
+          "wall_us": 8295109
+        },
+        {
+          "cpu_us": 8333000,
+          "decode_cpu_us": 7749299,
+          "individual_subgroup_checks": true,
+          "participants": 342,
+          "repeat": 2,
+          "scenario": "committee_and_signature",
+          "wall_us": 8345877
+        },
+        {
+          "cpu_us": 528681,
+          "participants": 512,
+          "repeat": 0,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 529368
+        },
+        {
+          "cpu_us": 530967,
+          "participants": 512,
+          "repeat": 1,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 532485
+        },
+        {
+          "cpu_us": 531254,
+          "participants": 512,
+          "repeat": 2,
+          "scenario": "preaggregated_signature_only",
+          "wall_us": 531689
+        },
+        {
+          "cpu_us": 2645556,
+          "decode_cpu_us": 2019187,
+          "individual_subgroup_checks": false,
+          "participants": 512,
+          "repeat": 0,
+          "scenario": "committee_and_signature",
+          "wall_us": 2651447
+        },
+        {
+          "cpu_us": 2637662,
+          "decode_cpu_us": 2013177,
+          "individual_subgroup_checks": false,
+          "participants": 512,
+          "repeat": 1,
+          "scenario": "committee_and_signature",
+          "wall_us": 2642947
+        },
+        {
+          "cpu_us": 2636612,
+          "decode_cpu_us": 2009890,
+          "individual_subgroup_checks": false,
+          "participants": 512,
+          "repeat": 2,
+          "scenario": "committee_and_signature",
+          "wall_us": 2643352
+        },
+        {
+          "cpu_us": 12236921,
+          "decode_cpu_us": 11616749,
+          "individual_subgroup_checks": true,
+          "participants": 512,
+          "repeat": 0,
+          "scenario": "committee_and_signature",
+          "wall_us": 12257961
+        },
+        {
+          "cpu_us": 12245209,
+          "decode_cpu_us": 11620410,
+          "individual_subgroup_checks": true,
+          "participants": 512,
+          "repeat": 1,
+          "scenario": "committee_and_signature",
+          "wall_us": 12286087
+        },
+        {
+          "cpu_us": 12206060,
+          "decode_cpu_us": 11587110,
+          "individual_subgroup_checks": true,
+          "participants": 512,
+          "repeat": 2,
+          "scenario": "committee_and_signature",
+          "wall_us": 12223354
+        }
+      ],
+      "median_cpu_us": {
+        "preaggregated_signature_only:342:na": 523743,
+        "committee_and_signature:342:False": 1906851,
+        "committee_and_signature:342:True": 8282006,
+        "preaggregated_signature_only:512:na": 530967,
+        "committee_and_signature:512:False": 2637662,
+        "committee_and_signature:512:True": 12236921
+      }
+    },
+    "wasmtime_comparison_only": {
+      "available": false,
+      "reason": "WASI process CPU clock unsupported by this comparison engine",
+      "exit_code": 134
+    }
+  },
+  "current_runtime_signature_lower_bound_fits_default_block": false,
+  "interpretation": "Measures monolithic verification only. Proof-mode verification runs separately from the objective block CPU window; see EthRelay and EthBridge implementation."
+}

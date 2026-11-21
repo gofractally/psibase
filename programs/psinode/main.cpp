@@ -1186,6 +1186,7 @@ void run(const std::string&              db_path,
          std::vector<MountArg>&          mountpoints,
          Timeout&                        http_timeout,
          std::size_t&                    service_threads,
+         std::uint64_t                   proof_timeout_ms,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
@@ -1406,7 +1407,7 @@ void run(const std::string&              db_path,
    // is destroyed.
    auto http_config = std::make_shared<http::http_config>();
 
-   RunQueue                runQueue{sharedState};
+   RunQueue                runQueue{sharedState, std::chrono::milliseconds(proof_timeout_ms)};
    boost::asio::io_context chainContext;
 
    auto shutdown_sockets = psio::finally{[&system] { system->sockets->shutdown(); }};
@@ -1437,6 +1438,7 @@ void run(const std::string&              db_path,
 
    using node_type = psinode;
    node_type node(chainContext, system.get(), prover);
+   node.chain().setProofWatchdogLimit(std::chrono::milliseconds(proof_timeout_ms));
    node.set_producer_id(producer);
    node.load_producers();
 
@@ -1909,6 +1911,7 @@ int main(int argc, char* argv[])
    byte_size                db_size;
    Timeout                  http_timeout;
    std::size_t              service_threads;
+   std::uint64_t            proof_timeout_ms;
    PsinodeServiceConfig     extra_options;
 
    namespace po = boost::program_options;
@@ -1916,6 +1919,10 @@ int main(int argc, char* argv[])
    po::options_description desc("psinode");
    po::options_description common_opts("Options");
    auto                    opt = common_opts.add_options();
+   opt("proof-timeout-ms", po::value(&proof_timeout_ms)->default_value(200)->notifier([](std::uint64_t value) {
+          if (value == 0 || value > 60000)
+             throw std::runtime_error("proof-timeout-ms must be between 1 and 60000");
+       }), "Maximum proof-admission CPU time in milliseconds (default 200; independent of objective block CPU)");
    opt("producer,p", po::value<std::string>(&producer)->default_value("")->value_name("name"),
        "Name of this producer");
    opt("key,k", po::value(&keys->provers)->default_value({}, ""),
@@ -2078,6 +2085,7 @@ int main(int argc, char* argv[])
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
              passphrase, pkcs11_modules, listen, mountpoints, http_timeout, service_threads,
+             proof_timeout_ms,
              root_ca, tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {

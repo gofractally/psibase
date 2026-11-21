@@ -1,7 +1,16 @@
 use crate::bindings::exports::permissions::plugin::admin::{Descriptions, PromptContext};
 use crate::bindings::exports::permissions::plugin::api::TrustLevel;
 use psibase::fracpack::{FracInputStream, Pack, Result, Unpack};
-use std::cmp::Ordering;
+
+// Persisted permission bytes and WIT discriminants have always used this order.
+// A generator/schema change must fail compilation rather than reinterpret it.
+const _: () = {
+    assert!(TrustLevel::None as u8 == 0);
+    assert!(TrustLevel::Low as u8 == 1);
+    assert!(TrustLevel::Medium as u8 == 2);
+    assert!(TrustLevel::High as u8 == 3);
+    assert!(TrustLevel::Max as u8 == 4);
+};
 
 impl From<u8> for TrustLevel {
     fn from(level: u8) -> Self {
@@ -34,15 +43,18 @@ impl Default for TrustLevel {
     }
 }
 
-impl Ord for TrustLevel {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (*self as u8).cmp(&(*other as u8))
-    }
+// Current wit-bindgen derives Ord for WIT enums. Authorization deliberately
+// uses these explicit ranks instead, preserving the established None=0,
+// Low=1, Medium=2, High=3, Max=4 policy across binding-generator versions.
+pub fn trust_at_least(granted: TrustLevel, required: TrustLevel) -> bool {
+    crate::trust_policy::at_least(u8::from(granted), u8::from(required))
 }
 
-impl PartialOrd for TrustLevel {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some((*self as u8).cmp(&(*other as u8)))
+pub fn higher_trust(left: TrustLevel, right: TrustLevel) -> TrustLevel {
+    if trust_at_least(left, right) {
+        left
+    } else {
+        right
     }
 }
 
@@ -73,6 +85,9 @@ pub struct PackablePromptContext {
     pub callee: String,
     pub level: TrustLevel,
     pub descriptions: Descriptions,
+    // Internal only; never supplied by the consent UI. Missing old contexts
+    // must fail decoding or the nonempty active-app validation.
+    pub active_app: String,
 }
 
 impl From<PackablePromptContext> for PromptContext {
@@ -95,6 +110,7 @@ impl From<PromptContext> for PackablePromptContext {
             callee: context.callee,
             level: context.level,
             descriptions: context.descriptions,
+            active_app: psibase_plugin::host::client::get_active_app(),
         }
     }
 }

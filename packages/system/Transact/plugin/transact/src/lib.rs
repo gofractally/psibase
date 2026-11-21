@@ -40,7 +40,7 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [add_signature, unhook_actions_sender, add_action_to_transaction],
+        None => [add_evidence, add_signature, unhook_actions_sender, add_action_to_transaction, register_pre_publish_hook],
         Low => [],
         High => [hook_actions_sender],
         Max => [set_propose_latch, propose, set_snapshot_time, get_query_token],
@@ -76,19 +76,27 @@ fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
 }
 
 fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::Error> {
+    if OpenTx::publication_started() {
+        return Err(PrePublishHook("cannot add actions during publication callbacks").into());
+    }
+    OpenTx::check_connection(bindings::host::accounts::api::get_current_user())
+        .map_err(ConnectionChanged)?;
     if let Some(sender) = OpenTx::latch_sender() {
         return Ok(sender);
     }
     if let Some(plugin) = OpenTx::sender_hook() {
-        if let Some(s) = on_actions_sender(
+        let sender = on_actions_sender(
             PluginRef::new(plugin.as_str(), "plugin", "transact-hook-actions-sender"),
             service,
             method,
-        )? {
+        )?;
+        OpenTx::validate_connection(bindings::host::accounts::api::get_current_user())
+            .map_err(ConnectionChanged)?;
+        if let Some(s) = sender {
             return Ok(s);
         }
     }
-    if let Some(sender) = bindings::host::accounts::api::get_current_user() {
+    if let Some(sender) = OpenTx::connection_user() {
         return Ok(sender);
     }
 
@@ -133,7 +141,12 @@ fn pack_staged_propose(actions: Vec<ImportAction>, auto_exec: bool) -> (String, 
 }
 
 fn flush_propose_latch() -> Result<(), HostTypes::Error> {
-    OpenTx::flush_latch(bindings::host::accounts::api::get_current_user().as_deref())
+    if !OpenTx::latch_is_active() {
+        return Ok(());
+    }
+    OpenTx::check_connection(bindings::host::accounts::api::get_current_user())
+        .map_err(ConnectionChanged)?;
+    OpenTx::flush_latch(OpenTx::connection_user().as_deref())
         .map_err(|_| NotLoggedIn("flush_propose_latch").into())
 }
 
@@ -177,6 +190,12 @@ impl From<ImportClaim> for psibase::Claim {
 }
 
 impl Hooks for TransactPlugin {
+    fn register_pre_publish_hook() -> Result<(), HostTypes::Error> {
+        // Host supplies the caller principal; callers cannot register a peer or
+        // remove another plugin's publication guard.
+        OpenTx::register_pre_publish_hook(&Client::get_sender())
+            .map_err(|e| PrePublishHook(e).into())
+    }
     fn hook_actions_sender() {
         assert_authorized_with_whitelist(FunctionName::hook_actions_sender, vec!["invite".into()])
             .unwrap();
@@ -215,6 +234,13 @@ impl Api for TransactPlugin {
             rawData: psibase::Hex::from(claim.raw_data),
         });
         Ok(())
+    }
+
+    fn add_evidence(claim: ExportClaim, proof: Vec<u8>) -> Result<(), HostTypes::Error> {
+        OpenTx::check_connection(bindings::host::accounts::api::get_current_user()).map_err(ConnectionChanged)?;
+        let service = claim.verify_service.parse().map_err(|_| BadResponse("invalid evidence verifier"))?;
+        OpenTx::add_evidence(psibase::Claim { service, rawData: claim.raw_data.into() }, proof.into())
+            .map_err(|e| BadResponse(e).into())
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {

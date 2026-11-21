@@ -22,6 +22,7 @@ namespace psibase
       bool                       timerRunning = false;
 
       std::shared_ptr<SharedState> sharedState;
+      std::optional<std::chrono::microseconds> proofTimeout;
 
       struct Item
       {
@@ -175,8 +176,9 @@ namespace psibase
       }
    };
 
-   RunQueue::RunQueue(std::shared_ptr<SharedState> sharedState)
-       : impl(new Impl{.sharedState = std::move(sharedState)})
+   RunQueue::RunQueue(std::shared_ptr<SharedState> sharedState,
+                      std::optional<std::chrono::microseconds> proofTimeout)
+       : impl(new Impl{.sharedState = std::move(sharedState), .proofTimeout = proofTimeout})
    {
    }
 
@@ -237,7 +239,7 @@ namespace psibase
             switch (item.kind)
             {
                case RunQueue::Impl::Item::Kind::run:
-                  bc.callRun(item.getRun());
+                  bc.callRun(item.getRun(), queue->proofTimeout);
                   break;
                case RunQueue::Impl::Item::Kind::timer:
                   bc.callTimer(item.getTimer());

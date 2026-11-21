@@ -230,4 +230,36 @@ pub mod tables {
         pub margin_first: bool,
         pub work_steps: u64,
     }
+    /// Exact executed price: quote token atoms divided by base token atoms.
+    #[derive(
+        Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, async_graphql::SimpleObject,
+    )]
+    pub struct CandlePrice {
+        pub base: u64,
+        pub quote: u64,
+    }
+    /// Only the latest nonempty bucket is objective state. Completed buckets
+    /// are emitted to the native prunable event log, never archived in tables.
+    #[table(name = "CurrentCandleTable", index = 15)]
+    #[derive(
+        Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, async_graphql::SimpleObject,
+    )]
+    pub struct CurrentCandle {
+        pub market: u64,
+        pub interval: u32,
+        pub bucket: u64,
+        pub open: CandlePrice,
+        pub high: CandlePrice,
+        pub low: CandlePrice,
+        pub close: CandlePrice,
+        pub volume_base: Wide,
+        pub volume_quote: Wide,
+        pub trades: u64,
+    }
+    impl CurrentCandle {
+        #[primary_key]
+        pub fn pk(&self) -> (u64, u32) {
+            (self.market, self.interval)
+        }
+    }
 }

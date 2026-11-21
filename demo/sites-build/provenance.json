@@ -1,0 +1,14 @@
+{
+  "released_table_layout_compatible": true,
+  "released_flags": [],
+  "compiler": "/Users/dlarimer/psibase/build/psidk/bin/clang++",
+  "wasi_libraries": "/Users/dlarimer/psibase-exchange/demo/upstream/psidk-ubuntu-2404/share/wasi-sysroot",
+  "sha256": {
+    "packages/user/Sites/src/Sites.cpp": "ecd97287aaa2e46ee4824a822d65837d4500bbdf12ca55e5b7a10e7b6841c953",
+    "packages/user/Sites/include/services/user/Sites.hpp": "d703117e5b46789d98379e021f41c26e914258244173ba9c75ea708051a68964",
+    "libraries/psibase/common/src/Rpc.cpp": "965054df481a3a1293a3afee850f5db70dba7c6706a73adb66925b693d084103",
+    "libraries/psibase/common/src/HttpHeaders.cpp": "90238d87f34c5a9570ddddf3c6a02983fd39e2ad3b07b0ee147ca56e894c509c",
+    "demo/sites-build/Sites.wasm": "1724dcbcb81d25e027ebb93a325e27055570d10329fc894096d8d9bc2669e5ca",
+    "demo/sites-build/Sites-schema.json": "32c727dec549174738994ab4fef30dd6e561c9e2f2c9a78e94ec78735bd6433f"
+  }
+}

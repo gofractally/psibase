@@ -459,7 +459,11 @@ impl<'a> DepGraph<'a> {
                         broken = true;
                     }
                 }
-                reverse_graph.get_mut(&dep.name).unwrap().push(name.clone());
+                // A missing dependency already marks this package directly broken.
+                // It has no installed reverse-graph node to update.
+                if let Some(dependents) = reverse_graph.get_mut(&dep.name) {
+                    dependents.push(name.clone());
+                }
             }
             if broken {
                 directly_broken.push(name.clone());
@@ -533,6 +537,25 @@ fn any_if(solver: &mut Solver, x: Lit, deps: Vec<Lit>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn install_with_an_existing_missing_dependency_does_not_panic() -> Result<(), anyhow::Error> {
+        let mut graph = DepGraph::new();
+        let existing: Meta = serde_json::from_str(
+            r#"{"name":"Existing","description":"","version":"1.0.0","depends":[{"name":"Missing","version":"1.0.0"}],"accounts":[],"exports":[]}"#,
+        )?;
+        graph.add_existing(existing, PackageDisposition::pinned("1.0.0"));
+        let new: PackageInfo = serde_json::from_str(
+            r#"{"name":"New","description":"","version":"1.0.0","depends":[],"accounts":[],"exports":[]}"#,
+        )?;
+        graph.add(new.clone());
+        graph.add_input(PackageRef {
+            name: "New".into(),
+            version: "1.0.0".into(),
+        });
+        assert_eq!(graph.solve()?, vec![PackageOp::Install(new)]);
+        Ok(())
+    }
 
     #[test]
     fn test_solve_empty() -> Result<(), anyhow::Error> {

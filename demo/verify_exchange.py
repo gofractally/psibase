@@ -46,6 +46,16 @@ def prepare():
     exchange = Path("packages/user/Exchange")
     shutil.copytree(ROOT / exchange, SOURCE / exchange, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns("node_modules", "__pycache__"))
+    # The package includes the native wallet component. Its WIT must match the
+    # current client interfaces even though these fixtures exercise services.
+    for relative in ("packages/user/Tokens/plugin", "packages/user/Tokens/query-service", "packages/system/Transact/plugin",
+                     "packages/user/Permissions/plugin"):
+        shutil.copytree(ROOT / relative, SOURCE / relative, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("target", "node_modules", "__pycache__"))
+    manifest = SOURCE / "packages/user/Cargo.toml"
+    contents = manifest.read_text()
+    if '"Exchange/plugin"' not in contents:
+        manifest.write_text(contents.replace("members = [", 'members = [\n    "Exchange/plugin",', 1))
     helper = Path("rust/psibase/src/tester.rs")
     shutil.copy2(ROOT / helper, SOURCE / helper)
     runner_source = Path("programs/psitest/main.cpp")
@@ -54,6 +64,9 @@ def prepare():
     shutil.copy2(ROOT / packager_source, SOURCE / packager_source)
     tracked = [*sorted((ROOT / exchange / "service").rglob("*.rs")),
                *sorted((ROOT / exchange / "query-service").rglob("*.rs")),
+               ROOT / "packages/user/Tokens/query-service/src/lib.rs",
+               ROOT / "packages/system/HttpServer/src/HttpServer.cpp",
+               ROOT / "packages/user/Sites/src/Sites.cpp",
                ROOT / helper, ROOT / runner_source, ROOT / packager_source]
     runner = ROOT / "build/psitest"
     packager = ROOT / "rust/target/release/cargo-psibase"

@@ -148,6 +148,29 @@ fn audit_with_deficits(chain: &Chain, deficits: &[(u64, u32, u64)]) {
     let mut batch_refunds: BTreeMap<u64, u128> = BTreeMap::new();
     let mut batch_outputs: BTreeMap<u64, u128> = BTreeMap::new();
     let mut armed_prices: BTreeMap<u64, usize> = BTreeMap::new();
+    // Preload independent totals once. Re-reading every global table for each
+    // market made the test auditor quadratic and obscured request CPU timings
+    // in fixtures with more than 1,000 markets. The assertions are unchanged.
+    let mut book_counts: BTreeMap<u64, usize> = BTreeMap::new();
+    let mut lp_totals: BTreeMap<u64, u128> = BTreeMap::new();
+    let mut lender_totals: BTreeMap<(u64, bool), u128> = BTreeMap::new();
+    let mut market_loans: BTreeMap<u64, Vec<Loan>> = BTreeMap::new();
+    let mut market_pools: BTreeMap<u64, Vec<Pool>> = BTreeMap::new();
+    for row in chain.open::<_, BookTable>().get_index_pk().iter() {
+        *book_counts.entry(row.market).or_default() += 1;
+    }
+    for row in chain.open::<_, LiquidityTable>().get_index_pk().iter() {
+        *lp_totals.entry(row.market).or_default() += row.shares as u128;
+    }
+    for row in chain.open::<_, LenderTable>().get_index_pk().iter() {
+        *lender_totals.entry((row.market, row.base)).or_default() += row.shares as u128;
+    }
+    for row in chain.open::<_, LoanTable>().get_index_pk().iter() {
+        market_loans.entry(row.market).or_default().push(row);
+    }
+    for row in chain.open::<_, PoolTable>().get_index_pk().iter() {
+        market_pools.entry(row.market).or_default().push(row);
+    }
     for row in chain.open::<_, StopBookTable>().get_index_pk().iter() {
         let g = chain
             .open::<_, StopPoolTable>()
@@ -278,35 +301,15 @@ fn audit_with_deficits(chain: &Chain, deficits: &[(u64, u32, u64)]) {
         let armed = armed_prices.get(&m.id).copied().unwrap_or(0);
         assert!(armed <= 64);
         if armed > 0 {
-            assert!(
-                chain
-                    .open::<_, BookTable>()
-                    .get_index_pk()
-                    .iter()
-                    .filter(|b| b.market == m.id)
-                    .count()
-                    <= 128
-            );
+            assert!(book_counts.get(&m.id).copied().unwrap_or(0) <= 128);
         }
         assert!(m.x as u128 * m.y as u128 >= m.k.get());
         *cash.entry((m.id, m.base)).or_default() += m.x as u128 + m.vault_base as u128;
         *cash.entry((m.id, m.quote)).or_default() += m.y as u128 + m.vault_quote as u128;
-        let lp: u128 = chain
-            .open::<_, LiquidityTable>()
-            .get_index_pk()
-            .iter()
-            .filter(|p| p.market == m.id)
-            .map(|p| p.shares as u128)
-            .sum();
+        let lp = lp_totals.get(&m.id).copied().unwrap_or(0);
         assert_eq!(lp, m.lp_supply as u128);
         for base in [true, false] {
-            let shares: u128 = chain
-                .open::<_, LenderTable>()
-                .get_index_pk()
-                .iter()
-                .filter(|p| p.market == m.id && p.base == base)
-                .map(|p| p.shares as u128)
-                .sum();
+            let shares = lender_totals.get(&(m.id, base)).copied().unwrap_or(0);
             assert_eq!(
                 shares,
                 if base {
@@ -318,12 +321,7 @@ fn audit_with_deficits(chain: &Chain, deficits: &[(u64, u32, u64)]) {
         }
         let mut debt_base = 0_u128;
         let mut debt_quote = 0_u128;
-        for g in chain
-            .open::<_, LoanTable>()
-            .get_index_pk()
-            .iter()
-            .filter(|g| g.market == m.id)
-        {
+        for g in market_loans.get(&m.id).into_iter().flatten() {
             assert_eq!(
                 units.get(&g.generation).copied().unwrap_or(0),
                 g.units as u128
@@ -385,12 +383,7 @@ fn audit_with_deficits(chain: &Chain, deficits: &[(u64, u32, u64)]) {
                 start += c;
             }
         }
-        for p in chain
-            .open::<_, PoolTable>()
-            .get_index_pk()
-            .iter()
-            .filter(|p| p.market == m.id)
-        {
+        for p in market_pools.get(&m.id).into_iter().flatten() {
             assert_eq!(
                 maker_shares.get(&p.id).copied().unwrap_or(0),
                 p.shares as u128
@@ -887,9 +880,11 @@ fn recent_trade_feed_is_native_paginated_and_excludes_rejected_actions(
         .borrow(f.market, true, 80, 200)
         .get()?;
     let public = read("/api/markets")?;
+    assert!(public["levels"].as_array().unwrap().is_empty());
+    let depth = read(&format!("/book?market={}&bid=true", f.market))?;
     let fields = ["market", "bid", "price", "outgoing", "active"];
-    assert!(!public["levels"].as_array().unwrap().is_empty());
-    for level in public["levels"].as_array().unwrap() {
+    assert!(!depth["levels"].as_array().unwrap().is_empty());
+    for level in depth["levels"].as_array().unwrap() {
         let level = level.as_object().unwrap();
         assert_eq!(level.len(), fields.len());
         assert!(fields.iter().all(|field| level.contains_key(*field)));
@@ -1135,3 +1130,16 @@ mod stop_security_tests;
 
 #[path = "stop_api_tests.rs"]
 mod stop_api_tests;
+
+#[path = "review_reproduction_tests.rs"]
+mod review_reproduction_tests;
+
+#[path = "native_wallet_cors_tests.rs"]
+mod native_wallet_cors_tests;
+
+#[path = "candle_native_tests.rs"]
+mod candle_native_tests;
+
+#[cfg(test)]
+#[path = "pagination_native_tests.rs"]
+mod pagination_native_tests;

@@ -436,7 +436,8 @@ namespace psibase
       return tokens;
    }
 
-   void BlockContext::callRun(psio::view<const RunRow> row)
+   void BlockContext::callRun(psio::view<const RunRow> row,
+                              std::optional<std::chrono::microseconds> proofTimeout)
    {
       auto action = row.action().unpack();
 
@@ -465,6 +466,8 @@ namespace psibase
       {
          auto session = db.startWrite(writer);
          auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
+         if (row.mode() == RunMode::verify && proofTimeout)
+            maxTime = saturatingCast<CpuClock::duration>(*proofTimeout);
          tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
          if (row.mode() == RunMode::speculative)
          {

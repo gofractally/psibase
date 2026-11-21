@@ -19,3 +19,4 @@ Events = "0.29.0"
 [dependencies]
 exchange = { path = "service" }
 r-exchange = { path = "query-service" }
+exchange-plugin = { path = "plugin" }

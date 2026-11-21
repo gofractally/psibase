@@ -1,0 +1,185 @@
+{
+  "status": "development_validation_passed",
+  "precision": 8,
+  "wei_per_token_unit": 10000000000,
+  "contract_runtime_keccak": "0x9672f6f18d0eb761ab413e4e668ed2e86bfb95a17f2e879317cd80ddf60ed371",
+  "solidity": {
+    "checks": [
+      "EIP-712 parity",
+      "10-gwei precision",
+      "plain transfer rejection",
+      "duplicate signatures",
+      "modified amount",
+      "signature order",
+      "unauthorized signer",
+      "nonce replay",
+      "allocation conservation",
+      "third-party claim",
+      "claim replay",
+      "receipt roots",
+      "runtime code hash"
+    ],
+    "vault": "0xe78A0F7E598Cc8b0Bb87894B0F60dD2a88d6a8Ab",
+    "runtimeKeccak": "0x9672f6f18d0eb761ab413e4e668ed2e86bfb95a17f2e879317cd80ddf60ed371"
+  },
+  "browser_encoding": {
+    "checks": [
+      "integer 10-gwei encoding",
+      "u64 boundary",
+      "precision rejection",
+      "lossless u64 JSON",
+      "exact deposit recipient calldata",
+      "deposit wei conversion",
+      "atomic token authorization and withdrawal"
+    ],
+    "native_wallet": "mocked transport; authentication is enforced by the native plugin and chain"
+  },
+  "rust_core_tests": 5,
+  "native_chain_tests": 2,
+  "chain_metrics": [
+    {
+      "proof_ns": 64712000,
+      "objective_ns": 38592000,
+      "error": null
+    },
+    {
+      "proof_ns": 2104000,
+      "objective_ns": 113435000,
+      "error": null
+    },
+    {
+      "proof_ns": 12283515000,
+      "objective_ns": 38188000,
+      "error": null
+    },
+    {
+      "proof_ns": 1002000,
+      "objective_ns": 83645000,
+      "error": null
+    },
+    {
+      "proof_ns": 1018000,
+      "objective_ns": 6338000,
+      "error": "service 'ethbridge' aborted with message: ETH deposit already credited"
+    },
+    {
+      "proof_ns": 12310404000,
+      "objective_ns": 37305000,
+      "error": null
+    },
+    {
+      "proof_ns": 1000000,
+      "objective_ns": 69497000,
+      "error": null
+    },
+    {
+      "proof_ns": 998000,
+      "objective_ns": 4744000,
+      "error": "service 'ethbridge' aborted with message: assertion `left == right` failed: ETH batch already completed\n  left: 1\n right: 0"
+    },
+    {
+      "proof_ns": 0,
+      "objective_ns": 5034000,
+      "error": "service 'ethrelay' aborted with message: Missing verified Ethereum evidence claim"
+    },
+    {
+      "proof_ns": 61501000,
+      "objective_ns": 0,
+      "error": "service 'verify-eth' aborted with message: Merkle branch mismatch"
+    },
+    {
+      "proof_ns": 63927000,
+      "objective_ns": 38121000,
+      "error": null
+    },
+    {
+      "proof_ns": 12306114000,
+      "objective_ns": 5173000,
+      "error": "service 'ethrelay' aborted with message: assertion `left == right` failed: Unauthenticated signing committee or skipped period\n  left: None\n right: Some(\"fd0ec57c38c0ec66526806e4d5a829466550432cd9b0f3b376cd6b9241525584\")"
+    },
+    {
+      "proof_ns": 1001000,
+      "objective_ns": 4832000,
+      "error": "service 'ethrelay' aborted with message: Missing verified Ethereum evidence claim"
+    },
+    {
+      "proof_ns": 11656350000,
+      "objective_ns": 0,
+      "error": "service 'verify-eth' aborted with message: Invalid BLS signature: BLST_BAD_ENCODING"
+    },
+    {
+      "proof_ns": 12992459000,
+      "objective_ns": 39502000,
+      "error": null
+    },
+    {
+      "proof_ns": 12471813000,
+      "objective_ns": 37318000,
+      "error": null
+    }
+  ],
+  "direct_chain_metrics": [
+    {
+      "operation": "makeBatch",
+      "objective_ns": 80796000
+    },
+    {
+      "operation": "gather",
+      "objective_ns": 60375000
+    },
+    {
+      "operation": "gather",
+      "objective_ns": 72580000
+    }
+  ],
+  "max_successful_objective_ms": 113.435,
+  "sequential_block_default_ms": 196,
+  "proof_watchdog_default_ms": 200,
+  "proof_wasm_imports": [
+    "env.getResult",
+    "env.getCurrentAction",
+    "env.abortMessage"
+  ],
+  "package": {
+    "path": "/Users/dlarimer/psibase-exchange/packages/user/target/wasm32-wasip1/release/packages/EthBridge.psi",
+    "sha256": "0205455c6c883fa80f23d4ec32f1663d6e0f990f7e586ada19210f7f16182ed3",
+    "bytes": 791427
+  },
+  "services": {
+    "verify-eth": {
+      "bytes": 339785,
+      "sha256": "8ce331c4d09c2b982475b21a954e8665ffd476e74b04701c719dbcf4bbd721e7"
+    },
+    "ethrelay": {
+      "bytes": 246821,
+      "sha256": "3724a6dd4b122c74bf9d1e11c305380f9d1f53673333790632bc942510f8bacb"
+    },
+    "ethbridge": {
+      "bytes": 567311,
+      "sha256": "4a467095e9b17d791bd7e7703a547f00367a3cf3d294e40c9a3017d0004869af"
+    },
+    "r-ethbridge": {
+      "bytes": 350242,
+      "sha256": "e80286f1e20b69fcfe5bdf32715f4a92932815062ae91a641444b4edd61df324"
+    }
+  },
+  "mainnet_evidence": {
+    "source": "https://ethereum-beacon-api.publicnode.com",
+    "trusted_root_for_fixture_only": "6fb35847419176a2a5bb7459025eff5e5377273264d1674cd52bd80d6ae7b882",
+    "version": "fulu",
+    "signature_slot": "15702546",
+    "genesis": {
+      "genesis_time": "1606824023",
+      "genesis_validators_root": "0x4b363db94e286120d76eb905340fdd4e54bfe9f06bf33ff6cf5ad27f511bfe95",
+      "genesis_fork_version": "0x00000000"
+    },
+    "note": "RPC-supplied checkpoint, not independently authenticated bootstrap. BLS and SSZ are independently checked by verify-eth."
+  },
+  "limits": [
+    "The old interpreter exceeds the separate proof-admission watchdog for BLS updates. Intended-engine proof qualification remains pending.",
+    "Parallel proof scheduling and the faster Mac engine are not implemented here.",
+    "Native browser wallet E2E is not qualified; browser tests mock its transport.",
+    "Proof submission is currently CLI-based; browser evidence-proof support needs a Transact API extension.",
+    "No live vault, custody providers, keeper or mainnet deployment has been provisioned."
+  ]
+}

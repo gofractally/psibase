@@ -1,0 +1,7 @@
+{
+  "name":"psibase-ethbridge-validation",
+  "private":true,
+  "type":"module",
+  "scripts":{"build":"node build-vault.mjs","test":"node test-vault.mjs"},
+  "dependencies":{"solc":"0.8.30","ganache":"7.9.2","ethers":"6.16.0","@ethereumjs/trie":"6.2.1","@ethereumjs/rlp":"5.0.2"}
+}

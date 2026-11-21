@@ -450,6 +450,13 @@ mod service {
             "permission denied: tokens::serveSys only callable by 'http-server'",
         );
 
+        // A registered server may be reused by another account. Authentication
+        // from that account's host must not expose private Tokens projections.
+        // Public token metadata remains available through the normal schema.
+        let root = http_server::Wrapper::call().rootHost(request.host.clone());
+        let user = request.host.eq_ignore_ascii_case(&format!("tokens.{root}"))
+            .then_some(user).flatten();
+
         // Services graphql queries
         None.or_else(|| serve_graphql(&request, Query { user }))
             // Serves a GraphiQL UI interface at the /graphiql endpoint

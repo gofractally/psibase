@@ -1,0 +1,11 @@
+[package]
+name = "ethrelay"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+[dependencies]
+psibase.workspace = true
+psibase_service.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ethrelay-core = { path = "../core" }

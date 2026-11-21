@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ETH Bridge · Psibase</title><link rel="stylesheet" href="/style.css">
+<main><header><span>PSIBASE / ETHEREUM</span><h1>ETH Bridge</h1><p>Finalized deposit proofs. Independent 2-of-3 custody.</p></header>
+<div class="account-bar"><button id="connect">Connect Psibase account</button><span id="identity"></span><button id="refresh">Refresh</button></div>
+<p id="message" role="status" aria-live="polite"></p><aside id="notice">Loading bridge configuration…</aside>
+<section class="balances"><div><small>Psibase ETH</small><strong id="psibase-balance">Connect an account</strong></div><div><small>Ethereum wallet</small><strong id="ethereum-balance">Loading…</strong><code id="ethereum-account"></code></div></section>
+<section><h2>Deposit ETH</h2><p>Send ETH to the vault for your connected Psibase account, then publish its finalized proof. The first proof publisher earns a share of the deposit fee.</p>
+<form id="deposit-form"><label>ETH amount<input name="amount" inputmode="decimal" required placeholder="0.1" value="0.1"></label><button>Deposit ETH</button></form>
+<form id="recover-form"><label>Deposit transaction hash<input name="txid" required placeholder="0x…" spellcheck="false"></label><button>Publish deposit proof</button></form><p id="proof-progress" aria-live="polite"></p>
+</section>
+<section><h2>Withdraw ETH</h2><p>Authorize the amount and service fee with your Psibase wallet. Two signers approve the deterministic batch. Once finalized, ETH is paid or remains available for collection at the recipient.</p>
+<form id="withdraw-form"><label>Ethereum recipient<input name="address" required placeholder="0x…" spellcheck="false"></label><label>ETH amount<input name="amount" inputmode="decimal" required placeholder="0.05" value="0.05"></label><button>Authorize withdrawal</button></form>
+<details><summary>Collection and relay tools</summary><form id="claim-form"><label>Allocated recipient<input name="address" required placeholder="0x…"></label><button>Collect allocated ETH</button></form><button id="batch">Create eligible batch</button><button id="relay">Publish latest finality proof</button></details><p id="wallet"></p>
+</section>
+<nav><button data-page="deposits">Deposits</button><button data-page="withdrawals">Withdrawals</button><button data-page="batches">Batches & signatures</button></nav>
+<section><h2 id="title">Deposits</h2><div id="rows"></div><button id="next" hidden>Next page</button></section>
+<details><summary>Network and custody</summary><dl id="config"></dl></details>
+<footer>Eight decimal places · one unit = 10 gwei. RPC observations are shown separately from Psibase-verified settlement.</footer></main><script type="module" src="/app.js"></script></html>

@@ -20,7 +20,7 @@ struct ReadyIndex {
     indexes: Vec<IndexInfo>,
 }
 
-fn indexed_ids(
+pub(crate) fn indexed_ids(
     market: u64,
     method: &str,
     limit: u32,

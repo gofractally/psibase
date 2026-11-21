@@ -1,0 +1,8 @@
+package ethbridge:plugin;
+interface api {
+    use host:types/types.{error};
+    submit: func(actions: string) -> result<_,error>;
+    prove: func(submission: string) -> result<_,error>;
+    identity: func() -> result<string,error>;
+}
+world imports {import api;}

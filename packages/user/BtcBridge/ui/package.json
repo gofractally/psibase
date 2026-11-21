@@ -1,0 +1,19 @@
+{
+  "name": "psibase-btcbridge-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && node build.mjs"
+  },
+  "dependencies": {
+    "@scure/bip32": "^2.0.1",
+    "@scure/btc-signer": "^2.0.1",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.0",
+    "typescript": "^5.9.0",
+    "@types/qrcode": "^1.5.6"
+  }
+}

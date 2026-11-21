@@ -1,0 +1,11 @@
+[package]
+name = "ethbridge-core"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+[dependencies]
+ethrelay-core = { path = "../../EthRelay/core" }
+secp256k1 = { version = "0.29", features = ["recovery", "lowmemory"] }
+serde.workspace = true
+serde_json.workspace = true
+hex = "0.4"

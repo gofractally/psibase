@@ -7,4 +7,6 @@ plugin_error! {
     WrongOrigin(origin: &'a str) => "Cannot be called by {origin}",
     ClaimProofMismatch => "Number of proofs does not match number of claims",
     BadResponse(msg: &'a str) => "Bad response: {msg}",
+    ConnectionChanged(msg: &'a str) => "Transaction account guard: {msg}",
+    PrePublishHook(msg: &'a str) => "Pre-publication hook: {msg}",
 }

@@ -1,11 +1,14 @@
 //! Native Psibase exchange. Free balances remain in native shared-token rows.
 //! Only irrevocably committed collateral/order/relay/lending cash enters escrow.
 #![allow(non_snake_case)]
+pub mod candles;
 pub mod math;
+pub mod pages;
 pub mod snapshot;
 pub mod stops;
 pub mod tables;
-#[cfg(test)]
+// Actual-chain fixtures require the WASI tester; pure math tests also run on host.
+#[cfg(all(test, target_family = "wasm"))]
 mod tests;
 pub mod trades;
 
@@ -272,6 +275,7 @@ pub mod service {
         Wrapper::emit()
             .history()
             .liquidated(m.id, long, g.price, c, d, out - d);
+        crate::candles::record(m.id, long, c, out, now());
     }
     fn claim_loan(user: AccountNumber, m: &Market, long: bool, p: u64) -> u64 {
         let table = BorrowerTable::read_write();
@@ -501,6 +505,7 @@ pub mod service {
             Wrapper::emit()
                 .history()
                 .traded(m.id, user, sell, used, out);
+            crate::candles::record(m.id, sell, used, out, now());
         }
         (used, out, events)
     }
@@ -1367,4 +1372,14 @@ pub mod service {
     fn traded(market: u64, owner: AccountNumber, sell_base: bool, input: u64, output: u64) {}
     #[event(history, public)]
     fn liquidated(market: u64, long: bool, price: u64, collateral: u64, debt: u64, surplus: u64) {}
+    #[event(history, public)]
+    fn candle5s(market: u64, candle: CurrentCandle) {}
+    #[event(history, public)]
+    fn candle15s(market: u64, candle: CurrentCandle) {}
+    #[event(history, public)]
+    fn candle1m(market: u64, candle: CurrentCandle) {}
+    #[event(history, public)]
+    fn candle1h(market: u64, candle: CurrentCandle) {}
+    #[event(history, public)]
+    fn candle1d(market: u64, candle: CurrentCandle) {}
 }

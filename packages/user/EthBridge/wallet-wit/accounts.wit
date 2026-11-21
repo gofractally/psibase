@@ -1,0 +1,4 @@
+package accounts:query;
+interface types { record account { account-num: string, auth-service: string, } }
+interface api { use host:types/types.{error}; use types.{account}; get-account: func(name: string) -> result<option<account>,error>; get-current-user: func() -> option<string>; }
+world imports { import api; }

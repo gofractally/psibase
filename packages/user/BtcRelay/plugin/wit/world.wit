@@ -1,0 +1,6 @@
+package btcrelay:plugin;
+interface api {
+    use host:types/types.{error};
+    headers: func(headers: list<string>) -> result<_, error>;
+}
+world imports { import api; }

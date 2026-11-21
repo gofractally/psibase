@@ -1,0 +1,47 @@
+[
+  {
+    "fact": {
+      "kind": "Bootstrap",
+      "fact": {
+        "network": "31b5cad193cb1f9f96981751961b681d70f7334f25720bba032ed7548f61ddb2",
+        "beacon": "6fb35847419176a2a5bb7459025eff5e5377273264d1674cd52bd80d6ae7b882",
+        "slot": 15702464,
+        "committee": "d1e7a088e4462d476e949f9c90e67bebae6f0b5affa8b94d538be628d2b9223a",
+        "execution": {
+          "block_hash": "b78f2f1bb87b4f367a3d645653531f33276dcbacd512564680ca493d81699a27",
+          "parent_hash": "4858a66e43cfa01842feffeb420cf75ce5c54a63a59b61bbe34ab5c3cbeec7cd",
+          "state_root": "3e9f5c53587d5a2160b300476893c853eded2906083d7f38c69c48d77a1916d9",
+          "receipts_root": "cc7eb3845a18fcc0136503184fd4d0d46e9f8b6f8df5fd2034fd9ac7184dd840",
+          "block_number": 26462606
+        }
+      }
+    },
+    "claim": "248a52759b7c202775d67a954403e41fa8775f2451e0add8170c96252800da65",
+    "fixture": "mainnet-bootstrap",
+    "wall_seconds_including_process_start": 0.6151360840303823
+  },
+  {
+    "fact": {
+      "kind": "Update",
+      "fact": {
+        "network": "31b5cad193cb1f9f96981751961b681d70f7334f25720bba032ed7548f61ddb2",
+        "committee": "d1e7a088e4462d476e949f9c90e67bebae6f0b5affa8b94d538be628d2b9223a",
+        "attested_slot": 15702545,
+        "signature_slot": 15702546,
+        "finalized_slot": 15702464,
+        "finalized_root": "6fb35847419176a2a5bb7459025eff5e5377273264d1674cd52bd80d6ae7b882",
+        "next_committee": null,
+        "execution": {
+          "block_hash": "b78f2f1bb87b4f367a3d645653531f33276dcbacd512564680ca493d81699a27",
+          "parent_hash": "4858a66e43cfa01842feffeb420cf75ce5c54a63a59b61bbe34ab5c3cbeec7cd",
+          "state_root": "3e9f5c53587d5a2160b300476893c853eded2906083d7f38c69c48d77a1916d9",
+          "receipts_root": "cc7eb3845a18fcc0136503184fd4d0d46e9f8b6f8df5fd2034fd9ac7184dd840",
+          "block_number": 26462606
+        }
+      }
+    },
+    "claim": "89ef03c82312dd701e9f43660b983231095c6023253e9e3cd1c6d6c82b04770d",
+    "fixture": "mainnet-finality",
+    "wall_seconds_including_process_start": 0.033190749934874475
+  }
+]

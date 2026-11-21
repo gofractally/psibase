@@ -1,0 +1,24 @@
+[package]
+name = "ethbridge"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+[package.metadata.psibase]
+server = "r-ethbridge"
+plugins = ["ethbridge-plugin"]
+postinstall = [
+    { sender = "ethbridge", service = "sites", method = "setcsp", data = { path = "*", csp = "default-src 'self';script-src 'self';style-src 'self';img-src 'self' data:;connect-src 'self' auth-sig.{{root}} https:;frame-src supervisor.{{root}};frame-ancestors 'self';base-uri 'none';form-action 'self';object-src 'none';" } },
+]
+data = [{src="../ui",dst="/"}]
+[dependencies]
+psibase.workspace = true
+psibase_service.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ethbridge-core = { path = "../core" }
+ethrelay-core = { path = "../../EthRelay/core" }
+ethrelay = { path = "../../EthRelay/service" }
+signing = { path = "../../Signing/service" }
+signing-core = { path = "../../Signing/core" }
+[dev-dependencies]
+ethbridge-pkg = {path=".."}

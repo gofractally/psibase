@@ -7,6 +7,7 @@
 #include <psio/fracpack.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
+#include <services/system/HttpServerRequest.hpp>
 #include <services/system/RTransact.hpp>
 
 static constexpr bool enable_print = false;
@@ -273,9 +274,7 @@ namespace SystemService
       auto user = recurse().to<RTransact>().getUser(req);
 
       // Remove sensitive headers
-      req.removeCookie("__HOST-SESSION");
-      req.removeCookie("SESSION");
-      std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
+      http_detail::stripAuthenticationHeaders(req);
 
       // Extract subdomain
       auto root        = to<XHttp>().rootHost(req.host);
@@ -358,7 +357,9 @@ namespace SystemService
          }
          else if (req.method == "OPTIONS")
          {
-            sendReplyImpl(server, sock, {.status = HttpStatus::ok, .headers = allowCors()});
+            sendReplyImpl(server, sock,
+                          {.status = HttpStatus::ok,
+                           .headers = http_detail::defaultPreflightHeaders()});
          }
          else
          {

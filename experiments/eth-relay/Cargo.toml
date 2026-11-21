@@ -1,0 +1,13 @@
+[package]
+name = "eth-relay-bench"
+version = "0.1.0"
+edition = "2021"
+publish = false
+[workspace]
+[dependencies]
+blst = { version = "=0.3.17", default-features = false, features = ["portable", "no-threads"] }
+serde_json = "1.0"
+libc = "0.2"
+[profile.release]
+opt-level = 3
+lto = true

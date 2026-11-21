@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { depthRows, orderSpread, quoteForSize, maximumBidSize, unitsFromAmount, ownershipForDeposit, ownershipForWithdrawal } from '../src/order-book.js';
 import { candlesFromTrades, depthBounds } from '../src/market-chart.js';
-import { walletApiBase } from '../src/config.js';
 const market={base_lot:'10000',quote_tick:'1',x:'10000000000',lp_supply:'100000000'};
 
 test('visible depth uses executable quantities and cumulative totals in price priority',()=>{
@@ -42,9 +41,4 @@ test('depth zoom is symmetric around current price and never changes native orde
  assert.deepEqual(depthBounds(57000,2),{low:55860,high:58140});
  assert.deepEqual(depthBounds(57000,.5),{low:56715,high:57284.99999999999});
  assert.throws(()=>depthBounds(57000,0));assert.throws(()=>depthBounds(57000,26));
-});
-test('native hosted UI targets explicit local development wallet only on its known host',()=>{
- assert.equal(walletApiBase('http://exchange.psibase.localhost:8089/'),'http://127.0.0.1:8090');
- assert.equal(walletApiBase('http://127.0.0.1:8090/'),'');
- assert.equal(walletApiBase('https://exchange.example.com/'),'');
 });

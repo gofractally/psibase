@@ -1,176 +1,193 @@
-# Exchange UI bridge contract
+# Native Exchange UI contract
 
-This static interface sends every financial mutation to the native Psibase
-service through the local demo bridge. It does not store balances, simulate
-fills, or persist orders in the browser. The account picker controls only the
-explicitly labelled local devnet accounts; it is not a production signer.
-Production deployment should replace this bridge with native Supervisor/plugin
-transaction signing while keeping the same service actions and queries.
+The chain-hosted interface imports Psibase's native `/common/common-lib.js` and
+uses its Supervisor. It has no development-wallet HTTP dependency. Public
+markets, depth, token metadata and trade prints use same-origin native queries.
+Private data and financial operations use native plugins. Private queries never
+select an owner supplied by the page. Financial calls carry the displayed owner
+as a native precondition: they fail if Host has switched accounts, and cannot
+select or impersonate that owner.
 
-`GET /api/state?account=alice` returns the native `/snapshot?owner=alice` JSON
-directly, or wrapped under `snapshot`. Expected arrays: `markets`, `tokens`,
-`balances`, `levels`, `positions`, `stop_positions`, `loans`, `loan_positions`, `lenders`,
-`relay_shares`. The UI accepts atom quantities as digit strings or native
-`Quantity` objects with `value`. Market records have `id,base,quote,base_lot,
-quote_tick,x,y,k,lp_supply,vault_base,vault_quote,debt_base,debt_quote,
-lending_base,lending_quote`. Token records have `id,precision,symbol`.
-Balance records have `token,wallet,incoming,outgoing,spendable`.
-Own order positions expose native `remaining_outgoing`, `remaining_base`,
-`remaining_quote`, and `status`. Only a positive remaining outgoing amount
-counts as an open order. The UI does not infer original or lifetime filled
-quantities from settlement balances.
-Loan metadata is scoped to the owner's position. The UI uses the native
-`claimable_surplus` floor payout directly when supplied; it does not need
-other borrowers' aggregate collateral or debt to display balances.
-Own stop rows contain `owner,generation,market,sell_base,trigger,status,
-remaining_outgoing,claimable_input,claimable_output,input_token,output_token`
-and optional native
-`can_cancel/can_claim` flags. Status is `armed`, `filled`, `partially_filled`,
-or `unfilled`. Armed stops reserve their outgoing asset;
-completed stops have zero remaining outgoing amount. The UI adds the exact
-input refund and output payout to available funds. No aggregate stop data
-or other owners' orders enter private wallet balances.
+## Account authority
 
-The snapshot includes the latest 1,000 own stop positions, in descending
-generation order, with nullable `stop_positions_next`. Older rows use
-`GET /api/stops?account=alice&before=GEN&limit=100`, forwarded to the native
-owner-authenticated `/stops` endpoint. The limit is 1–200 and `before` is an
-exclusive u64 generation cursor. The response is
-`{owner,stop_positions,next_before}`. Cursors never select another owner.
+`host:accounts/api.getCurrentUser()` supplies the active account.
+`host:accounts/activeApp.connectAccount()` opens the native account prompt;
+`getConnectedAccounts`, `login(account)` and `logout()` manage accounts already
+connected through Host. The UI does not import keys or impersonate demo accounts.
+The supervisor supplies authenticated caller origins, the current account and
+its native auth plugin. Plugin calls compose and submit native transactions.
 
-`GET /api/stop?account=alice&generation=GEN` reads one authenticated own row
-or null. Only this point response includes `input_auto_debit` and
-`output_auto_debit`, taken from that owner's native receipt settings. An
-unknown generation and a generation belonging to someone else both return
-the same null private position.
+## Funding and transfer permission
 
-The interface fetches one older page per explicit click and keeps it
-separate from live balances. Loaded pages are cleared on wallet/market
-changes and financial submissions. Older armed orders can be cancelled;
-older completed receipts have a **Return to balance** action. That action
-posts `{account,generation}` to `/api/release-stop`, which performs a fresh
-authenticated point lookup before one atomic native `claimstop` and its
-AUTO_DEBIT re-credits. It does not depend on old market metadata being in
-the current snapshot. Missing/foreign rows return 404, armed rows return 400,
-and no push occurs in either case. Unknown submission results are not retried.
-For wallets below the snapshot limit there is no extra pagination request
-or older-order interface.
-When the snapshot has older rows, the balance column is explicitly labelled
-**Available shown** with an older-orders note. Positive receipts outside the
-snapshot are excluded rather than double-counted from a potentially stale
-loaded page. This can understate total available proceeds in the local demo
-wallet; it does not change native ownership or liabilities. The explicit
-older-receipt escape is limited to this case, while ordinary proceeds remain
-implicit. A production wallet can extend authenticated pagination and
-transaction preparation without changing the matching service.
+The ticket tabs are **Spot | Margin | Deposit | Withdraw**. Deposit calls
+`tokens:plugin/transfer.credit(tokenId, "exchange", decimalAmount, memo, expectedUser)`.
+The Tokens-owned review displays the exact operation, asset, amount, source,
+destination and requesting app. Its optional, initially unchecked **Trust
+exchange** remembers a narrow wallet↔exchange transfer permission in native
+client storage. It does not grant generic Tokens High authority, issuer
+permissions, AUTO_DEBIT or an on-chain unlimited allowance. The account menu
+reads `transfer.trustStatus()` and offers `transfer.revokeTrust()`.
 
-`GET /api/trades?market=ID&limit=100` returns actual native executed trades,
-latest first, with `event_id,base_amount,quote_amount,time,sell_base,kind`
-and `next_before`. The initial load follows at most five 100-entry pages;
-subsequent updates send exclusive `after=latestEventId`, following
-`before=next_before` while retaining that original `after` cursor if needed.
-Returned IDs satisfy `after < event_id < before` when both cursors exist;
-the latest-seen cursor advances only after that bounded fetch completes.
-The browser retains at most 2,000 unique events per visited market. Each
-print is the actual aggregate execution VWAP, including liquidation trades;
-there is no synthetic external trade data in the chart or tape.
+An untrusted transfer interrupts the composed transaction before submission.
+Only that known native prompt signal saves an exact call and a nonsensitive form
+draft in session storage. On return the UI checks the same connected owner and
+`transfer.approvalStatus()`: only an approved review resumes that exact operation.
+The native operation checks the original expected owner again within the same
+supervised call, including automatic preparation followups. A denial restores
+the draft without submitting. Errors and unknown submission
+outcomes are never retried automatically. The native permission binds approval
+to the exact atom amount, operation, token, counterparty, caller and memo; it is
+staged during composition and rolled back if another prompt or signing fails
+before publication. It becomes irrevocably spent immediately before the
+publication attempt, including when the RPC reply is unknown or the chain rejects
+the transaction. An unknown result therefore cannot replay a one-off approval.
 
-`GET /api/tokens?after=ID&limit=1` proxies the public native token catalog.
-The creation form accepts any native token IDs and resolves their actual
-precision and reserved symbol metadata through that endpoint before packing
-amounts. Multiple independently funded books for one pair are supported;
-market pickers show each unique market ID and the selected lot/tick grid.
+Withdrawal calls `exchange:plugin/user.withdraw(tokenId, atomAmountString, expectedOwner, fundingAfter?)`.
+The native plugin realizes eligible own proceeds as needed and schedules native
+Tokens debit/uncredit actions. Tokens owns transfer authorization for these
+calls as well. Reserved order input and margin collateral remain unavailable
+until the relevant cancellation, repayment or native liquidation releases them.
 
-Market capability fields are native `margin_enabled` (sticky eligibility),
-`legacy_unsupported`, and `escrow_base/escrow_quote` objects with
-`actual,expected,funded`. The UI labels eligible books **Margin enabled** and
-others **Spot only**. Borrowing and new lending require eligibility and
-verified funding; observed native underfunding pauses new commitment buttons.
-Existing cancellation, repayment, redemption, and withdrawal actions remain
-available for the native service to validate.
+## Exchange plugin
 
-`POST /api/action` receives `{account,method,args}` and returns a confirmed
-transaction or an HTTP failure with `{error: "chain rejection reason"}`.
-All u64 form amounts, prices, units, and shares are sent as **digit strings**
-to avoid JavaScript rounding. Token IDs and event limits are bounded numbers.
+Financial input quantities are digit strings. Returned native integer values
+above JavaScript’s safe integer range remain strings and are converted directly
+to BigInt for arithmetic. Page cursors are opaque strings, not offsets or IDs.
+No financial amount is rounded through JavaScript Number.
 
-| Method | Arguments |
-|---|---|
-| `create` | `base,quote,base_amount,quote_amount,base_lot,quote_tick` |
-| `trade` | `market,sell_base,amount,min_output,max_events` |
-| `limit` | `market,bid,price,amount` |
-| `cancel` | `market,bid,price` |
-| `stop` | `market,sell_base,trigger,amount` |
-| `cancelstop`, `claimstop` | `generation` |
-| `process` | `market` (permissionless due-order execution) |
-| `borrow` | `market,long,price,units` |
-| `repay` | `market,long,price,units` |
-| `claim` | `market,long,price` |
-| `liquidate` | `market,max_events` |
-| `renew` | `market` (new term only after both debt books are empty) |
-| `lend` | `market,base,amount` |
-| `unlend` | `market,base,shares` |
-| `addliq`, `remliq` | `market,shares` |
+| Interface and method | Parameters | Result |
+|---|---|---|
+| `queries.snapshot` | none | bounded compatibility snapshot with explicit continuations |
+| `queries.scopedSnapshot` | optional exact market ID | fresh selected-market snapshot |
+| `queries.positions` | kind, optional market ID, optional after, limit | own orders/loans/lenders/liquidity page, all referenced metadata, `next_after` |
+| `queries.assets` | optional after, limit | own native asset page, `next_after` |
+| `queries.asset` | exact token ID | exact own balance and token metadata |
+| `queries.stops` | optional before string, limit 1–200 | own stop page, referenced market/token metadata, `next_before` |
+| `queries.stop` | generation string | own stop or null JSON |
+| `queries.history` | tokenId, optional before string, limit | native Tokens transfer history JSON |
+| `user.execute` | allowlisted method, args JSON, expected owner, optional funding cursor | funding/execution result below |
+| `user.withdraw` | tokenId, atom amount string, expected owner, optional funding cursor | funding/execution result below |
+| `user.releasePosition` | orders/loans, exact market, optional side/price, expected owner | exact own receipt recovery beyond visible pages |
+| `user.releaseStop` | generation string, expected owner | native own receipt release |
 
-`POST /api/deposit` and `/api/withdraw` receive
-`{account,tokenId,amount:"nativeAtoms"}`. The bridge must use native token
-credit/uncredit/debit actions and preserve user identity. The `spendable`
-balance includes both directions of live shared token credits; it is not
-an exchange-maintained free-balance ledger.
+`execute` supports create, trade, limit, cancel, stop, cancelstop, claimstop,
+process, borrow, repay, claim, liquidate, renew, lend, unlend, addliq and remliq.
+The plugin queries exact market/token/position points and bounded own funding
+pages rather than inferring absence from a truncated catalog.
 
-The UI adds funded maker `position.proceeds`, each closed loan's exact
-surplus, and both exact stop payouts to available funds. The user does not
-need a separate claim step. A stop market order reserves its input now:
-base atoms for sells, quote atoms for buys. Native reserve price reaching
-the trigger executes the funded order; any unfilled input is returned. It
-does not promise a future execution price or become a resting limit order.
-New owned stops require at least the market's base size increment for sells,
-or its trigger-value equivalent in quote tokens for buys. Existing owned
-armed positions at the same market, side, and trigger can receive smaller
-positive additions. The preview and local input validation show this minimum
-in ordinary token units; the native service remains authoritative.
+Funding results include `{status,executed,prepared,funding_cursor,scanned,
+funding_complete}`. `executed` means the requested transaction completed.
+`prepared` means a confirmed native transaction realized some own proceeds but
+the requested action remains pending. Only that successful result allows one
+automatic followup; there are at most two confirmed preparation calls per click
+and at most 32 claims per call. Remaining preparation is returned to the user as
+an explicit continuation, not an error claiming those transactions failed.
+`scan_progress` means this bounded scan page scheduled no transaction; it is
+returned immediately and never causes an automatic scan loop. The UI preserves
+the exact owner, operation, arguments and opaque funding cursor, displays the
+request summary, and offers **Continue preparing funds** or **Discard request**.
+An approved native prompt return makes exactly one Exchange call, so it cannot
+restart the automatic preparation budget. A preparation result then requires an
+explicit Continue. Changing the draft/account/market discards the continuation. Unknown or rejected
+financial submissions never trigger an automatic retry.
 
-The local wallet adapter derives required input assets from the native
-action's integer formulas. Ready shared funds are spent or withdrawn directly
-without realizing unrelated proceeds. Otherwise it realizes only owner
-receipts needed for missing input assets, using `settle`, `claim`, or
-`claimstop`. Each preparation transaction includes all corresponding
-AUTO_DEBIT re-credits atomically and is followed by a fresh native read.
-There are at most two preparation transactions per HTTP request, each with
-at most 32 receipts and 64 total native actions including re-credits.
+## Snapshot scope and explicit browsing
 
-The final requested action is then submitted exactly once, as its own
-transaction. It is never automatically retried after an unknown submission
-result. If preparation reaches its bound first, HTTP 409 returns structured
-`progress` and a plain retry message; the UI refreshes native balances.
-Already realized proceeds remain the owner's free funds. A retry begins
-from native state rather than replaying a cached preparation. This bounded
-multi-transaction behavior is specific to the local development wallet;
-a production native wallet/plugin can provide its own transaction workflow.
+Market discovery uses independent public pages. A selected market is fetched by
+exact ID even when absent from the first discovery page. The Markets screen
+supports Load more and Open market by ID; `?market=ID` opens a direct market URL.
+Selection updates only the market URL parameter using same-origin replaceState,
+preserving other parameters, path and fragment without growing browser history.
+On a native prompt return, the exact reviewed draft market takes precedence
+over an older address-bar query before the scoped snapshot is fetched. The UI
+polls the selected market, not the catalog.
 
-The default price chart groups actual native timestamps into 5-second,
-15-second, or 1-minute OHLC candles and aligned base-volume bars. Empty time
-intervals stay empty. The depth view combines current native limit orders
-and executable market-maker reserves within a configurable symmetric
-percentage of the current price. Far orders remain on chain; changing the
-viewport does not cancel them. Session activity entries are added only after
-a successful confirmed transaction response.
+`scopedSnapshot` carries the selected market’s first 200 own orders, loans,
+lenders and liquidity records, up to 200 levels independently on each book side,
+and the latest 200 owner-global stop records. Metadata accompanies every
+referenced market and token. `continuations` contains independent markets,
+book_bid, book_ask, orders, loans, lenders, liquidity, assets and stops fields;
+`coverage_complete` describes those requested bounded collections only.
+Explicit selected snapshots have `balance_scope:"selected-market-points"` and
+`asset_page_included:false`: exact base/quote cash points, without scanning the
+asset catalog. An explicitly selected third funding token gets one exact balance
+point while its Deposit/Withdraw ticket is active.
 
-State refreshes every two seconds while the document is visible; incremental
-trades additionally pause outside the exchange view. Chart geometry and trade-tape signatures skip
-unchanged SVG/HTML work; focused forms are not replaced by polling. Optional
-`?profile=1` logs API UTF-8 payload bytes, fetch/decode durations, synchronous
-render durations, and actual chart redraw durations to the console. It is
-disabled by default, keeps no metrics buffer, and does not measure browser
-paint or frame time.
+Even when selected pages are complete, proceeds in other markets can exist.
+The UI therefore labels projected amounts **Available shown** and **Reserved
+shown**, with a clear scope note. Fresh selected-market positions and recent
+stop receipts feed the portfolio calculator. Older account pages are separate
+point views, never merged into live available/committed arithmetic. Their values
+remain visible across two-second polls with a last-query explanation; owner
+changes and financial mutations invalidate their rows/cursors. Private stale
+responses are discarded using both owner/scope and request-epoch guards.
 
-When hosted on `exchange.psibase.localhost`, the central API adapter uses
-the explicitly configured local development wallet at
-`http://127.0.0.1:8090`. The bridge permits that exact native origin via CORS.
-Other hostnames use same-origin API paths. Native Sites serves all static
-assets; a production wallet signer can replace this demo adapter separately.
+The account’s Positions tab pages all own limit orders, margin loans, lending
+and liquidity records across markets, with an optional exact market filter.
+Rows include Open market and appropriate cancel/repay/recovery controls. Settled
+loan and maker receipts remain accessible. Stop pages traverse the native global
+owner index in descending order; a market filter applies to the loaded stop
+rows, and explicit further pages may contain additional matches. There is no
+unbounded catchup scan. Expanded public depth has independent buy/sell controls
+and a Refresh depth action; cached expanded depth is labeled as a page view and
+never enters current funding/spread calculations.
 
-Build: `npm run build` (no dependencies). Test: `npm test`.
-The bridge can serve `dist/` directly, or those static assets can be published
-to the native service. Do not launch the `dev` static-only server expecting
-financial actions; the real bridge is required.
+After create completes, the UI opens paged own liquidity positions if the native
+result does not identify the committed market. It does not predict an allocator
+ID or misidentify another concurrent creation.
+
+## Assets and transaction history
+
+The top-right account menu contains Assets, Positions, Transaction history and
+Permissions. Assets use explicit native owner pages and exact token-ID lookup.
+Selected-market live balances override matching cached asset rows; other asset
+rows retain their last query values until refreshed. Available/reserved amounts
+are explicitly scoped, and an unqueried reserved amount is shown as a dash. There is no
+bottom-of-page asset section. Deposit and Withdraw shortcuts select their ticket
+tabs.
+
+Transaction history reads one selected asset's durable native Tokens
+`balChanges` connection, limited to the connected owner and exact exchange
+counterparty. Native decimal event amounts are parsed exactly at the token's
+precision. The UI rejects a response containing another owner, counterparty or
+token. Older pages require an explicit click. Node event retention may limit
+history. The expandable **Recent actions on this browser** is clearly separate:
+it remembers successful native calls locally and is not represented as a
+complete historical trade audit.
+
+## Public data and refresh
+
+`GET /markets?after=ID&limit=100` supplies bounded discovery and token metadata,
+with `next_after`. `GET /market?market=ID` resolves an exact market.
+`GET /book?market=ID&bid=true|false&after=OPAQUE&limit=100` pages either side
+independently with `next_after`; no global depth prefix can hide the other side.
+`GET /tokens?after=ID&limit=1` resolves any native token ID and its precision and
+reserved symbol. `GET /trades?market=ID&limit=100` supplies actual native trade
+and liquidation prints. The first tape load follows at most five pages; later
+refreshes use exclusive `after=latestEventId`, preserving that lower bound while
+following bounded `before` pages. At most 2,000 unique prints are retained per
+visited market for the visible recent-trades tape. Candles use the independent
+native candle-history endpoint rather than this browser cache.
+
+`GET /candles?market=ID&interval=5|15|60|3600|86400&limit=200` reads native
+candle history. Completed bars reside in prunable event history; only the current
+bar per market/interval remains in objective state. Coverage starts when this
+aggregation is deployed; the UI does not invent earlier bars or zero-trade
+buckets. `before` and `next_before` are opaque event cursor strings, not times.
+A page includes the current bar only on the latest page.
+
+Candle `time` is a Unix-seconds bucket. Open/high/low/close, base-atom volume and
+trade count are exact integer strings. `price_precision` gives the decimal scale
+of OHLC prices: the backend scales atomic quote/base ratios by 10^18 and accounts
+for both token precisions. It can exceed ordinary quote-token precision, so tiny
+asset prices do not round to zero. The UI validates the ranges and converts to
+Number only when mapping SVG geometry. The 1h and 1d views use UTC dates/times.
+Older/Latest controls fetch bounded native pages. Current hourly/daily bars
+refresh at most every ten seconds; shorter intervals at most every two seconds.
+
+Visible, idle pages refresh snapshots every two seconds. Hidden pages do not
+poll. Financial submission pauses polling; account changes discard stale private
+data. Native transfer history is fetched when its account tab is opened or its
+asset is changed, rather than scanning every asset during each market refresh.
+
+Recent-trades requests run only while that order-book tab is visible. Native candle history is independent of its bounded print cache.

@@ -1,4 +1,5 @@
 use crate::bindings::exports::permissions::plugin::api::TrustLevel;
+use crate::types::higher_trust;
 
 use psibase::fracpack::{Pack, Unpack};
 use psibase_plugin::host::client::*;
@@ -96,7 +97,7 @@ impl Permissions {
             .and_then(|perms| perms.get_trust_level(caller));
 
         match (session_trust, persistent_trust) {
-            (Some(s), Some(p)) => Some(s.max(p)),
+            (Some(s), Some(p)) => Some(higher_trust(s, p)),
             (Some(s), None) => Some(s),
             (None, Some(p)) => Some(p),
             (None, None) => None,

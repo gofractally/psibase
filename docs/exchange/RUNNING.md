@@ -2,14 +2,12 @@
 
 The running application is **http://exchange.psibase.localhost:8089/**, served
 by the native Sites service under the exchange account's subdomain. The native
-Psibase node listens on **127.0.0.1:8089**. The development wallet adapter listens
-on **127.0.0.1:8090**; that address is no longer the application host.
-Both listeners are restricted to this computer.
+Psibase node listens on **127.0.0.1:8089**. Signing, account connections and
+cross-app transfer consent use the native Supervisor, Host and Tokens plugins.
+The retired development wallet HTTP server on 8090 is stopped and is not started
+by `demo/run.py`. The bot uses the native CLI independently of the browser.
 All orders, fills, market makers, lending positions, collateral and repayments
-execute in native Psibase services and persist in its database. The Python
-adapter is a development wallet; it contains no matcher or independent account
-ledger. Its native UI origin is explicitly allowlisted for local development
-requests. Other account subdomains cannot use it through browser CORS.
+execute in native Psibase services and persist in its database.
 
 ## Source and running state
 
@@ -42,25 +40,36 @@ layout and declares Sites and Events dependencies. Its post-install actions
 configure market indexes for trade, liquidation and stop execution history. The query service
 returns `None` for static asset paths so HttpServer can apply its standard
 Sites fallback; it retains the native action-schema developer endpoints.
-The demo publishing script adds only the exact local wallet address to the
-account's content policy. Browser CORS on the wallet permits the exact exchange
-origin, not arbitrary sibling account subdomains.
+The demo publishing script grants the native Supervisor frame access; it grants
+no development-wallet endpoint. Rebuilding the native client stack uses
+`demo/build_native_wallet.py` and `demo/publish_native_wallet.py`; component
+files, dependency links and native prompt routes must match, rather than mixing
+client protocols from different SDK revisions.
 
-`start` retains existing chain state and leaves the node and wallet running
-independently of a terminal. It does not reset balances or issue more tokens.
-PIDs and logs are under `demo/`; the database is `demo/chain/`. PID checks
-refuse to stop a reused PID belonging to another program. Do not run two
-nodes against the same database directory.
+`start` retains existing chain state and starts the native node independently
+of a terminal. It does not reset balances or issue more tokens. PIDs and logs
+are under `demo/`; the database is `demo/chain/`. PID checks refuse to stop a
+reused PID belonging to another program. Do not run two nodes against the same
+database directory.
 
 ## Demo wallets and assets
 
-The wallet selector exposes `alice`, `bob`, `carol`, and `liquidity`. These
-are deliberately insecure local development identities using native AuthAny.
-They are not accounts to use on a public network. An actual deployment must
-use its native wallet/plugin and account authentication in place of this
-loopback development adapter. The native financial service always derives
-the actor from `get_sender()`; the browser cannot supply another position's
-owner as an action argument.
+The account menu connects accounts through native Host. For the local fixture,
+import `alice`, `bob`, `carol` or `liquidity` in the native account prompt. These
+accounts use AuthAny and therefore have no private-key field. They remain
+insecure development identities: a native wallet UI does not make AuthAny
+secure. The demo also has an unsigned single-producer administrative root; see
+[NATIVE_WALLET_REVIEW.md](NATIVE_WALLET_REVIEW.md). Public deployment requires
+secured users, producer claims and independent upgrade authorities.
+
+The ticket has **Spot | Margin | Deposit | Withdraw**. A deposit opens the
+Tokens-owned exact-transfer confirmation. Its initially unchecked **Trust
+exchange** option remembers a client-side wallet↔Exchange permission for later
+transfers on this browser. The account menu exposes Assets, native per-token
+exchange transfer history and permission revocation. This transfer history is
+not a complete order/fill audit. Available proceeds are implicitly prepared
+when spending or withdrawing; unknown transaction outcomes are never retried.
+The financial service always derives the actor from `get_sender()`.
 
 BTC and USD are **local demonstration assets**, not externally redeemable
 bitcoin or dollars. BTC has eight decimals; USD has four. The legitimate
@@ -125,7 +134,7 @@ quotes are canceled and replaced around the live price.
 Only native exchange data reaches the browser. Feed source, timestamps and bot
 status stay in `demo/market-activity.log` and `demo/market-activity-status.json`.
 Stopping the bot retains funded orders. `demo/run.py stop` also stops the
-background trader before the wallet and node; `start` starts the wallet/node,
+background trader before the native node; `start` starts the native node,
 and the trader can be started explicitly using the command above.
 
 ### Charts and order-book display

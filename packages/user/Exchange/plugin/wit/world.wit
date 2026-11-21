@@ -1,0 +1,33 @@
+package exchange:plugin;
+
+/// All values returned here are native owner-authorized JSON. No caller-supplied
+/// owner, service, HTTP path, or GraphQL query is accepted.
+interface queries {
+    use host:types/types.{error};
+    snapshot: func() -> result<string, error>;
+    /// Optional exact market selection; position families carry continuations.
+    market: func(market: string) -> result<string, error>;
+    scoped-snapshot: func(market: option<string>) -> result<string, error>;
+    positions: func(kind: string, market: option<string>, after: option<string>, limit: u32) -> result<string, error>;
+    position: func(kind: string, market: string, side: option<bool>, price: option<string>) -> result<string, error>;
+    assets: func(after: option<string>, limit: u32) -> result<string, error>;
+    asset: func(token: u32) -> result<string, error>;
+    stops: func(before: option<string>, limit: u32) -> result<string, error>;
+    stop: func(generation: string) -> result<string, error>;
+    history: func(token-id: u32, before: option<string>, limit: u32) -> result<string, error>;
+}
+
+interface user {
+    use host:types/types.{error};
+    /// Result status: executed, prepared (financial transaction), or
+    /// scan_progress (no transaction). funding-cursor resumes one bounded scan.
+    /// A prepared result retains its input cursor so no receipts are skipped.
+    /// Never retry when the previous financial submission outcome is unknown.
+    execute: func(method: string, args-json: string, expected-owner: string, funding-after: option<string>) -> result<string, error>;
+    /// Withdraw exact integer atoms; conversion uses native token precision.
+    withdraw: func(token-id: u32, amount: string, expected-owner: string, funding-after: option<string>) -> result<string, error>;
+    /// Settle one exact own maker or closed-loan receipt outside visible pages.
+    release-position: func(kind: string, market: string, side: option<bool>, price: option<string>, expected-owner: string) -> result<_, error>;
+    /// Recover a freshly queried closed receipt beyond snapshot pagination.
+    release-stop: func(generation: string, expected-owner: string) -> result<_, error>;
+}

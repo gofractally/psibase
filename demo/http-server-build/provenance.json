@@ -1,0 +1,13 @@
+{
+  "compiler": "/Users/dlarimer/psibase/build/psidk/bin/clang++",
+  "wasi_libraries": "/Users/dlarimer/psibase-exchange/demo/upstream/psidk-ubuntu-2404/share/wasi-sysroot",
+  "sha256": {
+    "packages/system/HttpServer/src/HttpServer.cpp": "58896723f67751d20be4c8a04bd330333d992a316d0c95602d7529fe11404a94",
+    "libraries/psibase/common/src/Rpc.cpp": "965054df481a3a1293a3afee850f5db70dba7c6706a73adb66925b693d084103",
+    "libraries/psibase/common/src/HttpHeaders.cpp": "90238d87f34c5a9570ddddf3c6a02983fd39e2ad3b07b0ee147ca56e894c509c",
+    "packages/system/HttpServer/include/services/system/HttpServerRequest.hpp": "27ed7fdc2ff1e4ff405df280f87e68a2614cb2ed3a17841538ead8079c424f64",
+    "packages/psibase_tests/test/test_rpc.cpp": "e443cb810e9735ada7b718ee6110e30fdb58311d62751588b7c052e943e39e7e",
+    "demo/http-server-build/HttpServer.wasm": "d3483a4f598f4bebccf0b61eddade3412dcf06bc3bd605429689714b59d83313",
+    "demo/http-server-build/HttpServer-schema.json": "f56c8b6be1feb9f2699d0cf60d7fc6dead122e233e24e43858e9cb54343cd220"
+  }
+}
