@@ -29,7 +29,7 @@ report['thread_sanitizer']=a.tsan
 for directory in ['cmake/dependencies','libraries/psibase/native/tests/storage']:
     for path in sorted((root/directory).rglob('*')):
         if path.is_file():report['source_sha256'][str(path.relative_to(root))]=hashlib.sha256(path.read_bytes()).hexdigest()
-for relative in ['cmake/psitri.cmake','libraries/psibase/native/src/psitriStorage.cpp',
+for relative in ['cmake/PsibaseDependencies.cmake','cmake/psitri.cmake','libraries/psibase/native/src/psitriStorage.cpp',
                  'libraries/psibase/native/include/psibase/storage.hpp',
                  'libraries/psibase/native/include/psibase/CpuAccounting.hpp',
                  'libraries/psibase/native/include/psibase/NativeThreadClock.hpp',
@@ -69,7 +69,7 @@ try:
     report['new_psio_symbols']='psio::' in symbols
     report['new_psio_headers']='/psio/cpp/' in (build/'compile_commands.json').read_text()
     if report['new_psio_symbols'] or report['new_psio_headers']:raise RuntimeError('new codec leaked into engine-only boundary')
-    names=['storage_contract','engine_dependency_smoke','cpu_accounting_contract','serialized_contract']
+    names=['storage_contract','engine_dependency_smoke','cpu_accounting_contract','serialized_contract','identity_io_contract']
     report['binary_sha256']={name:hashlib.sha256((build/name).read_bytes()).hexdigest() for name in names if (build/name).exists()}
     report['passed']=True
 except Exception as error:

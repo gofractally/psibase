@@ -8,6 +8,7 @@
 #include <array>
 #include <atomic>
 #include <cassert>
+#include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -450,9 +451,9 @@ namespace psibase::storage
          state->access.invoke(
              [&]
              {
-                // SAL's accepted root commit may perform fsync/msync without an EINTR
-                // retry. Defer only the CPU sampling signal across this bounded atomic
-                // publication; the caller's publication gate already defers timeout.
+                // Defer CPU sampling across accepted atomic publication. SAL retries
+                // interrupted flushes; the publication gate still requires accepted
+                // root/effect work to finish before cancellation is reported.
                 accounting::PublicationSignalMask samplingMask;
                 auto                              tx = state->writer->start_transaction(0);
                 tx.primary().set_root(native(state, updated));
@@ -566,15 +567,33 @@ namespace psibase::storage
       int        fd       = ::open(filename.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
       if (fd < 0)
          throw std::runtime_error("cannot create database identity");
-      const auto written = ::write(fd, identity.data(), identity.size());
-      const bool failed  = written != static_cast<ssize_t>(identity.size()) || ::fsync(fd) != 0;
+      std::size_t offset = 0;
+      while (offset < identity.size())
+      {
+         const auto written = ::write(fd, identity.data() + offset, identity.size() - offset);
+         if (written < 0 && errno == EINTR)
+            continue;
+         if (written <= 0)
+            break;
+         offset += written;
+      }
+      auto sync = [](int descriptor)
+      {
+         int result;
+         do
+         {
+            result = ::fsync(descriptor);
+         } while (result < 0 && errno == EINTR);
+         return result;
+      };
+      const bool failed = offset != identity.size() || sync(fd) != 0;
       ::close(fd);
       if (failed)
          throw std::runtime_error("cannot persist database identity");
       fd = ::open(path.c_str(), O_RDONLY | O_DIRECTORY);
       if (fd < 0)
          throw std::runtime_error("cannot open database directory");
-      const int result = ::fsync(fd);
+      const int result = sync(fd);
       ::close(fd);
       if (result)
          throw std::runtime_error("cannot persist database directory");

@@ -1,0 +1,32 @@
+{
+  "scope": "Delete only successful, generated deterministic durability fixture databases; all source/build binaries/raw stdout stderr/case results retained",
+  "free_bytes_before": 15118417920,
+  "removed": [
+    {
+      "path": "/home/dlarimer/psibase-migration-20261121/psitri-durability/build-durability-clang20/evidence/20261121T195245Z/database",
+      "cases": 74,
+      "result_sha256": "2a174d74f0230b0fe108f6db0434a864d1625f2eb3467dc06ed6c8307a61fac6",
+      "du": "6.6G\t/home/dlarimer/psibase-migration-20261121/psitri-durability/build-durability-clang20/evidence/20261121T195245Z/database",
+      "file_count": 604,
+      "removed": true
+    },
+    {
+      "path": "/home/dlarimer/psibase-migration-20261121/psitri-durability/build-durability-clang20/evidence/20261121T194418Z/database",
+      "cases": 72,
+      "result_sha256": "c98e647596cb2ac319274f6240228f1fb191fa011042c614dc8b85765f9b9b44",
+      "du": "6.6G\t/home/dlarimer/psibase-migration-20261121/psitri-durability/build-durability-clang20/evidence/20261121T194418Z/database",
+      "file_count": 602,
+      "removed": true
+    },
+    {
+      "path": "/home/dlarimer/psibase-migration-20261121/psitri-durability/build-durability-gcc15/evidence/20261121T195220Z/database",
+      "cases": 74,
+      "result_sha256": "074fd7762e0b4e7737d3e0df14bf509e6d8e7e9d1ea5538fdd2c740a64602f73",
+      "du": "6.6G\t/home/dlarimer/psibase-migration-20261121/psitri-durability/build-durability-gcc15/evidence/20261121T195220Z/database",
+      "file_count": 604,
+      "removed": true
+    }
+  ],
+  "time_utc": "2026-11-21T20:26:08Z",
+  "free_bytes_after": 36232146944
+}

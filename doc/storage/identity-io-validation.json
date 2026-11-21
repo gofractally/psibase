@@ -1,0 +1,30 @@
+{
+  "status": "Identity initialization I/O correctness checkpoint; full application/performance/cache/recovery gates pending",
+  "pins": {
+    "psitri": "6cff821fdf341cc6512ba214dd4da8318ecb59a4",
+    "ucc": "cd2e2e305363588e8c9c8eb8b23572cd56952ce7"
+  },
+  "behavior": "Complete partial writes; retry EINTR for identity write, file fsync and directory fsync. Zero writes and terminal errors still reject database construction before any handle returns. Existing chain/root publication contract unchanged; stale no-EINTR SAL comment corrected.",
+  "fault_fixture": "Public facade constructor, owner-thread scoped syscall interposition;9cases healthy/write-EINTR/short-write/file-fsync-EINTR/dir-fsync-EINTR/zero-write/write-EIO/file-fsync-EIO/dir-fsync-EIO; exact retry counts; successful identity bytes and read-only reopen verified.30s test guard.",
+  "reference": "Previous helper passes healthy then rejects injected EINTR: raw failure retained.",
+  "qualification": {
+    "mac_boundary": "doc/storage/evidence/identity-io/mac",
+    "linux_boundary": "doc/storage/evidence/identity-io/linux",
+    "mac_native": "doc/storage/evidence/identity-io/mac-native",
+    "mac_startup": "doc/storage/evidence/identity-io/mac-startup",
+    "native_database": "10cases78assertions",
+    "native_watchdog": "3runs13cases197assertions each; original5ms budgets unchanged",
+    "vm_traps": "50faults pass",
+    "startup_scope": "Fresh+reopen200status/perf/metrics and graceful0 exits, config/log preserved; frozen explicitly manifested builtin packages only, not merged app qualification"
+  },
+  "capacity_event": "Final Linux metadata recheck correctly stopped below15GiB before configure/build. Removed only3 successful deterministic fixture DB trees, retained raw case logs/source/build binaries, restored~33.7GiB and recheck passed. No original/user/app/SDK data removed.",
+  "source_sha256": {
+    "libraries/psibase/native/src/psitriStorage.cpp": "9829dcf301414908995b1e201d9471947c86faf5d63a9aec62bc510bfae720e0",
+    "libraries/psibase/native/tests/storage/identity_io_contract.cpp": "518ba957f63b62cebec000b066322e01175d1a6c0c757c46566d667ace6c7561",
+    "libraries/psibase/native/tests/storage/CMakeLists.txt": "d258ec09ba81f7de0562e278d6ba4dcd4fc8c16ae7bd571b4ea1bc4943dbae75",
+    "libraries/psibase/native/tests/storage/run_contract.py": "e8e8a9e263411375edad2ec80465efd415149467cbf172ab3fd87e538ab3fb98",
+    "cmake/PsibaseDependencies.cmake": "fc2c5880a6b61cf3bb06bfba6511f4d18992880450ad9f1ef35fae9be256e8ac",
+    "cmake/dependencies/psitri-files.sha256": "a1ff4e19563c548f38a1d645f4ff0f0d0d51211020f8017e38477dfc4f399f03",
+    "cmake/dependencies/ucc-files.sha256": "e13393d906320edc16c75601980db377c80dba35bfbb7ca745796d005bace7e6"
+  }
+}
