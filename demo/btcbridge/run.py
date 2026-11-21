@@ -36,20 +36,21 @@ def wait(fn,seconds=45):
    time.sleep(.25)
  raise RuntimeError(f'Startup failed: {last}; inspect {STATE}/*.log')
 def build():
- invoke(['cargo','build','--manifest-path',ROOT/'rust/Cargo.toml','-p','psibase','--release','--target',RUST_HOST])
+ if 'BTCBRIDGE_CLI' not in os.environ:
+  invoke(['cargo','build','--locked','--manifest-path',ROOT/'rust/Cargo.toml','-p','psibase','--release','--target',RUST_HOST])
  invoke(['npm','run','build'],cwd=ROOT/'packages/user/BtcBridge/ui')
  env=os.environ.copy();sdk=Path(os.environ.get('BTCBRIDGE_WASI_SDK','/Users/dlarimer/psibase/build/wasi-sdk-prefix/src/wasi-sdk'))
  env.update(CC_wasm32_wasip1=str(sdk/'bin/clang'),AR_wasm32_wasip1=str(sdk/'bin/llvm-ar'))
- invoke([ROOT/'rust/target/release/cargo-psibase','psibase','--manifest-path',ROOT/'packages/user/Cargo.toml','--psitest',ROOT/'build/psitest','-p','signing-pkg','-p','btcbridge-pkg','package'],env=env)
- invoke(['cargo','build','--manifest-path',ROOT/'packages/user/Signing/daemon/Cargo.toml','--target',RUST_HOST,'--target-dir',ROOT/'packages/user/target'])
+ invoke([CARGO_PSIBASE,'psibase','--manifest-path',ROOT/'packages/user/Cargo.toml','--psitest',PSITEST,'-p','signing-pkg','-p','btcbridge-pkg','-p','exchange-pkg','package'],env=env)
+ invoke(['cargo','build','--locked','--manifest-path',ROOT/'packages/user/Signing/daemon/Cargo.toml','--target',RUST_HOST,'--target-dir',ROOT/'packages/user/target'])
 def prepare_packages():
  PACKAGES.mkdir(parents=True,exist_ok=True)
- index=json.loads((ROOT/'demo/artifacts/packages/index.json').read_text())
+ index=json.loads((PACKAGE_SOURCE/'index.json').read_text())
  index=[e for e in index if e['name'] not in ('Signing','BtcBridge')]
  for e in index:
   out=PACKAGES/e['file']
   if out.is_symlink() or out.exists():out.unlink()
-  out.symlink_to((ROOT/'demo/artifacts/packages'/e['file']).resolve())
+  out.symlink_to((PACKAGE_SOURCE/e['file']).resolve())
   if e['name']=='Exchange':
    source=out.resolve();out.unlink()
    with zipfile.ZipFile(source) as old,zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as new:
@@ -61,7 +62,9 @@ def prepare_packages():
       data=json.dumps(meta).encode()
      new.writestr(item,data)
    e['sha256']=hashlib.sha256(out.read_bytes()).hexdigest()
- for name in ('Signing','BtcBridge'):
+ app_packages=['Signing','BtcBridge']
+ if not any(e['name']=='Exchange' for e in index):app_packages.append('Exchange')
+ for name in app_packages:
   source=ROOT/f'packages/user/target/wasm32-wasip1/release/packages/{name}.psi'
   out=PACKAGES/(name+'.psi');shutil.copyfile(source,out)
   with zipfile.ZipFile(out) as z:meta=json.loads(z.read('meta.json'))
@@ -74,7 +77,7 @@ def start_base():
  (STATE/'chain').mkdir(parents=True,exist_ok=True)
  conf=STATE/'chain/config'
  if not conf.exists():conf.write_text(f'p2p = off\nproducer = psibase\nhost = psibase.localhost\nlisten = 127.0.0.1:{NODE_PORT}\nmount = {PACKAGES.resolve()}\ndatabase-cache-size = 256MiB\nservice-threads = 4\nhttp-timeout = 30s\n\n[logger.stderr]\ntype = console\nfilter = Severity >= warning\nformat = [{{Severity}}] {{Message}}\n')
- proc('node',[ROOT/'build/psinode',STATE/'chain'])
+ proc('node',[NODE,STATE/'chain'])
  def node_ready():
   try:urllib.request.urlopen(f'http://127.0.0.1:{NODE_PORT}/',timeout=1)
   except urllib.error.HTTPError as error:
