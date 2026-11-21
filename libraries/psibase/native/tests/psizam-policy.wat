@@ -1,4 +1,5 @@
 (module
+  (type $element-type (func (result i32)))
   (import "env" "span" (func $span (param i32 i32 i32) (result i64)))
   (import "env" "write" (func $write (param i32)))
   (import "env" "nested" (func $nested (param i32) (result i32)))
@@ -6,6 +7,7 @@
   (import "env" "nan" (func $nan (result f64)))
   (memory (export "memory") 1 3)
   (table 1 100 funcref)
+  (elem (i32.const 0) $element)
   (global $counter (mut i32) (i32.const 7))
   (data (i32.const 0) "abc")
   (func (export "span") (result i64)
@@ -30,6 +32,8 @@
   (func (export "trap") unreachable)
   (func $recurse (export "recurse") call $recurse)
   (func (export "loop") (loop $forever br $forever))
+  (func $element (type $element-type) i32.const 42)
+  (func (export "indirect") (result i32) i32.const 0 call_indirect (type $element-type))
   (func (export "value") (result i32) i32.const 42)
   (func (export "nan") (result i64) call $nan f64.const 0 f64.add i64.reinterpret_f64)
   (func (export "fp") (result i64)

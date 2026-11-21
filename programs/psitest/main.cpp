@@ -1809,7 +1809,6 @@ static void run(const char*                               wasm,
    vm_options             options;
    psibase::validateNativeWasm(code, options);
    backend_t backend(code, nullptr, options);
-   psibase::applyNativeTableLimit(backend.get_module(), options);
    psizam::debug::binary::input_stream s{(const char*)code.data(), code.size()};
    //
    auto dwarf_info = dwarf::get_info_from_wasm(s);

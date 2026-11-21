@@ -76,7 +76,6 @@ namespace
       explicit Runtime(psibase::VMOptions values = {})
           : options(values), code(load(options)), backend(code, nullptr, options)
       {
-         psibase::applyNativeTableLimit(backend.get_module(), options);
          backend.set_wasm_allocator(&memory);
          backend.initialize(stack, &host);
       }
@@ -156,6 +155,10 @@ TEST_CASE("Native memory and table growth remain inside the chain configuration"
    CHECK(runtime.integer("grow") == 1);
    CHECK(runtime.integer("grow") == 0xffffffffu);
    CHECK(runtime.integer("grow-table") == 0xffffffffu);
+   Runtime fixed({1024, 1, 1, 65536});
+   CHECK(fixed.integer("indirect") == 42);
+   CHECK(fixed.integer("grow-table") == 0xffffffffu);
+   CHECK(fixed.integer("indirect") == 42);
 }
 
 TEST_CASE("Backend reuse resets memory globals and table state")

@@ -18,7 +18,7 @@ Psibase uses the native execution core of [psizam](https://github.com/gofractall
 
 The pinned source is the `external/psizam` submodule. Native node, tester and schema execution use `jit_profile` on x86-64 and AArch64, guarded memory and deterministic software floating point. The existing transaction CPU watchdog remains authoritative; psizam gas metering is disabled for this policy. The default proof-admission CPU budget remains 200 ms.
 
-`NativeVMOptions` forwards every serialized chain `VMOptions` field: mutable global bytes, memory pages, table elements and stack bytes. The adapter rejects shared memory, memory64, imported resources, multiple memories or tables, exception tags, and tables other than funcref. It clamps table growth to the same configured limit as the initial table. Invalid policies fail explicitly.
+`NativeVMOptions` forwards every serialized chain `VMOptions` field: mutable global bytes, memory pages, table elements and stack bytes. The adapter rejects shared memory, memory64, imported resources, multiple memories or tables, exception tags, and tables other than funcref. It caps table growth before code generation using the same configured limit as the initial table, so the generated table layout agrees with initialization. Invalid policies fail explicitly.
 
 Cached backends have exclusive transaction ownership and reset linear memory, mutable globals and table state before reuse. The transaction removes its watchdog before returning backends to the shared cache. Native host spans and unaligned pointer proxies preserve their WASM32 ABI and validate access inside guarded memory.
 

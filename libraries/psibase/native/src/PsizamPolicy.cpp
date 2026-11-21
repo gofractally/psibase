@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <limits>
 #include <psibase/PsizamPolicy.hpp>
-#include <psizam/types.hpp>
 #include <stdexcept>
 
 namespace psibase
@@ -100,14 +99,4 @@ namespace psibase
       }
    }
 
-   void applyNativeTableLimit(psizam::module& module, const NativeVMOptions& options)
-   {
-      for (auto& table : module.tables)
-      {
-         table.limits.maximum = table.limits.flags
-                                    ? std::min(table.limits.maximum, options.max_table_elements)
-                                    : options.max_table_elements;
-         table.limits.flags   = 1;
-      }
-   }
 }  // namespace psibase

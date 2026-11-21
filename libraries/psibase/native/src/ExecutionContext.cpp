@@ -228,7 +228,6 @@ namespace psibase
                           std::make_unique<backend_t>(c->code, nullptr, this->vmOptions);
                       backend.debug = dwarf::register_with_debugger(backend.backend->get_module());
                    }
-                   applyNativeTableLimit(backend.backend->get_module(), this->vmOptions);
                 }
              });
       }
