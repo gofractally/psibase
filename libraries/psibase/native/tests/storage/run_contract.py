@@ -15,6 +15,7 @@ p.add_argument('--cc',required=True)
 p.add_argument('--cxx',required=True)
 p.add_argument('--build-dir',default='build-storage-contract')
 p.add_argument('--jobs',default='4')
+p.add_argument('--tsan',action='store_true')
 a=p.parse_args()
 root=Path(__file__).resolve().parents[5]
 build=root/a.build_dir
@@ -22,6 +23,7 @@ evidence=build/'evidence'/datetime.datetime.now(datetime.timezone.utc).strftime(
 evidence.mkdir(parents=True,exist_ok=False)
 report={'platform':platform.platform(),'machine':platform.machine(),'commands':[],
         'complete':False,'passed':False,'source_sha256':{},'free_bytes_before':shutil.disk_usage(root).free}
+report['thread_sanitizer']=a.tsan
 for directory in ['cmake/dependencies','libraries/psibase/native/tests/storage']:
     for path in sorted((root/directory).rglob('*')):
         if path.is_file():report['source_sha256'][str(path.relative_to(root))]=hashlib.sha256(path.read_bytes()).hexdigest()
@@ -49,17 +51,21 @@ def run(name,args):
 try:
     if report['free_bytes_before']<15*1024**3:raise RuntimeError('less than 15GiB free; no build started')
     run('compiler',[a.cxx,'--version'])
+    sanitizer = ['-DCMAKE_C_FLAGS=-fsanitize=thread -fno-omit-frame-pointer',
+                 '-DCMAKE_CXX_FLAGS=-fsanitize=thread -fno-omit-frame-pointer',
+                 '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread'] if a.tsan else []
     run('configure',['cmake','-S','libraries/psibase/native/tests/storage','-B',build,'-G','Ninja',
                      '-DCMAKE_BUILD_TYPE=Debug','-DCMAKE_C_COMPILER='+a.cc,'-DCMAKE_CXX_COMPILER='+a.cxx,
                      '-DFETCHCONTENT_SOURCE_DIR_PSIBASE_PSITRI='+str(root/'.caches/psitri-sources/psitri'),
-                     '-DFETCHCONTENT_SOURCE_DIR_PSIBASE_UCC='+str(root/'.caches/psitri-sources/ucc')])
+                     '-DFETCHCONTENT_SOURCE_DIR_PSIBASE_UCC='+str(root/'.caches/psitri-sources/ucc'),*sanitizer])
     run('build',['cmake','--build',build,'--parallel',a.jobs])
     run('tests',['ctest','--test-dir',build,'--verbose','--output-on-failure'])
     symbols=run('symbols',['nm','-C',build/'storage_contract']).stdout
     report['new_psio_symbols']='psio::' in symbols
     report['new_psio_headers']='/psio/cpp/' in (build/'compile_commands.json').read_text()
     if report['new_psio_symbols'] or report['new_psio_headers']:raise RuntimeError('new codec leaked into engine-only boundary')
-    report['binary_sha256']={name:hashlib.sha256((build/name).read_bytes()).hexdigest() for name in ['storage_contract','engine_dependency_smoke','cpu_accounting_contract']}
+    names=['storage_contract','engine_dependency_smoke','cpu_accounting_contract','serialized_contract']
+    report['binary_sha256']={name:hashlib.sha256((build/name).read_bytes()).hexdigest() for name in names if (build/name).exists()}
     report['passed']=True
 except Exception as error:
     report['error']=str(error)

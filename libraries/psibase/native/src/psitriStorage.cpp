@@ -7,17 +7,16 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <condition_variable>
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <deque>
 #include <fstream>
-#include <functional>
-#include <future>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <type_traits>
+#include <utility>
 
 namespace psibase::storage
 {
@@ -62,100 +61,65 @@ namespace psibase::storage
       return result;
    }
 
-   // All engine calls and native retained-handle destruction run on this owner.
-   // Callers retain only shared opaque handles. Completion propagates exceptions
-   // to the caller and leaves the executor usable for the next operation.
-   class Executor
+   // SAL's public session contract permits serialized cross-thread use:
+   // psitri e4d23be, sal/allocator.hpp:158-161 and allocator_session.hpp:431-438.
+   // Every native operation AND retained-handle destruction enters this same
+   // gate. Work stays on its existing caller; waiting consumes no thread CPU.
+   // Recursion is only for native owned-handle cleanup. Application callbacks
+   // remain outside this boundary, after the higher-level publication locks.
+   class SerializedNativeAccess
    {
-      std::mutex                        mutex;
-      std::condition_variable           ready;
-      std::deque<std::function<void()>> queue;
-      bool                              stopping = false;
-      std::thread                       worker;
-      std::thread::id                   owner;
-
+      std::recursive_mutex mutex;
+#ifndef NDEBUG
+      std::thread::id activeThread{};
+      unsigned        depth = 0;
+#endif
      public:
-      Executor()
-      {
-         std::promise<void> started;
-         auto               future = started.get_future();
-         worker                    = std::thread(
-             [this, &started]
-             {
-                owner = std::this_thread::get_id();
-                started.set_value();
-                for (;;)
-                {
-                   std::function<void()> operation;
-                   {
-                      std::unique_lock lock(mutex);
-                      ready.wait(lock, [&] { return stopping || !queue.empty(); });
-                      if (stopping && queue.empty())
-                         break;
-                      operation = std::move(queue.front());
-                      queue.pop_front();
-                   }
-                   operation();
-                }
-             });
-         future.get();
-      }
-      ~Executor()
-      {
-         // The facade never calls application code on this worker. Every
-         // synchronous caller owns State throughout invoke(), so the final
-         // state/executor owner is released by the caller, never this worker.
-         if (std::this_thread::get_id() == owner)
-            std::terminate();
-         {
-            std::lock_guard lock(mutex);
-            stopping = true;
-         }
-         ready.notify_one();
-         worker.join();
-      }
       template <class F>
       auto invoke(F&& function, bool cleanup = false) -> std::invoke_result_t<F>
       {
-         if (std::this_thread::get_id() == owner)
-            return std::forward<F>(function)();
-         using Result = std::invoke_result_t<F>;
-         auto counter = accounting::threadCounter();
-         auto request =
+         auto context =
              cleanup ? std::shared_ptr<accounting::Context>{} : accounting::currentContext();
-         auto operation = [counter, request,
-                           function = std::forward<F>(function)]() mutable -> Result
+         if (context)
+            context->check();
+         std::unique_lock lock(mutex);
+#ifndef NDEBUG
+         // Also covers recursive native cleanup; a second OS thread can never
+         // be active inside this database's engine/session/handle graph.
+         assert(!depth || activeThread == std::this_thread::get_id());
+         activeThread = std::this_thread::get_id();
+         ++depth;
+         struct Exit
          {
-            accounting::ActiveJob cpu(counter);
-            accounting::Scope     context(request, accounting::adoptContext);
-            if constexpr (std::is_void_v<Result>)
+            SerializedNativeAccess* access;
+            ~Exit()
             {
-               function();
-               accounting::check();
+               assert(access->depth);
+               if (!--access->depth)
+                  access->activeThread = {};
             }
-            else
-            {
-               auto result = function();
-               accounting::check();
-               return result;
-            }
-         };
-         auto task   = std::make_shared<std::packaged_task<Result()>>(std::move(operation));
-         auto result = task->get_future();
+         } exit{this};
+#endif
+         // Recheck after a potentially long mutex wait. A cancelled caller
+         // never starts mutable native work or a new publication afterward.
+         accounting::Scope request(context, accounting::adoptContext);
+         if constexpr (std::is_void_v<std::invoke_result_t<F>>)
          {
-            std::lock_guard lock(mutex);
-            if (stopping)
-               throw std::runtime_error("storage executor stopped");
-            queue.emplace_back([task] { (*task)(); });
+            std::forward<F>(function)();
+            accounting::check();
          }
-         ready.notify_one();
-         return result.get();
+         else
+         {
+            decltype(auto) result = std::forward<F>(function)();
+            accounting::check();
+            return result;
+         }
       }
    };
 
    struct State
    {
-      Executor                               executor;
+      SerializedNativeAccess                 access;
       std::shared_ptr<Engine::database>      engine;
       std::shared_ptr<Engine::write_session> writer;
       std::shared_ptr<Engine::read_session>  reader;
@@ -164,7 +128,7 @@ namespace psibase::storage
       bool                                   temporary = false;
       ~State()
       {
-         executor.invoke(
+         access.invoke(
              [&]
              {
                 reader.reset();
@@ -195,13 +159,13 @@ namespace psibase::storage
    {
       if (!snapshot)
          return {};
-      return shared_root(new root{state, std::move(snapshot), {}}, [state](const root* r)
-                         { state->executor.invoke([&] { delete r; }, true); });
+      return shared_root(new root{state, std::move(snapshot), {}},
+                         [state](const root* r) { state->access.invoke([&] { delete r; }, true); });
    }
    shared_root retain(const std::shared_ptr<State>& state, Cursor cursor)
    {
-      return shared_root(new root{state, {}, std::move(cursor)}, [state](const root* r)
-                         { state->executor.invoke([&] { delete r; }, true); });
+      return shared_root(new root{state, {}, std::move(cursor)},
+                         [state](const root* r) { state->access.invoke([&] { delete r; }, true); });
    }
    Snapshot native(const std::shared_ptr<State>& state, const shared_root& r)
    {
@@ -313,7 +277,7 @@ namespace psibase::storage
       auto state = view->state;
       if (source->state != state)
          throw std::runtime_error("foreign storage root");
-      return state->executor.invoke(
+      return state->access.invoke(
           [&]
           {
              auto c = source->cursor();
@@ -347,7 +311,7 @@ namespace psibase::storage
    {
       if (!source)
          return false;
-      return source->state->executor.invoke(
+      return source->state->access.invoke(
           [&]
           {
              auto c     = source->cursor();
@@ -410,7 +374,7 @@ namespace psibase::storage
          return true;
       if (r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return r->state->executor.invoke(
+      return r->state->access.invoke(
           [&]
           {
              auto c = r->cursor();
@@ -456,7 +420,7 @@ namespace psibase::storage
          return is_empty(a, lower, upper);
       if (a->state != b->state || a->state != view->state)
          throw std::runtime_error("foreign storage roots");
-      return view->state->executor.invoke(
+      return view->state->access.invoke(
           [&] { return equalCursors(a->cursor(), b->cursor(), bytes(lower), bytes(upper)); });
    }
 
@@ -470,7 +434,10 @@ namespace psibase::storage
    {
       auto state = view->state;
       state->writable();
-      auto updated = state->executor.invoke(
+      // Keep publication and the logical view's cached manifest in the same
+      // order even when independent callers publish through one physical DB.
+      std::lock_guard viewLock(view->mutex);
+      auto            updated = state->access.invoke(
           [&]
           {
              auto edit = state->writer->start_write_transaction(native(state, source));
@@ -480,7 +447,7 @@ namespace psibase::storage
           });
       accounting::Publication publication;
       if (view->publish)
-         state->executor.invoke(
+         state->access.invoke(
              [&]
              {
                 // SAL's accepted root commit may perform fsync/msync without an EINTR
@@ -491,10 +458,7 @@ namespace psibase::storage
                 tx.primary().set_root(native(state, updated));
                 tx.commit();
              });
-      {
-         std::lock_guard lock(view->mutex);
-         view->top = std::move(updated);
-      }
+      view->top = std::move(updated);
       publication.finish();
    }
    void write_session::upsert(shared_root&          source,
@@ -503,7 +467,7 @@ namespace psibase::storage
    {
       auto state = view->state;
       state->writable();
-      source = state->executor.invoke(
+      source = state->access.invoke(
           [&]
           {
              auto edit = state->writer->start_write_transaction(native(state, source));
@@ -519,7 +483,7 @@ namespace psibase::storage
          throw std::runtime_error("root-list too large");
       auto state = view->state;
       state->writable();
-      source = state->executor.invoke(
+      source = state->access.invoke(
           [&]
           {
              auto list =
@@ -542,7 +506,7 @@ namespace psibase::storage
       state->writable();
       if (!source)
          return;
-      source = state->executor.invoke(
+      source = state->access.invoke(
           [&]
           {
              auto edit = state->writer->start_write_transaction(native(state, source));
@@ -557,7 +521,7 @@ namespace psibase::storage
    {
       auto state = view->state;
       state->writable();
-      destination = state->executor.invoke(
+      destination = state->access.invoke(
           [&]
           {
              auto edit = state->writer->start_write_transaction(native(state, destination));
@@ -656,7 +620,7 @@ namespace psibase::storage
       state->path      = path;
       view             = std::make_shared<database_view>();
       view->state      = state;
-      state->executor.invoke(
+      state->access.invoke(
           [&]
           {
              Engine::config cfg;

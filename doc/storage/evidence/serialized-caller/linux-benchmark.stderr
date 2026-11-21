@@ -1,0 +1,34 @@
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/direct/ptrs/header.bin[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=138525594533888, size=4224[0m
+control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/direct/iref/header.bin[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=138525594525696, size=4224[0m
+allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (899 GB) — capping[0m
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/direct/header[0m
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/direct/roots[0m
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/direct/session_ops.bin[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=93618176[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=137519899344896, size=93618176[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=24576[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=138525594501120, size=24576[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=20480[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=138525590478848, size=20480[0m
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/facade/ptrs/header.bin[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=138525593366528, size=4224[0m
+control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/facade/iref/header.bin[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=138525593358336, size=4224[0m
+allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (899 GB) — capping[0m
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/facade/header[0m
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/facade/roots[0m
+mapping.cpp:84             (null)     mapping               [33mOpened empty file: /home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-performance-serialized-linux/benchmark-database-4151820/facade/session_ops.bin[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=93618176[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=136513931182080, size=93618176[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=24576[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=138525590454272, size=24576[0m
+mapping.cpp:132            (null)     resize                [33mResizing mapping: current=0, new=20480[0m
+mapping.cpp:192            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=138525590433792, size=20480[0m

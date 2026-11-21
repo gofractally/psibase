@@ -8,6 +8,18 @@
 #include <vector>
 using namespace psibase;
 using namespace std::chrono_literals;
+constexpr bool deferredSignalsByTsan =
+#if defined(__SANITIZE_THREAD__)
+    true;
+#elif defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+    true;
+#else
+    false;
+#endif
+#else
+    false;
+#endif
 void require(bool result, const char* message)
 {
    if (!result)
@@ -133,9 +145,22 @@ int main(int argc, char** argv)
          while (clock->read() - start < 20ms)
          {
          }
-         require(clock->nativeState()->usedAltStack.load(), "sampler did not use alternate stack");
-         stop = true;
+         const bool usedAltStack = clock->nativeState()->usedAltStack.load();
+         stop                    = true;
          thread.join();
+         if constexpr (deferredSignalsByTsan)
+         {
+            // LLVM's TSan ProcessPendingSignalsImpl invokes asynchronous user
+            // handlers later on an ordinary stack. Check the requested policy
+            // here; the noninstrumented contract verifies actual stack use.
+            struct sigaction action{};
+            require(sigaction(SIGUSR2, nullptr, &action) == 0 && (action.sa_flags & SA_ONSTACK),
+                    "sampler lost SA_ONSTACK under TSan");
+            std::cout << "TSan defers async callbacks; actual alternate stack is verified by the "
+                         "native contract\n";
+         }
+         else
+            require(usedAltStack, "sampler did not use alternate stack");
          require(errnoPreserved, "handler changed errno");
          auto final = clock->read();
          require(final >= start + 20ms, "final owner CPU lost");
@@ -241,12 +266,22 @@ int main(int argc, char** argv)
          } while (std::chrono::steady_clock::now() < deadline);
          require(mach_port_get_refs(mach_task_self(), port, MACH_PORT_RIGHT_DEAD_NAME,
                                     &references) == KERN_SUCCESS &&
-                     references == 1,
-                 "exited target clock did not own exactly its retained port right");
+                     references >= 1,
+                 "exited target clock did not retain its owned port right");
+         // Keep one independent probe right so the name remains queryable
+         // after clock destruction, including when an instrumentation runtime
+         // also retains thread rights. Our clock must release exactly one.
+         require(mach_port_mod_refs(mach_task_self(), port, MACH_PORT_RIGHT_DEAD_NAME, 1) ==
+                     KERN_SUCCESS,
+                 "could not retain independent port probe right");
+         const auto before = references;
          clock.reset();
          require(mach_port_get_refs(mach_task_self(), port, MACH_PORT_RIGHT_DEAD_NAME,
-                                    &references) == KERN_INVALID_NAME,
-                 "final retained target clock leaked its port right");
+                                    &references) == KERN_SUCCESS &&
+                     references == before,
+                 "final retained target clock did not release exactly its port right");
+         require(mach_port_deallocate(mach_task_self(), port) == KERN_SUCCESS,
+                 "independent port probe right was not released");
       }
       {
          // A delayed/blocked signal cannot freeze live CPU accounting: bounded

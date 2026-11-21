@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import platform
+import os
 import shutil
 import statistics
 import subprocess
@@ -26,6 +27,8 @@ report = {'platform': platform.platform(), 'machine': platform.machine(), 'comma
           'free_bytes_before': shutil.disk_usage(root).free, 'source_sha256': {},
           'scope': 'Serial warm 10000-record point reads/updates, 128-byte values, one fsync commit; not an application throughput or cache qualification.',
           'passed': False}
+report['host_load_at_start'] = list(os.getloadavg())
+report['host_context'] = 'Shared host; concurrent builds may run. Relative matched microbenchmark, no idle-host absolute-performance claim.'
 report['triedent_comparison'] = a.triedent
 report['compiler_optimization'] = 'CMake Release; no extra ISA tuning or LTO in this standalone fixture'
 if a.triedent:
@@ -75,7 +78,9 @@ try:
                       '-DFETCHCONTENT_SOURCE_DIR_PSIBASE_PSITRI=' + str(root / '.caches/psitri-sources/psitri'),
                       '-DFETCHCONTENT_SOURCE_DIR_PSIBASE_UCC=' + str(root / '.caches/psitri-sources/ucc')])
     run('build', ['cmake', '--build', build, '--target', 'storage_benchmark', '--parallel', a.jobs])
+    report['host_load_before_benchmark'] = list(os.getloadavg())
     data = json.loads(run('benchmark', [build / 'storage_benchmark', build / 'benchmark-database']).stdout)
+    report['host_load_after_benchmark'] = list(os.getloadavg())
     report['measurements'] = data
     kinds = ['direct_read', 'facade_read', 'direct_write', 'facade_write']
     if a.triedent:
