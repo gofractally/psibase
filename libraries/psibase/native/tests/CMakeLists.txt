@@ -7,6 +7,22 @@ add_test(NAME WatchdogTests COMMAND WatchdogTests)
 
 set_tests_properties(WatchdogTests PROPERTIES PROCESSORS 2)
 
+add_executable(CpuAccountingContract storage/cpu_accounting_contract.cpp)
+target_link_libraries(CpuAccountingContract PRIVATE psibase Threads::Threads)
+add_test(NAME CpuAccountingContract COMMAND CpuAccountingContract)
+set_tests_properties(CpuAccountingContract PROPERTIES TIMEOUT 30)
+
+if(APPLE)
+    add_executable(DarwinCpuContract storage/darwin_cpu_contract.cpp)
+    target_link_libraries(DarwinCpuContract PRIVATE psibase Threads::Threads)
+    add_test(NAME DarwinCpuLifetimeIo COMMAND DarwinCpuContract)
+    foreach(mode previous blocked replaced)
+        add_test(NAME DarwinCpu_${mode} COMMAND DarwinCpuContract ${mode})
+    endforeach()
+    set_tests_properties(DarwinCpuLifetimeIo DarwinCpu_previous DarwinCpu_blocked
+        DarwinCpu_replaced PROPERTIES TIMEOUT 30)
+endif()
+
 add_executable(saturatingTests saturatingTests.cpp)
 target_link_libraries(saturatingTests psibase)
 
