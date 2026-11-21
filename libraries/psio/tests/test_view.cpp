@@ -18,7 +18,7 @@ void test_mutate(const T& original, F&& f, const T& expected)
 {
    auto bin = psio::to_frac(original);
    f(psio::view<T>{bin});
-   CHECK(psio::from_frac<T>(bin) == expected);
+   CHECK((psio::from_frac<T>(bin) == expected));
 }
 
 template <typename T, typename F>
