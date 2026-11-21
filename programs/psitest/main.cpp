@@ -17,6 +17,18 @@
 #include <psio/view.hpp>
 
 #include <stdio.h>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#endif
+
+static char** host_environment()
+{
+#ifdef __APPLE__
+   return *_NSGetEnviron();
+#else
+   return ::environ;
+#endif
+}
 #include <bitset>
 #include <chrono>
 #include <optional>
@@ -759,7 +771,8 @@ struct callbacks
    int32_t wasi_environ_sizes_get(wasm_ptr<uint32_t> environc, wasm_ptr<uint32_t> bufsize)
    {
       std::size_t totalSize = 0;
-      char**      p         = environ;
+      char**      environment = host_environment();
+      char**      p           = environment;
       for (; *p; ++p)
       {
          auto size = std::strlen(*p) + 1;
@@ -767,9 +780,9 @@ struct callbacks
             return wasi_errno_overflow;
          totalSize += size;
       }
-      if (totalSize > 0xffffffffu || p - environ > 0xffffffffu)
+      if (totalSize > 0xffffffffu || p - environment > 0xffffffffu)
          return wasi_errno_overflow;
-      *environc = p - environ;
+      *environc = p - environment;
       *bufsize  = totalSize;
       return 0;
    }
@@ -784,7 +797,7 @@ struct callbacks
          return wasi_errno_fault;
       char* memory = state.backend.get_context().linear_memory();
 
-      for (char** p = ::environ; *p; ++p)
+      for (char** p = host_environment(); *p; ++p)
       {
          auto size = std::strlen(*p) + 1;
          if (end - buf < size || end - env < 4)
@@ -982,12 +995,12 @@ struct callbacks
       std::string cPath = "/" + span_str(path);
       if (flags & wasi_lookupflags_symlink_follow)
       {
-         if (::lstat(cPath.c_str(), &stat) < 0)
+         if (::stat(cPath.c_str(), &stat) < 0)
             return wasi_errno_noent;
       }
       else
       {
-         if (::stat(cPath.c_str(), &stat) < 0)
+         if (::lstat(cPath.c_str(), &stat) < 0)
             return wasi_errno_noent;
       }
       auto result = wasi_filestat_t::from_stat(stat);
@@ -1108,6 +1121,9 @@ struct callbacks
          *nwritten += iovs_item.buf_len;
       }
 
+      if ((fd == STDOUT_FILENO || fd == STDERR_FILENO) && fflush(file->f) != 0)
+         return wasi_errno_io;
+
       return 0;
    }
 
@@ -1128,6 +1144,9 @@ struct callbacks
 
          size_t bytes_read = fread(iovs_buf, 1, iovs_item.buf_len, file->f);
          *nread += bytes_read;
+
+         if (bytes_read < iovs_item.buf_len && ferror(file->f))
+            return wasi_errno_io;
 
          if (bytes_read < iovs_item.buf_len)
             return 0;

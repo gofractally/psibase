@@ -3,6 +3,11 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#if defined(__APPLE__) && !defined(O_PATH)
+// Darwin has no Linux path-only descriptor. Read-only opens retain the
+// existing O_NOFOLLOW checks; inaccessible paths fail closed.
+#define O_PATH O_RDONLY
+#endif
 #include <algorithm>
 #include <filesystem>
 #include <psibase/check.hpp>

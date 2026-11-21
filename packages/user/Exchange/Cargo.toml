@@ -1,0 +1,19 @@
+[package]
+name = "exchange-pkg"
+description = "Permissionless pooled order books, committed relay and secured margin"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+[package.metadata.psibase]
+package-name = "Exchange"
+services = ["exchange"]
+[package.metadata.psibase.dependencies]
+Tokens = "0.29.0"
+Nft = "0.29.0"
+Symbol = "0.29.0"
+HttpServer = "0.29.0"
+Transact = "0.29.0"
+[dependencies]
+exchange = { path = "service" }
+r-exchange = { path = "query-service" }

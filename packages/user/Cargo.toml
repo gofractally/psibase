@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
+    "Exchange",
+    "Exchange/service",
+    "Exchange/query-service",
     "Branding",
     "Branding/service",
     "Branding/plugin",

@@ -1,0 +1,8 @@
+upstream/
+chain/
+failed-bootstrap-*/
+*.log
+*.pid
+__pycache__/
+artifacts/
+seed.json

@@ -461,7 +461,7 @@ impl<T: MakeView> OptionView<T> {
         self.transpose().map_or(default, f)
     }
     pub fn map_or_default<'a, U: Default, F: FnOnce(&'a View<T>) -> U>(&'a self, f: F) -> U {
-        self.transpose().map_or_default(f)
+        self.transpose().map_or_else(U::default, f)
     }
     pub fn map_or_else<'a, U, D: FnOnce() -> U, F: FnOnce(&'a View<T>) -> U>(
         &'a self,

@@ -1,0 +1,16 @@
+{
+  "verified": true,
+  "financial_snapshots_preserved_across_native_node_and_wallet_restart": true,
+  "wallets": [
+    "alice",
+    "bob",
+    "carol",
+    "liquidity"
+  ],
+  "snapshot_sha256": {
+    "alice": "4cb4dbc86e01bb611af6234ebf7c4c320dbe3fc4a4836ec64c57915482fccfb5",
+    "bob": "e6bd78688ef6e2dfd958bad26d0981aa45a65217962535d4d468057ec598e8b7",
+    "carol": "5793c90f1918102f17ba687c74ff6f968855d31da5bfd68eb6b2edd73d45a12f",
+    "liquidity": "d95ae0a493e68addc1beec2547c63a5edaa2ca36afae8aee96d651328fe7dbc9"
+  }
+}

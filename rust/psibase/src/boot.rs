@@ -191,6 +191,14 @@ pub fn get_initial_actions<
 
     builder.set_label("Creating system accounts".to_string());
 
+    // The producer is not a service/package account. Create it before setting
+    // its authentication; otherwise a fresh boot aborts at setAuthServ.
+    builder.push(accounts::Wrapper::pack().newAccount(
+        initial_producer,
+        auth_any::SERVICE,
+        accounts::NewAccountMode::REQUIRE_NEW,
+    ))?;
+
     if let Some(key) = tx_signing_key {
         builder.push(set_key_action(initial_producer, key))?;
         builder.push(set_auth_service_action(initial_producer, auth_sig::SERVICE))?;

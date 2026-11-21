@@ -55,6 +55,81 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Tokens"))]
+    fn test_shared_tuple_index_and_lazy_ids(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        use crate::tables::tables::{InitTable, SharedBalanceTable};
+
+        let alice = account!("alice");
+        let bob = account!("bob");
+        let carol = account!("carol");
+        for user in [alice, bob, carol] {
+            chain.new_account(user)?;
+            Wrapper::push_from(&chain, user)
+                .setUserConf(
+                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+                    false,
+                )
+                .get()?;
+        }
+        let a = Wrapper::push_from(&chain, alice);
+        let token = a.create(4.try_into().unwrap(), 1000.into()).get()?;
+        claim_token_nft(&chain, alice, token);
+        a.mint(token, 1000.into(), "".into()).get()?;
+        a.credit(token, bob, 100.into(), "".into()).get()?;
+        a.credit(token, carol, 200.into(), "".into()).get()?;
+        let shared_row = |creditor, debitor| {
+            chain
+                .open::<_, SharedBalanceTable>()
+                .get_index_by_creditor_debitor_token()
+                .get(&(creditor, debitor, token))
+        };
+        let last_shared_id = || {
+            chain
+                .open::<_, InitTable>()
+                .get_index_pk()
+                .get(&())
+                .unwrap()
+                .last_used_shared_bal_id
+        };
+        let bob_row = shared_row(alice, bob).unwrap();
+        let carol_row = shared_row(alice, carol).unwrap();
+        assert_ne!(bob_row.shared_bal_id, carol_row.shared_bal_id);
+        assert_eq!(bob_row.balance.value, 100);
+        assert_eq!(carol_row.balance.value, 200);
+        assert!(shared_row(bob, alice).is_none());
+
+        let next_before = last_shared_id();
+        for increment in 0..3 {
+            assert_eq!(
+                a.getSharedBal(token, alice, bob).get()?.value,
+                100 + increment
+            );
+            a.credit(token, bob, 1.into(), "".into()).get()?;
+        }
+        assert_eq!(
+            last_shared_id(),
+            next_before,
+            "existing shared balance lookups must not allocate IDs",
+        );
+        assert_eq!(shared_row(alice, bob).unwrap().balance.value, 103);
+
+        // Native direct revocation removes both primary and secondary entries.
+        a.uncredit(token, bob, 103.into(), "".into()).get()?;
+        assert!(shared_row(alice, bob).is_none());
+        assert!(chain
+            .open::<_, SharedBalanceTable>()
+            .get_index_pk()
+            .get(&bob_row.shared_bal_id)
+            .is_none());
+        assert_eq!(shared_row(alice, carol).unwrap().balance.value, 200);
+
+        a.credit(token, bob, 7.into(), "".into()).get()?;
+        let recreated = shared_row(alice, bob).unwrap();
+        assert_eq!(recreated.balance.value, 7);
+        assert!(recreated.shared_bal_id > carol_row.shared_bal_id);
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Tokens"))]
     fn test_basics(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 

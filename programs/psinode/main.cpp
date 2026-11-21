@@ -31,6 +31,9 @@
 #include <boost/asio/ssl/host_name_verification.hpp>
 
 #include <charconv>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#endif
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -283,7 +286,12 @@ void initialize_database(SystemContext& context, const std::string& template_);
 
 void load_environment(Database& db)
 {
-   for (const char* const* iter = ::environ; *iter; ++iter)
+#ifdef __APPLE__
+   const char* const* environment = *_NSGetEnviron();
+#else
+   const char* const* environment = ::environ;
+#endif
+   for (const char* const* iter = environment; *iter; ++iter)
    {
       std::string_view entry{*iter};
       auto             pos = entry.find('=');
@@ -1000,7 +1008,7 @@ struct PsinodeConfig
    std::vector<listen_spec> listen;
    TLSConfig                tls;
    Timeout                  http_timeout;
-   std::size_t              service_threads;
+   std::uint64_t            service_threads;
    psibase::loggers::Config loggers;
 
    static bool isNative(std::string_view name)

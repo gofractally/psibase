@@ -469,6 +469,14 @@ pub mod tables {
     }
 
     impl SharedBalance {
+        // Added for fresh deployments. Existing chains must populate this
+        // secondary index for every SharedBalance row before upgrading callers
+        // to rely on it; see docs/exchange/SECURITY.md.
+        #[secondary_key(1)]
+        pub fn by_creditor_debitor_token(&self) -> (AccountNumber, AccountNumber, TID) {
+            (self.creditor, self.debitor, self.token_id)
+        }
+
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
             Token::get_assert(token_id);
             assert_ne!(
@@ -493,32 +501,10 @@ pub mod tables {
             }
         }
 
-        pub fn get(
-            creditor: AccountNumber,
-            debitor: AccountNumber,
-            token_id: TID,
-        ) -> Option<Self> {
-            let shared_creditor_bal_ids = UserPendingTable::read()
-                .get_index_pk()
-                .range((creditor, token_id, 0_u64)..(creditor, token_id, u64::MAX))
-                .map(|bal| bal.shared_bal_id)
-                .collect::<Vec<_>>();
-
-            if shared_creditor_bal_ids.is_empty() {
-                return None;
-            }
-
-            shared_creditor_bal_ids.iter().find_map(|bal_id| {
-                let shared_bal = SharedBalanceTable::read().get_index_pk().get(bal_id)?;
-                if shared_bal.creditor == creditor
-                    && shared_bal.debitor == debitor
-                    && shared_bal.token_id == token_id
-                {
-                    Some(shared_bal)
-                } else {
-                    None
-                }
-            })
+        pub fn get(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Option<Self> {
+            SharedBalanceTable::read()
+                .get_index_by_creditor_debitor_token()
+                .get(&(creditor, debitor, token_id))
         }
 
         pub fn get_assert(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
@@ -526,7 +512,8 @@ pub mod tables {
         }
 
         pub fn get_or_new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
-            Self::get(creditor, debitor, token_id).unwrap_or(Self::new(creditor, debitor, token_id))
+            Self::get(creditor, debitor, token_id)
+                .unwrap_or_else(|| Self::new(creditor, debitor, token_id))
         }
 
         pub fn credit(&mut self, quantity: Quantity, memo: Memo) {
