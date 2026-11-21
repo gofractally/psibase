@@ -288,7 +288,9 @@ function(psibase_package)
                 set(wasm ${_WASM_${service}})
                 list(APPEND zip-deps ${wasm})
             endif()
-            list(APPEND copy-contents COMMAND ln -f ${wasm} ${outdir}/service/${service-basename}.wasm)
+            list(APPEND copy-contents
+                COMMAND ${CMAKE_COMMAND} -E rm -f ${outdir}/service/${service-basename}.wasm
+                COMMAND ln ${wasm} ${outdir}/service/${service-basename}.wasm)
             list(APPEND contents service/${service-basename}.wasm service/${service-basename}.json)
         endif()
         if(_DATA_${service})
@@ -366,7 +368,8 @@ function(psibase_package)
     elseif(_POSTINSTALL)
         list(APPEND copy-contents
             COMMAND ${CMAKE_COMMAND} -E make_directory ${outdir}/script
-            COMMAND ln -f ${_POSTINSTALL} ${outdir}/script/postinstall.json)
+            COMMAND ${CMAKE_COMMAND} -E rm -f ${outdir}/script/postinstall.json
+            COMMAND ln ${_POSTINSTALL} ${outdir}/script/postinstall.json)
         list(APPEND contents script/postinstall.json)
         list(APPEND zip-deps ${_POSTINSTALL})
     endif()

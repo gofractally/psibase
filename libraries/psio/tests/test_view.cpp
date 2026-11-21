@@ -18,7 +18,7 @@ void test_mutate(const T& original, F&& f, const T& expected)
 {
    auto bin = psio::to_frac(original);
    f(psio::view<T>{bin});
-   CHECK(psio::from_frac<T>(bin) == expected);
+   CHECK((psio::from_frac<T>(bin) == expected));
 }
 
 template <typename T, typename F>
@@ -61,7 +61,7 @@ TEST_CASE("tuple view", "[view]")
                 CHECK(*get<1>(v) == 43);
                 CHECK(get<2>(v).front() == 44);
                 CHECK(!get<3>(v));
-                CHECK(v.unpack() == t);
+                CHECK((v.unpack() == t));
                 auto [v0, v1, v2, v3] = v;
                 CHECK(v0 == 42);
                 CHECK(*v1 == 43);

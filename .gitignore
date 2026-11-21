@@ -49,3 +49,4 @@ AGENTS.md
 /external/psitri/
 /external/ucc/
 /external/psizam/
+/external/*.psibase-fetch.lock

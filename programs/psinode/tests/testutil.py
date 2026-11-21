@@ -99,7 +99,11 @@ def run_test_wasm(command):
     test_wasms = args.test_wasms
     if test_wasms is None:
         test_wasms = dirname
-    return subprocess.run([psitest, os.path.join(test_wasms, command[0])] + command[1:], check=True)
+    # Test WASMs load their companion modules using paths relative to this directory.
+    test_wasms = os.path.abspath(test_wasms)
+    psitest = os.path.abspath(psitest) if os.path.dirname(psitest) else psitest
+    return subprocess.run([psitest, os.path.join(test_wasms, command[0])] + command[1:],
+                          cwd=test_wasms, check=True)
 
 def main(argv=sys.argv):
     parser = argparse.ArgumentParser()

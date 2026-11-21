@@ -45,6 +45,7 @@ use psibase_plugin::{
     trust::{self, *},
     *,
 };
+use psibase_plugin::Error;
 
 struct InvitePlugin;
 

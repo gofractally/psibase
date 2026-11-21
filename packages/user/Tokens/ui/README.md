@@ -90,6 +90,11 @@ to the exact user/counterparty. It accepts no user name or arbitrary query. The
 native GraphQL counterparty search currently uses substring matching, so the
 additional exact output filter is required.
 
+Run the prompt tests from this directory with `npm test`. They execute the
+production prompt module with DOM and native RPC fixtures, checking exact display
+values, consent defaults, approve/deny transport, pending decisions and errors.
+They do not replace installed native-wallet browser tests.
+
 Run deterministic exact-policy tests with:
 
 ```sh

@@ -57,6 +57,39 @@ An override is explicit co-development input, not evidence that the configured
 pin was consumed. Storage's existing source hashes remain authoritative; this
 module does not bypass them or qualify arbitrary dirty trees.
 
+Acquire through `psibase_acquire_dependency` before adding transitive consumers
+that call raw `FetchContent_MakeAvailable`. A new FetchContent build tree can
+otherwise remove an existing `SOURCE_DIR` before cloning, even when another
+build tree already populated it. The guarded acquisition serializes the source
+path and never runs that clone/update operation on a pre-existing directory:
+
+- A clean Git checkout at the exact winning declaration's commit is reused
+  without Git mutation. Extra local branches, tags, reflogs and index bytes are
+  preserved. This covers normal reconfiguration and a second build directory.
+- A dirty checkout, different HEAD (including a clean unpushed commit), hidden
+  index flags, non-Git data or an unverifiable declaration fails without changing
+  the source. Select a separate qualified checkout or explicitly opt into the
+  source with `FETCHCONTENT_SOURCE_DIR_<NAME>`; acquisition never resets it.
+- Explicit source overrides remain developer input. The storage adapter's
+  strict source hashes still apply, and the standalone consumer records actual
+  source/HEAD/status rather than assuming the configured pin was consumed.
+
+Each build records acquisition mode, actual source/HEAD, winning repository/pin
+and explicit override in `psibase-dependencies/<name>-source.txt`. Verified reuse
+uses a function-local FetchContent source setting only after checking the exact
+pin and cleanliness; it does not add a cached or HOME-based override. Since
+FetchContent has no public pre-population declaration accessor, this guard
+reads its saved declaration property and fails closed if that representation
+is unavailable. It does not guess a source path and risk deleting another one.
+
+The disposable fixture checks working-file and complete `.git` metadata bytes
+before/after each protected operation, including dirty edits, an unpushed commit
+and annotated local tag:
+
+```sh
+python3 tests/cmake/dependencies/preservation.py build/dependency-preservation
+```
+
 The standalone consumer exercises existing PSIO reflection, typed PSSZ
 encode/validate/decode, a zero-copy view, and PSSZ-to-JSON transcoding:
 

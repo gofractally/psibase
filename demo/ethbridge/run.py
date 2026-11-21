@@ -15,9 +15,9 @@ def proc(name,args):
  with (STATE/(name+'.log')).open('a') as log:p=subprocess.Popen([str(a) for a in args],cwd=ROOT,stdin=subprocess.DEVNULL,stdout=log,stderr=log,start_new_session=True)
  path.write_text(str(p.pid))
 def prepare():
- PACKAGES.mkdir(parents=True,exist_ok=True);index=json.loads((ROOT/'demo/artifacts/packages/index.json').read_text());index=[e for e in index if e['name'] not in ('Signing','EthBridge','Exchange')]
+ PACKAGES.mkdir(parents=True,exist_ok=True);index=json.loads((PACKAGE_SOURCE/'index.json').read_text());index=[e for e in index if e['name'] not in ('Signing','EthBridge','Exchange')]
  for e in index:
-  out=PACKAGES/e['file'];out.unlink(missing_ok=True);out.symlink_to((ROOT/'demo/artifacts/packages'/e['file']).resolve())
+  out=PACKAGES/e['file'];out.unlink(missing_ok=True);out.symlink_to((PACKAGE_SOURCE/e['file']).resolve())
  for name in ['Signing','EthBridge']:
   source=ROOT/f'packages/user/target/wasm32-wasip1/release/packages/{name}.psi';out=PACKAGES/(name+'.psi');shutil.copyfile(source,out)
   with zipfile.ZipFile(out) as z:meta=json.loads(z.read('meta.json'))
@@ -26,7 +26,7 @@ def prepare():
 def base():
  (STATE/'chain').mkdir(parents=True,exist_ok=True);conf=STATE/'chain/config'
  if not conf.exists():conf.write_text(f'p2p = off\nproducer = psibase\nhost = psibase.localhost\nlisten = 127.0.0.1:{NODE_PORT}\nmount = {PACKAGES}\ndatabase-cache-policy = disabled\nservice-threads = 4\nhttp-timeout = 120s\n\n[logger.stderr]\ntype = console\nfilter = Severity >= warning\nformat = [{{Severity}}] {{Message}}\n')
- proc('node',[ROOT/'build/psinode',STATE/'chain','--proof-timeout-ms','30000'])
+ proc('node',[NODE,STATE/'chain','--proof-timeout-ms',os.environ.get('ETHBRIDGE_PROOF_TIMEOUT_MS','30000')])
  def ready():
   try:urllib.request.urlopen(f'http://127.0.0.1:{NODE_PORT}/',timeout=1)
   except urllib.error.HTTPError:return True
@@ -35,6 +35,8 @@ def base():
 def signers():
  for i in range(3):proc('signer-'+str(i),[DAEMON,'watch',STATE/f'signer-{i}.json'])
 def setup():
+ wallet_source=os.environ.get('ETHBRIDGE_NATIVE_WALLET_SOURCE','legacy-overlay')
+ if wallet_source not in ('packages','legacy-overlay'):raise ValueError('ETHBRIDGE_NATIVE_WALLET_SOURCE must be packages or legacy-overlay')
  prepare();base();progress=STATE/'progress.json';stages=json.loads(progress.read_text()) if progress.exists() else {}
  def done(stage):stages[stage]=True;progress.write_text(json.dumps(stages))
  if not stages.get('boot'):
@@ -66,8 +68,13 @@ def setup():
   vault=json.loads((STATE/'vault.json').read_text());account=evidence('account',vault['address']+'@'+hex(vault['number']));receipt=evidence('receipt',vault['txid'],0)
   submit([action('ethbridge','ethbridge','init',{'chain_id':1338,'deployment':deployment,'vault':vault['address'][2:].lower(),'block':vault['block'][2:],'account_fact':json.dumps(account['fact']),'configured_fact':json.dumps(receipt['fact']),'treasury':'treasury','batch_size':1,'withdrawal_fee':1000})],[account,receipt]);done('bridge')
  for user in auth.USERS:call(user,'tokens','setUserConf',index=0,enabled=True)
- from publish import publish
- publish();(STATE/'ready.json').write_text(json.dumps({'url':ORIGIN,'chain_id':1338,'wallet':rpc('eth_accounts')[1]}));start()
+ if wallet_source=='packages':
+  from publish import publish_ui
+  publish_ui()
+ else:
+  from publish import publish
+  publish()
+ (STATE/'ready.json').write_text(json.dumps({'url':ORIGIN,'chain_id':1338,'wallet':rpc('eth_accounts')[1]}));start()
 def beacon(block,bootstrap=False):
  network=json.loads((STATE/'network.json').read_text());slot=(int(time.time())-network['genesis_time'])//12-3
  if not bootstrap:

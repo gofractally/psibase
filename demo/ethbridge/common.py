@@ -6,10 +6,12 @@ STATE=Path(os.environ.get('ETHBRIDGE_STATE',Path(__file__).parent/'state')).reso
 NODE_PORT=int(os.environ.get('ETHBRIDGE_NODE_PORT','8093'));WEB_PORT=int(os.environ.get('ETHBRIDGE_WEB_PORT','8094'));RPC_PORT=int(os.environ.get('ETHBRIDGE_RPC_PORT','8095'))
 API=f'http://psibase.localhost:{NODE_PORT}/';ORIGIN=f'http://ethbridge.psibase.localhost:{NODE_PORT}'
 RUST_HOST=subprocess.check_output(['rustc','-vV'],text=True).split('host: ')[1].splitlines()[0]
-CLI=ROOT/f'rust/target/{RUST_HOST}/release/psibase';BOOT_CLI=ROOT/'rust/target/release/psibase'
-DAEMON=ROOT/f'packages/user/target/{RUST_HOST}/debug/signing-daemon'
-RELAYER=ROOT/f'packages/user/target/{RUST_HOST}/debug/ethbridge-relayer'
-BEACON=ROOT/f'packages/user/target/{RUST_HOST}/debug/examples/dev_beacon'
+CLI=Path(os.environ.get('ETHBRIDGE_CLI',ROOT/f'rust/target/{RUST_HOST}/release/psibase'));BOOT_CLI=Path(os.environ.get('ETHBRIDGE_BOOT_CLI',ROOT/'rust/target/release/psibase'))
+DAEMON=Path(os.environ.get('ETHBRIDGE_SIGNING_DAEMON',ROOT/f'packages/user/target/{RUST_HOST}/debug/signing-daemon'))
+RELAYER=Path(os.environ.get('ETHBRIDGE_RELAYER',ROOT/f'packages/user/target/{RUST_HOST}/debug/ethbridge-relayer'))
+BEACON=Path(os.environ.get('ETHBRIDGE_BEACON',ROOT/f'packages/user/target/{RUST_HOST}/debug/examples/dev_beacon'))
+NODE=Path(os.environ.get('ETHBRIDGE_NODE_BIN',ROOT/'build/psinode'))
+PACKAGE_SOURCE=Path(os.environ.get('ETHBRIDGE_PACKAGE_SOURCE',ROOT/'demo/artifacts/packages')).resolve()
 LOCK=threading.RLock()
 def action(sender,service,method,data):return dict(sender=sender,service=service,method=method,data=data)
 def signing_flags(senders):

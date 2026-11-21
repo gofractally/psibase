@@ -43,12 +43,14 @@ if(PSIBASE_DEPENDENCY_PROOF_PREDECLARE_PSIO_TAG)
         SOURCE_DIR "${CMAKE_BINARY_DIR}/parent-selected-psio")
 endif()
 psibase_declare_dependencies()
+# Acquire through the preservation guard before transitive consumers can call
+# raw FetchContent_MakeAvailable. They will then share the populated target.
+psibase_acquire_dependency(psio)
 if(PSIBASE_DEPENDENCY_PROOF_MODE STREQUAL "diamond")
     # Both leaves try conflicting declarations; the root's choice must win.
     add_subdirectory(leaf leaf-a)
     add_subdirectory(leaf leaf-b)
 endif()
-psibase_acquire_dependency(psio)
 if(NOT TARGET psio::psio)
     message(FATAL_ERROR "Canonical PSIO did not export psio::psio")
 endif()

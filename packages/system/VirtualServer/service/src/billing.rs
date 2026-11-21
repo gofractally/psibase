@@ -10,10 +10,24 @@ use std::collections::HashMap;
 
 /// Upper bound on the bytes written when crediting the fee receiver during
 /// settlement.
-/// Possible writes:
-/// * A new primary balance record on the fee receiver account
-/// * A new SharedBalance record between vserver and the fee receiver
-const FEE_RECEIVER_CREDIT_MAX_BYTES: u64 = 169;
+/// Includes keys and values for two pending-balance records (2 * 53), the
+/// SharedBalance secondary index (40), the SharedBalance primary record (63),
+/// and a new receiver primary balance when auto-debit is enabled (53).
+/// Transact also consumes the allowance for the two history-event writes:
+/// debited (at most 123) and credited (at most 124). Decimal quantities use at
+/// most 21 characters (u64 digits plus a decimal point); the memo is empty.
+/// Freed records do not replenish the system-write allowance. Requalify these
+/// wire-layout sizes when changing Tokens tables or the serialization format.
+const FEE_RECEIVER_CREDIT_MAX_BYTES: u64 = 262 + 123 + 124;
+
+/// `fromSub` cannot allocate service records here: vserver keeps its primary
+/// balance, and the payer's subaccount balance already exists. It can delete
+/// an automatically created subaccount when its balance reaches zero. Keep
+/// those frees attributed to the system until the final history-event write,
+/// whose key and value use at most 123 bytes plus a 4-byte nonempty-memo
+/// length and the 80-byte subaccount memo.
+/// Requalify this bound when changing Tokens or the serialization format.
+const PAYER_CHARGE_MAX_BYTES: u64 = 123 + 4 + 80;
 
 /// Pays fees out to the configured `fee_receiver`.
 pub fn credit_fee_receiver(amount: u64) {
@@ -54,9 +68,11 @@ pub fn reconcile() {
     // 1. Charge payers first so the service balance funds the relay/fee payouts below.
     for ((account, sub), net) in &payer_accruals {
         if *net < 0 {
-            // [DB WRITE] No allocation - primary balance record for vserver already exists, it is created
-            // by the first resource purchase, which must be done before billing is enabled.
+            // Empty automatically created resource subaccounts are deleted by
+            // fromSub. User billing cannot run recursively after cache drain.
+            Transact::call().systemWrite(PAYER_CHARGE_MAX_BYTES);
             Tokens::call().fromSub(sys, key(account, sub), Quantity::new((-net) as u64));
+            Transact::call().systemWrite(0);
         }
     }
 
