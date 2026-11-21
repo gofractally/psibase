@@ -1896,6 +1896,9 @@ int main(int argc, char* argv[])
    {
       auto prefix = psibase::installPrefix();
       ::setenv("PSIBASE_DATADIR", (prefix / "share" / "psibase").c_str(), 1);
+      // WASI libc resolves relative paths using PWD. Test launchers can
+      // change cwd without updating that inherited environment variable.
+      ::setenv("PWD", boost::filesystem::current_path().c_str(), 1);
    }
    bool                               show_usage   = false;
    bool                               error        = false;
