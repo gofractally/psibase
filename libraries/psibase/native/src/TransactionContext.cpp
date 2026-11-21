@@ -71,9 +71,10 @@ namespace psibase
    static void execProcessTransaction(TransactionContext& self);
 
    void TransactionContext::execTransaction()
+   try
    {
       // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
-      auto storageAccounting = impl->watchdog.accountingScope();
+      auto         storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       // Prepare for execution
       auto& db         = blockContext.db;
@@ -103,6 +104,10 @@ namespace psibase
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
       blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
+   }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
    }
 
    static void execGenesisAction(TransactionContext& self, const Action& action)
@@ -174,6 +179,7 @@ namespace psibase
    }
 
    void TransactionContext::execVerifyProof(size_t i)
+   try
    {
       // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
       auto storageAccounting = impl->watchdog.accountingScope();
@@ -185,13 +191,18 @@ namespace psibase
       auto id = sha256(signedTransaction.transaction.data(), signedTransaction.transaction.size());
       execVerifyProof(id, claimsView[i], signedTransaction.proofs[i]);
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    void TransactionContext::execVerifyProof(const Checksum256& id,
                                             Claim              claim,
                                             std::vector<char>  proof)
+   try
    {
       // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
-      auto storageAccounting = impl->watchdog.accountingScope();
+      auto         storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -226,13 +237,18 @@ namespace psibase
          throw;
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    void TransactionContext::execNonTrxAction(uint64_t      callerFlags,
                                              const Action& action,
                                              ActionTrace&  atrace)
+   try
    {
       // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
-      auto storageAccounting = impl->watchdog.accountingScope();
+      auto         storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db      = blockContext.db;
       config               = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -256,15 +272,20 @@ namespace psibase
          throw;
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    void TransactionContext::execCalledAction(uint64_t      callerFlags,
                                              const Action& action,
                                              ActionTrace&  atrace)
+   try
    {
       // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
       auto storageAccounting = impl->watchdog.accountingScope();
-      atrace.action    = action;
-      ActionContext ac = {*this, action, atrace};
+      atrace.action          = action;
+      ActionContext ac       = {*this, action, atrace};
       try
       {
          auto& ec = getExecutionContext(action.service);
@@ -276,11 +297,16 @@ namespace psibase
          throw;
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    void TransactionContext::execCalledAction(uint64_t      callerFlags,
                                              const Action& action,
                                              ActionTrace&  atrace,
                                              CallFlags     flags)
+   try
    {
       // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
       auto storageAccounting = impl->watchdog.accountingScope();
@@ -337,12 +363,17 @@ namespace psibase
          importedHandles.clear();
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    // TODO: different wasmConfig, controlled by config file
    void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
+   try
    {
       // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
-      auto storageAccounting = impl->watchdog.accountingScope();
+      auto         storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -365,13 +396,18 @@ namespace psibase
          throw;
       }
    }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
+   }
 
    void TransactionContext::execExport(std::string_view fn,
                                        const Action&    action,
                                        ActionTrace&     atrace)
+   try
    {
       // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
-      auto storageAccounting = impl->watchdog.accountingScope();
+      auto         storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -393,6 +429,10 @@ namespace psibase
          reportError(*this, atrace);
          throw;
       }
+   }
+   catch (const accounting::Cancelled&)
+   {
+      throw TimeoutException{};
    }
 
    ExecutionContext& TransactionContext::getExecutionContext(AccountNumber service)

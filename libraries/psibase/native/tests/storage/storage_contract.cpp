@@ -1,3 +1,5 @@
+#include <signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <algorithm>
 #include <array>
@@ -339,6 +341,109 @@ int main(int argc, char** argv)
               throws([&] { database db(base / "unknown", config, open_mode::create); },
                      "unidentified store accepted");
               require(std::filesystem::exists(base / "unknown/foreign"), "unknown store removed");
+           });
+      test("concurrent read-only opens share a store and leave every file unchanged",
+           [&]
+           {
+              const auto path = base / "shared-readers";
+              {
+                 database db(path, config, open_mode::create_new);
+                 auto     w   = db.start_write_session();
+                 auto     top = w->get_top_root();
+                 put(*w, top, "value", "stable");
+                 w->set_top_root(top);
+              }
+              const auto before = digest(path);
+              {
+                 database first(path, config, open_mode::read_only);
+                 auto     firstReader = first.start_read_session();
+                 auto     firstTop    = first.start_write_session()->get_top_root();
+                 database second(path, config, open_mode::read_only);
+                 auto     secondReader = second.start_read_session();
+                 auto     secondTop    = second.start_write_session()->get_top_root();
+                 require(get(*firstReader, firstTop, "value") == "stable" &&
+                             get(*secondReader, secondTop, "value") == "stable",
+                         "concurrent read-only read");
+                 require(before == digest(path), "live read-only roots changed file bytes");
+                 throws([&] { database writer(path, config, open_mode::read_write); },
+                        "writer opened beside read-only openers");
+              }
+              require(before == digest(path), "read-only openers changed file bytes");
+           });
+      test("a killed writer is refused read-only, then recovered by the next writer",
+           [&]
+           {
+              const auto path = base / "killed";
+              {
+                 database db(path, config, open_mode::create_new);
+                 auto     w   = db.start_write_session();
+                 auto     top = w->get_top_root();
+                 put(*w, top, "head", "initial");
+                 w->set_top_root(top);
+              }
+              int ready[2];
+              require(::pipe(ready) == 0, "pipe");
+              const pid_t child = ::fork();
+              require(child >= 0, "fork");
+              if (child == 0)
+              {
+                 // Dies holding the published root, older revisions, and unpublished work.
+                 database                 db(path, config, open_mode::read_write);
+                 auto                     w = db.start_write_session();
+                 std::vector<shared_root> held;
+                 for (unsigned revision = 0; revision < 20; ++revision)
+                 {
+                    auto top = w->get_top_root();
+                    for (unsigned i = 0; i < 200; ++i)
+                       put(*w, top, "key" + std::to_string(i), std::string(256, char('a' + revision)));
+                    put(*w, top, "head", "revision-" + std::to_string(revision));
+                    w->set_top_root(top);
+                    held.push_back(top);
+                 }
+                 auto unpublished = w->get_top_root();
+                 put(*w, unpublished, "head", "never-published");
+                 held.push_back(unpublished);
+                 (void)!::write(ready[1], "r", 1);
+                 for (;;)
+                    ::pause();
+              }
+              ::close(ready[1]);
+              char byte = 0;
+              require(::read(ready[0], &byte, 1) == 1, "writer child did not publish");
+              ::close(ready[0]);
+              ::kill(child, SIGKILL);
+              int status = 0;
+              ::waitpid(child, &status, 0);
+              require(WIFSIGNALED(status), "writer child was not killed");
+
+              const auto before  = digest(path);
+              bool       refused = false;
+              try
+              {
+                 database db(path, config, open_mode::read_only);
+              }
+              catch (const std::exception& error)
+              {
+                 refused = std::string_view(error.what()).find("not shut down cleanly") !=
+                           std::string_view::npos;
+              }
+              require(refused, "read-only open accepted a store its writer never closed");
+              require(before == digest(path), "refused read-only open changed file bytes");
+              {
+                 database db(path, config, open_mode::read_write);
+                 auto     w   = db.start_write_session();
+                 auto     top = w->get_top_root();
+                 require(get(*w, top, "head") == "revision-19", "recovered head is not the last publication");
+                 for (unsigned i = 0; i < 200; ++i)
+                    require(get(*w, top, "key" + std::to_string(i)) == std::string(256, char('a' + 19)),
+                            "recovered state is not the last publication");
+                 put(*w, top, "head", "after-recovery");
+                 w->set_top_root(top);
+              }
+              database db(path, config, open_mode::read_only);
+              auto     reader = db.start_read_session();
+              require(get(*reader, db.start_write_session()->get_top_root(), "head") == "after-recovery",
+                      "store was not usable after recovery");
            });
       std::cout << "{\"passed\":true,\"contract_groups\":" << passed << "}\n";
    }

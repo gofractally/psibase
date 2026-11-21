@@ -39,6 +39,10 @@ namespace psibase::storage
    constexpr std::string_view identity    = "psibase.psitri.big.manifest.v1\n";
    constexpr std::string_view identityKey = "\xffpsibase-storage-format";
    constexpr std::string_view formatFile  = "psibase-storage-format";
+   // Present from before the engine creates its first file until the identity
+   // sidecar is durable. While it exists without a valid sidecar, everything in
+   // the directory is this adapter's own unfinished initialization.
+   constexpr std::string_view initFile = "psibase-storage-initializing";
    constexpr std::string_view countKey    = "count";
 
    std::string_view bytes(std::span<const char> data)
@@ -599,6 +603,42 @@ namespace psibase::storage
       if (result)
          throw std::runtime_error("cannot persist database directory");
    }
+   void syncDirectory(const std::filesystem::path& path)
+   {
+      const int fd = ::open(path.c_str(), O_RDONLY | O_DIRECTORY);
+      if (fd < 0)
+         throw std::runtime_error("cannot open database directory");
+      int result;
+      do
+      {
+         result = ::fsync(fd);
+      } while (result < 0 && errno == EINTR);
+      ::close(fd);
+      if (result)
+         throw std::runtime_error("cannot persist database directory");
+   }
+   void writeInitializingFile(const std::filesystem::path& path)
+   {
+      const auto filename = path / initFile;
+      const int  fd       = ::open(filename.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+      if (fd < 0)
+         throw std::runtime_error("cannot begin database initialization");
+      int result;
+      do
+      {
+         result = ::fsync(fd);
+      } while (result < 0 && errno == EINTR);
+      ::close(fd);
+      if (result)
+         throw std::runtime_error("cannot begin database initialization");
+      syncDirectory(path);
+   }
+   void removeContents(const std::filesystem::path& path)
+   {
+      std::error_code ignored;
+      for (const auto& entry : std::filesystem::directory_iterator(path, ignored))
+         std::filesystem::remove_all(entry.path(), ignored);
+   }
    database::database(std::shared_ptr<database_view> v) : view(std::move(v)) {}
    database::database(const std::filesystem::path& requested,
                       const database_config&,
@@ -640,9 +680,27 @@ namespace psibase::storage
          state->temporary = true;
          path             = state->path;
       }
-      const bool directoryExists = std::filesystem::exists(path);
-      const bool nonempty        = directoryExists && !std::filesystem::is_empty(path);
-      const bool existing        = std::filesystem::exists(path / formatFile);
+      bool directoryExists = std::filesystem::exists(path);
+      if (std::filesystem::exists(path / initFile))
+      {
+         const bool complete = std::filesystem::exists(path / formatFile) &&
+                               readIdentityFile(path) == identity;
+         if (complete)
+         {
+            // Only removing the marker was left to do.
+            if (!state->readonly)
+               std::filesystem::remove(path / initFile);
+         }
+         else if (mode == open_mode::read_only || mode == open_mode::read_write)
+            throw std::runtime_error(
+                "database does not exist: its initialization was interrupted");
+         else
+            // An earlier initialization of this directory stopped before the
+            // identity was durable. Nothing was ever published from it.
+            removeContents(path);
+      }
+      const bool nonempty = directoryExists && !std::filesystem::is_empty(path);
+      const bool existing = std::filesystem::exists(path / formatFile);
       if (existing && readIdentityFile(path) != identity)
          throw std::runtime_error("unsupported psibase storage format");
       if (nonempty && !existing)
@@ -654,50 +712,104 @@ namespace psibase::storage
       if (mode == open_mode::trunc && existing)
          std::filesystem::remove_all(path);
       const bool fresh = !existing || mode == open_mode::trunc;
-      state->path      = path;
-      view             = std::make_shared<database_view>();
-      view->state      = state;
-      state->access.invoke(
-          [&]
-          {
-             Engine::config cfg;
-             cfg.sync_mode                = psitri::sync_mode::fsync;
-             cfg.enable_read_cache        = false;
-             cfg.max_pinned_cache_size_mb = 0;
-             if (!fresh)
+      // A store whose last writer never closed it (killed, crashed, fail-stopped) is
+      // recovered by the engine on the next read-write open. Recovery writes, so a
+      // read-only open cannot do it and must not read through what was left behind.
+      const bool unclean = !fresh && !Engine::database::closed_cleanly(path);
+      if (unclean && state->readonly)
+         throw std::runtime_error(
+             "database was not shut down cleanly; open it read-write once to recover it");
+      state->path = path;
+      view        = std::make_shared<database_view>();
+      view->state = state;
+      const bool createdDirectory = fresh && !std::filesystem::exists(path);
+      try
+      {
+         if (fresh && !state->temporary)
+         {
+            std::filesystem::create_directories(path);
+            writeInitializingFile(path);
+         }
+         state->access.invoke(
+             [&]
              {
-                // Validate the native manifest in genuine read-only mode before
-                // acquiring a writable engine/session. Never repair another store.
-                auto check  = Engine::database::open(path, psitri::open_mode::read_only, cfg);
-                auto reader = check->start_read_session();
-                if (reader->create_cursor(0).get<std::string>(identityKey) != identity)
-                   throw std::runtime_error("psibase manifest identity mismatch");
-             }
-             state->engine = Engine::database::open(
-                 path,
-                 state->readonly
-                     ? psitri::open_mode::read_only
-                     : (fresh ? psitri::open_mode::create_only : psitri::open_mode::open_existing),
-                 cfg);
-             if (state->readonly)
-             {
-                state->reader = state->engine->start_read_session();
-                view->top     = retain(state, state->reader->create_cursor(0));
-             }
-             else
-             {
-                state->writer = state->engine->start_write_session();
-                if (fresh)
+                Engine::config cfg;
+                // A temporary store is deleted when it closes; nothing in it can
+                // outlive the process, so it never pays for a flush.
+                cfg.sync_mode = state->temporary ? psitri::sync_mode::none
+                                                 : psitri::sync_mode::fsync;
+                cfg.enable_read_cache        = false;
+                cfg.max_pinned_cache_size_mb = 0;
+                if (!fresh && !unclean)
                 {
-                   auto tx = state->writer->start_transaction(0);
-                   tx.upsert(identityKey, identity);
-                   tx.commit();
+                   // Validate the native manifest in genuine read-only mode before
+                   // acquiring a writable engine/session. Never repair another store.
+                   auto check  = Engine::database::open(path, psitri::open_mode::read_only, cfg);
+                   auto reader = check->start_read_session();
+                   if (reader->create_cursor(0).get<std::string>(identityKey) != identity)
+                      throw std::runtime_error("psibase manifest identity mismatch");
                 }
-                view->top = retain(state, state->writer->get_root(0));
-             }
-          });
-      if (fresh)
-         writeIdentityFile(path);
+                state->engine = Engine::database::open(
+                    path,
+                    state->readonly ? psitri::open_mode::read_only
+                                    : (fresh ? psitri::open_mode::create_only
+                                             : psitri::open_mode::open_existing),
+                    cfg);
+                if (state->readonly)
+                {
+                   state->reader = state->engine->start_read_session();
+                   view->top     = retain(state, state->reader->create_cursor(0));
+                }
+                else
+                {
+                   state->writer = state->engine->start_write_session();
+                   if (fresh)
+                   {
+                      auto tx = state->writer->start_transaction(0);
+                      tx.upsert(identityKey, identity);
+                      tx.commit();
+                   }
+                   view->top = retain(state, state->writer->get_root(0));
+                   // The sidecar identified this store as ours; after recovery the
+                   // manifest must still agree before anything is published to it.
+                   if (unclean &&
+                       state->writer->get_root(0).get<std::string>(identityKey) != identity)
+                      throw std::runtime_error("psibase manifest identity mismatch");
+                }
+             });
+         if (fresh)
+         {
+            writeIdentityFile(path);
+            if (!state->temporary)
+               std::filesystem::remove(path / initFile);
+         }
+      }
+      catch (...)
+      {
+         if (fresh && !state->temporary)
+         {
+            // Close the engine, then take back everything this constructor created,
+            // so the same path can be initialized again. An existing store is never
+            // touched: `fresh` means the directory was absent or empty.
+            const auto owner = std::move(state);
+            view.reset();
+            owner->access.invoke(
+                [&]
+                {
+                   owner->reader.reset();
+                   owner->writer.reset();
+                   owner->engine.reset();
+                },
+                true);
+            removeContents(path);
+            if (createdDirectory)
+            {
+               std::error_code ignored;
+               std::filesystem::remove(path, ignored);
+            }
+         }
+         throw;
+      }
    }
    std::shared_ptr<database> database::clone() const
    {

@@ -311,6 +311,12 @@ namespace psibase
                init();
             rethrowVMExcept(f);
          }
+         catch (const accounting::Cancelled&)
+         {
+            // A synchronous storage check can observe expiry before the
+            // watchdog thread has delivered asyncTimeout to this VM.
+            throw TimeoutException{};
+         }
          catch (...)
          {
             if (timedOut)

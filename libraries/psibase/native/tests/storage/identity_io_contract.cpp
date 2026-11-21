@@ -1,5 +1,6 @@
 #include <dlfcn.h>
 #include <pthread.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <cerrno>
 #include <cstdlib>
@@ -24,7 +25,8 @@ namespace
       zeroWrite,
       writeError,
       fileSyncError,
-      directorySyncError
+      directorySyncError,
+      crash  // the process dies as the identity is about to be written
    };
    struct Fault
    {
@@ -64,6 +66,8 @@ extern "C" ssize_t write(int descriptor, const void* data, std::size_t size)
    if (descriptor != fault.descriptor)
       return next(descriptor, data, size);
    ++fault.writes;
+   if (fault.mode == Mode::crash)
+      std::_Exit(77);
    if (!fault.injected)
    {
       switch (fault.mode)
@@ -157,8 +161,67 @@ int main(int argc, char** argv)
                                                 psibase::storage::open_mode::read_only);
             require(reopened.read_only(), "read-only reopen failed");
          }
+         else
+         {
+            // A failed initialization takes back what it created: the same path
+            // must initialize on the next attempt, with no manual cleanup.
+            database.reset();
+            require(!std::filesystem::exists(path),
+                    "failed initialization left its directory behind");
+            {
+               psibase::storage::database retried(path, {1, 1, 1, 1},
+                                                  psibase::storage::open_mode::create_new);
+            }
+            psibase::storage::database reopened(path, {1, 1, 1, 1},
+                                                psibase::storage::open_mode::read_only);
+            require(reopened.read_only(), "retried initialization did not produce a store");
+         }
          std::cout << "identity mode=" << unsigned(mode) << " accepted=" << accepted
                    << " writes=" << fault.writes << " syncs=" << fault.syncs << '\n';
+      }
+      {
+         // The process dies between committing the manifest and writing the identity.
+         const auto  path  = root / "crashed";
+         const pid_t child = ::fork();
+         require(child >= 0, "fork failed");
+         if (child == 0)
+         {
+            Fault fault{Mode::crash};
+            current = &fault;
+            psibase::storage::database database(path, {1, 1, 1, 1},
+                                                psibase::storage::open_mode::create);
+            std::_Exit(0);  // unreachable: the identity write exits 77
+         }
+         int status = 0;
+         ::waitpid(child, &status, 0);
+         require(WIFEXITED(status) && WEXITSTATUS(status) == 77,
+                 "initialization did not stop at the identity write");
+         {
+            // The engine's files exist; the identity was created but never written.
+            std::ifstream partial(path / "psibase-storage-format");
+            require(std::filesystem::exists(path / "roots") &&
+                        std::string(std::istreambuf_iterator<char>(partial), {}) != identity,
+                    "crash fixture is not an interrupted initialization");
+         }
+         bool missing = false;
+         try
+         {
+            psibase::storage::database database(path, {1, 1, 1, 1},
+                                                psibase::storage::open_mode::read_write);
+         }
+         catch (const std::runtime_error&)
+         {
+            missing = true;
+         }
+         require(missing, "an interrupted initialization opened as an existing database");
+         {
+            psibase::storage::database database(path, {1, 1, 1, 1},
+                                                psibase::storage::open_mode::create);
+         }
+         psibase::storage::database reopened(path, {1, 1, 1, 1},
+                                             psibase::storage::open_mode::read_only);
+         require(reopened.read_only(), "interrupted initialization did not self-heal");
+         std::cout << "interrupted initialization: restarted on the same path\n";
       }
       for (auto mode :
            {Mode::zeroWrite, Mode::writeError, Mode::fileSyncError, Mode::directorySyncError})

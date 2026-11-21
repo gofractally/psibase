@@ -26,6 +26,14 @@ target_link_directories(PsitriDatabaseTests PRIVATE ${ICU_LIBRARY_DIR})
 target_link_libraries(PsitriDatabaseTests PRIVATE psibase Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME PsitriDatabaseTests COMMAND PsitriDatabaseTests)
 
+# Keep the VM's trap handlers in charge; this bounded standalone consumer does
+# not install Catch2 fatal-signal handlers over the native runtime.
+add_executable(StorageTimeoutTests StorageTimeoutTests.cpp)
+target_link_directories(StorageTimeoutTests PRIVATE ${ICU_LIBRARY_DIR})
+target_link_libraries(StorageTimeoutTests PRIVATE psibase Threads::Threads)
+add_test(NAME StorageTimeoutTests COMMAND StorageTimeoutTests)
+set_tests_properties(StorageTimeoutTests PROPERTIES TIMEOUT 30 PROCESSORS 2)
+
 if(APPLE)
   add_executable(DarwinCpuVmTrapTests DarwinCpuVmTrapTests.cpp)
   target_link_directories(DarwinCpuVmTrapTests PRIVATE ${ICU_LIBRARY_DIR})
