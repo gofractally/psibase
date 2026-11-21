@@ -1,0 +1,32 @@
+{
+  "status": "candidate; macOS accuracy qualification blocked",
+  "behavior": "Real target-thread CPU clocks replace the Darwin CLOCK_MONOTONIC fallback. Sleep/queue waits no longer consume CPU budget. Darwin send rights are retained for clock lifetime and deallocated. Explicit raw-clock overload remains supported.",
+  "sources": [
+    "https://github.com/apple-oss-distributions/xnu/blob/main/doc/observability/recount.md",
+    "https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/thread.c",
+    "https://developer.apple.com/forums/thread/110688"
+  ],
+  "baseline_evidence": "build-native-psitri/evidence/20261121T183217Z",
+  "isolated_evidence": "build-storage-contract/probes/native-clock-only/results.json",
+  "isolated_result": {
+    "test_cases": 8,
+    "passed": 6,
+    "failed": 2,
+    "assertions": 199,
+    "assertions_passed": 183,
+    "assertions_failed": 16,
+    "failures": [
+      "Watchdog required accuracy",
+      "Watchdog threaded"
+    ]
+  },
+  "threshold_policy": "Original 5ms accuracy margins and 20ms limits unchanged. No QoS changes, polling changes, or wall-time extrapolation adopted.",
+  "remote_sample_limit": "Observed Mach sample lag versus target self CPU up to 5007000ns; no public alternate flavor in this SDK supplies a qualified improvement.",
+  "probe_evidence": "build-storage-contract/probes/watchdog-target-clock",
+  "source_sha256": {
+    "libraries/psibase/native/include/psibase/Watchdog.hpp": "7390b036a3ed39f595f2501e86c307f8dd6108040cc140c78a4329d72ce19ec2",
+    "libraries/psibase/native/src/Watchdog.cpp": "a5dc9ea33efa8a45293cfc6ecda48eab13a66264b6dd574b09dc843e7a7e586b",
+    "libraries/psibase/native/tests/WatchdogTests.cpp": "f715cc1d179dbff6f3aeab3f4d4298be77798692c914960e4bea9e94a8cc6925",
+    "libraries/psibase/native/include/psibase/NativeThreadClock.hpp": "9d6e141ac1a4654097355429d74932e4c06dc698ec1f0b35219f1dea57465401"
+  }
+}

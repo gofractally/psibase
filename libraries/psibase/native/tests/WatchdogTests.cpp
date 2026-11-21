@@ -145,3 +145,33 @@ TEST_CASE("Watchdog threaded")
       }
    }
 }
+
+#ifdef __APPLE__
+TEST_CASE("Darwin target CPU clocks own and release their thread ports", "[accounting]")
+{
+   auto references = []
+   {
+      const auto port = mach_thread_self();
+      mach_port_urefs_t count = 0;
+      REQUIRE(mach_port_get_refs(mach_task_self(), port, MACH_PORT_RIGHT_SEND, &count) == KERN_SUCCESS);
+      REQUIRE(mach_port_deallocate(mach_task_self(), port) == KERN_SUCCESS);
+      return count;
+   };
+   const auto before = references();
+   {
+      std::vector<std::shared_ptr<accounting::NativeThreadClock>> clocks;
+      for (unsigned i = 0; i < 32; ++i)
+         clocks.push_back(std::make_shared<accounting::NativeThreadClock>());
+      CHECK(references() == before + 32);
+      bool valid = true;
+      std::thread sampler([clocks, &valid]
+      {
+         for (const auto& clock : clocks)
+            valid = valid && clock->read().count() >= 0;
+      });
+      sampler.join();
+      CHECK(valid);
+   }
+   CHECK(references() == before);
+}
+#endif

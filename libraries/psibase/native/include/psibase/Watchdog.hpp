@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <psibase/NativeThreadClock.hpp>
 #include <condition_variable>
 #include <functional>
 #include <mutex>
@@ -19,11 +20,8 @@ namespace psibase
       using duration                  = std::chrono::duration<rep, period>;
       using time_point                = std::chrono::time_point<CpuClock>;
       static constexpr bool is_steady = false;
-#ifdef __APPLE__
-      static time_point     now(clockid_t clock = CLOCK_MONOTONIC);
-#else
-      static time_point     now(clockid_t clock = CLOCK_THREAD_CPUTIME_ID);
-#endif
+      static time_point now();
+      static time_point now(clockid_t clock);
    };
 
    class Watchdog;
@@ -65,7 +63,7 @@ namespace psibase
       bool                  paused;
       CpuClock::duration    elapsedOrStart;
       CpuClock::duration    limit = CpuClock::duration::max();
-      clockid_t             cpuclock;
+      std::shared_ptr<accounting::NativeThreadClock> cpuclock;
       std::function<void()> handler;
    };
 

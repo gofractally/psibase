@@ -6,6 +6,11 @@
 namespace psibase
 {
 
+   CpuClock::time_point CpuClock::now()
+   {
+      return time_point(accounting::currentThreadClock()->read());
+   }
+
    CpuClock::time_point CpuClock::now(clockid_t clock)
    {
       struct timespec result;
@@ -71,14 +76,7 @@ namespace psibase
          elapsedOrStart(CpuClock::now().time_since_epoch()),
          handler(handler)
    {
-#ifdef __APPLE__
-      cpuclock = CLOCK_MONOTONIC;
-#else
-      if (int err = pthread_getcpuclockid(pthread_self(), &cpuclock))
-      {
-         throw std::system_error(err, std::system_category());
-      }
-#endif
+      cpuclock = accounting::currentThreadClock();
       manager->add(this);
    }
    Watchdog::~Watchdog()
@@ -138,7 +136,7 @@ namespace psibase
       }
       else
       {
-         return limit - (CpuClock::now(cpuclock).time_since_epoch() - elapsedOrStart);
+         return limit - (cpuclock->read() - elapsedOrStart);
       }
    }
 
