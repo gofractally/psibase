@@ -439,7 +439,7 @@ def _write_config(dir, log_filter, log_format, softhsm, trustfile):
         with open(logfile, 'x') as f:
             f.write(_default_config % (extra, log_filter, log_format))
 
-def _init_softhsm(dir, pin):
+def _init_softhsm(dir, pin, module):
     conf = os.path.join(dir, 'softhsm.conf')
     tokens = os.path.join(dir, 'tokens')
     os.makedirs(tokens, exist_ok=True)
@@ -448,7 +448,7 @@ def _init_softhsm(dir, pin):
     env = {'SOFTHSM2_CONF': conf}
     full_env = dict(os.environ)
     full_env.update(env)
-    subprocess.run(['softhsm2-util', '--init-token', '--slot', '0', '--label', 'psibase', '--pin', pin, '--so-pin', pin], env=full_env, check=True)
+    subprocess.run(['softhsm2-util', '--module', module, '--init-token', '--slot', '0', '--label', 'psibase', '--pin', pin, '--so-pin', pin], env=full_env, check=True)
     return env
 
 class Node(API):
@@ -474,7 +474,7 @@ class Node(API):
         os.makedirs(self.dir, exist_ok=True)
         if softhsm is not None:
             self.softhsm_pin = 'Ch4ng#Me!'
-            self.env.update(_init_softhsm(os.path.join(self.dir, 'softhsm'), self.softhsm_pin))
+            self.env.update(_init_softhsm(os.path.join(self.dir, 'softhsm'), self.softhsm_pin, softhsm))
         _write_config(self.dir, log_filter, log_format, softhsm, trustfile)
         if isinstance(listen, str):
             listen = [listen]

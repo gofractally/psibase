@@ -1,0 +1,116 @@
+{
+  "scope": "Linux n-triedent-tests CTest child resource normalization only; production node policy, workload and600s timeout unchanged",
+  "baseline_head": "4d7097848da7dc803db55227f3a7d67ef5335056",
+  "binary_sha256": "01a27931ecdf85e54fdec1550daa3a354869f7b8232cc4173c7af4fa0f42b16b",
+  "original_seconds": 600.001367688179,
+  "original_timeout_seconds": 600,
+  "restricted_seconds": 2.769858829677105,
+  "full_cases": 26,
+  "restricted_assertions": 50736019,
+  "resource_limits": {
+    "before": [
+      68719476736,
+      68719476736
+    ],
+    "after": [
+      65536,
+      68719476736
+    ],
+    "pid": 86264
+  },
+  "registered_ctest": {
+    "source": "/home/dlarimer/psibase-migration-20261121/triedent-launcher-source/libraries/triedent/test",
+    "binary": "/home/dlarimer/psibase-migration-20261121/source/build/triedent-tests",
+    "binary_sha256": "01a27931ecdf85e54fdec1550daa3a354869f7b8232cc4173c7af4fa0f42b16b",
+    "source_sha256": {
+      "register_test.cmake": "0db960790698b433f0e67e2e7a0d67adf8bf1fd03225b8c27ec4e9ef746767fe",
+      "README.md": "0d340afbe810792406828124b09ecd82e31dfc4f505d44e38daa26eb23df4624",
+      "restricted_memlock.py": "c258b60701c025ec011b06e178d347ab57cdf9b0ccdb416850eeaa018f8bc52f"
+    },
+    "commands": [
+      {
+        "name": "configure-linux",
+        "argv": [
+          "cmake",
+          "-S",
+          "/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/harness",
+          "-B",
+          "/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/linux"
+        ],
+        "exit_code": 0,
+        "seconds": 0.0846937969326973
+      },
+      {
+        "name": "registered-linux",
+        "argv": [
+          "ctest",
+          "--test-dir",
+          "/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/linux",
+          "--show-only=json-v1"
+        ],
+        "exit_code": 0,
+        "seconds": 0.005302414298057556
+      },
+      {
+        "name": "ctest-full",
+        "argv": [
+          "ctest",
+          "--test-dir",
+          "/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/linux",
+          "--verbose",
+          "--output-on-failure",
+          "--timeout",
+          "600"
+        ],
+        "exit_code": 0,
+        "seconds": 2.274145882576704
+      },
+      {
+        "name": "configure-darwin",
+        "argv": [
+          "cmake",
+          "-S",
+          "/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/harness",
+          "-B",
+          "/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/darwin-registration-only",
+          "-DCMAKE_SYSTEM_NAME=Darwin"
+        ],
+        "exit_code": 0,
+        "seconds": 0.016577962785959244
+      },
+      {
+        "name": "registered-darwin",
+        "argv": [
+          "ctest",
+          "--test-dir",
+          "/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/darwin-registration-only",
+          "--show-only=json-v1"
+        ],
+        "exit_code": 0,
+        "seconds": 0.005125157535076141
+      }
+    ],
+    "load_before": [
+      2.61328125,
+      5.712890625,
+      4.27392578125
+    ],
+    "passed": true,
+    "load_after": [
+      2.61328125,
+      5.712890625,
+      4.27392578125
+    ],
+    "binary_sha256_after": "01a27931ecdf85e54fdec1550daa3a354869f7b8232cc4173c7af4fa0f42b16b"
+  },
+  "source_diff_818_to_4d": "Empty for libraries/triedent; exact compiler/build commands and raw trace retained",
+  "cause": "Default fixture3x1GiB pinned tiers repeatedly succeed under64GiB inherited soft limit.853 default DB constructions in splice alone;963 overall (~2.8TiB repeated population). One child recorded489s kernelCPU in492s elapsed, confirming progress not deadlock.18-case insertion trace54 successful1GiB pin requests ~0.24-0.28s each.",
+  "resource_policy": "Linux child soft limit min(64KiB,inherited finite soft,inherited finite hard); hard unchanged, never raise a limit. Non-Linux registration retains native_test. Direct binary remains uncapped for successful-pinning qualification.",
+  "limitations": "This correctness profile does not qualify memory pressure or successful large pin allocation; shared host load recorded, no idle performance claim.",
+  "source_sha256": {
+    "libraries/triedent/test/CMakeLists.txt": "95d34340d7c640a5d7b77103a4f0f9b3aecc80b98e4a071a4fae9880795fe5ff",
+    "libraries/triedent/test/register_test.cmake": "0db960790698b433f0e67e2e7a0d67adf8bf1fd03225b8c27ec4e9ef746767fe",
+    "libraries/triedent/test/restricted_memlock.py": "c258b60701c025ec011b06e178d347ab57cdf9b0ccdb416850eeaa018f8bc52f",
+    "libraries/triedent/test/README.md": "0d340afbe810792406828124b09ecd82e31dfc4f505d44e38daa26eb23df4624"
+  }
+}

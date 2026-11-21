@@ -14,7 +14,7 @@ add_executable(triedent-tests
 target_link_libraries(triedent-tests PUBLIC Catch2::Catch2WithMain triedent)
 target_include_directories(triedent-tests PUBLIC ${Boost_INCLUDE_DIRS})
 set_target_properties(triedent-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
-native_test(triedent-tests)
+include("${CMAKE_CURRENT_SOURCE_DIR}/register_test.cmake")
 
 add_executable(triedent-tests-bigdb big.cpp)
 target_link_libraries(triedent-tests-bigdb PUBLIC Boost::program_options triedent)

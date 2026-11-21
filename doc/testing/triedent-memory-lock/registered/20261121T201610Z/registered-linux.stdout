@@ -1,0 +1,63 @@
+{
+  "backtraceGraph" : 
+  {
+    "commands" : 
+    [
+      "add_test",
+      "include"
+    ],
+    "files" : 
+    [
+      "/home/dlarimer/psibase-migration-20261121/triedent-launcher-source/libraries/triedent/test/register_test.cmake",
+      "/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/harness/CMakeLists.txt"
+    ],
+    "nodes" : 
+    [
+      {
+        "file" : 1
+      },
+      {
+        "command" : 1,
+        "file" : 1,
+        "line" : 11,
+        "parent" : 0
+      },
+      {
+        "file" : 0,
+        "parent" : 1
+      },
+      {
+        "command" : 0,
+        "file" : 0,
+        "line" : 6,
+        "parent" : 2
+      }
+    ]
+  },
+  "kind" : "ctestInfo",
+  "tests" : 
+  [
+    {
+      "backtrace" : 3,
+      "command" : 
+      [
+        "/usr/bin/python3",
+        "/home/dlarimer/psibase-migration-20261121/triedent-launcher-source/libraries/triedent/test/restricted_memlock.py",
+        "/home/dlarimer/psibase-migration-20261121/source/build/triedent-tests"
+      ],
+      "name" : "n-triedent-tests",
+      "properties" : 
+      [
+        {
+          "name" : "WORKING_DIRECTORY",
+          "value" : "/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/linux"
+        }
+      ]
+    }
+  ],
+  "version" : 
+  {
+    "major" : 1,
+    "minor" : 0
+  }
+}

@@ -424,6 +424,30 @@ fn system_writes_accumulate_shortfall(chain: psibase::Chain) -> Result<(), psiba
     Ok(())
 }
 
+#[psibase::test_case(packages("VirtualServer", "StagedTx"))]
+fn settlement_creates_auto_debit_fee_balance(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    initial_setup(&chain)?;
+    let receiver = account!("fees");
+    chain.new_account(receiver)?;
+    Tokens::push_from(&chain, receiver)
+        .setUserConf(tokens::BalanceFlags::AUTO_DEBIT.index(), true)
+        .get()?;
+    assert_eq!(Tokens::push(&chain).getBalance(1, receiver).get()?.value, 0);
+
+    // The first settlement must allocate both the shared-balance indexes and
+    // the recipient's primary balance after the billing caches are drained.
+    super::helpers::enable_billing_with_receiver(&chain, receiver)?;
+    assert!(
+        Tokens::push_from(&chain, PRODUCER_ACCOUNT)
+            .getBalance(1, receiver)
+            .get()?
+            .value > 0
+    );
+    chain.finish_block();
+    assert!(check_disk_invariant("auto-debit fee settlement", &chain));
+    Ok(())
+}
+
 // Bytes consumed since init
 fn disk_consumed(chain: &psibase::Chain) -> u64 {
     let disk = get_disk_state(chain);

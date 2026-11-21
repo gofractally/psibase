@@ -104,7 +104,11 @@ impl Chain {
 
     fn make_test_chain_prototype() -> Chain {
         let result = Chain::create_impl(1 << 27, 1 << 27, 1 << 27, 1 << 27, false);
-        result.boot().unwrap();
+        // A package under test may also belong to TestDefault. Select its local
+        // build during boot; installing the same version afterward is a no-op.
+        result
+            .boot_with(&Self::test_registry(), &["TestDefault".to_string()])
+            .unwrap();
         result
     }
 

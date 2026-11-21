@@ -1,0 +1,31 @@
+{
+  "source": "/home/dlarimer/psibase-migration-20261121/source",
+  "original": "/home/dlarimer/psibase-migration-20261121/evidence/triedent-triage-20261121T200355Z",
+  "scope": "Unchanged complete26-case workload and600s wall cap; child-only soft memory-lock cap64KiB; inherited hard limit preserved; node policy unchanged",
+  "binary_sha256": "01a27931ecdf85e54fdec1550daa3a354869f7b8232cc4173c7af4fa0f42b16b",
+  "head": "4d7097848da7dc803db55227f3a7d67ef5335056",
+  "source_status_before": "",
+  "load_before": [
+    15.03369140625,
+    7.494140625,
+    4.490234375
+  ],
+  "passed": true,
+  "argv": [
+    "/usr/bin/python3",
+    "/home/dlarimer/psibase-migration-20261121/evidence/triedent-restricted-20261121T201357Z/child.py",
+    "/home/dlarimer/psibase-migration-20261121/evidence/triedent-restricted-20261121T201357Z/child-limits.json",
+    "/home/dlarimer/psibase-migration-20261121/source/build/triedent-tests",
+    "--durations",
+    "yes"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 2.769858829677105,
+  "load_after": [
+    14.71044921875,
+    7.552734375,
+    4.525390625
+  ],
+  "source_status_after": "",
+  "binary_sha256_after": "01a27931ecdf85e54fdec1550daa3a354869f7b8232cc4173c7af4fa0f42b16b"
+}

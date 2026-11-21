@@ -1,0 +1,138 @@
+Randomness seeded to: 712587762
+0.331 s: key round trip
+0.518 s: key order
+1.058 s: insert
+1.012 s: insert
+0.996 s: insert
+1.000 s: insert
+1.010 s: insert
+1.006 s: insert
+0.998 s: insert
+1.015 s: insert
+1.034 s: insert
+0.984 s: insert
+1.005 s: insert
+1.010 s: insert
+1.018 s: insert
+0.969 s: insert
+1.002 s: insert
+1.015 s: insert
+1.047 s: insert
+1.013 s: insert
+1.023 s: erase
+0.992 s: erase
+1.039 s: erase
+1.075 s: erase
+1.118 s: erase
+1.095 s: erase
+1.087 s: erase
+1.065 s: erase
+1.038 s: erase
+1.047 s: erase
+1.062 s: erase
+1.088 s: erase
+1.086 s: erase
+1.098 s: erase
+1.107 s: erase
+1.170 s: erase
+1.157 s: erase
+1.162 s: erase
+1.155 s: erase
+1.145 s: erase
+0.333 s: recover
+0.162 s: many refs
+0.171 s: small cache
+0.803 s: small cache no inplace
+1.096 s: test is_empty
+1.118 s: test is_empty
+1.087 s: test is_empty
+1.096 s: test is_empty
+1.066 s: test is_empty
+1.078 s: test is_empty
+1.056 s: test is_empty
+1.071 s: test is_empty
+1.056 s: test is_empty
+1.085 s: test is_empty
+1.071 s: test is_empty
+1.052 s: test is_empty
+1.042 s: test is_empty
+1.029 s: test is_empty
+1.052 s: test is_empty
+1.046 s: test is_empty
+1.052 s: test is_empty
+1.047 s: test is_empty
+1.030 s: test is_empty
+0.956 s: test is_empty
+0.942 s: test is_empty
+0.945 s: test is_empty
+0.979 s: test is_empty
+0.972 s: test is_empty
+0.998 s: test is_empty
+0.979 s: test is_empty
+1.000 s: test is_empty
+0.993 s: test is_empty
+1.059 s: test is_empty
+0.962 s: test is_empty
+0.986 s: test is_empty
+1.029 s: test is_empty
+0.995 s: test is_empty
+0.965 s: test is_empty
+0.962 s: test is_empty
+1.024 s: test is_empty
+1.023 s: test is_empty
+1.038 s: test is_empty
+1.053 s: test is_empty
+1.067 s: test is_equal_weak
+1.099 s: test is_equal_weak
+1.107 s: test is_equal_weak
+1.062 s: test is_equal_weak
+0.991 s: test is_equal_weak
+0.974 s: test is_equal_weak
+0.984 s: test is_equal_weak
+1.017 s: test is_equal_weak
+1.043 s: test is_equal_weak
+1.036 s: test is_equal_weak
+0.998 s: test take
+0.990 s: test take
+0.990 s: test take
+1.004 s: test take
+1.099 s: test take
+1.131 s: test take
+1.110 s: test take
+1.037 s: test take
+1.098 s: test take
+1.110 s: test take
+1.106 s: test take
+1.121 s: test take
+1.076 s: test take
+1.092 s: test take
+1.044 s: test take
+1.051 s: test take
+1.080 s: test take
+1.077 s: test take
+1.080 s: test take
+1.088 s: test take
+1.082 s: test take
+1.079 s: test take
+1.190 s: test take
+1.183 s: test splice
+1.121 s: test splice
+1.032 s: test splice
+1.023 s: test splice
+2.945 s: test splice
+2.979 s: test splice
+3.156 s: test splice
+3.050 s: test splice
+8.685 s: test splice
+9.429 s: test splice
+9.531 s: test splice
+9.733 s: test splice
+9.265 s: test splice
+9.802 s: test splice
+9.207 s: test splice
+9.348 s: test splice
+9.069 s: test splice
+9.045 s: test splice
+9.694 s: test splice
+9.148 s: test splice
+277.547 s: test splice

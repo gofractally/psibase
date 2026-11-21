@@ -45,5 +45,6 @@ const fixture={vault:address.slice(2).toLowerCase(),deployment:deployment.slice(
 // EIP-2098 compactSerialized folds the parity into s. Rust's generic service
 // supplies raw r||s instead, so retain that exact representation explicitly.
 for(let i=0;i<fixture.signatures.length;i++){const s=signers[i].signingKey.sign(digest);fixture.signatures[i].compact=(s.r+s.s.slice(2)).slice(2)}
-fs.writeFileSync(new URL('vault-fixture.json',import.meta.url),JSON.stringify(fixture,null,2)+'\n');
+const fixtureOutput=process.env.ETHBRIDGE_FIXTURE_OUTPUT??new URL('vault-fixture.json',import.meta.url);
+fs.writeFileSync(fixtureOutput,JSON.stringify(fixture,null,2)+'\n');
 console.log(JSON.stringify({checks:['EIP-712 parity','10-gwei precision','plain transfer rejection','duplicate signatures','modified amount','signature order','unauthorized signer','nonce replay','allocation conservation','third-party claim','claim replay','receipt roots','runtime code hash'],vault:address,runtimeKeccak:artifact.runtimeKeccak}));await rpc.disconnect();

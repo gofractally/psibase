@@ -11,7 +11,11 @@ API=f'http://psibase.localhost:{NODE_PORT}/'
 ORIGIN=f'http://btcbridge.psibase.localhost:{NODE_PORT}'
 RUST_HOST=next(line.split(': ',1)[1] for line in subprocess.check_output(['rustc','-vV'],text=True).splitlines() if line.startswith('host: '))
 CLI=Path(os.environ.get('BTCBRIDGE_CLI',ROOT/f'rust/target/{RUST_HOST}/release/psibase'))
-DAEMON=ROOT/f'packages/user/target/{RUST_HOST}/debug/signing-daemon'
+DAEMON=Path(os.environ.get('BTCBRIDGE_SIGNING_DAEMON',ROOT/f'packages/user/target/{RUST_HOST}/debug/signing-daemon'))
+NODE=Path(os.environ.get('BTCBRIDGE_NODE_BIN',ROOT/'build/psinode'))
+CARGO_PSIBASE=Path(os.environ.get('BTCBRIDGE_CARGO_PSIBASE',ROOT/'rust/target/release/cargo-psibase'))
+PSITEST=Path(os.environ.get('BTCBRIDGE_PSITEST',ROOT/'build/psitest'))
+PACKAGE_SOURCE=Path(os.environ.get('BTCBRIDGE_PACKAGE_SOURCE',ROOT/'demo/artifacts/packages')).resolve()
 BITCOIN=Path(os.environ.get('BTCBRIDGE_BITCOIN_BIN',Path(__file__).parent/'bin/bitcoin-32.1/bin'))
 LOCK=threading.RLock()
 RELAYER=os.environ.get('BTCBRIDGE_RELAYER_ACCOUNT','alice')
