@@ -228,8 +228,20 @@ namespace psibase
             case triedent::open_mode::gc:
                throw std::runtime_error("offline triedent GC mode is not a psitri open mode");
          }
+         auto nativeDirectory = dir;
+         if (targetMode != storage::open_mode::temporary)
+         {
+            // The node directory also owns configuration, logs and secrets.
+            // Keep the strictly identified native store in its own namespace.
+            // Never silently start a fresh chain over a prior storage layout.
+            for (const char* marker : {"db", "psibase-storage-format", "roots", "segs"})
+               if (std::filesystem::exists(dir / marker))
+                  throw std::runtime_error(
+                      "Database uses a previous storage layout; use a fresh chain directory");
+            nativeDirectory /= "state";
+         }
          trie = std::make_shared<storage::database>(
-             dir,
+             nativeDirectory,
              storage::database_config{config.hot_bytes, config.warm_bytes, config.cool_bytes,
                                       config.cold_bytes},
              targetMode);

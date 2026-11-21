@@ -1,7 +1,9 @@
 #include <unistd.h>
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
 #include <filesystem>
+#include <fstream>
 #include <psibase/CpuAccounting.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/api.hpp>
@@ -315,4 +317,70 @@ TEST_CASE("accepted subjective effects finish before deferred cancellation is re
    REQUIRE(std::string(committed->begin(), committed->end()) == "accepted");
    db.abortSubjective();
    shared.setCallbacks(nullptr);
+}
+
+TEST_CASE("psitri node files remain outside the identified native store", "[storage][psitri]")
+{
+   auto path = directory("node-layout");
+   std::filesystem::create_directories(path);
+   {
+      std::ofstream file(path / "config");
+      file << "database-cache-policy = disabled\n";
+   }
+   {
+      std::ofstream file(path / "node.log");
+      file << "existing node log\n";
+   }
+   {
+      SharedDatabase shared(path, config, triedent::open_mode::create_new);
+      CHECK(shared.directory() == std::filesystem::absolute(path / "state").lexically_normal());
+      CHECK(std::filesystem::exists(path / "state" / "psibase-storage-format"));
+      auto writer = shared.createWriter();
+      shared.kvPutSubjective(*writer, DbId::subjective, span("layout"), span("preserved"));
+   }
+   {
+      SharedDatabase reopened(path, config, triedent::open_mode::read_only);
+      auto           writer = reopened.createWriter();
+      REQUIRE(reopened.kvGetSubjective(*writer, DbId::subjective, span("layout")));
+   }
+   auto read = [](const std::filesystem::path& file)
+   {
+      std::ifstream input(file);
+      return std::string(std::istreambuf_iterator<char>(input), {});
+   };
+   CHECK(read(path / "config") == "database-cache-policy = disabled\n");
+   CHECK(read(path / "node.log") == "existing node log\n");
+}
+
+TEST_CASE("psitri refuses prior root-level storage layouts before creating state",
+          "[storage][psitri]")
+{
+   for (const char* marker : {"db", "psibase-storage-format", "roots", "segs"})
+   {
+      auto path = directory("previous-layout");
+      std::filesystem::create_directories(path);
+      {
+         std::ofstream file(path / marker);
+         file << "preserved prior store\n";
+      }
+      CHECK_THROWS_WITH(SharedDatabase(path, config, triedent::open_mode::create),
+                        "Database uses a previous storage layout; use a fresh chain directory");
+      CHECK_FALSE(std::filesystem::exists(path / "state"));
+      std::ifstream file(path / marker);
+      CHECK(std::string(std::istreambuf_iterator<char>(file), {}) == "preserved prior store\n");
+   }
+}
+
+TEST_CASE("psitri empty temporary paths use and clean up the system temporary directory",
+          "[storage][psitri]")
+{
+   std::filesystem::path temporary;
+   {
+      SharedDatabase shared({}, config, triedent::open_mode::temporary);
+      temporary = shared.directory();
+      CHECK(std::filesystem::weakly_canonical(temporary.parent_path()) ==
+            std::filesystem::weakly_canonical(std::filesystem::temp_directory_path()));
+      CHECK(std::filesystem::exists(temporary / "psibase-storage-format"));
+   }
+   CHECK_FALSE(std::filesystem::exists(temporary));
 }

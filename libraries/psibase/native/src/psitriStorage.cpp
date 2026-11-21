@@ -595,7 +595,10 @@ namespace psibase::storage
                 "; psibase uses explicit storage configuration");
       auto state      = std::make_shared<State>();
       state->readonly = mode == open_mode::read_only;
-      auto path       = std::filesystem::absolute(requested).lexically_normal();
+      auto path       = std::filesystem::absolute(mode == open_mode::temporary && requested.empty()
+                                                      ? std::filesystem::temp_directory_path()
+                                                      : requested)
+                            .lexically_normal();
       if (mode == open_mode::temporary)
       {
          static std::atomic<unsigned> serial = 0;
