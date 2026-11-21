@@ -72,6 +72,8 @@ namespace psibase
 
    void TransactionContext::execTransaction()
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       // Prepare for execution
       auto& db         = blockContext.db;
@@ -173,6 +175,8 @@ namespace psibase
 
    void TransactionContext::execVerifyProof(size_t i)
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog.accountingScope();
       // TODO: fracpack validation, allowing new fields in inner transaction. Might be redundant elsewhere?
       auto trxView    = *signedTransaction.transaction;
       auto claimsView = trxView.claims();
@@ -186,6 +190,8 @@ namespace psibase
                                             Claim              claim,
                                             std::vector<char>  proof)
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -225,6 +231,8 @@ namespace psibase
                                              const Action& action,
                                              ActionTrace&  atrace)
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db      = blockContext.db;
       config               = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -253,6 +261,8 @@ namespace psibase
                                              const Action& action,
                                              ActionTrace&  atrace)
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog.accountingScope();
       atrace.action    = action;
       ActionContext ac = {*this, action, atrace};
       try
@@ -272,6 +282,8 @@ namespace psibase
                                              ActionTrace&  atrace,
                                              CallFlags     flags)
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog.accountingScope();
       if (flags == CallFlags::none)
       {
          execCalledAction(callerFlags, action, atrace);
@@ -329,6 +341,8 @@ namespace psibase
    // TODO: different wasmConfig, controlled by config file
    void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
@@ -356,6 +370,8 @@ namespace psibase
                                        const Action&    action,
                                        ActionTrace&     atrace)
    {
+      // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
+      auto storageAccounting = impl->watchdog.accountingScope();
       ScopedAtomic saved{impl->vmTimedOut};
       auto&        db  = blockContext.db;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <pthread.h>
+#include <time.h>
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
@@ -10,12 +12,9 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
-#include <pthread.h>
-#include <time.h>
 
 #ifdef __APPLE__
-#include <mach/mach.h>
-#include <mach/thread_info.h>
+#include <psibase/DarwinCpuClock.hpp>
 #endif
 
 namespace psibase::accounting
@@ -36,9 +35,7 @@ namespace psibase::accounting
    class NativeThreadClock
    {
 #ifdef __APPLE__
-      const pthread_t owner = pthread_self();
-      const thread_t port = mach_thread_self();
-      mutable std::atomic<std::int64_t> observed{};
+      std::shared_ptr<darwin::State> state = darwin::currentState();
 #else
       clockid_t clock;
 #endif
@@ -47,53 +44,50 @@ namespace psibase::accounting
       NativeThreadClock()
       {
 #ifdef __APPLE__
-         if (port == MACH_PORT_NULL)
-            throw std::runtime_error("mach_thread_self failed");
+         // currentState explicitly reserves and checks the sampling signal.
 #else
          if (auto error = pthread_getcpuclockid(pthread_self(), &clock))
             throw std::system_error(error, std::system_category());
 #endif
       }
       NativeThreadClock(const NativeThreadClock&) = delete;
-      ~NativeThreadClock()
-      {
 #ifdef __APPLE__
-         if (mach_port_deallocate(mach_task_self(), port) != KERN_SUCCESS)
-            std::terminate();
+      auto nativeState() const { return state; }
 #endif
-      }
       Duration read() const
       {
 #ifdef __APPLE__
-         Duration value;
-         if (pthread_equal(owner, pthread_self()))
-         {
-            value = rawCpu(CLOCK_THREAD_CPUTIME_ID);
-         }
+         if (darwin::current.load(std::memory_order_acquire) == state.get())
+            state->observe(rawCpu(CLOCK_THREAD_CPUTIME_ID).count());
          else
          {
-            thread_basic_info_data_t info{};
-            mach_msg_type_number_t count = THREAD_BASIC_INFO_COUNT;
-            const auto error = thread_info(port, THREAD_BASIC_INFO,
-                                           reinterpret_cast<thread_info_t>(&info), &count);
-            if (error != KERN_SUCCESS)
-               throw std::runtime_error("thread_info CPU clock failed: " +
-                                        std::to_string(error));
-            value = std::chrono::seconds(std::int64_t(info.user_time.seconds) +
-                                         info.system_time.seconds) +
-                    std::chrono::microseconds(std::int64_t(info.user_time.microseconds) +
-                                              info.system_time.microseconds);
+            const auto generation = darwin::request(state);
+            const auto deadline   = std::chrono::steady_clock::now() + std::chrono::milliseconds(1);
+            while (state->completed.load(std::memory_order_acquire) < generation &&
+                   state->alive.load(std::memory_order_acquire) &&
+                   std::chrono::steady_clock::now() < deadline)
+               std::this_thread::sleep_for(std::chrono::microseconds(50));
+            if (auto error = state->error.load(std::memory_order_relaxed))
+               throw std::system_error(error, std::system_category());
+            if (state->completed.load(std::memory_order_acquire) < generation &&
+                state->alive.load(std::memory_order_acquire))
+            {
+               thread_basic_info_data_t info{};
+               mach_msg_type_number_t   count = THREAD_BASIC_INFO_COUNT;
+               const auto error = thread_info(state->port, THREAD_BASIC_INFO,
+                                              reinterpret_cast<thread_info_t>(&info), &count);
+               if (error == KERN_SUCCESS)
+                  state->observe(
+                      std::int64_t(info.user_time.seconds + info.system_time.seconds) * 1000000000 +
+                      std::int64_t(info.user_time.microseconds + info.system_time.microseconds) *
+                          1000);
+               else if (error != KERN_TERMINATED && state->alive.load(std::memory_order_acquire))
+                  throw std::runtime_error(
+                      "Darwin CPU sampling timeout and Mach fallback failed: " +
+                      std::to_string(error));
+            }
          }
-         // Remote Mach samples have microsecond precision and can lag a self
-         // sample. Preserve the largest actually observed CPU measurement;
-         // never advance from elapsed wall time or guessed CPU consumption.
-         auto prior = observed.load(std::memory_order_relaxed);
-         while (prior < value.count() &&
-                !observed.compare_exchange_weak(prior, value.count(),
-                                               std::memory_order_relaxed))
-         {
-         }
-         return Duration(std::max(prior, value.count()));
+         return Duration(state->cpu.load(std::memory_order_relaxed));
 #else
          return rawCpu(clock);
 #endif
@@ -105,4 +99,29 @@ namespace psibase::accounting
       thread_local auto clock = std::make_shared<NativeThreadClock>();
       return clock;
    }
+#ifdef __APPLE__
+   class PublicationSignalMask
+   {
+      sigset_t prior;
+
+     public:
+      PublicationSignalMask()
+      {
+         sigset_t set;
+         sigemptyset(&set);
+         sigaddset(&set, darwin::signalNumber);
+         if (auto error = pthread_sigmask(SIG_BLOCK, &set, &prior))
+            throw std::system_error(error, std::system_category());
+      }
+      ~PublicationSignalMask()
+      {
+         if (pthread_sigmask(SIG_SETMASK, &prior, nullptr))
+            std::terminate();
+      }
+   };
+#else
+   struct PublicationSignalMask
+   {
+   };
+#endif
 }  // namespace psibase::accounting

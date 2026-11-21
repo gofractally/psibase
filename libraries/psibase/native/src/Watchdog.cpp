@@ -8,7 +8,8 @@ namespace psibase
 
    CpuClock::time_point CpuClock::now()
    {
-      return time_point(accounting::currentThreadClock()->read());
+      return time_point(accounting::currentThreadClock()->read() +
+                        accounting::threadCounter()->sample());
    }
 
    CpuClock::time_point CpuClock::now(clockid_t clock)
@@ -72,24 +73,32 @@ namespace psibase
 
    Watchdog::Watchdog(WatchdogManager& m, std::function<void()> handler)
        : manager(&m),
+         extraCpu(accounting::threadCounter()),
+         cpuclock(accounting::currentThreadClock()),
          paused(false),
          elapsedOrStart(CpuClock::now().time_since_epoch()),
          handler(handler)
    {
-      cpuclock = accounting::currentThreadClock();
+      publishBudget();
+      request = std::make_shared<accounting::Request>([this] { return remaining().count() >= 0; });
+      extraCpu->subscribe(this, [manager = &m] { manager->cond.notify_one(); });
       manager->add(this);
    }
    Watchdog::~Watchdog()
    {
       manager->remove(this);
+      extraCpu->unsubscribe(this);
+      request->close();
    }
    void Watchdog::setLimit(CpuClock::duration dur)
    {
       assert(dur.count() >= 0);
-      bool notify = dur < limit;
+      bool notify;
       {
          std::lock_guard l{manager->mutex};
-         limit = dur;
+         notify = dur < limit;
+         limit  = dur;
+         publishBudget();
       }
       if (notify)
       {
@@ -101,7 +110,8 @@ namespace psibase
       assert(!paused);
       std::lock_guard l{manager->mutex};
       paused         = true;
-      elapsedOrStart = CpuClock::now().time_since_epoch() - elapsedOrStart;
+      elapsedOrStart = logicalNow() - elapsedOrStart;
+      publishBudget();
    }
    void Watchdog::resume()
    {
@@ -109,34 +119,51 @@ namespace psibase
       {
          std::lock_guard l{manager->mutex};
          paused         = false;
-         elapsedOrStart = CpuClock::now().time_since_epoch() - elapsedOrStart;
+         elapsedOrStart = logicalNow() - elapsedOrStart;
+         publishBudget();
       }
       manager->cond.notify_one();
    }
    CpuClock::duration Watchdog::elapsed()
    {
-      if (paused)
+      const auto budget = std::atomic_load(&publishedBudget);
+      if (budget->paused)
       {
-         return elapsedOrStart;
+         return budget->elapsedOrStart;
       }
       else
       {
-         return CpuClock::now().time_since_epoch() - elapsedOrStart;
+         return logicalNow() - budget->elapsedOrStart;
       }
    }
    void Watchdog::interrupt()
    {
+      request->cancel();
       handler();
    }
    CpuClock::duration Watchdog::wait_duration()
    {
-      if (paused)
+      return remaining();
+   }
+   CpuClock::duration Watchdog::logicalNow() const
+   {
+      return cpuclock->read() + extraCpu->sample();
+   }
+   void Watchdog::publishBudget()
+   {
+      std::atomic_store(&publishedBudget,
+                        std::make_shared<const Budget>(Budget{paused, elapsedOrStart, limit}));
+   }
+   CpuClock::duration Watchdog::remaining() const
+   {
+      const auto budget = std::atomic_load(&publishedBudget);
+      if (budget->paused)
       {
          return CpuClock::duration::max();
       }
       else
       {
-         return limit - (cpuclock->read() - elapsedOrStart);
+         return budget->limit - (logicalNow() - budget->elapsedOrStart);
       }
    }
 

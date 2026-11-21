@@ -28,5 +28,6 @@
     "libraries/psibase/native/src/Watchdog.cpp": "a5dc9ea33efa8a45293cfc6ecda48eab13a66264b6dd574b09dc843e7a7e586b",
     "libraries/psibase/native/tests/WatchdogTests.cpp": "f715cc1d179dbff6f3aeab3f4d4298be77798692c914960e4bea9e94a8cc6925",
     "libraries/psibase/native/include/psibase/NativeThreadClock.hpp": "9d6e141ac1a4654097355429d74932e4c06dc698ec1f0b35219f1dea57465401"
-  }
+  },
+  "resolution": "Historical failed candidate retained. Darwin precise self-signal sampling and critical timer qualification are recorded in cpu-accounting-validation.json."
 }
