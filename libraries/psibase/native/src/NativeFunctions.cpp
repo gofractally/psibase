@@ -166,10 +166,10 @@ namespace psibase
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "ConfigRow has incorrect key");
 
-         // Both of these are on the conservative side for triedent. The actual
+         // Both of these are on the conservative side for the storage engine. The actual
          // max values are odd.
-         check(row.maxKeySize <= 128, "maxKeySize too big for triedent");
-         check(row.maxValueSize <= (15 << 20), "maxValueSize too big for triedent");
+         check(row.maxKeySize <= 128, "maxKeySize too big for the storage engine");
+         check(row.maxValueSize <= (15 << 20), "maxValueSize too big for the storage engine");
       }
 
       void verifyWasmConfigRow(NativeTableNum     table,

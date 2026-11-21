@@ -311,11 +311,11 @@ struct test_chain
 
    test_chain(::state&                         state,
               const std::filesystem::path&     path,
-              const triedent::database_config& config,
-              triedent::open_mode              mode)
+              const psibase::storage::database_config& config,
+              psibase::storage::open_mode              mode)
        : test_chain{state, {path, config, mode}}
    {
-      if (mode != triedent::open_mode::read_only)
+      if (mode != psibase::storage::open_mode::read_only)
       {
          sys->sockets->set(*writer, psibase::SocketRow::producer_multicast,
                            std::make_shared<NullSocket>());
@@ -1207,6 +1207,15 @@ struct callbacks
       return result;
    }
 
+   // The tester ABI: four sizing hints, as laid out by the guest.
+   struct TesterDatabaseConfig
+   {
+      std::uint64_t hot_bytes;
+      std::uint64_t warm_bytes;
+      std::uint64_t cool_bytes;
+      std::uint64_t cold_bytes;
+   };
+
    uint32_t testerCreateChain(uint64_t hot_bytes,
                               uint64_t warm_bytes,
                               uint64_t cool_bytes,
@@ -1214,15 +1223,15 @@ struct callbacks
    {
       state.chains.push_back(std::make_unique<test_chain>(
           state, std::filesystem::temp_directory_path(),
-          triedent::database_config{hot_bytes, warm_bytes, cool_bytes, cold_bytes},
-          triedent::open_mode::temporary));
+          psibase::storage::database_config{hot_bytes, warm_bytes, cool_bytes, cold_bytes},
+          psibase::storage::open_mode::temporary));
       return state.chains.size() - 1;
    }
 
    uint32_t testerOpenChain(span<const char>                          path,
                             wasi_oflags_t                             oflags,
                             wasi_rights_t                             fs_rights_base,
-                            wasm_ptr<const triedent::database_config> config)
+                            wasm_ptr<const TesterDatabaseConfig> config)
    {
       bool read   = fs_rights_base & wasi_rights_fd_read;
       bool write  = fs_rights_base & wasi_rights_fd_write;
@@ -1232,27 +1241,30 @@ struct callbacks
 
       psibase::check(read, "Chain cannot be opened without read access");
 
-      triedent::open_mode mode;
+      psibase::storage::open_mode mode;
       if (!write)
       {
          if (create || excl || trunc)
             throw std::runtime_error("Unsupported combination of flags for openChain");
-         mode = triedent::open_mode::read_only;
+         mode = psibase::storage::open_mode::read_only;
       }
       else if (!create && !excl && !trunc)
-         mode = triedent::open_mode::read_write;
+         mode = psibase::storage::open_mode::read_write;
       else if (create && !excl && !trunc)
-         mode = triedent::open_mode::create;
+         mode = psibase::storage::open_mode::create;
       else if (create && excl && !trunc)
-         mode = triedent::open_mode::create_new;
+         mode = psibase::storage::open_mode::create_new;
       else if (create && !excl && trunc)
-         mode = triedent::open_mode::trunc;
+         mode = psibase::storage::open_mode::trunc;
       else
          throw std::runtime_error("Unsupported combination of flags for openChain");
 
       state.chains.push_back(std::make_unique<test_chain>(
           state, std::string_view{path.data(), path.size()},
-          create ? *config : triedent::database_config{1 << 27, 1 << 27, 1 << 27, 1 << 27}, mode));
+          create ? psibase::storage::database_config{config->hot_bytes, config->warm_bytes,
+                                                     config->cool_bytes, config->cold_bytes}
+                 : psibase::storage::database_config{1 << 27, 1 << 27, 1 << 27, 1 << 27},
+          mode));
       return state.chains.size() - 1;
    }
 

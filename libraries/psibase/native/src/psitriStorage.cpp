@@ -44,6 +44,9 @@ namespace psibase::storage
    // the directory is this adapter's own unfinished initialization.
    constexpr std::string_view initFile = "psibase-storage-initializing";
    constexpr std::string_view countKey    = "count";
+   // Engine root 0 is the flushed manifest (the "top root"). Root 1 is node-local
+   // state that is published without flushing.
+   constexpr std::uint32_t localRootIndex = 1;
 
    std::string_view bytes(std::span<const char> data)
    {
@@ -67,12 +70,12 @@ namespace psibase::storage
       return result;
    }
 
-   // SAL's public session contract permits serialized cross-thread use:
-   // psitri e4d23be, sal/allocator.hpp:158-161 and allocator_session.hpp:431-438.
-   // Every native operation AND retained-handle destruction enters this same
-   // gate. Work stays on its existing caller; waiting consumes no thread CPU.
-   // Recursion is only for native owned-handle cleanup. Application callbacks
-   // remain outside this boundary, after the higher-level publication locks.
+   // The engine has one writer. SAL's session contract permits serialized
+   // cross-thread use of it, so every MUTATING native operation enters this
+   // gate and runs on its caller. Reads and root lifetimes do not: they use
+   // per-thread reader sessions and thread-safe shared references (see
+   // ReaderPool and root). Application callbacks stay outside this boundary,
+   // after the higher-level publication locks.
    class SerializedNativeAccess
    {
       std::recursive_mutex mutex;
@@ -123,12 +126,58 @@ namespace psibase::storage
       }
    };
 
+   // Reader sessions, one in use per thread at a time. Reads never enter the
+   // writer's gate: each borrows an engine read session, opens its own cursor on
+   // the (immutable) shared tree, and returns the session. Borrowing is a single
+   // uncontended atomic exchange; the pool bounds how many engine sessions exist.
+   class ReaderPool
+   {
+      static constexpr unsigned size = 32;
+      struct Slot
+      {
+         std::atomic<bool>                     busy{false};
+         std::shared_ptr<Engine::read_session> session;
+      };
+      std::array<Slot, size> slots;
+
+     public:
+      template <class F>
+      auto use(Engine::database& engine, F&& function)
+      {
+         const unsigned start =
+             static_cast<unsigned>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+         for (;;)
+         {
+            for (unsigned i = 0; i < size; ++i)
+            {
+               auto& slot = slots[(start + i) % size];
+               if (slot.busy.exchange(true, std::memory_order_acquire))
+                  continue;
+               struct Return
+               {
+                  Slot& slot;
+                  ~Return() { slot.busy.store(false, std::memory_order_release); }
+               } giveBack{slot};
+               if (!slot.session)
+                  slot.session = engine.start_read_session();
+               return std::forward<F>(function)(*slot.session);
+            }
+            std::this_thread::yield();
+         }
+      }
+      void close()
+      {
+         for (auto& slot : slots)
+            slot.session.reset();
+      }
+   };
+
    struct State
    {
-      SerializedNativeAccess                 access;
+      SerializedNativeAccess                 access;  // the single writer; never taken by reads
       std::shared_ptr<Engine::database>      engine;
       std::shared_ptr<Engine::write_session> writer;
-      std::shared_ptr<Engine::read_session>  reader;
+      ReaderPool                             readers;
       std::filesystem::path                  path;
       bool                                   readonly  = false;
       bool                                   temporary = false;
@@ -137,7 +186,7 @@ namespace psibase::storage
          access.invoke(
              [&]
              {
-                reader.reset();
+                readers.close();
                 writer.reset();
                 engine.reset();
              },
@@ -154,46 +203,65 @@ namespace psibase::storage
             throw std::runtime_error("database is read-only");
       }
    };
+   // A root is an immutable tree plus a reference that keeps it alive. The
+   // reference is thread-safe: copying and dropping need neither a session nor
+   // the writer's gate, and the last drop is finished by the engine's release
+   // thread. `tree` is declared after `state` so it is dropped while the engine
+   // is still open.
    struct root
    {
-      std::shared_ptr<State>  state;
-      std::optional<Snapshot> snapshot;
-      std::optional<Cursor>   readonlyCursor;
-      Cursor cursor() const { return snapshot ? snapshot->snapshot_cursor() : *readonlyCursor; }
+      std::shared_ptr<State> state;
+      Engine::shared_tree    tree;
    };
-   shared_root retain(const std::shared_ptr<State>& state, Snapshot snapshot)
+   shared_root retain(const std::shared_ptr<State>& state, Engine::shared_tree tree)
    {
-      if (!snapshot)
+      if (!tree)
          return {};
-      return shared_root(new root{state, std::move(snapshot), {}},
-                         [state](const root* r) { state->access.invoke([&] { delete r; }, true); });
+      return std::make_shared<const root>(state, std::move(tree));
    }
-   shared_root retain(const std::shared_ptr<State>& state, Cursor cursor)
-   {
-      return shared_root(new root{state, {}, std::move(cursor)},
-                         [state](const root* r) { state->access.invoke([&] { delete r; }, true); });
-   }
+   // Writer side, inside the gate: continue from a root. The shared reference
+   // makes every edit copy-on-write, so concurrent readers never see a change.
    Snapshot native(const std::shared_ptr<State>& state, const shared_root& r)
    {
       state->writable();
       if (!r)
          return state->writer->create_temporary_tree();
-      if (r->state != state || !r->snapshot)
-         throw std::runtime_error("foreign or read-only storage root");
-      return *r->snapshot;
+      if (r->state != state)
+         throw std::runtime_error("foreign storage root");
+      return state->writer->adopt(r->tree);
+   }
+   shared_root publishable(const std::shared_ptr<State>& state, Snapshot tree)
+   {
+      return retain(state, state->writer->share(std::move(tree)));
    }
    struct database_view
    {
       std::shared_ptr<State> state;
       std::mutex             mutex;
       shared_root            top;
+      shared_root            local;
       bool                   publish = true;
    };
 
-   void readRootValue(const std::shared_ptr<State>& state,
-                      Cursor&                       cursor,
-                      std::vector<char>*            value,
-                      std::vector<shared_root>*     roots)
+   // Run a read on the caller's thread with a borrowed reader session.
+   template <class F>
+   auto reading(const shared_root& source, F&& function)
+   {
+      accounting::check();
+      auto& state = *source->state;
+      return state.readers.use(*state.engine,
+                               [&](Engine::read_session& session)
+                               {
+                                  decltype(auto) result = std::forward<F>(function)(session);
+                                  accounting::check();
+                                  return result;
+                               });
+   }
+
+   void readValue(const shared_root&        source,
+                  Cursor&                   cursor,
+                  std::vector<char>*        value,
+                  std::vector<shared_root>* roots)
    {
       if (value)
          value->clear();
@@ -221,15 +289,7 @@ namespace psibase::storage
                continue;
             if (!list.is_subtree())
                throw std::runtime_error("invalid owned root-list entry");
-            if (state->readonly)
-               (*roots)[i] = retain(state, list.subtree_cursor());
-            else
-            {
-               // Get an owned child through the public snapshot extension;
-               // a cursor alone does not expose writable allocator addresses.
-               // This path is supplied by the caller's owning snapshot below.
-               throw std::logic_error("owned root extraction needs snapshot");
-            }
+            (*roots)[i] = retain(source->state, list.subtree_shared());
          }
       }
       else if (value)
@@ -238,36 +298,6 @@ namespace psibase::storage
          if (!v)
             throw std::runtime_error("invalid byte value");
          value->assign(v->begin(), v->end());
-      }
-   }
-
-   void readValue(const shared_root&        source,
-                  Cursor&                   cursor,
-                  std::vector<char>*        value,
-                  std::vector<shared_root>* roots)
-   {
-      if (!cursor.is_subtree() || !roots || source->state->readonly)
-      {
-         readRootValue(source->state, cursor, value, roots);
-         return;
-      }
-      if (value)
-         value->clear();
-      roots->clear();
-      auto       list    = source->snapshot->get_subtree(cursor.key());
-      const auto encoded = list.get<std::string>(countKey);
-      if (!encoded || encoded->size() != 4)
-         throw std::runtime_error("invalid root-list header");
-      std::uint32_t count = 0;
-      for (unsigned i = 0; i < 4; ++i)
-         count = (count << 8) | static_cast<unsigned char>((*encoded)[i]);
-      if (count > 4096)
-         throw std::runtime_error("invalid root-list length");
-      roots->resize(count);
-      for (std::uint32_t i = 0; i < count; ++i)
-      {
-         accounting::check();
-         (*roots)[i] = retain(source->state, list.get_subtree(bytes(indexKey(i))));
       }
    }
 
@@ -280,18 +310,17 @@ namespace psibase::storage
    {
       if (!source)
          return false;
-      auto state = view->state;
-      if (source->state != state)
+      if (source->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return state->access.invoke(
-          [&]
-          {
-             auto c = source->cursor();
-             if (!c.lower_bound(bytes(key)) || c.key() != bytes(key))
-                return false;
-             readValue(source, c, value, roots);
-             return true;
-          });
+      return reading(source,
+                     [&](Engine::read_session& session)
+                     {
+                        auto c = session.create_cursor(source->tree);
+                        if (!c.lower_bound(bytes(key)) || c.key() != bytes(key))
+                           return false;
+                        readValue(source, c, value, roots);
+                        return true;
+                     });
    }
    std::optional<std::vector<char>> read_session::get(const shared_root&    source,
                                                       std::span<const char> key)
@@ -317,10 +346,11 @@ namespace psibase::storage
    {
       if (!source)
          return false;
-      return source->state->access.invoke(
-          [&]
+      return reading(
+          source,
+          [&](Engine::read_session& session)
           {
-             auto c     = source->cursor();
+             auto c     = session.create_cursor(source->tree);
              bool found = false;
              if (kind == Seek::lower)
                 found = c.lower_bound(bytes(key));
@@ -380,12 +410,13 @@ namespace psibase::storage
          return true;
       if (r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return r->state->access.invoke(
-          [&]
-          {
-             auto c = r->cursor();
-             return !c.lower_bound(bytes(lower)) || (!upper.empty() && c.key() >= bytes(upper));
-          });
+      return reading(r,
+                     [&](Engine::read_session& session)
+                     {
+                        auto c = session.create_cursor(r->tree);
+                        return !c.lower_bound(bytes(lower)) ||
+                               (!upper.empty() && c.key() >= bytes(upper));
+                     });
    }
 
    bool equalCursors(Cursor a, Cursor b, std::string_view lower, std::string_view upper)
@@ -426,8 +457,13 @@ namespace psibase::storage
          return is_empty(a, lower, upper);
       if (a->state != b->state || a->state != view->state)
          throw std::runtime_error("foreign storage roots");
-      return view->state->access.invoke(
-          [&] { return equalCursors(a->cursor(), b->cursor(), bytes(lower), bytes(upper)); });
+      return reading(a,
+                     [&](Engine::read_session& session)
+                     {
+                        return equalCursors(session.create_cursor(a->tree),
+                                            session.create_cursor(b->tree), bytes(lower),
+                                            bytes(upper));
+                     });
    }
 
    write_session::write_session(std::shared_ptr<database_view> v) : read_session(std::move(v)) {}
@@ -448,8 +484,7 @@ namespace psibase::storage
           {
              auto edit = state->writer->start_write_transaction(native(state, source));
              edit.upsert(identityKey, identity);
-             auto final = edit.get_tree();
-             return retain(state, std::move(final));
+             return publishable(state, edit.get_tree());
           });
       accounting::Publication publication;
       if (view->publish)
@@ -467,6 +502,31 @@ namespace psibase::storage
       view->top = std::move(updated);
       publication.finish();
    }
+   shared_root write_session::get_local_root()
+   {
+      std::lock_guard lock(view->mutex);
+      return view->local;
+   }
+   void write_session::set_local_root(shared_root source)
+   {
+      auto state = view->state;
+      state->writable();
+      std::lock_guard         viewLock(view->mutex);
+      accounting::Publication publication;
+      if (view->publish)
+         state->access.invoke(
+             [&]
+             {
+                accounting::PublicationSignalMask samplingMask;
+                // Published, never flushed: it becomes durable with the next
+                // flushed publication of the top root.
+                state->writer->set_root(localRootIndex, native(state, source));
+             });
+      else if (source && source->state != state)
+         throw std::runtime_error("foreign storage root");
+      view->local = std::move(source);
+      publication.finish();
+   }
    void write_session::upsert(shared_root&          source,
                               std::span<const char> key,
                               std::span<const char> value)
@@ -478,7 +538,7 @@ namespace psibase::storage
           {
              auto edit = state->writer->start_write_transaction(native(state, source));
              edit.upsert(bytes(key), bytes(value));
-             return retain(state, edit.get_tree());
+             return publishable(state, edit.get_tree());
           });
    }
    void write_session::upsert(shared_root&                 source,
@@ -503,7 +563,7 @@ namespace psibase::storage
              }
              auto edit = state->writer->start_write_transaction(native(state, source));
              edit.upsert_subtree(bytes(key), list.get_tree());
-             return retain(state, edit.get_tree());
+             return publishable(state, edit.get_tree());
           });
    }
    void write_session::remove(shared_root& source, std::span<const char> key)
@@ -517,7 +577,7 @@ namespace psibase::storage
           {
              auto edit = state->writer->start_write_transaction(native(state, source));
              edit.remove(bytes(key));
-             return retain(state, edit.get_tree());
+             return publishable(state, edit.get_tree());
           });
    }
    void write_session::splice(shared_root&          destination,
@@ -533,7 +593,8 @@ namespace psibase::storage
              auto edit = state->writer->start_write_transaction(native(state, destination));
              if (destination)
              {
-                auto c = destination->cursor();
+                const auto before = native(state, destination);
+                auto       c      = before.snapshot_cursor();
                 for (bool found = c.lower_bound(bytes(lower));
                      found && (upper.empty() || c.key() < bytes(upper)); found = c.next())
                 {
@@ -543,19 +604,19 @@ namespace psibase::storage
              }
              if (source)
              {
-                native(state, source);  // validate ownership before any publication
-                auto c = source->cursor();
+                const auto from = native(state, source);  // validates ownership first
+                auto       c    = from.snapshot_cursor();
                 for (bool found = c.lower_bound(bytes(lower));
                      found && (upper.empty() || c.key() < bytes(upper)); found = c.next())
                 {
                    accounting::check();
                    if (c.is_subtree())
-                      edit.upsert_subtree(c.key(), source->snapshot->get_subtree(c.key()));
+                      edit.upsert_subtree(c.key(), from.get_subtree(c.key()));
                    else
                       edit.upsert(c.key(), *c.value<std::string>());
                 }
              }
-             return retain(state, edit.get_tree());
+             return publishable(state, edit.get_tree());
           });
    }
 
@@ -641,8 +702,8 @@ namespace psibase::storage
    }
    database::database(std::shared_ptr<database_view> v) : view(std::move(v)) {}
    database::database(const std::filesystem::path& requested,
-                      const database_config&,
-                      open_mode mode)
+                      const database_config&       config,
+                      open_mode                    mode)
    {
       // The maintained engine retains these benchmark environment overrides.
       // Reject them before its cached environment is initialized or any store
@@ -736,8 +797,14 @@ namespace psibase::storage
                 Engine::config cfg;
                 // A temporary store is deleted when it closes; nothing in it can
                 // outlive the process, so it never pays for a flush.
-                cfg.sync_mode = state->temporary ? psitri::sync_mode::none
-                                                 : psitri::sync_mode::fsync;
+                cfg.sync_mode = state->temporary || config.sync == durability::none
+                                    ? psitri::sync_mode::none
+                                    : config.sync == durability::full ? psitri::sync_mode::full
+                                                                      : psitri::sync_mode::fsync;
+                // A flushed commit is only as good as the proof that all of it
+                // reached the disk: checksum what each durable commit covers so a
+                // power-loss rebuild can tell a complete flush from a partial one.
+                cfg.checksum_on_commit = cfg.sync_mode != psitri::sync_mode::none;
                 cfg.enable_read_cache        = false;
                 cfg.max_pinned_cache_size_mb = 0;
                 if (!fresh && !unclean)
@@ -757,8 +824,9 @@ namespace psibase::storage
                     cfg);
                 if (state->readonly)
                 {
-                   state->reader = state->engine->start_read_session();
-                   view->top     = retain(state, state->reader->create_cursor(0));
+                   auto reader = state->engine->start_read_session();
+                   view->top   = retain(state, reader->get_root(0));
+                   view->local = retain(state, reader->get_root(localRootIndex));
                 }
                 else
                 {
@@ -769,7 +837,8 @@ namespace psibase::storage
                       tx.upsert(identityKey, identity);
                       tx.commit();
                    }
-                   view->top = retain(state, state->writer->get_root(0));
+                   view->top   = publishable(state, state->writer->get_root(0));
+                   view->local = publishable(state, state->writer->get_root(localRootIndex));
                    // The sidecar identified this store as ours; after recovery the
                    // manifest must still agree before anything is published to it.
                    if (unclean &&
@@ -796,7 +865,7 @@ namespace psibase::storage
             owner->access.invoke(
                 [&]
                 {
-                   owner->reader.reset();
+                   owner->readers.close();
                    owner->writer.reset();
                    owner->engine.reset();
                 },
@@ -818,7 +887,8 @@ namespace psibase::storage
       result->publish = false;
       {
          std::lock_guard lock(view->mutex);
-         result->top = view->top;
+         result->top   = view->top;
+         result->local = view->local;
       }
       return std::shared_ptr<database>(new database(std::move(result)));
    }

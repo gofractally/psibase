@@ -7,6 +7,8 @@
 #include <cstring>
 #include <fstream>
 #include <functional>
+#include <mutex>
+#include <vector>
 #include <iostream>
 #include <psibase/storage.hpp>
 #include <psibase/storageDiagnostics.hpp>
@@ -341,6 +343,163 @@ int main(int argc, char** argv)
               throws([&] { database db(base / "unknown", config, open_mode::create); },
                      "unidentified store accepted");
               require(std::filesystem::exists(base / "unknown/foreign"), "unknown store removed");
+           });
+      test("reads run beside the writer and are never queued behind it",
+           [&]
+           {
+              database db(base / "parallel", config, open_mode::create_new);
+              auto     w = db.start_write_session();
+              shared_root small, large;
+              for (unsigned i = 0; i < 64; ++i)
+                 put(*w, small, "key" + std::to_string(i), "value" + std::to_string(i));
+              for (unsigned i = 0; i < 20000; ++i)
+                 put(*w, large, "bulk" + std::to_string(i), std::string(64, 'x'));
+              // One long writer operation: it holds the single-writer gate throughout.
+              std::atomic<bool> writing{false}, written{false};
+              std::thread       writer(
+                  [&]
+                  {
+                     shared_root copy;
+                     writing = true;
+                     w->splice(copy, large, {}, {});
+                     written = true;
+                  });
+              while (!writing)
+                 std::this_thread::yield();
+              auto     reader  = db.start_read_session();
+              unsigned during  = 0;
+              for (unsigned round = 0; round < 200 && !written; ++round)
+              {
+                 for (unsigned i = 0; i < 64; ++i)
+                    require(get(*reader, small, "key" + std::to_string(i)) ==
+                                "value" + std::to_string(i),
+                            "read beside the writer");
+                 if (!written)
+                    ++during;
+              }
+              writer.join();
+              require(during > 0, "reads waited for the writer to finish");
+           });
+      test("readers on many threads see whole snapshots while roots are published and dropped",
+           [&]
+           {
+              database    db(base / "snapshots", config, open_mode::create_new);
+              auto        w = db.start_write_session();
+              std::mutex  mutex;
+              shared_root latest;
+              auto        build = [&](unsigned generation)
+              {
+                 shared_root next;
+                 {
+                    std::lock_guard l(mutex);
+                    next = latest;
+                 }
+                 for (unsigned i = 0; i < 100; ++i)
+                    put(*w, next, "key" + std::to_string(i), std::to_string(generation));
+                 std::lock_guard l(mutex);
+                 latest = std::move(next);
+              };
+              build(1);
+              std::atomic<bool>        done{false};
+              std::atomic<unsigned>    reads{0};
+              std::vector<std::thread> readers;
+              for (unsigned r = 0; r < 6; ++r)
+                 readers.emplace_back(
+                     [&]
+                     {
+                        auto reader = db.start_read_session();
+                        while (!done)
+                        {
+                           shared_root mine;
+                           {
+                              std::lock_guard l(mutex);
+                              mine = latest;
+                           }
+                           const auto generation = get(*reader, mine, "key0");
+                           for (unsigned i = 1; i < 100; ++i)
+                              require(get(*reader, mine, "key" + std::to_string(i)) == generation,
+                                      "snapshot mixed two generations");
+                           ++reads;
+                        }  // `mine` is dropped on this thread, outside any lock
+                     });
+              for (unsigned generation = 2; generation <= 150; ++generation)
+              {
+                 build(generation);
+                 if (generation % 5 == 0)
+                 {
+                    auto top = w->get_top_root();
+                    std::array<shared_root, 1> roots;
+                    {
+                       std::lock_guard l(mutex);
+                       roots[0] = latest;
+                    }
+                    w->upsert(top, span("state"), roots);
+                    w->set_top_root(top);
+                 }
+              }
+              while (reads < 30)
+                 std::this_thread::yield();
+              done = true;
+              for (auto& t : readers)
+                 t.join();
+           });
+      test("the local root publishes apart from the top root and survives reopen",
+           [&]
+           {
+              const auto path = base / "local";
+              {
+                 database db(path, config, open_mode::create_new);
+                 auto     w = db.start_write_session();
+                 require(!w->get_local_root(), "fresh store has a local root");
+                 auto top = w->get_top_root();
+                 put(*w, top, "head", "one");
+                 w->set_top_root(top);
+                 shared_root local;
+                 put(*w, local, "session", "alice");
+                 w->set_local_root(local);
+                 require(get(*w, w->get_top_root(), "head") == "one" &&
+                             get(*w, w->get_top_root(), "session") == "<missing>",
+                         "local publication changed the top root");
+                 auto clone = db.clone();
+                 auto cw    = clone->start_write_session();
+                 auto mine  = cw->get_local_root();
+                 put(*cw, mine, "session", "clone");
+                 cw->set_local_root(mine);
+                 require(get(*w, w->get_local_root(), "session") == "alice",
+                         "clone published the local root");
+                 require(get(*cw, cw->get_local_root(), "session") == "clone",
+                         "clone lost its own local root");
+              }
+              {
+                 database db(path, config, open_mode::read_only);
+                 auto     proxy = db.start_write_session();
+                 require(get(*proxy, proxy->get_local_root(), "session") == "alice",
+                         "local root not visible read-only");
+              }
+              database db(path, config, open_mode::read_write);
+              auto     w = db.start_write_session();
+              require(get(*w, w->get_local_root(), "session") == "alice" &&
+                          get(*w, w->get_top_root(), "head") == "one",
+                      "roots lost across reopen");
+              w->set_local_root({});
+              require(!w->get_local_root(), "local root not cleared");
+           });
+      test("flushed durability survives a killed writer as well",
+           [&]
+           {
+              const auto      path = base / "flushed";
+              database_config flushed = config;
+              flushed.sync            = durability::flush;
+              {
+                 database db(path, flushed, open_mode::create_new);
+                 auto     w   = db.start_write_session();
+                 auto     top = w->get_top_root();
+                 put(*w, top, "head", "durable");
+                 w->set_top_root(top);
+              }
+              database db(path, flushed, open_mode::read_write);
+              auto     w = db.start_write_session();
+              require(get(*w, w->get_top_root(), "head") == "durable", "flushed store reopen");
            });
       test("concurrent read-only opens share a store and leave every file unchanged",
            [&]

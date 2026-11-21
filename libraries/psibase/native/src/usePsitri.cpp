@@ -5,7 +5,6 @@
 #include <psibase/Socket.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/storage.hpp>
-#include <triedent/database.hpp>
 
 namespace psibase
 {
@@ -129,8 +128,7 @@ namespace psibase
       ranges.push_back({.lower = keyExact(key), .upper = keyNext(key), .write = true});
    }
 
-   // TODO: move triedent::root destruction to a gc thread
-   struct Revision
+      struct Revision
    {
       storage::shared_root roots[numChainDatabases];
 
@@ -189,9 +187,9 @@ namespace psibase
           static_cast<std::uint32_t>(DbId::endPersistent) -
           static_cast<std::uint32_t>(DbId::beginIndependent);
 
-      SharedDatabaseImpl(const std::filesystem::path&     dir,
-                         const triedent::database_config& config,
-                         triedent::open_mode              mode)
+      SharedDatabaseImpl(const std::filesystem::path&    dir,
+                         const storage::database_config& config,
+                         storage::open_mode              targetMode)
       {
          // The largest object is 16 MiB
          // Each file must be at least double this
@@ -200,33 +198,6 @@ namespace psibase
              config.cool_bytes < min_size || config.cold_bytes < min_size)
          {
             throw std::runtime_error("Requested database size is too small");
-         }
-         storage::open_mode targetMode;
-         switch (mode)
-         {
-            case triedent::open_mode::create:
-               targetMode = storage::open_mode::create;
-               break;
-            case triedent::open_mode::create_new:
-               targetMode = storage::open_mode::create_new;
-               break;
-            case triedent::open_mode::read_only:
-               targetMode = storage::open_mode::read_only;
-               break;
-            case triedent::open_mode::read_write:
-               targetMode = storage::open_mode::read_write;
-               break;
-            case triedent::open_mode::temporary:
-               targetMode = storage::open_mode::temporary;
-               break;
-            case triedent::open_mode::trunc:
-               targetMode = storage::open_mode::trunc;
-               break;
-            case triedent::open_mode::resize:
-               targetMode = storage::open_mode::resize;
-               break;
-            case triedent::open_mode::gc:
-               throw std::runtime_error("offline triedent GC mode is not a psitri open mode");
          }
          auto nativeDirectory = dir;
          if (targetMode != storage::open_mode::temporary)
@@ -240,17 +211,17 @@ namespace psibase
                       "Database uses a previous storage layout; use a fresh chain directory");
             nativeDirectory /= "state";
          }
-         trie = std::make_shared<storage::database>(
-             nativeDirectory,
-             storage::database_config{config.hot_bytes, config.warm_bytes, config.cool_bytes,
-                                      config.cold_bytes},
-             targetMode);
+         trie = std::make_shared<storage::database>(nativeDirectory, config, targetMode);
          auto s  = trie->start_write_session();
          topRoot = s->get_top_root();
          head    = loadRevision(*s, topRoot, revisionHeadKey);
 
+         // Persistent subjective state lives under the store's local root: it is
+         // published without flushing and without touching the consensus manifest.
+         // (A store written before the local root existed kept it in the top root.)
          std::vector<storage::shared_root> roots;
-         if (s->get(topRoot, subjectiveKey, nullptr, &roots))
+         if (s->get(s->get_local_root(), subjectiveKey, nullptr, &roots) ||
+             s->get(topRoot, subjectiveKey, nullptr, &roots))
          {
             check(roots.size() == numPersistentDatabases, "Wrong number of subjective databases");
             for (std::size_t i = 0; i < numPersistentDatabases; ++i)
@@ -318,6 +289,16 @@ namespace psibase
          publication.finish();
       }
 
+      // Publish the persistent subjective databases. Caller holds subjectiveMutex.
+      // Independent of topMutex: block publication and subjective commits only
+      // meet at the engine's single-writer step, never across a flush.
+      void publishSubjective(storage::write_session& session, const IndependentRevision& proposed)
+      {
+         auto local = session.get_local_root();
+         session.upsert(local, subjectiveKey, std::span(proposed).first(numPersistentDatabases));
+         session.set_local_root(std::move(local));
+      }
+
       std::span<DbPtr> persistent()
       {
          return std::span{subjective}.subspan(0, numPersistentDatabases);
@@ -325,9 +306,9 @@ namespace psibase
       std::span<DbPtr> session() { return std::span{subjective}.subspan(numPersistentDatabases); }
    };  // SharedDatabaseImpl
 
-   SharedDatabase::SharedDatabase(const std::filesystem::path&     dir,
-                                  const triedent::database_config& config,
-                                  triedent::open_mode              mode)
+   SharedDatabase::SharedDatabase(const std::filesystem::path&    dir,
+                                  const storage::database_config& config,
+                                  storage::open_mode              mode)
        : impl{std::make_shared<SharedDatabaseImpl>(dir, config, mode)}
    {
    }
@@ -369,8 +350,7 @@ namespace psibase
       return loadRevision(writer, impl->getTopRoot(), revisionById(blockId), true);
    }
 
-   // TODO: move triedent::root destruction to a gc thread
-   void SharedDatabase::removeRevisions(Writer& writer, const Checksum256& irreversible)
+      void SharedDatabase::removeRevisions(Writer& writer, const Checksum256& irreversible)
    {
       check(impl->trie->owns(writer), "writer belongs to another database view");
       // TODO: Reduce critical section
@@ -443,14 +423,8 @@ namespace psibase
       std::lock_guard l{impl->subjectiveMutex};
       auto            proposedSubjective = impl->subjective;
       writer.upsert(proposedSubjective[independentIndex(db)], key, value);
-      std::lock_guard lock{impl->topMutex};
-      auto            proposed = impl->topRoot;
-      writer.upsert(
-          proposed, subjectiveKey,
-          std::span(proposedSubjective).first(SharedDatabaseImpl::numPersistentDatabases));
       accounting::Publication publication;
-      writer.set_top_root(proposed);
-      impl->topRoot    = std::move(proposed);
+      impl->publishSubjective(writer, proposedSubjective);
       impl->subjective = std::move(proposedSubjective);
       publication.finish();
    }
@@ -461,14 +435,8 @@ namespace psibase
       std::lock_guard l{impl->subjectiveMutex};
       auto            proposedSubjective = impl->subjective;
       writer.remove(proposedSubjective[independentIndex(db)], key);
-      std::lock_guard lock{impl->topMutex};
-      auto            proposed = impl->topRoot;
-      writer.upsert(
-          proposed, subjectiveKey,
-          std::span(proposedSubjective).first(SharedDatabaseImpl::numPersistentDatabases));
       accounting::Publication publication;
-      writer.set_top_root(proposed);
-      impl->topRoot    = std::move(proposed);
+      impl->publishSubjective(writer, proposedSubjective);
       impl->subjective = std::move(proposedSubjective);
       publication.finish();
    }
@@ -539,13 +507,7 @@ namespace psibase
             publication->finish();
             return false;
          }
-         std::lock_guard lock{impl->topMutex};
-         auto            proposed = impl->topRoot;
-         writer.upsert(
-             proposed, subjectiveKey,
-             std::span(proposedSubjective).first(SharedDatabaseImpl::numPersistentDatabases));
-         writer.set_top_root(proposed);
-         impl->topRoot    = std::move(proposed);
+         impl->publishSubjective(writer, proposedSubjective);
          impl->subjective = std::move(proposedSubjective);
       }
       else

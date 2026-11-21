@@ -6,17 +6,9 @@
 #include <psio/fracpack.hpp>
 #include <psio/to_key.hpp>
 #include <psibase/storage.hpp>
-#include <triedent/file_fwd.hpp>
 
 #include <array>
 #include <filesystem>
-
-namespace triedent
-{
-   class write_session;
-   class root;
-   struct database_config;
-}  // namespace triedent
 
 namespace psibase::net
 {
@@ -114,9 +106,9 @@ namespace psibase
       std::shared_ptr<SharedDatabaseImpl> impl;
 
       SharedDatabase() = default;
-      SharedDatabase(const std::filesystem::path&     dir,
-                     const triedent::database_config& config,
-                     triedent::open_mode              mode = triedent::open_mode::create);
+      SharedDatabase(const std::filesystem::path&    dir,
+                     const storage::database_config& config,
+                     storage::open_mode              mode = storage::open_mode::create);
       SharedDatabase(const SharedDatabase&) = default;
       SharedDatabase(SharedDatabase&&)      = default;
 

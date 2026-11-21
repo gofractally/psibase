@@ -20,7 +20,7 @@ namespace
    {
       SharedDatabase    database{{},
                                  {1 << 26, 1 << 26, 1 << 26, 1 << 26},
-                                 triedent::open_mode::temporary};
+                                 psibase::storage::open_mode::temporary};
       SystemContext     system{database,
                                WasmCache{4},
                                {},

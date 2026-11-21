@@ -934,7 +934,18 @@ inline constexpr std::size_t ceil_log2(std::size_t v)
 
 struct DbConfig
 {
-   DbConfig(const std::string& policy)
+   static psibase::storage::durability parseSync(const std::string& sync)
+   {
+      if (sync == "none")
+         return psibase::storage::durability::none;
+      if (sync == "flush")
+         return psibase::storage::durability::flush;
+      if (sync == "full")
+         return psibase::storage::durability::full;
+      throw std::runtime_error("Unsupported database-sync; expected none, flush, or full");
+   }
+   DbConfig(const std::string& policy, const std::string& syncName)
+       : sync(parseSync(syncName)), syncName(syncName)
    {
       if (policy != "disabled")
          throw std::runtime_error(
@@ -946,6 +957,8 @@ struct DbConfig
    uint64_t warm_bytes = 32 * 1024 * 1024;
    uint64_t cool_bytes = 32 * 1024 * 1024;
    uint64_t cold_bytes = 32 * 1024 * 1024;
+   psibase::storage::durability sync;
+   std::string                  syncName;
 };
 
 struct TLSConfig
@@ -1048,7 +1061,8 @@ struct PsinodeConfig
       constexpr std::string_view opts[] = {
           "producer", "pkcs11-modules",        "listen",       "tls-key",
           "tls-cert", "tls-trustfile",         "http-timeout", "service-threads",
-          "key",      "database-cache-policy", "mount",        "passphrase-file"};
+          "key",      "database-cache-policy", "mount",        "passphrase-file",
+          "database-sync"};
       return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
              name.starts_with("service.");
    }
@@ -1118,6 +1132,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    // private keys.
    file.keep("", "key");
    file.keep("", "database-cache-policy");
+   file.keep("", "database-sync");
    file.keep("", "mount");
    file.keep("", "passphrase-file");
    //
@@ -1231,14 +1246,16 @@ void run(const std::string&              db_path,
    auto sharedState = std::make_shared<psibase::SharedState>(
        SharedDatabase{
            db_path,
-           {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes},
-           triedent::open_mode::resize},
+           {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes,
+            db_conf.sync},
+           psibase::storage::open_mode::resize},
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
 
    PSIBASE_LOG(psibase::loggers::generic::get(), info)
-       << "Storage engine=psitri.big sync=fsync read-cache=false pinned-cache-MiB=0 "
+       << "Storage engine=psitri.big sync=" << db_conf.syncName
+       << " read-cache=false pinned-cache-MiB=0 "
           "cache-policy=disabled (performance qualification pending)";
 
    Secrets secrets{std::filesystem::path(db_path) / "secrets", passphrase};
@@ -1950,6 +1967,7 @@ int main(int argc, char* argv[])
    std::string              tls_cert;
    std::string              tls_key;
    std::string              db_cache_policy;
+   std::string              db_sync;
    byte_size                db_size;
    Timeout                  http_timeout;
    std::size_t              service_threads;
@@ -2024,6 +2042,13 @@ int main(int argc, char* argv[])
                }),
        "Generic psitri cache policy. This candidate supports disabled: read promotion off, "
        "pinned-cache budget 0 MiB. Performance qualification is pending.");
+   opt("database-sync",
+       po::value(&db_sync)->default_value("none")->notifier(
+           [](const std::string& sync) { DbConfig::parseSync(sync); }),
+       "What a block's state publication waits for. none: never flush; state survives a "
+       "process crash but not a power loss or kernel crash, which is recovered from peers. "
+       "flush: fsync every publication and rebuild from flushed state after a power loss. "
+       "full: also flush the drive cache.");
 #ifdef PSIBASE_ENABLE_SSL
    opt("tls-trustfile", po::value(&root_ca)->default_value({}, "")->value_name("path"),
        "A list of trusted Certification Authorities in PEM format");
@@ -2154,7 +2179,7 @@ int main(int argc, char* argv[])
       while (true)
       {
          restart.args.reset();
-         run(db_path, db_template, DbConfig{db_cache_policy}, AccountNumber{producer}, keys,
+         run(db_path, db_template, DbConfig{db_cache_policy, db_sync}, AccountNumber{producer}, keys,
              passphrase, pkcs11_modules, listen, mountpoints, http_timeout, service_threads,
              proof_timeout_ms, root_ca, tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)

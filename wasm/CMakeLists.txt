@@ -11,6 +11,9 @@ get_filename_component(ROOT_SOURCE_DIR ${CMAKE_SOURCE_DIR}/.. ABSOLUTE)
 get_filename_component(ROOT_BINARY_DIR ${CMAKE_BINARY_DIR}/.. ABSOLUTE)
 
 set(CMAKE_CXX_STANDARD 23)
+# No target here uses C++ modules. Without this, newer CMake asks the WASI SDK
+# for clang-scan-deps, which it does not ship.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -135,6 +138,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
             && export AR=${CMAKE_AR}                                                \
             && export RANLIB=${CMAKE_RANLIB}                                        \
             && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasip1\"  \
+            && export uname=wasi                                                    \
             && ./configure --prefix=${DEP_PREFIX} --static                          \
             && make -j                                                              \
             && make -j install                                                      \

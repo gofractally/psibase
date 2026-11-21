@@ -11,11 +11,10 @@
 #include <psibase/nativeTables.hpp>
 #include <psio/to_key.hpp>
 #include <thread>
-#include <triedent/file_fwd.hpp>
 using namespace psibase;
 namespace
 {
-   const triedent::database_config config{1 << 27, 1 << 27, 1 << 27, 1 << 27};
+   const psibase::storage::database_config config{1 << 27, 1 << 27, 1 << 27, 1 << 27};
    std::filesystem::path           directory(std::string_view name)
    {
       static std::atomic<unsigned> count = 0;
@@ -75,7 +74,7 @@ TEST_CASE("psitri native database preserves complete nested root frames", "[stor
 {
    auto path = directory("nested");
    {
-      SharedDatabase shared(path, config, triedent::open_mode::create_new);
+      SharedDatabase shared(path, config, psibase::storage::open_mode::create_new);
       auto           writer = shared.createWriter();
       Database       db(shared, shared.emptyRevision());
       auto           outer = db.startWrite(writer);
@@ -111,7 +110,7 @@ TEST_CASE("psitri native database preserves complete nested root frames", "[stor
          REQUIRE(value(read, DbId(i)) == "inner");
    }
    {
-      SharedDatabase reopened(path, config, triedent::open_mode::read_only);
+      SharedDatabase reopened(path, config, psibase::storage::open_mode::read_only);
       Database       db(reopened, reopened.getHead());
       auto           session = db.startRead();
       for (unsigned i = 0; i < numChainDatabases; ++i)
@@ -122,7 +121,7 @@ TEST_CASE("psitri native database preserves complete nested root frames", "[stor
 TEST_CASE("psitri subjective OCC retries preserve callbacks and independent writes",
           "[storage][psitri]")
 {
-   SharedDatabase    shared(directory("occ"), config, triedent::open_mode::create_new);
+   SharedDatabase    shared(directory("occ"), config, psibase::storage::open_mode::create_new);
    auto              writer = shared.createWriter();
    DatabaseCallbacks callbacks;
    unsigned          called  = 0;
@@ -155,12 +154,85 @@ TEST_CASE("psitri subjective OCC retries preserve callbacks and independent writ
    REQUIRE(std::string(b->begin(), b->end()) == "retry");
 }
 
+TEST_CASE("psitri subjective writes and queries run beside block publication",
+          "[storage][psitri]")
+{
+   auto path = directory("parallel");
+   {
+      // Flushed publication is the slow case: subjective work must not queue behind it.
+      auto flushed = config;
+      flushed.sync = psibase::storage::durability::flush;
+      SharedDatabase shared(path, flushed, psibase::storage::open_mode::create_new);
+      auto           writer = shared.createWriter();
+      auto           first  = revision(shared, writer, blockId(1), blockId(0), "block-1");
+      shared.setHead(*writer, first);
+
+      std::atomic<bool>        failed{false};
+      std::atomic<unsigned>    queries{0};
+      std::atomic<bool>        done{false};
+      std::vector<std::thread> threads;
+      for (unsigned t = 0; t < 4; ++t)
+         threads.emplace_back(
+             [&, t]
+             {
+                // Session-style writers: each keeps its own key in node-local state.
+                auto              mine = shared.createWriter();
+                const std::string key  = "session-" + std::to_string(t);
+                for (unsigned i = 0; i < 150; ++i)
+                {
+                   const auto text = std::to_string(i);
+                   shared.kvPutSubjective(*mine, DbId::nativeSubjective, span(key), span(text));
+                   auto got = shared.kvGetSubjective(*mine, DbId::nativeSubjective, span(key));
+                   if (!got || std::string(got->begin(), got->end()) != text)
+                      failed = true;
+                }
+             });
+      for (unsigned t = 0; t < 4; ++t)
+         threads.emplace_back(
+             [&]
+             {
+                // Queries: read consensus state from whatever head is current.
+                while (!done)
+                {
+                   Database db(shared, shared.getHead());
+                   auto     session = db.startRead();
+                   if (!value(db, DbId::service).starts_with("block-"))
+                      failed = true;
+                   ++queries;
+                }
+             });
+      for (std::uint32_t block = 2; block <= 40; ++block)
+         shared.setHead(*writer, revision(shared, writer, blockId(block), blockId(block - 1),
+                                          "block-" + std::to_string(block)));
+      for (unsigned t = 0; t < 4; ++t)
+         threads[t].join();
+      while (queries < 20)
+         std::this_thread::yield();
+      done = true;
+      for (unsigned t = 4; t < 8; ++t)
+         threads[t].join();
+      REQUIRE_FALSE(failed);
+   }
+   SharedDatabase reopened(path, config, psibase::storage::open_mode::read_only);
+   auto           writer = reopened.createWriter();
+   for (unsigned t = 0; t < 4; ++t)
+   {
+      auto got = reopened.kvGetSubjective(*writer, DbId::nativeSubjective,
+                                          span("session-" + std::to_string(t)));
+      REQUIRE(got);
+      REQUIRE(std::string(got->begin(), got->end()) == "149");
+   }
+   Database db(reopened, reopened.getHead());
+   auto     session = db.startRead();
+   REQUIRE(value(db, DbId::service) == "block-40");
+}
+
 TEST_CASE("psitri persistent subjective survives while session databases reset",
           "[storage][psitri]")
 {
    auto path = directory("subjective");
    {
-      SharedDatabase     shared(path, config, triedent::open_mode::create_new);
+      SharedDatabase     shared(path, config, psibase::storage::open_mode::create_new);
       auto               writer = shared.createWriter();
       Sockets            sockets(shared);
       SocketAutoCloseSet closing;
@@ -178,7 +250,7 @@ TEST_CASE("psitri persistent subjective survives while session databases reset",
       REQUIRE(db.commitSubjective(sockets, closing));
    }
    {
-      SharedDatabase shared(path, config, triedent::open_mode::read_only);
+      SharedDatabase shared(path, config, psibase::storage::open_mode::read_only);
       Database       db(shared, shared.getHead());
       auto           session = db.startRead();
       db.checkoutSubjective();
@@ -193,7 +265,7 @@ TEST_CASE("psitri persistent subjective survives while session databases reset",
 TEST_CASE("psitri clones isolate metadata, head, subjective and writer ownership",
           "[storage][psitri]")
 {
-   SharedDatabase shared(directory("clone"), config, triedent::open_mode::create_new);
+   SharedDatabase shared(directory("clone"), config, psibase::storage::open_mode::create_new);
    auto           writer = shared.createWriter();
    auto           parent = revision(shared, writer, blockId(1), {}, "parent");
    shared.setHead(*writer, parent);
@@ -219,7 +291,7 @@ TEST_CASE("psitri clones isolate metadata, head, subjective and writer ownership
 
 TEST_CASE("psitri retained revision pruning preserves valid descendants", "[storage][psitri]")
 {
-   SharedDatabase shared(directory("prune"), config, triedent::open_mode::create_new);
+   SharedDatabase shared(directory("prune"), config, psibase::storage::open_mode::create_new);
    auto           writer = shared.createWriter();
    auto           first  = revision(shared, writer, blockId(1), {}, "first");
    auto           second = revision(shared, writer, blockId(2), blockId(1), "second");
@@ -239,7 +311,7 @@ TEST_CASE("psitri retained revision pruning preserves valid descendants", "[stor
 TEST_CASE("cancelled requests cannot publish cached roots, sockets or callbacks",
           "[storage][psitri][accounting]")
 {
-   SharedDatabase shared(directory("cancelled"), config, triedent::open_mode::create_new);
+   SharedDatabase shared(directory("cancelled"), config, psibase::storage::open_mode::create_new);
    auto           writer = shared.createWriter();
    auto           parent = revision(shared, writer, blockId(1), {}, "parent");
    shared.setHead(*writer, parent);
@@ -284,7 +356,7 @@ TEST_CASE("cancelled requests cannot publish cached roots, sockets or callbacks"
 TEST_CASE("accepted subjective effects finish before deferred cancellation is reported",
           "[storage][psitri][accounting]")
 {
-   SharedDatabase shared(directory("accepted"), config, triedent::open_mode::create_new);
+   SharedDatabase shared(directory("accepted"), config, psibase::storage::open_mode::create_new);
    auto           writer  = shared.createWriter();
    auto           sockets = std::make_shared<Sockets>(shared);
    auto           socket  = std::make_shared<TestSocket>();
@@ -332,14 +404,14 @@ TEST_CASE("psitri node files remain outside the identified native store", "[stor
       file << "existing node log\n";
    }
    {
-      SharedDatabase shared(path, config, triedent::open_mode::create_new);
+      SharedDatabase shared(path, config, psibase::storage::open_mode::create_new);
       CHECK(shared.directory() == std::filesystem::absolute(path / "state").lexically_normal());
       CHECK(std::filesystem::exists(path / "state" / "psibase-storage-format"));
       auto writer = shared.createWriter();
       shared.kvPutSubjective(*writer, DbId::subjective, span("layout"), span("preserved"));
    }
    {
-      SharedDatabase reopened(path, config, triedent::open_mode::read_only);
+      SharedDatabase reopened(path, config, psibase::storage::open_mode::read_only);
       auto           writer = reopened.createWriter();
       REQUIRE(reopened.kvGetSubjective(*writer, DbId::subjective, span("layout")));
    }
@@ -363,7 +435,7 @@ TEST_CASE("psitri refuses prior root-level storage layouts before creating state
          std::ofstream file(path / marker);
          file << "preserved prior store\n";
       }
-      CHECK_THROWS_WITH(SharedDatabase(path, config, triedent::open_mode::create),
+      CHECK_THROWS_WITH(SharedDatabase(path, config, psibase::storage::open_mode::create),
                         "Database uses a previous storage layout; use a fresh chain directory");
       CHECK_FALSE(std::filesystem::exists(path / "state"));
       std::ifstream file(path / marker);
@@ -376,7 +448,7 @@ TEST_CASE("psitri empty temporary paths use and clean up the system temporary di
 {
    std::filesystem::path temporary;
    {
-      SharedDatabase shared({}, config, triedent::open_mode::temporary);
+      SharedDatabase shared({}, config, psibase::storage::open_mode::temporary);
       temporary = shared.directory();
       CHECK(std::filesystem::weakly_canonical(temporary.parent_path()) ==
             std::filesystem::weakly_canonical(std::filesystem::temp_directory_path()));

@@ -73,8 +73,11 @@ int main(int argc, char** argv)
              {
                 try
                 {
+                   // Only mutating work enters the writer's gate; reads no longer do.
                    accounting::Scope scope(holderRequest);
-                   require(reader->is_equal_weak(first, second, {}, {}),
+                   shared_root       copy;
+                   writer->splice(copy, first, {}, {});
+                   require(reader->is_equal_weak(first, copy, {}, {}),
                            "equal immutable roots differed");
                 }
                 catch (...)

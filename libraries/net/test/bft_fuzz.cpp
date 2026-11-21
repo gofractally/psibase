@@ -1,7 +1,6 @@
 #include "fuzz.hpp"
 #include "test_util.hpp"
 
-#include <triedent/database.hpp>
 
 // the central node can take the following actions:
 // - single step another node's io_context

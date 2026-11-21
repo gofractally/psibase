@@ -103,7 +103,7 @@ struct TempDatabase
        : sharedState{std::make_shared<psibase::SharedState>(
              psibase::SharedDatabase{std::filesystem::temp_directory_path(),
                                      {1ull << 27, 1ull << 27, 1ull << 27, 1ull << 27},
-                                     triedent::open_mode::temporary},
+                                     psibase::storage::open_mode::temporary},
              psibase::WasmCache{16})}
    {
    }

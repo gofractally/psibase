@@ -13,6 +13,15 @@ namespace psibase::storage
 {
    struct root;
    using shared_root = std::shared_ptr<const root>;
+   // What a publication of the top root waits for. Durability is opt-in: the
+   // default survives a process crash (the engine recovers on the next open) but
+   // not a power loss or kernel crash, and never waits on the disk.
+   enum class durability
+   {
+      none,   // never flush
+      flush,  // fsync each top-root publication
+      full    // also flush the drive cache (F_FULLFSYNC where it differs)
+   };
    struct database_config
    {
       // Validated legacy tester ABI sizing hints. They do not reserve memory,
@@ -21,6 +30,7 @@ namespace psibase::storage
       std::uint64_t warm_bytes;
       std::uint64_t cool_bytes;
       std::uint64_t cold_bytes;
+      durability    sync = durability::none;
    };
    enum class open_mode
    {
@@ -79,6 +89,13 @@ namespace psibase::storage
      public:
       shared_root get_top_root();
       void        set_top_root(shared_root);
+      // A second published root for node-local state. Publishing it never
+      // flushes and never touches the top root, so it does not wait behind (or
+      // delay) top-root publications beyond the engine's single-writer step.
+      // After a power loss it is the newest version that reached the disk
+      // whole, which may be older than the top root.
+      shared_root get_local_root();
+      void        set_local_root(shared_root);
       void        upsert(shared_root&, std::span<const char>, std::span<const char>);
       void        upsert(shared_root&, std::span<const char>, std::span<const shared_root>);
       void        remove(shared_root&, std::span<const char>);
