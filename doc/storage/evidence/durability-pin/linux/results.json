@@ -1,0 +1,106 @@
+{
+  "platform": "Linux-6.17.0-22-generic-x86_64-with-glibc2.42",
+  "machine": "x86_64",
+  "commands": [
+    {
+      "name": "compiler",
+      "argv": [
+        "/usr/bin/clang++-20",
+        "--version"
+      ],
+      "exit_code": 0,
+      "seconds": 0.01866019144654274
+    },
+    {
+      "name": "configure",
+      "argv": [
+        "cmake",
+        "-S",
+        "libraries/psibase/native/tests/storage",
+        "-B",
+        "/home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-durable-linux",
+        "-G",
+        "Ninja",
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DCMAKE_C_COMPILER=/usr/bin/clang-20",
+        "-DCMAKE_CXX_COMPILER=/usr/bin/clang++-20",
+        "-DFETCHCONTENT_SOURCE_DIR_PSIBASE_PSITRI=/home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/.caches/psitri-sources/psitri-6cff821fdf34",
+        "-DFETCHCONTENT_SOURCE_DIR_PSIBASE_UCC=/home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/.caches/psitri-sources/ucc-cd2e2e305363"
+      ],
+      "exit_code": 0,
+      "seconds": 0.48661375045776367
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cmake",
+        "--build",
+        "/home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-durable-linux",
+        "--parallel",
+        "4"
+      ],
+      "exit_code": 0,
+      "seconds": 5.303352348506451
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "ctest",
+        "--test-dir",
+        "/home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-durable-linux",
+        "--verbose",
+        "--output-on-failure"
+      ],
+      "exit_code": 0,
+      "seconds": 3.635547921061516
+    },
+    {
+      "name": "symbols",
+      "argv": [
+        "nm",
+        "-C",
+        "/home/dlarimer/psibase-migration-20261121/psitri-serialized-caller/build-storage-durable-linux/storage_contract"
+      ],
+      "exit_code": 0,
+      "seconds": 0.013207439333200455
+    }
+  ],
+  "complete": true,
+  "passed": true,
+  "source_sha256": {
+    "cmake/dependencies/psitri-files.sha256": "a1ff4e19563c548f38a1d645f4ff0f0d0d51211020f8017e38477dfc4f399f03",
+    "cmake/dependencies/ucc-files.sha256": "e13393d906320edc16c75601980db377c80dba35bfbb7ca745796d005bace7e6",
+    "libraries/psibase/native/tests/storage/CMakeLists.txt": "e7aa38e83074b010191fa864fd7fb12190d994e351ed5c2eaab717e732e25e6a",
+    "libraries/psibase/native/tests/storage/cpu_accounting_contract.cpp": "e755bfbd80ab88bbb0c936d98ad3dd492a6bcd294fc3fec9583ebee51c75ef97",
+    "libraries/psibase/native/tests/storage/darwin_cpu_contract.cpp": "239a635c641cff29701bcee6086bba9fdf4f11134de69b76466b3cca32a43a82",
+    "libraries/psibase/native/tests/storage/engine_dependency_smoke.cpp": "a1b48b2979bc802fd348f53d176dd32503063bb3717f62b7ea645fbb86244237",
+    "libraries/psibase/native/tests/storage/run_benchmark.py": "d312007d31f80e43bd694a65ad5e75ccf5fc7c8ca9202c68e6eef1db78bd3a6e",
+    "libraries/psibase/native/tests/storage/run_contract.py": "ac90847e5035da9fdf612faf6af3faea3a413d9bfc8fe9f7e4c277683ed7021d",
+    "libraries/psibase/native/tests/storage/run_native_contract.py": "d3b9c6905af1510926cc96da5ec26ad8ea2ca09d36adae9d5648ba628d327e93",
+    "libraries/psibase/native/tests/storage/run_startup_smoke.py": "2a0be4b24ee1c7584301a5a3c1ef2a5a763f21453d99a73903367859b4346844",
+    "libraries/psibase/native/tests/storage/serialized_contract.cpp": "1098d76e7fcb0d2ad295e3f669c6f6ab7d3ba170ed789720daf57d3b9e95a154",
+    "libraries/psibase/native/tests/storage/storage_benchmark.cpp": "4204c25ca3070160540c2f5389455733c514d8828fb1d560d83294a2d3e7b194",
+    "libraries/psibase/native/tests/storage/storage_contract.cpp": "39675d77f70d37d9e0c00a70a630c1905b8dd537c3f0a1791bbf607bc9e024c0",
+    "cmake/psitri.cmake": "9e8aebba8e8e41259fef432ec0b824345950cba1d5a7c05c1f47c231e99a364f",
+    "libraries/psibase/native/src/psitriStorage.cpp": "9538e8a0474278c3b4f8502039d1ad3a9f4ee81dc5c9244d65b0db8b1a8b5add",
+    "libraries/psibase/native/include/psibase/storage.hpp": "9fece8f7f112c28b710dd23f58fe252e9606dda32431e25f1a5473519e1ea968",
+    "libraries/psibase/native/include/psibase/CpuAccounting.hpp": "1fed01cfc7ee97284179ac245af8db2eb322e43fdf059ef5d514cb18e8dc57a2",
+    "libraries/psibase/native/include/psibase/NativeThreadClock.hpp": "286a41eefb45ebc027f0a2a00075891ec1fc989fad0684634c6584488b760cdc",
+    "libraries/psibase/native/include/psibase/DarwinCpuClock.hpp": "76ed14494822b09965e2aa49e40491765258cc0c8ae1ddb9cd726763f3bb11b8",
+    "libraries/psibase/native/include/psibase/DarwinWatchdogWake.hpp": "58636983979aacd5f9827700d7f56d9088ba3cd233ce86d3878e99f19f94f3b4",
+    "libraries/psibase/native/include/psibase/Watchdog.hpp": "7d03c0283b11e8e961e91b76664d1b3631f312b53e496fb34c1570338bcbcd00",
+    "libraries/psibase/native/src/Watchdog.cpp": "2ca8b95a5547f288cb1a983978964c50813f02e81d38722af78803bfb6590d6e",
+    "libraries/psibase/native/include/psibase/storageDiagnostics.hpp": "efd30349667c1ec42b29817d46130eb8794fac8eceee8454c99e6a0c2af81146"
+  },
+  "free_bytes_before": 23944699904,
+  "thread_sanitizer": false,
+  "new_psio_symbols": false,
+  "new_psio_headers": false,
+  "binary_sha256": {
+    "storage_contract": "8a40f1c18758f2986d8b390048e5b505a5d797f8e36c51d3e72b380d4b7e6bd9",
+    "engine_dependency_smoke": "754dbe80a32d8135a7d794f0b3bf32a7cb6a71c68603bf3ab2b1df166d5d01d9",
+    "cpu_accounting_contract": "723698ff51644da7571372dea63913125f8be62c40b66a6bfa2e404fc5121a8d",
+    "serialized_contract": "684c50f7d0d02b4f7f63ed9b944dfbd6ba3b9a3f81ec48ab6628188c84a90bc2"
+  },
+  "free_bytes_after": 22144708608
+}

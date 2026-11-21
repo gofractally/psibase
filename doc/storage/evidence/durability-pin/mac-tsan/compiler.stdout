@@ -1,0 +1,5 @@
+Homebrew clang version 22.1.2
+Target: arm64-apple-darwin25.3.0
+Thread model: posix
+InstalledDir: /opt/homebrew/Cellar/llvm/22.1.2/bin
+Configuration file: /opt/homebrew/Cellar/llvm/22.1.2/etc/clang/arm64-apple-darwin25.cfg

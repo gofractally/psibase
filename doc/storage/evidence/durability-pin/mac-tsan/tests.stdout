@@ -1,0 +1,963 @@
+UpdateCTestConfiguration  from :/Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/DartConfiguration.tcl
+Test project /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+      Start  1: engine_dependency_smoke
+
+1: Test command: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/engine_dependency_smoke "/Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database"
+1: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+1: Test timeout computed to be: 10000000
+1: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/ptrs/header.bin[0m
+1: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+1: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4347412480, size=4224[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+1: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+1: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/iref/header.bin[0m
+1: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+1: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4347428864, size=4224[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+1: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+1: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+1: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+1: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/header[0m
+1: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/roots[0m
+1: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/session_ops.bin[0m
+1: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+1: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=5609897984, size=93650944[0m
+1: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+1: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4347445248, size=32768[0m
+1: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+1: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4347478016, size=32768[0m
+1: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10c402890 0 ref: 1[0m
+1: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+1: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+1: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10c405490 1 ref: 1[0m
+1: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+1: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10c407f30 2 ref: 1[0m
+1: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+1: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10c402890 0 ref: 0[0m
+1: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10c402890 0 ref: 0[0m
+1: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+1: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+1: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10c405490 1 ref: 0[0m
+1: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10c405490 1 ref: 0[0m
+1: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+1: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+1: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10c407f30 2 ref: 0[0m
+1: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10c407f30 2 ref: 0[0m
+1: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+1: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+1: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+1: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+1: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/ptrs/header.bin, size=4224, addr=4347412480[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+1: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/iref/header.bin, size=4224, addr=4347428864[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+1: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+1: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+1: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+1: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+1: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/header, size=93650944, addr=4509925376[0m
+1: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/roots, size=32768, addr=4347445248[0m
+1: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/smoke-database-67830/session_ops.bin, size=32768, addr=4347478016[0m
+1: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10c402890 0 ref: 1[0m
+1: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+1: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+1: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10c407f30 1 ref: 1[0m
+1: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+1: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10c405490 2 ref: 1[0m
+1: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+1: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10c4027e0 3 ref: 1[0m
+1: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10c4027e0 3 ref: 0[0m
+1: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10c4027e0 3 ref: 0[0m
+1: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 3[0m
+1: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10c402890 0 ref: 0[0m
+1: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10c402890 0 ref: 0[0m
+1: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+1: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+1: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10c407f30 1 ref: 0[0m
+1: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10c407f30 1 ref: 0[0m
+1: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+1: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+1: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10c405490 2 ref: 0[0m
+1: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10c405490 2 ref: 0[0m
+1: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+1: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+1: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+1: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+1: Maintained generic Large Engine passed without any new psio dependency
+ 1/12 Test  #1: engine_dependency_smoke ...............   Passed    0.82 sec
+test 2
+      Start  2: storage_contract
+
+2: Test command: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/storage_contract "/Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases"
+2: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+2: Test timeout computed to be: 10000000
+2: diagnostic path boundaries and unavailable pressure...mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/diagnostics/ptrs/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312776704, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/diagnostics/iref/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312793088, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/diagnostics/header[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/diagnostics/roots[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/diagnostics/session_ops.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4478468096, size=93650944[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316594176, size=32768[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316626944, size=32768[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a505490 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a507f30 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a505490 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a505490 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a507f30 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a507f30 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: ok
+2: owned roots, nested rollback, atomic manifest and reopen...mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/ptrs/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312776704, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/iref/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312793088, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/header[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/roots[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/session_ops.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4579131392, size=93650944[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316594176, size=32768[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316626944, size=32768[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a507f30 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a505490 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a507f30 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a507f30 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a505490 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a505490 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/ptrs/header.bin, size=4224, addr=4312776704[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/iref/header.bin, size=4224, addr=4312793088[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/header, size=93650944, addr=4579131392[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/roots, size=32768, addr=4316594176[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/session_ops.bin, size=32768, addr=4316626944[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a5027e0 1 ref: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a5027e0 1 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a5027e0 1 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/ptrs/header.bin, size=4224, addr=4312776704[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/iref/header.bin, size=4224, addr=4312793088[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/header, size=93650944, addr=4579131392[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/roots, size=32768, addr=4316594176[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/manifest/session_ops.bin, size=32768, addr=4316626944[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a505490 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a507f30 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a505490 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a505490 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a507f30 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a507f30 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: ok
+2: ordered ranges, binary keys and max prefix...mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/ranges/ptrs/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312776704, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/ranges/iref/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312793088, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/ranges/header[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/ranges/roots[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/ranges/session_ops.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4579131392, size=93650944[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316594176, size=32768[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316626944, size=32768[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a507f30 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a505490 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a507f30 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a507f30 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a505490 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a505490 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: ok
+2: optimistic range comparison and splice...mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/occ/ptrs/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312776704, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/occ/iref/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312793088, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/occ/header[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/occ/roots[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/occ/session_ops.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4579131392, size=93650944[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316594176, size=32768[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316626944, size=32768[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a505490 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a507f30 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a505490 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a505490 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a507f30 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a507f30 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: ok
+2: large opaque value and exception cleanup...mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/ptrs/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312776704, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/iref/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312793088, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/header[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/roots[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/session_ops.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4579131392, size=93650944[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316594176, size=32768[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316626944, size=32768[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a507f30 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a505490 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/foreign/ptrs/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4379033600, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/foreign/iref/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4379049984, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/foreign/header[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/foreign/roots[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/foreign/session_ops.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4672782336, size=93650944[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4379066368, size=32768[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4379099136, size=32768[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a5027e0 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a50a9d0 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a50d470 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a5027e0 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a5027e0 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a50a9d0 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a50a9d0 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a50d470 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a50d470 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a507f30 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a507f30 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a505490 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a505490 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/ptrs/header.bin, size=4224, addr=4312776704[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/iref/header.bin, size=4224, addr=4312793088[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/header, size=93650944, addr=4579131392[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/roots, size=32768, addr=4316594176[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/session_ops.bin, size=32768, addr=4316626944[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a5027e0 1 ref: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a5027e0 1 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a5027e0 1 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/ptrs/header.bin, size=4224, addr=4312776704[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/iref/header.bin, size=4224, addr=4312793088[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/header, size=93650944, addr=4579131392[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/roots, size=32768, addr=4316594176[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/large/session_ops.bin, size=32768, addr=4316626944[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a5027e0 1 ref: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a5027e0 1 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a5027e0 1 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: ok
+2: clone does not publish or observe parent changes...mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/clone/ptrs/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312776704, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/clone/iref/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312793088, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/clone/header[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/clone/roots[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/clone/session_ops.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4579131392, size=93650944[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316594176, size=32768[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316626944, size=32768[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a505490 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a507f30 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a505490 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a505490 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a507f30 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a507f30 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: ok
+2: retained roots and clone leases outlive caller, cross-thread teardown...mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/leases/ptrs/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312776704, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/leases/iref/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312793088, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/leases/header[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/leases/roots[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/leases/session_ops.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4579131392, size=93650944[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316594176, size=32768[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316626944, size=32768[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502890 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a507f30 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a505490 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502890 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502890 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a507f30 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a507f30 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a505490 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a505490 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: ok
+2: read-only open and rejected opens leave every file unchanged...mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/ptrs/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312776704, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/iref/header.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4312793088, size=4224[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/header[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/roots[0m
+2: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/session_ops.bin[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4579131392, size=93650944[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316594176, size=32768[0m
+2: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+2: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4316626944, size=32768[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a5027e0 0 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+2: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10a502890 1 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+2: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10a505490 2 ref: 1[0m
+2: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a5027e0 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a5027e0 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+2: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10a502890 1 ref: 0[0m
+2: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10a502890 1 ref: 0[0m
+2: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+2: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10a505490 2 ref: 0[0m
+2: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10a505490 2 ref: 0[0m
+2: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+2: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+2: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/ptrs/header.bin, size=4224, addr=4312776704[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/iref/header.bin, size=4224, addr=4312793088[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/header, size=93650944, addr=4579131392[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/roots, size=32768, addr=4316594176[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/session_ops.bin, size=32768, addr=4316626944[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a5027e0 0 ref: 1[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502730 1 ref: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502730 1 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502730 1 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a5027e0 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a5027e0 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/ptrs/header.bin, size=4224, addr=4312776704[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/iref/header.bin, size=4224, addr=4312793088[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+2: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+2: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+2: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+2: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/header, size=93650944, addr=4579131392[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/roots, size=32768, addr=4316594176[0m
+2: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/contract-databases-67834/readonly/session_ops.bin, size=32768, addr=4316626944[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a5027e0 0 ref: 1[0m
+2: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10a502730 1 ref: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a502730 1 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a502730 1 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 1[0m
+2: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10a5027e0 0 ref: 0[0m
+2: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10a5027e0 0 ref: 0[0m
+2: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+2: ok
+2: {"passed":true,"contract_groups":8}
+ 2/12 Test  #2: storage_contract ......................   Passed   12.95 sec
+test 3
+      Start  3: serialized_contract
+
+3: Test command: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized_contract "/Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases"
+3: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+3: Test timeout computed to be: 45
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cancelled-lock-wait/ptrs/header.bin[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4315889664, size=4224[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cancelled-lock-wait/iref/header.bin[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4315906048, size=4224[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+3: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+3: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cancelled-lock-wait/header[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cancelled-lock-wait/roots[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cancelled-lock-wait/session_ops.bin[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4482662400, size=93650944[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4317872128, size=32768[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4317904896, size=32768[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af02940 0 ref: 1[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+3: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10af05490 1 ref: 1[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+3: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10af07f30 2 ref: 1[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af02940 0 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af02940 0 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+3: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10af05490 1 ref: 0[0m
+3: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10af05490 1 ref: 0[0m
+3: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+3: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10af07f30 2 ref: 0[0m
+3: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10af07f30 2 ref: 0[0m
+3: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+3: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/ptrs/header.bin[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4315889664, size=4224[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/iref/header.bin[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4315906048, size=4224[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+3: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+3: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/header[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/roots[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/session_ops.bin[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4482662400, size=93650944[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4317872128, size=32768[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4317904896, size=32768[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af02940 0 ref: 1[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+3: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10af05490 2 ref: 1[0m
+3: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10af07f30 1 ref: 1[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af02940 0 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af02940 0 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+3: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10af07f30 1 ref: 0[0m
+3: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10af07f30 1 ref: 0[0m
+3: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+3: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10af05490 2 ref: 0[0m
+3: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10af05490 2 ref: 0[0m
+3: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+3: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/ptrs/header.bin, size=4224, addr=4315889664[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/iref/header.bin, size=4224, addr=4315906048[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+3: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+3: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/header, size=93650944, addr=4587651072[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/roots, size=32768, addr=4317872128[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/session_ops.bin, size=32768, addr=4317904896[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af02890 0 ref: 1[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af027e0 1 ref: 1[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af027e0 1 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af027e0 1 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 1[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af02890 0 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af02890 0 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/ptrs/header.bin, size=4224, addr=4315889664[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/iref/header.bin, size=4224, addr=4315906048[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+3: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+3: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/header, size=93650944, addr=4587651072[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/roots, size=32768, addr=4317872128[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/cross-thread-lifetime/session_ops.bin, size=32768, addr=4317904896[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af02890 0 ref: 1[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af027e0 1 ref: 1[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af027e0 1 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af027e0 1 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 1[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af02890 0 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af02890 0 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/ptrs/header.bin[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4315889664, size=4224[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: control_block_alloc.cpp:124  (null)     ensure_capacity       [33mgrowing control_block capacity: 0 [0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/iref/header.bin[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=4224[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4315906048, size=4224[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+3: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+3: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/header[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/roots[0m
+3: mapping.cpp:85             (null)     mapping               [33mOpened empty file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/session_ops.bin[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=93650944[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4587651072, size=93650944[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4317872128, size=32768[0m
+3: mapping.cpp:133            (null)     resize                [33mResizing mapping: current=0, new=32768[0m
+3: mapping.cpp:193            (null)     resize                [33mRemapped to new location: old_addr=0, new_addr=4317904896, size=32768[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af02890 0 ref: 1[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted read_bit_decay thread[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted release thread[0m
+3: allocator_session.cpp:30   release    allocator_session     [36mallocator_session: constructor: 0x10af02940 1 ref: 1[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted compactor thread[0m
+3: allocator_session.cpp:30   compactor  allocator_session     [36mallocator_session: constructor: 0x10af05490 2 ref: 1[0m
+3: segment_thread.cpp:148     (null)     start                 [36mStarted segment_provider thread[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af02890 0 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af02890 0 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped read_bit_decay thread[0m
+3: allocator_session_impl.hpp:524  release    end_session           [36mallocator_session: end_session: 0x10af02940 1 ref: 0[0m
+3: allocator_session.cpp:36   release    ~allocator_session    [36mallocator_session: destructor: 0x10af02940 1 ref: 0[0m
+3: allocator.cpp:2528         release    release_session_num   [36mrelease_session_num: 1[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped release thread[0m
+3: allocator_session_impl.hpp:524  compactor  end_session           [36mallocator_session: end_session: 0x10af05490 2 ref: 0[0m
+3: allocator_session.cpp:36   compactor  ~allocator_session    [36mallocator_session: destructor: 0x10af05490 2 ref: 0[0m
+3: allocator.cpp:2528         compactor  release_session_num   [36mrelease_session_num: 2[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped compactor thread[0m
+3: segment_thread.cpp:174     (null)     stop                  [36mStopped segment_provider thread[0m
+3: allocator.cpp:487          (null)     truncate_free_tail_stopped  [36mtruncate_free_tail: 9 -> 1 segments (freeing 256 MB)[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/ptrs/header.bin, size=4224, addr=4315889664[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/iref/header.bin, size=4224, addr=4315906048[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+3: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+3: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/header, size=93650944, addr=4587651072[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/roots, size=32768, addr=4317872128[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/session_ops.bin, size=32768, addr=4317904896[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af02890 0 ref: 1[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af027e0 1 ref: 1[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af027e0 1 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af027e0 1 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 1[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af02890 0 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af02890 0 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/ptrs/header.bin, size=4224, addr=4315889664[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=34359738368[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/iref/header.bin, size=4224, addr=4315906048[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=4294967296[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=536870912[0m
+3: allocator.cpp:260          (null)     cap_to_disk_space     [33mmax_database_size (32768 GB) exceeds filesystem capacity (7449 GB) — capping[0m
+3: block_allocator.cpp:163    (null)     block_allocator       [1;31mFailed to reserve address space of size 7998470619136: Cannot allocate memory, trying lower max[0m
+3: block_allocator.cpp:157    (null)     block_allocator       [36mReserved contiguous address space:  size=3999235309568[0m
+3: block_allocator.cpp:179    (null)     block_allocator       [33mblock_allocator: reserved only 3999235309568 bytes of 7998470619136 requested — capping max_blocks from 238373 to 119186 (grow() will throw if data exceeds this limit)[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/header, size=93650944, addr=4587651072[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/roots, size=32768, addr=4317872128[0m
+3: mapping.cpp:95             (null)     mapping               [33mMapped file: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/serialized-databases-68182/concurrent-publish-read-destroy/session_ops.bin, size=32768, addr=4317904896[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af02890 0 ref: 1[0m
+3: allocator_session.cpp:30   (null)     allocator_session     [36mallocator_session: constructor: 0x10af027e0 1 ref: 1[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af027e0 1 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af027e0 1 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 1[0m
+3: allocator_session_impl.hpp:524  (null)     end_session           [36mallocator_session: end_session: 0x10af02890 0 ref: 0[0m
+3: allocator_session.cpp:36   (null)     ~allocator_session    [36mallocator_session: destructor: 0x10af02890 0 ref: 0[0m
+3: allocator.cpp:2528         (null)     release_session_num   [36mrelease_session_num: 0[0m
+3: {"passed":true,"groups":3,"wait_not_cpu":true,"cancel_before_mutation":true,"native_lifetime":true,"concurrent_publish":true}
+ 3/12 Test  #3: serialized_contract ...................   Passed    1.99 sec
+test 4
+      Start  4: storage_reject_HEART_PAGE_BYTES
+
+4: Test command: /opt/homebrew/bin/cmake "-E" "env" "HEART_PAGE_BYTES=1" "/Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/storage_contract" "--reject-engine-environment"
+4: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+4: Test timeout computed to be: 10000000
+4: Unsupported engine environment rejected before opening a store
+ 4/12 Test  #4: storage_reject_HEART_PAGE_BYTES .......   Passed    0.15 sec
+test 5
+      Start  5: storage_reject_HEART_PINNED_MB
+
+5: Test command: /opt/homebrew/bin/cmake "-E" "env" "HEART_PINNED_MB=1" "/Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/storage_contract" "--reject-engine-environment"
+5: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+5: Test timeout computed to be: 10000000
+5: Unsupported engine environment rejected before opening a store
+ 5/12 Test  #5: storage_reject_HEART_PINNED_MB ........   Passed    0.16 sec
+test 6
+      Start  6: storage_reject_HEART_READ_CACHE
+
+6: Test command: /opt/homebrew/bin/cmake "-E" "env" "HEART_READ_CACHE=1" "/Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/storage_contract" "--reject-engine-environment"
+6: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+6: Test timeout computed to be: 10000000
+6: Unsupported engine environment rejected before opening a store
+ 6/12 Test  #6: storage_reject_HEART_READ_CACHE .......   Passed    0.15 sec
+test 7
+      Start  7: storage_reject_HEART_READ_CACHE_SEC
+
+7: Test command: /opt/homebrew/bin/cmake "-E" "env" "HEART_READ_CACHE_SEC=1" "/Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/storage_contract" "--reject-engine-environment"
+7: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+7: Test timeout computed to be: 10000000
+7: Unsupported engine environment rejected before opening a store
+ 7/12 Test  #7: storage_reject_HEART_READ_CACHE_SEC ...   Passed    0.15 sec
+test 8
+      Start  8: cpu_accounting_contract
+
+8: Test command: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/cpu_accounting_contract
+8: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+8: Test timeout computed to be: 10000000
+8: {"passed":true,"groups":5,"live_cpu":true,"cumulative_clock":true,"scoped_cancellation":true}
+ 8/12 Test  #8: cpu_accounting_contract ...............   Passed    0.50 sec
+test 9
+      Start  9: darwin_cpu_lifetime_io
+
+9: Test command: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/darwin_cpu_contract
+9: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+9: Test timeout computed to be: 30
+9: TSan defers async callbacks; actual alternate stack is verified by the native contract
+9: {"passed":true,"exit_races":200,"alt_stack":true,"errno_preserved":true,"restart_read":true,"late_signal_safe":true,"coalesced_generation":true,"accepted_io_mask":true}
+ 9/12 Test  #9: darwin_cpu_lifetime_io ................   Passed    0.41 sec
+test 10
+      Start 10: darwin_cpu_previous
+
+10: Test command: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/darwin_cpu_contract "previous"
+10: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+10: Test timeout computed to be: 30
+10: previous handler preserved
+10/12 Test #10: darwin_cpu_previous ...................   Passed    0.13 sec
+test 11
+      Start 11: darwin_cpu_blocked
+
+11: Test command: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/darwin_cpu_contract "blocked"
+11: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+11: Test timeout computed to be: 30
+11: blocked signal rejected
+11/12 Test #11: darwin_cpu_blocked ....................   Passed    0.14 sec
+test 12
+      Start 12: darwin_cpu_replaced
+
+12: Test command: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan/darwin_cpu_contract "replaced"
+12: Working Directory: /Users/dlarimer/psibase-foundation-psitri/build-storage-durable-tsan
+12: Test timeout computed to be: 30
+12: replacement detected without reclaiming signal
+12/12 Test #12: darwin_cpu_replaced ...................   Passed    0.14 sec
+
+100% tests passed, 0 tests failed out of 12
+
+Total Test time (real) =  17.69 sec

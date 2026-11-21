@@ -1,0 +1,128 @@
+{
+  "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+  "commands": [
+    {
+      "name": "build",
+      "argv": [
+        "cmake",
+        "--build",
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri",
+        "--target",
+        "WatchdogTests",
+        "PsitriDatabaseTests",
+        "psinode",
+        "psitest",
+        "DarwinCpuVmTrapTests",
+        "--parallel",
+        "4"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "seconds": 28.117713083978742
+    },
+    {
+      "name": "watchdog-0",
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/native/libraries/psibase/native/tests/WatchdogTests"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "seconds": 1.7135019999695942
+    },
+    {
+      "name": "watchdog-1",
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/native/libraries/psibase/native/tests/WatchdogTests"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "seconds": 1.1017735409550369
+    },
+    {
+      "name": "watchdog-2",
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/native/libraries/psibase/native/tests/WatchdogTests"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "seconds": 1.1019296670565382
+    },
+    {
+      "name": "database",
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/native/libraries/psibase/native/tests/PsitriDatabaseTests"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "seconds": 0.8213281249627471
+    },
+    {
+      "name": "vm-traps",
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/native/libraries/psibase/native/tests/DarwinCpuVmTrapTests"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "seconds": 0.27288470894563943
+    },
+    {
+      "name": "config-help",
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/psinode",
+        "--help"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "seconds": 0.5595628749579191
+    },
+    {
+      "name": "legacy-cache-rejected",
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/psinode",
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/evidence/20261121T195921Z/storage-config-k6vmegdb",
+        "--database-cache-size",
+        "256MiB"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "seconds": 0.018234541988931596
+    },
+    {
+      "name": "unknown-policy-rejected",
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/psinode",
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/evidence/20261121T195921Z/storage-config-7za58sot",
+        "--database-cache-policy",
+        "unqualified"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "seconds": 0.017143458011560142
+    }
+  ],
+  "source_sha256": {
+    "programs/psinode/main.cpp": "f0ed8c3d8da4450875674108dbbfa2308a1d5f696a465e4eee864577c79da2b6",
+    "programs/psinode/config.in": "c713d48c4b9d0acd170617b9c787cc78f7188f371c51218e2aaf429fadd4b7b9",
+    "libraries/psibase/native/include/psibase/storage.hpp": "9fece8f7f112c28b710dd23f58fe252e9606dda32431e25f1a5473519e1ea968",
+    "libraries/psibase/native/include/psibase/storageDiagnostics.hpp": "efd30349667c1ec42b29817d46130eb8794fac8eceee8454c99e6a0c2af81146",
+    "libraries/psibase/native/include/psibase/db.hpp": "f602e4a38fde8cc9ff6cf719e629d122f038923e82fb389270b36642f5de287d",
+    "libraries/psibase/native/src/psitriStorage.cpp": "9538e8a0474278c3b4f8502039d1ad3a9f4ee81dc5c9244d65b0db8b1a8b5add",
+    "libraries/psibase/native/src/usePsitri.cpp": "c2c8f1b9eb8e9c91796180f0789955df73c121a78711b1d93d2618d1559ded57",
+    "libraries/psibase/native/src/Watchdog.cpp": "2ca8b95a5547f288cb1a983978964c50813f02e81d38722af78803bfb6590d6e",
+    "libraries/psibase/native/tests/WatchdogTests.cpp": "a649ce3669f02b98ec86fb01eec0d03cb38c75c85742192adeb20476f6ebaa1b",
+    "libraries/psibase/native/tests/PsitriDatabaseTests.cpp": "7678654c83e376fdc87cf4c71f779b20138a8d68b4bca3b10ef236e670fe4240",
+    "libraries/psibase/native/tests/DarwinCpuVmTrapTests.cpp": "226a1c58402828b44793dd02feed1a322a32a4cc23c4788cde8bd8e25a665dc7",
+    "libraries/psibase/native/include/psibase/NativeThreadClock.hpp": "286a41eefb45ebc027f0a2a00075891ec1fc989fad0684634c6584488b760cdc",
+    "libraries/psibase/native/include/psibase/DarwinCpuClock.hpp": "76ed14494822b09965e2aa49e40491765258cc0c8ae1ddb9cd726763f3bb11b8",
+    "libraries/psibase/native/include/psibase/DarwinWatchdogWake.hpp": "58636983979aacd5f9827700d7f56d9088ba3cd233ce86d3878e99f19f94f3b4",
+    "libraries/psibase/native/include/psibase/CpuAccounting.hpp": "1fed01cfc7ee97284179ac245af8db2eb322e43fdf059ef5d514cb18e8dc57a2",
+    "libraries/psibase/native/include/psibase/Watchdog.hpp": "7d03c0283b11e8e961e91b76664d1b3631f312b53e496fb34c1570338bcbcd00"
+  },
+  "passed": true,
+  "binary_sha256": {
+    "psinode": "fc0cfe6d1cefa8f81e8673dfb667ca20383113199dac62fc56e21070bf2dc39a",
+    "psitest": "3a6342d9500ef31a15c54fc144dcf2d2ac932e549ca92fc60887d10704f21d20",
+    "WatchdogTests": "e4a3c0cffd0effc87d2f3bb344634f062d56f8e00b93c0f56272972d9f7eb271",
+    "PsitriDatabaseTests": "8d7dbd33c52b6a8fdbe657e65c21a44cf6eeaa1f6bb27c0192453a8537c7508b"
+  }
+}

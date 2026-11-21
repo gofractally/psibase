@@ -1,0 +1,63 @@
+{
+  "scope": "Fresh native storage startup/restart using the explicitly supplied builtin package manifest; not merged app qualification",
+  "package_manifest": "build-native-psitri/startup-package-source.json",
+  "runs": [
+    {
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/psinode",
+        "/tmp/psitri-node-fjft9k2g/node",
+        "--listen",
+        "/tmp/psitri-node-fjft9k2g/socket"
+      ],
+      "environment": [
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "PATH",
+        "TMPDIR",
+        "TZ"
+      ],
+      "ready": true,
+      "last_status": 200,
+      "status": [
+        "storage-pressure-unavailable",
+        "needgenesis"
+      ],
+      "perf_status": 200,
+      "shutdown_status": 200,
+      "exit_code": 0,
+      "native_identity": true,
+      "sentinel_unchanged": true,
+      "config_unchanged": true
+    },
+    {
+      "argv": [
+        "/Users/dlarimer/psibase-foundation-psitri/build-native-psitri/psinode",
+        "/tmp/psitri-node-fjft9k2g/node",
+        "--listen",
+        "/tmp/psitri-node-fjft9k2g/socket"
+      ],
+      "environment": [
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "PATH",
+        "TMPDIR",
+        "TZ"
+      ],
+      "ready": true,
+      "last_status": 200,
+      "status": [
+        "storage-pressure-unavailable",
+        "needgenesis"
+      ],
+      "perf_status": 200,
+      "shutdown_status": 200,
+      "exit_code": 0,
+      "native_identity": true,
+      "sentinel_unchanged": true,
+      "config_unchanged": true
+    }
+  ],
+  "passed": true
+}

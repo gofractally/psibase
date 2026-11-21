@@ -485,20 +485,27 @@ PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
 struct MemStats
 {
    std::optional<uint64_t> database;
-   std::string databaseAttribution = "unavailable";
-   uint64_t code;
-   uint64_t data;
-   uint64_t wasmMemory;
-   uint64_t wasmCode;
-   uint64_t unclassified;
+   std::string             databaseAttribution = "unavailable";
+   uint64_t                code;
+   uint64_t                data;
+   uint64_t                wasmMemory;
+   uint64_t                wasmCode;
+   uint64_t                unclassified;
 };
-PSIO_REFLECT(MemStats, database, databaseAttribution, code, data, wasmMemory, wasmCode, unclassified)
+PSIO_REFLECT(MemStats,
+             database,
+             databaseAttribution,
+             code,
+             data,
+             wasmMemory,
+             wasmCode,
+             unclassified)
 
 struct Perf
 {
-   std::int64_t            timestamp;
-   MemStats                memory;
-   std::vector<ThreadInfo> tasks;
+   std::int64_t                           timestamp;
+   std::optional<MemStats>                memory;
+   std::optional<std::vector<ThreadInfo>> tasks;
 };
 PSIO_REFLECT(Perf, timestamp, memory, tasks)
 
@@ -543,14 +550,17 @@ void write_om_mem(std::string_view name, std::int64_t v, auto& stream)
 
 void write_om_mem(const Perf& perf, auto& stream)
 {
+   if (!perf.memory)
+      return;
+   const auto& memory = *perf.memory;
    write_om_descriptor("psinode_memory_bytes", "gauge", "bytes", "Resident Memory", stream);
-   if (perf.memory.database)
-      write_om_mem("database", *perf.memory.database, stream);
-   write_om_mem("code", perf.memory.code, stream);
-   write_om_mem("data", perf.memory.data, stream);
-   write_om_mem("wasm_code", perf.memory.wasmCode, stream);
-   write_om_mem("wasm_memory", perf.memory.wasmMemory, stream);
-   write_om_mem("unclassified", perf.memory.unclassified, stream);
+   if (memory.database)
+      write_om_mem("database", *memory.database, stream);
+   write_om_mem("code", memory.code, stream);
+   write_om_mem("data", memory.data, stream);
+   write_om_mem("wasm_code", memory.wasmCode, stream);
+   write_om_mem("wasm_memory", memory.wasmMemory, stream);
+   write_om_mem("unclassified", memory.unclassified, stream);
 }
 
 std::string usec_as_sec(std::int64_t time)
@@ -583,31 +593,33 @@ void write_om_task_sample(std::string_view  name,
 
 void write_om_tasks(const Perf& perf, auto& stream)
 {
+   if (!perf.tasks)
+      return;
    write_om_descriptor("psinode_cpu_user_seconds", "counter", "seconds", "CPU Time (User)", stream);
-   for (const auto& task : perf.tasks)
+   for (const auto& task : *perf.tasks)
    {
       write_om_task_sample("psinode_cpu_user_seconds_total", task, usec_as_sec(task.user), stream);
    }
    write_om_descriptor("psinode_cpu_system_seconds", "counter", "seconds", "CPU Time (System)",
                        stream);
-   for (const auto& task : perf.tasks)
+   for (const auto& task : *perf.tasks)
    {
       write_om_task_sample("psinode_cpu_system_seconds_total", task, usec_as_sec(task.system),
                            stream);
    }
    write_om_descriptor("psinode_page_faults", "counter", "", "Page Faults", stream);
-   for (const auto& task : perf.tasks)
+   for (const auto& task : *perf.tasks)
    {
       write_om_task_sample("psinode_page_faults_total", task, std::to_string(task.pageFaults),
                            stream);
    }
    write_om_descriptor("psinode_read_bytes", "counter", "bytes", "Bytes Read", stream);
-   for (const auto& task : perf.tasks)
+   for (const auto& task : *perf.tasks)
    {
       write_om_task_sample("psinode_read_bytes_total", task, std::to_string(task.read), stream);
    }
    write_om_descriptor("psinode_written_bytes", "counter", "bytes", "Bytes Written", stream);
-   for (const auto& task : perf.tasks)
+   for (const auto& task : *perf.tasks)
    {
       write_om_task_sample("psinode_written_bytes_total", task, std::to_string(task.written),
                            stream);
@@ -747,11 +759,12 @@ bool parse_map_line(const char* begin, const char* end, MappingInfo& mapping)
    auto offset        = read_field();
    auto dev           = read_field();
    auto inode         = read_field();
-   while (begin != end && *begin == ' ') ++begin;
+   while (begin != end && *begin == ' ')
+      ++begin;
    const auto pathname = std::string_view(begin, end);
-   mapping.pathname = pathname;
-   mapping.anonymous  = pathname == "";
-   mapping.special    = pathname.starts_with('[') && pathname.ends_with(']');
+   mapping.pathname    = pathname;
+   mapping.anonymous   = pathname == "";
+   mapping.special     = pathname.starts_with('[') && pathname.ends_with(']');
    return true;
 }
 
@@ -829,7 +842,7 @@ struct RegionInfo
    std::vector<Region> regions;
 };
 
-MemStats getMemStats(const SharedState& state)
+std::optional<MemStats> getMemStats(const SharedState& state)
 {
    RegionInfo regions;
    const auto directory = std::filesystem::weakly_canonical(state.databaseDirectory());
@@ -845,21 +858,22 @@ MemStats getMemStats(const SharedState& state)
    MemStats result = {};
    {
       std::ifstream in("/proc/self/smaps");
-      if (in)
-      {
-         result.database = 0;
-         result.databaseAttribution = "file-backed";
-      }
-      MappingInfo   info;
+      if (!in)
+         return std::nullopt;
+      result.database            = 0;
+      result.databaseAttribution = "file-backed";
+      MappingInfo info;
       while (in >> info)
       {
          auto group = regions.get(info.begin, info.end);
-         if (group == RegionGroup::unknown && psibase::storage::databaseMapping(info.pathname, directory))
+         if (group == RegionGroup::unknown &&
+             psibase::storage::databaseMapping(info.pathname, directory))
             group = RegionGroup::database;
          switch (group)
          {
             case RegionGroup::database:
-               if (result.database) *result.database += info.rss;
+               if (result.database)
+                  *result.database += info.rss;
                break;
             case RegionGroup::wasmCode:
                result.wasmCode += info.rss;
@@ -897,9 +911,13 @@ Perf get_perf(const SharedState& state)
                           std::chrono::steady_clock::now().time_since_epoch())
                           .count();
    result.memory    = getMemStats(state);
-   for (const auto& entry : std::filesystem::directory_iterator("/proc/self/task"))
+   std::error_code                     error;
+   std::filesystem::directory_iterator tasks("/proc/self/task", error);
+   if (!error)
    {
-      result.tasks.push_back(getThreadInfo(entry, clk_tck));
+      result.tasks.emplace();
+      for (const auto& entry : tasks)
+         result.tasks->push_back(getThreadInfo(entry, clk_tck));
    }
    return result;
 }
@@ -919,11 +937,12 @@ struct DbConfig
    DbConfig(const std::string& policy)
    {
       if (policy != "disabled")
-         throw std::runtime_error("Unsupported database-cache-policy; this candidate supports only disabled");
+         throw std::runtime_error(
+             "Unsupported database-cache-policy; this candidate supports only disabled");
    }
    // Compatibility sizing arguments for the tester-era SharedDatabase API.
    // They do not reserve RAM or configure independent psitri storage tiers.
-   uint64_t hot_bytes = 32 * 1024 * 1024;
+   uint64_t hot_bytes  = 32 * 1024 * 1024;
    uint64_t warm_bytes = 32 * 1024 * 1024;
    uint64_t cool_bytes = 32 * 1024 * 1024;
    uint64_t cold_bytes = 32 * 1024 * 1024;
@@ -1027,8 +1046,8 @@ struct PsinodeConfig
    static bool isNative(std::string_view name)
    {
       constexpr std::string_view opts[] = {
-          "producer", "pkcs11-modules",      "listen",       "tls-key",
-          "tls-cert", "tls-trustfile",       "http-timeout", "service-threads",
+          "producer", "pkcs11-modules",        "listen",       "tls-key",
+          "tls-cert", "tls-trustfile",         "http-timeout", "service-threads",
           "key",      "database-cache-policy", "mount",        "passphrase-file"};
       return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
              name.starts_with("service.");
@@ -1942,10 +1961,17 @@ int main(int argc, char* argv[])
    po::options_description desc("psinode");
    po::options_description common_opts("Options");
    auto                    opt = common_opts.add_options();
-   opt("proof-timeout-ms", po::value(&proof_timeout_ms)->default_value(200)->notifier([](std::uint64_t value) {
-          if (value == 0 || value > 60000)
-             throw std::runtime_error("proof-timeout-ms must be between 1 and 60000");
-       }), "Maximum proof-admission CPU time in milliseconds (default 200; independent of objective block CPU)");
+   opt("proof-timeout-ms",
+       po::value(&proof_timeout_ms)
+           ->default_value(200)
+           ->notifier(
+               [](std::uint64_t value)
+               {
+                  if (value == 0 || value > 60000)
+                     throw std::runtime_error("proof-timeout-ms must be between 1 and 60000");
+               }),
+       "Maximum proof-admission CPU time in milliseconds (default 200; independent of objective "
+       "block CPU)");
    opt("producer,p", po::value<std::string>(&producer)->default_value("")->value_name("name"),
        "Name of this producer");
    opt("key,k", po::value(&keys->provers)->default_value({}, ""),
@@ -1986,12 +2012,16 @@ int main(int argc, char* argv[])
    opt("database-template", po::value(&db_template)->default_value("XDefault", ""),
        "Template to install when initializing a new database");
    opt("database-cache-policy",
-       po::value(&db_cache_policy)->default_value("disabled")->notifier(
-           [](const std::string& policy)
-           {
-              if (policy != "disabled")
-                 throw std::runtime_error("Unsupported database-cache-policy; this candidate supports only disabled");
-           }),
+       po::value(&db_cache_policy)
+           ->default_value("disabled")
+           ->notifier(
+               [](const std::string& policy)
+               {
+                  if (policy != "disabled")
+                     throw std::runtime_error(
+                         "Unsupported database-cache-policy; this candidate supports only "
+                         "disabled");
+               }),
        "Generic psitri cache policy. This candidate supports disabled: read promotion off, "
        "pinned-cache budget 0 MiB. Performance qualification is pending.");
 #ifdef PSIBASE_ENABLE_SSL
@@ -2023,11 +2053,15 @@ int main(int argc, char* argv[])
    // Parse removed controls only to give existing configuration files a useful
    // migration error. They are not advertised as functioning psitri settings.
    po::options_description legacy_opts;
-   legacy_opts.add_options()("database-cache-size", po::value<std::string>()->notifier(
-       [](const std::string&)
-       {
-          throw std::runtime_error("database-cache-size is a removed triedent control; replace it with database-cache-policy=disabled (psitri read promotion off, pinned-cache budget 0 MiB)");
-       }));
+   legacy_opts.add_options()("database-cache-size",
+                             po::value<std::string>()->notifier(
+                                 [](const std::string&)
+                                 {
+                                    throw std::runtime_error(
+                                        "database-cache-size is a removed triedent control; "
+                                        "replace it with database-cache-policy=disabled (psitri "
+                                        "read promotion off, pinned-cache budget 0 MiB)");
+                                 }));
    desc.add(legacy_opts);
    cfg_opts.add(legacy_opts);
 
@@ -2122,8 +2156,7 @@ int main(int argc, char* argv[])
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_policy}, AccountNumber{producer}, keys,
              passphrase, pkcs11_modules, listen, mountpoints, http_timeout, service_threads,
-             proof_timeout_ms,
-             root_ca, tls_cert, tls_key, extra_options, restart);
+             proof_timeout_ms, root_ca, tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

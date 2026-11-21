@@ -51,12 +51,12 @@ function(psibase_add_psitri)
     endif()
     FetchContent_Declare(psibase_psitri
         GIT_REPOSITORY git@github.com:gofractally/psitri.git
-        GIT_TAG e4d23be469c7a246536431b2abb72859c6d1b014
+        GIT_TAG 6cff821fdf341cc6512ba214dd4da8318ecb59a4
         GIT_SHALLOW FALSE
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
     FetchContent_Declare(psibase_ucc
         GIT_REPOSITORY git@github.com:gofractally/ucc.git
-        GIT_TAG 2c124eba978e7bcf20e252eec7fd5b2ea3635295
+        GIT_TAG cd2e2e305363588e8c9c8eb8b23572cd56952ce7
         GIT_SHALLOW FALSE
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
     FetchContent_MakeAvailable(psibase_psitri psibase_ucc)

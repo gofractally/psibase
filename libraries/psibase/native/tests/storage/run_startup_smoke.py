@@ -4,6 +4,7 @@ import argparse
 import datetime
 import http.client
 import json
+import platform
 from pathlib import Path
 import socket
 import subprocess
@@ -79,7 +80,18 @@ try:
                         raise RuntimeError('node did not become ready')
                     status, body = request(base / 'socket', 'GET', '/native/admin/perf')
                     result['perf_status'] = status
+                    if status != 200:
+                        raise RuntimeError('performance endpoint failed')
+                    perf = json.loads(body)
+                    if platform.system() == 'Darwin' and (perf['memory'] is not None or perf['tasks'] is not None):
+                        raise RuntimeError('unsupported platform statistics must be null')
                     (evidence / f'node-{index}.perf.json').write_text(body)
+                    metrics_status, metrics = request(base / 'socket', 'GET', '/native/admin/metrics')
+                    if metrics_status != 200:
+                        raise RuntimeError('metrics endpoint failed')
+                    (evidence / f'node-{index}.metrics.txt').write_text(metrics)
+                    if platform.system() == 'Darwin' and ('psinode_memory_bytes{' in metrics or 'psinode_cpu_user_seconds_total{' in metrics):
+                        raise RuntimeError('unsupported metrics must be absent')
                     try:
                         result['shutdown_status'], _ = request(base / 'socket', 'POST', '/shutdown', '{"force":false}')
                     except http.client.RemoteDisconnected:

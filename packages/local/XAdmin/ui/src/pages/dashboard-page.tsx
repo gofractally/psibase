@@ -80,35 +80,35 @@ export function DashboardPage() {
         () => [
             {
                 memType: "database",
-                usage: bytesToMb(data?.memory.database ?? 0),
+                usage: bytesToMb(data?.memory?.database ?? 0),
                 fill: "var(--color-database)",
             },
             {
                 memType: "code",
-                usage: bytesToMb(data?.memory.code || 0),
+                usage: bytesToMb(data?.memory?.code || 0),
                 fill: "var(--color-code)",
             },
             {
                 memType: "data",
-                usage: bytesToMb(data?.memory.data || 0),
+                usage: bytesToMb(data?.memory?.data || 0),
                 fill: "var(--color-data)",
             },
             {
                 memType: "wasmMemory",
-                usage: bytesToMb(data?.memory.wasmMemory || 0),
+                usage: bytesToMb(data?.memory?.wasmMemory || 0),
                 fill: "var(--color-wasmMemory)",
             },
             {
                 memType: "wasmCode",
-                usage: bytesToMb(data?.memory.wasmCode || 0),
+                usage: bytesToMb(data?.memory?.wasmCode || 0),
                 fill: "var(--color-wasmCode)",
             },
             {
                 memType: "unclassified",
-                usage: bytesToMb(data?.memory.unclassified || 0),
+                usage: bytesToMb(data?.memory?.unclassified || 0),
                 fill: "var(--color-unclassified)",
             },
-        ].filter((entry) => entry.memType !== "database" || data?.memory.database != null),
+        ].filter((entry) => entry.memType !== "database" || data?.memory?.database != null),
         [data],
     );
 
@@ -145,69 +145,75 @@ export function DashboardPage() {
                         <CardDescription>
                             Memory consumed by this node process.
                             {" "}
-                            {databaseMemoryNotice(data?.memory.database, data?.memory.databaseAttribution)}
+                            {databaseMemoryNotice(data?.memory?.database, data?.memory?.databaseAttribution)}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex items-center justify-center">
-                        <ChartContainer
-                            config={chartConfig}
-                            className="aspect-square h-[250px] w-[250px]"
-                        >
-                            <PieChart>
-                                <ChartTooltip
-                                    content={
-                                        <ChartTooltipContent
-                                            hideLabel
-                                            indicator="dashed"
-                                        />
-                                    }
-                                />
-                                <Pie
-                                    data={chartData}
-                                    dataKey="usage"
-                                    nameKey="memType"
-                                    innerRadius={60}
-                                    strokeWidth={5}
-                                >
-                                    <Label
-                                        content={({ viewBox }) => {
-                                            if (
-                                                viewBox &&
-                                                "cx" in viewBox &&
-                                                "cy" in viewBox
-                                            ) {
-                                                return (
-                                                    <text
-                                                        x={viewBox.cx}
-                                                        y={viewBox.cy}
-                                                        textAnchor="middle"
-                                                        dominantBaseline="middle"
-                                                    >
-                                                        <tspan
+                        {data?.memory == null ? (
+                            <p className="text-muted-foreground text-sm">
+                                Process memory statistics are unavailable on this platform.
+                            </p>
+                        ) : (
+                            <ChartContainer
+                                config={chartConfig}
+                                className="aspect-square h-[250px] w-[250px]"
+                            >
+                                <PieChart>
+                                    <ChartTooltip
+                                        content={
+                                            <ChartTooltipContent
+                                                hideLabel
+                                                indicator="dashed"
+                                            />
+                                        }
+                                    />
+                                    <Pie
+                                        data={chartData}
+                                        dataKey="usage"
+                                        nameKey="memType"
+                                        innerRadius={60}
+                                        strokeWidth={5}
+                                    >
+                                        <Label
+                                            content={({ viewBox }) => {
+                                                if (
+                                                    viewBox &&
+                                                    "cx" in viewBox &&
+                                                    "cy" in viewBox
+                                                ) {
+                                                    return (
+                                                        <text
                                                             x={viewBox.cx}
                                                             y={viewBox.cy}
-                                                            className="fill-foreground text-3xl font-bold"
+                                                            textAnchor="middle"
+                                                            dominantBaseline="middle"
                                                         >
-                                                            {totalMb.toLocaleString()}
-                                                        </tspan>
-                                                        <tspan
-                                                            x={viewBox.cx}
-                                                            y={
-                                                                (viewBox.cy ||
-                                                                    0) + 24
-                                                            }
-                                                            className="fill-muted-foreground"
-                                                        >
-                                                            MB
-                                                        </tspan>
-                                                    </text>
-                                                );
-                                            }
-                                        }}
-                                    />
-                                </Pie>
-                            </PieChart>
-                        </ChartContainer>
+                                                            <tspan
+                                                                x={viewBox.cx}
+                                                                y={viewBox.cy}
+                                                                className="fill-foreground text-3xl font-bold"
+                                                            >
+                                                                {totalMb.toLocaleString()}
+                                                            </tspan>
+                                                            <tspan
+                                                                x={viewBox.cx}
+                                                                y={
+                                                                    (viewBox.cy ||
+                                                                        0) + 24
+                                                                }
+                                                                className="fill-muted-foreground"
+                                                            >
+                                                                MB
+                                                            </tspan>
+                                                        </text>
+                                                    );
+                                                }
+                                            }}
+                                        />
+                                    </Pie>
+                                </PieChart>
+                            </ChartContainer>
+                        )}
                     </CardContent>
                 </Card>
                 <Card>

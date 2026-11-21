@@ -1,0 +1,50 @@
+{
+  "status": "Durability corrected pin and native/standalone correctness checkpoint; full app/performance gates remain pending",
+  "pins": {
+    "psitri": "6cff821fdf341cc6512ba214dd4da8318ecb59a4",
+    "ucc": "cd2e2e305363588e8c9c8eb8b23572cd56952ce7"
+  },
+  "qualified": {
+    "mac": {
+      "evidence": "doc/storage/evidence/durability-pin/mac",
+      "passed": true
+    },
+    "mac-tsan": {
+      "evidence": "doc/storage/evidence/durability-pin/mac-tsan",
+      "passed": true
+    },
+    "mac-native": {
+      "evidence": "doc/storage/evidence/durability-pin/mac-native",
+      "passed": true
+    },
+    "linux": {
+      "evidence": "doc/storage/evidence/durability-pin/linux",
+      "passed": true
+    },
+    "linux-tsan": {
+      "evidence": "doc/storage/evidence/durability-pin/linux-tsan",
+      "passed": true
+    },
+    "mac-startup": {
+      "evidence": "doc/storage/evidence/durability-pin/mac-startup",
+      "passed": true
+    }
+  },
+  "library_durability_evidence": "Maintained psitri logs/durability-qualification-20261121/summary.json at pinned commit; Mac76 + LinuxClang74 + LinuxGCC74 ordinary-fault cases,21 existing API cases on each. No power-cut or arbitrary corruption guarantee.",
+  "diagnostics": {
+    "process_memory": "JSON null when /proc/self/smaps is unavailable; no fabricated zero metrics",
+    "task_cpu_io": "JSON null when /proc/self/task is unavailable; no fabricated zero metrics",
+    "consumer": "XAdmin nullable schemas, explicit unavailable memory notice; pure helper2tests pass; full shared UI build still pending"
+  },
+  "startup_scope": "Two fresh/reopen readiness and graceful-shutdown runs with explicitly manifested frozen builtin packages; not merged exchange/bridge/Favor qualification",
+  "cache_policy": "Still disabled-cache correctness candidate; application throughput, cache policy and beyond-RAM qualification remain pending",
+  "dependency_pattern": "Canonical Git FetchContent, exact pins, no copied codec. Layout-only canonical names/external-directory alignment is coordinated separately with central dependency agent.",
+  "source_sha256": {
+    "cmake/psitri.cmake": "9e8aebba8e8e41259fef432ec0b824345950cba1d5a7c05c1f47c231e99a364f",
+    "cmake/dependencies/psitri-files.sha256": "a1ff4e19563c548f38a1d645f4ff0f0d0d51211020f8017e38477dfc4f399f03",
+    "cmake/dependencies/ucc-files.sha256": "e13393d906320edc16c75601980db377c80dba35bfbb7ca745796d005bace7e6",
+    "programs/psinode/main.cpp": "f0ed8c3d8da4450875674108dbbfa2308a1d5f696a465e4eee864577c79da2b6",
+    "packages/local/XAdmin/ui/src/lib/chain-endpoints.ts": "7c0c18f90d32de7021b7b3211a9ad7e22c268d3197a1f10ea6996c9031bd66ec",
+    "packages/local/XAdmin/ui/src/pages/dashboard-page.tsx": "3ac0d5b2952836a633c14d0221cdb67a6643815a0d29ed99644b6d8c291032c5"
+  }
+}

@@ -73,7 +73,7 @@ const schem = z.object({
         wasmMemory: z.coerce.number(),
         wasmCode: z.coerce.number(),
         unclassified: z.coerce.number(),
-    }),
+    }).nullable(),
     tasks: z
         .object({
             id: z.number(),
@@ -84,7 +84,8 @@ const schem = z.object({
             read: z.string(),
             written: z.string(),
         })
-        .array(),
+        .array()
+        .nullable(),
 });
 
 const TransactStats = z.object({
