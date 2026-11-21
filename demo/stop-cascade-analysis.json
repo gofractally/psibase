@@ -1,0 +1,58 @@
+{
+  "assumptions": "Fee-free constant-product AMM; fully-funded sell stops; initiating order priced as first leg; stops only share remaining actual proceeds.",
+  "cascade": [
+    {
+      "aggregate_BTC": 10.0,
+      "final_marginal_price": 82.64462809917356,
+      "included_stop_pools": 1
+    },
+    {
+      "aggregate_BTC": 20.0,
+      "final_marginal_price": 69.44444444444444,
+      "included_stop_pools": 2
+    },
+    {
+      "aggregate_BTC": 40.0,
+      "final_marginal_price": 51.02040816326531,
+      "included_stop_pools": 3
+    },
+    {
+      "aggregate_BTC": 50.0,
+      "final_marginal_price": 44.44444444444444,
+      "included_stop_pools": 3
+    }
+  ],
+  "total_output_USD": 3333.3333333333335,
+  "initiator_USD": 909.0909090909091,
+  "stop_quantity_BTC": 40.0,
+  "stop_output_USD": 2424.242424242424,
+  "common_stop_VWAP_USD": 60.60606060606061,
+  "all_including_initiator_VWAP": 66.66666666666667,
+  "terminal_marginal_USD": 44.44444444444444,
+  "batch_membership_example": {
+    "stops": "5 BTC at 90 and 5 BTC at 80",
+    "one_seed_10_stop_prices": [
+      [
+        90.0,
+        75.75757575757575
+      ],
+      [
+        80.0,
+        75.75757575757575
+      ]
+    ],
+    "split_seed_6_then_4_stop_prices": [
+      [
+        90.0,
+        84.99065102838688
+      ],
+      [
+        80.0,
+        72.46376811594203
+      ]
+    ],
+    "same_final_reserves": true,
+    "initiator_single_USD": 909.0909090909091,
+    "initiator_split_USD": 879.3945709450221
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "note": "Rough incremental process-CPU estimate against before/after baseline. Ongoing bot, other UI traffic, native block production and scheduler variance remain. Not a capacity or isolated service-CPU benchmark.",
+  "baseline_before": {
+    "wall_seconds": 4.005062416079454,
+    "cpu_seconds": 1.6100000000000136
+  },
+  "load": {
+    "requests": 200,
+    "wall_seconds": 2.5501515000360087,
+    "cpu_seconds": 3.5599999999999454
+  },
+  "baseline_after": {
+    "wall_seconds": 4.005030583939515,
+    "cpu_seconds": 1.580000000000041
+  },
+  "estimated_incremental_cpu_ms_per_snapshot": 12.722041925670412
+}

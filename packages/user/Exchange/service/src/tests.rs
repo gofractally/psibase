@@ -650,6 +650,161 @@ fn private_http_snapshot_rejects_unauthenticated_queries(chain: Chain) -> Result
 }
 
 #[psibase::test_case(packages("Exchange"))]
+fn recent_trade_feed_is_native_paginated_and_excludes_rejected_actions(
+    chain: Chain,
+) -> Result<(), Error> {
+    let f = setup(&chain, true)?;
+    let trader = Wrapper::push_from(&chain, account!("trader"));
+    let first = trader.trade(f.market, true, 1000, 0, 16).get()?;
+    let second = trader.trade(f.market, false, 20000, 0, 16).get()?;
+    for _ in 0..4 {
+        chain.start_block();
+    }
+    let read = |path: &str| -> Result<Value, Error> {
+        let response = chain.get(crate::SERVICE, path)?;
+        assert_eq!(
+            response.status,
+            200,
+            "{}",
+            String::from_utf8_lossy(&response.body.0)
+        );
+        Ok(serde_json::from_slice(&response.body.0)?)
+    };
+    let newest = read(&format!("/trades?market={}&limit=1", f.market))?;
+    assert_eq!(newest["source"], "native-history");
+    assert_eq!(newest["trades"].as_array().unwrap().len(), 1);
+    let trade = &newest["trades"][0];
+    assert_eq!(trade["side"], "buy");
+    assert_eq!(trade["base_amount"], second.1.to_string());
+    assert_eq!(trade["quote_amount"], second.0.to_string());
+    assert!(trade["time"].as_str().unwrap().ends_with('Z'));
+    let cursor = newest["next_before"]
+        .as_str()
+        .expect("older real trade exists");
+    let older = read(&format!(
+        "/api/trades?market={}&limit=1&before={}",
+        f.market, cursor
+    ))?;
+    assert_eq!(older["trades"][0]["side"], "sell");
+    assert_eq!(older["trades"][0]["base_amount"], first.0.to_string());
+    assert_eq!(older["trades"][0]["quote_amount"], first.1.to_string());
+    assert_ne!(older["trades"][0]["event_id"], trade["event_id"]);
+    let oldest_id = older["trades"][0]["event_id"].as_str().unwrap();
+    let newest_id = trade["event_id"].as_str().unwrap();
+    let delta = read(&format!(
+        "/api/trades?market={}&limit=10&after={oldest_id}",
+        f.market
+    ))?;
+    assert_eq!(delta["trades"].as_array().unwrap().len(), 1);
+    assert_eq!(delta["trades"][0]["event_id"], newest_id);
+    assert!(delta["next_before"].is_null());
+    for range in [
+        format!("after={newest_id}"),
+        format!("after={oldest_id}&before={newest_id}"),
+        format!("after={newest_id}&before={oldest_id}"),
+        "after=18446744073709551615".into(),
+    ] {
+        let empty = read(&format!("/trades?market={}&limit=10&{range}", f.market))?;
+        assert!(empty["trades"].as_array().unwrap().is_empty());
+    }
+    rejects!(chain, trader.trade(f.market, true, 1000, 1_000_000_000, 16));
+    let after = read(&format!("/trades?market={}&limit=1", f.market))?;
+    assert_eq!(after["trades"][0]["event_id"], trade["event_id"]);
+    let delta = read(&format!("/trades?market={}&after={newest_id}", f.market))?;
+    assert!(delta["trades"].as_array().unwrap().is_empty());
+    let empty = read("/trades?market=18446744073709551615&limit=10")?;
+    assert!(empty["trades"].as_array().unwrap().is_empty());
+    assert_eq!(
+        chain
+            .get(crate::SERVICE, "/trades?market=1&limit=101")?
+            .status,
+        400
+    );
+    assert_eq!(
+        chain
+            .get(crate::SERVICE, "/api/state?account=alice")?
+            .status,
+        403
+    );
+    for invalid in ["-1", "18446744073709551616", "1%20OR%201", ""] {
+        assert_eq!(
+            chain
+                .get(crate::SERVICE, &format!("/trades?market=1&after={invalid}"))?
+                .status,
+            400
+        );
+    }
+    // Public price levels carry depth only. A private snapshot can reference
+    // a lending cohort only when this authenticated owner has a position in it.
+    Wrapper::push_from(&chain, account!("alice"))
+        .limit(f.market, true, 90, 90_000)
+        .get()?;
+    Wrapper::push_from(&chain, account!("bob"))
+        .limit(f.market, false, 110, 1000)
+        .get()?;
+    Wrapper::push_from(&chain, account!("lender"))
+        .lend(f.market, false, 100_000_000)
+        .get()?;
+    Wrapper::push_from(&chain, account!("alice"))
+        .borrow(f.market, true, 80, 100)
+        .get()?;
+    Wrapper::push_from(&chain, account!("bob"))
+        .borrow(f.market, true, 80, 200)
+        .get()?;
+    let public = read("/api/markets")?;
+    let fields = ["market", "bid", "price", "outgoing", "active"];
+    assert!(!public["levels"].as_array().unwrap().is_empty());
+    for level in public["levels"].as_array().unwrap() {
+        let level = level.as_object().unwrap();
+        assert_eq!(level.len(), fields.len());
+        assert!(fields.iter().all(|field| level.contains_key(*field)));
+    }
+    for field in [
+        "positions",
+        "loans",
+        "loan_positions",
+        "balances",
+        "lenders",
+        "relay_shares",
+    ] {
+        assert!(public.get(field).is_none());
+    }
+    for owner in [account!("alice"), account!("bob"), account!("trader")] {
+        let own: Value =
+            serde_json::from_str(&Wrapper::push_from(&chain, owner).snapshot(owner).get()?)?;
+        let loan_positions = own["loan_positions"].as_array().unwrap();
+        assert!(loan_positions
+            .iter()
+            .all(|p| p["owner"] == owner.to_string()));
+        assert!(own["loans"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|loan| loan_positions
+                .iter()
+                .any(|p| p["generation"] == loan["generation"])));
+        assert!(own["positions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|p| p["owner"] == owner.to_string()));
+        if owner == account!("trader") {
+            assert!(own["loans"].as_array().unwrap().is_empty());
+        } else {
+            assert_eq!(loan_positions.len(), 1);
+            assert_eq!(own["loans"].as_array().unwrap().len(), 1);
+            let expected_units = if owner == account!("alice") { 100 } else { 200 };
+            assert_eq!(own["loans"][0]["scope"], "own-position");
+            assert_eq!(own["loans"][0]["units"], expected_units);
+            assert_eq!(own["loans"][0]["original_units"], expected_units);
+            assert_eq!(own["loans"][0]["claimable_surplus"], 0);
+        }
+    }
+    audit(&chain);
+    Ok(())
+}
+
+#[psibase::test_case(packages("Exchange"))]
 fn independent_books_same_assets_cannot_capture_each_other(chain: Chain) -> Result<(), Error> {
     let f = setup(&chain, true)?;
     let first = serde_json::to_value(

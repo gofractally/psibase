@@ -34,6 +34,71 @@ def amount(action):
 
 
 class WalletTests(unittest.TestCase):
+    def test_native_account_ui_preflight_is_explicit_and_never_executes_wallet(self):
+        handler = object.__new__(bridge.Handler)
+        handler.headers = Message()
+        handler.headers["Host"] = f"127.0.0.1:{bridge.PORT}"
+        handler.headers["Origin"] = bridge.NATIVE_UI_ORIGIN
+        handler.headers["Access-Control-Request-Method"] = "POST"
+        handler.headers["Access-Control-Request-Headers"] = "content-type"
+        handler.send_response, handler.send_header = MagicMock(), MagicMock()
+        handler.end_headers, handler.send_json = MagicMock(), MagicMock()
+        with patch.object(bridge, "push") as execute:
+            handler.do_OPTIONS()
+        execute.assert_not_called()
+        handler.send_response.assert_called_once_with(204)
+        handler.headers.replace_header("Origin", "http://evil.psibase.localhost:8089")
+        handler.do_OPTIONS()
+        self.assertEqual(handler.send_json.call_args.args[1], 403)
+
+    def test_native_ui_cors_is_exact_origin_without_cookie_credentials(self):
+        handler = object.__new__(bridge.Handler)
+        handler.headers = Message()
+        handler.headers["Origin"] = bridge.NATIVE_UI_ORIGIN
+        handler.send_header = MagicMock()
+        with patch.object(bridge.SimpleHTTPRequestHandler, "end_headers"):
+            handler.end_headers()
+        sent = dict(call.args for call in handler.send_header.call_args_list)
+        self.assertEqual(sent["Access-Control-Allow-Origin"], bridge.NATIVE_UI_ORIGIN)
+        self.assertNotIn("Access-Control-Allow-Credentials", sent)
+        handler.headers.replace_header("Origin", "http://evil.psibase.localhost:8089")
+        handler.send_header.reset_mock()
+        with patch.object(bridge.SimpleHTTPRequestHandler, "end_headers"):
+            handler.end_headers()
+        self.assertFalse(any(call.args[0] == "Access-Control-Allow-Origin"
+                             for call in handler.send_header.call_args_list))
+
+    def test_trade_history_forwarding_keeps_native_numbers_and_public_origin(self):
+        body={"source":"native-history","trades":[{"event_id":"9007199254740999"}]}
+        with patch.object(bridge.urllib.request,"urlopen",return_value=io.BytesIO(json.dumps(body).encode())) as request:
+            self.assertEqual(bridge.read_trades("1","50","9007199254740998","9007199254740997"),body)
+        native=request.call_args.args[0]
+        self.assertTrue(native.full_url.endswith("/trades?market=1&limit=50&before=9007199254740998&after=9007199254740997"))
+        self.assertEqual(native.get_header("Host"),"exchange.psibase.localhost:8089")
+        self.assertIsNone(native.get_header("Authorization"))
+
+    def test_trade_history_rejects_untrusted_query_fragments_before_network(self):
+        with patch.object(bridge.urllib.request,"urlopen") as network:
+            for args in [("1;DROP TABLE",), ("0",), (True,), ("1","101"),
+                         ("1","0"),("1","50","-1"),("１２",),
+                         ("1","50",None,"-1"),("1","50",None,"0 OR 1"),
+                         ("1","50",None,str(1 << 64)),("1","50",None,True),
+                         ("1","50",None,""),("1","50","")]:
+                with self.subTest(args=args),self.assertRaises(ValueError):
+                    bridge.read_trades(*args)
+            network.assert_not_called()
+
+    def test_blank_trade_http_cursors_are_not_silently_dropped(self):
+        handler = object.__new__(bridge.Handler)
+        handler.headers = Message()
+        handler.headers["Host"] = f"127.0.0.1:{bridge.PORT}"
+        handler.path = "/api/trades?market=1&after="
+        handler.send_json = MagicMock()
+        with patch.object(bridge.urllib.request, "urlopen") as network:
+            handler.do_GET()
+        network.assert_not_called()
+        self.assertIn("Invalid trade cursor", handler.send_json.call_args.args[0]["error"])
+
     def test_cross_origin_mutation_is_rejected_before_wallet_execution(self):
         handler = object.__new__(bridge.Handler)
         handler.headers = Message()
@@ -160,6 +225,17 @@ class WalletTests(unittest.TestCase):
         funded = bridge.fund_claims("alice", current, prefix, accrued)
         self.assertEqual([a["method"] for a in funded], ["claim", "credit"])
         self.assertEqual(amount(funded[-1]), 67)
+
+    def test_own_loan_view_uses_exact_claim_without_other_borrower_totals(self):
+        current = state(True)
+        current["positions"] = []
+        current["loans"] = [{"generation": 5, "scope": "own-position", "active": False,
+                             "units": 2, "claimable_surplus": "67"}]
+        current["loan_positions"] = [{"generation": 5, "market": 1, "long": True,
+                                      "price": 80, "units": 2}]
+        prefix, accrued = bridge.settlements("alice", current)
+        self.assertEqual(accrued, {2: 67})
+        self.assertEqual([a["method"] for a in prefix], ["claim"])
 
     def test_u64_quantities_remain_exact_in_native_actions(self):
         exact = (1 << 64) - 1

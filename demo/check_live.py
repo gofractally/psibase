@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Read-only financial acceptance checks against the running native service.
 
-Owner snapshots are authenticated chain actions through the local demo wallet;
+Owner snapshots use authenticated native HTTP through the local demo wallet;
 this script does not place trades, create accounts, or change token balances.
 The actual-chain test suite separately audits every native escrow/table row.
 """
 import json
-from math import isqrt
 from pathlib import Path
 import importlib.util
 
@@ -15,81 +14,68 @@ bridge = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bridge)
 
 MAX = (1 << 40) - 1
-Q = 1 << 40
 
 
 def verify(states):
-    market_map = {}
-    loans = {}
-    levels = {}
+    """Audit the public health and EACH owner's view, without private pool access.
+
+    Requests can span blocks while the bot trades. A single HTTP response is
+    consistent; records from different owners must not be treated as one ledger
+    snapshot. The native test suite audits the complete escrow/risk schedule.
+    """
+    markets_seen, active_positions, checks = set(), set(), 0
     for state in states:
-        for market in state["markets"]:
-            mid = int(market["id"])
-            # Snapshot actions may span blocks; without economic mutations the
-            # economic market records remain identical.
-            assert market_map.setdefault(mid, market) == market
-        for loan in state.get("loans", []):
-            loans[int(loan["generation"])] = loan
-        for pool in state.get("levels", []):
-            levels[int(pool["id"])] = pool
-    checks = 0
-    for mid, market in market_map.items():
-        x, y, k = int(market["x"]), int(market["y"]), int(market["k"])
-        assert 0 < x <= MAX and 0 < y <= MAX and 0 < k <= x * y
-        assert 0 < int(market["lp_supply"]) <= MAX
-        for key in ("escrow_base", "escrow_quote"):
-            cash = market[key]
-            assert cash["funded"] and int(cash["actual"]) == int(cash["expected"]), (mid, key, "native escrow deficit")
-        if int(market["debt_base"]) or int(market["debt_quote"]):
-            assert market["margin_enabled"], "credit in market not certified immutable at creation"
-        lot, tick = int(market["base_lot"]), int(market["quote_tick"])
-        assert lot > 0 and tick > 0
-        for long in (True, False):
-            rows = sorted((g for g in loans.values() if int(g["market"]) == mid and g["long"] == long and g["active"]),
-                          key=lambda g: -int(g["price"]) if long else int(g["price"]))
-            assert len(rows) <= 64
-            u = x if long else y
-            face = collateral = 0
-            for g in rows:
-                p = int(g["price"])
-                c = int(g["units"]) * int(g["collateral_unit"])
-                debt = int(g["units"]) * int(g["face_unit"])
-                h = isqrt(k * lot // (p * tick)) if long else isqrt(k * p * tick // lot)
-                u = max(u, h)
-                assert 0 < h <= MAX and c > 0 and debt > 0 and u + c <= MAX
-                assert k * c // (u * (u + c)) >= debt, (mid, long, p, "undercovered")
-                u += c
-                face += debt
-                collateral += c
-                checks += 1
-            assert collateral <= MAX
-            assert face == int(market["debt_quote"] if long else market["debt_base"]), "snapshot truncated active loans"
-            cash = int(market["vault_quote"] if long else market["vault_base"])
-            assert cash + face <= MAX
-        checks += 1
-    for state in states:
-        for row in state.get("balances", []):
-            assert int(row["spendable"]) == int(row["incoming"]) + int(row["outgoing"])
-            assert all(int(row[key]) >= 0 for key in ("wallet", "incoming", "outgoing"))
-        for pos in state.get("positions", []):
-            pool = levels.get(int(pos["generation"]))
-            if pool is not None:
-                shares, supply = int(pos["shares"]), int(pool["shares"])
-                earned = shares * int(pool["index"]) - int(pos["debt"])
-                assert earned >= 0 and 0 < shares <= supply
-                assert int(pos["refund"]) == shares * int(pool["outgoing"]) // supply
-                assert int(pos["proceeds"]) == earned // Q
-                assert int(pos["proceeds"]) <= int(pool["incoming"])
-                checks += 1
-        for pos in state.get("loan_positions", []):
-            g = loans[int(pos["generation"])]
-            assert 0 < int(pos["units"]) <= int(g["units"])
-            if not g["active"]:
-                claim = int(pos["units"]) * int(g["original_surplus"]) // int(g["original_units"])
-                assert claim <= int(g["surplus"])
-                checks += 1
-    return {"market_count": len(market_map), "active_cohort_count": sum(bool(g["active"]) for g in loans.values()),
-            "known_wallet_count": len(states), "verified_financial_checks": checks}
+        owner = state['owner']
+        markets = {int(m['id']): m for m in state['markets']}
+        markets_seen.update(markets)
+        for mid, market in markets.items():
+            x, y, k = int(market['x']), int(market['y']), int(market['k'])
+            assert 0 < x <= MAX and 0 < y <= MAX and 0 < k <= x * y
+            assert 0 < int(market['lp_supply']) <= MAX
+            assert int(market['base_lot']) > 0 and int(market['quote_tick']) > 0
+            for key in ('escrow_base', 'escrow_quote'):
+                cash = market[key]
+                assert cash['funded'] and int(cash['actual']) == int(cash['expected']), (mid, key, 'native escrow deficit')
+            if int(market['debt_base']) or int(market['debt_quote']):
+                assert market['margin_enabled']
+            for side in ('base', 'quote'):
+                assert int(market['vault_' + side]) + int(market['debt_' + side]) <= MAX
+            checks += 1
+        for level in state['levels']:
+            assert set(level) == {'market', 'bid', 'price', 'outgoing', 'active'}
+            assert int(level['market']) in markets
+            assert 0 < int(level['price']) <= (1 << 32) - 1
+            assert 0 < int(level['outgoing']) <= MAX
+        for name in ('positions', 'loan_positions', 'lenders', 'relay_shares'):
+            assert all(row['owner'] == owner for row in state.get(name, [])), (owner, name, 'foreign owner exposed')
+        for row in state.get('balances', []):
+            assert int(row['spendable']) == int(row['incoming']) + int(row['outgoing'])
+            assert all(int(row[key]) >= 0 for key in ('wallet', 'incoming', 'outgoing'))
+        for pos in state.get('positions', []):
+            m = markets[int(pos['market'])]
+            for field, asset in (('refund', 'quote' if pos['bid'] else 'base'),
+                                 ('proceeds', 'base' if pos['bid'] else 'quote')):
+                assert 0 <= int(pos[field]) <= int(m['escrow_' + asset]['expected'])
+            checks += 1
+        loans = {int(g['generation']): g for g in state.get('loans', [])}
+        positions = {int(p['generation']): p for p in state.get('loan_positions', [])}
+        assert set(loans) == set(positions), (owner, 'unrelated loan generation exposed')
+        for generation, loan in loans.items():
+            pos = positions[generation]
+            assert loan['scope'] == 'own-position'
+            assert int(loan['units']) == int(pos['units']) > 0
+            assert int(loan['original_units']) == int(pos['units'])
+            claim = int(loan['claimable_surplus'])
+            assert claim == int(loan['original_surplus']) == int(loan['surplus']) >= 0
+            if loan['active']:
+                active_positions.add((owner, generation))
+                m = markets[int(loan['market'])]
+                assert claim == 0
+                assert int(loan['units']) * int(loan['face_unit']) <= int(m['debt_quote' if loan['long'] else 'debt_base'])
+            checks += 1
+    return {'market_count': len(markets_seen), 'known_active_loan_position_count': len(active_positions),
+            'known_wallet_count': len(states), 'verified_public_health_and_owner_checks': checks,
+            'scope': 'Public market backing and authenticated own views; complete ledger/risk audit is in native tests'}
 
 
 if __name__ == "__main__":

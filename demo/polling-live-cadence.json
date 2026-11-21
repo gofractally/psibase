@@ -1,0 +1,79 @@
+{
+  "observation_seconds": 24.431460084044375,
+  "note": "Process CPU includes ongoing 1Hz trading and other open UI clients; not isolated per-request CPU. Response durations are elapsed time.",
+  "samples": [
+    {
+      "response_ms": 27.119083097204566,
+      "bytes": 518,
+      "trades": 2
+    },
+    {
+      "response_ms": 27.375416015274823,
+      "bytes": 516,
+      "trades": 2
+    },
+    {
+      "response_ms": 27.298082946799695,
+      "bytes": 517,
+      "trades": 2
+    },
+    {
+      "response_ms": 27.22737507428974,
+      "bytes": 514,
+      "trades": 2
+    },
+    {
+      "response_ms": 27.243042015470564,
+      "bytes": 517,
+      "trades": 2
+    },
+    {
+      "response_ms": 27.437458047643304,
+      "bytes": 515,
+      "trades": 2
+    },
+    {
+      "response_ms": 27.57333405315876,
+      "bytes": 515,
+      "trades": 2
+    },
+    {
+      "response_ms": 27.82900002785027,
+      "bytes": 515,
+      "trades": 2
+    },
+    {
+      "response_ms": 28.328165994025767,
+      "bytes": 514,
+      "trades": 2
+    },
+    {
+      "response_ms": 27.455625007860363,
+      "bytes": 518,
+      "trades": 2
+    },
+    {
+      "response_ms": 28.215833008289337,
+      "bytes": 517,
+      "trades": 2
+    },
+    {
+      "response_ms": 31.516292016021907,
+      "bytes": 517,
+      "trades": 2
+    }
+  ],
+  "median_delta_ms": 27.446541527751833,
+  "median_delta_bytes": 516.5,
+  "median_delta_trade_count": 2.0,
+  "process_cpu": {
+    "node": {
+      "cpu_seconds": 10.680000000000007,
+      "percent_one_core_during_observation": 43.714129091183004
+    },
+    "bridge": {
+      "cpu_seconds": 0.06,
+      "percent_one_core_during_observation": 0.2455849948942864
+    }
+  }
+}

@@ -1,11 +1,15 @@
 # Native Psibase exchange demonstration
 
-The running application is **http://127.0.0.1:8090**. The native Psibase node
-listens on **127.0.0.1:8089**. Both listeners are restricted to this computer.
+The running application is **http://exchange.psibase.localhost:8089/**, served
+by the native Sites service under the exchange account's subdomain. The native
+Psibase node listens on **127.0.0.1:8089**. The development wallet adapter listens
+on **127.0.0.1:8090**; that address is no longer the application host.
+Both listeners are restricted to this computer.
 All orders, fills, market makers, lending positions, collateral and repayments
 execute in native Psibase services and persist in its database. The Python
-adapter is a development wallet and static file server; it contains no matcher
-or independent account ledger.
+adapter is a development wallet; it contains no matcher or independent account
+ledger. Its native UI origin is explicitly allowlisted for local development
+requests. Other account subdomains cannot use it through browser CORS.
 
 ## Source and running state
 
@@ -26,6 +30,21 @@ python3 demo/run.py start
 python3 demo/run.py status
 python3 demo/run.py stop
 ```
+
+To publish a changed UI through the same native account:
+
+```sh
+python3 demo/publish_ui.py
+```
+
+The Exchange package also contains its UI files under the native Sites data
+layout and declares Sites and Events dependencies. Its post-install actions
+configure market indexes for trade and liquidation history. The query service
+returns `None` for static asset paths so HttpServer can apply its standard
+Sites fallback; it retains the native action-schema developer endpoints.
+The demo publishing script adds only the exact local wallet address to the
+account's content policy. Browser CORS on the wallet permits the exact exchange
+origin, not arbitrary sibling account subdomains.
 
 `start` retains existing chain state and leaves the node and wallet running
 independently of a terminal. It does not reset balances or issue more tokens.
@@ -53,10 +72,77 @@ changed by an issuer.
 
 The initial market has 100 BTC and 10,000,000 USD in its relay, giving an
 initial price of 100,000 USD/BTC. Its base lot is 0.0001 BTC and tick is 1 USD.
-Several real limit pools are seeded around that price, with two wallets
-sharing one bid price. The liquidity wallet supplies both lending currencies.
+Real limit orders are seeded around that price, with two wallets
+placing bids at the same price. The liquidity wallet supplies both lending currencies.
 Alice starts with a small active long loan at an 80,000 USD trigger. Subsequent
 demo interactions change those balances normally; they are not reset on reload.
+
+### Dense book and background trading
+
+```sh
+python3 demo/market_activity.py seed
+python3 demo/market_activity.py start
+python3 demo/market_activity.py status
+python3 demo/market_activity.py stop
+```
+
+The additional fixture funds three dedicated maker accounts and one taker from
+the existing liquidity wallet, using existing native tokens. It initially adds
+96 funded limit orders across 24 bid and 24 ask prices; most prices contain
+orders from two wallets. Re-running it tops up missing maker inventory instead
+of resetting other users' orders or balances. Maker and taker setup is recorded
+in `demo/market-activity.json`.
+
+The current fixture sizes each maker contribution at 0.0480–0.2596 BTC and
+rotates bounded replenishment through the three dedicated makers every four
+seconds. It raises no new tokens. Both maintenance and that second's taker
+trade share one native transaction. Initial fixture setup may skip prices too
+close to the current relay to preserve its planning-time passivity guard;
+subsequent real fills and quoting change the displayed level count normally.
+
+The trader runs independently of the browser. A Node 22+ worker receives the
+public Coinbase Exchange BTC-USD WebSocket ticker and heartbeat channels.
+The Python trader targets **one native transaction per second**, overlapping a
+bounded number of confirmation waiters. Actual execution remains serialized
+by the chain. Replenishment actions occasionally join the same transaction.
+Source protocol: [Coinbase Exchange channels](https://docs.cdp.coinbase.com/exchange/websocket-feed/channels).
+
+The bot targets the **absolute live BTC/USD price**, buying below the feed and
+selling above it. The demo does not become an externally redeemable BTC/USD
+market. Trade sizes are bounded and the bot pauses if the feed is stale, a live
+move exceeds its 5% operating band, or confirmations fall behind; rejected
+transactions or exhausted dedicated funding stop it. It never obtains outside
+funds or cancels other wallets' orders. Between unchanged feed ticks it submits
+a small two-sided trade around the target, so all displayed volume is actual
+native execution. This is a development liquidity fixture, not a profit strategy.
+
+The original $100,000 fixture was aligned with the live ~$57,000 price using a
+funded marketable limit order, with its remainder canceled in the same atomic
+transaction. Resting user orders and the $80,000 margin trigger execute normally
+along that path; balances are not rewritten. The dedicated makers' former
+quotes are canceled and replaced around the live price.
+
+Only native exchange data reaches the browser. Feed source, timestamps and bot
+status stay in `demo/market-activity.log` and `demo/market-activity-status.json`.
+Stopping the bot retains funded orders. `demo/run.py stop` also stops the
+background trader before the wallet and node; `start` starts the wallet/node,
+and the trader can be started explicitly using the command above.
+
+### Charts and order-book display
+
+Candlesticks use confirmed native execution events and native block times,
+with 5-second, 15-second and 1-minute intervals. Each execution is an aggregate
+taker fill, so its displayed price is its actual quote/base VWAP. Empty time
+buckets are not filled with invented trades. The paginated history endpoint
+uses the native market event index to select a bounded number of event IDs
+before fetching exact history rows; it does not sort the entire chain history.
+
+Depth shows the relay and resting orders in a symmetric, configurable
+percentage window around the **current** price. Zoom changes only that display
+window. Old distant orders remain on chain and do not stretch the viewport.
+At the relay's own marginal price, the BTC and USD reserves have equal value:
+`P = USD_reserve / BTC_reserve`, hence `BTC_reserve * P = USD_reserve`.
+Their raw quantities change after trading without implying a value imbalance.
 
 Try the following flows:
 

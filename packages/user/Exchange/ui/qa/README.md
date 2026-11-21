@@ -1,4 +1,7 @@
-# Live browser verification
+# Initial financial browser verification
+
+See [NATIVE-HOST.md](NATIVE-HOST.md) for the later native-account hosting,
+OHLC/volume, depth zoom, responsive layout, and measured live-update checks.
 
 Verified against the running native Psibase chain at
 `http://127.0.0.1:8090/`, using visible Google Chrome through computer use.
@@ -8,7 +11,7 @@ the native chain bridge. No browser-side exchange simulation was used.
 * Alice deposited 10 USD and withdrew 10 USD; her native wallet returned to
   its original 800,000 USD.
 * A passive bid at 90,000 USD/BTC committed 90 USD and displayed exactly
-  0.001 BTC in the book. Cancelling it removed that price pool and returned
+  0.001 BTC in the book. Cancelling it removed that order and returned
   the full committed 90 USD.
 * A market buy spent 100 USD and credited 0.00099999 BTC. Relay reserves and
   its displayed price changed immediately.
@@ -36,7 +39,7 @@ The temporary viewport override was reset. Browser console warnings/errors
 were empty. Responsive overflow and tiny-relay axis rounding found during
 QA were fixed and the static assets rebuilt.
 
-The browser was left open on Alice's BTC/USD **market #1**, with the seeded
+At the end of that initial session, the browser was left open on Alice's BTC/USD **market #1**, with the seeded
 100-unit loan and original 99,000 bid preserved. The live tab is marked as
 a deliverable. `desktop.jpg` and `mobile.jpg` capture the final native state.
 
@@ -56,7 +59,13 @@ the native CUA capture. Image dimensions were independently checked:
 390×843. Raw layout measurements are in `viewport-checks.json`. Temporary
 viewport overrides were reset after verification.
 
+Subsequent real devnet activity has changed the price, filled orders, and
+liquidated the seeded position. These recorded balances describe the initial
+verification, not the current continuously trading state.
+
 These are local development tokens and demo identities, not real BTC or USD
-financial transactions. The UI's seven unit tests separately cover exact
+financial transactions. The UI's thirteen unit tests separately cover exact
 amount conversion, uint64 and commitment limits, relay estimates, XSS escaping,
-and native credit-capability/funding gates.
+native credit-capability/funding gates, exact asset-based order and liquidity
+inputs, cumulative depth, actual OHLC/volume aggregation, depth zoom, and
+native-host wallet routing.

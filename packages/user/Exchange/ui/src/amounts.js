@@ -4,7 +4,7 @@ export const UINT64_MAX = (1n << 64n) - 1n;
 export const COMMITTED_MAX = (1n << 40n) - 1n;
 export function committed(value, name = 'Committed amount') {
   const n = integer(value, name);
-  if (n > COMMITTED_MAX) throw new Error(`${name} exceeds this service’s checked arithmetic limit (${COMMITTED_MAX} native atoms).`);
+  if (n > COMMITTED_MAX) throw new Error(`${name} is too large for this market.`);
   return n;
 }
 export function integer(value, name = 'Value', allowZero = false) {

@@ -15,6 +15,24 @@ directly, or wrapped under `snapshot`. Expected arrays: `markets`, `tokens`,
 quote_tick,x,y,k,lp_supply,vault_base,vault_quote,debt_base,debt_quote,
 lending_base,lending_quote`. Token records have `id,precision,symbol`.
 Balance records have `token,wallet,incoming,outgoing,spendable`.
+Own order positions expose native `remaining_outgoing`, `remaining_base`,
+`remaining_quote`, and `status`. Only a positive remaining outgoing amount
+counts as an open order. The UI does not infer original or lifetime filled
+quantities from settlement balances.
+Loan metadata is scoped to the owner's position. The UI uses the native
+`claimable_surplus` floor payout directly when supplied; it does not need
+other borrowers' aggregate collateral or debt to display balances.
+
+`GET /api/trades?market=ID&limit=100` returns actual native executed trades,
+latest first, with `event_id,base_amount,quote_amount,time,sell_base,kind`
+and `next_before`. The initial load follows at most five 100-entry pages;
+subsequent updates send exclusive `after=latestEventId`, following
+`before=next_before` while retaining that original `after` cursor if needed.
+Returned IDs satisfy `after < event_id < before` when both cursors exist;
+the latest-seen cursor advances only after that bounded fetch completes.
+The browser retains at most 2,000 unique events per visited market. Each
+print is the actual aggregate execution VWAP, including liquidation trades;
+there is no synthetic external trade data in the chart or tape.
 
 `GET /api/tokens?after=ID&limit=1` proxies the public native token catalog.
 The creation form accepts any native token IDs and resolves their actual
@@ -64,10 +82,27 @@ closed loan positions. This realizes accrued funds inside the transaction;
 the user does not need a separate claim action. Never credit a browser-only
 balance or submit settlement and spending as separately committed steps.
 
-The chart is the executable depth of the current on-chain relay reserves,
-labelled explicitly as reserve liquidity rather than historical market data.
-Limit price markers are actual native pool prices. Session activity entries
-are added only after a successful confirmed transaction response.
+The default price chart groups actual native timestamps into 5-second,
+15-second, or 1-minute OHLC candles and aligned base-volume bars. Empty time
+intervals stay empty. The depth view combines current native limit orders
+and executable market-maker reserves within a configurable symmetric
+percentage of the current price. Far orders remain on chain; changing the
+viewport does not cancel them. Session activity entries are added only after
+a successful confirmed transaction response.
+
+State refreshes every two seconds while the document is visible; incremental
+trades additionally pause outside the exchange view. Chart geometry and trade-tape signatures skip
+unchanged SVG/HTML work; focused forms are not replaced by polling. Optional
+`?profile=1` logs API UTF-8 payload bytes, fetch/decode durations, synchronous
+render durations, and actual chart redraw durations to the console. It is
+disabled by default, keeps no metrics buffer, and does not measure browser
+paint or frame time.
+
+When hosted on `exchange.psibase.localhost`, the central API adapter uses
+the explicitly configured local development wallet at
+`http://127.0.0.1:8090`. The bridge permits that exact native origin via CORS.
+Other hostnames use same-origin API paths. Native Sites serves all static
+assets; a production wallet signer can replace this demo adapter separately.
 
 Build: `npm run build` (no dependencies). Test: `npm test`.
 The bridge can serve `dist/` directly, or those static assets can be published

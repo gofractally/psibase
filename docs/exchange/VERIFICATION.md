@@ -91,3 +91,55 @@ The demo uses local AuthAny wallets and native demonstration BTC/USD assets.
 No external currency redemption or real bitcoin custody is claimed. See
 [the security review](SECURITY.md) for the query privilege, upgrade and
 fresh-index deployment assumptions.
+
+## Native-host live-market and privacy follow-up
+
+The UI now runs at `http://exchange.psibase.localhost:8089/`, through Sites.
+Its package includes eight UI assets plus native Events market-index setup.
+The separate loopback wallet remains a development-only AuthAny adapter.
+The frozen updated Exchange package SHA-256 is
+`3530e8b6d34da4ff4482fd608804620399cf0aa729c38fd8049762ce6afcb003`.
+The deployed financial WASM is
+`77cd04405c389d879758d1a04946d06493f2db704ef00bd9defa0a604190395b`;
+only its read-only snapshot projection changed, with matching action bodies,
+math and financial table layouts unchanged.
+
+Follow-up validation passed:
+
+* One actual-chain history/privacy integration fixture, 107.05 seconds:
+  native before/after cursors, actual block times, rejected-action exclusion,
+  public-field allowlists, two borrowers sharing a cohort with isolated own
+  statistics, private action authorization, and independent cash audit.
+* Six native view tests and twenty wallet-adapter tests.
+* Thirteen UI tests, twelve background trader tests, and feed-decoder checks.
+* Actual native-host limit entry/cancellation, live candles/volume, depth zoom,
+  responsive viewports and zero final browser warnings/errors. See
+  [the UI verification](../../packages/user/Exchange/ui/qa/NATIVE-HOST.md).
+
+The trader follows absolute external BTC/USD ticks with funded native trades
+at a one-second target cadence. Maker orders are real funded orders; their
+inventory is replenished rather than synthesized in the browser. The large
+initial price alignment also exercised a real pooled margin liquidation.
+
+Public depth no longer exposes internal proceeds/share/index fields. Private
+loan views contain exact own quantities/claims, including when other users
+share that price cohort. Live negative checks reject unauthenticated and
+cross-owner requests. API projection is not cryptographic chain privacy:
+public transactions/events and local administrative SQL remain inspectable.
+
+`check_live.py` now checks public backing and authenticated own-position views
+without assuming those APIs expose other users' pool accounting. Its separate
+responses can span live trading blocks. Complete table/risk-schedule audits
+remain in the native tests.
+
+Polling now uses exclusive incremental history cursors. Measurements are in
+`demo/polling-before.json`, `polling-after.json`, `polling-live-cadence.json`,
+and the UI profile. Actual two-trade deltas were about 515 bytes versus about
+20KB for the previous 100-trade refresh. The browser measured approximately
+4.2ms synchronous state rendering and 3.9ms per actual chart rebuild; unchanged
+SVGs are skipped. Request timings are elapsed times, not transaction CPU.
+`polling-cpu-observation.json` is explicitly a rough process-CPU observation
+with continuing bot/UI/background traffic, not an isolated capacity benchmark.
+
+The [stop cascade analysis](CASCADE_AUCTION.md) and
+[stop-order design](STOP_LOSSES.md) are proposals, not deployed stop actions.

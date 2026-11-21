@@ -6,3 +6,6 @@ failed-bootstrap-*/
 __pycache__/
 artifacts/
 seed.json
+market-activity.json
+market-activity-status.json
+market-activity.lock

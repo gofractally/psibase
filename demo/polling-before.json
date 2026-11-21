@@ -1,0 +1,17 @@
+{
+  "state": {
+    "samples": 30,
+    "median_response_ms": 17.37747946754098,
+    "p95_response_ms": 17.785334028303623,
+    "mean_bytes": 8811
+  },
+  "trades_full": {
+    "samples": 30,
+    "median_response_ms": 87.81356253894046,
+    "p95_response_ms": 89.28633399773389,
+    "mean_bytes": 20371
+  },
+  "current_refresh_seconds": 2,
+  "current_steady_requests_per_second": 1,
+  "current_steady_response_bytes_per_second": 14591.0
+}

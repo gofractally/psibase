@@ -6,7 +6,12 @@ edition.workspace = true
 publish.workspace = true
 [package.metadata.psibase]
 server = "r-exchange"
-postinstall = [{ sender = "exchange", service = "exchange", method = "init", data = {} }]
+data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = [
+    { sender = "exchange", service = "exchange", method = "init", data = {} },
+    { sender = "exchange", service = "events", method = "addIndex", data = { db = 0, service = "exchange", event = "traded", column = 0 } },
+    { sender = "exchange", service = "events", method = "addIndex", data = { db = 0, service = "exchange", event = "liquidated", column = 0 } },
+]
 [dependencies]
 psibase.workspace = true
 psibase_service.workspace = true

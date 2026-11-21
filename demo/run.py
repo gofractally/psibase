@@ -68,9 +68,10 @@ def main():
         wait_http("http://127.0.0.1:8089/")
         start("bridge", [sys.executable, str(programs["bridge"])], programs["bridge"])
         wait_http("http://127.0.0.1:8090/api/health")
-        print("Exchange: http://127.0.0.1:8090")
+        print("Exchange: http://exchange.psibase.localhost:8089/")
     else:
-        for name in ("bridge", "node"):
+        programs["market-activity"] = ROOT / "demo/market_activity.py"
+        for name in ("market-activity", "bridge", "node"):
             pid = active(name, programs[name])
             print(f"{name}: {'running PID '+str(pid) if pid else 'stopped'}")
             if pid and args.operation == "stop":

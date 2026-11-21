@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CLI = os.environ.get("EXCHANGE_CLI", str(ROOT / "rust/target/release/psibase"))
 API = os.environ.get("EXCHANGE_CHAIN", "http://psibase.localhost:8089/")
 PORT = int(os.environ.get("EXCHANGE_PORT", "8090"))
+NATIVE_UI_ORIGIN = f"http://exchange.psibase.localhost:{urlsplit(API).port or 80}"
+UI_ORIGINS = (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}", NATIVE_UI_ORIGIN)
 ACCOUNTS = {"alice", "bob", "carol", "liquidity"}
 METHODS = {"create", "trade", "limit", "cancel", "lend", "unlend", "borrow",
            "repay", "liquidate", "addliq", "remliq", "claim", "settle", "renew"}
@@ -133,6 +135,29 @@ def read_tokens(after=0, limit=200):
         return json.load(reply)
 
 
+def read_trades(market, limit="50", before=None, after=None):
+    def parsed(value, label, maximum, minimum=0):
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            raise ValueError(f"Invalid {label}")
+        text = str(value)
+        if not text.isascii() or not text.isdigit():
+            raise ValueError(f"Invalid {label}")
+        result = int(text)
+        if not minimum <= result <= maximum:
+            raise ValueError(f"Invalid {label}")
+        return result
+    market = parsed(market, "trade market", (1 << 64) - 1, 1)
+    limit = parsed(limit, "trade page size", 100, 1)
+    cursor = "" if before is None else f"&before={parsed(before, 'trade cursor', (1 << 64) - 1)}"
+    cursor += "" if after is None else f"&after={parsed(after, 'trade cursor', (1 << 64) - 1)}"
+    endpoint = urlsplit(API)
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{endpoint.port or 80}/trades?market={market}&limit={limit}{cursor}",
+        headers={"Host": f"exchange.psibase.localhost:{endpoint.port or 80}"})
+    with urllib.request.urlopen(req, timeout=30) as reply:
+        return json.load(reply)
+
+
 def quantity(value):
     number = int(value)
     if not 0 < number <= (1 << 64) - 1:
@@ -165,7 +190,8 @@ def settlements(account, state):
         g = loans.get(int(pos["generation"]))
         m = available_market(pos["market"])
         if g and not g["active"] and m is not None:
-            paid = int(pos["units"]) * int(g["original_surplus"]) // int(g["original_units"])
+            paid = (int(g["claimable_surplus"]) if "claimable_surplus" in g else
+                    int(pos["units"]) * int(g["original_surplus"]) // int(g["original_units"]))
             token = int(m["quote"] if pos["long"] else m["base"])
             accrued[token] = accrued.get(token, 0) + paid
             actions.append(action(account, "exchange", "claim", {
@@ -246,6 +272,12 @@ class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
+        origin = self.headers.get("Origin")
+        if origin in UI_ORIGINS:
+            # Only this local account UI may use the development wallet.
+            # No wildcard, credential cookie, or arbitrary Psibase subdomain.
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         super().end_headers()
 
     def send_json(self, value, status=200):
@@ -260,6 +292,19 @@ class Handler(SimpleHTTPRequestHandler):
         # Loopback binding alone does not prevent browser DNS rebinding.
         return self.headers.get("Host", "") in (
             f"127.0.0.1:{PORT}", f"localhost:{PORT}")
+
+    def do_OPTIONS(self):
+        requested = self.headers.get("Access-Control-Request-Method", "")
+        headers = {h.strip().lower() for h in self.headers.get("Access-Control-Request-Headers", "").split(",") if h.strip()}
+        if (not self.local_host() or self.headers.get("Origin") not in UI_ORIGINS or
+                requested not in ("GET", "POST") or not headers.issubset({"content-type"})):
+            self.send_json({"error": "Local wallet preflight rejected"}, 403)
+            return
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_GET(self):
         if not self.local_host():
@@ -278,6 +323,12 @@ class Handler(SimpleHTTPRequestHandler):
                 query = parse_qs(parsed.query)
                 self.send_json(read_tokens(query.get("after", ["0"])[0],
                                            query.get("limit", ["200"])[0]))
+            elif parsed.path == "/api/trades":
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                self.send_json(read_trades(query.get("market", [None])[0],
+                                          query.get("limit", ["50"])[0],
+                                          query.get("before", [None])[0],
+                                          query.get("after", [None])[0]))
             else:
                 super().do_GET()
         except Exception as error:
@@ -288,7 +339,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not self.local_host():
                 raise ValueError("Local wallet host required")
             origin = self.headers.get("Origin")
-            if origin and origin not in (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"):
+            if origin and origin not in UI_ORIGINS:
                 raise ValueError("Cross-origin wallet request rejected")
             if self.headers.get_content_type() != "application/json":
                 raise ValueError("JSON request required")
@@ -319,5 +370,5 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"Exchange demo: http://127.0.0.1:{PORT}", flush=True)
+    print(f"Development wallet adapter: http://127.0.0.1:{PORT}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

@@ -389,3 +389,55 @@ authority are therefore trusted. A production alternative can compose the
 authorized native token plugin's reads in the client, or introduce narrowly
 scoped native read grants, rather than granting this broad flag. No collateral
 guarantee is asserted against malicious privileged code upgrades.
+
+## Native UI hosting and public execution history
+
+The UI is stored by native Sites under the exchange account. Unknown static
+paths fall through the read-only query handler to HttpServer's normal Sites
+fallback. The temporary wallet adapter remains loopback-only. Its browser
+allowlist now includes exactly `http://exchange.psibase.localhost:8089`, with
+explicit JSON preflight and origin-specific CORS; other account subdomains
+receive no access. Host checks, request bounds, action allowlists and native
+owner authorization remain in force. The local content-policy exception for
+`http://127.0.0.1:8090` is applied by the demo publishing script, not the
+production package metadata. These AuthAny demo identities remain unsuitable
+for public deployment.
+
+Public trades contain only existing public execution events. No second trade
+ledger or financial action was added. The query opens read-only handles to
+the pinned native Events ready-index metadata and market/event-ID index,
+selects at most `limit+1` IDs for each of the two event types, and fetches only
+those exact history ROWIDs. The maximum page is 100. This prevents a limited
+output query from secretly sorting an unbounded history. An incomplete native
+index produces an unavailable response rather than an inaccurate empty tape.
+Changes to native Events table layouts require review of these explicit
+read-only handles and their integration tests.
+
+The background liquidity fixture spends only its dedicated accounts' funded
+native tokens. WebSocket prices select trades; they do not set reserves,
+overwrite balances, or enter the browser. Native limits, execution bounds,
+collateral checks and escrow accounting still decide whether each transaction
+succeeds. The large demo correction from $100,000 to the live ~$57,000 range
+was a funded marketable limit and cancellation, including normal liquidation
+of the earlier $80,000 loan cohort. Subsequent live checks found covered debt
+and matching actual/expected token escrow.
+
+The owner projection now also handles shared credit cohorts: it computes the
+requesting borrower's own units and exact floor-rounded surplus, instead of
+returning the shared cohort's total units or surplus. The native integration
+fixture uses two owners in the same cohort to distinguish those cases. Public
+market reserves, vault totals and debt totals remain aggregate health data;
+individual maker, borrower, lender and liquidity-provider positions are scoped
+to the authenticated owner. Live unauthenticated and cross-owner snapshot
+requests returned 403, including the account-query alias.
+
+This is service-API privacy, not confidential consensus state. The existing
+public `traded` event contains an actor, and blockchain transactions identify
+their senders. Native administrative SQL can inspect that history. On this
+local demo, XAdmin treats the direct loopback socket as administrative, so an
+unauthenticated local SQL request can read public event actors. Remote SQL
+administration is separately authenticated in the native implementation.
+Likewise, the development wallet intentionally controls all four AuthAny demo
+accounts; its account selector is not proof of separate user authentication.
+Do not describe any of these local operator facilities as protecting balances
+from the machine's operator or as cryptographic on-chain privacy.

@@ -38,6 +38,50 @@ fn preserve_integers(value: &mut Value) {
         _ => {}
     }
 }
+
+fn order_view(position: &Maker, generation: &Pool, market: &Market) -> Value {
+    let remaining =
+        position.shares as u128 * generation.outgoing as u128 / generation.shares as u128;
+    let proceeds =
+        (position.shares as u128 * generation.index.get() - position.debt.get()) / crate::math::Q;
+    let quote_per_lot = position.price as u128 * market.quote_tick as u128;
+    let (base, quote) = if position.bid {
+        (
+            remaining * market.base_lot as u128 / quote_per_lot,
+            remaining,
+        )
+    } else {
+        (
+            remaining,
+            remaining * quote_per_lot / market.base_lot as u128,
+        )
+    };
+    json!({"owner":position.owner,"market":position.market,"bid":position.bid,
+        "side":if position.bid{"buy"}else{"sell"},"price":position.price,
+        "generation":position.generation,"shares":position.shares,"debt":position.debt.to_string(),
+        "refund":integer(remaining),"proceeds":integer(proceeds),"active":generation.active,
+        "remaining_outgoing":integer(remaining),"remaining_base":integer(base),
+        "remaining_quote":integer(quote),"claimable_incoming":integer(proceeds),
+        "status":if generation.active{"open"}else if generation.outgoing==0{"filled"}else{"remainder"}})
+}
+/// A private position view, not a serialized shared Loan row. Legacy ratio
+/// fields below describe this owner's units and exact rounded entitlement so
+/// existing wallet claim construction never needs another borrower's totals.
+fn loan_view(position: &Borrower, generation: &Loan) -> Value {
+    let claim = if generation.active {
+        0
+    } else {
+        assert!(generation.original_units > 0, "closed loan units");
+        position.units as u128 * generation.original_surplus as u128
+            / generation.original_units as u128
+    };
+    json!({"scope":"own-position","generation":position.generation,
+        "market":position.market,"long":position.long,"price":position.price,
+        "units":position.units,"collateral_unit":generation.collateral_unit,
+        "face_unit":generation.face_unit,"active":generation.active,
+        "claimable_surplus":integer(claim),"original_units":position.units,
+        "original_surplus":integer(claim),"surplus":integer(claim)})
+}
 fn metadata(t: &tokens::tables::tables::Token) -> Value {
     let sym = foreign::<_, symbol::tables::MappingTable>(symbol::SERVICE)
         .get_index_pk()
@@ -104,27 +148,36 @@ fn build(owner: AccountNumber, include_native: bool) -> String {
         .iter()
         .take(100)
         .collect();
-    let levels:Vec<_>=BookTable::with_service(service).get_index_pk().iter().take(1000).filter_map(|r|PoolTable::with_service(service).get_index_pk().get(&r.generation)).map(|p|json!({"id":p.id,"market":p.market,"bid":p.bid,"price":p.price,"outgoing":p.outgoing,"incoming":p.incoming,"shares":p.shares,"index":p.index.to_string(),"active":p.active})).collect();
-    let positions:Vec<_>=MakerTable::with_service(service).get_index_pk().range((owner,0,false,0)..=(owner,u64::MAX,true,u64::MAX)).take(1000).map(|p|{let g=PoolTable::with_service(service).get_index_pk().get(&p.generation).unwrap();json!({"owner":p.owner,"market":p.market,"bid":p.bid,"price":p.price,"generation":p.generation,"shares":p.shares,"debt":p.debt.to_string(),"refund":p.shares as u128*g.outgoing as u128/g.shares as u128,"proceeds":((p.shares as u128*g.index.get()-p.debt.get())/crate::math::Q) as u64,"active":g.active})}).collect();
+    let levels:Vec<_>=BookTable::with_service(service).get_index_pk().iter().take(1000).filter_map(|r|PoolTable::with_service(service).get_index_pk().get(&r.generation)).map(|p|json!({"market":p.market,"bid":p.bid,"price":p.price,"outgoing":p.outgoing,"active":p.active})).collect();
+    let positions: Vec<_> = MakerTable::with_service(service)
+        .get_index_pk()
+        .range((owner, 0, false, 0)..=(owner, u64::MAX, true, u64::MAX))
+        .take(1000)
+        .map(|position| {
+            let generation = PoolTable::with_service(service)
+                .get_index_pk()
+                .get(&position.generation)
+                .unwrap();
+            let market = MarketTable::with_service(service)
+                .get_index_pk()
+                .get(&position.market)
+                .unwrap();
+            order_view(&position, &generation, &market)
+        })
+        .collect();
     let loan_positions: Vec<_> = BorrowerTable::with_service(service)
         .get_index_pk()
         .range((owner, 0, false, 0)..=(owner, u64::MAX, true, u64::MAX))
         .take(1000)
         .collect();
-    let mut gids = std::collections::BTreeSet::new();
-    for b in LoanBookTable::with_service(service)
-        .get_index_pk()
+    let loans: Vec<_> = loan_positions
         .iter()
-        .take(1000)
-    {
-        gids.insert(b.generation);
-    }
-    for p in &loan_positions {
-        gids.insert(p.generation);
-    }
-    let loans: Vec<_> = gids
-        .iter()
-        .filter_map(|id| LoanTable::with_service(service).get_index_pk().get(id))
+        .filter_map(|position| {
+            LoanTable::with_service(service)
+                .get_index_pk()
+                .get(&position.generation)
+                .map(|generation| loan_view(position, &generation))
+        })
         .collect();
     let lenders: Vec<_> = LenderTable::with_service(service)
         .get_index_pk()
@@ -213,6 +266,53 @@ fn build(owner: AccountNumber, include_native: bool) -> String {
 mod tests {
     use super::*;
     #[test]
+    fn loan_views_expose_only_own_units_and_exact_rounded_claim() {
+        let position = Borrower {
+            owner: psibase::account!("alice"),
+            market: 1,
+            long: true,
+            price: 80,
+            generation: 7,
+            units: 3,
+        };
+        let generation = Loan {
+            generation: 7,
+            market: 1,
+            long: true,
+            price: 80,
+            units: 7,
+            collateral_unit: 100,
+            face_unit: 80,
+            active: true,
+            original_units: 0,
+            original_surplus: 0,
+            surplus: 0,
+        };
+        let active = loan_view(&position, &generation);
+        assert_eq!(active["units"], 3);
+        assert_eq!(active["original_units"], 3);
+        assert_eq!(active["claimable_surplus"], 0);
+        let closed = loan_view(
+            &position,
+            &Loan {
+                active: false,
+                original_units: 7,
+                original_surplus: 10,
+                surplus: 10,
+                ..generation
+            },
+        );
+        assert_eq!(closed["claimable_surplus"], 4);
+        assert_eq!(closed["original_surplus"], 4);
+        assert_eq!(closed["surplus"], 4);
+        assert_eq!(closed["original_units"], 3);
+        assert_eq!(
+            3 * closed["original_surplus"].as_u64().unwrap()
+                / closed["original_units"].as_u64().unwrap(),
+            4
+        );
+    }
+    #[test]
     fn wide_native_quantities_stay_exact() {
         let mut value = json!({"large":u64::MAX,"small":42,"nested":[u64::MAX]});
         preserve_integers(&mut value);
@@ -222,6 +322,67 @@ mod tests {
         assert_eq!(
             integer(2 * u64::MAX as u128),
             (2 * u64::MAX as u128).to_string()
+        );
+    }
+    #[test]
+    fn open_orders_expose_remaining_assets_and_proceeds_without_fabricated_fills() {
+        let market = Market {
+            id: 1,
+            base: 1,
+            quote: 2,
+            base_lot: 100,
+            quote_tick: 100,
+            x: 1_000_000,
+            y: 100_000_000,
+            k: 100_000_000_000_000_u128.into(),
+            lp_supply: 10_000_000,
+            vault_base: 0,
+            vault_quote: 0,
+            debt_base: 0,
+            debt_quote: 0,
+            lending_base: 0,
+            lending_quote: 0,
+            maturity: 1,
+            margin_enabled: Some(true),
+        };
+        let mut generation = Pool {
+            id: 2,
+            market: 1,
+            bid: true,
+            price: 90,
+            outgoing: 90_000,
+            incoming: 3000,
+            shares: 1000,
+            index: (crate::math::Q * 5).into(),
+            dust: 0_u128.into(),
+            active: true,
+        };
+        let position = Maker {
+            owner: psibase::account!("alice"),
+            market: 1,
+            bid: true,
+            price: 90,
+            generation: 2,
+            shares: 100,
+            debt: (crate::math::Q * 200).into(),
+        };
+        let view = order_view(&position, &generation, &market);
+        assert_eq!(view["remaining_outgoing"], 9000);
+        assert_eq!(view["remaining_base"], 100);
+        assert_eq!(view["remaining_quote"], 9000);
+        assert_eq!(view["claimable_incoming"], 300);
+        assert_eq!(view["status"], "open");
+        assert!(view.get("original").is_none() && view.get("filled").is_none());
+        generation.active = false;
+        generation.outgoing = 100;
+        assert_eq!(
+            order_view(&position, &generation, &market)["status"],
+            "remainder"
+        );
+        generation.outgoing = 0;
+        assert_eq!(
+            order_view(&position, &generation, &market)["status"],
+            "filled"
         );
     }
 }

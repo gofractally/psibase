@@ -3,6 +3,7 @@
 #![allow(non_snake_case)]
 pub mod math;
 pub mod snapshot;
+pub mod trades;
 pub mod tables;
 #[cfg(test)]
 mod tests;
