@@ -24,7 +24,8 @@ NATIVE_UI_ORIGIN = f"http://exchange.psibase.localhost:{urlsplit(API).port or 80
 UI_ORIGINS = (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}", NATIVE_UI_ORIGIN)
 ACCOUNTS = {"alice", "bob", "carol", "liquidity"}
 METHODS = {"create", "trade", "limit", "cancel", "lend", "unlend", "borrow",
-           "repay", "liquidate", "addliq", "remliq", "claim", "settle", "renew"}
+           "repay", "liquidate", "addliq", "remliq", "claim", "settle", "renew",
+           "stop", "cancelstop", "claimstop", "process"}
 LOCK = threading.RLock()
 AUTH = {}
 
@@ -158,47 +159,251 @@ def read_trades(market, limit="50", before=None, after=None):
         return json.load(reply)
 
 
+MAX_AMOUNT = (1 << 40) - 1
+CLAIMS_PER_PREPARATION = 32
+MAX_PREPARATIONS = 2
+MAX_PREPARATION_ACTIONS = 64
+FUNDED_METHODS = {"create", "trade", "limit", "stop", "lend", "borrow", "repay", "addliq"}
+
+
+def uint(value, label, maximum=(1 << 64) - 1, minimum=0):
+    if isinstance(value, bool) or not isinstance(value, (str, int)):
+        raise ValueError(f"Invalid {label}")
+    text = str(value)
+    if not text.isascii() or not text.isdigit() or not minimum <= int(text) <= maximum:
+        raise ValueError(f"Invalid {label}")
+    return int(text)
+
+
 def quantity(value):
-    number = int(value)
-    if not 0 < number <= (1 << 64) - 1:
-        raise ValueError("Amount must be a positive token quantity")
-    return {"value": number}
+    return {"value": uint(value, "positive token quantity", minimum=1)}
 
 
-def settlements(account, state):
-    """Owner pays for its own funded claims, folded into the same transaction."""
-    actions, accrued = [], {}
+def private_stop_query(account, path, retry=True):
+    if account not in ACCOUNTS:
+        raise ValueError("Unknown demo wallet")
+    endpoint = urlsplit(API)
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{endpoint.port or 80}{path}",
+        headers={"Host": f"exchange.psibase.localhost:{endpoint.port or 80}",
+                 "Authorization": bearer(account)})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as reply:
+            data = json.load(reply)
+    except urllib.error.HTTPError as error:
+        if error.code not in (401, 403):raise
+        AUTH.pop(account, None)
+        if retry:return private_stop_query(account, path, False)
+        raise ValueError("Native stop authorization failed") from error
+    if isinstance(data, str):data = json.loads(data)
+    if not isinstance(data, dict) or data.get("owner") != account:
+        raise ValueError("Native stop owner mismatch")
+    return data
+
+
+def read_stops(account, before=None, limit=100):
+    limit = uint(limit, "stop page size", 200, 1)
+    cursor = None if before is None else uint(before, "stop cursor")
+    suffix = "" if cursor is None else f"&before={cursor}"
+    data = private_stop_query(account, f"/stops?owner={account}&limit={limit}{suffix}")
+    rows = data.get("stop_positions")
+    if not isinstance(rows, list) or len(rows) > limit:
+        raise ValueError("Invalid native stop page")
+    previous = cursor if cursor is not None else 1 << 64
+    for row in rows:
+        generation = uint(row.get("generation"), "native stop generation", minimum=1)
+        if row.get("owner") != account or generation >= previous:
+            raise ValueError("Invalid native stop page owner or order")
+        previous = generation
+    next_before = data.get("next_before")
+    if next_before is not None and (not rows or uint(next_before, "native stop cursor") != previous):
+        raise ValueError("Invalid native stop page cursor")
+    return data
+
+
+def read_stop(account, generation):
+    generation = uint(generation, "stop generation", minimum=1)
+    data = private_stop_query(account, f"/stop?owner={account}&generation={generation}")
+    row = data.get("stop_position")
+    if row is not None and (not isinstance(row, dict) or row.get("owner") != account or
+                            uint(row.get("generation"), "native stop generation", minimum=1) != generation):
+        raise ValueError("Native stop position mismatch")
+    return data
+
+
+def claim_entries(account, state):
+    """Exact native owner receipts; no shared pool accounting is reproduced."""
+    entries = []
     markets = {int(m["id"]): m for m in state["markets"]}
-    def available_market(mid):
-        market = markets.get(int(mid))
+    def eligible(position):
+        if position.get("owner", account) != account:
+            return None
+        market = markets.get(int(position["market"]))
         if market is None or market.get("legacy_unsupported", False):
             return None
         for key in ("escrow_base", "escrow_quote"):
             if key in market and market[key].get("funded") is not True:
                 return None
         return market
-    for pos in state.get("positions", []):
-        paid = int(pos.get("proceeds", 0))
-        m = available_market(pos["market"])
-        if paid and m is not None:
-            token = int(m["base"] if pos["bid"] else m["quote"])
-            accrued[token] = accrued.get(token, 0) + paid
-            actions.append(action(account, "exchange", "settle", {
-                "market": pos["market"], "bid": pos["bid"], "price": pos["price"]}))
+    def append(method, args, payouts):
+        paid = {int(token): uint(amount, "native payout") for token, amount in payouts.items() if int(amount)}
+        if paid:
+            entries.append((action(account, "exchange", method, args), paid))
+    for position in state.get("positions", []):
+        market = eligible(position)
+        if market is not None:
+            append("settle", {"market": position["market"], "bid": position["bid"], "price": position["price"]},
+                   {market["base"] if position["bid"] else market["quote"]: position.get("proceeds", 0)})
     loans = {int(g["generation"]): g for g in state.get("loans", [])}
-    for pos in state.get("loan_positions", []):
-        g = loans.get(int(pos["generation"]))
-        m = available_market(pos["market"])
-        if g and not g["active"] and m is not None:
-            paid = (int(g["claimable_surplus"]) if "claimable_surplus" in g else
-                    int(pos["units"]) * int(g["original_surplus"]) // int(g["original_units"]))
-            token = int(m["quote"] if pos["long"] else m["base"])
-            accrued[token] = accrued.get(token, 0) + paid
-            actions.append(action(account, "exchange", "claim", {
-                "market": pos["market"], "long": pos["long"], "price": pos["price"]}))
-    if len(actions) > 64:
-        raise ValueError("Settle some existing positions before this wallet transaction")
+    for position in state.get("loan_positions", []):
+        loan = loans.get(int(position["generation"]))
+        market = eligible(position)
+        if loan and not loan["active"] and market is not None:
+            paid = (int(loan["claimable_surplus"]) if "claimable_surplus" in loan else
+                    int(position["units"]) * int(loan["original_surplus"]) // int(loan["original_units"]))
+            append("claim", {"market": position["market"], "long": position["long"], "price": position["price"]},
+                   {market["quote"] if position["long"] else market["base"]: paid})
+    for position in state.get("stop_positions", []):
+        market = eligible(position)
+        if (market is None or position.get("status") not in ("filled", "partially_filled", "unfilled") or
+                position.get("can_claim") is False):
+            continue
+        input_token = market["base"] if position["sell_base"] else market["quote"]
+        output_token = market["quote"] if position["sell_base"] else market["base"]
+        append("claimstop", {"generation": position["generation"]},
+               {input_token: position.get("claimable_input", 0), output_token: position.get("claimable_output", 0)})
+    return entries
+
+
+def selected_settlements(entries):
+    actions, accrued = [], {}
+    for claim, payouts in entries:
+        actions.append(claim)
+        for token, amount in payouts.items():
+            accrued[token] = accrued.get(token, 0) + amount
     return actions, accrued
+
+
+def settlements(account, state):
+    """Compatibility helper for the demo maker: one bounded owner batch."""
+    return selected_settlements(claim_entries(account, state)[:CLAIMS_PER_PREPARATION])
+
+
+def required_inputs(state, method, args):
+    """Derive only native action inputs, using exact integer service formulas."""
+    def amount(name):return uint(args.get(name), name, MAX_AMOUNT, 1)
+    def side(name):
+        result = args.get(name)
+        if not isinstance(result, bool):raise ValueError(f"Invalid {name}")
+        return result
+    def capped(value):return uint(value, "committed amount", MAX_AMOUNT, 1)
+    if method == "create":
+        base = uint(args.get("base"), "base token", (1 << 32) - 1)
+        quote = uint(args.get("quote"), "quote token", (1 << 32) - 1)
+        if base == quote:raise ValueError("Choose two different tokens")
+        return {base: amount("base_amount"), quote: amount("quote_amount")}
+    if method not in FUNDED_METHODS:return {}
+    market_id = uint(args.get("market"), "market", minimum=1)
+    market = next((m for m in state["markets"] if int(m["id"]) == market_id), None)
+    if market is None:raise ValueError("Unknown market")
+    base, quote = int(market["base"]), int(market["quote"])
+    if method in ("trade", "stop"):
+        return {base if side("sell_base") else quote: amount("amount")}
+    if method == "limit":return {quote if side("bid") else base: amount("amount")}
+    if method == "lend":return {base if side("base") else quote: amount("amount")}
+    if method in ("borrow", "repay"):
+        long = side("long");units, price = amount("units"), amount("price")
+        face = capped(units * (price * int(market["quote_tick"]) if long else int(market["base_lot"])))
+        if method == "repay":return {quote if long else base: face}
+        collateral = capped(2 * units * (int(market["base_lot"]) if long else price * int(market["quote_tick"])))
+        return {base if long else quote: collateral}
+    if method == "addliq":
+        shares, supply = amount("shares"), int(market["lp_supply"])
+        capped(supply + shares)
+        return {base: capped((shares * int(market["x"]) + supply - 1) // supply),
+                quote: capped((shares * int(market["y"]) + supply - 1) // supply)}
+    return {}
+
+
+def shared_available(state, token):
+    row = next((row for row in state.get("balances", [])
+                if int(row.get("token_id", row.get("token", 0))) == int(token)), {})
+    return int(row.get("incoming", 0)) + int(row.get("outgoing", 0))
+
+
+class PreparationProgress(ValueError):
+    def __init__(self, prepared, transactions, context):
+        super().__init__(f"Your balance is updating; retry the {context}.")
+        self.progress = {"prepared": prepared, "transactions": transactions}
+
+
+def prepare_funds(account, required, current=None, context="order"):
+    """At most two owner receipt transactions; final orders are never retried."""
+    current = read_state(account) if current is None else current
+    prepared = 0
+    for step in range(MAX_PREPARATIONS + 1):
+        needed = required(current) if callable(required) else required
+        missing = {int(token): amount - shared_available(current, token)
+                   for token, amount in needed.items() if amount > shared_available(current, token)}
+        if not missing:return current
+        entries = claim_entries(account, current)
+        total = {token: sum(payouts.get(token, 0) for _, payouts in entries) for token in missing}
+        if any(total[token] < amount for token, amount in missing.items()):
+            raise ValueError("Insufficient available funds; deposit funds or reduce the amount")
+        if step == MAX_PREPARATIONS:
+            raise PreparationProgress(prepared, step, context)
+        chosen = []
+        for entry in entries:
+            if not any(amount > 0 and entry[1].get(token, 0) for token, amount in missing.items()):continue
+            candidate, payouts = selected_settlements(chosen + [entry])
+            if len(fund_claims(account, current, candidate, payouts)) > MAX_PREPARATION_ACTIONS:break
+            chosen.append(entry)
+            for token in missing:missing[token] -= entry[1].get(token, 0)
+            if len(chosen) == CLAIMS_PER_PREPARATION or all(amount <= 0 for amount in missing.values()):break
+        actions, accrued = selected_settlements(chosen)
+        # Re-credit every AUTO_DEBIT receipt inside this same transaction.
+        # A later withdrawal then consumes fresh shared balances exactly once.
+        actions = fund_claims(account, current, actions, accrued)
+        assert len(actions) <= MAX_PREPARATION_ACTIONS
+        push(actions)
+        prepared += len(chosen)
+        current = read_state(account)
+    raise AssertionError("bounded preparation exhausted")
+
+
+def exchange_action(account, method, args):
+    if method not in METHODS:raise ValueError("Unsupported exchange action")
+    if not isinstance(args, dict):raise ValueError("Invalid action arguments")
+    if method in FUNDED_METHODS:
+        prepare_funds(account, lambda state: required_inputs(state, method, args))
+    # Never retry this push, including if its submission result is unknown.
+    return push([action(account, "exchange", method, args)])
+
+
+class StopNotFound(ValueError):
+    pass
+
+
+def release_stop(account, generation):
+    """Realize one freshly verified old receipt without replay or stale cash."""
+    row = read_stop(account, generation)["stop_position"]
+    if row is None:raise StopNotFound("This stop order is no longer available.")
+    if row.get("status") not in ("filled", "partially_filled", "unfilled"):
+        raise ValueError("This stop order is still waiting for its trigger.")
+    payouts, flags = {}, []
+    for side, field in (("input", "claimable_input"), ("output", "claimable_output")):
+        token = uint(row.get(f"{side}_token"), "receipt token", (1 << 32) - 1)
+        amount = uint(row.get(field, 0), "receipt amount")
+        auto = row.get(f"{side}_auto_debit")
+        if not isinstance(auto, bool):raise ValueError("Native receipt settings unavailable; refresh and try again.")
+        if amount:payouts[token] = payouts.get(token, 0) + amount
+        flags.append({"token": token, "auto_debit": auto})
+    if flags[0]["token"] == flags[1]["token"]:
+        raise ValueError("Invalid native receipt assets")
+    actions = fund_claims(account, {"balances": flags},
+                          [action(account, "exchange", "claimstop", {"generation": generation})], payouts)
+    # A failure, including an unknown submission outcome, is never retried.
+    return push(actions)
 
 
 def fund_claims(account, state, actions, accrued, delivered_token=None, delivered=0):
@@ -223,45 +428,28 @@ def fund_claims(account, state, actions, accrued, delivered_token=None, delivere
 
 
 def wallet_transfer(account, token, amount, depositing):
-    """Deposit credits user->DEX. Withdraw accepts/revokes native shared funds."""
-    amount = int(amount)
+    """Withdraw ready native cash directly; realize only needed owner receipts."""
+    token = uint(token, "token", (1 << 32) - 1)
     q = quantity(amount)
+    amount = q["value"]
     if depositing:
         return push([action(account, "tokens", "credit", {
-            "token_id": int(token), "debitor": "exchange", "amount": q,
+            "token_id": token, "debitor": "exchange", "amount": q,
             "memo": "Exchange deposit"})])
-    state = read_state(account)
-    actions, accrued = settlements(account, state)
-    # Exchange outputs are DEX->user pending credits; deposited principal is
-    # user->DEX pending credit. Neither is a cached synthetic balance.
+    state = prepare_funds(account, {token: amount}, context="withdrawal")
     row = next((r for r in state.get("balances", [])
-                if int(r.get("token_id", r.get("token", 0))) == int(token)), {})
-    earned = accrued.get(int(token), 0)
-    incoming = int(row.get("incoming", 0)) + earned
-    outgoing = int(row.get("outgoing", 0))
-    if amount > incoming + outgoing:
-        raise ValueError("Insufficient free shared balance")
-    # An auto-accepted claim is already in the primary wallet. Count that
-    # delivery once, preserve any excess as shared funding, and withdraw only
-    # the remaining request from previously pending balances.
-    delivered = min(earned, amount) if row.get("auto_debit", False) else 0
-    actions = fund_claims(account, state, actions, accrued, int(token), delivered)
-    incoming -= delivered
-    if row.get("auto_debit", False):
-        # All earned proceeds were accepted/recredited, so only the original
-        # incoming transfer plus recredited principal can be debited here.
-        incoming = int(row.get("incoming", 0))
-        outgoing += earned - delivered
-    remaining = amount - delivered
-    accept = min(incoming, remaining)
+                if int(r.get("token_id", r.get("token", 0))) == token), {})
+    incoming = int(row.get("incoming", 0))
+    accept = min(incoming, amount)
+    actions = []
     if accept:
         actions.append(action(account, "tokens", "debit", {
-            "token_id": int(token), "creditor": "exchange",
-            "amount": quantity(accept), "memo": "Exchange withdrawal"}))
-    if remaining > accept:
+            "token_id": token, "creditor": "exchange", "amount": quantity(accept),
+            "memo": "Exchange withdrawal"}))
+    if amount > accept:
         actions.append(action(account, "tokens", "uncredit", {
-            "token_id": int(token), "debitor": "exchange",
-            "amount": quantity(remaining - accept), "memo": "Exchange withdrawal"}))
+            "token_id": token, "debitor": "exchange", "amount": quantity(amount - accept),
+            "memo": "Exchange withdrawal"}))
     return push(actions)
 
 
@@ -329,8 +517,19 @@ class Handler(SimpleHTTPRequestHandler):
                                           query.get("limit", ["50"])[0],
                                           query.get("before", [None])[0],
                                           query.get("after", [None])[0]))
+            elif parsed.path == "/api/stops":
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                self.send_json(read_stops(query.get("account", ["alice"])[0],
+                                          query.get("before", [None])[0],
+                                          query.get("limit", ["100"])[0]))
+            elif parsed.path == "/api/stop":
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                self.send_json(read_stop(query.get("account", ["alice"])[0],
+                                         query.get("generation", [None])[0]))
             else:
                 super().do_GET()
+        except ValueError as error:
+            self.send_json({"error": str(error)}, 400)
         except Exception as error:
             self.send_json({"error": str(error)}, 503)
 
@@ -354,17 +553,18 @@ class Handler(SimpleHTTPRequestHandler):
                 method = data.get("method")
                 if method not in METHODS:
                     raise ValueError("Unsupported exchange action")
-                prefix = []
-                if method not in {"claim", "settle", "liquidate", "cancel"}:
-                    current = read_state(account)
-                    prefix, accrued = settlements(account, current)
-                    prefix = fund_claims(account, current, prefix, accrued)
-                trace = push(prefix + [action(account, "exchange", method, data.get("args", {}))])
+                trace = exchange_action(account, method, data.get("args", {}))
             elif self.path in ("/api/deposit", "/api/withdraw"):
                 trace = wallet_transfer(account, data["tokenId"], data["amount"], self.path.endswith("deposit"))
+            elif self.path == "/api/release-stop":
+                trace = release_stop(account, data.get("generation"))
             else:
                 raise ValueError("Unknown wallet endpoint")
             self.send_json({"ok": True, "trace": trace})
+        except PreparationProgress as error:
+            self.send_json({"ok": False, "error": str(error), "progress": error.progress}, 409)
+        except StopNotFound as error:
+            self.send_json({"error": str(error)}, 404)
         except Exception as error:
             self.send_json({"error": str(error)}, 400)
 

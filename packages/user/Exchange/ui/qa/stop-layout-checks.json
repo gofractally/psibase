@@ -1,0 +1,26 @@
+[
+  {
+    "ordersHeight": 234,
+    "ordersMin": "0px",
+    "pageHeight": 1241,
+    "scrollWidth": 920,
+    "ticketRight": 902,
+    "width": 920
+  },
+  {
+    "ordersHeight": 234,
+    "ordersMin": "0px",
+    "pageHeight": 1250,
+    "scrollWidth": 1366,
+    "ticketRight": 1338,
+    "width": 1366
+  },
+  {
+    "ordersHeight": 234,
+    "ordersMin": "0px",
+    "pageHeight": 1250,
+    "scrollWidth": 1440,
+    "ticketRight": 1412,
+    "width": 1440
+  }
+]

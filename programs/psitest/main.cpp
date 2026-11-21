@@ -17,6 +17,7 @@
 #include <psio/view.hpp>
 
 #include <stdio.h>
+#include <time.h>
 #ifdef __APPLE__
 #include <crt_externs.h>
 #endif
@@ -820,6 +821,25 @@ struct callbacks
       else if (id == 1)
       {  // CLOCK_MONOTONIC
          result = std::chrono::steady_clock::now().time_since_epoch();
+      }
+      else if (id == 2 || id == 3)
+      {  // Standard WASI PROCESS_CPUTIME_ID and THREAD_CPUTIME_ID.
+         // Host clock IDs differ between platforms; do not pass WASI IDs
+         // directly to clock_gettime or substitute elapsed time for CPU time.
+         timespec stamp;
+         const auto clock = id == 2 ? CLOCK_PROCESS_CPUTIME_ID : CLOCK_THREAD_CPUTIME_ID;
+         if (::clock_gettime(clock, &stamp) != 0)
+            return wasi_errno_inval;
+         constexpr uint64_t nanos_per_second = 1'000'000'000;
+         if (stamp.tv_sec < 0 || stamp.tv_nsec < 0 ||
+             static_cast<uint64_t>(stamp.tv_nsec) >= nanos_per_second)
+            return wasi_errno_inval;
+         const auto seconds = static_cast<uint64_t>(stamp.tv_sec);
+         const auto nanos   = static_cast<uint64_t>(stamp.tv_nsec);
+         if (seconds > (std::numeric_limits<uint64_t>::max() - nanos) / nanos_per_second)
+            return wasi_errno_overflow;
+         *time = seconds * nanos_per_second + nanos;
+         return wasi_errno_success;
       }
       else
       {

@@ -1,0 +1,18 @@
+[
+  {
+    "test": "sell-cancel",
+    "generation": "389"
+  },
+  {
+    "test": "buy-coalesce-cancel",
+    "generation": "393"
+  },
+  {
+    "test": "sell-trigger",
+    "generation": "394"
+  },
+  {
+    "test": "buy-trigger",
+    "generation": "396"
+  }
+]

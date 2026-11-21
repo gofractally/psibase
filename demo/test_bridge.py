@@ -8,6 +8,10 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch, MagicMock
 from types import SimpleNamespace
+try:
+    from .test_wallet_preparation import NativeWallet
+except ImportError:
+    from test_wallet_preparation import NativeWallet
 
 spec = importlib.util.spec_from_file_location("exchange_demo_bridge", Path(__file__).with_name("bridge.py"))
 bridge = importlib.util.module_from_spec(spec)
@@ -141,34 +145,32 @@ class WalletTests(unittest.TestCase):
             run.assert_called_once()
 
     def withdraw(self, current, token, quantity):
-        with patch.object(bridge, "read_state", return_value=copy.deepcopy(current)), \
-                patch.object(bridge, "push", side_effect=lambda actions: actions) as push:
-            result = bridge.wallet_transfer("alice", token, quantity, False)
-            push.assert_called_once()
-            return result
+        wallet=NativeWallet(current)
+        with patch.object(bridge,"read_state",side_effect=wallet.read),patch.object(bridge,"push",side_effect=wallet.push):
+            bridge.wallet_transfer("alice",token,quantity,False)
+        self.last_wallet=wallet
+        return [action for actions in wallet.calls for action in actions]
 
     def test_manual_debit_claims_stay_pending_before_withdrawal(self):
         actions = self.withdraw(state(False), 1, 140)
-        self.assertEqual([a["method"] for a in actions], ["settle", "settle", "debit", "uncredit"])
+        self.assertEqual([a["method"] for a in actions], ["settle", "debit", "uncredit"])
         self.assertEqual(amount(actions[-2]), 120)
         self.assertEqual(amount(actions[-1]), 20)
 
-    def test_auto_debit_partial_claim_withdrawal_recredits_excess(self):
+    def test_ready_cash_withdrawal_skips_all_unrelated_claims(self):
         actions = self.withdraw(state(True), 1, 50)
-        self.assertEqual([a["method"] for a in actions], ["settle", "settle", "credit", "credit"])
-        credits = {a["data"]["token_id"]: amount(a) for a in actions if a["method"] == "credit"}
-        self.assertEqual(credits, {1: 50, 2: 80})
-        # The requested 50 was already delivered by the first settled claim.
-        self.assertFalse(any(a["method"] in ("debit", "uncredit") for a in actions))
+        self.assertEqual([a["method"] for a in actions], ["debit", "uncredit"])
+        self.assertEqual([amount(a) for a in actions],[20,30])
+        self.assertEqual([p["proceeds"] for p in self.last_wallet.state["positions"]],[100,80])
 
     def test_auto_debit_claim_and_existing_pending_are_not_double_counted(self):
         actions = self.withdraw(state(True), 1, 140)
-        self.assertEqual([a["method"] for a in actions], ["settle", "settle", "credit", "debit", "uncredit"])
-        self.assertEqual(actions[2]["data"]["token_id"], 2)
-        self.assertEqual(amount(actions[2]), 80)
+        self.assertEqual([a["method"] for a in actions], ["settle", "credit", "debit", "uncredit"])
+        self.assertEqual(actions[1]["data"]["token_id"], 1)
+        self.assertEqual(amount(actions[1]), 100)
         self.assertEqual(amount(actions[-2]), 20)
-        self.assertEqual(amount(actions[-1]), 20)
-        self.assertEqual(100 + amount(actions[-2]) + amount(actions[-1]), 140)
+        self.assertEqual(amount(actions[-1]), 120)
+        self.assertEqual(self.last_wallet.row(1)["wallet"],1140)
 
     def test_claims_fund_following_exchange_action_under_both_native_settings(self):
         for auto in (False, True):
@@ -186,9 +188,8 @@ class WalletTests(unittest.TestCase):
         current = state(False)
         current["balances"][0]["auto_debit"] = True
         actions = self.withdraw(current, 2, 40)
-        self.assertEqual([a["method"] for a in actions], ["settle", "settle", "credit", "debit"])
-        self.assertEqual(actions[2]["data"]["token_id"], 1)
-        self.assertEqual(amount(actions[2]), 100)
+        self.assertEqual([a["method"] for a in actions], ["settle", "debit"])
+        self.assertTrue(all(a["data"].get("token_id",2)==2 for a in actions))
         self.assertEqual(amount(actions[-1]), 40)
 
     def test_recalled_or_legacy_book_cannot_block_healthy_wallet_actions(self):

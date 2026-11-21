@@ -1,0 +1,316 @@
+{
+  "source": "Exact current production Rust planner, math functions, record fields, and native claim arithmetic block",
+  "runner_sha256": "f6d144da9eac538e9b3964c254042ab57ace8ebd770aa8a531c6681fba049407",
+  "files": {
+    "stops.rs": "a8f2377891605590f38957bebd0e76f2918fb7d7f226a604167e8d56b02dfb58",
+    "math.rs": "7dff67eac91a23e4911e56495a51fd3c8b10038ccc9ed26fa452ef29c809bcce",
+    "tables.rs": "a2df5dcefd3a2fc5c3cb3792ec710f03600f7fa9cc692f697181d8917e8a3cc0",
+    "lib.rs": "6a04dc276d3cb1fcc30043838151210d5197276f0b7855b97219363dbac21f22",
+    "stop_math_tests.rs": "9895215d9b0fe0f661894cfba6535702fc5306a57b5cb5cedc8cc9c57d9ae768",
+    "stop_fuzz_tests.rs": "e24db7539f35d43329acd96fbda9f817227259eb0ad01bd45ba1ffe36218a3cc"
+  },
+  "limits": [
+    "Host extraction does not exercise native KV, token authorization/custody, ABI, WASM metering, or HTTP privacy.",
+    "Deterministic seeded samples and mutation detection are evidence, not a probability of being bug-free."
+  ],
+  "tests": {
+    "passed": 25,
+    "failed": 0,
+    "runtime_seconds": 0.20194154197815806
+  },
+  "mutations": [
+    {
+      "name": "ignore_seed_minimum_output",
+      "detected": true,
+      "reason": "test failure",
+      "runtime_seconds": 0.21466987498570234
+    },
+    {
+      "name": "miss_exact_trigger_boundary",
+      "detected": true,
+      "reason": "test failure",
+      "runtime_seconds": 0.17736541596241295
+    },
+    {
+      "name": "wrong_common_claim_denominator",
+      "detected": true,
+      "reason": "test failure",
+      "runtime_seconds": 0.22582862502895296
+    },
+    {
+      "name": "forget_refund_backing_debit",
+      "detected": true,
+      "reason": "test failure",
+      "runtime_seconds": 0.21040324994828552
+    }
+  ],
+  "coverage": {
+    "available": true,
+    "production_planner": {
+      "branches": {
+        "count": 138,
+        "covered": 133,
+        "notcovered": 5,
+        "percent": 96.37681159420289
+      },
+      "functions": {
+        "count": 32,
+        "covered": 31,
+        "percent": 96.875
+      },
+      "instantiations": {
+        "count": 38,
+        "covered": 37,
+        "percent": 97.36842105263158
+      },
+      "lines": {
+        "count": 409,
+        "covered": 406,
+        "percent": 99.26650366748166
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0
+      },
+      "regions": {
+        "count": 675,
+        "covered": 670,
+        "notcovered": 5,
+        "percent": 99.25925925925925
+      }
+    },
+    "totals_including_tests": {
+      "branches": {
+        "count": 218,
+        "covered": 199,
+        "notcovered": 19,
+        "percent": 91.28440366972477
+      },
+      "functions": {
+        "count": 83,
+        "covered": 82,
+        "percent": 98.79518072289156
+      },
+      "instantiations": {
+        "count": 89,
+        "covered": 88,
+        "percent": 98.87640449438202
+      },
+      "lines": {
+        "count": 1341,
+        "covered": 1338,
+        "percent": 99.77628635346755
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0
+      },
+      "regions": {
+        "count": 1805,
+        "covered": 1800,
+        "notcovered": 5,
+        "percent": 99.7229916897507
+      }
+    },
+    "files": [
+      {
+        "file": "/Users/dlarimer/psibase-exchange/packages/user/Exchange/service/src/stop_fuzz_tests.rs",
+        "summary": {
+          "branches": {
+            "count": 48,
+            "covered": 46,
+            "notcovered": 2,
+            "percent": 95.83333333333334
+          },
+          "functions": {
+            "count": 19,
+            "covered": 19,
+            "percent": 100
+          },
+          "instantiations": {
+            "count": 19,
+            "covered": 19,
+            "percent": 100
+          },
+          "lines": {
+            "count": 610,
+            "covered": 610,
+            "percent": 100
+          },
+          "mcdc": {
+            "count": 0,
+            "covered": 0,
+            "notcovered": 0,
+            "percent": 0
+          },
+          "regions": {
+            "count": 625,
+            "covered": 625,
+            "notcovered": 0,
+            "percent": 100
+          }
+        }
+      },
+      {
+        "file": "/Users/dlarimer/psibase-exchange/packages/user/Exchange/service/src/stop_math_tests.rs",
+        "summary": {
+          "branches": {
+            "count": 14,
+            "covered": 8,
+            "notcovered": 6,
+            "percent": 57.14285714285714
+          },
+          "functions": {
+            "count": 13,
+            "covered": 13,
+            "percent": 100
+          },
+          "instantiations": {
+            "count": 13,
+            "covered": 13,
+            "percent": 100
+          },
+          "lines": {
+            "count": 215,
+            "covered": 215,
+            "percent": 100
+          },
+          "mcdc": {
+            "count": 0,
+            "covered": 0,
+            "notcovered": 0,
+            "percent": 0
+          },
+          "regions": {
+            "count": 294,
+            "covered": 294,
+            "notcovered": 0,
+            "percent": 100
+          }
+        }
+      },
+      {
+        "file": "/var/folders/x0/js1_f1mn4hx_5j9pmxhmgv340000gn/T/exchange-stops-ubdu9fjl/covered.rs",
+        "summary": {
+          "branches": {
+            "count": 18,
+            "covered": 12,
+            "notcovered": 6,
+            "percent": 66.66666666666666
+          },
+          "functions": {
+            "count": 19,
+            "covered": 19,
+            "percent": 100
+          },
+          "instantiations": {
+            "count": 19,
+            "covered": 19,
+            "percent": 100
+          },
+          "lines": {
+            "count": 107,
+            "covered": 107,
+            "percent": 100
+          },
+          "mcdc": {
+            "count": 0,
+            "covered": 0,
+            "notcovered": 0,
+            "percent": 0
+          },
+          "regions": {
+            "count": 211,
+            "covered": 211,
+            "notcovered": 0,
+            "percent": 100
+          }
+        }
+      },
+      {
+        "file": "/var/folders/x0/js1_f1mn4hx_5j9pmxhmgv340000gn/T/exchange-stops-ubdu9fjl/covered_planner.rs",
+        "summary": {
+          "branches": {
+            "count": 138,
+            "covered": 133,
+            "notcovered": 5,
+            "percent": 96.37681159420289
+          },
+          "functions": {
+            "count": 32,
+            "covered": 31,
+            "percent": 96.875
+          },
+          "instantiations": {
+            "count": 38,
+            "covered": 37,
+            "percent": 97.36842105263158
+          },
+          "lines": {
+            "count": 409,
+            "covered": 406,
+            "percent": 99.26650366748166
+          },
+          "mcdc": {
+            "count": 0,
+            "covered": 0,
+            "notcovered": 0,
+            "percent": 0
+          },
+          "regions": {
+            "count": 675,
+            "covered": 670,
+            "notcovered": 5,
+            "percent": 99.25925925925925
+          }
+        }
+      }
+    ],
+    "uncovered_planner_branches": [
+      {
+        "line": 514,
+        "true_count": 3,
+        "false_count": 0,
+        "source": ".all(|(i, active)| !*active || model.stops[i].sell_base == seed.unwrap().sell)",
+        "rationale": "Defensive replay rejection path not reached by these cases. One-sided admission restricts candidates; this report does not claim a whole-program proof of unreachability."
+      },
+      {
+        "line": 345,
+        "true_count": 0,
+        "false_count": 27773,
+        "source": "if step == 0 {",
+        "rationale": "The preceding guards establish input-used>0 and barrier-u>0; their minimum is positive. Defensive local guard."
+      },
+      {
+        "line": 219,
+        "true_count": 0,
+        "false_count": 1612,
+        "source": "if self.early.as_ref().map(|p| !p[i]).unwrap_or(false) {",
+        "rationale": "Defensive replay rejection path not reached by these cases. One-sided admission restricts candidates; this report does not claim a whole-program proof of unreachability."
+      },
+      {
+        "line": 509,
+        "true_count": 5,
+        "false_count": 0,
+        "source": "let valid = !first.extra_margin",
+        "rationale": "Defensive replay rejection path not reached by these cases. One-sided admission restricts candidates; this report does not claim a whole-program proof of unreachability."
+      },
+      {
+        "line": 510,
+        "true_count": 5,
+        "false_count": 0,
+        "source": "&& first",
+        "rationale": "Defensive replay rejection path not reached by these cases. One-sided admission restricts candidates; this report does not claim a whole-program proof of unreachability."
+      }
+    ],
+    "uncalled_functions": [
+      "_RNCNvMs_NtCseLwGEz1rdVo_7covered5stopsNtB6_4Plan9drain_due0B8_"
+    ],
+    "runtime_seconds": 0.2521417079260573,
+    "branch_note": "Branch instrumentation enabled with -Zcoverage-options=branch and RUSTC_BOOTSTRAP=1; same production source."
+  }
+}

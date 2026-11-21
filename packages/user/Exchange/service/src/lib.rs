@@ -3,10 +3,11 @@
 #![allow(non_snake_case)]
 pub mod math;
 pub mod snapshot;
-pub mod trades;
+pub mod stops;
 pub mod tables;
 #[cfg(test)]
 mod tests;
+pub mod trades;
 
 #[psibase::service(name = "exchange", tables = "tables::tables")]
 pub mod service {
@@ -19,14 +20,14 @@ pub mod service {
         *,
     };
     const MAX_LOAN_PRICES: usize = 64;
-    fn now() -> u64 {
+    pub(crate) fn now() -> u64 {
         psibase::services::transact::Wrapper::call()
             .currentBlock()
             .time
             .seconds()
             .seconds as u64
     }
-    fn priority(high: bool, p: u64) -> u64 {
+    pub(crate) fn priority(high: bool, p: u64) -> u64 {
         assert!(p > 0 && p <= MAX_PRICE, "price range");
         if high {
             MAX_PRICE - p
@@ -34,7 +35,7 @@ pub mod service {
             p
         }
     }
-    fn next() -> u64 {
+    pub(crate) fn next() -> u64 {
         let t = ConfigTable::read_write();
         let mut c = t.get_index_pk().get(&()).expect("initialize exchange");
         let id = c.next;
@@ -83,7 +84,7 @@ pub mod service {
         );
         e
     }
-    fn take(user: AccountNumber, market: u64, token: u32, n: u64) {
+    pub(crate) fn take(user: AccountNumber, market: u64, token: u32, n: u64) {
         if n == 0 {
             return;
         }
@@ -106,7 +107,7 @@ pub mod service {
         t.toSub(token, subaccount(market), n.into());
         EscrowTable::read_write().put(&e).unwrap();
     }
-    fn give(user: AccountNumber, market: u64, token: u32, n: u64) {
+    pub(crate) fn give(user: AccountNumber, market: u64, token: u32, n: u64) {
         if n > 0 {
             let mut e = escrow(market, token);
             e.balance = e.balance.checked_sub(n).expect("market escrow underflow");
@@ -232,7 +233,7 @@ pub mod service {
         }
         out
     }
-    fn put_loan(g: &Loan) {
+    pub(crate) fn put_loan(g: &Loan) {
         LoanTable::read_write().put(g).unwrap();
         let table = LoanBookTable::read_write();
         let key = (g.market, g.long, priority(g.long, g.price));
@@ -302,7 +303,7 @@ pub mod service {
         } else {
             m.base_lot
         };
-        p.active = p.shares > 0 && p.outgoing >= lot;
+        p.active = p.active && p.shares > 0 && p.outgoing >= lot;
         PoolTable::read_write().put(p).unwrap();
         let b = BookTable::read_write();
         let key = (p.market, p.bid, priority(p.bid, p.price));
@@ -315,6 +316,9 @@ pub mod service {
             return;
         }
         if p.active {
+            if existing.is_none() {
+                crate::stops::admit_book(m.id);
+            }
             b.put(&Book {
                 market: p.market,
                 bid: p.bid,
@@ -420,8 +424,17 @@ pub mod service {
                 } else {
                     (mul(p.price, m.quote_tick), m.base_lot)
                 };
+                let capacity = crate::stops::maker_input_capacity(&p);
+                if capacity < inlot {
+                    p.active = false;
+                    pool_save(&mut p);
+                    events += 1;
+                    continue;
+                }
                 if u >= h && amount_in - used >= inlot {
-                    let n = ((amount_in - used) / inlot).min(p.outgoing / outlot);
+                    let n = ((amount_in - used) / inlot)
+                        .min(p.outgoing / outlot)
+                        .min(capacity / inlot);
                     let (a, b) = fill(m, user, &mut p, n);
                     used += a;
                     out = add(out, b);
@@ -586,6 +599,27 @@ pub mod service {
         max_events: u32,
     ) -> (u64, u64, u32) {
         let mut m = self::market(market);
+        if crate::stops::armed(market) {
+            assert!(
+                amount > 0 && max_events > 0 && max_events <= 256,
+                "trade amount/event budget"
+            );
+            crate::math::amount(amount as u128);
+            let result = crate::stops::execute(
+                &mut m,
+                get_sender(),
+                Some(crate::stops::Seed {
+                    sell: sell_base,
+                    input: amount,
+                    limit: None,
+                    min_output,
+                    max_events,
+                }),
+                true,
+            );
+            save(&m);
+            return result;
+        }
         let result = route(
             &mut m,
             get_sender(),
@@ -620,16 +654,31 @@ pub mod service {
             .unwrap_or(false);
         let already_funded = crossing_relay || crossing_book;
         if already_funded {
-            let (used, _, _) = route(
-                &mut m,
-                get_sender(),
-                !bid,
-                amount,
-                0,
-                256,
-                Some(price),
-                false,
-            );
+            let (used, _, _) = if crate::stops::armed(market) {
+                crate::stops::execute(
+                    &mut m,
+                    get_sender(),
+                    Some(crate::stops::Seed {
+                        sell: !bid,
+                        input: amount,
+                        limit: Some(price),
+                        min_output: 0,
+                        max_events: 1024,
+                    }),
+                    false,
+                )
+            } else {
+                route(
+                    &mut m,
+                    get_sender(),
+                    !bid,
+                    amount,
+                    0,
+                    256,
+                    Some(price),
+                    false,
+                )
+            };
             remaining -= used;
             save(&m);
         }
@@ -651,6 +700,32 @@ pub mod service {
             }
             return 0;
         }
+        if already_funded {
+            let crosses_relay = (if bid { m.y } else { m.x })
+                < book_trigger(m.k.get(), !bid, price, m.base_lot, m.quote_tick);
+            let crosses_book = book_head(market, !bid)
+                .map(|p| {
+                    if bid {
+                        price >= p.price
+                    } else {
+                        price <= p.price
+                    }
+                })
+                .unwrap_or(false);
+            if crosses_relay || crosses_book {
+                // An opposite cascade or terminal output/precision bound can
+                // change the final book after this seed's valid partial fill.
+                // Return its unspent principal rather than post a crossing
+                // order or retry an unbounded sequence of auctions.
+                give(
+                    get_sender(),
+                    m.id,
+                    if bid { m.quote } else { m.base },
+                    remaining,
+                );
+                return 0;
+            }
+        }
         post_limit(market, bid, price, remaining, already_funded)
     }
     fn post_limit(market: u64, bid: bool, price: u64, amount: u64, already_funded: bool) -> u64 {
@@ -659,9 +734,8 @@ pub mod service {
         assert!(amount > 0, "positive order");
         let qprice = mul(price, m.quote_tick);
         assert!(
-            already_funded
-                || (if bid { m.y } else { m.x })
-                    >= book_trigger(m.k.get(), !bid, price, m.base_lot, m.quote_tick),
+            (if bid { m.y } else { m.x })
+                >= book_trigger(m.k.get(), !bid, price, m.base_lot, m.quote_tick),
             "limit event budget exhausted before reaching price"
         );
         if let Some(other) = book_head(m.id, !bid) {
@@ -961,6 +1035,13 @@ pub mod service {
     fn liquidate(market: u64, max_events: u32) -> u32 {
         assert!(max_events <= 256, "event budget");
         let mut m = self::market(market);
+        if max_events > 0 && crate::stops::armed(market) {
+            let before = loan_rows(market, true).len() + loan_rows(market, false).len();
+            crate::stops::execute(&mut m, get_sender(), None, true);
+            let after = loan_rows(market, true).len() + loan_rows(market, false).len();
+            save(&m);
+            return (before - after) as u32;
+        }
         let mut n = 0;
         while n < max_events && pending(&m) {
             let long = due(&m, true);
@@ -994,6 +1075,9 @@ pub mod service {
             });
         pos.shares = add(pos.shares, shares);
         LiquidityTable::read_write().put(&pos).unwrap();
+        if crate::stops::armed(market) {
+            crate::stops::execute(&mut m, get_sender(), None, true);
+        }
         save(&m);
         (dx, dy)
     }
@@ -1023,6 +1107,9 @@ pub mod service {
         m.lp_supply = s;
         pos.shares -= shares;
         LiquidityTable::read_write().put(&pos).unwrap();
+        if crate::stops::armed(market) {
+            crate::stops::execute(&mut m, get_sender(), None, true);
+        }
         save(&m);
         give(get_sender(), m.id, m.base, dx);
         give(get_sender(), m.id, m.quote, dy);
@@ -1043,6 +1130,239 @@ pub mod service {
         assert_eq!(owner, get_sender(), "snapshot owner authority");
         crate::snapshot::read_exchange(owner)
     }
+    #[action]
+    fn stop(market: u64, sell_base: bool, trigger: u64, amount: u64) -> u64 {
+        let m = self::market(market);
+        priority(sell_base, trigger);
+        crate::math::amount(amount as u128);
+        assert!(amount > 0, "positive stop input");
+        assert!(!pending(&m), "process due margin before arming stops");
+        assert!(
+            (if sell_base { m.x } else { m.y })
+                < crate::math::trigger(m.k.get(), sell_base, trigger, m.base_lot, m.quote_tick),
+            "stop trigger already reached"
+        );
+        assert!(
+            crate::stops::book_count(market) <= crate::stops::MAX_BOOKS,
+            "reduce ordinary book before enabling stops"
+        );
+        let rows: Vec<_> = StopBookTable::read()
+            .get_index_pk()
+            .range((market, false, 0)..=(market, true, u64::MAX))
+            .take(crate::stops::MAX_STOPS + 1)
+            .collect();
+        assert!(rows.len() <= crate::stops::MAX_STOPS, "stop price capacity");
+        let key = (market, sell_base, priority(sell_base, trigger));
+        let existing = StopBookTable::read().get_index_pk().get(&key);
+        assert!(
+            existing.is_some() || rows.len() < crate::stops::MAX_STOPS,
+            "stop price capacity"
+        );
+        if existing.is_none() {
+            assert!(
+                amount
+                    >= if sell_base {
+                        m.base_lot
+                    } else {
+                        mul(trigger, m.quote_tick)
+                    },
+                "new stop price requires one execution lot"
+            );
+        }
+        let mut total = amount;
+        for row in &rows {
+            if row.sell_base == sell_base {
+                total = add(
+                    total,
+                    StopPoolTable::read()
+                        .get_index_pk()
+                        .get(&row.generation)
+                        .unwrap()
+                        .input,
+                );
+            }
+        }
+        let _ = total;
+        let mut pool = existing
+            .map(|r| {
+                StopPoolTable::read()
+                    .get_index_pk()
+                    .get(&r.generation)
+                    .unwrap()
+            })
+            .unwrap_or_else(|| StopPool {
+                id: next(),
+                market,
+                sell_base,
+                trigger,
+                input: 0,
+                shares: 0,
+                batch: None,
+            });
+        let owner = get_sender();
+        let old_position = StopPositionTable::read()
+            .get_index_pk()
+            .get(&(owner, pool.id));
+        assert!(
+            old_position.is_some()
+                || amount
+                    >= if sell_base {
+                        m.base_lot
+                    } else {
+                        mul(trigger, m.quote_tick)
+                    },
+            "new stop position requires one execution lot"
+        );
+        let mut pos = old_position.unwrap_or(StopPosition {
+            owner,
+            generation: pool.id,
+            shares: 0,
+        });
+        take(
+            owner,
+            market,
+            if sell_base { m.base } else { m.quote },
+            amount,
+        );
+        pool.input = add(pool.input, amount);
+        pool.shares = add(pool.shares, amount);
+        pos.shares = add(pos.shares, amount);
+        StopPositionTable::read_write().put(&pos).unwrap();
+        StopPoolTable::read_write().put(&pool).unwrap();
+        StopBookTable::read_write()
+            .put(&StopBook {
+                market,
+                sell_base,
+                priority: key.2,
+                generation: pool.id,
+            })
+            .unwrap();
+        pool.id
+    }
+    fn settle_stop(generation: u64, cancel: bool) -> (u64, u64) {
+        let owner = get_sender();
+        let pos = StopPositionTable::read()
+            .get_index_pk()
+            .get(&(owner, generation))
+            .expect("no own stop position");
+        let mut pool = StopPoolTable::read()
+            .get_index_pk()
+            .get(&generation)
+            .expect("unknown stop generation");
+        let m = self::market(pool.market);
+        let (refund, output) = if let Some(id) = pool.batch {
+            let mut b = StopBatchTable::read().get_index_pk().get(&id).unwrap();
+            assert!(
+                b.input_total > 0 && pos.shares <= b.shares_remaining,
+                "stop claim shares"
+            );
+            let refund = crate::math::amount(
+                pos.shares as u128 * b.refund_total as u128 / b.input_total as u128,
+            );
+            let output = crate::math::amount(
+                pos.shares as u128 * b.output_total as u128 / b.input_total as u128,
+            );
+            b.shares_remaining -= pos.shares;
+            b.refund_remaining = b
+                .refund_remaining
+                .checked_sub(refund)
+                .expect("stop refund backing");
+            b.output_remaining = b
+                .output_remaining
+                .checked_sub(output)
+                .expect("stop output backing");
+            StopBatchTable::read_write().put(&b).unwrap();
+            (refund, output)
+        } else {
+            assert!(cancel, "stop has not triggered");
+            assert_eq!(pool.input, pool.shares, "armed stop principal");
+            pool.input -= pos.shares;
+            if pool.input == 0 {
+                StopBookTable::read_write().erase(&(
+                    pool.market,
+                    pool.sell_base,
+                    priority(pool.sell_base, pool.trigger),
+                ));
+            }
+            (pos.shares, 0)
+        };
+        pool.shares -= pos.shares;
+        StopPoolTable::read_write().put(&pool).unwrap();
+        StopPositionTable::read_write().erase(&(owner, generation));
+        give(
+            owner,
+            m.id,
+            if pool.sell_base { m.base } else { m.quote },
+            refund,
+        );
+        give(
+            owner,
+            m.id,
+            if pool.sell_base { m.quote } else { m.base },
+            output,
+        );
+        (refund, output)
+    }
+    #[action]
+    fn cancelstop(generation: u64) -> (u64, u64) {
+        settle_stop(generation, true)
+    }
+    #[action]
+    fn claimstop(generation: u64) -> (u64, u64) {
+        settle_stop(generation, false)
+    }
+    #[action]
+    fn process(market: u64) -> u32 {
+        let mut m = self::market(market);
+        // Permissionless bounded lifecycle repair also works without stops.
+        // It never spends an owner's principal or accrued proceeds.
+        let mut repaired = 0;
+        for bid in [true, false] {
+            while repaired < crate::stops::MAX_BOOKS as u32 {
+                let Some(mut p) = book_head(market, bid) else {
+                    break;
+                };
+                let inlot = if bid {
+                    m.base_lot
+                } else {
+                    mul(p.price, m.quote_tick)
+                };
+                if crate::stops::maker_input_capacity(&p) >= inlot {
+                    break;
+                }
+                p.active = false;
+                pool_save(&mut p);
+                repaired += 1;
+            }
+        }
+        let count = if crate::stops::armed(market) {
+            crate::stops::execute(&mut m, get_sender(), None, true).2
+        } else {
+            let mut n = 0;
+            while pending(&m) {
+                assert!(n < MAX_LOAN_PRICES as u32, "credit price capacity");
+                let long = due(&m, true);
+                close_head(&mut m, long);
+                n += 1;
+            }
+            n
+        };
+        save(&m);
+        count + repaired
+    }
+    #[event(history, public)]
+    fn stoptraded(
+        market: u64,
+        sell_base: bool,
+        input: u64,
+        output: u64,
+        batch: u64,
+        margin_first: bool,
+        work_steps: u64,
+    ) {
+    }
+    #[event(history, public)]
+    fn auctionwork(market: u64, work_steps: u64, stops: u32, margins: u32, margin_first: bool) {}
     #[event(history, public)]
     fn traded(market: u64, owner: AccountNumber, sell_base: bool, input: u64, output: u64) {}
     #[event(history, public)]

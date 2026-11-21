@@ -64,6 +64,35 @@ fn order_view(position: &Maker, generation: &Pool, market: &Market) -> Value {
         "remaining_quote":integer(quote),"claimable_incoming":integer(proceeds),
         "status":if generation.active{"open"}else if generation.outgoing==0{"filled"}else{"remainder"}})
 }
+
+fn stop_view(position: &StopPosition, pool: &StopPool, batch: Option<&StopBatch>) -> Value {
+    let (remaining, refund, output, status) = if let Some(batch) = batch {
+        assert!(batch.input_total > 0, "stop batch denominator");
+        let refund =
+            position.shares as u128 * batch.refund_total as u128 / batch.input_total as u128;
+        let output =
+            position.shares as u128 * batch.output_total as u128 / batch.input_total as u128;
+        (
+            0,
+            refund,
+            output,
+            if refund == 0 {
+                "filled"
+            } else if output == 0 {
+                "unfilled"
+            } else {
+                "partially_filled"
+            },
+        )
+    } else {
+        (position.shares as u128, 0, 0, "armed")
+    };
+    json!({"owner":position.owner,"generation":position.generation,
+        "market":pool.market,"sell_base":pool.sell_base,"trigger":pool.trigger,
+        "status":status,"remaining_outgoing":integer(remaining),
+        "claimable_input":integer(refund),"claimable_output":integer(output),
+        "original_input":integer(position.shares as u128)})
+}
 /// A private position view, not a serialized shared Loan row. Legacy ratio
 /// fields below describe this owner's units and exact rounded entitlement so
 /// existing wallet claim construction never needs another borrower's totals.
@@ -81,6 +110,93 @@ fn loan_view(position: &Borrower, generation: &Loan) -> Value {
         "face_unit":generation.face_unit,"active":generation.active,
         "claimable_surplus":integer(claim),"original_units":position.units,
         "original_surplus":integer(claim),"surplus":integer(claim)})
+}
+fn stored_stop_view(position: &StopPosition) -> Value {
+    let pool = StopPoolTable::with_service(crate::SERVICE)
+        .get_index_pk()
+        .get(&position.generation)
+        .expect("stop position generation");
+    let batch = pool.batch.map(|id| {
+        StopBatchTable::with_service(crate::SERVICE)
+            .get_index_pk()
+            .get(&id)
+            .expect("stop batch")
+    });
+    let market = MarketTable::with_service(crate::SERVICE)
+        .get_index_pk()
+        .get(&pool.market)
+        .expect("stop market");
+    let mut value = stop_view(position, &pool, batch.as_ref());
+    value["input_token"] = json!(if pool.sell_base {
+        market.base
+    } else {
+        market.quote
+    });
+    value["output_token"] = json!(if pool.sell_base {
+        market.quote
+    } else {
+        market.base
+    });
+    value
+}
+fn stop_page(owner: AccountNumber, before: Option<u64>, limit: usize) -> (Vec<Value>, Option<u64>) {
+    use std::ops::Bound::{Excluded, Included};
+    let table = StopPositionTable::with_service(crate::SERVICE);
+    let index = table.get_index_pk();
+    let upper = before
+        .map(|id| Excluded((owner, id)))
+        .unwrap_or(Included((owner, u64::MAX)));
+    let mut rows: Vec<_> = index
+        .range((Included((owner, 0)), upper))
+        .rev()
+        .take(limit + 1)
+        .collect();
+    let more = rows.len() > limit;
+    rows.truncate(limit);
+    let next = if more {
+        rows.last().map(|row| row.generation)
+    } else {
+        None
+    };
+    let values = rows.iter().map(stored_stop_view).collect();
+    (values, next)
+}
+/// Only an authenticated handler supplies the owner; cursors never choose it.
+pub fn read_stops(owner: AccountNumber, before: Option<u64>, limit: u32) -> String {
+    assert!((1..=200).contains(&limit), "stop position page size");
+    let (positions, next) = stop_page(owner, before, limit as usize);
+    let mut page = json!({"owner":owner,"stop_positions":positions,"next_before":next});
+    preserve_integers(&mut page);
+    page.to_string()
+}
+pub fn read_stop(owner: AccountNumber, generation: u64) -> String {
+    let position = StopPositionTable::with_service(crate::SERVICE)
+        .get_index_pk()
+        .get(&(owner, generation));
+    let view = position.as_ref().map(|position| {
+        let mut view = stored_stop_view(position);
+        let defaults = foreign::<_, tokens::tables::tables::UserConfigTable>(tokens::SERVICE)
+            .get_index_pk()
+            .get(&owner)
+            .map(|row| row.flags)
+            .unwrap_or(0);
+        for (token_key, flag_key) in [
+            ("input_token", "input_auto_debit"),
+            ("output_token", "output_auto_debit"),
+        ] {
+            let token = view[token_key].as_u64().unwrap() as u32;
+            let flags = foreign::<_, tokens::tables::tables::BalanceConfigTable>(tokens::SERVICE)
+                .get_index_pk()
+                .get(&(owner, token))
+                .map(|row| row.flags)
+                .unwrap_or(defaults);
+            view[flag_key] = json!(flags & 1 != 0);
+        }
+        view
+    });
+    let mut value = json!({"owner":owner,"stop_position":view});
+    preserve_integers(&mut value);
+    value.to_string()
 }
 fn metadata(t: &tokens::tables::tables::Token) -> Value {
     let sym = foreign::<_, symbol::tables::MappingTable>(symbol::SERVICE)
@@ -170,6 +286,7 @@ fn build(owner: AccountNumber, include_native: bool) -> String {
         .range((owner, 0, false, 0)..=(owner, u64::MAX, true, u64::MAX))
         .take(1000)
         .collect();
+    let (stop_positions, stop_positions_next) = stop_page(owner, None, 1000);
     let loans: Vec<_> = loan_positions
         .iter()
         .filter_map(|position| {
@@ -257,7 +374,7 @@ fn build(owner: AccountNumber, include_native: bool) -> String {
         }
     }
     let ms:Vec<Value>=markets.iter().map(|m|json!({"id":m.id,"base":m.base,"quote":m.quote,"base_lot":m.base_lot,"quote_tick":m.quote_tick,"x":m.x,"y":m.y,"k":m.k.to_string(),"lp_supply":m.lp_supply,"vault_base":m.vault_base,"vault_quote":m.vault_quote,"debt_base":m.debt_base,"debt_quote":m.debt_quote,"lending_base":m.lending_base,"lending_quote":m.lending_quote,"maturity":m.maturity,"margin_enabled":m.margin_enabled==Some(true),"legacy_unsupported":m.margin_enabled.is_none(),"escrow_base":escrow_view(m.id,m.base,include_native),"escrow_quote":escrow_view(m.id,m.quote,include_native)})).collect();
-    let mut result = json!({"owner":owner,"markets":ms,"levels":levels,"positions":positions,"loans":loans,"loan_positions":loan_positions,"lenders":lenders,"relay_shares":relay_shares,"balances":balances,"tokens":token_data});
+    let mut result = json!({"owner":owner,"markets":ms,"levels":levels,"positions":positions,"stop_positions":stop_positions,"stop_positions_next":stop_positions_next,"loans":loans,"loan_positions":loan_positions,"lenders":lenders,"relay_shares":relay_shares,"balances":balances,"tokens":token_data});
     preserve_integers(&mut result);
     result.to_string()
 }
@@ -265,6 +382,47 @@ fn build(owner: AccountNumber, include_native: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stop_views_expose_exact_own_claims_without_other_owners_totals() {
+        let position = StopPosition {
+            owner: psibase::account!("alice"),
+            generation: 8,
+            shares: 3,
+        };
+        let pool = StopPool {
+            id: 8,
+            market: 1,
+            sell_base: true,
+            trigger: 90,
+            input: 7,
+            shares: 7,
+            batch: None,
+        };
+        let armed = stop_view(&position, &pool, None);
+        assert_eq!(armed["remaining_outgoing"], 3);
+        assert_eq!(armed["claimable_output"], 0);
+        let batch = StopBatch {
+            id: 9,
+            market: 1,
+            sell_base: true,
+            input_total: 7,
+            input_used: 3,
+            output_total: 10,
+            refund_total: 4,
+            refund_remaining: 4,
+            output_remaining: 10,
+            shares_remaining: 7,
+            margin_first: true,
+            work_steps: 5,
+        };
+        let closed = stop_view(&position, &pool, Some(&batch));
+        assert_eq!(closed["remaining_outgoing"], 0);
+        assert_eq!(closed["claimable_input"], 1);
+        assert_eq!(closed["claimable_output"], 4);
+        assert_eq!(closed["original_input"], 3);
+        assert!(closed.get("input_total").is_none() && closed.get("shares_remaining").is_none());
+        assert!(closed.get("refund_total").is_none() && closed.get("work_steps").is_none());
+    }
     #[test]
     fn loan_views_expose_only_own_units_and_exact_rounded_claim() {
         let position = Borrower {

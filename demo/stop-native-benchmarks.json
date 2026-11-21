@@ -1,0 +1,6582 @@
+{
+  "source_logs": [
+    {
+      "path": "demo/stop-final-native-tests.log",
+      "sha256": "fd733ce1e6d305d8c05ee1890914566760c7ad97ede8686e6c917d00cc875db9"
+    },
+    {
+      "path": "demo/stop-additional-native-tests.log",
+      "sha256": "0628b750eabc197444d2cf14dca71e12cbfbd0314ddd423b9ce5323a10136af4"
+    }
+  ],
+  "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+  "cpu": "Apple M5 Max",
+  "clock_scope": "Direct process/thread CPU clocks bracket only each native push in psitest; process CPU includes host worker threads, thread CPU is the calling host thread. Native billable watchdog is monotonic elapsed on macOS and thread CPU on Linux and pauses for some runtime work. Tester wall includes the complete push. Durations are not deterministic.",
+  "fixture_scope": "Repeated benchmark samples fork identical funded native state and block time. Regression measurements are single native actions, not repeated latency samples. Setup, boot, fixture cloning, and post-action full audit are excluded from each timed push.",
+  "confidence_scope": "Observed timing distributions for explicit fixtures on this machine, not a production latency guarantee or probability of financial correctness.",
+  "scenarios": [
+    {
+      "scenario": "baseline_relay_trade",
+      "axes": {},
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 8,
+        "median_ms": 78.6525,
+        "p95_ms": 79.803,
+        "min_ms": 77.877,
+        "max_ms": 79.803
+      },
+      "tester_wall_time": {
+        "samples": 8,
+        "median_ms": 110.5015,
+        "p95_ms": 111.879958,
+        "min_ms": 109.564833,
+        "max_ms": 111.879958
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        477
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "seed": 7001
+          },
+          "wall_ns": "111316833",
+          "process_cpu_ns": "111285000",
+          "thread_cpu_ns": "111144666",
+          "native_billable_ns": "79441000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "seed": 7001
+          },
+          "wall_ns": "110393000",
+          "process_cpu_ns": "110441000",
+          "thread_cpu_ns": "110303541",
+          "native_billable_ns": "78558000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "seed": 7001
+          },
+          "wall_ns": "110502459",
+          "process_cpu_ns": "110393000",
+          "thread_cpu_ns": "110243625",
+          "native_billable_ns": "78795000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "seed": 7001
+          },
+          "wall_ns": "109590958",
+          "process_cpu_ns": "109624000",
+          "thread_cpu_ns": "109485250",
+          "native_billable_ns": "77925000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "seed": 7001
+          },
+          "wall_ns": "110648084",
+          "process_cpu_ns": "110651000",
+          "thread_cpu_ns": "110479292",
+          "native_billable_ns": "78747000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "seed": 7001
+          },
+          "wall_ns": "109564833",
+          "process_cpu_ns": "109635000",
+          "thread_cpu_ns": "109513833",
+          "native_billable_ns": "77877000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "seed": 7001
+          },
+          "wall_ns": "110500541",
+          "process_cpu_ns": "110536000",
+          "thread_cpu_ns": "110399084",
+          "native_billable_ns": "78282000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "seed": 7001
+          },
+          "wall_ns": "111879958",
+          "process_cpu_ns": "111705000",
+          "thread_cpu_ns": "111560125",
+          "native_billable_ns": "79803000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 8,
+        "median_ms": 110.4885,
+        "p95_ms": 111.705,
+        "min_ms": 109.624,
+        "max_ms": 111.705
+      },
+      "thread_cpu_time": {
+        "samples": 8,
+        "median_ms": 110.3513125,
+        "p95_ms": 111.560125,
+        "min_ms": 109.48525,
+        "max_ms": 111.560125
+      }
+    },
+    {
+      "scenario": "full_capacity_64_stops_64_loans_128_prices",
+      "axes": {
+        "books": 128,
+        "loans": 64,
+        "stops": 64
+      },
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 12,
+        "median_ms": 369.81600000000003,
+        "p95_ms": 438.377,
+        "min_ms": 368.058,
+        "max_ms": 438.377
+      },
+      "tester_wall_time": {
+        "samples": 12,
+        "median_ms": 471.53331249999997,
+        "p95_ms": 539.301542,
+        "min_ms": 468.747625,
+        "max_ms": 539.301542
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        4671
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "470302542",
+          "process_cpu_ns": "469987000",
+          "thread_cpu_ns": "469860125",
+          "native_billable_ns": "369573000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "470089709",
+          "process_cpu_ns": "469942000",
+          "thread_cpu_ns": "469786208",
+          "native_billable_ns": "369416000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "475772833",
+          "process_cpu_ns": "474960000",
+          "thread_cpu_ns": "474821417",
+          "native_billable_ns": "374110000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "481365792",
+          "process_cpu_ns": "478347000",
+          "thread_cpu_ns": "478194959",
+          "native_billable_ns": "379944000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "539301542",
+          "process_cpu_ns": "507545000",
+          "thread_cpu_ns": "507403625",
+          "native_billable_ns": "438377000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "472783083",
+          "process_cpu_ns": "471869000",
+          "thread_cpu_ns": "471674541",
+          "native_billable_ns": "369632000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "471848542",
+          "process_cpu_ns": "471236000",
+          "thread_cpu_ns": "471090375",
+          "native_billable_ns": "369686000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "471133583",
+          "process_cpu_ns": "470461000",
+          "thread_cpu_ns": "470310333",
+          "native_billable_ns": "370425000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 8,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "471218083",
+          "process_cpu_ns": "470939000",
+          "thread_cpu_ns": "470793625",
+          "native_billable_ns": "369946000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 9,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "474811541",
+          "process_cpu_ns": "473028000",
+          "thread_cpu_ns": "472877000",
+          "native_billable_ns": "370087000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 10,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "468747625",
+          "process_cpu_ns": "468530000",
+          "thread_cpu_ns": "468390917",
+          "native_billable_ns": "368058000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 11,
+            "seed": 7003,
+            "stops": 64,
+            "loans": 64,
+            "books": 128
+          },
+          "wall_ns": "469681917",
+          "process_cpu_ns": "469192000",
+          "thread_cpu_ns": "469052667",
+          "native_billable_ns": "368948000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 12,
+        "median_ms": 471.0875,
+        "p95_ms": 507.545,
+        "min_ms": 468.53,
+        "max_ms": 507.545
+      },
+      "thread_cpu_time": {
+        "samples": 12,
+        "median_ms": 470.942,
+        "p95_ms": 507.403625,
+        "min_ms": 468.390917,
+        "max_ms": 507.403625
+      },
+      "deterministic_work_steps": [
+        19810
+      ]
+    },
+    {
+      "scenario": "same_price_stop_owners",
+      "axes": {
+        "input_total": 25600,
+        "owners": 1
+      },
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 12,
+        "median_ms": 82.4785,
+        "p95_ms": 86.804,
+        "min_ms": 81.765,
+        "max_ms": 86.804
+      },
+      "tester_wall_time": {
+        "samples": 12,
+        "median_ms": 143.15968750000002,
+        "p95_ms": 147.817042,
+        "min_ms": 142.057959,
+        "max_ms": 147.817042
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        534
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "143062125",
+          "process_cpu_ns": "143020000",
+          "thread_cpu_ns": "142860708",
+          "native_billable_ns": "82567000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "143907750",
+          "process_cpu_ns": "143548000",
+          "thread_cpu_ns": "143394750",
+          "native_billable_ns": "83752000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "143683584",
+          "process_cpu_ns": "143155000",
+          "thread_cpu_ns": "143025959",
+          "native_billable_ns": "81765000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "146883250",
+          "process_cpu_ns": "145439000",
+          "thread_cpu_ns": "145276166",
+          "native_billable_ns": "86793000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "144003041",
+          "process_cpu_ns": "143209000",
+          "thread_cpu_ns": "143058166",
+          "native_billable_ns": "82943000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "142253208",
+          "process_cpu_ns": "142286000",
+          "thread_cpu_ns": "142147292",
+          "native_billable_ns": "82088000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "143257250",
+          "process_cpu_ns": "143270000",
+          "thread_cpu_ns": "143129417",
+          "native_billable_ns": "82686000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "147817042",
+          "process_cpu_ns": "146422000",
+          "thread_cpu_ns": "146251583",
+          "native_billable_ns": "86804000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 8,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "142057959",
+          "process_cpu_ns": "142110000",
+          "thread_cpu_ns": "141975166",
+          "native_billable_ns": "81882000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 9,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "142538583",
+          "process_cpu_ns": "142598000",
+          "thread_cpu_ns": "142446500",
+          "native_billable_ns": "82182000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 10,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "142466125",
+          "process_cpu_ns": "142537000",
+          "thread_cpu_ns": "142385792",
+          "native_billable_ns": "82390000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 11,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "142389917",
+          "process_cpu_ns": "142272000",
+          "thread_cpu_ns": "142122292",
+          "native_billable_ns": "81976000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 12,
+        "median_ms": 143.0875,
+        "p95_ms": 146.422,
+        "min_ms": 142.11,
+        "max_ms": 146.422
+      },
+      "thread_cpu_time": {
+        "samples": 12,
+        "median_ms": 142.9433335,
+        "p95_ms": 146.251583,
+        "min_ms": 141.975166,
+        "max_ms": 146.251583
+      },
+      "deterministic_work_steps": [
+        233
+      ]
+    },
+    {
+      "scenario": "same_price_stop_owners",
+      "axes": {
+        "input_total": 25600,
+        "owners": 16
+      },
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 12,
+        "median_ms": 82.737,
+        "p95_ms": 83.614,
+        "min_ms": 81.688,
+        "max_ms": 83.614
+      },
+      "tester_wall_time": {
+        "samples": 12,
+        "median_ms": 115.73512500000001,
+        "p95_ms": 117.27675,
+        "min_ms": 114.11075,
+        "max_ms": 117.27675
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        534
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "115138500",
+          "process_cpu_ns": "115148000",
+          "thread_cpu_ns": "115012958",
+          "native_billable_ns": "82384000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "117276750",
+          "process_cpu_ns": "116930000",
+          "thread_cpu_ns": "116792583",
+          "native_billable_ns": "83577000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "115261667",
+          "process_cpu_ns": "115343000",
+          "thread_cpu_ns": "115197084",
+          "native_billable_ns": "82175000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "115778209",
+          "process_cpu_ns": "115806000",
+          "thread_cpu_ns": "115665792",
+          "native_billable_ns": "82765000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "114110750",
+          "process_cpu_ns": "114194000",
+          "thread_cpu_ns": "114054042",
+          "native_billable_ns": "81688000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "115336667",
+          "process_cpu_ns": "115403000",
+          "thread_cpu_ns": "115258583",
+          "native_billable_ns": "82446000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "116727417",
+          "process_cpu_ns": "116445000",
+          "thread_cpu_ns": "116297750",
+          "native_billable_ns": "83614000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "116211500",
+          "process_cpu_ns": "116152000",
+          "thread_cpu_ns": "116001084",
+          "native_billable_ns": "82941000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 8,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "116111625",
+          "process_cpu_ns": "116083000",
+          "thread_cpu_ns": "115939875",
+          "native_billable_ns": "82792000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 9,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "116216334",
+          "process_cpu_ns": "116113000",
+          "thread_cpu_ns": "115964042",
+          "native_billable_ns": "82984000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 10,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "115692041",
+          "process_cpu_ns": "115753000",
+          "thread_cpu_ns": "115610125",
+          "native_billable_ns": "82709000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 11,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "115310792",
+          "process_cpu_ns": "115355000",
+          "thread_cpu_ns": "115217667",
+          "native_billable_ns": "82488000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 12,
+        "median_ms": 115.7795,
+        "p95_ms": 116.93,
+        "min_ms": 114.194,
+        "max_ms": 116.93
+      },
+      "thread_cpu_time": {
+        "samples": 12,
+        "median_ms": 115.6379585,
+        "p95_ms": 116.792583,
+        "min_ms": 114.054042,
+        "max_ms": 116.792583
+      },
+      "deterministic_work_steps": [
+        233
+      ]
+    },
+    {
+      "scenario": "same_price_stop_owners",
+      "axes": {
+        "input_total": 25600,
+        "owners": 128
+      },
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 12,
+        "median_ms": 81.932,
+        "p95_ms": 83.871,
+        "min_ms": 80.538,
+        "max_ms": 83.871
+      },
+      "tester_wall_time": {
+        "samples": 12,
+        "median_ms": 114.675771,
+        "p95_ms": 117.282959,
+        "min_ms": 112.67425,
+        "max_ms": 117.282959
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        534
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "117282959",
+          "process_cpu_ns": "116786000",
+          "thread_cpu_ns": "116636000",
+          "native_billable_ns": "83871000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "116265250",
+          "process_cpu_ns": "116041000",
+          "thread_cpu_ns": "115890292",
+          "native_billable_ns": "83175000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "116678208",
+          "process_cpu_ns": "116527000",
+          "thread_cpu_ns": "116382416",
+          "native_billable_ns": "83166000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "115435750",
+          "process_cpu_ns": "115367000",
+          "thread_cpu_ns": "115227333",
+          "native_billable_ns": "82353000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "114835000",
+          "process_cpu_ns": "114843000",
+          "thread_cpu_ns": "114693042",
+          "native_billable_ns": "82223000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "114934291",
+          "process_cpu_ns": "114967000",
+          "thread_cpu_ns": "114835209",
+          "native_billable_ns": "81878000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "113981416",
+          "process_cpu_ns": "114082000",
+          "thread_cpu_ns": "113940583",
+          "native_billable_ns": "81500000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "114108084",
+          "process_cpu_ns": "114177000",
+          "thread_cpu_ns": "114032875",
+          "native_billable_ns": "81575000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 8,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "113367333",
+          "process_cpu_ns": "113425000",
+          "thread_cpu_ns": "113285084",
+          "native_billable_ns": "81044000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 9,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "113696333",
+          "process_cpu_ns": "113704000",
+          "thread_cpu_ns": "113559000",
+          "native_billable_ns": "81464000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 10,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "112674250",
+          "process_cpu_ns": "112736000",
+          "thread_cpu_ns": "112601208",
+          "native_billable_ns": "80538000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 11,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002
+          },
+          "wall_ns": "114516542",
+          "process_cpu_ns": "114542000",
+          "thread_cpu_ns": "114413750",
+          "native_billable_ns": "81986000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 12,
+        "median_ms": 114.6925,
+        "p95_ms": 116.786,
+        "min_ms": 112.736,
+        "max_ms": 116.786
+      },
+      "thread_cpu_time": {
+        "samples": 12,
+        "median_ms": 114.55339599999999,
+        "p95_ms": 116.636,
+        "min_ms": 112.601208,
+        "max_ms": 116.636
+      },
+      "deterministic_work_steps": [
+        233
+      ]
+    },
+    {
+      "scenario": "exhausted_maker_permissionless_retirement",
+      "axes": {
+        "incoming_headroom": 255,
+        "native_input_lot": 1099511627520
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 38.755,
+        "p95_ms": 38.755,
+        "min_ms": 38.755,
+        "max_ms": 38.755
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 65.76475,
+        "p95_ms": 65.76475,
+        "min_ms": 65.76475,
+        "max_ms": 65.76475
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        193
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "incoming_headroom": 255,
+            "native_input_lot": 1099511627520
+          },
+          "wall_ns": "65764750",
+          "process_cpu_ns": "65869000",
+          "thread_cpu_ns": "65734916",
+          "native_billable_ns": "38755000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 65.869,
+        "p95_ms": 65.869,
+        "min_ms": 65.869,
+        "max_ms": 65.869
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 65.734916,
+        "p95_ms": 65.734916,
+        "min_ms": 65.734916,
+        "max_ms": 65.734916
+      }
+    },
+    {
+      "scenario": "stop_lp_resize_unreachable_trigger",
+      "axes": {
+        "added_lp_shares": 1999000000,
+        "initial_lp_supply": 1000000
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 77.029,
+        "p95_ms": 77.029,
+        "min_ms": 77.029,
+        "max_ms": 77.029
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 110.118125,
+        "p95_ms": 110.118125,
+        "min_ms": 110.118125,
+        "max_ms": 110.118125
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        392
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "initial_lp_supply": 1000000,
+            "added_lp_shares": 1999000000
+          },
+          "wall_ns": "110118125",
+          "process_cpu_ns": "109566000",
+          "thread_cpu_ns": "109378208",
+          "native_billable_ns": "77029000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 109.566,
+        "p95_ms": 109.566,
+        "min_ms": 109.566,
+        "max_ms": 109.566
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 109.378208,
+        "p95_ms": 109.378208,
+        "min_ms": 109.378208,
+        "max_ms": 109.378208
+      }
+    },
+    {
+      "scenario": "stop_margin_first_limit_fallback",
+      "axes": {
+        "loan_prices": 1,
+        "seed_limit": 80,
+        "stop_prices": 1
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 88.365,
+        "p95_ms": 88.365,
+        "min_ms": 88.365,
+        "max_ms": 88.365
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 122.302208,
+        "p95_ms": 122.302208,
+        "min_ms": 122.302208,
+        "max_ms": 122.302208
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        629
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "stop_prices": 1,
+            "loan_prices": 1,
+            "seed_limit": 80
+          },
+          "wall_ns": "122302208",
+          "process_cpu_ns": "122352000",
+          "thread_cpu_ns": "122216084",
+          "native_billable_ns": "88365000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 122.352,
+        "p95_ms": 122.352,
+        "min_ms": 122.352,
+        "max_ms": 122.352
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 122.216084,
+        "p95_ms": 122.216084,
+        "min_ms": 122.216084,
+        "max_ms": 122.216084
+      }
+    },
+    {
+      "scenario": "stop_margin_first_minout_fallback",
+      "axes": {
+        "loan_prices": 1,
+        "seed_min_output": 7000000,
+        "stop_prices": 1
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 83.165,
+        "p95_ms": 83.165,
+        "min_ms": 83.165,
+        "max_ms": 83.165
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 115.951083,
+        "p95_ms": 115.951083,
+        "min_ms": 115.951083,
+        "max_ms": 115.951083
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        560
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "stop_prices": 1,
+            "loan_prices": 1,
+            "seed_min_output": 7000000
+          },
+          "wall_ns": "115951083",
+          "process_cpu_ns": "116013000",
+          "thread_cpu_ns": "115891542",
+          "native_billable_ns": "83165000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 116.013,
+        "p95_ms": 116.013,
+        "min_ms": 116.013,
+        "max_ms": 116.013
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 115.891542,
+        "p95_ms": 115.891542,
+        "min_ms": 115.891542,
+        "max_ms": 115.891542
+      }
+    },
+    {
+      "scenario": "stop_maximum_output_partial_refund",
+      "axes": {
+        "input_atoms": 1099511627775,
+        "maker_levels": 2,
+        "output_bound": 1099511627775
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 85.205,
+        "p95_ms": 85.205,
+        "min_ms": 85.205,
+        "max_ms": 85.205
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 119.585541,
+        "p95_ms": 119.585541,
+        "min_ms": 119.585541,
+        "max_ms": 119.585541
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        571
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "input_atoms": 1099511627775,
+            "maker_levels": 2,
+            "output_bound": 1099511627775
+          },
+          "wall_ns": "119585541",
+          "process_cpu_ns": "119633000",
+          "thread_cpu_ns": "119486041",
+          "native_billable_ns": "85205000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 119.633,
+        "p95_ms": 119.633,
+        "min_ms": 119.633,
+        "max_ms": 119.633
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 119.486041,
+        "p95_ms": 119.486041,
+        "min_ms": 119.486041,
+        "max_ms": 119.486041
+      }
+    },
+    {
+      "scenario": "stop_minimum_atom_64_prices",
+      "axes": {
+        "book_prices": 0,
+        "owners": 1,
+        "seed_atoms": 1,
+        "stop_prices": 64
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 180.933,
+        "p95_ms": 180.933,
+        "min_ms": 180.933,
+        "max_ms": 180.933
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 238.016417,
+        "p95_ms": 238.016417,
+        "min_ms": 238.016417,
+        "max_ms": 238.016417
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        1983
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "stop_prices": 64,
+            "seed_atoms": 1,
+            "book_prices": 0,
+            "owners": 1
+          },
+          "wall_ns": "238016417",
+          "process_cpu_ns": "237979000",
+          "thread_cpu_ns": "237812917",
+          "native_billable_ns": "180933000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 237.979,
+        "p95_ms": 237.979,
+        "min_ms": 237.979,
+        "max_ms": 237.979
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 237.812917,
+        "p95_ms": 237.812917,
+        "min_ms": 237.812917,
+        "max_ms": 237.812917
+      }
+    },
+    {
+      "scenario": "stop_opposed_maturity",
+      "axes": {
+        "loan_prices": 2,
+        "seed_atoms": 0,
+        "stop_prices": 2
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 55.298,
+        "p95_ms": 55.298,
+        "min_ms": 55.298,
+        "max_ms": 55.298
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 84.29725,
+        "p95_ms": 84.29725,
+        "min_ms": 84.29725,
+        "max_ms": 84.29725
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        327
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "stop_prices": 2,
+            "loan_prices": 2,
+            "seed_atoms": 0
+          },
+          "wall_ns": "84297250",
+          "process_cpu_ns": "84411000",
+          "thread_cpu_ns": "84253709",
+          "native_billable_ns": "55298000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 84.411,
+        "p95_ms": 84.411,
+        "min_ms": 84.411,
+        "max_ms": 84.411
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 84.253709,
+        "p95_ms": 84.253709,
+        "min_ms": 84.253709,
+        "max_ms": 84.253709
+      }
+    },
+    {
+      "scenario": "stop_opposing_reversal_limit_refund",
+      "axes": {
+        "limit": 80,
+        "opposing_stop_input": 30000000,
+        "seed_input": 500000
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 101.979,
+        "p95_ms": 101.979,
+        "min_ms": 101.979,
+        "max_ms": 101.979
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 139.405792,
+        "p95_ms": 139.405792,
+        "min_ms": 139.405792,
+        "max_ms": 139.405792
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        828
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "limit": 80,
+            "seed_input": 500000,
+            "opposing_stop_input": 30000000
+          },
+          "wall_ns": "139405792",
+          "process_cpu_ns": "139428000",
+          "thread_cpu_ns": "139286291",
+          "native_billable_ns": "101979000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 139.428,
+        "p95_ms": 139.428,
+        "min_ms": 139.428,
+        "max_ms": 139.428
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 139.286291,
+        "p95_ms": 139.286291,
+        "min_ms": 139.286291,
+        "max_ms": 139.286291
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 2
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 83.767,
+        "p95_ms": 83.767,
+        "min_ms": 83.767,
+        "max_ms": 83.767
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 118.010334,
+        "p95_ms": 118.010334,
+        "min_ms": 118.010334,
+        "max_ms": 118.010334
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        536
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 2,
+            "sell_base": true
+          },
+          "wall_ns": "118010334",
+          "process_cpu_ns": "117690000",
+          "thread_cpu_ns": "117547917",
+          "native_billable_ns": "83767000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 117.69,
+        "p95_ms": 117.69,
+        "min_ms": 117.69,
+        "max_ms": 117.69
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 117.547917,
+        "p95_ms": 117.547917,
+        "min_ms": 117.547917,
+        "max_ms": 117.547917
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 5
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 80.708,
+        "p95_ms": 80.708,
+        "min_ms": 80.708,
+        "max_ms": 80.708
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 113.980833,
+        "p95_ms": 113.980833,
+        "min_ms": 113.980833,
+        "max_ms": 113.980833
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        489
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 5,
+            "sell_base": false
+          },
+          "wall_ns": "113980833",
+          "process_cpu_ns": "113560000",
+          "thread_cpu_ns": "113420333",
+          "native_billable_ns": "80708000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.56,
+        "p95_ms": 113.56,
+        "min_ms": 113.56,
+        "max_ms": 113.56
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.420333,
+        "p95_ms": 113.420333,
+        "min_ms": 113.420333,
+        "max_ms": 113.420333
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 10
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 82.656,
+        "p95_ms": 82.656,
+        "min_ms": 82.656,
+        "max_ms": 82.656
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 116.429125,
+        "p95_ms": 116.429125,
+        "min_ms": 116.429125,
+        "max_ms": 116.429125
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        531
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 10,
+            "sell_base": true
+          },
+          "wall_ns": "116429125",
+          "process_cpu_ns": "116481000",
+          "thread_cpu_ns": "116334875",
+          "native_billable_ns": "82656000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 116.481,
+        "p95_ms": 116.481,
+        "min_ms": 116.481,
+        "max_ms": 116.481
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 116.334875,
+        "p95_ms": 116.334875,
+        "min_ms": 116.334875,
+        "max_ms": 116.334875
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 13
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 80.504,
+        "p95_ms": 80.504,
+        "min_ms": 80.504,
+        "max_ms": 80.504
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 113.365875,
+        "p95_ms": 113.365875,
+        "min_ms": 113.365875,
+        "max_ms": 113.365875
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        475
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 13,
+            "sell_base": false
+          },
+          "wall_ns": "113365875",
+          "process_cpu_ns": "112868000",
+          "thread_cpu_ns": "112734625",
+          "native_billable_ns": "80504000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.868,
+        "p95_ms": 112.868,
+        "min_ms": 112.868,
+        "max_ms": 112.868
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.734625,
+        "p95_ms": 112.734625,
+        "min_ms": 112.734625,
+        "max_ms": 112.734625
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 18
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 84.259,
+        "p95_ms": 84.259,
+        "min_ms": 84.259,
+        "max_ms": 84.259
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 118.40325,
+        "p95_ms": 118.40325,
+        "min_ms": 118.40325,
+        "max_ms": 118.40325
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        530
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 18,
+            "sell_base": true
+          },
+          "wall_ns": "118403250",
+          "process_cpu_ns": "118178000",
+          "thread_cpu_ns": "117994084",
+          "native_billable_ns": "84259000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 118.178,
+        "p95_ms": 118.178,
+        "min_ms": 118.178,
+        "max_ms": 118.178
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 117.994084,
+        "p95_ms": 117.994084,
+        "min_ms": 117.994084,
+        "max_ms": 117.994084
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 21
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 79.772,
+        "p95_ms": 79.772,
+        "min_ms": 79.772,
+        "max_ms": 79.772
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 112.845458,
+        "p95_ms": 112.845458,
+        "min_ms": 112.845458,
+        "max_ms": 112.845458
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        483
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 21,
+            "sell_base": false
+          },
+          "wall_ns": "112845458",
+          "process_cpu_ns": "112869000",
+          "thread_cpu_ns": "112710583",
+          "native_billable_ns": "79772000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.869,
+        "p95_ms": 112.869,
+        "min_ms": 112.869,
+        "max_ms": 112.869
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.710583,
+        "p95_ms": 112.710583,
+        "min_ms": 112.710583,
+        "max_ms": 112.710583
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 26
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 80.12,
+        "p95_ms": 80.12,
+        "min_ms": 80.12,
+        "max_ms": 80.12
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 113.404291,
+        "p95_ms": 113.404291,
+        "min_ms": 113.404291,
+        "max_ms": 113.404291
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        484
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 26,
+            "sell_base": true
+          },
+          "wall_ns": "113404291",
+          "process_cpu_ns": "113330000",
+          "thread_cpu_ns": "113168875",
+          "native_billable_ns": "80120000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.33,
+        "p95_ms": 113.33,
+        "min_ms": 113.33,
+        "max_ms": 113.33
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.168875,
+        "p95_ms": 113.168875,
+        "min_ms": 113.168875,
+        "max_ms": 113.168875
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 29
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 81.356,
+        "p95_ms": 81.356,
+        "min_ms": 81.356,
+        "max_ms": 81.356
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 114.263292,
+        "p95_ms": 114.263292,
+        "min_ms": 114.263292,
+        "max_ms": 114.263292
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        484
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 29,
+            "sell_base": false
+          },
+          "wall_ns": "114263292",
+          "process_cpu_ns": "113885000",
+          "thread_cpu_ns": "113735625",
+          "native_billable_ns": "81356000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.885,
+        "p95_ms": 113.885,
+        "min_ms": 113.885,
+        "max_ms": 113.885
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.735625,
+        "p95_ms": 113.735625,
+        "min_ms": 113.735625,
+        "max_ms": 113.735625
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 34
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 79.514,
+        "p95_ms": 79.514,
+        "min_ms": 79.514,
+        "max_ms": 79.514
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 112.326458,
+        "p95_ms": 112.326458,
+        "min_ms": 112.326458,
+        "max_ms": 112.326458
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        486
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 34,
+            "sell_base": true
+          },
+          "wall_ns": "112326458",
+          "process_cpu_ns": "112410000",
+          "thread_cpu_ns": "112267625",
+          "native_billable_ns": "79514000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.41,
+        "p95_ms": 112.41,
+        "min_ms": 112.41,
+        "max_ms": 112.41
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.267625,
+        "p95_ms": 112.267625,
+        "min_ms": 112.267625,
+        "max_ms": 112.267625
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 37
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 82.978,
+        "p95_ms": 82.978,
+        "min_ms": 82.978,
+        "max_ms": 82.978
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 116.618792,
+        "p95_ms": 116.618792,
+        "min_ms": 116.618792,
+        "max_ms": 116.618792
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        533
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 37,
+            "sell_base": false
+          },
+          "wall_ns": "116618792",
+          "process_cpu_ns": "116694000",
+          "thread_cpu_ns": "116546792",
+          "native_billable_ns": "82978000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 116.694,
+        "p95_ms": 116.694,
+        "min_ms": 116.694,
+        "max_ms": 116.694
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 116.546792,
+        "p95_ms": 116.546792,
+        "min_ms": 116.546792,
+        "max_ms": 116.546792
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 42
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 78.585,
+        "p95_ms": 78.585,
+        "min_ms": 78.585,
+        "max_ms": 78.585
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 111.328458,
+        "p95_ms": 111.328458,
+        "min_ms": 111.328458,
+        "max_ms": 111.328458
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        483
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 42,
+            "sell_base": true
+          },
+          "wall_ns": "111328458",
+          "process_cpu_ns": "111393000",
+          "thread_cpu_ns": "111259667",
+          "native_billable_ns": "78585000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 111.393,
+        "p95_ms": 111.393,
+        "min_ms": 111.393,
+        "max_ms": 111.393
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 111.259667,
+        "p95_ms": 111.259667,
+        "min_ms": 111.259667,
+        "max_ms": 111.259667
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 45
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 80.066,
+        "p95_ms": 80.066,
+        "min_ms": 80.066,
+        "max_ms": 80.066
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 142.128416,
+        "p95_ms": 142.128416,
+        "min_ms": 142.128416,
+        "max_ms": 142.128416
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        484
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 45,
+            "sell_base": false
+          },
+          "wall_ns": "142128416",
+          "process_cpu_ns": "141948000",
+          "thread_cpu_ns": "141799583",
+          "native_billable_ns": "80066000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 141.948,
+        "p95_ms": 141.948,
+        "min_ms": 141.948,
+        "max_ms": 141.948
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 141.799583,
+        "p95_ms": 141.799583,
+        "min_ms": 141.799583,
+        "max_ms": 141.799583
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 50
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 79.975,
+        "p95_ms": 79.975,
+        "min_ms": 79.975,
+        "max_ms": 79.975
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 114.206916,
+        "p95_ms": 114.206916,
+        "min_ms": 114.206916,
+        "max_ms": 114.206916
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        486
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 50,
+            "sell_base": true
+          },
+          "wall_ns": "114206916",
+          "process_cpu_ns": "113992000",
+          "thread_cpu_ns": "113823292",
+          "native_billable_ns": "79975000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.992,
+        "p95_ms": 113.992,
+        "min_ms": 113.992,
+        "max_ms": 113.992
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.823292,
+        "p95_ms": 113.823292,
+        "min_ms": 113.823292,
+        "max_ms": 113.823292
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 53
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 80.336,
+        "p95_ms": 80.336,
+        "min_ms": 80.336,
+        "max_ms": 80.336
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 115.249958,
+        "p95_ms": 115.249958,
+        "min_ms": 115.249958,
+        "max_ms": 115.249958
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        486
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 53,
+            "sell_base": false
+          },
+          "wall_ns": "115249958",
+          "process_cpu_ns": "114607000",
+          "thread_cpu_ns": "114430417",
+          "native_billable_ns": "80336000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 114.607,
+        "p95_ms": 114.607,
+        "min_ms": 114.607,
+        "max_ms": 114.607
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 114.430417,
+        "p95_ms": 114.430417,
+        "min_ms": 114.430417,
+        "max_ms": 114.430417
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 58
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 84.647,
+        "p95_ms": 84.647,
+        "min_ms": 84.647,
+        "max_ms": 84.647
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 118.617833,
+        "p95_ms": 118.617833,
+        "min_ms": 118.617833,
+        "max_ms": 118.617833
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        531
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 58,
+            "sell_base": true
+          },
+          "wall_ns": "118617833",
+          "process_cpu_ns": "118309000",
+          "thread_cpu_ns": "118155208",
+          "native_billable_ns": "84647000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 118.309,
+        "p95_ms": 118.309,
+        "min_ms": 118.309,
+        "max_ms": 118.309
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 118.155208,
+        "p95_ms": 118.155208,
+        "min_ms": 118.155208,
+        "max_ms": 118.155208
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 61
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 80.244,
+        "p95_ms": 80.244,
+        "min_ms": 80.244,
+        "max_ms": 80.244
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 113.469791,
+        "p95_ms": 113.469791,
+        "min_ms": 113.469791,
+        "max_ms": 113.469791
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        483
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 61,
+            "sell_base": false
+          },
+          "wall_ns": "113469791",
+          "process_cpu_ns": "113160000",
+          "thread_cpu_ns": "113000125",
+          "native_billable_ns": "80244000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.16,
+        "p95_ms": 113.16,
+        "min_ms": 113.16,
+        "max_ms": 113.16
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 113.000125,
+        "p95_ms": 113.000125,
+        "min_ms": 113.000125,
+        "max_ms": 113.000125
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 66
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 85.622,
+        "p95_ms": 85.622,
+        "min_ms": 85.622,
+        "max_ms": 85.622
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 119.372292,
+        "p95_ms": 119.372292,
+        "min_ms": 119.372292,
+        "max_ms": 119.372292
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        531
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 66,
+            "sell_base": true
+          },
+          "wall_ns": "119372292",
+          "process_cpu_ns": "118614000",
+          "thread_cpu_ns": "118438666",
+          "native_billable_ns": "85622000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 118.614,
+        "p95_ms": 118.614,
+        "min_ms": 118.614,
+        "max_ms": 118.614
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 118.438666,
+        "p95_ms": 118.438666,
+        "min_ms": 118.438666,
+        "max_ms": 118.438666
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 69
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 79.995,
+        "p95_ms": 79.995,
+        "min_ms": 79.995,
+        "max_ms": 79.995
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 112.787333,
+        "p95_ms": 112.787333,
+        "min_ms": 112.787333,
+        "max_ms": 112.787333
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        483
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 69,
+            "sell_base": false
+          },
+          "wall_ns": "112787333",
+          "process_cpu_ns": "112810000",
+          "thread_cpu_ns": "112669708",
+          "native_billable_ns": "79995000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.81,
+        "p95_ms": 112.81,
+        "min_ms": 112.81,
+        "max_ms": 112.81
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.669708,
+        "p95_ms": 112.669708,
+        "min_ms": 112.669708,
+        "max_ms": 112.669708
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 74
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 79.059,
+        "p95_ms": 79.059,
+        "min_ms": 79.059,
+        "max_ms": 79.059
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 111.7885,
+        "p95_ms": 111.7885,
+        "min_ms": 111.7885,
+        "max_ms": 111.7885
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        485
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 74,
+            "sell_base": true
+          },
+          "wall_ns": "111788500",
+          "process_cpu_ns": "111869000",
+          "thread_cpu_ns": "111725625",
+          "native_billable_ns": "79059000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 111.869,
+        "p95_ms": 111.869,
+        "min_ms": 111.869,
+        "max_ms": 111.869
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 111.725625,
+        "p95_ms": 111.725625,
+        "min_ms": 111.725625,
+        "max_ms": 111.725625
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 77
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 79.716,
+        "p95_ms": 79.716,
+        "min_ms": 79.716,
+        "max_ms": 79.716
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 112.584834,
+        "p95_ms": 112.584834,
+        "min_ms": 112.584834,
+        "max_ms": 112.584834
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        485
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 77,
+            "sell_base": false
+          },
+          "wall_ns": "112584834",
+          "process_cpu_ns": "112646000",
+          "thread_cpu_ns": "112493583",
+          "native_billable_ns": "79716000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.646,
+        "p95_ms": 112.646,
+        "min_ms": 112.646,
+        "max_ms": 112.646
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 112.493583,
+        "p95_ms": 112.493583,
+        "min_ms": 112.493583,
+        "max_ms": 112.493583
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 82
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 81.81,
+        "p95_ms": 81.81,
+        "min_ms": 81.81,
+        "max_ms": 81.81
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 116.866417,
+        "p95_ms": 116.866417,
+        "min_ms": 116.866417,
+        "max_ms": 116.866417
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        485
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 82,
+            "sell_base": true
+          },
+          "wall_ns": "116866417",
+          "process_cpu_ns": "115956000",
+          "thread_cpu_ns": "115786708",
+          "native_billable_ns": "81810000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 115.956,
+        "p95_ms": 115.956,
+        "min_ms": 115.956,
+        "max_ms": 115.956
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 115.786708,
+        "p95_ms": 115.786708,
+        "min_ms": 115.786708,
+        "max_ms": 115.786708
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 85
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 80.134,
+        "p95_ms": 80.134,
+        "min_ms": 80.134,
+        "max_ms": 80.134
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 141.749125,
+        "p95_ms": 141.749125,
+        "min_ms": 141.749125,
+        "max_ms": 141.749125
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        485
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 85,
+            "sell_base": false
+          },
+          "wall_ns": "141749125",
+          "process_cpu_ns": "141398000",
+          "thread_cpu_ns": "141228833",
+          "native_billable_ns": "80134000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 141.398,
+        "p95_ms": 141.398,
+        "min_ms": 141.398,
+        "max_ms": 141.398
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 141.228833,
+        "p95_ms": 141.228833,
+        "min_ms": 141.228833,
+        "max_ms": 141.228833
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": true,
+        "step": 90
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 81.483,
+        "p95_ms": 81.483,
+        "min_ms": 81.483,
+        "max_ms": 81.483
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 119.156917,
+        "p95_ms": 119.156917,
+        "min_ms": 119.156917,
+        "max_ms": 119.156917
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        485
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 90,
+            "sell_base": true
+          },
+          "wall_ns": "119156917",
+          "process_cpu_ns": "117441000",
+          "thread_cpu_ns": "117247792",
+          "native_billable_ns": "81483000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 117.441,
+        "p95_ms": 117.441,
+        "min_ms": 117.441,
+        "max_ms": 117.441
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 117.247792,
+        "p95_ms": 117.247792,
+        "min_ms": 117.247792,
+        "max_ms": 117.247792
+      }
+    },
+    {
+      "scenario": "stop_seeded_state_trade",
+      "axes": {
+        "sell_base": false,
+        "step": 93
+      },
+      "sampling": "single_native_actions",
+      "native_billable_time": {
+        "samples": 1,
+        "median_ms": 83.871,
+        "p95_ms": 83.871,
+        "min_ms": 83.871,
+        "max_ms": 83.871
+      },
+      "tester_wall_time": {
+        "samples": 1,
+        "median_ms": 117.741292,
+        "p95_ms": 117.741292,
+        "min_ms": 117.741292,
+        "max_ms": 117.741292
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        485
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "seed": "0x202611215eed",
+            "step": 93,
+            "sell_base": false
+          },
+          "wall_ns": "117741292",
+          "process_cpu_ns": "116721000",
+          "thread_cpu_ns": "116565875",
+          "native_billable_ns": "83871000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 1,
+        "median_ms": 116.721,
+        "p95_ms": 116.721,
+        "min_ms": 116.721,
+        "max_ms": 116.721
+      },
+      "thread_cpu_time": {
+        "samples": 1,
+        "median_ms": 116.565875,
+        "p95_ms": 116.565875,
+        "min_ms": 116.565875,
+        "max_ms": 116.565875
+      }
+    },
+    {
+      "scenario": "maximal_mixed_64_stops_64_loans_128_prices_process",
+      "axes": {
+        "books": 128,
+        "entry": "process",
+        "loans": 64,
+        "seed_atoms": 0,
+        "stops": 64
+      },
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 12,
+        "median_ms": 425.61,
+        "p95_ms": 517.228,
+        "min_ms": 404.475,
+        "max_ms": 517.228
+      },
+      "tester_wall_time": {
+        "samples": 12,
+        "median_ms": 554.2648955,
+        "p95_ms": 677.814917,
+        "min_ms": 514.9055,
+        "max_ms": 677.814917
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        5287
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "528753709",
+          "process_cpu_ns": "523255000",
+          "thread_cpu_ns": "523052625",
+          "native_billable_ns": "414229000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "573928750",
+          "process_cpu_ns": "552073000",
+          "thread_cpu_ns": "551908875",
+          "native_billable_ns": "422162000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "677814917",
+          "process_cpu_ns": "615183000",
+          "thread_cpu_ns": "614952291",
+          "native_billable_ns": "517228000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "519210250",
+          "process_cpu_ns": "517102000",
+          "thread_cpu_ns": "516922375",
+          "native_billable_ns": "405616000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "514905500",
+          "process_cpu_ns": "513777000",
+          "thread_cpu_ns": "513623417",
+          "native_billable_ns": "404475000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "550377541",
+          "process_cpu_ns": "536298000",
+          "thread_cpu_ns": "536094375",
+          "native_billable_ns": "423972000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "578031500",
+          "process_cpu_ns": "565078000",
+          "thread_cpu_ns": "564851750",
+          "native_billable_ns": "457238000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "619894167",
+          "process_cpu_ns": "588359000",
+          "thread_cpu_ns": "588124333",
+          "native_billable_ns": "474100000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 8,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "601996750",
+          "process_cpu_ns": "572667000",
+          "thread_cpu_ns": "572472292",
+          "native_billable_ns": "470927000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 9,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "525495833",
+          "process_cpu_ns": "522252000",
+          "thread_cpu_ns": "522076917",
+          "native_billable_ns": "412208000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 10,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "558152250",
+          "process_cpu_ns": "553527000",
+          "thread_cpu_ns": "553335042",
+          "native_billable_ns": "436837000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 11,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 0,
+            "entry": "process"
+          },
+          "wall_ns": "540053291",
+          "process_cpu_ns": "538148000",
+          "thread_cpu_ns": "537947083",
+          "native_billable_ns": "427248000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 12,
+        "median_ms": 545.1105,
+        "p95_ms": 615.183,
+        "min_ms": 513.777,
+        "max_ms": 615.183
+      },
+      "thread_cpu_time": {
+        "samples": 12,
+        "median_ms": 544.927979,
+        "p95_ms": 614.952291,
+        "min_ms": 513.623417,
+        "max_ms": 614.952291
+      },
+      "deterministic_work_steps": [
+        18880
+      ]
+    },
+    {
+      "scenario": "maximal_mixed_64_stops_64_loans_128_prices_one_atom_seed",
+      "axes": {
+        "books": 128,
+        "entry": "trade",
+        "loans": 64,
+        "seed_atoms": 1,
+        "stops": 64
+      },
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 12,
+        "median_ms": 458.918,
+        "p95_ms": 529.052,
+        "min_ms": 437.036,
+        "max_ms": 529.052
+      },
+      "tester_wall_time": {
+        "samples": 12,
+        "median_ms": 580.053146,
+        "p95_ms": 688.762333,
+        "min_ms": 554.20425,
+        "max_ms": 688.762333
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        5592
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "571166125",
+          "process_cpu_ns": "566187000",
+          "thread_cpu_ns": "565990458",
+          "native_billable_ns": "450645000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "573485417",
+          "process_cpu_ns": "568451000",
+          "thread_cpu_ns": "568282708",
+          "native_billable_ns": "452854000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "564766125",
+          "process_cpu_ns": "562016000",
+          "thread_cpu_ns": "561833584",
+          "native_billable_ns": "447920000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "570377417",
+          "process_cpu_ns": "566943000",
+          "thread_cpu_ns": "566775875",
+          "native_billable_ns": "454009000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "557984375",
+          "process_cpu_ns": "556606000",
+          "thread_cpu_ns": "556455750",
+          "native_billable_ns": "441417000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "554204250",
+          "process_cpu_ns": "553252000",
+          "thread_cpu_ns": "553087416",
+          "native_billable_ns": "437036000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "688762333",
+          "process_cpu_ns": "642425000",
+          "thread_cpu_ns": "642222417",
+          "native_billable_ns": "527605000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "678555583",
+          "process_cpu_ns": "643147000",
+          "thread_cpu_ns": "642943334",
+          "native_billable_ns": "529052000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 8,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "625522750",
+          "process_cpu_ns": "604173000",
+          "thread_cpu_ns": "603985334",
+          "native_billable_ns": "505592000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 9,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "586620875",
+          "process_cpu_ns": "576982000",
+          "thread_cpu_ns": "576813792",
+          "native_billable_ns": "465898000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 10,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "595118459",
+          "process_cpu_ns": "593223000",
+          "thread_cpu_ns": "593054833",
+          "native_billable_ns": "463827000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 11,
+            "seed": 7004,
+            "stops": 64,
+            "loans": 64,
+            "books": 128,
+            "seed_atoms": 1,
+            "entry": "trade"
+          },
+          "wall_ns": "612194875",
+          "process_cpu_ns": "596523000",
+          "thread_cpu_ns": "596329083",
+          "native_billable_ns": "470638000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 12,
+        "median_ms": 572.7165,
+        "p95_ms": 643.147,
+        "min_ms": 553.252,
+        "max_ms": 643.147
+      },
+      "thread_cpu_time": {
+        "samples": 12,
+        "median_ms": 572.54825,
+        "p95_ms": 642.943334,
+        "min_ms": 553.087416,
+        "max_ms": 642.943334
+      },
+      "deterministic_work_steps": [
+        18893
+      ]
+    },
+    {
+      "scenario": "same_price_stop_owners_interleaved",
+      "axes": {
+        "input_total": 25600,
+        "owners": 1,
+        "seed_input": 10000,
+        "trigger": 99
+      },
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 64,
+        "median_ms": 82.62299999999999,
+        "p95_ms": 87.749,
+        "min_ms": 81.469,
+        "max_ms": 111.95
+      },
+      "tester_wall_time": {
+        "samples": 64,
+        "median_ms": 143.503,
+        "p95_ms": 153.251083,
+        "min_ms": 141.232834,
+        "max_ms": 177.338875
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        534
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "145755750",
+          "process_cpu_ns": "144679000",
+          "thread_cpu_ns": "144504875",
+          "native_billable_ns": "84852000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "147837667",
+          "process_cpu_ns": "146288000",
+          "thread_cpu_ns": "146113291",
+          "native_billable_ns": "85140000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "144290917",
+          "process_cpu_ns": "144040000",
+          "thread_cpu_ns": "143883750",
+          "native_billable_ns": "83685000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "146168625",
+          "process_cpu_ns": "145238000",
+          "thread_cpu_ns": "145070125",
+          "native_billable_ns": "85154000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "143559959",
+          "process_cpu_ns": "143547000",
+          "thread_cpu_ns": "143418333",
+          "native_billable_ns": "82627000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "141980708",
+          "process_cpu_ns": "141963000",
+          "thread_cpu_ns": "141825666",
+          "native_billable_ns": "81519000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "141948333",
+          "process_cpu_ns": "141993000",
+          "thread_cpu_ns": "141844375",
+          "native_billable_ns": "81937000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "144432625",
+          "process_cpu_ns": "144265000",
+          "thread_cpu_ns": "144113750",
+          "native_billable_ns": "82635000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 8,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "144103875",
+          "process_cpu_ns": "144034000",
+          "thread_cpu_ns": "143895709",
+          "native_billable_ns": "83010000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 9,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "143780333",
+          "process_cpu_ns": "143835000",
+          "thread_cpu_ns": "143675375",
+          "native_billable_ns": "82619000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 10,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "151955208",
+          "process_cpu_ns": "149502000",
+          "thread_cpu_ns": "149298000",
+          "native_billable_ns": "86355000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 11,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "148727917",
+          "process_cpu_ns": "147242000",
+          "thread_cpu_ns": "147081750",
+          "native_billable_ns": "87749000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 12,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "153251083",
+          "process_cpu_ns": "150316000",
+          "thread_cpu_ns": "150112375",
+          "native_billable_ns": "83759000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 13,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "141895000",
+          "process_cpu_ns": "141900000",
+          "thread_cpu_ns": "141743375",
+          "native_billable_ns": "81469000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 14,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "141827042",
+          "process_cpu_ns": "141844000",
+          "thread_cpu_ns": "141699583",
+          "native_billable_ns": "81522000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 15,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "145504250",
+          "process_cpu_ns": "145224000",
+          "thread_cpu_ns": "145066625",
+          "native_billable_ns": "84226000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 16,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "143730583",
+          "process_cpu_ns": "143850000",
+          "thread_cpu_ns": "143578250",
+          "native_billable_ns": "83005000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 17,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "143477041",
+          "process_cpu_ns": "143315000",
+          "thread_cpu_ns": "143161208",
+          "native_billable_ns": "83386000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 18,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "143695292",
+          "process_cpu_ns": "143273000",
+          "thread_cpu_ns": "143131000",
+          "native_billable_ns": "83900000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 19,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "141794333",
+          "process_cpu_ns": "141834000",
+          "thread_cpu_ns": "141684250",
+          "native_billable_ns": "81964000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 20,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "141631916",
+          "process_cpu_ns": "141624000",
+          "thread_cpu_ns": "141484250",
+          "native_billable_ns": "81748000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 21,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "141926333",
+          "process_cpu_ns": "141957000",
+          "thread_cpu_ns": "141818667",
+          "native_billable_ns": "82006000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 22,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "143307625",
+          "process_cpu_ns": "143324000",
+          "thread_cpu_ns": "143184125",
+          "native_billable_ns": "82688000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 23,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "144499083",
+          "process_cpu_ns": "144221000",
+          "thread_cpu_ns": "144082625",
+          "native_billable_ns": "84052000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 24,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "142084708",
+          "process_cpu_ns": "142117000",
+          "thread_cpu_ns": "141973792",
+          "native_billable_ns": "82031000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 25,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "142444833",
+          "process_cpu_ns": "142483000",
+          "thread_cpu_ns": "142330208",
+          "native_billable_ns": "81954000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 26,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "155384291",
+          "process_cpu_ns": "151352000",
+          "thread_cpu_ns": "151175125",
+          "native_billable_ns": "92164000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 27,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "144035625",
+          "process_cpu_ns": "144016000",
+          "thread_cpu_ns": "143879083",
+          "native_billable_ns": "83289000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 28,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "144257375",
+          "process_cpu_ns": "144198000",
+          "thread_cpu_ns": "144052541",
+          "native_billable_ns": "83282000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 29,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "143528959",
+          "process_cpu_ns": "143507000",
+          "thread_cpu_ns": "143341125",
+          "native_billable_ns": "82601000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 30,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "142263458",
+          "process_cpu_ns": "142329000",
+          "thread_cpu_ns": "142186083",
+          "native_billable_ns": "81810000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 31,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "142364042",
+          "process_cpu_ns": "142335000",
+          "thread_cpu_ns": "142197666",
+          "native_billable_ns": "81831000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 32,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "141232834",
+          "process_cpu_ns": "141285000",
+          "thread_cpu_ns": "141142084",
+          "native_billable_ns": "81524000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 33,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "142585542",
+          "process_cpu_ns": "142468000",
+          "thread_cpu_ns": "142334209",
+          "native_billable_ns": "81677000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 34,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "142166375",
+          "process_cpu_ns": "142218000",
+          "thread_cpu_ns": "142065000",
+          "native_billable_ns": "82234000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 35,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "142167083",
+          "process_cpu_ns": "142204000",
+          "thread_cpu_ns": "142054500",
+          "native_billable_ns": "81792000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 36,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "142849875",
+          "process_cpu_ns": "142806000",
+          "thread_cpu_ns": "142662041",
+          "native_billable_ns": "82250000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 37,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "148587041",
+          "process_cpu_ns": "147130000",
+          "thread_cpu_ns": "146978250",
+          "native_billable_ns": "85319000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 38,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "144734417",
+          "process_cpu_ns": "144209000",
+          "thread_cpu_ns": "144053625",
+          "native_billable_ns": "83613000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 39,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "176817750",
+          "process_cpu_ns": "161150000",
+          "thread_cpu_ns": "160956500",
+          "native_billable_ns": "111950000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 40,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "143372917",
+          "process_cpu_ns": "143322000",
+          "thread_cpu_ns": "143171583",
+          "native_billable_ns": "82494000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 41,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "142775000",
+          "process_cpu_ns": "142799000",
+          "thread_cpu_ns": "142649625",
+          "native_billable_ns": "82195000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 42,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "142537667",
+          "process_cpu_ns": "142532000",
+          "thread_cpu_ns": "142381333",
+          "native_billable_ns": "82202000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 43,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "141968000",
+          "process_cpu_ns": "142002000",
+          "thread_cpu_ns": "141857208",
+          "native_billable_ns": "82224000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 44,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "141937875",
+          "process_cpu_ns": "141974000",
+          "thread_cpu_ns": "141824875",
+          "native_billable_ns": "81913000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 45,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "144749834",
+          "process_cpu_ns": "144497000",
+          "thread_cpu_ns": "144340958",
+          "native_billable_ns": "82767000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 46,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "144202334",
+          "process_cpu_ns": "144122000",
+          "thread_cpu_ns": "143988459",
+          "native_billable_ns": "83483000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 47,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "149537792",
+          "process_cpu_ns": "147294000",
+          "thread_cpu_ns": "147134625",
+          "native_billable_ns": "86274000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 48,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "150359125",
+          "process_cpu_ns": "148392000",
+          "thread_cpu_ns": "148214834",
+          "native_billable_ns": "85727000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 49,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "147893375",
+          "process_cpu_ns": "146158000",
+          "thread_cpu_ns": "146005000",
+          "native_billable_ns": "86175000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 50,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "142705334",
+          "process_cpu_ns": "142736000",
+          "thread_cpu_ns": "142589500",
+          "native_billable_ns": "82523000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 51,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "141476250",
+          "process_cpu_ns": "141545000",
+          "thread_cpu_ns": "141398875",
+          "native_billable_ns": "81641000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 52,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "147205542",
+          "process_cpu_ns": "145845000",
+          "thread_cpu_ns": "145678375",
+          "native_billable_ns": "86952000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 53,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "144258500",
+          "process_cpu_ns": "144214000",
+          "thread_cpu_ns": "144071625",
+          "native_billable_ns": "82982000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 54,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "141944292",
+          "process_cpu_ns": "142022000",
+          "thread_cpu_ns": "141863167",
+          "native_billable_ns": "81752000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 55,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "142448375",
+          "process_cpu_ns": "142490000",
+          "thread_cpu_ns": "142344375",
+          "native_billable_ns": "82264000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 56,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "142197834",
+          "process_cpu_ns": "142242000",
+          "thread_cpu_ns": "142112958",
+          "native_billable_ns": "81792000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 57,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "177338875",
+          "process_cpu_ns": "162680000",
+          "thread_cpu_ns": "162485667",
+          "native_billable_ns": "108105000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 58,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 2
+          },
+          "wall_ns": "143906084",
+          "process_cpu_ns": "143852000",
+          "thread_cpu_ns": "143698500",
+          "native_billable_ns": "83068000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 59,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 1
+          },
+          "wall_ns": "142450000",
+          "process_cpu_ns": "142549000",
+          "thread_cpu_ns": "142410333",
+          "native_billable_ns": "81883000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 60,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 0
+          },
+          "wall_ns": "143871834",
+          "process_cpu_ns": "143560000",
+          "thread_cpu_ns": "143411041",
+          "native_billable_ns": "83440000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 61,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 2
+          },
+          "wall_ns": "141627375",
+          "process_cpu_ns": "141667000",
+          "thread_cpu_ns": "141519583",
+          "native_billable_ns": "81851000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 62,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 1
+          },
+          "wall_ns": "141761959",
+          "process_cpu_ns": "141818000",
+          "thread_cpu_ns": "141679167",
+          "native_billable_ns": "81762000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 63,
+            "owners": 1,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 0
+          },
+          "wall_ns": "142060875",
+          "process_cpu_ns": "142098000",
+          "thread_cpu_ns": "141954792",
+          "native_billable_ns": "81500000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 64,
+        "median_ms": 143.323,
+        "p95_ms": 150.316,
+        "min_ms": 141.285,
+        "max_ms": 162.68
+      },
+      "thread_cpu_time": {
+        "samples": 64,
+        "median_ms": 143.177854,
+        "p95_ms": 150.112375,
+        "min_ms": 141.142084,
+        "max_ms": 162.485667
+      },
+      "deterministic_work_steps": [
+        233
+      ]
+    },
+    {
+      "scenario": "same_price_stop_owners_interleaved",
+      "axes": {
+        "input_total": 25600,
+        "owners": 16,
+        "seed_input": 10000,
+        "trigger": 99
+      },
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 64,
+        "median_ms": 82.801,
+        "p95_ms": 90.036,
+        "min_ms": 81.526,
+        "max_ms": 104.701
+      },
+      "tester_wall_time": {
+        "samples": 64,
+        "median_ms": 116.0648955,
+        "p95_ms": 126.8715,
+        "min_ms": 113.789125,
+        "max_ms": 145.551875
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        534
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "114806667",
+          "process_cpu_ns": "114840000",
+          "thread_cpu_ns": "114683500",
+          "native_billable_ns": "82032000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "114097167",
+          "process_cpu_ns": "114183000",
+          "thread_cpu_ns": "114035583",
+          "native_billable_ns": "81604000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "121162917",
+          "process_cpu_ns": "118819000",
+          "thread_cpu_ns": "118645000",
+          "native_billable_ns": "87184000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "115521250",
+          "process_cpu_ns": "115550000",
+          "thread_cpu_ns": "115403125",
+          "native_billable_ns": "82740000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "118064250",
+          "process_cpu_ns": "117026000",
+          "thread_cpu_ns": "116877833",
+          "native_billable_ns": "85069000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "114565167",
+          "process_cpu_ns": "114626000",
+          "thread_cpu_ns": "114486833",
+          "native_billable_ns": "82049000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "114677708",
+          "process_cpu_ns": "114746000",
+          "thread_cpu_ns": "114575417",
+          "native_billable_ns": "82050000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "114237292",
+          "process_cpu_ns": "114322000",
+          "thread_cpu_ns": "114185292",
+          "native_billable_ns": "81851000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 8,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "115326292",
+          "process_cpu_ns": "115387000",
+          "thread_cpu_ns": "115237500",
+          "native_billable_ns": "82548000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 9,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "118811750",
+          "process_cpu_ns": "118217000",
+          "thread_cpu_ns": "118071750",
+          "native_billable_ns": "85812000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 10,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "121226500",
+          "process_cpu_ns": "119708000",
+          "thread_cpu_ns": "119528417",
+          "native_billable_ns": "85405000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 11,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "120364541",
+          "process_cpu_ns": "119279000",
+          "thread_cpu_ns": "119117458",
+          "native_billable_ns": "86943000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 12,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "123513708",
+          "process_cpu_ns": "121382000",
+          "thread_cpu_ns": "121201166",
+          "native_billable_ns": "89444000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 13,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "118860208",
+          "process_cpu_ns": "118749000",
+          "thread_cpu_ns": "118623958",
+          "native_billable_ns": "85674000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 14,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "117784916",
+          "process_cpu_ns": "117243000",
+          "thread_cpu_ns": "117095125",
+          "native_billable_ns": "83828000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 15,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "117422125",
+          "process_cpu_ns": "117052000",
+          "thread_cpu_ns": "116892208",
+          "native_billable_ns": "83668000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 16,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "118029666",
+          "process_cpu_ns": "117457000",
+          "thread_cpu_ns": "117296875",
+          "native_billable_ns": "83061000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 17,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "115682250",
+          "process_cpu_ns": "115632000",
+          "thread_cpu_ns": "115473625",
+          "native_billable_ns": "82561000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 18,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "114877834",
+          "process_cpu_ns": "114895000",
+          "thread_cpu_ns": "114741541",
+          "native_billable_ns": "82472000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 19,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "114364208",
+          "process_cpu_ns": "114444000",
+          "thread_cpu_ns": "114306667",
+          "native_billable_ns": "81674000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 20,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "113789125",
+          "process_cpu_ns": "113839000",
+          "thread_cpu_ns": "113699083",
+          "native_billable_ns": "81526000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 21,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "116680125",
+          "process_cpu_ns": "116735000",
+          "thread_cpu_ns": "116589042",
+          "native_billable_ns": "83420000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 22,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "116967458",
+          "process_cpu_ns": "116581000",
+          "thread_cpu_ns": "116433416",
+          "native_billable_ns": "83803000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 23,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "114156291",
+          "process_cpu_ns": "114211000",
+          "thread_cpu_ns": "114082875",
+          "native_billable_ns": "81634000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 24,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "114935250",
+          "process_cpu_ns": "115010000",
+          "thread_cpu_ns": "114851833",
+          "native_billable_ns": "82552000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 25,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "114877958",
+          "process_cpu_ns": "114935000",
+          "thread_cpu_ns": "114791208",
+          "native_billable_ns": "81920000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 26,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "119539584",
+          "process_cpu_ns": "118703000",
+          "thread_cpu_ns": "118551667",
+          "native_billable_ns": "85755000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 27,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "116160375",
+          "process_cpu_ns": "116152000",
+          "thread_cpu_ns": "116007500",
+          "native_billable_ns": "82863000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 28,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "118104083",
+          "process_cpu_ns": "117163000",
+          "thread_cpu_ns": "116996166",
+          "native_billable_ns": "85128000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 29,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "116729250",
+          "process_cpu_ns": "116712000",
+          "thread_cpu_ns": "116557583",
+          "native_billable_ns": "83437000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 30,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "114445583",
+          "process_cpu_ns": "114526000",
+          "thread_cpu_ns": "114384917",
+          "native_billable_ns": "81897000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 31,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "115039125",
+          "process_cpu_ns": "115099000",
+          "thread_cpu_ns": "114956459",
+          "native_billable_ns": "82332000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 32,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "114138458",
+          "process_cpu_ns": "114215000",
+          "thread_cpu_ns": "114066708",
+          "native_billable_ns": "81641000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 33,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "114388000",
+          "process_cpu_ns": "114430000",
+          "thread_cpu_ns": "114280250",
+          "native_billable_ns": "81928000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 34,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "114495625",
+          "process_cpu_ns": "114570000",
+          "thread_cpu_ns": "114406583",
+          "native_billable_ns": "81941000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 35,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "115585417",
+          "process_cpu_ns": "115203000",
+          "thread_cpu_ns": "115051958",
+          "native_billable_ns": "82116000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 36,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "127361750",
+          "process_cpu_ns": "122055000",
+          "thread_cpu_ns": "121898625",
+          "native_billable_ns": "91080000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 37,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "121933292",
+          "process_cpu_ns": "120102000",
+          "thread_cpu_ns": "119947500",
+          "native_billable_ns": "88828000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 38,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "145551875",
+          "process_cpu_ns": "138218000",
+          "thread_cpu_ns": "137988500",
+          "native_billable_ns": "104701000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 39,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "117906292",
+          "process_cpu_ns": "117792000",
+          "thread_cpu_ns": "117633333",
+          "native_billable_ns": "84863000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 40,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "119044083",
+          "process_cpu_ns": "118450000",
+          "thread_cpu_ns": "118298250",
+          "native_billable_ns": "85724000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 41,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "116346708",
+          "process_cpu_ns": "116235000",
+          "thread_cpu_ns": "116098166",
+          "native_billable_ns": "83106000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 42,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "126871500",
+          "process_cpu_ns": "122324000",
+          "thread_cpu_ns": "122163166",
+          "native_billable_ns": "91665000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 43,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "115249250",
+          "process_cpu_ns": "115281000",
+          "thread_cpu_ns": "115133291",
+          "native_billable_ns": "82668000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 44,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "115343458",
+          "process_cpu_ns": "115403000",
+          "thread_cpu_ns": "115252833",
+          "native_billable_ns": "82421000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 45,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "115626958",
+          "process_cpu_ns": "115680000",
+          "thread_cpu_ns": "115538917",
+          "native_billable_ns": "82762000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 46,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "115969416",
+          "process_cpu_ns": "116038000",
+          "thread_cpu_ns": "115888459",
+          "native_billable_ns": "82677000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 47,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "116913625",
+          "process_cpu_ns": "116588000",
+          "thread_cpu_ns": "116415125",
+          "native_billable_ns": "82840000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 48,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "118720458",
+          "process_cpu_ns": "118109000",
+          "thread_cpu_ns": "117960417",
+          "native_billable_ns": "84350000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 49,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "114970334",
+          "process_cpu_ns": "115038000",
+          "thread_cpu_ns": "114891583",
+          "native_billable_ns": "81983000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 50,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "115397584",
+          "process_cpu_ns": "115432000",
+          "thread_cpu_ns": "115282584",
+          "native_billable_ns": "82602000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 51,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "114133333",
+          "process_cpu_ns": "114189000",
+          "thread_cpu_ns": "114034917",
+          "native_billable_ns": "81679000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 52,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "119870291",
+          "process_cpu_ns": "118806000",
+          "thread_cpu_ns": "118660500",
+          "native_billable_ns": "84906000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 53,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "115741375",
+          "process_cpu_ns": "115796000",
+          "thread_cpu_ns": "115656292",
+          "native_billable_ns": "82714000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 54,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "114440125",
+          "process_cpu_ns": "114516000",
+          "thread_cpu_ns": "114370458",
+          "native_billable_ns": "81861000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 55,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "118658459",
+          "process_cpu_ns": "118140000",
+          "thread_cpu_ns": "117994708",
+          "native_billable_ns": "85478000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 56,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "115568875",
+          "process_cpu_ns": "115532000",
+          "thread_cpu_ns": "115387084",
+          "native_billable_ns": "82420000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 57,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "118093458",
+          "process_cpu_ns": "117700000",
+          "thread_cpu_ns": "117556375",
+          "native_billable_ns": "84539000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 58,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 1
+          },
+          "wall_ns": "121430584",
+          "process_cpu_ns": "119433000",
+          "thread_cpu_ns": "119266584",
+          "native_billable_ns": "87971000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 59,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 0
+          },
+          "wall_ns": "117500625",
+          "process_cpu_ns": "117283000",
+          "thread_cpu_ns": "117125167",
+          "native_billable_ns": "83764000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 60,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 1
+          },
+          "wall_ns": "131660083",
+          "process_cpu_ns": "124842000",
+          "thread_cpu_ns": "124663833",
+          "native_billable_ns": "88574000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 61,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 0
+          },
+          "wall_ns": "122952500",
+          "process_cpu_ns": "120347000",
+          "thread_cpu_ns": "120209500",
+          "native_billable_ns": "90036000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 62,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 2
+          },
+          "wall_ns": "114225291",
+          "process_cpu_ns": "114275000",
+          "thread_cpu_ns": "114132708",
+          "native_billable_ns": "81759000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 63,
+            "owners": 16,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 2
+          },
+          "wall_ns": "113843750",
+          "process_cpu_ns": "113912000",
+          "thread_cpu_ns": "113770167",
+          "native_billable_ns": "81526000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 64,
+        "median_ms": 116.095,
+        "p95_ms": 122.055,
+        "min_ms": 113.839,
+        "max_ms": 138.218
+      },
+      "thread_cpu_time": {
+        "samples": 64,
+        "median_ms": 115.9479795,
+        "p95_ms": 121.898625,
+        "min_ms": 113.699083,
+        "max_ms": 137.9885
+      },
+      "deterministic_work_steps": [
+        233
+      ]
+    },
+    {
+      "scenario": "same_price_stop_owners_interleaved",
+      "axes": {
+        "input_total": 25600,
+        "owners": 128,
+        "seed_input": 10000,
+        "trigger": 99
+      },
+      "sampling": "identical_native_fixture_repeats",
+      "native_billable_time": {
+        "samples": 64,
+        "median_ms": 82.7715,
+        "p95_ms": 87.773,
+        "min_ms": 81.301,
+        "max_ms": 122.603
+      },
+      "tester_wall_time": {
+        "samples": 64,
+        "median_ms": 115.682333,
+        "p95_ms": 129.561291,
+        "min_ms": 113.759834,
+        "max_ms": 171.085
+      },
+      "rejections": 0,
+      "inner_action_counts": [
+        534
+      ],
+      "raw_samples": [
+        {
+          "metadata": {
+            "repeat": 0,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "114539750",
+          "process_cpu_ns": "114652000",
+          "thread_cpu_ns": "114520458",
+          "native_billable_ns": "81813000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 1,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "118098542",
+          "process_cpu_ns": "117233000",
+          "thread_cpu_ns": "117073375",
+          "native_billable_ns": "85148000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 2,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "119709875",
+          "process_cpu_ns": "118028000",
+          "thread_cpu_ns": "117881417",
+          "native_billable_ns": "86566000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 3,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "116859209",
+          "process_cpu_ns": "116343000",
+          "thread_cpu_ns": "116188667",
+          "native_billable_ns": "83855000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 4,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "115586334",
+          "process_cpu_ns": "115667000",
+          "thread_cpu_ns": "115514416",
+          "native_billable_ns": "82678000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 5,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "114384000",
+          "process_cpu_ns": "114451000",
+          "thread_cpu_ns": "114308834",
+          "native_billable_ns": "81883000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 6,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "114039292",
+          "process_cpu_ns": "114083000",
+          "thread_cpu_ns": "113941667",
+          "native_billable_ns": "81573000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 7,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "116310916",
+          "process_cpu_ns": "115884000",
+          "thread_cpu_ns": "115732708",
+          "native_billable_ns": "82770000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 8,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "118208500",
+          "process_cpu_ns": "117596000",
+          "thread_cpu_ns": "117442375",
+          "native_billable_ns": "84780000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 9,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "117026375",
+          "process_cpu_ns": "117105000",
+          "thread_cpu_ns": "116946792",
+          "native_billable_ns": "83974000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 10,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "115253792",
+          "process_cpu_ns": "115347000",
+          "thread_cpu_ns": "115199417",
+          "native_billable_ns": "82462000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 11,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "117617500",
+          "process_cpu_ns": "117365000",
+          "thread_cpu_ns": "117213750",
+          "native_billable_ns": "84420000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 12,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "136232292",
+          "process_cpu_ns": "127019000",
+          "thread_cpu_ns": "126882708",
+          "native_billable_ns": "102473000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 13,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "114555750",
+          "process_cpu_ns": "114630000",
+          "thread_cpu_ns": "114499667",
+          "native_billable_ns": "82041000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 14,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "113994834",
+          "process_cpu_ns": "114047000",
+          "thread_cpu_ns": "113912083",
+          "native_billable_ns": "81301000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 15,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "116047250",
+          "process_cpu_ns": "116080000",
+          "thread_cpu_ns": "115939750",
+          "native_billable_ns": "83136000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 16,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "119557167",
+          "process_cpu_ns": "118710000",
+          "thread_cpu_ns": "118558125",
+          "native_billable_ns": "86040000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 17,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "114164375",
+          "process_cpu_ns": "114232000",
+          "thread_cpu_ns": "114076000",
+          "native_billable_ns": "81794000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 18,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "114288292",
+          "process_cpu_ns": "114337000",
+          "thread_cpu_ns": "114200250",
+          "native_billable_ns": "81811000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 19,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "114719583",
+          "process_cpu_ns": "114788000",
+          "thread_cpu_ns": "114644875",
+          "native_billable_ns": "81963000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 20,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "114018125",
+          "process_cpu_ns": "114072000",
+          "thread_cpu_ns": "113928750",
+          "native_billable_ns": "81753000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 21,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "114993917",
+          "process_cpu_ns": "115027000",
+          "thread_cpu_ns": "114881583",
+          "native_billable_ns": "82186000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 22,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "114388750",
+          "process_cpu_ns": "114442000",
+          "thread_cpu_ns": "114304875",
+          "native_billable_ns": "81819000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 23,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "117631375",
+          "process_cpu_ns": "116882000",
+          "thread_cpu_ns": "116724333",
+          "native_billable_ns": "82773000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 24,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "114327250",
+          "process_cpu_ns": "114400000",
+          "thread_cpu_ns": "114259542",
+          "native_billable_ns": "81736000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 25,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "114766708",
+          "process_cpu_ns": "114833000",
+          "thread_cpu_ns": "114696625",
+          "native_billable_ns": "82218000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 26,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "116912208",
+          "process_cpu_ns": "116419000",
+          "thread_cpu_ns": "116263125",
+          "native_billable_ns": "83630000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 27,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "118909875",
+          "process_cpu_ns": "117454000",
+          "thread_cpu_ns": "117298875",
+          "native_billable_ns": "85849000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 28,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "115289500",
+          "process_cpu_ns": "115295000",
+          "thread_cpu_ns": "115138334",
+          "native_billable_ns": "82366000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 29,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "116815916",
+          "process_cpu_ns": "116496000",
+          "thread_cpu_ns": "116346209",
+          "native_billable_ns": "83982000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 30,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "116545292",
+          "process_cpu_ns": "116223000",
+          "thread_cpu_ns": "116075667",
+          "native_billable_ns": "83675000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 31,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "113759834",
+          "process_cpu_ns": "113837000",
+          "thread_cpu_ns": "113689625",
+          "native_billable_ns": "81335000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 32,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "114436709",
+          "process_cpu_ns": "114507000",
+          "thread_cpu_ns": "114359792",
+          "native_billable_ns": "82062000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 33,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "114471084",
+          "process_cpu_ns": "114526000",
+          "thread_cpu_ns": "114379500",
+          "native_billable_ns": "81910000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 34,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "114499916",
+          "process_cpu_ns": "114564000",
+          "thread_cpu_ns": "114419833",
+          "native_billable_ns": "81910000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 35,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "115648541",
+          "process_cpu_ns": "115670000",
+          "thread_cpu_ns": "115510542",
+          "native_billable_ns": "82788000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 36,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "117962334",
+          "process_cpu_ns": "117078000",
+          "thread_cpu_ns": "116931291",
+          "native_billable_ns": "84690000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 37,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "171085000",
+          "process_cpu_ns": "138609000",
+          "thread_cpu_ns": "138424333",
+          "native_billable_ns": "122603000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 38,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "116458084",
+          "process_cpu_ns": "116333000",
+          "thread_cpu_ns": "116203375",
+          "native_billable_ns": "83321000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 39,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "115971625",
+          "process_cpu_ns": "116044000",
+          "thread_cpu_ns": "115918333",
+          "native_billable_ns": "82957000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 40,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "118520958",
+          "process_cpu_ns": "118380000",
+          "thread_cpu_ns": "118232083",
+          "native_billable_ns": "84259000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 41,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "115040333",
+          "process_cpu_ns": "115100000",
+          "thread_cpu_ns": "114958625",
+          "native_billable_ns": "82189000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 42,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "114989458",
+          "process_cpu_ns": "115027000",
+          "thread_cpu_ns": "114884541",
+          "native_billable_ns": "82320000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 43,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "115356208",
+          "process_cpu_ns": "115391000",
+          "thread_cpu_ns": "115237458",
+          "native_billable_ns": "82564000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 44,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "114532292",
+          "process_cpu_ns": "114555000",
+          "thread_cpu_ns": "114413667",
+          "native_billable_ns": "81927000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 45,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "116505417",
+          "process_cpu_ns": "116524000",
+          "thread_cpu_ns": "116378625",
+          "native_billable_ns": "83652000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 46,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "114432750",
+          "process_cpu_ns": "114528000",
+          "thread_cpu_ns": "114383917",
+          "native_billable_ns": "81980000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 47,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "121806875",
+          "process_cpu_ns": "120048000",
+          "thread_cpu_ns": "119872417",
+          "native_billable_ns": "86877000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 48,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "118300750",
+          "process_cpu_ns": "117765000",
+          "thread_cpu_ns": "117618916",
+          "native_billable_ns": "85465000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 49,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "115553541",
+          "process_cpu_ns": "115561000",
+          "thread_cpu_ns": "115409125",
+          "native_billable_ns": "82822000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 50,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "115540708",
+          "process_cpu_ns": "115537000",
+          "thread_cpu_ns": "115389167",
+          "native_billable_ns": "82724000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 51,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "114698792",
+          "process_cpu_ns": "114753000",
+          "thread_cpu_ns": "114610958",
+          "native_billable_ns": "82115000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 52,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "113927375",
+          "process_cpu_ns": "113999000",
+          "thread_cpu_ns": "113854375",
+          "native_billable_ns": "81469000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 53,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "116395417",
+          "process_cpu_ns": "116352000",
+          "thread_cpu_ns": "116203584",
+          "native_billable_ns": "83160000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 54,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "121671541",
+          "process_cpu_ns": "118940000",
+          "thread_cpu_ns": "118767041",
+          "native_billable_ns": "84538000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 55,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "116255417",
+          "process_cpu_ns": "116129000",
+          "thread_cpu_ns": "115984416",
+          "native_billable_ns": "83562000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 56,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "115912083",
+          "process_cpu_ns": "115665000",
+          "thread_cpu_ns": "115521792",
+          "native_billable_ns": "82385000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 57,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "129561291",
+          "process_cpu_ns": "124873000",
+          "thread_cpu_ns": "124677542",
+          "native_billable_ns": "87773000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 58,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 4,
+            "order_slot": 0
+          },
+          "wall_ns": "124033958",
+          "process_cpu_ns": "120277000",
+          "thread_cpu_ns": "120109417",
+          "native_billable_ns": "83492000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 59,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 5,
+            "order_slot": 2
+          },
+          "wall_ns": "117256084",
+          "process_cpu_ns": "117065000",
+          "thread_cpu_ns": "116898000",
+          "native_billable_ns": "83453000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 60,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 0,
+            "order_slot": 2
+          },
+          "wall_ns": "163901250",
+          "process_cpu_ns": "140527000",
+          "thread_cpu_ns": "140323084",
+          "native_billable_ns": "114466000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 61,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 1,
+            "order_slot": 1
+          },
+          "wall_ns": "114579000",
+          "process_cpu_ns": "114674000",
+          "thread_cpu_ns": "114531459",
+          "native_billable_ns": "81912000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 62,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 2,
+            "order_slot": 0
+          },
+          "wall_ns": "115716125",
+          "process_cpu_ns": "115629000",
+          "thread_cpu_ns": "115475292",
+          "native_billable_ns": "82905000",
+          "rejected": false
+        },
+        {
+          "metadata": {
+            "repeat": 63,
+            "owners": 128,
+            "input_total": 25600,
+            "seed": 7002,
+            "seed_input": 10000,
+            "trigger": 99,
+            "permutation": 3,
+            "order_slot": 1
+          },
+          "wall_ns": "114336458",
+          "process_cpu_ns": "114370000",
+          "thread_cpu_ns": "114233417",
+          "native_billable_ns": "81850000",
+          "rejected": false
+        }
+      ],
+      "process_cpu_time": {
+        "samples": 64,
+        "median_ms": 115.666,
+        "p95_ms": 124.873,
+        "min_ms": 113.837,
+        "max_ms": 140.527
+      },
+      "thread_cpu_time": {
+        "samples": 64,
+        "median_ms": 115.512479,
+        "p95_ms": 124.677542,
+        "min_ms": 113.689625,
+        "max_ms": 140.323084
+      },
+      "deterministic_work_steps": [
+        233
+      ]
+    }
+  ]
+}

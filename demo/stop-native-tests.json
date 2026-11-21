@@ -1,0 +1,64 @@
+{
+  "suite": "Full Exchange WASM suite, including native chain fixtures",
+  "result": {
+    "passed": 53,
+    "failed": 0,
+    "ignored": 5,
+    "suite_wall_seconds": 943.28
+  },
+  "native_chain_fixture_count": 27,
+  "native_chain_fixtures": [
+    "tests::cascade_checkpoints_and_both_directions",
+    "tests::exactly_funded_marketable_limits_rest_without_second_debit",
+    "tests::hybrid_rounding_topups_and_native_rollback",
+    "tests::independent_books_same_assets_cannot_capture_each_other",
+    "tests::mutable_token_admin_blocks_margin",
+    "tests::native_custody_revoke_and_actor_isolation",
+    "tests::pooled_liquidation_preserves_borrower_rows",
+    "tests::private_http_snapshot_rejects_unauthenticated_queries",
+    "tests::recalled_old_spot_book_cannot_drain_new_guaranteed_market",
+    "tests::recent_trade_feed_is_native_paginated_and_excludes_rejected_actions",
+    "tests::recipient_auto_debit_independent_and_read_only_snapshot",
+    "tests::stop_api_tests::stop_private_pages_and_point_reads_are_authenticated_owner_only",
+    "tests::stop_benchmark_tests::deterministic_fixture_forks_and_native_baseline_time",
+    "tests::stop_benchmark_tests::deterministic_full_capacity_stop_margin_book_timing_and_progress",
+    "tests::stop_benchmark_tests::deterministic_stop_transaction_time_is_independent_of_owner_count",
+    "tests::stop_security_tests::exhausted_native_maker_retirement_keeps_late_join_claims_and_never_reactivates",
+    "tests::stop_security_tests::stop_book_caps_apply_to_all_writers_and_cancellation_is_an_escape",
+    "tests::stop_security_tests::stop_lp_resize_can_move_trigger_beyond_max_without_freezing_market",
+    "tests::stop_security_tests::stop_margin_first_invalid_limit_and_minout_use_causal_fallback",
+    "tests::stop_security_tests::stop_maximum_principal_caps_output_and_refunds_without_overflow",
+    "tests::stop_security_tests::stop_minimum_atom_triggers_sixty_four_prices_without_hanging",
+    "tests::stop_security_tests::stop_opposed_maturity_calls_latch_both_directions_and_finish",
+    "tests::stop_security_tests::stop_owner_coalescing_cancellation_and_generation_replay",
+    "tests::stop_security_tests::stop_pooled_claims_are_exact_and_replay_cannot_drain_other_books",
+    "tests::stop_security_tests::stop_reversal_refunds_marketable_limit_remainder_without_posting_or_recursing",
+    "tests::stop_security_tests::stop_seeded_native_state_sequence_preserves_cash_and_trade_progress",
+    "tests::unsafe_liquidity_and_lender_withdrawals_rejected"
+  ],
+  "log": "demo/stop-final-native-tests.log",
+  "log_sha256": "fd733ce1e6d305d8c05ee1890914566760c7ad97ede8686e6c917d00cc875db9",
+  "source_provenance": "demo/stop-native-source.json",
+  "ignored_scope": "Five expected-panic arithmetic/admission/minimum-output cases omitted by the WASM harness are covered by the actual Rust host harness.",
+  "measurement_scope": "Suite wall time is setup plus verification, not transaction CPU. Per-transaction distributions are in stop-native-benchmarks.json.",
+  "additional_suite": {
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "suite_wall_seconds": 271.45,
+    "log": "demo/stop-additional-native-tests.log",
+    "log_sha256": "0628b750eabc197444d2cf14dca71e12cbfbd0314ddd423b9ce5323a10136af4",
+    "source_provenance": "demo/stop-additional-native-source.json",
+    "native_chain_fixtures": [
+      "tests::stop_benchmark_tests::deterministic_additional_stop_maximal_mixed_maturity_distribution",
+      "tests::stop_benchmark_tests::deterministic_additional_stop_owners_interleaved_distribution"
+    ],
+    "scope": "Two additional deterministic benchmark fixtures: 192 interleaved owner samples and 24 maximal two-sided maturity cascades; all samples audit native cash and exact outcomes."
+  },
+  "source_change_between_suites": [
+    "packages/user/Exchange/service/src/stop_benchmark_tests.rs"
+  ],
+  "production_sources_identical_between_suites": true,
+  "unique_passed_tests": 55,
+  "unique_native_chain_fixtures": 29
+}

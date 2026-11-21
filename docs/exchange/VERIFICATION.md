@@ -1,7 +1,13 @@
-# Verification results
+# Historical verification records
 
-Verified current upstream baseline `db601e572` with the local native exchange
-implementation. The frozen exchange package used for the chain and tests has
+For the current implemented stop auction, native test/CPU evidence and deployed
+financial artifacts, read [STOP_VALIDATION.md](STOP_VALIDATION.md). This file
+preserves earlier spot/credit and native-host follow-up records. Their counts,
+balances, package hashes and timings apply to those historical artifacts, not
+a claim about the latest running stop-capable package.
+
+The earlier spot/credit verification used upstream baseline `db601e572` with
+the local native exchange implementation. That historical frozen package had
 SHA-256:
 
 ```
@@ -141,5 +147,9 @@ SVGs are skipped. Request timings are elapsed times, not transaction CPU.
 `polling-cpu-observation.json` is explicitly a rough process-CPU observation
 with continuing bot/UI/background traffic, not an isolated capacity benchmark.
 
-The [stop cascade analysis](CASCADE_AUCTION.md) and
-[stop-order design](STOP_LOSSES.md) are proposals, not deployed stop actions.
+The stop auction is now implemented in consensus source and its tested
+financial/query WASMs have been deployed. [CASCADE_AUCTION.md](CASCADE_AUCTION.md)
+and [STOP_LOSSES.md](STOP_LOSSES.md) document that implementation; the augmented
+threshold tree remains a separate proposal. Current native validation,
+per-transaction CPU distributions and final live-QA status are recorded in
+[STOP_VALIDATION.md](STOP_VALIDATION.md) and its linked artifact records.

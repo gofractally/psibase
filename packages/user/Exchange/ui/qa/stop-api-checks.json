@@ -1,0 +1,54 @@
+[
+  {
+    "check": "anonymous point",
+    "status": 403
+  },
+  {
+    "check": "wrong requested owner",
+    "status": 403
+  },
+  {
+    "check": "other owner point is null",
+    "status": 200
+  },
+  {
+    "check": "own point",
+    "status": 200
+  },
+  {
+    "check": "own descending page",
+    "status": 200
+  },
+  {
+    "check": "blank point",
+    "status": 400
+  },
+  {
+    "check": "boolean point",
+    "status": 400
+  },
+  {
+    "check": "blank cursor",
+    "status": 400
+  },
+  {
+    "check": "oversized page",
+    "status": 400
+  },
+  {
+    "check": "bridge blank cursor",
+    "status": 400
+  },
+  {
+    "check": "bridge blank point",
+    "status": 400
+  },
+  {
+    "check": "bridge unknown wallet",
+    "status": 400
+  },
+  {
+    "check": "bridge Bob point",
+    "status": 200
+  }
+]

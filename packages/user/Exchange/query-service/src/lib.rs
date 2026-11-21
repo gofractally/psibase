@@ -46,6 +46,30 @@ pub mod service {
             .unwrap_or((&request.target, ""));
         if request.method == "GET" {
             match path {
+                "/stop" | "/api/stop" | "/stops" | "/api/stops" => {
+                    let Some(owner) = user else {
+                        return reply(403,"{\"error\":\"authenticated native user required\"}".into(),true);
+                    };
+                    if parameter(query,"owner").or_else(||parameter(query,"account"))
+                        .map(|requested|requested!=owner.to_string()).unwrap_or(false) {
+                        return reply(403,"{\"error\":\"stop position owner authority\"}".into(),true);
+                    }
+                    if path=="/stop" || path=="/api/stop" {
+                        let Some(generation) = parameter(query,"generation").and_then(decimal::<u64>) else {
+                            return reply(400,"{\"error\":\"invalid stop generation\"}".into(),true);
+                        };
+                        return reply(200,exchange::snapshot::read_stop(owner,generation),true);
+                    }
+                    let limit = decimal::<u32>(parameter(query,"limit").unwrap_or("100"));
+                    let before = parameter(query,"before").map(decimal::<u64>);
+                    let Some(limit) = limit else {
+                        return reply(400,"{\"error\":\"invalid stop page\"}".into(),true);
+                    };
+                    if !(1..=200).contains(&limit) || before==Some(None) {
+                        return reply(400,"{\"error\":\"invalid stop page\"}".into(),true);
+                    }
+                    return reply(200,exchange::snapshot::read_stops(owner,before.flatten(),limit),true);
+                }
                 "/snapshot" | "/api/state" => {
                     let Some(owner) = user else {
                         return reply(

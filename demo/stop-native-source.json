@@ -1,0 +1,38 @@
+{
+  "base_commit": "a33ff0f314275bdc9b44317208cc3744af820001",
+  "workspace_manifest": "committed HEAD (concurrent work excluded)",
+  "source_sha256": {
+    "packages/user/Exchange/service/src/lib.rs": "6a04dc276d3cb1fcc30043838151210d5197276f0b7855b97219363dbac21f22",
+    "packages/user/Exchange/service/src/math.rs": "7dff67eac91a23e4911e56495a51fd3c8b10038ccc9ed26fa452ef29c809bcce",
+    "packages/user/Exchange/service/src/snapshot.rs": "532616f85c6ccf2ed72047881202923fcf515158ea4021708599f73c130029e5",
+    "packages/user/Exchange/service/src/stop_api_tests.rs": "cbe50eba65d4b7d4caa945432c694e54c733eb4229381a8c25f1f4f32329ecb1",
+    "packages/user/Exchange/service/src/stop_benchmark_tests.rs": "44800d1e3f58d750fe64e581bf337d49ca9e562b7074a4ccb782920a8bfc4f80",
+    "packages/user/Exchange/service/src/stop_fuzz_tests.rs": "e24db7539f35d43329acd96fbda9f817227259eb0ad01bd45ba1ffe36218a3cc",
+    "packages/user/Exchange/service/src/stop_math_tests.rs": "9895215d9b0fe0f661894cfba6535702fc5306a57b5cb5cedc8cc9c57d9ae768",
+    "packages/user/Exchange/service/src/stop_security_tests.rs": "8487b3800cc0ca7d89a144ac5c43c7d205ae2a159028bf1c918fd7484257da83",
+    "packages/user/Exchange/service/src/stops.rs": "a8f2377891605590f38957bebd0e76f2918fb7d7f226a604167e8d56b02dfb58",
+    "packages/user/Exchange/service/src/tables.rs": "a2df5dcefd3a2fc5c3cb3792ec710f03600f7fa9cc692f697181d8917e8a3cc0",
+    "packages/user/Exchange/service/src/test_metrics.rs": "c85ce110ded1162d23615a262e9cd1e6ed91331c227de243fbddbc47ac814820",
+    "packages/user/Exchange/service/src/tests.rs": "8a9009c257a90bc5ed5b9a8697fb82888d943bf4f460ac4b923a151799fdf7ae",
+    "packages/user/Exchange/service/src/trades.rs": "835bad6258e9e38faed57d0a90f936a131c3e1fd2a5394a3028cf505294141ad",
+    "packages/user/Exchange/query-service/src/lib.rs": "3ddf3b1d281f7b69501e8fb7da4090d1de697ec0e16d81d2778ee6351e95f16e",
+    "rust/psibase/src/tester.rs": "0308a07d33f318f8705adf714549e719b0d56cf5b06e75244c3752383550b8d6",
+    "programs/psitest/main.cpp": "78fdc8b9bdc0424bdfa37b68564778779a9473d58ea15f8634e1bf3677a87ded",
+    "rust/cargo-psibase/src/main.rs": "df6c77bcbc631c69947302f14ee489650bf11081f7d74fde5b0e5f67029cc8cb"
+  },
+  "test_runner": {
+    "executable": "/Users/dlarimer/psibase-exchange/build/psitest",
+    "sha256": "ee94376b8f9af0a2aac148f5569e9651b9d63b60ca1e831efe21291eef535bce",
+    "source": "programs/psitest/main.cpp",
+    "cpu_clock_ids_required": [
+      2,
+      3
+    ],
+    "note": "Source and executable hashes are recorded separately; rebuild psitest before CPU measurements. Metrics fail if either CPU clock is unavailable."
+  },
+  "packager": {
+    "executable": "/Users/dlarimer/psibase-exchange/rust/target/release/cargo-psibase",
+    "sha256": "5e5823acc26bf9ebcd3ba168039f205806d9ba4e7d08a58e0a44b00ce8e35d81",
+    "source": "rust/cargo-psibase/src/main.rs"
+  }
+}

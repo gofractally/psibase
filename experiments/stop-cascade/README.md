@@ -2,7 +2,9 @@
 
 This is a **design proposal experiment**, not production exchange code or a
 deployed-contract test. It does not access the chain, native database, or network.
-The implemented exchange does not yet provide these stop-auction semantics.
+The exchange now implements a bounded atomic stop auction, documented in
+[CASCADE_AUCTION.md](../../docs/exchange/CASCADE_AUCTION.md). This experiment's
+augmented threshold tree is not used by that implementation.
 
 Run with Python 3.10 or later; no dependencies are required:
 
@@ -76,12 +78,14 @@ at different prices. The two-number certificate does **not** make that update
 logarithmic: rebuild in O(n), bound admission, or prove a richer representation.
 
 The test's lot counterexample is a warning about applying the monotone premise
-to the existing router. With product `10^10`, reserves `(10,000,1,000,000)`, a
+to the legacy no-stop router. With product `10^10`, reserves `(10,000,1,000,000)`, a
 funded bid at tick 100, and a 100-atom input lot, selling 99 atoms skips that bid
 and moves the relay down. Selling 100 instead fills the bid and leaves the relay
 unchanged. The larger input has a higher final relay price. This is a standalone
-math model of the branch, not a live-chain regression. An auction needs a proved
-lot/dust policy before treating arbitrary atom inputs as a monotone curve.
+math model of the branch, not a live-chain regression. The implemented stop-aware
+engine separately respects strict lot boundaries and returns unspent input.
+This experiment does not establish that its mixed margin/stop paths reduce to
+one monotone scalar curve suitable for the proposed tree.
 
 Discovery is not execution. To avoid O(k) writes for k activated stop levels, a
 future design must freeze the prefix under a common auction generation, retain

@@ -173,4 +173,61 @@ pub mod tables {
             (self.market, self.token)
         }
     }
+    #[table(name = "StopPoolTable", index = 11)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+    pub struct StopPool {
+        #[primary_key]
+        pub id: u64,
+        pub market: u64,
+        pub sell_base: bool,
+        pub trigger: u64,
+        /// Armed principal; zero after closure, whose claims live in batch.
+        pub input: u64,
+        pub shares: u64,
+        pub batch: Option<u64>,
+    }
+    #[table(name = "StopBookTable", index = 12)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+    pub struct StopBook {
+        pub market: u64,
+        pub sell_base: bool,
+        pub priority: u64,
+        pub generation: u64,
+    }
+    impl StopBook {
+        #[primary_key]
+        pub fn pk(&self) -> (u64, bool, u64) {
+            (self.market, self.sell_base, self.priority)
+        }
+    }
+    #[table(name = "StopPositionTable", index = 13)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+    pub struct StopPosition {
+        pub owner: AccountNumber,
+        pub generation: u64,
+        pub shares: u64,
+    }
+    impl StopPosition {
+        #[primary_key]
+        pub fn pk(&self) -> (AccountNumber, u64) {
+            (self.owner, self.generation)
+        }
+    }
+    #[table(name = "StopBatchTable", index = 14)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+    pub struct StopBatch {
+        #[primary_key]
+        pub id: u64,
+        pub market: u64,
+        pub sell_base: bool,
+        pub input_total: u64,
+        pub input_used: u64,
+        pub output_total: u64,
+        pub refund_total: u64,
+        pub refund_remaining: u64,
+        pub output_remaining: u64,
+        pub shares_remaining: u64,
+        pub margin_first: bool,
+        pub work_steps: u64,
+    }
 }

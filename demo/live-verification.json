@@ -1,7 +1,7 @@
 {
   "market_count": 2,
-  "known_active_loan_position_count": 0,
+  "known_active_loan_position_count": 1,
   "known_wallet_count": 4,
-  "verified_public_health_and_owner_checks": 12,
+  "verified_public_health_and_owner_checks": 17,
   "scope": "Public market backing and authenticated own views; complete ledger/risk audit is in native tests"
 }

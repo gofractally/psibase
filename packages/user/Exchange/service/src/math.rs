@@ -72,6 +72,12 @@ pub fn trigger(k: u128, long: bool, p: u64, l: u64, t: u64) -> u64 {
 pub fn book_trigger(k: u128, long: bool, p: u64, l: u64, t: u64) -> u64 {
     book_trigger_raw(k, long, p, l, t).min(MAX)
 }
+/// Existing armed stops can become unreachable after an LP product resize.
+/// Keep their actual threshold above MAX rather than panicking or falsely
+/// activating at the clamped reserve bound. New admission may remain strict.
+pub fn stop_trigger(k: u128, long: bool, p: u64, l: u64, t: u64) -> u64 {
+    book_trigger_raw(k, long, p, l, t)
+}
 fn book_trigger_raw(k: u128, long: bool, p: u64, l: u64, t: u64) -> u64 {
     assert!(p > 0 && p <= MAX_PRICE, "price range");
     let price = mul(p, t);

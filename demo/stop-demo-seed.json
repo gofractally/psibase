@@ -1,0 +1,132 @@
+{
+  "scope": "Funded native demo orders and one safely collateralized long on main book; no balance rewriting",
+  "commands": [
+    {
+      "owner": "alice",
+      "method": "borrow",
+      "args": {
+        "market": 1,
+        "long": true,
+        "price": 40000,
+        "units": 100
+      }
+    },
+    {
+      "owner": "alice",
+      "method": "stop",
+      "args": {
+        "market": 1,
+        "sell_base": true,
+        "trigger": 56000,
+        "amount": 500000
+      }
+    },
+    {
+      "owner": "bob",
+      "method": "stop",
+      "args": {
+        "market": 1,
+        "sell_base": true,
+        "trigger": 56000,
+        "amount": 250000
+      }
+    },
+    {
+      "owner": "alice",
+      "method": "stop",
+      "args": {
+        "market": 1,
+        "sell_base": false,
+        "trigger": 60000,
+        "amount": 1000000
+      }
+    },
+    {
+      "owner": "bob",
+      "method": "stop",
+      "args": {
+        "market": 1,
+        "sell_base": false,
+        "trigger": 60000,
+        "amount": 500000
+      }
+    }
+  ],
+  "own_views": {
+    "alice": {
+      "armed_stops": [
+        {
+          "owner": "alice",
+          "generation": 400,
+          "market": 1,
+          "sell_base": false,
+          "trigger": 60000,
+          "status": "armed",
+          "remaining_outgoing": 1000000,
+          "claimable_input": 0,
+          "claimable_output": 0,
+          "original_input": 1000000,
+          "input_token": 2,
+          "output_token": 1
+        },
+        {
+          "owner": "alice",
+          "generation": 399,
+          "market": 1,
+          "sell_base": true,
+          "trigger": 56000,
+          "status": "armed",
+          "remaining_outgoing": 500000,
+          "claimable_input": 0,
+          "claimable_output": 0,
+          "original_input": 500000,
+          "input_token": 1,
+          "output_token": 2
+        }
+      ],
+      "loan_positions": [
+        {
+          "owner": "alice",
+          "market": 1,
+          "long": true,
+          "price": 40000,
+          "generation": 398,
+          "units": 100
+        }
+      ]
+    },
+    "bob": {
+      "armed_stops": [
+        {
+          "owner": "bob",
+          "generation": 400,
+          "market": 1,
+          "sell_base": false,
+          "trigger": 60000,
+          "status": "armed",
+          "remaining_outgoing": 500000,
+          "claimable_input": 0,
+          "claimable_output": 0,
+          "original_input": 500000,
+          "input_token": 2,
+          "output_token": 1
+        },
+        {
+          "owner": "bob",
+          "generation": 399,
+          "market": 1,
+          "sell_base": true,
+          "trigger": 56000,
+          "status": "armed",
+          "remaining_outgoing": 250000,
+          "claimable_input": 0,
+          "claimable_output": 0,
+          "original_input": 250000,
+          "input_token": 1,
+          "output_token": 2
+        }
+      ],
+      "loan_positions": []
+    }
+  }
+}

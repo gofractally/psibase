@@ -144,13 +144,21 @@ relay reserves
 + lending-vault free cash
 + pledged active-loan collateral
 + liquidated-loan surplus escrow
-+ explicitly owned rounding reserves.
++ armed stop input
++ closed stop-batch remaining input refunds
++ closed stop-batch remaining output proceeds.
 ```
 
 Free user-to-exchange shared balances are outside this committed sum. Loan
 face receivables, LP shares, maker shares, and the displayed market value of
 collateral are not additional physical tokens. Counting any of them as
 physical custody would duplicate the backing.
+
+Include retired maker generations and batches with zero remaining shares.
+Their funded cash can remain claimable or retained as nonwithdrawable rounding
+dust. Dust is already contained in maker cash, loan surplus or batch remaining
+fields; do not add scaled dust metadata as a second physical balance. Closed
+stop-pool input is zero: ownership references to its batch are not new cash.
 
 Claims consume escrow at the same time as they credit a recipient. Maker
 share entry debt must prevent late deposits from collecting old proceeds.
@@ -209,6 +217,51 @@ remaining surplus stays escrowed and is claimed proportionally later. This
 permits zero borrower-position accesses during liquidation. Partly closing
 arbitrary individual borrowers ahead of the certified schedule needs a new
 post-state certificate; pooled bookkeeping alone does not justify it.
+
+## Implemented atomic stop-auction boundary
+
+The current [stop engine](../../packages/user/Exchange/service/src/stops.rs)
+loads at most 64 armed stop generations, 128 ordinary price levels and 64
+credit cohorts per market, shared across both directions. Oversized legacy
+books are refused first-stop admission using a bounded cap-plus-one lookup;
+all new price writers preserve the stop-enabled book cap. Each new owner stop
+position needs one execution lot; small coalesced top-ups are permitted and
+cancellation removes the whole owner position. These are resource/admission
+rules, not a claim that capacity cannot be economically occupied.
+
+Discovery simulates an actual causal path, latching crossings in either
+direction, then optionally tries one same-direction margin-first replay. The
+replay needs a nonzero seed, a same-direction selected margin prefix, no
+opposite activated stop, no new prospective margin, no reduced seed execution,
+and unchanged limit/minimum-output protection. Mixed maturity flows and
+infeasible replays use the original causal plan; there is no repeated fixed
+point search or persistent frozen market. Current-due `process` has no seed and
+cannot manufacture a future trigger.
+
+For a selected early prefix, its starting reserve is no greater than the
+previously certified start. The conservative recovery bound therefore still
+covers every lender face. Keep actual margin recoveries and borrower surplus
+separate from ordinary stop output. A uniform stop price is not authorization
+to share away a senior lender's backing. Final state still passes the entire
+remaining margin schedule, including after an LP resize.
+
+Stop output and unused input are allocated directly from a common per-direction
+batch using immutable original input as denominator. All arithmetic rounds
+toward backed pool cash; claims consume the authenticated position and debit
+the exact same native payouts. Whole-lot, zero-output, reserve and output limits
+end in partial execution/refunds. Intrinsically exhausted maker generations
+retire terminally while preserving their funds; permissionless bounded repair
+avoids requiring the maker to cooperate. Existing stops whose thresholds move
+above `MAX` after LP growth stay armed and cancellable using unclamped stop
+barriers, rather than panicking or falsely firing at the reserve cap.
+
+Barriers are computed once, ordered heads advance, and only changed aggregate
+rows are committed. No matcher, trigger or liquidation operation enumerates
+owners. The deterministic planner work cap is not total native CPU, gas, or the
+seed's `max_events` budget; native funding, database work and final certificate
+checks add cost. See [CASCADE_AUCTION.md](CASCADE_AUCTION.md) for the progress
+argument and [STOP_LOSSES.md](STOP_LOSSES.md) for the exact cash identity and
+preservation by each mutation/withdrawal.
 
 ## Implementation review checklist and required tests
 
@@ -333,7 +386,7 @@ must replace the adapter with authenticated native wallet/plugin signing.
 Native sender authorization and all financial checks remain in the on-chain
 exchange service; the adapter contains no alternative matching ledger.
 
-Eleven actual-chain fixtures independently recompute native escrow, maker share
+The original spot/credit actual-chain fixtures independently recompute native escrow, maker share
 and proceeds liabilities, borrower unit supply, LP/lending share supply, and
 the sequential two-sided liquidation certificate. They cover native revocation,
 actor isolation, failed-action rollback, late joins and rounding, pooled
@@ -343,14 +396,18 @@ limit funding, independently funded same-pair books, and historical issuer
 recall isolation. These tests supplement,
 rather than replace, the algebra.
 
-Observed final checks: all five standalone arithmetic tests and all fourteen
-Python wallet transaction-construction/security tests passed. The native
-exchange suite completed with 16 passed, zero failed and one expected-panic
-case skipped by the WASM harness; the host arithmetic run covers that case.
-All eleven actual-chain fixtures passed. The filtered native token tuple-index
-regression also passed. These executions used the frozen package recorded in
-[VERIFICATION.md](VERIFICATION.md), rather than inferring runtime success from
-compilation or from the existence of an interface. `demo/check_live.py` separately
+Stop-specific native fixtures extend that audit to armed principal, common
+batch refunds/output and owner share supplies. The actual-Rust host harness
+executes extracted current planner/math source and native claim arithmetic,
+including targeted Rust mutations and planner-only region/branch coverage.
+These host results do not exercise native authorization, Tokens, KV, ABI or
+WASM metering. Reference-model Python tests are another separate evidence
+category, not an alternate proof of deployed behavior.
+
+Runner results, expected WASM panic-test skips, package fingerprints and
+measured native performance belong in [VERIFICATION.md](VERIFICATION.md).
+Earlier spot-only frozen-package results do not establish that a later
+stop-capable package passed. `demo/check_live.py` separately
 checks live native snapshots for relay products, the full active credit
 schedule, debt totals, claim arithmetic and free shared-balance sums without
 mutating economic state. It is not a substitute for the actual-chain tests'
@@ -403,10 +460,11 @@ owner authorization remain in force. The local content-policy exception for
 production package metadata. These AuthAny demo identities remain unsuitable
 for public deployment.
 
-Public trades contain only existing public execution events. No second trade
-ledger or financial action was added. The query opens read-only handles to
+Public trades contain actual native execution events, including `stoptraded`
+for executed stop input/output, excluding refunds and claims. No second mutable
+trade ledger is required. The query opens read-only handles to
 the pinned native Events ready-index metadata and market/event-ID index,
-selects at most `limit+1` IDs for each of the two event types, and fetches only
+selects at most `limit+1` IDs for each of `traded`, `liquidated` and `stoptraded`, and fetches only
 those exact history ROWIDs. The maximum page is 100. This prevents a limited
 output query from secretly sorting an unbounded history. An incomplete native
 index produces an unavailable response rather than an inaccurate empty tape.

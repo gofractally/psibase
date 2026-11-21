@@ -1,6 +1,7 @@
 //! Recent executions from the existing native event log. No synthetic history
-//! and no second mutable trade ledger. These are aggregate taker executions;
-//! amounts determine their average execution price across all matched sources.
+//! and no second mutable trade ledger. These are aggregate taker, liquidation,
+//! and stop-batch executions; amounts determine each record's realized VWAP.
+//! Event order is commit order, not the auction's simulated marginal-price path.
 use psibase::fracpack::Unpack as _;
 use psibase::{AccountNumber, DbId, KvHandle, KvMode, MethodNumber, ServiceWrapper, ToKey};
 use serde_json::{json, Value};
@@ -73,7 +74,7 @@ fn indexed_ids(
     Ok(ids)
 }
 
-fn query(market: u64, limit: u32, normal: &[u64], liquidations: &[u64]) -> String {
+fn query(market: u64, limit: u32, normal: &[u64], liquidations: &[u64], stops: &[u64]) -> String {
     // These IDs come from at most limit+1 native index seeks per event type.
     // SQL fetches by exact ROWID, never scans/sorts the complete event history.
     let ids = |values: &[u64]| {
@@ -89,13 +90,16 @@ fn query(market: u64, limit: u32, normal: &[u64], liquidations: &[u64]) -> Strin
     };
     let trades = ids(normal);
     let liquidated = ids(liquidations);
+    let stop_trades = ids(stops);
     format!(
         "WITH recent AS (SELECT * FROM (\
          SELECT ROWID AS event_id,market,sell_base,input,output,'trade' AS kind \
          FROM \"history.exchange.traded\" WHERE ROWID IN ({trades}) AND market={market} UNION ALL \
          SELECT ROWID AS event_id,market,long AS sell_base,collateral AS input,\
          debt+surplus AS output,'liquidation' AS kind \
-         FROM \"history.exchange.liquidated\" WHERE ROWID IN ({liquidated}) AND market={market}) \
+         FROM \"history.exchange.liquidated\" WHERE ROWID IN ({liquidated}) AND market={market} UNION ALL \
+         SELECT ROWID AS event_id,market,sell_base,input,output,'stop' AS kind \
+         FROM \"history.exchange.stoptraded\" WHERE ROWID IN ({stop_trades}) AND market={market}) \
          ORDER BY event_id DESC LIMIT {}) \
          SELECT r.*,b.blockNum,b.blockTime FROM recent r \
          LEFT JOIN \"history.transact.blockStart\" b ON b.ROWID=(\
@@ -144,7 +148,7 @@ fn normalize(raw: &str, market: u64, limit: u32) -> Result<String, String> {
         let output = number(&row, "output")?;
         let kind = row["kind"]
             .as_str()
-            .filter(|v| *v == "trade" || *v == "liquidation")
+            .filter(|v| *v == "trade" || *v == "liquidation" || *v == "stop")
             .ok_or_else(|| "Invalid native history execution kind".to_string())?;
         let (base, quote) = if sell_base {
             (input, output)
@@ -177,7 +181,7 @@ fn normalize(raw: &str, market: u64, limit: u32) -> Result<String, String> {
     };
     Ok(
         json!({"market":market.to_string(),"source":"native-history",
-        "aggregation":"taker-execution","trades":trades,"next_before":next})
+        "aggregation":"native-aggregate-execution","trades":trades,"next_before":next})
         .to_string(),
     )
 }
@@ -202,10 +206,11 @@ pub fn read(
     }
     let normal = indexed_ids(market, "traded", limit, before, after)?;
     let liquidations = indexed_ids(market, "liquidated", limit, before, after)?;
-    if normal.is_empty() && liquidations.is_empty() {
+    let stops = indexed_ids(market, "stoptraded", limit, before, after)?;
+    if normal.is_empty() && liquidations.is_empty() && stops.is_empty() {
         return normalize("[]", market, limit);
     }
-    let sql = query(market, limit, &normal, &liquidations);
+    let sql = query(market, limit, &normal, &liquidations, &stops);
     let raw = psibase::services::r_events::Wrapper::call().sqlQuery(sql, vec![]);
     normalize(&raw, market, limit)
 }
@@ -236,9 +241,10 @@ mod tests {
     }
     #[test]
     fn query_fetches_only_exact_native_index_ids() {
-        let sql = query(17, 50, &[99, 95], &[98]);
+        let sql = query(17, 50, &[99, 95], &[98], &[96]);
         assert!(sql.contains("ROWID IN (99,95) AND market=17"));
         assert!(sql.contains("ROWID IN (98) AND market=17"));
+        assert!(sql.contains("ROWID IN (96) AND market=17"));
         assert!(sql.contains("LIMIT 51"));
         assert!(sql.contains("history.transact.blockStart"));
     }

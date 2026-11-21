@@ -1,7 +1,7 @@
 # Exchange
 
 A Psibase service using native objective `Table` records, the native Tokens
-service and immutable Symbol mappings. Anyone can create the first book for a
+service and immutable Symbol mappings. Anyone can create a book for a
 token pair by funding both sides of its relay. Multiple independently funded
 books can use the same pair, with distinct market IDs and isolated collateral,
 relay reserves and lending vaults. A creator chooses base/quote orientation and
@@ -22,7 +22,7 @@ primary wallet immediately.
 
 Each commitment reads live native balances. It first uncredits the sender's
 exchange→user proceeds, then debits any required user→exchange deposit. Orders,
-collateral, lender cash and relay reserves alone become committed escrow in
+armed stops, collateral, lender cash and relay reserves become committed escrow in
 the native Tokens subaccount `market-{id}`. Each book has a separate native
 subaccount, including books that use the same pair. An
 aggressive limit order keeps its already-funded remainder inside the same
@@ -30,7 +30,7 @@ transaction while posting it; it does not refund and debit that remainder a
 second time. This works with either recipient auto-debit preference.
 
 Withdrawals use native Tokens uncredit/debit. The frontend can atomically
-settle a user's maker proceeds and closed-loan surplus before their next action,
+settle a user's maker proceeds, closed-loan surplus and funded stop claims before their next action,
 without a separate claim screen. The service never accepts an arbitrary owner
 parameter for spending, cancellation, repayment, LP withdrawal or claiming.
 
@@ -60,14 +60,52 @@ A fill updates the aggregate escrow/index, with no maker-position iteration.
 An aggressive order consumes the relay to the next price, fills the aggregate
 maker pool there, then uses the relay across the next gap. Marketable limits
 perform this routing with an explicit price boundary and post a passive
-remainder. Maker fills are whole lots; unposted odd-lot remainder is returned.
+remainder. A funded remainder still crossing the final relay/opposite book is
+returned after a cascade or terminal execution bound, rather than posted as a
+crossing order or recursively replanned. Maker fills are whole lots; unposted
+odd-lot remainder is returned.
 The limit price is checked against each actual relay leg's integer output.
 
-Market trades accept a minimum output and a caller-selected event budget
-(maximum 256). A boundary checkpoint can leave a due liquidation pending; no
-ordinary relay advancement proceeds past it until bounded processing runs.
+Market trades accept a minimum output and a caller-selected seed routing budget
+(maximum 256). In the legacy path a boundary checkpoint can leave a due
+liquidation pending; no ordinary relay advancement proceeds past it until
+bounded processing runs.
 Unused market input is refunded. Any rejection reverts all native table writes,
 token calls, emitted events and allocations through Psibase transaction rollback.
+
+## Pooled stop-market auctions
+
+`stop(market,sell_base,trigger,amount)` commits actual base/quote funding and
+coalesces the owner's input at a trigger generation. `cancelstop(generation)`
+cancels a whole armed owner position; `claimstop(generation)` settles closed
+refund/output. New owner positions require one execution lot; small top-ups
+are allowed. Triggering uses inclusive native integer relay-reserve barriers,
+not an external ticker or UI request. New already-reached triggers are rejected.
+
+With stops armed, the market admits at most 64 stop generations, 128 ordinary
+price levels and 64 loan-price cohorts, across both directions. Planning and
+one optional same-direction margin-first replay happen on a bounded snapshot.
+An infeasible replay falls back to the original actual causal path, preserving
+the initiating limit and minimum output. Mixed-direction and no-seed maturity
+work remain causal. `process(market)` can run current-due work and bounded maker
+repair, with no persistent auction or market lock.
+
+All stops activated in one transaction share actual output and unspent input
+proportionally in one batch per direction. Claims use the immutable global
+input denominator once; remaining rounding cash is nonwithdrawable reserve.
+The initiating order and senior margin recoveries keep separate proceeds.
+Stops do not guarantee their trigger price or a complete fill. Lots, zero output,
+reserve/output bounds or other representability limits return unspent input.
+An intrinsically exhausted maker generation retires without losing its funds;
+old cancellation cannot reactivate it. An LP resize making a stop unreachable
+above the reserve cap leaves that stop armed and cancellable.
+
+No trigger or auction visits stop owners or borrowers. Execution cost depends
+on aggregate active prices and path transitions. The seed routing budget is
+not a hard total CPU limit for automatic cascades; deterministic `auctionwork`
+metadata and actual native benchmarks describe different costs. See
+[the auction contract](../../../docs/exchange/CASCADE_AUCTION.md) and
+[cash preservation](../../../docs/exchange/STOP_LOSSES.md) for exact rules.
 
 ## Relay and fixed-face margin
 
@@ -154,12 +192,15 @@ The cash invariant is separate from the face-value accounting:
 ```
 native balance in this book's subaccount, by token
  = relay reserves + free lending cash + active pledged collateral
- + maker outgoing/incoming escrow + closed-loan surplus escrow.
+ + maker outgoing/incoming escrow + closed-loan surplus escrow
+ + armed stop input + closed batch remaining refunds/output.
 ```
 
 User→exchange deposits and exchange→user settled credits are outside that
 subaccount identity. They are actual native shared balances, never another
-exchange receivable. Loan face and LP shares are not physical cash.
+exchange receivable. Loan face and LP shares are not physical cash. Retired
+maker cash and residual batch dust still count; scaled dust metadata and closed
+stop shares must not be added as duplicate cash.
 
 **Preservation argument.** A permitted ordinary relay leg stops at the head's
 trigger, so its own planned liquidation starts are unchanged; the opposite
@@ -179,6 +220,11 @@ cannot touch pledged escrow. Maker and closed-loan claims move funded cash
 once. These transitions preserve both the cash identity and constructive
 repayment capacity. At maturity, closing a cohort before its price trigger is
 also covered by the same lower bound.
+
+Stops move fully funded principal into actual relay/book input and backed batch
+refund/output. Owner claims reduce exactly those amounts and physical native
+cash together. Conditional same-direction early margin execution improves the
+conservative recovery bound; its proceeds are never included in stop sharing.
 
 This is repayment-token solvency under the stated contract and token rules,
 not a guarantee of an external dollar peg, borrower profit, or immunity from
@@ -211,15 +257,20 @@ Use the current repository-built `cargo-psibase` and `psitest`:
 ```sh
 cd packages/user
 python3 Exchange/test_math.py
+python3 Exchange/test_stops.py --mutations --coverage
 ../../rust/target/release/cargo-psibase psibase \
   --psitest=../../build/psitest -p exchange-pkg package
 ../../rust/target/release/cargo-psibase psibase \
   --psitest=../../build/psitest -p exchange test
 ```
 
-The host arithmetic runner also executes the panic-boundary test that the
-aborting WASM test harness intentionally skips. It compiles the same function
-and test source, omitting only the platform-dependent wide-storage adapter.
+The host runners also execute panic-boundary tests that the aborting WASM test
+harness intentionally skips. They compile the same function/test source, with a
+host adapter for platform-dependent wide storage. The stop harness extracts the
+actual planner and native claim arithmetic; it does not replace native KV,
+custody, sender, rollback or WASM testing. Optional `--branch-coverage` uses
+experimental host-only Rust branch instrumentation; its report separates
+planner coverage from test helpers and assigns no probability of correctness.
 
 The local demo's package overlay supplies current token and account interfaces;
 released pre-version packages need the explicit compatibility preparation in

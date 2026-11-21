@@ -82,6 +82,9 @@ impl Chain {
     pub fn new() -> Chain {
         unimplemented!();
     }
+    pub fn fork(&self) -> Chain {
+        unimplemented!();
+    }
     pub fn push(&self, _transaction: &SignedTransaction) -> TransactionTrace {
         unimplemented!();
     }
@@ -118,6 +121,30 @@ impl Chain {
             is_auto_block_start: proto.is_auto_block_start,
             public: true,
         });
+        result.auto_select_chain();
+        result.start_session();
+        result.start_block();
+        result
+    }
+
+    /// Fork a completed fixture for independent deterministic scenarios.
+    ///
+    /// Finishes the parent's current block, clones its committed native
+    /// database, and starts a new session/block in the child. Transactions in
+    /// one child never modify the parent or a sibling. Repeated children have
+    /// identical chain state and time, allowing transaction-time measurements
+    /// without repeatedly booting an unrelated baseline.
+    pub fn fork(&self) -> Chain {
+        if self.producing.get() {
+            self.finish_block();
+        }
+        let mut result = Chain {
+            chain_handle: unsafe { tester_raw::cloneChain(self.chain_handle) },
+            status: self.status.clone(),
+            producing: Cell::new(false),
+            is_auto_block_start: self.is_auto_block_start,
+            public: true,
+        };
         result.auto_select_chain();
         result.start_session();
         result.start_block();

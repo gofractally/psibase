@@ -46,8 +46,29 @@ def verify(states):
             assert int(level['market']) in markets
             assert 0 < int(level['price']) <= (1 << 32) - 1
             assert 0 < int(level['outgoing']) <= MAX
-        for name in ('positions', 'loan_positions', 'lenders', 'relay_shares'):
+        for name in ('positions', 'loan_positions', 'lenders', 'relay_shares', 'stop_positions'):
             assert all(row['owner'] == owner for row in state.get(name, [])), (owner, name, 'foreign owner exposed')
+        stop_ids = set()
+        for pos in state.get('stop_positions', []):
+            generation = int(pos['generation'])
+            assert generation not in stop_ids
+            stop_ids.add(generation)
+            assert pos['status'] in ('armed', 'filled', 'partially_filled', 'unfilled')
+            assert not {'shares', 'input_total', 'output_total', 'refund_total', 'shares_remaining'}.intersection(pos)
+            m = markets[int(pos['market'])]
+            sell = pos['sell_base']
+            in_asset, out_asset = ('base', 'quote') if sell else ('quote', 'base')
+            assert int(pos['input_token']) == int(m[in_asset])
+            assert int(pos['output_token']) == int(m[out_asset])
+            remaining = int(pos['remaining_outgoing'])
+            refund, output = int(pos['claimable_input']), int(pos['claimable_output'])
+            assert 0 <= remaining + refund <= int(m['escrow_' + in_asset]['expected'])
+            assert 0 <= output <= int(m['escrow_' + out_asset]['expected'])
+            if pos['status'] == 'armed':
+                assert remaining > 0 and refund == output == 0
+            else:
+                assert remaining == 0
+            checks += 1
         for row in state.get('balances', []):
             assert int(row['spendable']) == int(row['incoming']) + int(row['outgoing'])
             assert all(int(row[key]) >= 0 for key in ('wallet', 'incoming', 'outgoing'))

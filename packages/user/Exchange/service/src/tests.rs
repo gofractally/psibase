@@ -97,6 +97,10 @@ fn state(chain: &Chain) -> Value {
         "escrow":chain.open::<_,EscrowTable>().get_index_pk().iter().collect::<Vec<_>>(),
         "native_subaccounts":chain.open::<_,tokens::tables::tables::SubAccountTable>().get_index_pk().iter().collect::<Vec<_>>(),
         "native_sub_balances":chain.open::<_,tokens::tables::tables::SubAccountBalanceTable>().get_index_pk().iter().collect::<Vec<_>>()
+        ,"stop_pool":chain.open::<_,StopPoolTable>().get_index_pk().iter().collect::<Vec<_>>()
+        ,"stop_book":chain.open::<_,StopBookTable>().get_index_pk().iter().collect::<Vec<_>>()
+        ,"stop_position":chain.open::<_,StopPositionTable>().get_index_pk().iter().collect::<Vec<_>>()
+        ,"stop_batch":chain.open::<_,StopBatchTable>().get_index_pk().iter().collect::<Vec<_>>()
     })
 }
 macro_rules! rejects {
@@ -139,6 +143,124 @@ fn audit_with_deficits(chain: &Chain, deficits: &[(u64, u32, u64)]) {
     let mut units: BTreeMap<u64, u128> = BTreeMap::new();
     let mut maker_shares: BTreeMap<u64, u128> = BTreeMap::new();
     let mut maker_claims: BTreeMap<u64, u128> = BTreeMap::new();
+    let mut stop_shares: BTreeMap<u64, u128> = BTreeMap::new();
+    let mut batch_shares: BTreeMap<u64, u128> = BTreeMap::new();
+    let mut batch_refunds: BTreeMap<u64, u128> = BTreeMap::new();
+    let mut batch_outputs: BTreeMap<u64, u128> = BTreeMap::new();
+    let mut armed_prices: BTreeMap<u64, usize> = BTreeMap::new();
+    for row in chain.open::<_, StopBookTable>().get_index_pk().iter() {
+        let g = chain
+            .open::<_, StopPoolTable>()
+            .get_index_pk()
+            .get(&row.generation)
+            .unwrap();
+        assert!(g.batch.is_none() && g.input > 0);
+        assert_eq!((row.market, row.sell_base), (g.market, g.sell_base));
+        assert_eq!(
+            row.priority,
+            if g.sell_base {
+                crate::math::MAX_PRICE - g.trigger
+            } else {
+                g.trigger
+            }
+        );
+        *armed_prices.entry(g.market).or_default() += 1;
+    }
+    for p in chain.open::<_, StopPositionTable>().get_index_pk().iter() {
+        let g = chain
+            .open::<_, StopPoolTable>()
+            .get_index_pk()
+            .get(&p.generation)
+            .unwrap();
+        assert!(p.shares > 0);
+        *stop_shares.entry(g.id).or_default() += p.shares as u128;
+        if let Some(id) = g.batch {
+            let b = chain
+                .open::<_, StopBatchTable>()
+                .get_index_pk()
+                .get(&id)
+                .unwrap();
+            assert!(b.input_total > 0 && b.market == g.market && b.sell_base == g.sell_base);
+            *batch_refunds.entry(id).or_default() +=
+                p.shares as u128 * b.refund_total as u128 / b.input_total as u128;
+            *batch_outputs.entry(id).or_default() +=
+                p.shares as u128 * b.output_total as u128 / b.input_total as u128;
+        }
+    }
+    for g in chain.open::<_, StopPoolTable>().get_index_pk().iter() {
+        assert_eq!(
+            stop_shares.get(&g.id).copied().unwrap_or(0),
+            g.shares as u128
+        );
+        if let Some(id) = g.batch {
+            assert_eq!(g.input, 0);
+            *batch_shares.entry(id).or_default() += g.shares as u128;
+        } else {
+            assert_eq!(g.input, g.shares);
+            let row = chain.open::<_, StopBookTable>().get_index_pk().get(&(
+                g.market,
+                g.sell_base,
+                if g.sell_base {
+                    crate::math::MAX_PRICE - g.trigger
+                } else {
+                    g.trigger
+                },
+            ));
+            if g.input > 0 {
+                assert_eq!(
+                    row.unwrap().generation,
+                    g.id,
+                    "armed input must remain discoverable"
+                );
+            } else {
+                assert!(row.map(|r| r.generation != g.id).unwrap_or(true));
+            }
+            *cash
+                .entry((
+                    g.market,
+                    if g.sell_base {
+                        chain
+                            .open::<_, MarketTable>()
+                            .get_index_pk()
+                            .get(&g.market)
+                            .unwrap()
+                            .base
+                    } else {
+                        chain
+                            .open::<_, MarketTable>()
+                            .get_index_pk()
+                            .get(&g.market)
+                            .unwrap()
+                            .quote
+                    },
+                ))
+                .or_default() += g.input as u128;
+        }
+    }
+    for b in chain.open::<_, StopBatchTable>().get_index_pk().iter() {
+        assert_eq!(
+            b.input_used as u128 + b.refund_total as u128,
+            b.input_total as u128
+        );
+        assert_eq!(
+            batch_shares.get(&b.id).copied().unwrap_or(0),
+            b.shares_remaining as u128
+        );
+        assert!(batch_refunds.get(&b.id).copied().unwrap_or(0) <= b.refund_remaining as u128);
+        assert!(batch_outputs.get(&b.id).copied().unwrap_or(0) <= b.output_remaining as u128);
+        assert!(b.refund_remaining <= b.refund_total && b.output_remaining <= b.output_total);
+        let m = chain
+            .open::<_, MarketTable>()
+            .get_index_pk()
+            .get(&b.market)
+            .unwrap();
+        *cash
+            .entry((b.market, if b.sell_base { m.base } else { m.quote }))
+            .or_default() += b.refund_remaining as u128;
+        *cash
+            .entry((b.market, if b.sell_base { m.quote } else { m.base }))
+            .or_default() += b.output_remaining as u128;
+    }
     for p in chain.open::<_, MakerTable>().get_index_pk().iter() {
         let g = chain
             .open::<_, PoolTable>()
@@ -153,6 +275,19 @@ fn audit_with_deficits(chain: &Chain, deficits: &[(u64, u32, u64)]) {
         *units.entry(p.generation).or_default() += p.units as u128;
     }
     for m in &markets {
+        let armed = armed_prices.get(&m.id).copied().unwrap_or(0);
+        assert!(armed <= 64);
+        if armed > 0 {
+            assert!(
+                chain
+                    .open::<_, BookTable>()
+                    .get_index_pk()
+                    .iter()
+                    .filter(|b| b.market == m.id)
+                    .count()
+                    <= 128
+            );
+        }
         assert!(m.x as u128 * m.y as u128 >= m.k.get());
         *cash.entry((m.id, m.base)).or_default() += m.x as u128 + m.vault_base as u128;
         *cash.entry((m.id, m.quote)).or_default() += m.y as u128 + m.vault_quote as u128;
@@ -990,3 +1125,13 @@ fn recalled_old_spot_book_cannot_drain_new_guaranteed_market(chain: Chain) -> Re
     );
     Ok(())
 }
+
+#[path = "test_metrics.rs"]
+mod metrics;
+#[path = "stop_benchmark_tests.rs"]
+mod stop_benchmark_tests;
+#[path = "stop_security_tests.rs"]
+mod stop_security_tests;
+
+#[path = "stop_api_tests.rs"]
+mod stop_api_tests;

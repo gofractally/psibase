@@ -3,12 +3,14 @@ import { creditStatus, fundingPaused } from './market-policy.js';
 import { depthRows, orderSpread, quoteForSize, maximumBidSize, unitsFromAmount, ownershipForDeposit, ownershipForWithdrawal, tradePriceAtoms } from './order-book.js';
 import { candlesFromTrades, depthBounds } from './market-chart.js';
 import { walletApiBase } from './config.js';
+import { ownStops, stopPayouts, stopRemaining, canCancelStop, stopStatus, validateStopTrigger, minimumStopAmount } from './stop-orders.js';
 const API_BASE=walletApiBase(location.href);
 const PROFILE=new URLSearchParams(location.search).get('profile')==='1';
 const profile=(kind,metrics)=>{if(PROFILE)console.debug('[exchange-profile]',JSON.stringify({kind,...metrics}));};
 
 const $ = selector => document.querySelector(selector);
 const state = { account: localStorage.getItem('relay-account') || 'alice', market: null, data: null, side: 'buy', type: 'market', ticket: 'spot', orderTab: 'orders', pending: false, online: false, activity: [], refresh: 0, fetches: 0, chart: 'price', interval: 5, depthRange: 2, bookView: 'orders', trades: new Map(), tradeRequests: new Set() };
+state.olderStops=null;state.stopPageLoading=false;state.stopPageRequest=0;
 let toastTimer;
 let previousDepth = new Map();
 let previousChartSignature='';
@@ -42,6 +44,13 @@ function accrued(id) {
     const m = (state.data.markets || []).find(m => key(m.id) === key(p.market));
     if (g && g.active === false && m && !fundingPaused(m) && key(g.long ? m.quote : m.base) === key(id)) amount += g.claimable_surplus!==undefined?value(g.claimable_surplus):value(p.units) * value(g.original_surplus) / (value(g.original_units) || 1n);
   }
+  for(const p of ownStops(state.data,state.account)){
+    const m=state.data.markets?.find(m=>key(m.id)===key(p.market));
+    if(!m||fundingPaused(m))continue;
+    const paid=stopPayouts(p);
+    if(key(p.sell_base?m.base:m.quote)===key(id))amount+=paid.input;
+    if(key(p.sell_base?m.quote:m.base)===key(id))amount+=paid.output;
+  }
   return amount;
 }
 
@@ -54,7 +63,11 @@ async function api(path, body) {
     if(PROFILE){const text=await response.text();data=JSON.parse(text);const decoded=performance.now();profile('api',{path,status:response.status,bytes:new TextEncoder().encode(text).byteLength,fetchMs:+(received-started).toFixed(2),decodeMs:+(decoded-received).toFixed(2),totalMs:+(decoded-started).toFixed(2)});}
     else data = await response.json();
   } catch { throw new Error(`The local chain bridge returned HTTP ${response.status}.`); }
-  if (!response.ok || data.error || data.ok === false) throw new Error(typeof data.error === 'string' ? data.error : data.error?.message || data.message || `Transaction rejected (HTTP ${response.status}).`);
+  if (!response.ok || data.error || data.ok === false) {
+    const error=new Error(typeof data.error==='string'?data.error:data.error?.message||data.message||`Transaction rejected (HTTP ${response.status}).`);
+    if(data.progress)error.progress=data.progress;
+    throw error;
+  }
   return data;
 }
 async function resolveToken(id) {
@@ -77,7 +90,7 @@ function toast(text, type = '') {
 }
 function setPending(pending) {
   state.pending = pending;
-  document.querySelectorAll('button[type="submit"], button[data-action], button[data-position-action]').forEach(button => { button.disabled = pending || button.dataset.locked === 'true'; });
+  document.querySelectorAll('button[type="submit"], button[data-action], button[data-position-action], button[data-stop-page], button[data-release-stop]').forEach(button => { button.disabled = pending || button.dataset.locked === 'true'; });
   $('#account').disabled = pending;
 }
 async function transact(label, method, args) {
@@ -85,18 +98,20 @@ async function transact(label, method, args) {
 }
 async function submit(label, path, args) {
   if (state.pending) return;
+  clearOlderStops();
   setPending(true);
+  if(market())renderOrders();
   toast(`${label} · submitting to Psibase…`, 'pending');
   try {
     const result = await api(path, args);
     const id = result.transactionId || result.transaction_id || result.id || '';
-    state.activity.unshift({ label, time: new Date(), id: key(id) });
+    state.activity.unshift({ label, time: new Date(), id: key(id), account:state.account });
     state.activity = state.activity.slice(0, 30);
     toast(`${label} confirmed${id ? ` · ${key(id).slice(0, 12)}…` : ''}`);
     if ($('#modal').open) $('#modal').close();
     await refresh();
     return result;
-  } catch (error) { toast(error.message, 'error'); }
+  } catch (error) { if(error.progress)await refresh();toast(error.message, 'error'); }
   finally { setPending(false); }
 }
 async function refresh() {
@@ -319,15 +334,32 @@ function renderTicket() {
     $('#margin-form input[name=price]').value = price(suggested).replace(/,/g, '');
     $('#margin-form input[name=collateral]').value = decimal(sell?2n*suggested*value(m.quote_tick):2n*value(m.base_lot),precision(sell?q:b),precision(sell?q:b),false);
   } else {
-    $('#ticket-content').innerHTML = `<form id="spot-form" class="ticket-body"><div class="buy-sell-toggle"><button type="button" class="${!sell ? 'active' : ''}" data-side="buy">Buy</button><button type="button" class="${sell ? 'active' : ''}" data-side="sell">Sell</button></div><div class="order-type"><button type="button" data-type="market" class="${state.type === 'market' ? 'active' : ''}">Market</button><button type="button" data-type="limit" class="${state.type === 'limit' ? 'active' : ''}">Limit</button></div><div class="available-row"><span>Available</span><strong id="ticket-available">—</strong></div>${state.type === 'limit' ? `<label>Limit price<div class="input-wrap"><input name="price" inputmode="decimal" placeholder="0.00" required><span>${esc(symbol(q))}</span></div></label>` : ''}<label>${state.type==='limit'?'Size':(sell ? 'Amount to sell' : 'Amount to spend')}<div class="input-wrap"><input name="amount" inputmode="decimal" placeholder="${precision(input) > 2 ? '0.00000000' : '0.00'}" required><span>${esc(symbol(input))}</span></div></label><div class="percentage-row">${[25, 50, 75, 100].map(n => `<button type="button" data-percent="${n}">${n}%</button>`).join('')}</div>${state.type === 'market' ? '<label>Slippage limit<div class="input-wrap"><input name="slippage" inputmode="decimal" value="1.00" required><span>%</span></div></label>' : ''}<div id="order-estimate" class="estimate-box"></div><button type="submit" class="button ${sell ? 'sell' : 'buy'}">${sell ? 'Sell' : 'Buy'} ${esc(symbol(b))}</button><p class="help-inline">${state.type === 'limit' ? 'A limit order executes at your price or better. You can cancel its remaining amount at any time.' : 'Your order executes against available buy and sell liquidity. Your minimum receive amount is protected.'}</p></form>`;
-    if (state.type === 'limit') {
-      const current = value(m.y) * value(m.base_lot) / (value(m.x) * value(m.quote_tick));
-      $('#spot-form input[name=price]').value = price(current * (sell ? 105n : 95n) / 100n).replace(/,/g, '');
+    const isLimit=state.type==='limit',isStop=state.type==='stop';
+    const description=isStop?'Your order is funded now and executes at market when the trigger is reached. The execution price may differ from the trigger. Any unfilled amount is returned automatically.':isLimit?'A limit order executes at your price or better. You can cancel its remaining amount at any time.':'Your order executes against available buy and sell liquidity. Your minimum receive amount is protected.';
+    const placeholder=precision(input)?`0.${'0'.repeat(precision(input))}`:'0';
+    $('#ticket-content').innerHTML = `<form id="spot-form" class="ticket-body">
+      <div class="buy-sell-toggle"><button type="button" class="${!sell?'active':''}" data-side="buy">Buy</button><button type="button" class="${sell?'active':''}" data-side="sell">Sell</button></div>
+      <div class="order-type">${[['market','Market'],['limit','Limit'],['stop','Stop market']].map(([type,label])=>`<button type="button" data-type="${type}" class="${state.type===type?'active':''}">${label}</button>`).join('')}</div>
+      <div class="available-row"><span>Available</span><strong id="ticket-available">—</strong></div>
+      ${isLimit||isStop?`<label>${isStop?'Trigger price':'Limit price'}<div class="input-wrap"><input name="price" inputmode="decimal" placeholder="0.00" required><span>${esc(symbol(q))}</span></div></label>`:''}
+      <label>${isLimit||(isStop&&sell)?'Size':sell?'Amount to sell':'Amount to spend'}<div class="input-wrap"><input name="amount" inputmode="decimal" placeholder="${placeholder}" required><span>${esc(symbol(input))}</span></div></label>
+      <div class="percentage-row">${[25,50,75,100].map(n=>`<button type="button" data-percent="${n}">${n}%</button>`).join('')}</div>
+      ${state.type==='market'?'<label>Slippage limit<div class="input-wrap"><input name="slippage" inputmode="decimal" value="1.00" required><span>%</span></div></label>':''}
+      <div id="order-estimate" class="estimate-box"></div>
+      <button type="submit" class="button ${sell?'sell':'buy'}">${isStop?`Place ${sell?'sell':'buy'} stop`:`${sell?'Sell':'Buy'} ${esc(symbol(b))}`}</button><p class="help-inline">${description}</p></form>`;
+    if(isLimit||isStop){
+      const current=value(m.y)*value(m.base_lot)/(value(m.x)*value(m.quote_tick));
+      const numerator=isStop?(sell?95n:105n):(sell?105n:95n);
+      $('#spot-form input[name=price]').value=price(current*numerator/100n).replace(/,/g,'');
     }
   }
   updateEstimates();
 }
 function estimateLine(label, text) { return `<div class="estimate-line"><span>${esc(label)}</span><strong>${esc(text)}</strong></div>`; }
+function stopMinimum(m,sell,trigger){
+  const positions=[...(state.data.stop_positions||[]),...ownStops(state.olderStops,state.account)];
+  return minimumStopAmount(m,sell,trigger,{owner:state.account,stop_positions:positions},state.account);
+}
 function updateEstimates() {
   const m = market(); if (!m) return;
   const { b, q } = assets(m); const sell = state.side === 'sell';
@@ -352,7 +384,12 @@ function updateEstimates() {
     } else {
       const form = $('#spot-form'); const amount = atoms(form.elements.amount.value || '0', precision(state.type==='limit'?b:input), 'Amount', true);
       let expected;
-      if (state.type === 'limit') {
+      if(state.type==='stop'){
+        const trigger=validateStopTrigger(priceTick(form.elements.price.value,m,{...b,precision:precision(b)},{...q,precision:precision(q)}),m,sell);
+        const minimum=stopMinimum(m,sell,trigger);
+        area.innerHTML=estimateLine('Trigger',`At or ${sell?'below':'above'} ${price(trigger)} ${symbol(q)}`)+estimateLine('Minimum amount at this stop price',`${fmt(minimum,input)} ${symbol(input)}`)+estimateLine('Amount reserved',`${fmt(amount,input)} ${symbol(input)}`)+estimateLine('Execution','Market order on trigger')+estimateLine('Unfilled amount','Returned automatically');
+        updateLiquidityPreview();return;
+      }else if (state.type === 'limit') {
         const p = priceTick(form.elements.price.value, m, { ...b, precision: precision(b) }, { ...q, precision: precision(q) });
         const total = amount ? quoteForSize(amount,p,m) : 0n;
         area.innerHTML=estimateLine('Order value',`${fmt(total,q)} ${symbol(q)}`)+estimateLine('Size',`${fmt(amount,b)} ${symbol(b)}`)+estimateLine('Trading fee','0%');
@@ -370,11 +407,20 @@ function updateEstimates() {
 function renderOrders() {
   const m = market(); const { b, q } = assets(m);
   const positions = (state.data.positions || []).filter(p => own(p) && sameMarket(p) && value(p.remaining_outgoing ?? p.refund)>0n);
+  const stops=ownStops(state.data,state.account).filter(sameMarket);
+  const openStops=stops.filter(p=>stopRemaining(p)>0n);
   const loans = (state.data.loan_positions || []).filter(p => own(p) && sameMarket(p) && (state.data.loans||[]).some(g=>key(g.generation??g.id)===key(p.generation)&&g.active===true));
-  $('#order-count').textContent = String(positions.length); $('#loan-count').textContent = String(loans.length);
+  $('#order-count').textContent = String(positions.length+openStops.length); $('#loan-count').textContent = String(loans.length);
   let html;
   if (state.orderTab === 'activity') {
-    html = state.activity.length ? state.activity.map(a => `<div class="activity-item"><span>✓</span><div>${esc(a.label)}<small>${esc(a.id ? a.id.slice(0, 28) + '…' : 'Confirmed on the local chain')}</small></div><time>${esc(a.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</time></div>`).join('') : empty('Your transactions, confirmed', 'Actions from this session will appear here.', '↗');
+    const activity=state.activity.filter(a=>a.account===state.account);
+    const completed=stops.filter(p=>p.status!=='armed'&&(stopPayouts(p).input>0n||stopPayouts(p).output>0n));
+    html=completed.map(p=>{
+      const paid=stopPayouts(p),input=p.sell_base?b:q,output=p.sell_base?q:b;
+      const receipt=[paid.output?`${fmt(paid.output,output)} ${symbol(output)} received`:'',paid.input?`${fmt(paid.input,input)} ${symbol(input)} returned`:''].filter(Boolean).join(' · ');
+      return `<div class="activity-item"><span>✓</span><div>${p.sell_base?'Sell':'Buy'} stop · ${esc(stopStatus(p).toLowerCase())}<small>${esc(receipt)}</small></div></div>`;
+    }).join('')+activity.map(a=>`<div class="activity-item"><span>✓</span><div>${esc(a.label)}<small>${esc(a.id?a.id.slice(0,28)+'…':'Confirmed on the local chain')}</small></div><time>${esc(a.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}))}</time></div>`).join('');
+    if(!html)html=empty('Your transactions, confirmed','Actions from this session will appear here.','↗');
   } else if (state.orderTab === 'loans') {
     html = loans.length ? `<table class="data-table"><thead><tr><th>Position</th><th>Liquidation price</th><th>Amount owed</th><th>Collateral</th><th></th></tr></thead><tbody>${loans.map(p => {
       const g = (state.data.loans || []).find(g => key(g.generation ?? g.id) === key(p.generation)); if (!g) return '';
@@ -384,16 +430,53 @@ function renderOrders() {
       return `<tr><td><span class="${long ? 'side-buy' : 'side-sell'}">${long ? 'Long' : 'Short'} ${esc(symbol(b))}</span></td><td>${esc(price(p.price ?? g.price))}</td><td>${esc(fmt(active?debt:0n, debtAsset))} ${esc(symbol(debtAsset))}${active ? '' : `<br><small>${esc(fmt(debt,debtAsset))} ${esc(symbol(debtAsset))} proceeds</small>`}</td><td>${active?`${esc(fmt(value(p.units)*value(g.collateral_unit),collateralAsset))} ${esc(symbol(collateralAsset))}`:'Released'}</td><td><button class="button small ${active ? 'subtle' : 'primary'}" data-position-action="${active ? 'repay' : 'claim'}" data-long="${long}" data-price="${esc(p.price ?? g.price)}" data-units="${esc(p.units)}" data-face="${esc(g.face_unit)}">${active ? 'Repay' : 'Close'}</button></td></tr>`;
     }).join('')}</tbody></table>` : empty('No margin positions', 'Open a position from the Margin tab.', '◇');
   } else {
-    html = positions.length ? `<table class="data-table"><thead><tr><th>Order</th><th>Price</th><th>Remaining</th><th>Status</th><th></th></tr></thead><tbody>${positions.map(p => {
+    html = positions.length||openStops.length ? `<table class="data-table"><thead><tr><th>Order</th><th>Price / trigger</th><th>Remaining</th><th>Status</th><th></th></tr></thead><tbody>${positions.map(p => {
       const remaining=value(p.remaining_outgoing??p.refund);
       const baseRemaining=p.remaining_base!==undefined?value(p.remaining_base):(p.bid?remaining*value(m.base_lot)/(value(p.price)*value(m.quote_tick)):remaining);
       const remainder=p.active===false;
       const amountText=baseRemaining>0n?`${fmt(baseRemaining,b)} ${symbol(b)}`:`${fmt(remaining,p.bid?q:b)} ${symbol(p.bid?q:b)}`;
-      return `<tr><td><span class="${p.bid ? 'side-buy' : 'side-sell'}">${p.bid ? 'Buy' : 'Sell'} ${esc(symbol(b))}</span></td><td>${esc(price(p.price))}</td><td>${esc(amountText)}</td><td><span class="order-status">${remainder?'Remainder':'Open'}</span></td><td><button class="button small subtle" data-position-action="cancel" data-bid="${Boolean(p.bid)}" data-price="${esc(p.price)}">Cancel</button></td></tr>`;
-    }).join('')}</tbody></table>` : empty('Your orders will appear here', 'Place a limit order at your chosen price.', '≋');
+      return `<tr><td><span class="${p.bid ? 'side-buy' : 'side-sell'}">${p.bid ? 'Buy' : 'Sell'} ${esc(symbol(b))}</span><small class="order-kind">Limit</small></td><td>${esc(price(p.price))}</td><td>${esc(amountText)}</td><td><span class="order-status">${remainder?'Remainder':'Open'}</span></td><td><button class="button small subtle" data-position-action="cancel" data-bid="${Boolean(p.bid)}" data-price="${esc(p.price)}">Cancel</button></td></tr>`;
+    }).join('')}${openStops.map(p=>{
+      const input=p.sell_base?b:q,cancelable=canCancelStop(p);
+      return `<tr><td><span class="${p.sell_base?'side-sell':'side-buy'}">${p.sell_base?'Sell':'Buy'} ${esc(symbol(b))}</span><small class="order-kind">Stop market</small></td><td>${esc(price(p.trigger))}<small class="order-kind">${p.sell_base?'At or below':'At or above'}</small></td><td>${esc(fmt(stopRemaining(p),input))} ${esc(symbol(input))}</td><td><span class="order-status">${esc(stopStatus(p))}</span></td><td><button class="button small subtle" data-position-action="cancelstop" data-generation="${esc(p.generation)}" data-locked="${!cancelable}" ${cancelable?'':'disabled'}>Cancel</button></td></tr>`;
+    }).join('')}</tbody></table>` : empty('Your orders will appear here', 'Place a limit or stop order at your chosen price.', '≋');
   }
-  $('#orders-content').innerHTML = html;
+  $('#orders-content').innerHTML = html+(state.orderTab==='loans'?'':renderOlderStops(m,b,q));
   setPending(state.pending);
+}
+
+function clearOlderStops(){state.olderStops=null;state.stopPageLoading=false;state.stopPageRequest++;}
+async function loadOlderStops(mode){
+  if(state.pending||state.stopPageLoading)return;
+  if(mode==='recent'){clearOlderStops();renderOrders();return;}
+  const before=mode==='refresh'?state.olderStops?.before:state.olderStops?state.olderStops.next_before:state.data?.stop_positions_next;
+  if(before===null||before===undefined)return;
+  const account=state.account,marketId=key(state.market),request=++state.stopPageRequest;
+  state.stopPageLoading=true;renderOrders();
+  try{
+    const page=await api(`/api/stops?account=${encodeURIComponent(account)}&before=${encodeURIComponent(before)}&limit=100`);
+    if(request!==state.stopPageRequest||account!==state.account||marketId!==key(state.market))return;
+    if(key(page.owner)!==account)throw new Error('Order response did not match the selected wallet.');
+    state.olderStops={...page,before};
+  }catch(error){toast(error.message,'error');}
+  finally{if(request===state.stopPageRequest){state.stopPageLoading=false;if(market())renderOrders();}}
+}
+function renderOlderStops(m,b,q){
+  const page=state.olderStops,next=page?page.next_before:state.data.stop_positions_next;
+  if(!page&&(next===null||next===undefined))return '';
+  let html='';
+  if(page){
+    const rows=ownStops(page,state.account).filter(sameMarket);
+    html=`<div class="older-orders-heading">Older stop orders</div>${rows.length?`<table class="data-table"><thead><tr><th>Order</th><th>Trigger</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(p=>{
+      const input=p.sell_base?b:q,output=p.sell_base?q:b,paid=stopPayouts(p),armed=p.status==='armed';
+      const receipt=[paid.output?`${fmt(paid.output,output)} ${symbol(output)} received`:'',paid.input?`${fmt(paid.input,input)} ${symbol(input)} returned`:''].filter(Boolean).map(esc).join('<br>');
+      const amount=armed?`${esc(fmt(stopRemaining(p),input))} ${esc(symbol(input))}`:receipt||'—';
+      const action=armed?`<button class="button small subtle" data-position-action="cancelstop" data-generation="${esc(p.generation)}" data-locked="${!canCancelStop(p)}">Cancel</button>`:(paid.input||paid.output)?`<button class="button small subtle" data-release-stop="${esc(p.generation)}">Return to balance</button>`:'';
+      return `<tr><td><span class="${p.sell_base?'side-sell':'side-buy'}">${p.sell_base?'Sell':'Buy'} ${esc(symbol(b))}</span><small class="order-kind">Stop market</small></td><td>${esc(price(p.trigger,m))}</td><td>${amount}</td><td><span class="order-status">${esc(stopStatus(p))}</span></td><td>${action}</td></tr>`;
+    }).join('')}</tbody></table>`:'<p class="older-orders-empty">No orders in this page for the selected market.</p>'}`;
+  }
+  const locked=String(state.stopPageLoading);
+  return html+`<div class="stop-pagination">${next===null||next===undefined?'':`<button class="button small ghost" data-stop-page="next" data-locked="${locked}">${state.stopPageLoading?'Loading…':page?'Next older orders':'Load older orders'}</button>`}${page?`<button class="button small ghost" data-stop-page="refresh" data-locked="${locked}">Refresh older orders</button><button class="button small ghost" data-stop-page="recent" data-locked="${locked}">Back to recent orders</button>`:''}</div>`;
 }
 
 function committed(id) {
@@ -409,9 +492,16 @@ function committed(id) {
     const m = state.data.markets.find(m => key(m.id) === key(p.market));
     if (g && g.active !== false && m && key(g.long ? m.base : m.quote) === key(id)) total += value(p.units) * value(g.collateral_unit);
   }
+  for(const p of ownStops(state.data,state.account)){
+    const m=state.data.markets.find(m=>key(m.id)===key(p.market));
+    if(m&&key(p.sell_base?m.base:m.quote)===key(id))total+=stopRemaining(p);
+  }
   return total;
 }
 function renderBalances() {
+  const partial=state.data.stop_positions_next!==null&&state.data.stop_positions_next!==undefined;
+  $('#available-balance-label').textContent=partial?'Available shown':'Available to trade';
+  $('#balances-subtitle').textContent=partial?'Available shown includes recent orders. Older stop orders are outside this view and can be reviewed under Open orders.':'Your wallet, available trading balance, and reserved funds.';
   $('#balances').innerHTML = (state.data.tokens || []).map(t => {
     const row = balance(t.id); const name = symbol(t);
     return `<tr><td><div class="asset-name">${coin(t)}<div><strong>${esc(name)}</strong><small>Native token #${esc(t.id)}</small></div></div></td><td>${esc(fmt(row.wallet, t))}</td><td>${esc(fmt(available(t.id), t))}</td><td class="committed-amount" title="Funds reserved for orders and margin collateral">${esc(fmt(committed(t.id), t))}</td><td><div class="balance-buttons"><button class="button ghost" data-funds="deposit" data-token="${esc(t.id)}">Deposit</button><button class="button ghost" data-funds="withdraw" data-token="${esc(t.id)}">Withdraw</button></div></td></tr>`;
@@ -519,12 +609,15 @@ function setView(view) {
   if(view==='trade'&&market()){renderChart();loadTrades(market().id);}
 }
 function selectMarket(id) {
+  clearOlderStops();
   state.market = id; $('#ticket-content').dataset.ready = ''; render(); setView('trade');
 }
 
 document.addEventListener('click', async event => {
   const button = event.target.closest('button,[data-price]'); if (!button) return;
   const d = button.dataset;
+  if(d.stopPage){await loadOlderStops(d.stopPage);return;}
+  if(d.releaseStop){await submit('Return stop funds','/api/release-stop',{account:state.account,generation:d.releaseStop});return;}
   if (d.view) setView(d.view);
   if (d.zoom) { state.depthRange=Math.max(.05,Math.min(25,state.depthRange*(d.zoom==='in'?.5:2))); $('#depth-range').value=String(state.depthRange); renderChart(); }
   if (d.chart) { state.chart = d.chart; document.querySelectorAll('[data-chart]').forEach(el=>el.classList.toggle('active',el===button)); renderChart(); }
@@ -552,7 +645,8 @@ document.addEventListener('click', async event => {
   if (d.action === 'liquidate') await transact('Process liquidations', 'liquidate', { market: key(state.market), max_events: 64 });
   if (d.action === 'renew') await transact('Renew lending term', 'renew', { market: key(state.market) });
   if (d.positionAction) {
-    if (['remliq', 'unlend'].includes(d.positionAction)) showShares(d.positionAction, d);
+    if(d.positionAction==='cancelstop')await transact('Cancel stop order','cancelstop',{generation:d.generation});
+    else if (['remliq', 'unlend'].includes(d.positionAction)) showShares(d.positionAction, d);
     else if (d.positionAction === 'repay') showRepay(d);
     else await transact(d.positionAction === 'cancel' ? 'Cancel order' : 'Receive position proceeds', d.positionAction, { market: key(state.market), price: d.price, ...(d.positionAction === 'cancel' ? { bid: d.bid === 'true' } : { long: d.long === 'true' }) });
   }
@@ -566,6 +660,12 @@ document.addEventListener('submit', async event => {
     if (form.id === 'spot-form') {
       const sell = state.side === 'sell'; const input = sell ? b : q;
       if (state.type === 'limit') {const p=priceTick(f.get('price'),m,{...b,precision:precision(b)},{...q,precision:precision(q)});const size=atoms(f.get('amount'),precision(b),'Size');const total=quoteForSize(size,p,m);await transact('Place limit order','limit',{market:key(m.id),bid:!sell,price:String(p),amount:String(commit(sell?size:total))});}
+      else if(state.type==='stop'){
+        const trigger=validateStopTrigger(priceTick(f.get('price'),m,{...b,precision:precision(b)},{...q,precision:precision(q)}),m,sell);
+        const amount=commit(atoms(f.get('amount'),precision(input),'Amount')),minimum=stopMinimum(m,sell,trigger);
+        if(amount<minimum)throw new Error(`Minimum amount at this stop price: ${fmt(minimum,input)} ${symbol(input)}.`);
+        await transact(`Place ${sell?'sell':'buy'} stop`,'stop',{market:key(m.id),sell_base:sell,trigger:String(trigger),amount:String(amount)});
+      }
       else {
         const amount=commit(atoms(f.get('amount'),precision(input)));
         const slip = atoms(f.get('slippage'), 2, 'Slippage', true); if (slip > 5000n) throw new Error('Slippage must be 50% or less.');
@@ -625,7 +725,7 @@ document.addEventListener('change', async event => {
 });
 $('#account').value = state.account;
 if (!$('#account').value) { state.account = 'alice'; $('#account').value = 'alice'; }
-$('#account').addEventListener('change', () => { state.account = $('#account').value; localStorage.setItem('relay-account', state.account); state.data = null; refresh(); });
+$('#account').addEventListener('change', () => { clearOlderStops();state.account = $('#account').value; localStorage.setItem('relay-account', state.account); state.data = null; refresh(); });
 $('#market-select').addEventListener('change', () => selectMarket($('#market-select').value));
 $('#refresh').addEventListener('click', refresh);
 $('#modal').addEventListener('click', event => { if (event.target === $('#modal')) { const r = $('#modal').getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) $('#modal').close(); } });

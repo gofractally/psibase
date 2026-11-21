@@ -1,0 +1,52 @@
+{
+  "status": "Deployed; native browser and persistence checks passed",
+  "package_sha256": "470c870e11e041c5e32c6a2f478f6dfffa303ec87a98b0ad51d4989f4a5ec53a",
+  "files": {
+    "exchange.wasm": {
+      "sha256": "e3431919968b9e7488f8642bd77010fefe64dbfe8b772acbf5d64cfdf62c7a11",
+      "size": 289589
+    },
+    "exchange.schema.json": {
+      "sha256": "50a730c91dedeb53a6b9918b82ecb4e145efbbd0c6a789dbd81f4c8ca3b881a2",
+      "size": 6671
+    },
+    "r-exchange.wasm": {
+      "sha256": "09c4ed4f920c75d62971495fac4efade7a789be52951e7d1c5886f3de7e7f0f6",
+      "size": 374020
+    },
+    "r-exchange.schema.json": {
+      "sha256": "763d76dacfd9fba9e3b4a149caa5b532fb16c67b9cc5b34af68cdb2de9dd227c",
+      "size": 715
+    }
+  },
+  "financial_flags": [],
+  "query_flags": [
+    "isPrivileged"
+  ],
+  "financial_source_provenance": "demo/stop-native-source.json",
+  "additional_test_source_provenance": "demo/stop-additional-native-source.json",
+  "ui_matches_package": true,
+  "upgrade_preserved_all_four_wallets": true,
+  "ui_assets": [
+    "index.html",
+    "style.css",
+    "src/market-policy.js",
+    "src/market-chart.js",
+    "src/config.js",
+    "src/stop-orders.js",
+    "src/amounts.js",
+    "src/order-book.js",
+    "src/app.js"
+  ],
+  "ui_minimum_size_validation": true,
+  "persistence_report": "demo/stop-persistence-verification.json",
+  "demo_seed": "demo/stop-demo-seed.json",
+  "financial_test_package_sha256": "37845ce046bd3c598852f98a5b5c8044c491ed1cf679541bf7b1e9c4163ed03f",
+  "final_package_ui_only_change": true,
+  "financial_byte_identity_verified": true,
+  "browser_qa": "packages/user/Exchange/ui/qa/STOPS.md",
+  "layout_qa": "packages/user/Exchange/ui/qa/LAYOUT-HEIGHT.md",
+  "live_verification": "demo/live-verification.json",
+  "demo_python_tests": 57,
+  "ui_tests": 16
+}

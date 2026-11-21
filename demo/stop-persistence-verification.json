@@ -1,0 +1,38 @@
+{
+  "result": "passed",
+  "known_wallets": [
+    "alice",
+    "bob",
+    "carol",
+    "demomakera",
+    "demomakerb",
+    "demomakerc",
+    "demotaker",
+    "liquidity"
+  ],
+  "compared_fields": [
+    "balances",
+    "lenders",
+    "levels",
+    "loan_positions",
+    "loans",
+    "markets",
+    "positions",
+    "relay_shares",
+    "stop_positions",
+    "stop_positions_next",
+    "tokens"
+  ],
+  "snapshots_identical": true,
+  "account_sha256": {
+    "alice": "3df8883900c2a2677f16b1e89b86992e3fe09210defcea901f846543b436b119",
+    "bob": "d0d928fac5624b37b51c4fc5f993d5560feb1a9c052b7eaa06dd1c26cada1fa9",
+    "carol": "f2c22145a0d63030fea5838ca8ae8e3272a4356195b40fb4e599baa3c99547f7",
+    "demomakera": "20639f125e8a2150c68119ac52fc285688d3d8dd0bcec6a784efae8f098b44ec",
+    "demomakerb": "7485aaa00875eb298466f109fd3ca1078c4f71e17b1bf209d53bc79d3d0e62f0",
+    "demomakerc": "4515dc0dd5479bfbfdac3c15e73812b01781727ceaa3ccc795a278cb9c559b62",
+    "demotaker": "aca30713293aee90aa82bb75f5df26f342f2e70025f1525ec17f14a94e13036d",
+    "liquidity": "8f629b97efe83c429c31cf7b4355b1869a516a23ab58bcd3a9d3654076a3d83f"
+  },
+  "scope": "Controlled native node and wallet restart with active main stop orders and one secured loan; background trader stopped and drained before snapshots; all8 financial owner views and public backing preserved."
+}

@@ -11,6 +11,7 @@ postinstall = [
     { sender = "exchange", service = "exchange", method = "init", data = {} },
     { sender = "exchange", service = "events", method = "addIndex", data = { db = 0, service = "exchange", event = "traded", column = 0 } },
     { sender = "exchange", service = "events", method = "addIndex", data = { db = 0, service = "exchange", event = "liquidated", column = 0 } },
+    { sender = "exchange", service = "events", method = "addIndex", data = { db = 0, service = "exchange", event = "stoptraded", column = 0 } },
 ]
 [dependencies]
 psibase.workspace = true

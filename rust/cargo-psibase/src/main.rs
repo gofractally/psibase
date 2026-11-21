@@ -683,6 +683,11 @@ async fn build_service_impl(
         .arg("--target=wasm32-wasip1")
         .arg("--manifest-path")
         .arg(manifest)
+        // Every generated wrapper has the same package/output name. Do not
+        // inherit a shared CARGO_TARGET_DIR: parallel services could overwrite
+        // another wrapper after normalization and before schema execution.
+        .arg("--target-dir")
+        .arg(manifest.parent().expect("wrapper manifest directory").join("target"))
         .arg("--message-format=json-diagnostic-rendered-ansi")
         .arg("--color=always")
         .arg(target)

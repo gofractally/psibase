@@ -14,8 +14,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def command_for_pid(pid):
-    return subprocess.run(["ps", "-p", str(pid), "-o", "command="],
-                          text=True, capture_output=True).stdout.strip()
+    result = subprocess.run(["ps", "-p", str(pid), "-o", "stat=", "-o", "command="],
+                            text=True, capture_output=True).stdout.strip().split(None, 1)
+    # A just-exited child may briefly remain as a zombie, with its command
+    # replaced by '(psinode)' or '<defunct>'. It no longer owns a listener or
+    # database lock; retain the strict identity check for live reused PIDs.
+    if len(result) < 2 or result[0].startswith("Z"):
+        return ""
+    return result[1]
 
 
 def active(name, expected):

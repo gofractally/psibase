@@ -1,0 +1,99 @@
+{
+  "stage": "sell-stop-completed-before-withdrawal",
+  "market": [
+    {
+      "id": 7,
+      "base": 1,
+      "quote": 2,
+      "base_lot": 10000,
+      "quote_tick": 1,
+      "x": 120001,
+      "y": 833327,
+      "k": "100000000000",
+      "lp_supply": 316227,
+      "vault_base": 0,
+      "vault_quote": 0,
+      "debt_base": 0,
+      "debt_quote": 0,
+      "lending_base": 0,
+      "lending_quote": 0,
+      "maturity": 1797834276,
+      "margin_enabled": true,
+      "legacy_unsupported": false,
+      "escrow_base": {
+        "expected": 120001,
+        "actual": 120001,
+        "funded": true
+      },
+      "escrow_quote": {
+        "expected": 909091,
+        "actual": 909091,
+        "funded": true
+      }
+    }
+  ],
+  "balances": [
+    {
+      "token": 1,
+      "wallet": 800000000,
+      "incoming": 50780299,
+      "outgoing": 197999682,
+      "spendable": 248779981,
+      "auto_debit": false
+    },
+    {
+      "token": 2,
+      "wallet": 8000000000,
+      "incoming": 10907245,
+      "outgoing": 1500100000,
+      "spendable": 1511007245,
+      "auto_debit": false
+    }
+  ],
+  "stop_positions": [
+    {
+      "owner": "alice",
+      "generation": 394,
+      "market": 7,
+      "sell_base": true,
+      "trigger": 95000,
+      "status": "filled",
+      "remaining_outgoing": 0,
+      "claimable_input": 0,
+      "claimable_output": 75764,
+      "original_input": 10001,
+      "input_token": 1,
+      "output_token": 2
+    }
+  ],
+  "trades": {
+    "market": "7",
+    "source": "native-history",
+    "aggregation": "native-aggregate-execution",
+    "trades": [
+      {
+        "event_id": "83303",
+        "market": "7",
+        "side": "sell",
+        "sell_base": true,
+        "base_amount": "10000",
+        "quote_amount": "90909",
+        "block_num": "9867",
+        "time": "2026-11-21T09:03:49.000000Z",
+        "kind": "trade"
+      },
+      {
+        "event_id": "83300",
+        "market": "7",
+        "side": "sell",
+        "sell_base": true,
+        "base_amount": "10001",
+        "quote_amount": "75764",
+        "block_num": "9867",
+        "time": "2026-11-21T09:03:49.000000Z",
+        "kind": "stop"
+      }
+    ],
+    "next_before": null
+  }
+}

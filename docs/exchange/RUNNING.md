@@ -39,7 +39,7 @@ python3 demo/publish_ui.py
 
 The Exchange package also contains its UI files under the native Sites data
 layout and declares Sites and Events dependencies. Its post-install actions
-configure market indexes for trade and liquidation history. The query service
+configure market indexes for trade, liquidation and stop execution history. The query service
 returns `None` for static asset paths so HttpServer can apply its standard
 Sites fallback; it retains the native action-schema developer endpoints.
 The demo publishing script adds only the exact local wallet address to the
@@ -132,7 +132,9 @@ and the trader can be started explicitly using the command above.
 
 Candlesticks use confirmed native execution events and native block times,
 with 5-second, 15-second and 1-minute intervals. Each execution is an aggregate
-taker fill, so its displayed price is its actual quote/base VWAP. Empty time
+taker fill, liquidation or same-direction stop batch, so its displayed price
+is its actual quote/base VWAP. Event commit order does not reproduce every
+intermediate marginal price in an auction. Empty time
 buckets are not filled with invented trades. The paginated history endpoint
 uses the native market event index to select a bounded number of event IDs
 before fetching exact history rows; it does not sort the entire chain history.
@@ -227,15 +229,28 @@ Rebuild the application and tests using the locally built tools:
 cd /Users/dlarimer/psibase-exchange
 npm --prefix packages/user/Exchange/ui run build
 npm --prefix packages/user/Exchange/ui test
-python3 -m unittest discover -s demo -p 'test_bridge.py' -v
-rust/target/release/cargo-psibase psibase \
-  --psitest="$PWD/build/psitest" -p exchange-pkg package \
-  --manifest-path packages/user/Cargo.toml
-rust/target/release/cargo-psibase psibase \
-  --psitest="$PWD/build/psitest" -p exchange test \
-  --manifest-path packages/user/Cargo.toml
+python3 -m unittest discover -s demo -p 'test_*.py' -v
+python3 packages/user/Exchange/test_stops.py
+python3 experiments/stop-cascade/test_reference_model.py
+python3 demo/verify_exchange.py test
+python3 demo/verify_exchange.py package
 python3 demo/check_live.py
 ```
+
+`verify_exchange.py` builds an isolated snapshot of the committed workspace
+manifests plus current Exchange sources and the native fixture-fork helper.
+This prevents another task's unfinished workspace packages from affecting
+verification. It records source hashes under `build-exchange-verification/`.
+It does not alter those concurrent sources or manifests. The host stop harness
+extracts the production Rust planner and claim arithmetic; it complements the
+native suite and does not exercise native token custody or authorization.
+
+Native benchmark repeats fork identical funded chain state and fixed block
+time. Only the individual transaction is timed; boot, fixture construction,
+forking and full post-action audits are excluded. See
+[the validation report](VERIFICATION.md) for distributions and confidence
+boundaries. Measured durations are variable; exact outputs, work counts and
+accounting assertions are deterministic.
 
 Native test cases perform independent cash, ownership, share,
 unit and complete liquidation-schedule audits, including rejected-transaction
