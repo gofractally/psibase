@@ -44,3 +44,8 @@ target/
 .clangd
 AGENTS.md
 .direnv
+# FetchContent sources are independent canonical repositories, never vendored.
+/external/psio/
+/external/psitri/
+/external/ucc/
+/external/psizam/
