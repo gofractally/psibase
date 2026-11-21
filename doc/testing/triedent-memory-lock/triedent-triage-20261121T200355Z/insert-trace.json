@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "strace",
+    "-f",
+    "-tt",
+    "-T",
+    "-e",
+    "trace=mlock,mmap,munmap,ftruncate",
+    "-o",
+    "/home/dlarimer/psibase-migration-20261121/evidence/triedent-triage-20261121T200355Z/insert.strace",
+    "/home/dlarimer/psibase-migration-20261121/source/build/triedent-tests",
+    "insert",
+    "--durations",
+    "yes"
+  ],
+  "exit_code": 0,
+  "seconds": 19.699217904359102,
+  "memlock": [
+    68719476736,
+    68719476736
+  ],
+  "load": [
+    3.2919921875,
+    2.701171875,
+    2.82470703125
+  ]
+}

@@ -1,0 +1,192 @@
+Randomness seeded to: 673498837
+0.324 s: key round trip
+0.499 s: key order
+0.001 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: insert
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.000 s: erase
+0.001 s: recover
+0.019 s: many refs
+0.477 s: small cache
+0.933 s: small cache no inplace
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_empty
+0.000 s: test is_equal_weak
+0.000 s: test is_equal_weak
+0.000 s: test is_equal_weak
+0.000 s: test is_equal_weak
+0.000 s: test is_equal_weak
+0.000 s: test is_equal_weak
+0.000 s: test is_equal_weak
+0.000 s: test is_equal_weak
+0.000 s: test is_equal_weak
+0.000 s: test is_equal_weak
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test take
+0.000 s: test splice
+0.000 s: test splice
+0.000 s: test splice
+0.000 s: test splice
+0.000 s: test splice
+0.000 s: test splice
+0.000 s: test splice
+0.000 s: test splice
+0.001 s: test splice
+0.001 s: test splice
+0.001 s: test splice
+0.001 s: test splice
+0.002 s: test splice
+0.001 s: test splice
+0.001 s: test splice
+0.001 s: test splice
+0.001 s: test splice
+0.001 s: test splice
+0.002 s: test splice
+0.001 s: test splice
+0.043 s: test splice
+0.046 s: test splice
+0.043 s: test splice
+0.000 s: mapping access
+0.001 s: extend mapping aligned
+0.002 s: extend mapping unaligned
+0.000 s: file access
+0.000 s: file mode
+0.011 s: gc_queue
+0.101 s: location_lock
+0.000 s: object_info
+0.000 s: ring_allocator
+0.000 s: region_allocator
+0.101 s: region_allocator threaded
+0.000 s: cache_allocator
+0.101 s: cache_allocator long
+0.000 s: copy constructor
+0.000 s: Test cow_ptr
+0.000 s: move constructor
+0.000 s: Test cow_ptr
+0.000 s: copy constructor null
+0.000 s: Test cow_ptr
+0.000 s: move constructor null
+0.000 s: Test cow_ptr
+0.000 s: copy assignment null/null
+0.000 s: Test cow_ptr
+0.000 s: copy assignment null/p
+0.000 s: Test cow_ptr
+0.000 s: copy assignment p/null
+0.000 s: Test cow_ptr
+0.000 s: copy assignment p/p
+0.000 s: Test cow_ptr
+0.000 s: move assignment null/null
+0.000 s: Test cow_ptr
+0.000 s: move assignment null/p
+0.000 s: Test cow_ptr
+0.000 s: move assignment p/null
+0.000 s: Test cow_ptr
+0.000 s: move assignment p/p
+0.000 s: Test cow_ptr
+0.000 s: release null
+0.000 s: Test cow_ptr
+0.000 s: release
+0.000 s: Test cow_ptr
+0.000 s: release 2
+0.000 s: Test cow_ptr
+0.000 s: unique null
+0.000 s: Test cow_ptr
+0.000 s: unique null
+0.000 s: Test cow_ptr
+0.000 s: unique 2
+0.000 s: Test cow_ptr
+===============================================================================
+All tests passed (50736019 assertions in 26 test cases)
+
