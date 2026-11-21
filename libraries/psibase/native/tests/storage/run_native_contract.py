@@ -20,7 +20,10 @@ build = root / a.build_dir
 evidence = build / 'evidence' / datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
 evidence.mkdir(parents=True, exist_ok=False)
 report = {'platform': platform.platform(), 'commands': [], 'source_sha256': {}, 'passed': False}
-sources = ['programs/psinode/main.cpp', 'programs/psinode/config.in',
+sources = ['cmake/PsibaseDependencies.cmake', 'cmake/PsibaseDependencyValidation.cmake',
+           'cmake/ucc.cmake', 'cmake/psitri.cmake',
+           'cmake/dependencies/ucc-files.sha256', 'cmake/dependencies/psitri-files.sha256',
+           'programs/psinode/main.cpp', 'programs/psinode/config.in',
            'libraries/psibase/native/include/psibase/storage.hpp',
            'libraries/psibase/native/include/psibase/storageDiagnostics.hpp',
            'libraries/psibase/native/include/psibase/db.hpp',

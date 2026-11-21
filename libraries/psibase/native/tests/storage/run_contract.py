@@ -29,7 +29,8 @@ report['thread_sanitizer']=a.tsan
 for directory in ['cmake/dependencies','libraries/psibase/native/tests/storage']:
     for path in sorted((root/directory).rglob('*')):
         if path.is_file():report['source_sha256'][str(path.relative_to(root))]=hashlib.sha256(path.read_bytes()).hexdigest()
-for relative in ['cmake/PsibaseDependencies.cmake','cmake/psitri.cmake','libraries/psibase/native/src/psitriStorage.cpp',
+for relative in ['cmake/PsibaseDependencies.cmake','cmake/PsibaseDependencyValidation.cmake',
+                 'cmake/ucc.cmake','cmake/psitri.cmake','libraries/psibase/native/src/psitriStorage.cpp',
                  'libraries/psibase/native/include/psibase/storage.hpp',
                  'libraries/psibase/native/include/psibase/CpuAccounting.hpp',
                  'libraries/psibase/native/include/psibase/NativeThreadClock.hpp',
