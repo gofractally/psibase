@@ -181,7 +181,12 @@ namespace psibase::net
 
       struct DeferredMessage
       {
-         using MessageKey = std::tuple<peer_id, Checksum256>;
+         struct MessageKey
+         {
+            peer_id     peer;
+            Checksum256 blockid;
+            friend auto operator<=>(const MessageKey&, const MessageKey&) = default;
+         };
          peer_id           peer;
          Checksum256       blockid;
          std::vector<char> message;
@@ -275,7 +280,7 @@ namespace psibase::net
       }
       void on_peer_block(peer_id peer, const Checksum256& blockid)
       {
-         auto r = deferredMessages.equal_range(std::tuple{peer, blockid});
+         auto r = deferredMessages.equal_range(typename DeferredMessage::MessageKey{peer, blockid});
          for (const auto& value : std::ranges::subrange(r.first, r.second))
          {
             async_send(peer, value.message);
