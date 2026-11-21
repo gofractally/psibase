@@ -27,6 +27,8 @@ published `checkpoint/native-runtime-2026-11-21` revision.
 UCC is the public standalone extraction with its two qualified header fixes;
 its checkpoint covers the existing container tests and header consumer, not
 the complete database engine.
+The psitri repository remains private; its SSH URL requires authorized GitHub
+access. Dependency acquisition does not change that repository's visibility.
 
 For psitri, UCC, and psizam, the first declaration MUST retain
 `SOURCE_SUBDIR .psibase-no-top-level-cmake`. `psibase_acquire_dependency(name)`
