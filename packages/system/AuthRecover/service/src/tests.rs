@@ -3,48 +3,59 @@
 #[cfg(test)]
 mod tests {
     use crate::Wrapper;
+    use p256::{
+        ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey},
+        pkcs8::EncodePublicKey,
+    };
     use psibase::fracpack::Pack;
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
     use psibase::*;
 
-    const BOBKEY: &'static str = r#"-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4Jw8jwL4Yno9j3aqw5DL+HbsycEd
-j/AzX82KcJ6DAv8m0bA7bCi4j0Clslq6sU/80vgq8MWqQRDh0DAZ/Ycpgg==
------END PUBLIC KEY-----
-"#;
+    // Public, deterministic test fixtures; never use these keys for deployment.
+    #[derive(Clone, Copy)]
+    enum TestKey {
+        Bob = 1,
+        Recovery = 2,
+        NewBob = 3,
+    }
 
-    const RECOVERYKEY: &'static str = r#"-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDR3UnfN5DKcSWyVgQDijnOK6kJjN
-NIkZtaNwUbRF7vWce01NqajaiOnNtjTTPluCsR8GhTSGV4RVokrRT1AgLw==
------END PUBLIC KEY-----
-"#;
+    impl TestKey {
+        fn signing_key(self) -> SigningKey {
+            SigningKey::from_bytes((&[self as u8; 32]).into()).unwrap()
+        }
 
-    const BOBKEY2: &'static str = r#"-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEay21JDU2rSOGWbR+St+53yDbnQIZ
-s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
------END PUBLIC KEY-----
-"#;
+        fn public_key(self) -> SubjectPublicKeyInfo {
+            SubjectPublicKeyInfo(
+                self.signing_key()
+                    .verifying_key()
+                    .to_public_key_der()
+                    .unwrap()
+                    .as_bytes()
+                    .to_vec(),
+            )
+        }
+    }
 
     const BOB: AccountNumber = account!("bob45678");
 
     fn do_test(
         chain: &psibase::Chain,
-        recover: Option<&str>,
+        recover: Option<TestKey>,
         delay: Option<MicroSeconds>,
-        set_key: Option<&str>,
+        set_key: Option<TestKey>,
         activate: bool,
-        keys: Vec<&str>,
+        keys: Vec<TestKey>,
         err: Option<&str>,
     ) -> Result<(), psibase::Error> {
         let alice = account!("alice");
         chain.new_account(alice).unwrap();
-        let bobkey: SubjectPublicKeyInfo = BOBKEY.parse()?;
+        let bobkey = TestKey::Bob.public_key();
         Wrapper::push_from(&chain, alice)
             .newAccount(BOB, bobkey)
             .get()?;
 
         if let Some(recover) = recover {
-            let recovery_key: SubjectPublicKeyInfo = recover.parse()?;
+            let recovery_key = recover.public_key();
             Wrapper::push_from(&chain, alice)
                 .recover(BOB, recovery_key.clone())
                 .get()?;
@@ -56,29 +67,40 @@ s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
 
         let mut actions = Vec::new();
         if let Some(set_key) = set_key {
-            actions.push(Wrapper::pack_from(BOB).setKey(set_key.parse()?))
+            actions.push(Wrapper::pack_from(BOB).setKey(set_key.public_key()))
         }
         if activate {
             actions.push(Wrapper::pack_from(BOB).activate())
         }
         let claims = keys
-            .into_iter()
-            .map(|k| {
-                Ok::<_, Error>(Claim {
-                    service: services::verify_sig::SERVICE,
-                    rawData: k.parse::<SubjectPublicKeyInfo>()?.0.into(),
-                })
+            .iter()
+            .map(|k| Claim {
+                service: services::verify_sig::SERVICE,
+                rawData: k.public_key().0.into(),
             })
-            .collect::<Result<_, _>>()?;
+            .collect();
         let mut tx = Transaction {
             tapos: Default::default(),
             actions,
             claims,
         };
         chain.fill_tapos(&mut tx, 2);
+        let transaction = tx.packed();
+        let digest = psibase::sha256(&transaction);
+        let proofs = keys
+            .iter()
+            .map(|key| {
+                let signature: Signature = key
+                    .signing_key()
+                    .sign_prehash(&digest.0)
+                    .map_err(Error::new)?;
+                Ok(signature.to_bytes().to_vec().into())
+            })
+            .collect::<Result<_, Error>>()?;
         let res = ChainEmptyResult {
             trace: chain.push(&SignedTransaction {
-                transaction: tx.packed().into(),
+                transaction: transaction.into(),
+                proofs,
                 ..Default::default()
             }),
         };
@@ -94,11 +116,11 @@ s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
     fn test_recover(chain: psibase::Chain) -> Result<(), psibase::Error> {
         do_test(
             &chain,
-            Some(RECOVERYKEY),
+            Some(TestKey::Recovery),
             None,
-            Some(BOBKEY2),
+            Some(TestKey::NewBob),
             true,
-            vec![RECOVERYKEY, BOBKEY2],
+            vec![TestKey::Recovery, TestKey::NewBob],
             None,
         )
     }
@@ -106,11 +128,11 @@ s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
     fn test_recover_missing_new_key(chain: psibase::Chain) -> Result<(), psibase::Error> {
         do_test(
             &chain,
-            Some(RECOVERYKEY),
+            Some(TestKey::Recovery),
             None,
-            Some(BOBKEY2),
+            Some(TestKey::NewBob),
             true,
-            vec![RECOVERYKEY],
+            vec![TestKey::Recovery],
             Some("Authorization for bob45678 -> auth-rcovr::activate failed"),
         )
     }
@@ -118,11 +140,11 @@ s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
     fn test_recover_missing_recovery_key(chain: psibase::Chain) -> Result<(), psibase::Error> {
         do_test(
             &chain,
-            Some(RECOVERYKEY),
+            Some(TestKey::Recovery),
             None,
-            Some(BOBKEY2),
+            Some(TestKey::NewBob),
             true,
-            vec![BOBKEY2],
+            vec![TestKey::NewBob],
             Some("Authorization for bob45678 -> auth-rcovr::setkey failed"),
         )
     }
@@ -130,11 +152,11 @@ s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
     fn test_recover_missing_activate(chain: psibase::Chain) -> Result<(), psibase::Error> {
         do_test(
             &chain,
-            Some(RECOVERYKEY),
+            Some(TestKey::Recovery),
             None,
-            Some(BOBKEY2),
+            Some(TestKey::NewBob),
             false,
-            vec![RECOVERYKEY],
+            vec![TestKey::Recovery],
             Some("Work not completed: auth-rcovr"),
         )
     }
@@ -144,9 +166,9 @@ s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
             &chain,
             None,
             None,
-            Some(BOBKEY2),
+            Some(TestKey::NewBob),
             true,
-            vec![BOBKEY, BOBKEY2],
+            vec![TestKey::Bob, TestKey::NewBob],
             None,
         )
     }
@@ -154,11 +176,11 @@ s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
     fn test_timeout_not_reached(chain: psibase::Chain) -> Result<(), psibase::Error> {
         do_test(
             &chain,
-            Some(RECOVERYKEY),
+            Some(TestKey::Recovery),
             Some(MicroSeconds::new(899000000)),
-            Some(BOBKEY2),
+            Some(TestKey::NewBob),
             true,
-            vec![RECOVERYKEY, BOBKEY2],
+            vec![TestKey::Recovery, TestKey::NewBob],
             None,
         )
     }
@@ -166,11 +188,11 @@ s2vjfI4TO+IYj/Kebav3qNYEdW0wpurC4SlSZPMHLK46fgGsLarhdvRIDQ==
     fn test_timeout_expired(chain: psibase::Chain) -> Result<(), psibase::Error> {
         do_test(
             &chain,
-            Some(RECOVERYKEY),
+            Some(TestKey::Recovery),
             Some(MicroSeconds::new(900000000)),
-            Some(BOBKEY2),
+            Some(TestKey::NewBob),
             true,
-            vec![RECOVERYKEY, BOBKEY2],
+            vec![TestKey::Recovery, TestKey::NewBob],
             Some("Authorization for bob45678 -> auth-rcovr::setkey failed"),
         )
     }
