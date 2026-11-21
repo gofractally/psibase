@@ -98,9 +98,9 @@ def _setup():
   # Boot uses optimistic pushes. Let their block references and package metadata
   # become visible in the committed head before resolving/installing more apps.
   for _ in range(2):
-   previous=wait(lambda:http('/common/tapos/head',service='psibase'))
+   previous=wait(lambda:http('/common/tapos/head',service='common-api'))
    def advanced():
-    current=http('/common/tapos/head',service='psibase')
+    current=http('/common/tapos/head',service='common-api')
     if current==previous:raise ValueError('Waiting for committed boot head')
     return current
    wait(advanced)
