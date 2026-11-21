@@ -1,0 +1,39 @@
+{
+  "time_utc": "2026-11-21T20:12:07Z",
+  "results": {
+    "source": "/home/dlarimer/psibase-migration-20261121/source",
+    "binary": "/home/dlarimer/psibase-migration-20261121/source/build/triedent-tests",
+    "binary_sha256": "01a27931ecdf85e54fdec1550daa3a354869f7b8232cc4173c7af4fa0f42b16b",
+    "head": "4d7097848da7dc803db55227f3a7d67ef5335056",
+    "argv": [
+      "/home/dlarimer/psibase-migration-20261121/source/build/triedent-tests",
+      "--durations",
+      "yes"
+    ],
+    "load_before": [
+      2.43017578125,
+      2.2109375,
+      2.69482421875
+    ],
+    "passed": false,
+    "pid": 58114
+  },
+  "tail": [
+    "9.069 s: test splice",
+    "9.045 s: test splice",
+    "9.694 s: test splice",
+    "9.148 s: test splice"
+  ],
+  "children": [
+    {
+      "pid": "58115",
+      "stat": "58115 (triedent-tests) R 58114 58114 58114 0 -1 4194304 360349908 0 1 0 230 48928 0 0 20 0 1 0 1873506772 3456221184 724202 18446744073709551615 100158529064960 100158529795489 140726677669632 0 0 0 0 0 17578 0 0 0 17 6 0 0 0 0 0 100158529982360 100158530005408 100158602682368 140726677675287 140726677675373 140726677675373 140726677675954 0\n",
+      "status": {
+        "State": "R (running)",
+        "VmLck": "3145744 kB",
+        "VmRSS": "2897564 kB",
+        "Threads": "1"
+      }
+    }
+  ]
+}

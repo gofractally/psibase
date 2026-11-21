@@ -1,0 +1,26 @@
+Internal ctest changing into directory: /home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/linux
+UpdateCTestConfiguration  from :/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/linux/DartConfiguration.tcl
+UpdateCTestConfiguration  from :/home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/linux/DartConfiguration.tcl
+Test project /home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/linux
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 1
+    Start 1: n-triedent-tests
+
+1: Test command: /usr/bin/python3 "/home/dlarimer/psibase-migration-20261121/triedent-launcher-source/libraries/triedent/test/restricted_memlock.py" "/home/dlarimer/psibase-migration-20261121/source/build/triedent-tests"
+1: Working Directory: /home/dlarimer/psibase-migration-20261121/evidence/triedent-registered-launcher/20261121T201610Z/linux
+1: Test timeout computed to be: 600
+1: triedent test memory-lock soft limit: 68719476736 -> 65536 bytes; hard limit unchanged: 68719476736
+1: Randomness seeded to: 471358470
+1: ===============================================================================
+1: All tests passed (50736019 assertions in 26 test cases)
+1: 
+1/1 Test #1: n-triedent-tests .................   Passed    2.27 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   2.27 sec
