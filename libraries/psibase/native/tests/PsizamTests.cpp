@@ -1,5 +1,6 @@
 #include <bit>
 #include <catch2/catch_all.hpp>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <psibase/PsizamPolicy.hpp>
@@ -360,19 +361,26 @@ namespace
          auto code = psizam::read_wasm(PSIBASE_PSIZAM_SERVICE_WASM);
          // Pass the same SDK-produced Action bytes through the real WASM host
          // span ABI, without teaching the fixture the serialization layout.
-         auto nested = psio::to_frac(psibase::Action{.sender = service, .service = peer});
-         constexpr std::string_view marker = "PSIZAM_NESTED_ACTION";
-         auto slot = std::search(code.begin(), code.end(), marker.begin(), marker.end());
-         REQUIRE(slot != code.end());
-         REQUIRE(code.end() - slot >= 64);
-         REQUIRE(nested.size() + 4 <= 64);
-         std::fill_n(slot, 64, 0);
-         auto size = static_cast<std::uint32_t>(nested.size());
-         std::memcpy(std::addressof(*slot), &size, sizeof(size));
-         std::memcpy(std::addressof(*(slot + 4)), nested.data(), nested.size());
+         auto patch = [&](std::string_view marker, std::uint64_t sender)
+         {
+            auto nested = psio::to_frac(
+                psibase::Action{.sender = psibase::AccountNumber{sender}, .service = peer});
+            auto slot = std::search(code.begin(), code.end(), marker.begin(), marker.end());
+            REQUIRE(slot != code.end());
+            REQUIRE(code.end() - slot >= 64);
+            REQUIRE(nested.size() + 4 <= 64);
+            std::fill_n(slot, 64, 0);
+            auto size = static_cast<std::uint32_t>(nested.size());
+            std::memcpy(std::addressof(*slot), &size, sizeof(size));
+            std::memcpy(std::addressof(*(slot + 4)), nested.data(), nested.size());
+         };
+         patch("PSIZAM_NESTED_ACTION", service.value);
+         patch("PSIZAM_LOOP_ACTION", 2);
+         patch("PSIZAM_THROW_ACTION", 7);
          for (auto account : {service, peer})
          {
-            psibase::CodeRow row{.codeNum = account};
+            psibase::CodeRow row{.codeNum = account,
+                                 .flags = account == service ? psibase::CodeRow::isPrivileged : 0};
             block.db.kvPut(row.db, row.key(), row);
             psibase::setCode(
                 block.db, account, 0, 0,
@@ -529,4 +537,66 @@ TEST_CASE("Native cross-service calls preserve caller state stack and host span 
    // outer host action context and result transport before returning to WASM.
    CHECK(NativeService::value(fixture.called(transaction, fixture.service)) == 8);
    CHECK(NativeService::value(fixture.called(transaction, fixture.peer)) == 9);
+}
+
+TEST_CASE("Alt context deadlines and errors preserve transaction and cache ownership",
+          "[.alt-timeout-probe]")
+{
+   for (auto sender : {5u, 6u})
+   {
+      std::fprintf(stderr, "Checking tight alt loop %u\n", sender);
+      NativeService fixture;
+      {
+         psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                                 fixture.trace, psibase::DbMode::transaction()};
+         transaction.setWatchdog(std::chrono::milliseconds(20));
+         CHECK_THROWS_AS(fixture.run(transaction, sender), psibase::TimeoutException);
+         CHECK_THROWS_AS(fixture.called(transaction, fixture.service), psibase::TimeoutException);
+      }
+      CHECK_FALSE(psizam::detail::timed_run_has_timed_out.load());
+      {
+         psibase::TransactionContext next{fixture.block, fixture.signedTransaction, fixture.trace,
+                                          psibase::DbMode::transaction()};
+         CHECK(NativeService::value(fixture.run(next)) == 8);
+         CHECK(NativeService::value(fixture.called(next, fixture.peer)) == 8);
+      }
+   }
+   for (auto sender : {8u, 9u})
+   {
+      std::fprintf(stderr, "Checking thrown alt host call %u\n", sender);
+      NativeService fixture;
+      {
+         psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                                 fixture.trace, psibase::DbMode::transaction()};
+         CHECK_THROWS_WITH(fixture.run(transaction, sender),
+                           Catch::Matchers::ContainsSubstring("alt fixture failure"));
+         CHECK(transaction.remainingStack == transaction.getWasmConfig().vmOptions.max_stack_bytes);
+         CHECK(NativeService::value(fixture.called(transaction, fixture.service)) == 8);
+         CHECK(fixture.cache.span().empty());
+      }
+      {
+         psibase::TransactionContext next{fixture.block, fixture.signedTransaction, fixture.trace,
+                                          psibase::DbMode::transaction()};
+         CHECK(NativeService::value(fixture.run(next)) == 8);
+      }
+   }
+   for (unsigned attempt = 0; attempt < 8; ++attempt)
+   {
+      std::fprintf(stderr, "Checking replay alt clear race %u\n", attempt);
+      NativeService fixture;
+      fixture.block.isProducing = false;
+      fixture.signedTransaction.subjectiveData.emplace(100000, std::vector<char>{});
+      {
+         psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                                 fixture.trace, psibase::DbMode::transaction()};
+         transaction.setWatchdog(std::chrono::milliseconds(2));
+         CHECK_THROWS_AS(fixture.run(transaction, 10), psibase::TimeoutException);
+      }
+      CHECK_FALSE(psizam::detail::timed_run_has_timed_out.load());
+      {
+         psibase::TransactionContext next{fixture.block, fixture.signedTransaction, fixture.trace,
+                                          psibase::DbMode::transaction()};
+         CHECK(NativeService::value(fixture.run(next)) == 8);
+      }
+   }
 }

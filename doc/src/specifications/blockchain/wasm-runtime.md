@@ -20,7 +20,7 @@ The pinned source is the `external/psizam` submodule. Native node, tester and sc
 
 `NativeVMOptions` forwards every serialized chain `VMOptions` field: mutable global bytes, memory pages, table elements and stack bytes. The adapter rejects shared memory, memory64, imported resources, multiple memories or tables, exception tags, and tables other than funcref. It caps table growth before code generation using the same configured limit as the initial table, so the generated table layout agrees with initialization. Invalid policies fail explicitly.
 
-Cached backends have exclusive transaction ownership and reset linear memory, mutable globals and table state before reuse. The transaction removes its watchdog before returning backends to the shared cache. Native host spans and unaligned pointer proxies preserve their WASM32 ABI and validate access inside guarded memory.
+Cached backends have exclusive transaction ownership and reset linear memory, mutable globals and table state before reuse. The watchdog disables executable code for both primary and alternative RPC/callback contexts on expiry. The transaction unregisters its watchdog and waits for any callback before clearing either context map and returning backends to the shared cache. Timed-out transaction contexts cannot be reused. Native host spans and unaligned pointer proxies preserve their WASM32 ABI and validate access inside guarded memory.
 
 The native target links the engine core and standalone debugger only. The psizam component/runtime facade, which imports the new psio serialization headers, is excluded from the legacy-wire node during this checkpoint. This boundary allows the runtime and serialization migrations to be validated independently.
 

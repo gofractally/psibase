@@ -2,8 +2,12 @@
   (import "env" "setRetval" (func $retval (param i32 i32)))
   (import "env" "getResult" (func $result (param i32 i32 i32) (result i32)))
   (import "env" "call" (func $call (param i32 i32 i64) (result i32)))
+  (import "env" "abortMessage" (func $abort (param i32 i32)))
   (memory 1)
+  (data (i32.const 64) "alt fixture failure")
   (data (i32.const 128) "PSIZAM_NESTED_ACTION\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00")
+  (data (i32.const 256) "PSIZAM_LOOP_ACTION\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00")
+  (data (i32.const 384) "PSIZAM_THROW_ACTION\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00")
   (global $counter (mut i32) (i32.const 7))
   (func (export "start") (param i64))
   (func (export "called") (param $service i64) (param $sender i64)
@@ -13,6 +17,22 @@
     if (loop $forever br $forever) end
     local.get $sender i64.const 3 i64.eq
     if i32.const 65535 i32.const 2 call $retval return end
+    local.get $sender i64.const 7 i64.eq
+    if i32.const 64 i32.const 19 call $abort return end
+    local.get $sender i64.const 5 i64.eq
+    if i32.const 260 i32.const 256 i32.load i64.const 1 call $call drop return end
+    local.get $sender i64.const 6 i64.eq
+    if i32.const 260 i32.const 256 i32.load i64.const 2 call $call drop return end
+    local.get $sender i64.const 8 i64.eq
+    if i32.const 388 i32.const 384 i32.load i64.const 1 call $call drop return end
+    local.get $sender i64.const 9 i64.eq
+    if i32.const 388 i32.const 384 i32.load i64.const 2 call $call drop return end
+    local.get $sender i64.const 10 i64.eq
+    if
+      (loop $clear-alt
+        i32.const 388 i32.const 384 i32.load i64.const 2 call $call drop
+        br $clear-alt)
+    end
     local.get $sender i64.const 4 i64.eq
     if
       i32.const 132 i32.const 128 i32.load i64.const 0 call $call drop

@@ -451,7 +451,9 @@ namespace psibase
                        std::uint32_t    oldValueLen,
                        std::uint32_t    newValueLen)
       {
-         auto saved          = self.currentActContext->transactionContext.remainingStack;
+         auto& transactionStack = self.currentActContext->transactionContext.remainingStack;
+         auto  saved            = transactionStack;
+         auto  restoreStack     = psio::finally{[&] { transactionStack = saved; }};
          auto remainingStack = self.currentExecContext->remainingStack();
          check(remainingStack >= VMOptions::stack_usage_for_call, "stack overflow");
          remainingStack -= VMOptions::stack_usage_for_call;
@@ -481,8 +483,6 @@ namespace psibase
              std::get<ActionTrace>(self.currentActContext->actionTrace.innerTraces.back().inner);
          self.currentActContext->transactionContext.execCalledAction(callerFlags, act,
                                                                      inner_action_trace, flags);
-
-         self.currentActContext->transactionContext.remainingStack = saved;
       }
    }  // namespace
 
@@ -571,7 +571,9 @@ namespace psibase
 
    uint32_t NativeFunctions::call(std::span<const char> data, std::uint64_t flagsRaw)
    {
-      auto saved          = currentActContext->transactionContext.remainingStack;
+      auto& transactionStack = currentActContext->transactionContext.remainingStack;
+      auto  saved            = transactionStack;
+      auto  restoreStack     = psio::finally{[&] { transactionStack = saved; }};
       auto remainingStack = currentExecContext->remainingStack();
       check(remainingStack >= VMOptions::stack_usage_for_call, "stack overflow");
       remainingStack -= VMOptions::stack_usage_for_call;
@@ -605,7 +607,6 @@ namespace psibase
                                                              flags);
       setResult(*this, inner_action_trace.rawRetval);
 
-      currentActContext->transactionContext.remainingStack = saved;
       return result_value.size();
    }
 

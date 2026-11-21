@@ -37,3 +37,9 @@ target_compile_definitions(PsizamTests PRIVATE
 target_link_libraries(PsizamTests psibase Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME PsizamTests COMMAND PsizamTests)
 set_tests_properties(PsizamTests PROPERTIES TIMEOUT 30)
+
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_test(NAME PsizamAltTimeout
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/run_psizam_alt_timeout.py"
+        "$<TARGET_FILE:PsizamTests>")
+set_tests_properties(PsizamAltTimeout PROPERTIES TIMEOUT 15 PROCESSORS 2)
