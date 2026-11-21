@@ -448,6 +448,55 @@ fn settlement_creates_auto_debit_fee_balance(chain: psibase::Chain) -> Result<()
     Ok(())
 }
 
+#[psibase::test_case(packages("VirtualServer", "StagedTx"))]
+fn settlement_exhausts_resource_buffer(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    initial_setup(&chain)?;
+    let alice = account!("alice");
+    Wrapper::push_from(&chain, alice)
+        .conf_buffer(Some(crate::tables::tables::BufferConfig {
+            threshold_percent: 0,
+            capacity: 0,
+        }))
+        .get()?;
+    setup_enable_billing(&chain)?;
+
+    // buy_res_for creates an automatically deleted Tokens subaccount. Charge
+    // exactly its balance using the trusted CPU-usage notification, while the
+    // funded producer pays the transaction's ordinary CPU/network/disk costs.
+    // This avoids depending on a measured execution time to hit zero exactly.
+    let buffer_key = (Tokens::SERVICE, 8u16, 0u8, Wrapper::SERVICE, alice.to_string()).to_key();
+    for _ in 0..2 {
+        let cost = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_cpu_cost(1)
+            .get()?;
+        assert!(cost.value > 0);
+        Tokens::push_from(&chain, PRODUCER_ACCOUNT)
+            .credit(1, Wrapper::SERVICE, cost, "".into())
+            .get()?;
+        Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .buy_res_for(cost, alice, None)
+            .get()?;
+        assert!(chain.kv_get_bytes(DbId::Service, &buffer_key).is_some());
+
+        chain
+            .propose::<Wrapper>(PRODUCER_ACCOUNT, services::transact::Wrapper::SERVICE)
+            .useCpuSys(alice, 1)
+            .get()?;
+        assert!(chain.kv_get_bytes(DbId::Service, &buffer_key).is_none());
+        assert_eq!(
+            Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+                .get_resources(alice)
+                .get()?
+                .value,
+            0
+        );
+    }
+
+    chain.finish_block();
+    assert!(check_disk_invariant("exhausted resource buffer settlement", &chain));
+    Ok(())
+}
+
 // Bytes consumed since init
 fn disk_consumed(chain: &psibase::Chain) -> u64 {
     let disk = get_disk_state(chain);
