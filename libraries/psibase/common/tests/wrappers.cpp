@@ -139,6 +139,16 @@ TEST_CASE("Precision: it is its number, 0 to 8", "[wrappers]")
    CHECK(!psio::validate_pssz<Precision>(bytesOf("09")).ok());
    CHECK(readsJson<Precision>("8"));
    CHECK(!readsJson<Precision>("9"));
+   // The rejection names the number.
+   {
+      const auto status = psio::validate_pssz<Precision>(bytesOf("09"));
+      REQUIRE(!status.ok());
+      CHECK(status.error().what == "Value 9 outside allowed Precision range: 0 to 8");
+      Precision  out;
+      const auto read = psio::decode_json_checked(psio::ijson{}, std::string_view{"200"}, out);
+      REQUIRE(!read.ok());
+      CHECK(read.error().what == "Value 200 outside allowed Precision range: 0 to 8");
+   }
 }
 
 TEST_CASE("Decimal: a record whose text is the decimal number", "[wrappers]")

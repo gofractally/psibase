@@ -849,9 +849,7 @@ TEST_CASE("psibase records: the types slice 2b declared with PSIO, read", "[cano
    const auto nine     = psio1::convert_to_frac(std::uint8_t{9});
 #ifndef COMPILING_WASM
    // A value that is not a Memo or a Precision aborts with the type's own
-   // message, wherever it is read. (Precision: the message of the legacy
-   // hook named the value, "Value 9 outside allowed Precision range: 0 to
-   // 8"; a PSIO invariant reports a constant text.)
+   // message, wherever it is read.
    CHECK(rejection([&] { (void)psio1::from_frac<Memo>(longMemo); }) ==
          "Memo exceeds 80 bytes");
    CHECK(rejection([&] { (void)psio1::fracpack_validate<Memo>(longMemo); }) ==
@@ -861,11 +859,11 @@ TEST_CASE("psibase records: the types slice 2b declared with PSIO, read", "[cano
    CHECK(rejection([&] { (void)psio1::convert_from_json<Memo>("\"" + std::string(81, 'a') + "\""); }) ==
          "Memo exceeds 80 bytes");
    CHECK(rejection([&] { (void)psio1::from_frac<Precision>(nine); }) ==
-         "Value outside allowed Precision range: 0 to 8");
+         "Value 9 outside allowed Precision range: 0 to 8");
    CHECK(rejection([&] { (void)psio1::fracpack_validate<Precision>(nine); }) ==
-         "Value outside allowed Precision range: 0 to 8");
+         "Value 9 outside allowed Precision range: 0 to 8");
    CHECK(rejection([&] { (void)psio1::convert_from_json<Precision>("9"); }) ==
-         "Value outside allowed Precision range: 0 to 8");
+         "Value 9 outside allowed Precision range: 0 to 8");
    CHECK(rejection([&] { (void)psio1::convert_from_json<Decimal>("\"1.2.3\""); }) ==
          "Invalid number: parse error");
    CHECK(rejection([&] { (void)psio1::fracpack_validate<std::tuple<std::uint32_t, Memo>>(psio1::convert_to_frac(std::tuple{std::uint32_t{1}, std::string(81, 'a')})); }) ==

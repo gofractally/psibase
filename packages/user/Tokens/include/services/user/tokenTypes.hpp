@@ -24,7 +24,7 @@ namespace UserService
    ///
    /// A precision is its number wherever it is serialized (`transparent()`).
    /// A reader that checks its input rejects a number above 8
-   /// (`invariant(inRange)`).
+   /// (`invariant(inRange)`), with a message that names the number.
    struct Precision
    {
       static constexpr uint8_t precisionMin = 0;
@@ -35,21 +35,24 @@ namespace UserService
       explicit constexpr Precision(uint8_t p) : value{p} { validate(p); }
       constexpr Precision() : Precision(0) {}
 
+      /// "Value 9 outside allowed Precision range: 0 to 8"
+      static std::string outOfRange(uint8_t p)
+      {
+         return "Value " + std::to_string(p) + " outside allowed Precision range: " +
+                std::to_string(precisionMin) + " to " + std::to_string(precisionMax);
+      }
       static constexpr bool validate(const uint8_t& p)
       {
          if (precisionMin > p || p > precisionMax)
          {
-            psibase::check(
-                false, "Value " + std::to_string(p) + " outside allowed Precision range: " +
-                           std::to_string(precisionMin) + " to " + std::to_string(precisionMax));
+            psibase::check(false, outOfRange(p));
          }
          return true;
       }
       static psio::codec_status inRange(const Precision& p) noexcept
       {
          if (precisionMin > p.value || p.value > precisionMax)
-            return psio::codec_fail("Value outside allowed Precision range: 0 to 8", 0,
-                                    "Precision");
+            return psio::codec_fail_owned(outOfRange(p.value), 0, "Precision");
          return psio::codec_ok();
       }
 
