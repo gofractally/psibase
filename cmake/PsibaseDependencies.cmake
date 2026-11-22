@@ -28,7 +28,7 @@ function(psibase_declare_dependencies)
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
     FetchContent_Declare(ucc
         GIT_REPOSITORY https://github.com/gofractally/ucc.git
-        GIT_TAG cd2e2e305363588e8c9c8eb8b23572cd56952ce7
+        GIT_TAG d79166da0290fdf9d1f9d5880d4dfb45b2822cf3
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/ucc"
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
