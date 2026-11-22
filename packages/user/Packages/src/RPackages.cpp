@@ -84,8 +84,8 @@ namespace UserService
          requireAccount(owner);
 
          using Conn =
-             psibase::Connection<PublishedPackage, psio1::FixedString{"PublishedPackageConnection"},
-                                 psio1::FixedString{"PublishedPackageEdge"}>;
+             psibase::Connection<PublishedPackage, psio::fixed_string{"PublishedPackageConnection"},
+                                 psio::fixed_string{"PublishedPackageEdge"}>;
          auto published = Packages{}.open<PublishedPackageTable>().getIndex<0>();
          if (name)
          {

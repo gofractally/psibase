@@ -3,7 +3,6 @@
 #include <array>
 #include <cstdint>
 #include <optional>
-#include <psio/annotate.hpp>
 #include <psio/reflect.hpp>
 #include <string>
 #include <variant>

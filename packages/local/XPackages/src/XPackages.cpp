@@ -23,9 +23,9 @@ namespace
                      const std::optional<std::string>& after) const
       {
          using NodeType = LocalPackage;
-         using EdgeType = Edge<NodeType, psio1::reflected_name<NodeType> + "Edge">;
-         using ConnType = Connection<NodeType, psio1::reflected_name<NodeType> + "Connection",
-                                     psio1::reflected_name<NodeType> + "Edge">;
+         using EdgeType = Edge<NodeType, psio::reflect<NodeType>::fixed_name + "Edge">;
+         using ConnType = Connection<NodeType, psio::reflect<NodeType>::fixed_name + "Connection",
+                                     psio::reflect<NodeType>::fixed_name + "Edge">;
          ConnType result;
          PSIBASE_SUBJECTIVE_TX
          {

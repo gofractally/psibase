@@ -73,8 +73,8 @@ TEST_CASE("tables: a key is read through a view of the packed row", "[tables]")
 
 TEST_CASE("tables: GraphQL connection and edge names", "[tables]")
 {
-   using Conn = psibase::Connection<Row, psio1::reflected_name<Row> + "Connection",
-                                    psio1::reflected_name<Row> + "Edge">;
+   using Conn = psibase::Connection<Row, psio::reflect<Row>::fixed_name + "Connection",
+                                    psio::reflect<Row>::fixed_name + "Edge">;
    CHECK(std::string_view{get_type_name((const Conn*)nullptr)} == "RowConnection");
    CHECK(std::string_view{get_type_name((const Conn::Edge*)nullptr)} == "RowEdge");
    CHECK(std::string_view{get_type_name((const psibase::WithBlockContext<Row>*)nullptr)} ==

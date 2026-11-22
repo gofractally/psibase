@@ -54,11 +54,6 @@ namespace psibase
 
    using ServiceDatabaseSchema = std::vector<TableInfo>;
 
-   template <auto X, auto Y>
-   constexpr bool is_equal_member = false;
-   template <auto X>
-   constexpr bool is_equal_member<X, X> = true;
-
    template <auto V>
    const char* psibase_get_key_transform_name(nt_wrap<V>*, auto)
    {
@@ -175,21 +170,6 @@ namespace psibase
              });
       }
 
-      // The index of the data member K among the reflected members of T.
-      template <typename T, auto K, std::size_t... I>
-      static constexpr std::uint32_t get_member_index(std::index_sequence<I...>)
-      {
-         const bool    found[] = {is_equal_member<psio::reflect<T>::template member_pointer<I>, K>...,
-                                  false};
-         std::uint32_t i       = 0;
-         for (; i < sizeof...(I); ++i)
-         {
-            if (found[i])
-               return i;
-         }
-         abortMessage("Member is not reflected");
-      }
-
       template <bool Last, auto K, typename T, typename M>
       static void makeKeyImpl(M                    T::*,
                               FieldId&&            prefix,
@@ -209,9 +189,9 @@ namespace psibase
          {
             static_assert(!std::is_function_v<M>,
                           "Member function keys not supported. Use CompositeKey instead.");
-            constexpr auto idx = get_member_index<T, K>(
-                std::make_index_sequence<psio::reflect<T>::member_count>{});
-            prefix.path.push_back(idx);
+            constexpr auto idx = psio::reflect<T>::index_of_member(K);
+            static_assert(idx.has_value(), "Member is not reflected");
+            prefix.path.push_back(static_cast<std::uint32_t>(*idx));
             if constexpr (Last)
             {
                out.push_back(std::move(prefix));

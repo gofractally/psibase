@@ -469,21 +469,12 @@ namespace psibase
    {
       using type = tuple_cat_t<flatten_key_t<T>...>;
    };
-   template <typename T, typename = std::make_index_sequence<psio::reflect<T>::member_count>>
-   struct flatten_members;
-   template <typename T, std::size_t... I>
-   struct flatten_members<T, std::index_sequence<I...>>
-   {
-      using type =
-          tuple_cat_t<flatten_key_t<typename psio::reflect<T>::template member_type<I>>...>;
-   };
-   // (psio::Reflected is asked of object types only: for a reference type it
-   // does not compile.)
+   // A reflected record is flattened to the key types of its members.
    template <typename T>
-      requires(std::is_class_v<T> && !std::is_const_v<T> && psio::Reflected<T>)
+      requires psio::Reflected<T>
    struct flatten_key<T>
    {
-      using type = typename flatten_members<T>::type;
+      using type = flatten_key_t<typename psio::reflect<T>::member_types>;
    };
 
    UniqueKvHandle proxyKvOpen(DbId db, std::span<const char> prefix, KvMode mode);

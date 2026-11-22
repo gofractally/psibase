@@ -1040,18 +1040,3 @@ namespace psio1::reflection_impl
       requires ::psio::Reflected<T>
    canonical_reflect<T> psio_get_reflect_impl(T*, ReflectDummyParam*);
 }  // namespace psio1::reflection_impl
-
-// TEMPORARY: removed when PSIO has a compile-time string (gap G19,
-// doc/pssz-conversion.md), or with psio1.
-namespace psio1
-{
-   // The name of a type reflected with PSIO as a FixedString: a string that
-   // is a template argument and concatenates at compile time
-   // (`reflected_name<T> + "Edge"`). psibase names its GraphQL connection and
-   // edge types that way; psio::reflect<T>::name is a std::string_view, which
-   // is neither.
-   template <typename T>
-   inline constexpr auto reflected_name =
-       reflection_impl::canonical_name<static_cast<unsigned>(::psio::reflect<T>::name.size())>(
-           ::psio::reflect<T>::name);
-}  // namespace psio1

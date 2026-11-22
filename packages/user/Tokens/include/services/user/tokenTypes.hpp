@@ -7,10 +7,7 @@
 #include <optional>
 #include <psibase/check.hpp>
 #include <psio/adapter.hpp>
-#include <psio/annotate.hpp>
-#include <psio/invariant.hpp>
 #include <psio/reflect.hpp>
-#include <psio/transparent.hpp>
 #include <span>
 #include <string>
 #include <string_view>

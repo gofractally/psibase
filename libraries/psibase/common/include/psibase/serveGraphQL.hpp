@@ -5,6 +5,8 @@
 #include <rapidjson/writer.h>
 #include <psibase/Table.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psio/fixed_string.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/graphql.hpp>
 #include <psio1/to_hex.hpp>
 
@@ -94,7 +96,7 @@ namespace psibase
    ///
    /// `node` contains the row data. `cursor` identifies where in the
    /// table the node is located.
-   template <typename Node, psio1::FixedString EdgeName>
+   template <typename Node, psio::fixed_string EdgeName>
    struct Edge
    {
       Node        node;
@@ -102,7 +104,7 @@ namespace psibase
       PSIO_REFLECT(Edge, node, cursor)
    };
 
-   template <typename Node, psio1::FixedString EdgeName>
+   template <typename Node, psio::fixed_string EdgeName>
    constexpr const char* get_type_name(const Edge<Node, EdgeName>*)
    {
       return EdgeName.c_str();
@@ -112,7 +114,7 @@ namespace psibase
    ///
    /// `edges` contain the matching rows. `pageInfo` gives clients information
    /// needed to resume paging.
-   template <typename Node, psio1::FixedString ConnectionName, psio1::FixedString EdgeName>
+   template <typename Node, psio::fixed_string ConnectionName, psio::fixed_string EdgeName>
    struct Connection
    {
       using NodeType = Node;
@@ -123,7 +125,7 @@ namespace psibase
       PSIO_REFLECT(Connection, edges, pageInfo)
    };
 
-   template <typename Node, psio1::FixedString ConnectionName, psio1::FixedString EdgeName>
+   template <typename Node, psio::fixed_string ConnectionName, psio::fixed_string EdgeName>
    constexpr const char* get_type_name(const Connection<Node, ConnectionName, EdgeName>*)
    {
       return ConnectionName.c_str();
@@ -160,7 +162,7 @@ namespace psibase
    template <typename T>
    const char* get_type_name(const WithBlockContext<T>*)
    {
-      static constexpr auto name = psio1::reflected_name<T> + "WithBlockContext";
+      static constexpr auto name = psio::reflect<T>::fixed_name + "WithBlockContext";
       return name.c_str();
    }
 
@@ -669,7 +671,7 @@ namespace psibase
    constexpr auto gql_callable_fn(const TableIndex<T, K>*)
    {
       using Connection = psibase::Connection<  //
-          T, psio1::reflected_name<T> + "Connection", psio1::reflected_name<T> + "Edge">;
+          T, psio::reflect<T>::fixed_name + "Connection", psio::reflect<T>::fixed_name + "Edge">;
       return &detail::makeConnectionFn<Connection, T, K>;
    }  // gql_callable_fn
 
@@ -685,7 +687,7 @@ namespace psibase
    {
       using R          = decltype(std::declval<F>()(std::declval<T>()));
       using Connection = psibase::Connection<  //
-          R, psio1::reflected_name<R> + "Connection", psio1::reflected_name<R> + "Edge">;
+          R, psio::reflect<R>::fixed_name + "Connection", psio::reflect<R>::fixed_name + "Edge">;
       return &detail::makeTransformedConnection<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
@@ -701,7 +703,7 @@ namespace psibase
    {
       using R          = decltype(std::declval<F>()(std::declval<T>()));
       using Connection = psibase::Connection<  //
-          R, psio1::reflected_name<R> + "Connection", psio1::reflected_name<R> + "Edge">;
+          R, psio::reflect<R>::fixed_name + "Connection", psio::reflect<R>::fixed_name + "Edge">;
       return &detail::makeTransformedConnectionView<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
@@ -896,14 +898,14 @@ namespace psibase
       /// Each node is wrapped in WithBlockContext<T> carrying block metadata.
       /// Returns error if both first and last are specified.
       Connection<WithBlockContext<T>,
-                 psio1::reflected_name<T> + "Connection",
-                 psio1::reflected_name<T> + "Edge">
+                 psio::reflect<T>::fixed_name + "Connection",
+                 psio::reflect<T>::fixed_name + "Edge">
       query() const
       {
          auto [rows, has_next_page, has_prev_page] = all_edges();
 
-         using ConnType = Connection<WithBlockContext<T>, psio1::reflected_name<T> + "Connection",
-                                     psio1::reflected_name<T> + "Edge">;
+         using ConnType = Connection<WithBlockContext<T>, psio::reflect<T>::fixed_name + "Connection",
+                                     psio::reflect<T>::fixed_name + "Edge">;
          using EdgeType = typename ConnType::Edge;
 
          std::vector<uint64_t> rowids;

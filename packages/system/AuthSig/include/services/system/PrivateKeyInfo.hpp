@@ -1,7 +1,6 @@
 #pragma once
 #include <psibase/Table.hpp>
 #include <psibase/crypto.hpp>
-#include <psio/transparent.hpp>
 #include <string>
 #include <vector>
 

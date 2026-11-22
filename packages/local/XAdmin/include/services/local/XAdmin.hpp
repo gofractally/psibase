@@ -3,7 +3,6 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/SocketInfo.hpp>
-#include <psio/transparent.hpp>
 #include <services/system/SetCode.hpp>
 
 namespace LocalService

@@ -1,10 +1,7 @@
 #pragma once
 
 #include <psibase/check.hpp>
-#include <psio/annotate.hpp>
-#include <psio/invariant.hpp>
 #include <psio/reflect.hpp>
-#include <psio/transparent.hpp>
 
 #include <string>
 #include <string_view>
