@@ -27,6 +27,12 @@ namespace psibase
       ~WasmCache();
 
       std::vector<std::span<const char>> span() const;
+
+      /// Start compiling newly stored code in the background, so that it is
+      /// ready, or nearly, when a transaction first executes it.
+      void compileAhead(const Checksum256&    hash,
+                        std::span<const char> code,
+                        const VMOptions&      options);
    };
 
    struct ExecutionMemoryImpl;

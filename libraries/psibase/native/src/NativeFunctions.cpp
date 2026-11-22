@@ -148,6 +148,27 @@ namespace psibase
                "CodeByHashRow has incorrect key");
       }
 
+      void compileStoredCode(TransactionContext& context,
+                             psio::input_stream  key,
+                             psio::input_stream  value)
+      {
+         NativeTableNum table;
+         if (key.remaining() < sizeof(table))
+            return;
+         memcpy(&table, key.pos, sizeof(table));
+         std::reverse((char*)&table, (char*)(&table + 1));
+         if (table != codeByHashTable)
+            return;
+         auto code = psio::view<const CodeByHashRow>(
+             psio::prevalidated{std::span{value.pos, value.end}});
+         if (code.vmType() != 0 || code.vmVersion() != 0)
+            return;
+         std::span<const std::uint8_t> bytes = code.code();
+         context.blockContext.systemContext.wasmCache.compileAhead(
+             code.codeHash(), {reinterpret_cast<const char*>(bytes.data()), bytes.size()},
+             context.vmOptions());
+      }
+
       void verifyRemoveCodeByHashRow(TransactionContext& ctx,
                                      psio::input_stream  key,
                                      psio::input_stream  value)
@@ -765,6 +786,8 @@ namespace psibase
                    {
                       verifyWriteConstrained(transactionContext, fullKey,
                                              {value.data(), value.size()}, existing);
+                      compileStoredCode(transactionContext, fullKey,
+                                        {value.data(), value.size()});
                    }
                    notifyKvMut(*this, bucketDb, fullKey.size(),
                                existing ? existing->remaining() : -1, value.size());
@@ -777,6 +800,7 @@ namespace psibase
              else if (bucketDb == DbId::nativeSubjective)
              {
                 verifyWriteSubjective(database, fullKey, {value.data(), value.size()});
+                compileStoredCode(transactionContext, fullKey, {value.data(), value.size()});
              }
              else if (bucketDb == DbId::nativeSession)
              {

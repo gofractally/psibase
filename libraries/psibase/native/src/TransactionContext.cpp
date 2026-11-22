@@ -161,6 +161,11 @@ namespace psibase
             }
             setCode(db, service.service, service.vmType, service.vmVersion,
                     {service.code.data(), service.code.size()});
+            if (service.vmType == 0 && service.vmVersion == 0)
+               self.blockContext.systemContext.wasmCache.compileAhead(
+                   sha256(service.code.data(), service.code.size()),
+                   {reinterpret_cast<const char*>(service.code.data()), service.code.size()},
+                   self.vmOptions());
          }
       }
       catch (const std::exception& e)
@@ -534,6 +539,11 @@ namespace psibase
    std::chrono::nanoseconds TransactionContext::getBillableTime()
    {
       return impl->watchdog->elapsed();
+   }
+
+   const VMOptions& TransactionContext::vmOptions() const
+   {
+      return impl->wasmConfig.vmOptions;
    }
 
    void TransactionContext::setWatchdog(CpuClock::duration watchdogLimit)

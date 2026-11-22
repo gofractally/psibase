@@ -1,6 +1,14 @@
 #include <psibase/NativeFunctions.hpp>
 
 #include <atomic>
+#if defined(__APPLE__)
+#include <pthread/qos.h>
+#endif
+#include <condition_variable>
+#include <deque>
+#include <future>
+#include <map>
+#include <thread>
 #include <boost/multi_index/key.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
@@ -102,6 +110,64 @@ namespace psibase
             nativeArtifacts(path.empty() ? nativeAotCacheFromEnvironment()
                                          : std::make_shared<NativeAotCache>(path)) {}
 
+      // Compiling a service to native code takes seconds. It starts when the
+      // code is stored, on these threads, so it overlaps the rest of the
+      // transaction that installed it and other compiles. The first execution
+      // waits for it; it never runs the service on another engine instead.
+      using PendingKey = std::pair<Checksum256, VMOptions>;
+      struct Job
+      {
+         PendingKey                 key;
+         std::vector<std::uint8_t>  code;
+         std::promise<void>         done;
+      };
+      static constexpr std::size_t           maxQueuedCompiles = 256;
+      std::condition_variable                jobReady;
+      std::deque<Job>                        jobs;
+      std::map<PendingKey, std::shared_future<void>> pending;
+      std::vector<std::thread>               workers;
+      bool                                   stopping = false;
+
+      ~WasmCacheImpl()
+      {
+         {
+            std::lock_guard lock{mutex};
+            stopping = true;
+         }
+         jobReady.notify_all();
+         for (auto& worker : workers)
+            worker.join();
+      }
+
+      void compileAhead(const Checksum256& hash, std::span<const char> code, const VMOptions& options);
+      void runCompiles();
+
+      // Blocks until a compile started for this code, if any, has finished.
+      void awaitCompile(const Checksum256& hash, const VMOptions& options)
+      {
+         std::shared_future<void> done;
+         {
+            std::lock_guard lock{mutex};
+            auto            it = pending.find(PendingKey{hash, options});
+            if (it == pending.end())
+               return;
+            // Still queued behind other code: the caller needs it now, and
+            // compiles it itself rather than waiting for a free thread.
+            for (auto job = jobs.begin(); job != jobs.end(); ++job)
+            {
+               if (job->key == it->first)
+               {
+                  job->done.set_value();
+                  jobs.erase(job);
+                  pending.erase(it);
+                  return;
+               }
+            }
+            done = it->second;
+         }
+         done.wait();
+      }
+
       void add(BackendEntry&& entry)
       {
          std::lock_guard<std::mutex> lock{mutex};
@@ -125,6 +191,87 @@ namespace psibase
          return result;
       }
    };
+
+   void WasmCacheImpl::compileAhead(const Checksum256&    hash,
+                                    std::span<const char> code,
+                                    const VMOptions&      options)
+   {
+#if defined(PSIBASE_VM_LLVM_AOT)
+      std::lock_guard lock{mutex};
+      PendingKey      key{hash, options};
+      if (stopping || jobs.size() >= maxQueuedCompiles || pending.contains(key) ||
+          backends.get<ByHash>().find(std::tie(hash, options)) != backends.get<ByHash>().end())
+         return;
+      Job job{key, {code.begin(), code.end()}, {}};
+      pending.emplace(key, job.done.get_future().share());
+      // Smallest first: compile time grows with size, and one large service
+      // would otherwise hold a thread while many small ones wait behind it.
+      auto position = std::find_if(jobs.begin(), jobs.end(), [&](const Job& queued)
+                                   { return queued.code.size() > job.code.size(); });
+      jobs.insert(position, std::move(job));
+      const auto        cores  = std::thread::hardware_concurrency();
+      const std::size_t wanted = std::clamp<std::size_t>(cores > 2 ? cores - 2 : 1, 1, 16);
+      if (workers.size() < wanted && workers.size() < jobs.size())
+         workers.emplace_back([this] { runCompiles(); });
+      jobReady.notify_one();
+#endif
+   }
+
+   void WasmCacheImpl::runCompiles()
+   {
+#if defined(__APPLE__)
+      // Execution is waiting on these threads; without a class they are
+      // scheduled as background work on the efficiency cores.
+      pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
+#endif
+      for (;;)
+      {
+         std::unique_lock lock{mutex};
+         jobReady.wait(lock, [&] { return stopping || !jobs.empty(); });
+         if (stopping)
+         {
+            // Release anything still waiting; it compiles for itself.
+            for (auto& job : jobs)
+               job.done.set_value();
+            jobs.clear();
+            pending.clear();
+            return;
+         }
+         Job job = std::move(jobs.front());
+         jobs.pop_front();
+         lock.unlock();
+         try
+         {
+            // Code that fails here fails the same way, with its error
+            // reported, when a transaction first executes it.
+            NativeVMOptions options{job.key.second, nativeArtifacts};
+            validateNativeWasm(job.code, options);
+            psizam::debug::binary::input_stream stream{
+                reinterpret_cast<const char*>(job.code.data()), job.code.size()};
+            if (!dwarf::has_debug_info(stream))
+            {
+               BackendEntry entry{job.key.first, job.key.second};
+               entry.backend = std::make_unique<backend_t>(job.code, nullptr, options);
+               entry.debug   = dwarf::register_with_debugger(entry.backend->get_module());
+               add(std::move(entry));
+            }
+         }
+         catch (...)
+         {
+         }
+         lock.lock();
+         pending.erase(job.key);
+         lock.unlock();
+         job.done.set_value();
+      }
+   }
+
+   void WasmCache::compileAhead(const Checksum256&    hash,
+                                std::span<const char> code,
+                                const VMOptions&      options)
+   {
+      impl->compileAhead(hash, code, options);
+   }
 
    WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath)
        : impl{std::make_shared<WasmCacheImpl>(cacheSize, nativeArtifactPath)} {}
@@ -213,8 +360,9 @@ namespace psibase
          rethrowVMExcept(
              [&]
              {
-                backend = transactionContext.blockContext.systemContext.wasmCache.impl->get(
-                    code.codeHash, vmOptions);
+                auto& cache = *transactionContext.blockContext.systemContext.wasmCache.impl;
+                cache.awaitCompile(code.codeHash, vmOptions);
+                backend = cache.get(code.codeHash, vmOptions);
                 if (!backend.backend)
                 {
                    validateNativeWasm(c->code, this->vmOptions);

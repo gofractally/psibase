@@ -68,6 +68,8 @@ namespace psibase
 
       // Set watchdog timer; it will expire at startTime + serviceLoadTime + watchdogLimit.
       // This may be called multiple times with different limits; the most-recent limit applies.
+      /// The VM limits this context executes services under.
+      const VMOptions& vmOptions() const;
       void setWatchdog(CpuClock::duration watchdogLimit);
 
       const WasmConfigRow& getWasmConfig() const;
