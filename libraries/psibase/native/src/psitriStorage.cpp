@@ -243,19 +243,72 @@ namespace psibase::storage
       bool                   publish = true;
    };
 
-   // Run a read on the caller's thread with a borrowed reader session.
-   template <class F>
-   auto reading(const shared_root& source, F&& function)
+   // A storage session's own engine reader. The session's holder (one thread or
+   // strand at a time) reads through it directly. `busy` only detects misuse: if
+   // two threads ever read through one session object at once, the second falls
+   // back to the shared pool instead of sharing an engine session.
+   struct session_reader
    {
-      accounting::check();
-      auto& state = *source->state;
-      return state.readers.use(*state.engine,
-                               [&](Engine::read_session& session)
-                               {
-                                  decltype(auto) result = std::forward<F>(function)(session);
-                                  accounting::check();
-                                  return result;
-                               });
+      std::shared_ptr<State>                state;  // keeps the engine open
+      std::atomic<bool>                     busy{false};
+      bool                                  unavailable = false;
+      std::shared_ptr<Engine::read_session> session;
+      ~session_reader()
+      {
+         if (session)
+            state->access.invoke([&] { session.reset(); }, true);
+      }
+   };
+
+   // Run a read on the caller's thread through the session's own reader.
+   struct session_reading
+   {
+      template <class F>
+      static auto run(read_session& owner, const shared_root& source, F&& function)
+      {
+         accounting::check();
+         auto& state = *source->state;
+         auto  body  = [&](Engine::read_session& session)
+         {
+            decltype(auto) result = std::forward<F>(function)(session);
+            accounting::check();
+            return result;
+         };
+         if (!owner.reader)
+         {
+            owner.reader        = std::make_shared<session_reader>();
+            owner.reader->state = source->state;
+         }
+         auto& own = *owner.reader;
+         if (!own.busy.exchange(true, std::memory_order_acquire))
+         {
+            struct Release
+            {
+               std::atomic<bool>& busy;
+               ~Release() { busy.store(false, std::memory_order_release); }
+            } release{own.busy};
+            if (!own.session && !own.unavailable)
+            {
+               try
+               {
+                  own.session = state.engine->start_read_session();
+               }
+               catch (const std::runtime_error&)
+               {
+                  // The engine is out of session slots; share the pool instead.
+                  own.unavailable = true;
+               }
+            }
+            if (own.session)
+               return body(*own.session);
+         }
+         return state.readers.use(*state.engine, body);
+      }
+   };
+   template <class F>
+   auto reading(read_session& owner, const shared_root& source, F&& function)
+   {
+      return session_reading::run(owner, source, std::forward<F>(function));
    }
 
    void readValue(const shared_root&        source,
@@ -312,7 +365,7 @@ namespace psibase::storage
          return false;
       if (source->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return reading(source,
+      return reading(*this, source,
                      [&](Engine::read_session& session)
                      {
                         auto c = session.create_cursor(source->tree);
@@ -337,7 +390,8 @@ namespace psibase::storage
       less,
       max
    };
-   bool seek(const shared_root&        source,
+   bool seek(read_session&             owner,
+             const shared_root&        source,
              std::span<const char>     key,
              Seek                      kind,
              std::vector<char>*        outKey,
@@ -347,7 +401,7 @@ namespace psibase::storage
       if (!source)
          return false;
       return reading(
-          source,
+          owner, source,
           [&](Engine::read_session& session)
           {
              auto c     = session.create_cursor(source->tree);
@@ -380,7 +434,7 @@ namespace psibase::storage
    {
       if (r && r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return seek(r, k, Seek::lower, o, v, s);
+      return seek(*this, r, k, Seek::lower, o, v, s);
    }
    bool read_session::get_less_than(const shared_root&        r,
                                     std::span<const char>     k,
@@ -390,7 +444,7 @@ namespace psibase::storage
    {
       if (r && r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return seek(r, k, Seek::less, o, v, s);
+      return seek(*this, r, k, Seek::less, o, v, s);
    }
    bool read_session::get_max(const shared_root&        r,
                               std::span<const char>     k,
@@ -400,7 +454,7 @@ namespace psibase::storage
    {
       if (r && r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return seek(r, k, Seek::max, o, v, s);
+      return seek(*this, r, k, Seek::max, o, v, s);
    }
    bool read_session::is_empty(const shared_root&    r,
                                std::span<const char> lower,
@@ -410,7 +464,7 @@ namespace psibase::storage
          return true;
       if (r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return reading(r,
+      return reading(*this, r,
                      [&](Engine::read_session& session)
                      {
                         auto c = session.create_cursor(r->tree);
@@ -457,7 +511,7 @@ namespace psibase::storage
          return is_empty(a, lower, upper);
       if (a->state != b->state || a->state != view->state)
          throw std::runtime_error("foreign storage roots");
-      return reading(a,
+      return reading(*this, a,
                      [&](Engine::read_session& session)
                      {
                         return equalCursors(session.create_cursor(a->tree),

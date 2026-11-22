@@ -43,14 +43,19 @@ namespace psibase::storage
       resize
    };
    struct database_view;
+   struct session_reader;
    class database;
 
    class read_session
    {
      protected:
       std::shared_ptr<database_view> view;
+      // This session's own engine reader, taken once and kept: a thread or
+      // strand that holds a session reads through it with no sharing.
+      std::shared_ptr<session_reader> reader;
       explicit read_session(std::shared_ptr<database_view> v);
       friend class database;
+      friend struct session_reading;
 
      public:
       virtual ~read_session();
