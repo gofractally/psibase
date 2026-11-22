@@ -3,10 +3,27 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#if defined(__APPLE__) && !defined(O_PATH)
-// Darwin has no Linux path-only descriptor. Read-only opens retain the
-// existing O_NOFOLLOW checks; inaccessible paths fail closed.
+// Path resolution opens each component WITHOUT following a symbolic link, then
+// inspects the descriptor: a directory is entered, a link is read and resolved
+// against the mounts. Linux spells that O_PATH | O_NOFOLLOW and reads the link
+// with readlinkat(fd, ""). Darwin has no O_PATH; O_SYMLINK opens the link itself
+// and freadlink reads it. O_NOFOLLOW alone would refuse the link with ELOOP,
+// which the caller cannot tell from a missing file.
+#if defined(__APPLE__)
+#ifndef O_PATH
 #define O_PATH O_RDONLY
+#endif
+#define PSIBASE_OPEN_LINK_ITSELF (O_RDONLY | O_SYMLINK)
+static ssize_t readLinkFd(int fd, char* buffer, std::size_t size)
+{
+   return ::freadlink(fd, buffer, size);
+}
+#else
+#define PSIBASE_OPEN_LINK_ITSELF (O_PATH | O_NOFOLLOW)
+static ssize_t readLinkFd(int fd, char* buffer, std::size_t size)
+{
+   return ::readlinkat(fd, "", buffer, size);
+}
 #endif
 #include <algorithm>
 #include <filesystem>
@@ -61,7 +78,7 @@ namespace psibase
                std::string linkValue(statbuf.st_size ? statbuf.st_size + 1 : 256, '\0');
                while (true)
                {
-                  auto sz = ::readlinkat(dir.fd, "", linkValue.data(), linkValue.size());
+                  auto sz = readLinkFd(dir.fd, linkValue.data(), linkValue.size());
                   if (sz < 0)
                      throw std::system_error{ENOENT, std::generic_category()};
                   if (static_cast<std::size_t>(sz) == linkValue.size())
@@ -204,7 +221,7 @@ namespace psibase
                {
                   // Following the host file
                   const Fd& prev = path.back();
-                  auto fd = Fd{prev ? ::openat(prev.fd, item.c_str(), O_PATH | O_NOFOLLOW) : -1};
+                  auto fd = Fd{prev ? ::openat(prev.fd, item.c_str(), PSIBASE_OPEN_LINK_ITSELF) : -1};
                   if (!fd)
                      path.push_back(std::move(fd));
                   else
