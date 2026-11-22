@@ -181,6 +181,19 @@ namespace psibase
       std::shared_ptr<const Revision> head;
 
       mutable std::mutex  subjectiveMutex;
+      // Guards only the value of `subjective`. A subjective writer holds
+      // subjectiveMutex for its whole comparison, splice and publication;
+      // readers that only need the current roots must not wait behind that.
+      // Every execution context takes those roots when it is created, and on
+      // a producer verifying signatures a sixth of the main thread's time
+      // was spent waiting here for the service thread's commits.
+      // Lock order: subjectiveMutex, then this.
+      mutable std::mutex  subjectiveSnapshotMutex;
+      void setSubjective(IndependentRevision&& next)
+      {
+         std::lock_guard l{subjectiveSnapshotMutex};
+         subjective = std::move(next);
+      }
       IndependentRevision subjective;
 
       static constexpr auto numPersistentDatabases =
@@ -246,7 +259,7 @@ namespace psibase
 
       auto getNativeSubjective(DbId db = DbId::nativeSubjective)
       {
-         std::lock_guard l{subjectiveMutex};
+         std::lock_guard l{subjectiveSnapshotMutex};
          return subjective[independentIndex(db)];
       }
 
@@ -425,7 +438,7 @@ namespace psibase
       writer.upsert(proposedSubjective[independentIndex(db)], key, value);
       accounting::Publication publication;
       impl->publishSubjective(writer, proposedSubjective);
-      impl->subjective = std::move(proposedSubjective);
+      impl->setSubjective(std::move(proposedSubjective));
       publication.finish();
    }
 
@@ -437,7 +450,7 @@ namespace psibase
       writer.remove(proposedSubjective[independentIndex(db)], key);
       accounting::Publication publication;
       impl->publishSubjective(writer, proposedSubjective);
-      impl->subjective = std::move(proposedSubjective);
+      impl->setSubjective(std::move(proposedSubjective));
       publication.finish();
    }
 
@@ -452,7 +465,7 @@ namespace psibase
 
    IndependentRevision SharedDatabase::getSubjective()
    {
-      std::lock_guard l{impl->subjectiveMutex};
+      std::lock_guard l{impl->subjectiveSnapshotMutex};
       return impl->subjective;
    }
 
@@ -508,7 +521,7 @@ namespace psibase
             return false;
          }
          impl->publishSubjective(writer, proposedSubjective);
-         impl->subjective = std::move(proposedSubjective);
+         impl->setSubjective(std::move(proposedSubjective));
       }
       else
          publication.emplace();
