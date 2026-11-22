@@ -18,9 +18,9 @@ HEADERS = ROOT / 'libraries/psibase/common/src/HttpHeaders.cpp'
 includes = [ROOT / 'packages/user/Sites/include']
 includes += [p for p in sorted((ROOT / 'packages').glob('**/include')) if 'target' not in p.parts]
 includes += [ROOT / 'libraries/psibase/common/include', ROOT / 'libraries/psibase/wasm32-psibase',
-             ROOT / 'libraries/psio1/include', REL / 'include', REL / 'include/wasm32-psibase']
+             ROOT / 'libraries/psio1/include', ROOT / 'external/psio/cpp/include', REL / 'include', REL / 'include/wasm32-psibase']
 flags = ['--target=wasm32-wasip1', '-std=c++23', '-O2', '-fno-exceptions',
-         '-DCOMPILING_SERVICE', '-DCOMPILING_WASM', '-mthread-model', 'single',
+         '-DCOMPILING_SERVICE', '-DCOMPILING_WASM', '-DPSIO_EXCEPTIONS_ENABLED=0', '-DPSIO_HAVE_SIMDJSON=0', '-mthread-model', 'single',
          '-msign-ext', '-mnontrapping-fptoint', '-msimd128', '-mbulk-memory']
 for include in includes:
     flags += ['-I', str(include)]

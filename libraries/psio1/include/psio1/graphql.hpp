@@ -25,6 +25,15 @@ namespace psio1
       return false;
    }
 
+   // TEMPORARY: removed when psio1 is deleted.
+   // A type with a PSIO text adapter is a GraphQL String holding that text.
+   template <typename T>
+      requires ::psio::has_adapter_v<T, ::psio::text_category>
+   constexpr bool use_json_string_for_gql(T*)
+   {
+      return true;
+   }
+
    inline constexpr bool use_json_string_for_gql(std::vector<char>*)
    {
       return true;

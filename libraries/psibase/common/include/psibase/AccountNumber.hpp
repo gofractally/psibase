@@ -1,8 +1,14 @@
 #pragma once
-#include <compare>
 #include <psibase/name.hpp>
-#include <psio1/from_json.hpp>
-#include <psio1/to_json.hpp>
+#include <psio/adapter.hpp>
+#include <psio/reflect.hpp>
+
+#include <compare>
+#include <cstdint>
+#include <cstdlib>
+#include <span>
+#include <string>
+#include <string_view>
 
 namespace psibase
 {
@@ -14,6 +20,11 @@ namespace psibase
    /// must not start or end with '-' or contain two consecutive '-'s
    ///
    /// The empty name `""` is value 0.
+   ///
+   /// In every binary format an account is its 64-bit value: 8 bytes,
+   /// little-endian, in PSSZ; 8 bytes, big-endian, as a key (so keys sort
+   /// by `value`). In JSON it is its name, and in a schema it is the custom
+   /// type `AccountNumber` over that record.
    struct AccountNumber
    {
       using Subaccount                              = std::uint8_t;
@@ -62,30 +73,38 @@ namespace psibase
       /// Compares by 64-bit `value`. This does not sort by the
       /// string (name) form.
       friend auto operator<=>(const AccountNumber&, const AccountNumber&) = default;
-      PSIO1_REFLECT(AccountNumber, definitionWillNotChange(), value)
+      PSIO_REFLECT(AccountNumber, definitionWillNotChange(), value)
    };
 
-   template <typename S>
-   void to_json(const AccountNumber& n, S& s)
+   /// The text form of an [AccountNumber]: its name.
+   ///
+   /// Text is read strictly. Exactly one text names each account, the one
+   /// [AccountNumber::str] writes; anything else (upper case, a character
+   /// outside the alphabet, a misplaced `-`, more than 10 characters, a
+   /// subaccount that is not canonical) is rejected rather than mapped to
+   /// another account or to 0.
+   struct AccountNumberText
    {
-      to_json(n.str(), s);
-   }
+      static constexpr std::string_view schema_id = "AccountNumber";
 
-   template <typename S>
-   void from_json(AccountNumber& result, S& stream)
-   {
-      result = AccountNumber{stream.get_string()};
-   }
-
-   inline constexpr bool use_json_string_for_gql(AccountNumber*)
-   {
-      return true;
-   }
-
-   inline constexpr bool psio_custom_schema(AccountNumber*)
-   {
-      return true;
-   }
+      static std::size_t packsize(const AccountNumber& value) { return value.str().size(); }
+      static void encode(const AccountNumber& value, std::string& out) { out += value.str(); }
+      static AccountNumber decode(std::span<const char> text)
+      {
+         return AccountNumber{std::string_view{text.data(), text.size()}};
+      }
+      static psio::codec_status validate(std::span<const char> text) noexcept
+      {
+         const std::string_view name{text.data(), text.size()};
+         if (AccountNumber{name}.str() == name)
+            return psio::codec_ok();
+         return psio::codec_fail("AccountNumber: not an account name", 0, "AccountNumber");
+      }
+      static psio::codec_status validate_strict(std::span<const char> text) noexcept
+      {
+         return validate(text);
+      }
+   };
 
    inline namespace literals
    {
@@ -100,3 +119,5 @@ namespace psibase
       }
    }  // namespace literals
 }  // namespace psibase
+
+PSIO_ADAPTER(psibase::AccountNumber, psio::text_category, psibase::AccountNumberText)

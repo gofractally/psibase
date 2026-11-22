@@ -330,6 +330,17 @@ template <typename S> void to_json(float value, S& stream)              { return
       stream.write('}');
    }
 
+   // TEMPORARY: removed when psio1 is deleted.
+   // A type with a PSIO text adapter is written as that text.
+   template <typename T, typename S>
+      requires ::psio::has_adapter_v<T, ::psio::text_category>
+   void to_json(const T& t, S& stream)
+   {
+      std::string text;
+      ::psio::adapter<T, ::psio::text_category>::encode(t, text);
+      to_json(text, stream);
+   }
+
    template <typename S>
    void to_json_hex(const char* data, size_t size, S& stream)
    {

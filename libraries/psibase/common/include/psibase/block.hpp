@@ -2,9 +2,13 @@
 
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
+#include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/time.hpp>
+#include <psio1/from_json.hpp>
+#include <psio1/reflect.hpp>
 #include <psio1/shared_view_ptr.hpp>
+#include <psio1/to_json.hpp>
 
 namespace psibase
 {

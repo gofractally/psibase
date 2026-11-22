@@ -1683,6 +1683,25 @@ namespace psio1
          return false;
       }
 
+      // TEMPORARY: removed when psio1 is deleted.
+      // A type that PSIO's schema presents as Custom{wire type, id} (a
+      // reflected record or enum with a text adapter) is the same custom type
+      // here, under the same id.
+      template <typename T>
+         requires ::psio::schema_custom_v<T>
+      constexpr bool psio_custom_schema(T*)
+      {
+         return true;
+      }
+      template <typename T>
+      std::string custom_schema_id()
+      {
+         if constexpr (::psio::schema_custom_v<T>)
+            return std::string{::psio::schema_custom_id<T>()};
+         else
+            return psio1::get_type_name<T>();
+      }
+
       template <typename Rep>
       constexpr bool psio_custom_schema(
           std::chrono::time_point<std::chrono::system_clock, std::chrono::duration<Rep>>*)
@@ -1939,7 +1958,7 @@ namespace psio1
                if constexpr (psio_custom_schema(static_cast<T*>(nullptr)))
                {
                   auto& item = schema.types.find(name)->second;
-                  item       = Custom{.type = std::move(item), .id = psio1::get_type_name<T>()};
+                  item       = Custom{.type = std::move(item), .id = custom_schema_id<T>()};
                }
             }
             return Type{std::move(name)};

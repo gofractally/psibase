@@ -8,7 +8,7 @@ fn main() {
         .file("../../libraries/psio1/src/from_json.cpp")
         .file("../../libraries/psio1/src/schema.cpp")
         .file("../../libraries/psio1/src/fpconv.c")
-        .flag("-std=gnu++2a")
+        .flag("-std=gnu++23")
         .extra_warnings(false)
         .flag("-Wno-sign-compare") // TODO
         .flag("-Wno-missing-field-initializers") // TODO
@@ -16,7 +16,12 @@ fn main() {
         .flag("-Wno-ambiguous-reversed-operator") // TODO
         .include(Path::new("../../libraries/psio1/include"))
         .include(Path::new("../../libraries/psio1/consthash/include"))
-        .include(Path::new("../../external/rapidjson/include"));
+        .include(Path::new("../../external/rapidjson/include"))
+        // TEMPORARY: removed with psio1. psio1 recognises types declared with
+        // PSIO, so its headers include PSIO's (acquired by the CMake configure).
+        .include(Path::new("../../external/psio/cpp/include"))
+        .include(Path::new("../../external/psio/cpp/external/xxhash"))
+        .define("PSIO_HAVE_SIMDJSON", "0");
     // Boost is not on the default include path everywhere (Homebrew on macOS).
     // CMake passes the directory it found; a plain `cargo test` may set it too.
     println!("cargo:rerun-if-env-changed=PSIBASE_BOOST_INCLUDE_DIR");

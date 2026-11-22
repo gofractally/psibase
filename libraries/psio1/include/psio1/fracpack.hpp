@@ -1605,3 +1605,8 @@ namespace psio1
    constexpr bool packable_as_impl<T, U> = PackableAs<struct_tuple_t<T>, struct_tuple_t<U>>;
 
 }  // namespace psio1
+
+// TEMPORARY: removed when psio1 is deleted.
+// psibase's time types are std::chrono types declared without reference to
+// this library (psibase/time.hpp); it handles them wherever it packs.
+#include <psio1/chrono.hpp>

@@ -596,6 +596,19 @@ namespace psio1
       }
    }
 
+   // TEMPORARY: removed when psio1 is deleted.
+   // A type with a PSIO text adapter is read from that text. This library's
+   // JSON keeps its historical leniency: the adapter's `validate` is the rule
+   // of PSIO's own JSON formats and is not applied here.
+   template <typename T, typename S>
+      requires ::psio::has_adapter_v<T, ::psio::text_category>
+   void from_json(T& obj, S& stream)
+   {
+      auto text = stream.get_string();
+      obj       = ::psio::adapter<T, ::psio::text_category>::decode(
+          std::span<const char>{text.data(), text.size()});
+   }
+
    /// not implemented, so don't link
    template <typename First, typename Second, typename S>
    void from_json(std::pair<First, Second>& obj, S& stream);

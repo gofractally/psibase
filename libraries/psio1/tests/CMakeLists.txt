@@ -18,6 +18,7 @@ if(DEFINED IS_NATIVE)
         test_view.cpp
         test_schema.cpp
         test_key.cpp
+        canonical_glue_tests.cpp
     )
     target_link_libraries(psio-tests psio1 Catch2::Catch2WithMain Threads::Threads )
 
@@ -28,6 +29,7 @@ endif()
 if(DEFINED IS_WASM)
     add_executable(psio-tests
         graphql.cpp
+        canonical_glue_tests.cpp
     )
     target_link_libraries(psio-tests psio1 catch2 boost psitestlib )
 endif()

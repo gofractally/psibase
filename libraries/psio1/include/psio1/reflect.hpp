@@ -32,6 +32,11 @@
 
 #include <psio1/get_type_name.hpp>
 
+// TEMPORARY: removed when psio1 is deleted (see the end of this file).
+#include <psio/adapter.hpp>
+#include <psio/annotate.hpp>
+#include <psio/reflect.hpp>
+
 namespace psio1
 {
    template <typename R, typename C, typename... Args>
@@ -880,4 +885,87 @@ namespace psio1::reflection_impl
 {
    using std::pair;
    PSIO1_REFLECT(template(typename, typename) pair, first, second)
+}  // namespace psio1::reflection_impl
+
+// TEMPORARY: removed when psio1 is deleted.
+//
+// Types reflected with PSIO (PSIO_REFLECT, psio::reflect<T>) are usable by
+// this library while the rest of psibase is converted: psio1::reflect<T> is
+// derived from psio::reflect<T>, so fracpack, views, keys, JSON, schemas and
+// GraphQL see such a type exactly as if it had been declared with
+// PSIO1_REFLECT. Only data members are bridged.
+namespace psio1::reflection_impl
+{
+   struct canonical_name
+   {
+      const char* text;
+      constexpr const char* c_str() const { return text; }
+      constexpr             operator const char*() const { return text; }
+      constexpr             operator std::string_view() const { return text; }
+   };
+
+   // The projection a PSIO record proxy inherits; it forwards to the proxy
+   // object this library's proxies hold.
+   template <typename ProxyObject>
+   struct canonical_projection
+   {
+      ProxyObject _psio_proxy_obj;
+      template <std::size_t I, auto MemberPtr>
+      decltype(auto) get()
+      {
+         return _psio_proxy_obj.template get<I, MemberPtr>();
+      }
+      template <std::size_t I, auto MemberPtr>
+      decltype(auto) get() const
+      {
+         return _psio_proxy_obj.template get<I, MemberPtr>();
+      }
+   };
+
+   template <typename T,
+             typename = std::make_index_sequence<::psio::reflect<T>::member_count>>
+   struct canonical_reflect;
+
+   template <typename T, std::size_t... I>
+   struct canonical_reflect<T, std::index_sequence<I...>>
+   {
+      static_assert(::psio::reflect<T>::method_count == 0,
+                    "psio1 does not bridge the methods of a type reflected with PSIO");
+      static_assert(!::psio::has_adapter_v<T, ::psio::binary_category> &&
+                        !::psio::has_adapter_v<T, ::psio::sortable_binary_category>,
+                    "psio1 does not bridge binary or key adapters of a type reflected with PSIO");
+
+      static constexpr bool is_defined              = true;
+      static constexpr bool is_struct               = true;
+      static constexpr bool definitionWillNotChange = ::psio::is_dwnc_v<T>;
+      static constexpr bool requires_compressed_method_names() { return true; }
+      static constexpr canonical_name name{::psio::reflect<T>::name.data()};
+      using data_members = MemberList<::psio::reflect<T>::template member_pointer<I>...>;
+      // One extra element: an empty record must not declare an empty array.
+      static constexpr const char* data_member_names[sizeof...(I) + 1] = {
+          ::psio::reflect<T>::template member_name<I>.data()..., nullptr};
+      using member_functions = MemberList<>;
+      static constexpr std::initializer_list<const char*> member_function_names[1] = {};
+      static constexpr auto member_pointers()
+      {
+         return std::make_tuple(::psio::reflect<T>::template member_pointer<I>...);
+      }
+
+      template <typename ProxyObject>
+      struct proxy : ::psio::reflect<T>::template proxy<canonical_projection<ProxyObject>>
+      {
+         template <typename... Args>
+         explicit proxy(Args&&... args)
+             : ::psio::reflect<T>::template proxy<canonical_projection<ProxyObject>>(
+                   canonical_projection<ProxyObject>{ProxyObject(std::forward<Args>(args)...)})
+         {
+         }
+         auto& psio_get_proxy() { return this->_psio_proxy_obj; }
+         auto& psio_get_proxy() const { return this->_psio_proxy_obj; }
+      };
+   };
+
+   template <typename T>
+      requires ::psio::Reflected<T>
+   canonical_reflect<T> psio_get_reflect_impl(T*, ReflectDummyParam*);
 }  // namespace psio1::reflection_impl
