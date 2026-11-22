@@ -15,7 +15,9 @@
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 #include <psio/view.hpp>
+#include <psibase/NativeVM.hpp>
 #include <psizam/debug/debug.hpp>
+#include "VmConsensusReplay.hpp"
 
 #include <stdio.h>
 #include <time.h>
@@ -61,13 +63,14 @@ struct vm_options : psibase::NativeVMOptions
    static constexpr std::uint32_t max_func_local_bytes = 1024 * 1024;
    vm_options()
        : NativeVMOptions(psibase::VMOptions{std::numeric_limits<std::uint32_t>::max(), 65536,
-                                            std::numeric_limits<std::uint32_t>::max(), 1024 * 1024})
+                                            std::numeric_limits<std::uint32_t>::max(), 1024 * 1024},
+                         psibase::nativeAotCacheFromEnvironment())
    {
    }
 };
 
 using backend_t =
-    psizam::backend<rhf_t, psizam::jit_profile, vm_options, psizam::debug::debug_instr_map>;
+    psizam::backend<rhf_t, psibase::NativeVM, vm_options, psizam::debug::debug_instr_map>;
 
 inline constexpr int max_backtrace_frames = 512;
 
@@ -253,6 +256,7 @@ struct NullSocket : psibase::Socket
 
 struct test_chain
 {
+   psibase::vm_consensus_replay::Capture vmReplayCapture;
    ::state&                                 state;
    std::set<test_chain_ref*>                refs;
    psibase::SharedDatabase                  db;
@@ -367,6 +371,7 @@ struct test_chain
       nativeFunctionsTransactionContext.reset();
       altBlockContext.reset();
 
+      vmReplayCapture.begin(db, head, name);
       blockContext =
           std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
 
@@ -389,6 +394,7 @@ struct test_chain
          nativeFunctionsActionContext.reset();
          nativeFunctionsTransactionContext.reset();
          auto [revision, blockId] = blockContext->writeRevision(NullProver{}, psibase::Claim{});
+         vmReplayCapture.finish(db, revision, blockContext->current);
          head                     = revision;
          db.setHead(*writer, revision);
          db.removeRevisions(*writer, blockId);  // temp rule: head is now irreversible
@@ -1336,6 +1342,8 @@ struct callbacks
          trace.error = e.what();
       }
 
+      if (trace.error && std::getenv("PSIBASE_TESTER_TRACE_ERRORS"))
+         std::fprintf(stderr, "psitest native trace error: %s\n", trace.error->c_str());
       state.result_value = psio::convert_to_frac(trace);
       state.result_key.clear();
       psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
@@ -1395,6 +1403,8 @@ struct callbacks
       }
 
       // std::cout << eosio::format_json(trace) << "\n";
+      if (trace.error && std::getenv("PSIBASE_TESTER_TRACE_ERRORS"))
+         std::fprintf(stderr, "psitest native trace error: %s\n", trace.error->c_str());
       state.result_value = psio::convert_to_frac(trace);
       state.result_key.clear();
       psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");

@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 
 #include <psibase/block.hpp>
 #include <psibase/nativeTables.hpp>
@@ -20,7 +21,7 @@ namespace psibase
    {
       std::shared_ptr<WasmCacheImpl> impl;
 
-      WasmCache(uint32_t cacheSize);
+      WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath = {});
       WasmCache(const WasmCache&);
       WasmCache(WasmCache&&);
       ~WasmCache();

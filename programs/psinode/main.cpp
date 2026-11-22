@@ -1201,7 +1201,7 @@ void run(const std::string&              db_path,
            db_path,
            {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes},
            triedent::open_mode::resize},
-       WasmCache{128});
+       WasmCache{128, std::filesystem::path(db_path) / "cache" / "llvm-aot"});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
 

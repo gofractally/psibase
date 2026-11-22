@@ -8,9 +8,10 @@
 #include <mutex>
 #include <psibase/ActionContext.hpp>
 #include <psibase/PsizamPolicy.hpp>
+#include <psibase/NativeAotCache.hpp>
 #include <psibase/db.hpp>
 #include <psio/finally.hpp>
-#include <psizam/backend.hpp>
+#include <psibase/NativeVM.hpp>
 #include <psizam/debug/debug.hpp>
 
 namespace bmi = boost::multi_index;
@@ -22,7 +23,7 @@ namespace psibase
 {
    struct ExecutionContextImpl;
    using rhf_t  = psizam::registered_host_functions<ExecutionContextImpl>;
-   using impl_t = psizam::jit_profile;
+   using impl_t = NativeVM;
    using backend_t =
        psizam::backend<rhf_t, impl_t, NativeVMOptions, psizam::debug::debug_instr_map>;
 
@@ -94,8 +95,12 @@ namespace psibase
       std::mutex       mutex;
       uint32_t         cacheSize;
       BackendContainer backends;
+      std::shared_ptr<NativeAotCache> nativeArtifacts;
 
-      WasmCacheImpl(uint32_t cacheSize) : cacheSize{cacheSize} {}
+      WasmCacheImpl(uint32_t cacheSize, const std::filesystem::path& path)
+          : cacheSize{cacheSize},
+            nativeArtifacts(path.empty() ? nativeAotCacheFromEnvironment()
+                                         : std::make_shared<NativeAotCache>(path)) {}
 
       void add(BackendEntry&& entry)
       {
@@ -121,7 +126,8 @@ namespace psibase
       }
    };
 
-   WasmCache::WasmCache(uint32_t cacheSize) : impl{std::make_shared<WasmCacheImpl>(cacheSize)} {}
+   WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath)
+       : impl{std::make_shared<WasmCacheImpl>(cacheSize, nativeArtifactPath)} {}
 
    WasmCache::WasmCache(const WasmCache& src) : impl{src.impl} {}
 
@@ -183,7 +189,8 @@ namespace psibase
                            AccountNumber       service)
           : NativeFunctions{transactionContext.blockContext.db, transactionContext,
                             transactionContext.dbMode},
-            vmOptions{vmOptions},
+            vmOptions{vmOptions,
+                      transactionContext.blockContext.systemContext.wasmCache.impl->nativeArtifacts},
             wa{memory.impl->wa}
       {
          database.checkoutSubjective();
@@ -298,7 +305,12 @@ namespace psibase
       {
          auto prev         = currentActContext;
          currentActContext = &actionContext;
-         auto             restore = psio::finally{[&] { currentActContext = prev; }};
+         auto& vmContext = backend.backend->get_context();
+         const auto previousStack = vmContext.get_remaining_call_depth();
+         auto restore = psio::finally{[&] {
+            currentActContext = prev;
+            vmContext.set_max_call_depth(previousStack);
+         }};
          RecordActionTime timer{actionContext};
          try
          {
