@@ -26,8 +26,8 @@ TEST_CASE("VM deterministic relaxed SIMD preserves rounding signed dots and modu
    Matrix m(PSIBASE_VM_CONSENSUS_RELAXED_MATH_WASM);
 
    // The exact product is 1+2ulp+ulp^2. Separate multiply/add returns zero;
-   // a fused multiply-add returns ulp^2. The chosen profile must not vary by
-   // FMA hardware availability or LLVM contraction.
+   // a fused multiply-add returns ulp^2. Code version 0 is the strict profile:
+   // it must not fuse, whatever the hardware or LLVM contraction would do.
    vectorEquals(m.call("relaxed_f32_madd", repeated32(0x3f800001), repeated32(0x3f800001),
                         repeated32(0xbf800002)), repeated32(0));
    vectorEquals(m.call("relaxed_f32_nmadd", repeated32(0x3f800001), repeated32(0x3f800001),
@@ -64,4 +64,25 @@ TEST_CASE("VM deterministic relaxed SIMD preserves rounding signed dots and modu
       m.call("relaxed_f64_madd", a64, b64, c64);
       m.call("relaxed_f64_nmadd", a64, b64, c64);
    }
+}
+
+TEST_CASE("VM code version 1 fuses relaxed multiply-add on every engine")
+{
+   REQUIRE(psibase::nativeFloatProfile(0) == psizam::float_profile::strict);
+   REQUIRE(psibase::nativeFloatProfile(1) == psizam::float_profile::performance);
+   REQUIRE(!psibase::nativeFloatProfile(2));
+   Matrix m(PSIBASE_VM_CONSENSUS_RELAXED_MATH_WASM, 1);
+
+   // One rounding keeps the ulp^2 term: 2^-46 in f32 and 2^-104 in f64.
+   vectorEquals(m.call("relaxed_f32_madd", repeated32(0x3f800001), repeated32(0x3f800001),
+                        repeated32(0xbf800002)), repeated32(0x28800000));
+   vectorEquals(m.call("relaxed_f32_nmadd", repeated32(0x3f800001), repeated32(0x3f800001),
+                        repeated32(0x3f800002)), repeated32(0xa8800000));
+   psizam::v128_t onePlus{0x3ff0000000000001ull, 0x3ff0000000000001ull};
+   vectorEquals(m.call("relaxed_f64_madd", onePlus, onePlus,
+                        psizam::v128_t{0xbff0000000000002ull, 0xbff0000000000002ull}),
+                {0x3970000000000000ull, 0x3970000000000000ull});
+   vectorEquals(m.call("relaxed_f64_nmadd", onePlus, onePlus,
+                        psizam::v128_t{0x3ff0000000000002ull, 0x3ff0000000000002ull}),
+                {0xb970000000000000ull, 0xb970000000000000ull});
 }

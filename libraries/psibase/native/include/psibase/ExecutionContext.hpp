@@ -32,7 +32,8 @@ namespace psibase
       /// ready, or nearly, when a transaction first executes it.
       void compileAhead(const Checksum256&    hash,
                         std::span<const char> code,
-                        const VMOptions&      options);
+                        const VMOptions&      options,
+                        std::uint8_t          vmVersion);
    };
 
    struct ExecutionMemoryImpl;

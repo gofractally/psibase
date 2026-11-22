@@ -85,7 +85,8 @@ void load_local_packages(TransactionContext&           tc,
          };
          tc.blockContext.db.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
          tc.blockContext.systemContext.wasmCache.compileAhead(
-             codeHash, {reinterpret_cast<const char*>(code.data()), code.size()}, tc.vmOptions());
+             codeHash, {reinterpret_cast<const char*>(code.data()), code.size()}, tc.vmOptions(),
+             0);
          CodeByHashRow codeByHashRow{
              .codeHash = codeHash,
              .code     = std::move(code),

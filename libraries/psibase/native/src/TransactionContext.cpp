@@ -161,11 +161,11 @@ namespace psibase
             }
             setCode(db, service.service, service.vmType, service.vmVersion,
                     {service.code.data(), service.code.size()});
-            if (service.vmType == 0 && service.vmVersion == 0)
+            if (service.vmType == 0)
                self.blockContext.systemContext.wasmCache.compileAhead(
                    sha256(service.code.data(), service.code.size()),
                    {reinterpret_cast<const char*>(service.code.data()), service.code.size()},
-                   self.vmOptions());
+                   self.vmOptions(), service.vmVersion);
          }
       }
       catch (const std::exception& e)

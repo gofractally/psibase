@@ -161,12 +161,12 @@ namespace psibase
             return;
          auto code = psio::view<const CodeByHashRow>(
              psio::prevalidated{std::span{value.pos, value.end}});
-         if (code.vmType() != 0 || code.vmVersion() != 0)
+         if (code.vmType() != 0)
             return;
          std::span<const std::uint8_t> bytes = code.code();
          context.blockContext.systemContext.wasmCache.compileAhead(
              code.codeHash(), {reinterpret_cast<const char*>(bytes.data()), bytes.size()},
-             context.vmOptions());
+             context.vmOptions(), code.vmVersion());
       }
 
       void verifyRemoveCodeByHashRow(TransactionContext& ctx,

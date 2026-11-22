@@ -81,10 +81,28 @@ namespace psibase
       return processNativeAotCache();
    }
 
+   std::optional<psizam::float_profile> nativeFloatProfile(std::uint8_t vmVersion)
+   {
+      switch (vmVersion)
+      {
+         case 0:
+            return psizam::float_profile::strict;
+         case 1:
+            return psizam::float_profile::performance;
+         default:
+            return std::nullopt;
+      }
+   }
+
    NativeVMOptions::NativeVMOptions(const VMOptions& options,
-                                    std::shared_ptr<NativeAotCache> artifacts)
+                                    std::shared_ptr<NativeAotCache> artifacts,
+                                    std::uint8_t vmVersion)
        : VMOptions(options), nativeArtifacts(std::move(artifacts))
    {
+      auto profile = nativeFloatProfile(vmVersion);
+      if (!profile)
+         throw std::runtime_error("vmVersion is not supported");
+      float_profile = *profile;
       const char* only = std::getenv("PSIBASE_NATIVE_AOT_CACHE_ONLY");
       native_aot_cache_only = only && std::string_view(only) == "1";
       if (max_pages > 65536)
@@ -99,9 +117,10 @@ namespace psibase
    {
 #if defined(PSIBASE_VM_LLVM_AOT)
       return sha256(std::tuple{
-          std::string("psibase-saved-native-aot-v1"), sha256(wasm.data(), wasm.size()),
+          std::string("psibase-saved-native-aot-v2"), sha256(wasm.data(), wasm.size()),
           static_cast<const VMOptions&>(*this), maximumFunctionBytes, std::uint8_t(components),
-          std::uint8_t(fp), std::uint8_t(memory_mode), std::uint8_t(checked_kind),
+          std::uint8_t(fp), std::uint8_t(float_profile), std::uint8_t(memory_mode),
+          std::uint8_t(checked_kind),
           gas_metering, limit_table_growth, defer_start, enable_exception_handling,
           enable_atomics, enable_relaxed_simd, enable_tail_calls, enable_simd,
           enable_bulk_memory, max_memory_section_elements, stack_usage_for_call,

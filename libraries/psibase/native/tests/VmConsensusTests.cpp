@@ -295,8 +295,9 @@ namespace
       Transcript transcript;
 
      public:
-      explicit Matrix(const char* path)
-          : wasm(psizam::read_wasm(path)), options(psibase::VMOptions{1024, 2, 3, 65536}),
+      explicit Matrix(const char* path, std::uint8_t vmVersion = 0)
+          : wasm(psizam::read_wasm(path)),
+            options(psibase::VMOptions{1024, 2, 3, 65536}, {}, vmVersion),
             artifact(wasm, options), scope(artifact), jit1(wasm, options), jit2(wasm, options),
             aot(wasm, options), saved(wasm, options)
       {

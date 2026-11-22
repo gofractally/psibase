@@ -7,6 +7,7 @@
 #include <span>
 #include <array>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace psibase
@@ -17,6 +18,12 @@ namespace psibase
    /// The cache for a process that configures none: PSIBASE_NATIVE_AOT_CACHE,
    /// else one shared by the user's processes.
    std::shared_ptr<NativeAotCache> nativeAotCacheFromEnvironment();
+
+   /// The float profile a code version (CodeRow::vmVersion) executes under:
+   /// 0 is the strict WebAssembly deterministic profile, 1 the deterministic
+   /// performance profile (fused relaxed_madd). A version this node does not
+   /// know has none and its code is refused, never run under another policy.
+   std::optional<psizam::float_profile> nativeFloatProfile(std::uint8_t vmVersion);
 
    // Keep chain VMOptions and its wire reflection unchanged. These native-only
    // choices are explicit instead of inheriting the general runtime defaults.
@@ -40,12 +47,17 @@ namespace psibase
           psizam::max_func_local_bytes_flags_t::stack;
       static constexpr std::uint32_t max_memory_section_elements = 1;
 
+      // Set from the executing code's version; every engine and the artifact
+      // identity take it from here.
+      psizam::float_profile float_profile = psizam::float_profile::strict;
+
       std::shared_ptr<NativeAotCache> nativeArtifacts;
       // Diagnostic mode used to prove a warm run needs no compiler fallback.
       bool native_aot_cache_only = false;
 
       explicit NativeVMOptions(const VMOptions& options,
-                               std::shared_ptr<NativeAotCache> artifacts = {});
+                               std::shared_ptr<NativeAotCache> artifacts = {},
+                               std::uint8_t vmVersion = 0);
       std::array<std::uint8_t, 32> native_aot_identity(
           std::span<const std::uint8_t> wasm, std::uint32_t maximumFunctionBytes,
           psizam::max_func_local_bytes_flags_t components,

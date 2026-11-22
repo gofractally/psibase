@@ -84,10 +84,12 @@ namespace psibase
    {
       Checksum256                hash;
       VMOptions                  vmOptions;
+      // Code under different versions compiles differently from the same bytes.
+      std::uint8_t               vmVersion = 0;
       std::unique_ptr<backend_t>                    backend;
       std::shared_ptr<dwarf::debugger_registration> debug;
 
-      auto byHash() const { return std::tie(hash, vmOptions); }
+      auto byHash() const { return std::tie(hash, vmOptions, vmVersion); }
    };
 
    struct ByAge;
@@ -114,7 +116,7 @@ namespace psibase
       // code is stored, on these threads, so it overlaps the rest of the
       // transaction that installed it and other compiles. The first execution
       // waits for it; it never runs the service on another engine instead.
-      using PendingKey = std::pair<Checksum256, VMOptions>;
+      using PendingKey = std::tuple<Checksum256, VMOptions, std::uint8_t>;
       struct Job
       {
          PendingKey                 key;
@@ -139,16 +141,19 @@ namespace psibase
             worker.join();
       }
 
-      void compileAhead(const Checksum256& hash, std::span<const char> code, const VMOptions& options);
+      void compileAhead(const Checksum256&    hash,
+                        std::span<const char> code,
+                        const VMOptions&      options,
+                        std::uint8_t          vmVersion);
       void runCompiles();
 
       // Blocks until a compile started for this code, if any, has finished.
-      void awaitCompile(const Checksum256& hash, const VMOptions& options)
+      void awaitCompile(const Checksum256& hash, const VMOptions& options, std::uint8_t vmVersion)
       {
          std::shared_future<void> done;
          {
             std::lock_guard lock{mutex};
-            auto            it = pending.find(PendingKey{hash, options});
+            auto            it = pending.find(PendingKey{hash, options, vmVersion});
             if (it == pending.end())
                return;
             // Still queued behind other code: the caller needs it now, and
@@ -177,12 +182,12 @@ namespace psibase
             ind.pop_front();
       }
 
-      BackendEntry get(const Checksum256& hash, const VMOptions& vmOptions)
+      BackendEntry get(const Checksum256& hash, const VMOptions& vmOptions, std::uint8_t vmVersion)
       {
-         BackendEntry                result{hash, vmOptions};
+         BackendEntry                result{hash, vmOptions, vmVersion};
          std::lock_guard<std::mutex> lock{mutex};
          auto&                       ind = backends.get<ByHash>();
-         auto                        it  = ind.find(std::tie(hash, vmOptions));
+         auto                        it  = ind.find(std::tie(hash, vmOptions, vmVersion));
          if (it == ind.end())
             return result;
          ind.modify(it, [&](auto& x) { result = std::move(x); });
@@ -194,13 +199,17 @@ namespace psibase
 
    void WasmCacheImpl::compileAhead(const Checksum256&    hash,
                                     std::span<const char> code,
-                                    const VMOptions&      options)
+                                    const VMOptions&      options,
+                                    std::uint8_t          vmVersion)
    {
 #if defined(PSIBASE_VM_LLVM_AOT)
+      if (!nativeFloatProfile(vmVersion))
+         return;
       std::lock_guard lock{mutex};
-      PendingKey      key{hash, options};
+      PendingKey      key{hash, options, vmVersion};
       if (stopping || jobs.size() >= maxQueuedCompiles || pending.contains(key) ||
-          backends.get<ByHash>().find(std::tie(hash, options)) != backends.get<ByHash>().end())
+          backends.get<ByHash>().find(std::tie(hash, options, vmVersion)) !=
+              backends.get<ByHash>().end())
          return;
       Job job{key, {code.begin(), code.end()}, {}};
       pending.emplace(key, job.done.get_future().share());
@@ -244,13 +253,14 @@ namespace psibase
          {
             // Code that fails here fails the same way, with its error
             // reported, when a transaction first executes it.
-            NativeVMOptions options{job.key.second, nativeArtifacts};
+            const auto& [hash, limits, vmVersion] = job.key;
+            NativeVMOptions options{limits, nativeArtifacts, vmVersion};
             validateNativeWasm(job.code, options);
             psizam::debug::binary::input_stream stream{
                 reinterpret_cast<const char*>(job.code.data()), job.code.size()};
             if (!dwarf::has_debug_info(stream))
             {
-               BackendEntry entry{job.key.first, job.key.second};
+               BackendEntry entry{hash, limits, vmVersion};
                entry.backend = std::make_unique<backend_t>(job.code, nullptr, options);
                entry.debug   = dwarf::register_with_debugger(entry.backend->get_module());
                add(std::move(entry));
@@ -268,9 +278,10 @@ namespace psibase
 
    void WasmCache::compileAhead(const Checksum256&    hash,
                                 std::span<const char> code,
-                                const VMOptions&      options)
+                                const VMOptions&      options,
+                                std::uint8_t          vmVersion)
    {
-      impl->compileAhead(hash, code, options);
+      impl->compileAhead(hash, code, options, vmVersion);
    }
 
    WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath)
@@ -349,7 +360,11 @@ namespace psibase
              db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
          check(c.has_value(), "service code record is missing");
          check(c->vmType == 0, "vmType is not 0");
-         check(c->vmVersion == 0, "vmVersion is not 0");
+         // The version a service was deployed under selects the execution
+         // policy its code keeps until it is next deployed.
+         auto profile = nativeFloatProfile(c->vmVersion);
+         check(profile.has_value(), "vmVersion is not supported");
+         this->vmOptions.float_profile = *profile;
          if (transactionContext.dbMode.verifyOnly)
          {
             check(code.flags & CodeRow::isVerify,
@@ -361,8 +376,8 @@ namespace psibase
              [&]
              {
                 auto& cache = *transactionContext.blockContext.systemContext.wasmCache.impl;
-                cache.awaitCompile(code.codeHash, vmOptions);
-                backend = cache.get(code.codeHash, vmOptions);
+                cache.awaitCompile(code.codeHash, vmOptions, code.vmVersion);
+                backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
                 if (!backend.backend)
                 {
                    validateNativeWasm(c->code, this->vmOptions);
