@@ -42,6 +42,19 @@ mod service {
     fn verifySeq() -> u64 {
         unimplemented!()
     }
+
+    /// The execution policy version given to code deployed with version 0.
+    #[action]
+    fn defaultVmVersion() -> u8 {
+        unimplemented!()
+    }
+
+    /// Sets the version later deployments get by default. Code already
+    /// deployed keeps the version it was deployed under.
+    #[action]
+    fn setDefaultVmVersion(vmVersion: u8) {
+        unimplemented!()
+    }
 }
 
 #[test]
