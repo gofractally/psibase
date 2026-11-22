@@ -18,7 +18,7 @@ The defaults are immutable Git revisions:
 | psio | `f6b10ec7d7bba4022cd1c9394f88ad1440b4b2b7` | Maintained upstream CMake target |
 | psitri | `a7c6660de883c6190135e213e2206d006286a7ee` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
-| psizam | `c99b440ff0e17d789cbe25699982c718433aa2a8` | Sources only |
+| psizam | `e8c5b92672be884ed136f8983aa9e1cea3824bb4` | Sources only |
 
 The PSIO pin is the published `codex/annotation-header-self-containment`
 checkpoint: main `ff114b6` plus direct standard includes and a first-header
