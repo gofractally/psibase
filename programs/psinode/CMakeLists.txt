@@ -28,6 +28,12 @@ target_include_directories(psinode PUBLIC
     ../../packages/psibase_tests)
 set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 
+# Fills the native artifact cache from package files; see precompile.cpp.
+add_executable(psibase-precompile precompile.cpp)
+target_link_libraries(psibase-precompile psibase)
+target_link_directories(psibase-precompile PUBLIC ${ICU_LIBRARY_DIR})
+set_target_properties(psibase-precompile PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+
 find_package(Python COMPONENTS Interpreter)
 if(Python_Interpreter_FOUND)
     # These tests would otherwise fail one by one with ModuleNotFoundError.

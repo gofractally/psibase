@@ -34,6 +34,8 @@ namespace psibase
                         std::span<const char> code,
                         const VMOptions&      options,
                         std::uint8_t          vmVersion);
+      /// Returns once every compile started by compileAhead has finished.
+      void finishCompiles();
    };
 
    struct ExecutionMemoryImpl;

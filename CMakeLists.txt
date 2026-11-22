@@ -1548,6 +1548,21 @@ psibase_package(
     DEPENDS wasm
 )
 
+# With LLVM a service takes seconds to compile, the largest tens of seconds,
+# and a node compiles it when it is first installed. Compile every packaged
+# service into the native artifact cache here instead, so that the nodes and
+# tests this build runs load artifacts rather than compile during a boot.
+if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/native-aot-cache.stamp
+        DEPENDS ${SERVICE_DIR}/index.json psibase-precompile
+        COMMAND psibase-precompile ${SERVICE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/native-aot-cache.stamp
+        COMMENT "Compiling packaged services into the native artifact cache"
+    )
+    add_custom_target(native-aot-cache ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/native-aot-cache.stamp)
+endif()
+
 psibase_package(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/Counter.psi
     NAME Counter

@@ -125,6 +125,7 @@ namespace psibase
       };
       static constexpr std::size_t           maxQueuedCompiles = 256;
       std::condition_variable                jobReady;
+      std::condition_variable                compilesIdle;
       std::deque<Job>                        jobs;
       std::map<PendingKey, std::shared_future<void>> pending;
       std::vector<std::thread>               workers;
@@ -146,6 +147,11 @@ namespace psibase
                         const VMOptions&      options,
                         std::uint8_t          vmVersion);
       void runCompiles();
+      void finishCompiles()
+      {
+         std::unique_lock lock{mutex};
+         compilesIdle.wait(lock, [&] { return pending.empty(); });
+      }
 
       // Blocks until a compile started for this code, if any, has finished.
       void awaitCompile(const Checksum256& hash, const VMOptions& options, std::uint8_t vmVersion)
@@ -165,6 +171,7 @@ namespace psibase
                   job->done.set_value();
                   jobs.erase(job);
                   pending.erase(it);
+                  compilesIdle.notify_all();
                   return;
                }
             }
@@ -244,6 +251,7 @@ namespace psibase
                job.done.set_value();
             jobs.clear();
             pending.clear();
+            compilesIdle.notify_all();
             return;
          }
          Job job = std::move(jobs.front());
@@ -273,6 +281,7 @@ namespace psibase
          pending.erase(job.key);
          lock.unlock();
          job.done.set_value();
+         compilesIdle.notify_all();
       }
    }
 
@@ -282,6 +291,11 @@ namespace psibase
                                 std::uint8_t          vmVersion)
    {
       impl->compileAhead(hash, code, options, vmVersion);
+   }
+
+   void WasmCache::finishCompiles()
+   {
+      impl->finishCompiles();
    }
 
    WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath)
