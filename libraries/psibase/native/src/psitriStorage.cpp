@@ -93,25 +93,7 @@ namespace psibase::storage
              cleanup ? std::shared_ptr<accounting::Context>{} : accounting::currentContext();
          if (context)
             context->check();
-         // A mutation holds the gate for microseconds. When two threads
-         // write steadily, a block producer and the thread executing
-         // incoming transactions, blocking on every handoff costs far more
-         // than the wait itself: a quarter of a producer's main thread was
-         // spent asleep here. Spin for about as long as one mutation takes
-         // before falling back to a blocking wait, which a long holder such
-         // as a flush still gets.
-         std::unique_lock lock(mutex, std::try_to_lock);
-         for (unsigned spins = 0; !lock.owns_lock() && spins < 4000; ++spins)
-         {
-#if defined(__x86_64__) || defined(__i386__)
-            __builtin_ia32_pause();
-#elif defined(__aarch64__)
-            __asm__ __volatile__("isb");
-#endif
-            lock.try_lock();
-         }
-         if (!lock.owns_lock())
-            lock.lock();
+         std::unique_lock lock(mutex);
 #ifndef NDEBUG
          // Also covers recursive native cleanup; a second OS thread can never
          // be active inside this database's engine/session/handle graph.
