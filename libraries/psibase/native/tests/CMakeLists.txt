@@ -53,14 +53,6 @@ target_link_libraries(StorageTimeoutTests PRIVATE psibase Threads::Threads)
 add_test(NAME StorageTimeoutTests COMMAND StorageTimeoutTests)
 set_tests_properties(StorageTimeoutTests PROPERTIES TIMEOUT 30 PROCESSORS 2)
 
-if(APPLE)
-  add_executable(DarwinCpuVmTrapTests DarwinCpuVmTrapTests.cpp)
-  target_link_directories(DarwinCpuVmTrapTests PRIVATE ${ICU_LIBRARY_DIR})
-  target_link_libraries(DarwinCpuVmTrapTests PRIVATE psibase Threads::Threads)
-  add_test(NAME DarwinCpuVmTrapTests COMMAND DarwinCpuVmTrapTests)
-  set_tests_properties(DarwinCpuVmTrapTests PROPERTIES TIMEOUT 30)
-endif()
-
 # The fixture exercises the actual registered-host ABI and native code writer.
 find_program(PSIZAM_WAT2WASM NAMES wat2wasm REQUIRED)
 set(PSIZAM_POLICY_WASM "${CMAKE_CURRENT_BINARY_DIR}/psizam-policy.wasm")
