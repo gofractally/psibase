@@ -47,7 +47,8 @@ namespace psibase
             while (!query.empty())
             {
                auto [key, value] = readQueryItem(query);
-               psio1::get_data_member<T>(key, [&](auto m) { result.*m = std::move(value); });
+               psio::reflect<T>::visit_field_by_name(
+                   result, std::string_view{key}, [&](auto& member) { member = std::move(value); });
             }
          }
          return result;

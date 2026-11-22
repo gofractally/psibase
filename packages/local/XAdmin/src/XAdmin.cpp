@@ -516,7 +516,7 @@ namespace LocalService
                // will be round-tripped unmodified.
                if (entry.key == "hosts" || entry.key == "peers")
                   continue;
-               else if (psio1::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
+               else if (psio::reflect<AdminOptionsRow>::index_of(entry.key).has_value() ||
                         // In the unlikely event that the host has a option that
                         // begins with "host.", writeConfig should not remove it
                         entry.key.starts_with("host."))

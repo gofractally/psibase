@@ -4,7 +4,6 @@
 #include <psibase/Rpc.hpp>
 #include <psio/reflect.hpp>
 #include <psio1/fracpack.hpp>
-#include <psio1/reflect.hpp>
 #include <psio1/to_json.hpp>
 
 namespace psibase

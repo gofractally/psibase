@@ -8,7 +8,6 @@
 #include <psibase/Table.hpp>
 #include <psibase/db.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/reflect.hpp>
 #include <psio1/schema.hpp>
 #include <string>
 #include <type_traits>
@@ -176,15 +175,17 @@ namespace psibase
              });
       }
 
-      template <auto K, auto... M>
-      static constexpr std::uint32_t get_member_index(psio1::MemberList<M...>*)
+      // The index of the data member K among the reflected members of T.
+      template <typename T, auto K, std::size_t... I>
+      static constexpr std::uint32_t get_member_index(std::index_sequence<I...>)
       {
-         std::uint32_t i = 0;
-         for (bool found : {is_equal_member<M, K>...})
+         const bool    found[] = {is_equal_member<psio::reflect<T>::template member_pointer<I>, K>...,
+                                  false};
+         std::uint32_t i       = 0;
+         for (; i < sizeof...(I); ++i)
          {
-            if (found)
+            if (found[i])
                return i;
-            ++i;
          }
          abortMessage("Member is not reflected");
       }
@@ -201,15 +202,15 @@ namespace psibase
             prefix.transform = psibase_get_key_transform_name((nt_wrap<K>*)nullptr, K);
             prefix.type =
                 builder
-                    .insert<std::remove_cv_t<typename psio1::MemberPtrType<M T::*>::ReturnType>>();
+                    .insert<std::remove_cv_t<typename psio::method_traits<M T::*>::result>>();
             out.push_back(std::move(prefix));
          }
          else
          {
             static_assert(!std::is_function_v<M>,
                           "Member function keys not supported. Use CompositeKey instead.");
-            constexpr auto idx =
-                get_member_index<K>((typename psio1::reflect<T>::data_members*)nullptr);
+            constexpr auto idx = get_member_index<T, K>(
+                std::make_index_sequence<psio::reflect<T>::member_count>{});
             prefix.path.push_back(idx);
             if constexpr (Last)
             {
@@ -292,7 +293,7 @@ namespace psibase
       {
          if constexpr (!std::is_void_v<T>)
          {
-            out.push_back({.name    = psio1::get_type_name<T>(),
+            out.push_back({.name    = psio::get_type_name<T>(),
                            .table   = table,
                            .type    = builder.insert<typename T::value_type>(),
                            .indexes = makeIndexes(builder, (T*)nullptr)});

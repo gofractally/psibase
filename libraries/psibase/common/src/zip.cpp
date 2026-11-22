@@ -3,7 +3,6 @@
 #include <iterator>
 #include <psibase/check.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/reflect.hpp>
 #include <ranges>
 #include <span>
 #include <type_traits>
@@ -53,8 +52,8 @@ namespace psibase::zip
    bool readStruct(auto& iter, auto end, T& obj)
    {
       bool ok = true;
-      psio1::for_each_member(&obj, (typename psio1::reflect<T>::data_members*)nullptr,
-                            [&](auto& member) { ok = ok && read(iter, end, member); });
+      psio::reflect<T>::for_each_field(
+          obj, [&](auto, std::string_view, auto& member) { ok = ok && read(iter, end, member); });
       return ok;
    }
 

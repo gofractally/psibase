@@ -10,7 +10,6 @@
 #include <psibase/openssl.hpp>
 #include <psio/reflect.hpp>
 #include <psio1/fracpack.hpp>
-#include <psio1/reflect.hpp>
 #include <vector>
 
 using namespace psibase;

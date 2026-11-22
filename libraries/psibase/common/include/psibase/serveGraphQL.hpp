@@ -142,10 +142,7 @@ namespace psibase
       template <typename T>
       consteval bool has_block_member()
       {
-         for (const char* n : psio1::reflect<T>::data_member_names)
-            if (std::string_view{n} == "block")
-               return true;
-         return false;
+         return psio::reflect<T>::index_of("block").has_value();
       }
    }  // namespace detail
 
@@ -163,7 +160,7 @@ namespace psibase
    template <typename T>
    const char* get_type_name(const WithBlockContext<T>*)
    {
-      static constexpr auto name = psio1::reflect<T>::name + "WithBlockContext";
+      static constexpr auto name = psio1::reflected_name<T> + "WithBlockContext";
       return name.c_str();
    }
 
@@ -672,7 +669,7 @@ namespace psibase
    constexpr auto gql_callable_fn(const TableIndex<T, K>*)
    {
       using Connection = psibase::Connection<  //
-          T, psio1::reflect<T>::name + "Connection", psio1::reflect<T>::name + "Edge">;
+          T, psio1::reflected_name<T> + "Connection", psio1::reflected_name<T> + "Edge">;
       return &detail::makeConnectionFn<Connection, T, K>;
    }  // gql_callable_fn
 
@@ -688,7 +685,7 @@ namespace psibase
    {
       using R          = decltype(std::declval<F>()(std::declval<T>()));
       using Connection = psibase::Connection<  //
-          R, psio1::reflect<R>::name + "Connection", psio1::reflect<R>::name + "Edge">;
+          R, psio1::reflected_name<R> + "Connection", psio1::reflected_name<R> + "Edge">;
       return &detail::makeTransformedConnection<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
@@ -704,7 +701,7 @@ namespace psibase
    {
       using R          = decltype(std::declval<F>()(std::declval<T>()));
       using Connection = psibase::Connection<  //
-          R, psio1::reflect<R>::name + "Connection", psio1::reflect<R>::name + "Edge">;
+          R, psio1::reflected_name<R> + "Connection", psio1::reflected_name<R> + "Edge">;
       return &detail::makeTransformedConnectionView<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
@@ -899,14 +896,14 @@ namespace psibase
       /// Each node is wrapped in WithBlockContext<T> carrying block metadata.
       /// Returns error if both first and last are specified.
       Connection<WithBlockContext<T>,
-                 psio1::reflect<T>::name + "Connection",
-                 psio1::reflect<T>::name + "Edge">
+                 psio1::reflected_name<T> + "Connection",
+                 psio1::reflected_name<T> + "Edge">
       query() const
       {
          auto [rows, has_next_page, has_prev_page] = all_edges();
 
-         using ConnType = Connection<WithBlockContext<T>, psio1::reflect<T>::name + "Connection",
-                                     psio1::reflect<T>::name + "Edge">;
+         using ConnType = Connection<WithBlockContext<T>, psio1::reflected_name<T> + "Connection",
+                                     psio1::reflected_name<T> + "Edge">;
          using EdgeType = typename ConnType::Edge;
 
          std::vector<uint64_t> rowids;
@@ -1082,8 +1079,8 @@ namespace psibase
                           }
                           else
                           {
-                             bool found = psio1::get_data_member<T>(
-                                 key, [&](auto member) { from_json(s.data.*member, stream); });
+                             bool found = psio::reflect<T>::visit_field_by_name(
+                                 s.data, key, [&](auto& member) { from_json(member, stream); });
                              if (!found)
                              {
                                 from_json_skip_value(stream);

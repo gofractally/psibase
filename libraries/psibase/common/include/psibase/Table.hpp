@@ -469,12 +469,21 @@ namespace psibase
    {
       using type = tuple_cat_t<flatten_key_t<T>...>;
    };
+   template <typename T, typename = std::make_index_sequence<psio::reflect<T>::member_count>>
+   struct flatten_members;
+   template <typename T, std::size_t... I>
+   struct flatten_members<T, std::index_sequence<I...>>
+   {
+      using type =
+          tuple_cat_t<flatten_key_t<typename psio::reflect<T>::template member_type<I>>...>;
+   };
+   // (psio::Reflected is asked of object types only: for a reference type it
+   // does not compile.)
    template <typename T>
-      requires psio1::Reflected<T>
+      requires(std::is_class_v<T> && !std::is_const_v<T> && psio::Reflected<T>)
    struct flatten_key<T>
    {
-      using type = flatten_key_t<
-          typename psio1::get_struct_tuple_impl<typename psio1::reflect<T>::data_members>::type>;
+      using type = typename flatten_members<T>::type;
    };
 
    UniqueKvHandle proxyKvOpen(DbId db, std::span<const char> prefix, KvMode mode);
@@ -726,31 +735,32 @@ namespace psibase
          return (value.*f);
       }
 
-      template <std::uint32_t I, typename C, typename T>
-      constexpr auto get_view_member(psio1::view<const C> v, T C::* m, psio1::MemberList<>*)
-          -> psio1::view<const T>
+      // The view of the member `m` names: the reflected member of C equal to it.
+      template <std::size_t I, typename C, typename T>
+      constexpr auto get_view_member(psio1::view<const C> v, T C::* m) -> psio1::view<const T>
       {
-         abortMessage("Member was not reflected");
-      }
-
-      template <std::uint32_t I, typename C, typename T, auto M0, auto... M>
-      constexpr auto get_view_member(psio1::view<const C> v, T C::* m, psio1::MemberList<M0, M...>*)
-          -> psio1::view<const T>
-      {
-         if constexpr (std::is_same_v<decltype(m), decltype(M0)>)
+         if constexpr (I == psio::reflect<C>::member_count)
          {
-            if (m == M0)
-            {
-               return v.psio_get_proxy().template get<I, M0>();
-            }
+            abortMessage("Member was not reflected");
          }
-         return get_view_member<I + 1>(v, m, (psio1::MemberList<M...>*)nullptr);
+         else
+         {
+            constexpr auto M = psio::reflect<C>::template member_pointer<I>;
+            if constexpr (std::is_same_v<T C::*, std::remove_const_t<decltype(M)>>)
+            {
+               if (m == M)
+               {
+                  return v.psio_get_proxy().template get<I, M>();
+               }
+            }
+            return get_view_member<I + 1>(v, m);
+         }
       }
 
       template <typename T, typename C>
       decltype(auto) invoke(T C::* f, psio1::view<const C> value)
       {
-         return get_view_member<0>(value, f, (typename psio1::reflect<C>::data_members*)nullptr);
+         return get_view_member<0>(value, f);
       }
       template <typename R, typename C, typename... A>
       decltype(auto) invoke(R (C::*f)(A...) const, const C& value, A&&... a)

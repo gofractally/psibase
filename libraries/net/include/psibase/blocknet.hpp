@@ -5,7 +5,6 @@
 #include <psibase/net_base.hpp>
 #include <psio/reflect.hpp>
 #include <psio1/finally.hpp>
-#include <psio1/reflect.hpp>
 #include <psio1/to_hex.hpp>
 
 #include <algorithm>
