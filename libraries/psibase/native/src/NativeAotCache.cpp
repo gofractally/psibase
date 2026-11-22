@@ -112,11 +112,22 @@ namespace psibase
       }
    }  // namespace
 
-   NativeAotCache::NativeAotCache(const std::filesystem::path& path) noexcept
+   NativeAotCache::NativeAotCache(const std::filesystem::path& requested) noexcept
    {
       try
       {
-         if (path.empty())
+         if (requested.empty())
+            return;
+         // Resolve links in the part of the path that already exists before the
+         // no-follow walk below. System temporary directories are reached through
+         // links on macOS (/tmp, /var), and refusing them left every test and any
+         // node under such a path without a cache, recompiling each module on
+         // every use. The walk still refuses a link swapped in afterwards, and the
+         // final directory must still be private to this user.
+         std::error_code                ignored;
+         const std::filesystem::path path =
+             std::filesystem::weakly_canonical(std::filesystem::absolute(requested), ignored);
+         if (ignored || path.empty())
             return;
          Fd current(::open(path.is_absolute() ? "/" : ".",
                            O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC));
