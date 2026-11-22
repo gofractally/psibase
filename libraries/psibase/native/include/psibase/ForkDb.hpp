@@ -1193,12 +1193,31 @@ namespace psibase
             PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, state->info.header, state->blockId());
             try
             {
+               using clock    = std::chrono::steady_clock;
+               const auto t0  = clock::now();
                auto claim = validateBlockSignature(prev, state->info, blockPtr->signature());
                ctx.start(Block(blockPtr->block()));
+               const auto t1 = clock::now();
                validateTransactionSignatures(ctx, ctx.current, prev->revision);
+               const auto t2 = clock::now();
                ctx.execAllInBlock();
+               const auto t3 = clock::now();
                auto [newRevision, id] = ctx.writeRevision(FixedProver(blockPtr->signature()), claim,
                                                           state->getProdsAuthRevision());
+               // Where validating a block spends its time. Checking the
+               // transactions' signatures and executing them are separate
+               // passes; a node that trusts a block's signatures already
+               // (replaying its own log, say) would need only the second.
+               if (!ctx.current.transactions.empty())
+               {
+                  auto ms = [](auto d)
+                  { return std::chrono::duration<double, std::milli>(d).count(); };
+                  PSIBASE_LOG(blockLogger, info)
+                      << "Validated block: " << ctx.current.transactions.size() << " transactions, "
+                      << ctx.transactionBytes << " bytes; block signature " << ms(t1 - t0)
+                      << " ms, transaction signatures " << ms(t2 - t1) << " ms, execution "
+                      << ms(t3 - t2) << " ms, commit " << ms(clock::now() - t3) << " ms";
+               }
                // TODO: diff header fields
                check(id == state->blockId(), "blockId does not match");
                state->revision = newRevision;
