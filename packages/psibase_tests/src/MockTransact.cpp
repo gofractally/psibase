@@ -20,7 +20,7 @@ namespace TestService
                     std::uint32_t          newValueLen);
       void setConsensus(psibase::ConsensusData consensus);
    };
-   PSIO1_REFLECT(MockTransact, method(kvNotify, service, db, keyLen, oldValueLen, newValueLen))
+   PSIO_REFLECT(MockTransact, method(kvNotify, service, db, keyLen, oldValueLen, newValueLen))
 
 }  // namespace TestService
 

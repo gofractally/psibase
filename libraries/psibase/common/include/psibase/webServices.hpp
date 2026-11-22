@@ -39,7 +39,7 @@ namespace psibase
       std::optional<HttpReply> serveSys(HttpRequest                  request,
                                         std::optional<std::int32_t>  socket,
                                         std::optional<AccountNumber> user);
-      PSIO1_REFLECT(ServerInterface, method(serveSys, request, socket, user))
+      PSIO_REFLECT(ServerInterface, method(serveSys, request, socket, user))
    };
 
 }  // namespace psibase

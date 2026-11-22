@@ -28,7 +28,7 @@ namespace UserService
          /// Called on the invite creator when the invite is accepted
          void onInvAccept(uint32_t inviteId, psibase::AccountNumber accepter);
       };
-      PSIO1_REFLECT(InviteHooks, method(onInvAccept, inviteId, accepter))
+      PSIO_REFLECT(InviteHooks, method(onInvAccept, inviteId, accepter))
 
       /// This service facilitates the creation and redemption of invites
       ///
@@ -107,7 +107,7 @@ namespace UserService
       };
 
       // clang-format off
-      PSIO1_REFLECT(Invite,
+      PSIO_REFLECT(Invite,
          method(init),
          method(getInvCost, numAccounts),
          method(createInvite, inviteId, payload, numAccounts, useHooks, resources),

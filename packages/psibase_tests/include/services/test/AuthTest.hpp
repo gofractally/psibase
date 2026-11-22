@@ -51,7 +51,7 @@ namespace TestService
                        std::vector<psibase::AccountNumber>   rejected,
                        std::optional<psibase::ServiceMethod> action);
    };
-   PSIO1_REFLECT(AuthTest,
+   PSIO_REFLECT(AuthTest,
                 method(newAccount, account, deps, threshold),
                 method(canAuthUserSys, account),
                 method(setAuth, account, deps, threshold, action),

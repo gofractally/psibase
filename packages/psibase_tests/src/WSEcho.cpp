@@ -11,7 +11,7 @@ struct WSEcho : psibase::Service
    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest        request,
                                               std::optional<std::int32_t> socket);
 };
-PSIO1_REFLECT(WSEcho,
+PSIO_REFLECT(WSEcho,
              method(recv, socket, data, flags),
              method(close, socket),
              method(serveSys, request, socket))

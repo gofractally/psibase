@@ -71,7 +71,7 @@ namespace SystemService
    };
 
    // clang-format off
-   PSIO1_REFLECT(Credentials,
+   PSIO_REFLECT(Credentials,
       method(init),
       method(canAuthUserSys, user),
       method(checkAuthSys, flags, sender, action, claims),

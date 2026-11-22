@@ -47,7 +47,7 @@ namespace TestService
 
       std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
    };
-   PSIO1_REFLECT(SubjectiveDb,
+   PSIO_REFLECT(SubjectiveDb,
                 method(write, key, value),
                 method(read, key),
                 method(abort, key, value, op),

@@ -37,6 +37,6 @@ namespace TestService
       void                  onBlock();
       void onTrx(const psibase::Checksum256& id, psio1::view<const psibase::TransactionTrace> trace);
    };
-   PSIO1_REFLECT(NotifyService, method(onBlock), method(onTrx, id, trace));
+   PSIO_REFLECT(NotifyService, method(onBlock), method(onTrx, id, trace));
    PSIBASE_REFLECT_TABLES(NotifyService, NotifyService::WriteOnly, NotifyService::Subjective)
 }  // namespace TestService

@@ -131,7 +131,7 @@ namespace SystemService
       /// Removes the redirect set with `setRedirect` for the sender's subdomain. No-op if none is set.
       void clearRedirect();
    };
-   PSIO1_REFLECT(HttpServer,
+   PSIO_REFLECT(HttpServer,
                 method(sendProds, action),
                 method(deferReply, socket),
                 method(claimReply, socket),

@@ -110,7 +110,7 @@ namespace SystemService
       bool isRejectSys(psibase::AccountNumber              sender,
                        std::vector<psibase::AccountNumber> rejecters);
    };
-   PSIO1_REFLECT(Producers,
+   PSIO_REFLECT(Producers,
                 method(init),
                 method(setConsensus, consensus),
                 method(setProducers, producers),

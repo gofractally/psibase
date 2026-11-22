@@ -12,7 +12,7 @@ namespace UserService
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
    };
-   PSIO1_REFLECT(RPackages, method(serveSys, request))
+   PSIO_REFLECT(RPackages, method(serveSys, request))
    PSIBASE_REFLECT_TABLES(RPackages)
 
 }  // namespace UserService

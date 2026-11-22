@@ -7,7 +7,7 @@ struct ServerId : psibase::Service
 {
    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest req);
 };
-PSIO1_REFLECT(ServerId, method(serveSys, req))
+PSIO_REFLECT(ServerId, method(serveSys, req))
 
 using namespace psibase;
 

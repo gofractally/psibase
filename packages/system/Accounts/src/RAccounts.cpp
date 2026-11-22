@@ -93,7 +93,7 @@ namespace SystemService
                                                  after);
       }
    };
-   PSIO1_REFLECT(AccountsQuery,
+   PSIO_REFLECT(AccountsQuery,
                 method(getAccount, accountName),
                 method(getAccounts, accountNames),
                 method(accountsByPre, prefix, first, last, before, after),

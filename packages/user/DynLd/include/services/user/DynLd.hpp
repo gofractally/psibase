@@ -40,6 +40,6 @@ namespace UserService
       void link(std::string group, std::vector<DynDep> deps);
       void unlink(std::string group);
    };
-   PSIO1_REFLECT(DynLd, method(link, group, deps), method(unlink, group))
+   PSIO_REFLECT(DynLd, method(link, group, deps), method(unlink, group))
    PSIBASE_REFLECT_TABLES(DynLd, DynLd::Tables)
 }  // namespace UserService

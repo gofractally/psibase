@@ -24,7 +24,7 @@ struct XDelay : psibase::Service
                                               std::optional<std::int32_t> socket);
    void                              ready(std::uint64_t id);
 };
-PSIO1_REFLECT(XDelay, method(serveSys, request, socket), method(ready, id))
+PSIO_REFLECT(XDelay, method(serveSys, request, socket), method(ready, id))
 PSIBASE_REFLECT_TABLES(XDelay, XDelay::Session)
 
 using namespace psibase;

@@ -165,7 +165,7 @@ namespace SystemService
       void assignAuth(psibase::AccountNumber name, psibase::AccountNumber authService);
    };
 
-   PSIO1_REFLECT(Accounts,
+   PSIO_REFLECT(Accounts,
                 method(init),
                 method(preapproveAcc, name),
                 method(newAccount, name, authService, mode),

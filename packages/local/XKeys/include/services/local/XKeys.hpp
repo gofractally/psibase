@@ -42,6 +42,6 @@ namespace LocalService
       /// All the required keys myst have been created by the caller
       psibase::SignedTransaction signTx(std::vector<psibase::Action> actions);
    };
-   PSIO1_REFLECT(XKeys, method(newKey), method(deleteKey, key), method(signTx, actions))
+   PSIO_REFLECT(XKeys, method(newKey), method(deleteKey, key), method(signTx, actions))
    PSIBASE_REFLECT_TABLES(XKeys, XKeys::Subjective)
 }  // namespace LocalService

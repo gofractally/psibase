@@ -92,7 +92,7 @@ namespace LocalService
       /// This action can be called inside a subjective tx
       AdminOptionsRow options();
    };
-   PSIO1_REFLECT(XAdmin,
+   PSIO_REFLECT(XAdmin,
                 method(isAdmin, account, socket),
                 method(checkAuth, req, socket),
                 method(serveSys, req, socket),

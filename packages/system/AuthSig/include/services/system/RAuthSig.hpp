@@ -13,7 +13,7 @@ namespace SystemService
 
          auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       };
-      PSIO1_REFLECT(RAuthSig,  //
+      PSIO_REFLECT(RAuthSig,  //
                    method(serveSys, request))
       PSIBASE_REFLECT_TABLES(RAuthSig)
    }  // namespace AuthSig

@@ -44,7 +44,7 @@ namespace SystemService
          return std::nullopt;
       }
    };
-   PSIO1_REFLECT(WsAuth,
+   PSIO_REFLECT(WsAuth,
                 method(serveSys, request, socket, user),
                 method(consume, ticket))
 }  // namespace SystemService

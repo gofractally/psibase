@@ -11,5 +11,5 @@ namespace TestService
       static constexpr auto flags   = psibase::CodeRow::isPrivileged;
       void                  test();
    };
-   PSIO1_REFLECT(TestKV, method(test))
+   PSIO_REFLECT(TestKV, method(test))
 }  // namespace TestService

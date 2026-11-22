@@ -9,5 +9,5 @@ namespace UserService
       void nop();
       void withId(std::uint32_t id);
    };
-   PSIO1_REFLECT(Nop, method(nop), method(withId, id))
+   PSIO_REFLECT(Nop, method(nop), method(withId, id))
 }  // namespace UserService

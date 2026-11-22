@@ -66,7 +66,7 @@ struct ActionQuery
       std::span<const char> result = action.rawData();
       return psio1::to_hex(result);
    }
-   PSIO1_REFLECT(ActionQuery, method(sender), method(service), method(method), method(rawData))
+   PSIO_REFLECT(ActionQuery, method(sender), method(service), method(method), method(rawData))
 };
 
 struct TransactionQuery
@@ -82,7 +82,7 @@ struct TransactionQuery
       }
       return result;
    }
-   PSIO1_REFLECT(TransactionQuery, method(actions))
+   PSIO_REFLECT(TransactionQuery, method(actions))
 };
 
 struct SignedTransactionQuery
@@ -120,7 +120,7 @@ struct SignedTransactionQuery
          return std::nullopt;
       }
    }
-   PSIO1_REFLECT(SignedTransactionQuery,
+   PSIO_REFLECT(SignedTransactionQuery,
                 method(id),
                 method(numActions),
                 method(transaction),
@@ -170,7 +170,7 @@ struct BlockQuery
       }
       return result;
    }
-   PSIO1_REFLECT(BlockQuery,
+   PSIO_REFLECT(BlockQuery,
                 method(id),
                 method(header),
                 method(transactions),
@@ -191,7 +191,7 @@ struct TransactionLocation
    AccountNumber          producer() const { return blockHeader.producer; }
    std::uint32_t          index() const { return txIndex; }
    SignedTransactionQuery transaction() const { return SignedTransactionQuery{value, censor}; }
-   PSIO1_REFLECT(TransactionLocation,
+   PSIO_REFLECT(TransactionLocation,
                 method(blockNum),
                 method(blockId),
                 method(blockTime),
@@ -283,7 +283,7 @@ struct Query
       return std::nullopt;
    }
 };
-PSIO1_REFLECT(  //
+PSIO_REFLECT(  //
     Query,
     method(blocks),
     method(block, blockNum),

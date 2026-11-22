@@ -21,6 +21,6 @@ namespace TestService
       using Tables                  = psibase::ServiceTables<CallCounterTable>;
       int call(int number, std::string memo);
    };
-   PSIO1_REFLECT(TestServiceEntry, method(call, number, memo))
+   PSIO_REFLECT(TestServiceEntry, method(call, number, memo))
    PSIBASE_REFLECT_TABLES(TestServiceEntry, TestServiceEntry::Tables)
 }  // namespace TestService

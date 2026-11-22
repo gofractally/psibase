@@ -22,7 +22,7 @@ struct GetUser : psibase::Service
       return result;
    }
 };
-PSIO1_REFLECT(GetUser, method(serveSys, req, socket, user))
+PSIO_REFLECT(GetUser, method(serveSys, req, socket, user))
 PSIBASE_REFLECT_TABLES(GetUser)
 
 PSIBASE_DISPATCH(GetUser)

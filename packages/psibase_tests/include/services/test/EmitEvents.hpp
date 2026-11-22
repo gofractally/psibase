@@ -43,7 +43,7 @@ namespace TestService
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
    };
 
-   PSIO1_REFLECT(EmitEvents,  //
+   PSIO_REFLECT(EmitEvents,  //
                 method(init),
                 method(foo, s, i),
                 method(foo2, s, i),

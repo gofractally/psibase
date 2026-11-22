@@ -35,7 +35,7 @@ struct ParallelSubjectiveService : psibase::Service
    static constexpr auto             serviceFlags = psibase::CodeRow::isPrivileged;
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };
-PSIO1_REFLECT(ParallelSubjectiveService, method(serveSys, req))
+PSIO_REFLECT(ParallelSubjectiveService, method(serveSys, req))
 PSIBASE_REFLECT_TABLES(ParallelSubjectiveService, ParallelSubjectiveService::Tables)
 
 volatile int dummy;

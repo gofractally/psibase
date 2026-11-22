@@ -712,7 +712,7 @@ namespace psibase
    {
       std::string sqlQuery(const std::string& squery, const std::vector<std::string>& params);
    };
-   PSIO1_REFLECT(EventQueryInterface, method(sqlQuery, query, params))
+   PSIO_REFLECT(EventQueryInterface, method(sqlQuery, query, params))
 
    template <typename T>
    struct SqlRow

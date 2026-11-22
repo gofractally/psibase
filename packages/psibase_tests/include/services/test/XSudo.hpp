@@ -12,5 +12,5 @@ namespace TestService
       static constexpr auto             flags   = psibase::CodeRow::isPrivileged;
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest req);
    };
-   PSIO1_REFLECT(XSudo, method(serveSys, req))
+   PSIO_REFLECT(XSudo, method(serveSys, req))
 }  // namespace TestService

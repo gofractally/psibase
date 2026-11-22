@@ -34,7 +34,7 @@ namespace UserService
          {
             return to<Invite>().getExpDate(this->inviteId);
          }
-         PSIO1_REFLECT(InviteDetails,
+         PSIO_REFLECT(InviteDetails,
                       inviteId,
                       cid,
                       inviter,
@@ -106,7 +106,7 @@ namespace UserService
                 .query();
          }
       };
-      PSIO1_REFLECT(Query,
+      PSIO_REFLECT(Query,
                    method(inviteById, inviteId),
                    method(invitesByInviter, inviter),
                    method(getInviteCost, numAccounts),
@@ -128,7 +128,7 @@ namespace UserService
             return std::nullopt;
          }
       };
-      PSIO1_REFLECT(RInvite, method(serveSys, request))
+      PSIO_REFLECT(RInvite, method(serveSys, request))
       PSIBASE_REFLECT_TABLES(RInvite)
    }  // namespace InviteNs
 }  // namespace UserService

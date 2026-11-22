@@ -59,7 +59,7 @@ namespace TestService
       // Stores n bytes of data to the database
       void useDisk(std::uint32_t n);
    };
-   PSIO1_REFLECT(CredResThief,
+   PSIO_REFLECT(CredResThief,
                 method(create),
                 method(buyRes, amount),
                 method(bill, key, method),

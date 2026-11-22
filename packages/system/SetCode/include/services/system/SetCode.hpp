@@ -135,7 +135,7 @@ namespace SystemService
       /// the verify services change.
       std::uint64_t verifySeq();
    };
-   PSIO1_REFLECT(SetCode,
+   PSIO_REFLECT(SetCode,
                 method(init),
                 method(setCode, service, vmType, vmVersion, code),
                 method(stageCode, service, id, vmType, vmVersion, code),

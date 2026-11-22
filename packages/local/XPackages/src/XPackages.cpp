@@ -35,7 +35,7 @@ namespace
          return result;
       }
    };
-   PSIO1_REFLECT(Query, method(installed, gt, ge, lt, le, first, last, before, after))
+   PSIO_REFLECT(Query, method(installed, gt, ge, lt, le, first, last, before, after))
 
    HttpReply error(const HttpRequest& req, HttpStatus status, std::string_view msg)
    {

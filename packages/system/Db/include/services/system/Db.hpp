@@ -15,5 +15,5 @@ namespace SystemService
                                    psio1::view<const std::vector<char>> prefix,
                                    psibase::KvMode                     mode);
    };
-   PSIO1_REFLECT(Db, method(open, db, prefix, mode))
+   PSIO_REFLECT(Db, method(open, db, prefix, mode))
 }  // namespace SystemService

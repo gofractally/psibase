@@ -9,5 +9,5 @@ namespace TestService
       static constexpr auto service = psibase::AccountNumber{"loop"};
       void                  loop();
    };
-   PSIO1_REFLECT(Loop, method(loop))
+   PSIO_REFLECT(Loop, method(loop))
 }  // namespace TestService

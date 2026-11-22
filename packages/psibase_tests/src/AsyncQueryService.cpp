@@ -40,7 +40,7 @@ struct AsyncQueryService : psibase::Service
    auto                  serveSys(const HttpRequest& req, std::optional<std::int32_t> socket)
        -> std::optional<HttpReply>;
 };
-PSIO1_REFLECT(AsyncQueryService, method(onBlock), method(serveSys, request, socket))
+PSIO_REFLECT(AsyncQueryService, method(onBlock), method(serveSys, request, socket))
 PSIBASE_REFLECT_TABLES(AsyncQueryService, AsyncQueryService::Subjective, AsyncQueryService::Session)
 
 void wait_until(std::chrono::steady_clock::time_point end)

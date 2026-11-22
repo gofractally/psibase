@@ -191,7 +191,7 @@ namespace UserService
       void checkOrder(std::uint64_t id, std::uint32_t index);
       void removeOrder(std::uint64_t id);
    };
-   PSIO1_REFLECT(Packages,
+   PSIO_REFLECT(Packages,
                 method(postinstall, package, manifest),
                 method(setSchema, account, schema),
                 method(getSchema),

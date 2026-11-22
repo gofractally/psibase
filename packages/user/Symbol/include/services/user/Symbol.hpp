@@ -54,7 +54,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO1_REFLECT(Symbol,
+   PSIO_REFLECT(Symbol,
       method(init),
       method(create, newSymbol),
       method(admin_create, newSymbol, recipient),

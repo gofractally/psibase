@@ -14,7 +14,7 @@ namespace SystemService
                     std::optional<psibase::AccountNumber> user)
           -> std::optional<psibase::HttpReply>;
    };
-   PSIO1_REFLECT(Explorer,  //
+   PSIO_REFLECT(Explorer,  //
                 method(serveSys, request))
    PSIBASE_REFLECT_TABLES(Explorer)
 }  // namespace SystemService

@@ -135,7 +135,7 @@ namespace LocalService
       void closeP2P(std::int32_t socket);
       void onTimer(std::uint64_t timerId);
    };
-   PSIO1_REFLECT(XPeers,
+   PSIO_REFLECT(XPeers,
                 method(serveSys, request, socket),
                 method(onConfig),
                 method(onP2P, socket, reply),

@@ -16,5 +16,5 @@ namespace LocalService
       void addCallback(TransactionCallbackType type, psibase::MethodNumber callback);
       void removeCallback(TransactionCallbackType type, psibase::MethodNumber callback);
    };
-   PSIO1_REFLECT(XTransact, method(addCallback, type, action), method(removeCallback, type, action))
+   PSIO_REFLECT(XTransact, method(addCallback, type, action), method(removeCallback, type, action))
 }  // namespace LocalService

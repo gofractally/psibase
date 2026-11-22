@@ -883,7 +883,7 @@ namespace SystemService
             return result;
          }
       };
-      PSIO1_REFLECT(Query,                                //
+      PSIO_REFLECT(Query,                                //
                    method(getConfig, account),           //
                    method(getContent, account),          //
                    method(getContentAt, account, path),  //

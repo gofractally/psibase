@@ -19,7 +19,7 @@ struct VerifyFlagsService : Service
    }
    void recv() {}
 };
-PSIO1_REFLECT(VerifyFlagsService,
+PSIO_REFLECT(VerifyFlagsService,
              method(verifySys, transactionHash, claim, proof),
              method(sudo),
              method(setRow),

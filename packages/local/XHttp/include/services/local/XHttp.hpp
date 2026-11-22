@@ -155,7 +155,7 @@ namespace LocalService
       /// The sender must be the current owner of the socket.
       bool isSecure(int32_t socket);
    };
-   PSIO1_REFLECT(XHttp,
+   PSIO_REFLECT(XHttp,
                 method(send, socket, data, flags),
                 method(sendRequest, request, tls, endpoint),
                 method(websocket, request, tls, endpoint),

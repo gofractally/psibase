@@ -1365,7 +1365,7 @@ struct TransactQuery
       return {};
    }
 };
-PSIO1_REFLECT(TransactQuery, method(snapshotInfo));
+PSIO_REFLECT(TransactQuery, method(snapshotInfo));
 
 std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  request,
                                              std::optional<std::int32_t>  socket,

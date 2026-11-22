@@ -30,7 +30,7 @@ namespace SystemService
    };
 
    // clang-format off
-   PSIO1_REFLECT(CommonApi,
+   PSIO_REFLECT(CommonApi,
       method(serveSys, request),
    )
    PSIBASE_REFLECT_TABLES(CommonApi)

@@ -15,5 +15,5 @@ namespace LocalService
                                    psio1::view<const std::vector<char>> prefix,
                                    psibase::KvMode                     mode);
    };
-   PSIO1_REFLECT(XDb, method(open, db, prefix, mode))
+   PSIO_REFLECT(XDb, method(open, db, prefix, mode))
 }  // namespace LocalService

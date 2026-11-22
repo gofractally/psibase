@@ -25,6 +25,6 @@ namespace LocalService
       void       startSession();
       AuthResult checkAuth(const psibase::HttpRequest& req, std::optional<std::int32_t> socket);
    };
-   PSIO1_REFLECT(XBasic, method(startSession), method(checkAuth, request, socket))
+   PSIO_REFLECT(XBasic, method(startSession), method(checkAuth, request, socket))
    PSIBASE_REFLECT_TABLES(XBasic, XBasic::Session)
 }  // namespace LocalService

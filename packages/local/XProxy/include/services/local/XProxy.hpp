@@ -55,7 +55,7 @@ namespace LocalService
       void recv(std::int32_t socket, psio1::view<const std::vector<char>> data, std::uint32_t flags);
       void close(std::int32_t socket);
    };
-   PSIO1_REFLECT(XProxy,
+   PSIO_REFLECT(XProxy,
                 method(serveSys, request, socket),
                 method(onReply, socket, reply),
                 method(onAccept, socket, reply),

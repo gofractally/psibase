@@ -111,7 +111,7 @@ namespace SystemService
      private:
       psibase::Actor<AuthInterface> authServiceOf(psibase::AccountNumber account);
    };
-   PSIO1_REFLECT(AuthDelegate,  //
+   PSIO_REFLECT(AuthDelegate,  //
                 method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),

@@ -28,7 +28,7 @@ namespace
          }
          return result;
       }
-      PSIO1_REFLECT(Query, method(originServers))
+      PSIO_REFLECT(Query, method(originServers))
    };
 
    HttpReply makeError(HttpStatus status, std::string_view msg)

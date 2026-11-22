@@ -49,7 +49,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO1_REFLECT(Chainmail,
+   PSIO_REFLECT(Chainmail,
       method(init),
       method(send, receiver, subject, body),
       method(archive, msg_id),

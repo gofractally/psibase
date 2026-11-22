@@ -70,7 +70,7 @@ namespace SystemService
       /// Decompresses content compressed with some algorithm
       std::vector<char> decompress(const std::vector<char>& content);
    };
-   PSIO1_REFLECT(DecompressorInterface, method(decompress, content))
+   PSIO_REFLECT(DecompressorInterface, method(decompress, content))
 
    /// Provide web hosting
    ///
@@ -184,7 +184,7 @@ namespace SystemService
                                                      std::string_view rootDomain);
    };
 
-   PSIO1_REFLECT(Sites,
+   PSIO_REFLECT(Sites,
                 method(serveSys, request, socket),
                 method(storeSys, path, contentType, contentEncoding, content),
                 method(hardlink, path, contentType, contentEncoding, contentHash),

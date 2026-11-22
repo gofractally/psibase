@@ -29,7 +29,7 @@ namespace SystemService
              .get(account);
       }
    };
-   PSIO1_REFLECT(Query,                   //
+   PSIO_REFLECT(Query,                   //
                 method(owned, account),  //
                 method(owner, account)   //
                                          //

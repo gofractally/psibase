@@ -802,7 +802,7 @@ namespace
    {
       void loginSys(std::string rootHost) {}
    };
-   PSIO1_REFLECT(LoginInterface, method(loginSys, rootHost))
+   PSIO_REFLECT(LoginInterface, method(loginSys, rootHost))
 }  // namespace
 
 std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)

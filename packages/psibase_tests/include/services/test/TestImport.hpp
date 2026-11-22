@@ -15,7 +15,7 @@ namespace TestService
       void testCallback();
       void testImport(bool expectHandle);
    };
-   PSIO1_REFLECT(TestImport,
+   PSIO_REFLECT(TestImport,
                 method(testPlain),
                 method(testRpc),
                 method(testCallback),

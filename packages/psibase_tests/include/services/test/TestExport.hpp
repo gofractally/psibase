@@ -17,7 +17,7 @@ namespace TestService
       void doExport(int initialValue, bool subjective);
       int  getValue();
    };
-   PSIO1_REFLECT(TestExport,
+   PSIO_REFLECT(TestExport,
                 method(testPlain),
                 method(testRpc),
                 method(testCallback),

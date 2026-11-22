@@ -95,7 +95,7 @@ namespace UserService
       /// Forwards to event-index::sync
       void sync();
    };
-   PSIO1_REFLECT(EventConfig,
+   PSIO_REFLECT(EventConfig,
                 method(init),
                 method(addIndex, db, service, event, column),
                 method(event, db, type, rawData),

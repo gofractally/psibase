@@ -14,6 +14,6 @@ namespace SystemService
                      psibase::Claim       claim,
                      std::vector<char>    proof);
    };
-   PSIO1_REFLECT(VerifySig, method(verifySys, transactionHash, claim, proof))
+   PSIO_REFLECT(VerifySig, method(verifySys, transactionHash, claim, proof))
    PSIBASE_REFLECT_TABLES(VerifySig)
 }  // namespace SystemService

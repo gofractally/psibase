@@ -57,7 +57,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO1_REFLECT(Nft,
+   PSIO_REFLECT(Nft,
       method(init),
       method(mint, nftId),
       method(burn, nftId),

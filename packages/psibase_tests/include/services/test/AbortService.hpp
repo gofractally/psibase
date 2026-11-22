@@ -12,5 +12,5 @@ namespace TestService
       void                  abort(std::string message);
    };
 
-   PSIO1_REFLECT(AbortService, method(abort, message))
+   PSIO_REFLECT(AbortService, method(abort, message))
 }  // namespace TestService

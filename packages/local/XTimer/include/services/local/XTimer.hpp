@@ -53,6 +53,6 @@ namespace LocalService
       // Internal callback
       void runOne();
    };
-   PSIO1_REFLECT(XTimer, method(runAt, time, callback), method(cancel, id), method(runOne))
+   PSIO_REFLECT(XTimer, method(runAt, time, callback), method(cancel, id), method(runOne))
    PSIBASE_REFLECT_TABLES(XTimer, XTimer::Session)
 }  // namespace LocalService

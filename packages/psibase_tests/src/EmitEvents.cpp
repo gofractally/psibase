@@ -83,7 +83,7 @@ struct Query
           .query();
    }
 };
-PSIO1_REFLECT(Query,  //
+PSIO_REFLECT(Query,  //
              method(foo2Events, first, last, before, after),
              method(exampleRecords, first, last, before, after))
 

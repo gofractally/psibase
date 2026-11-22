@@ -81,7 +81,7 @@ struct LoginInterface
 {
    void loginSys(std::string rootHost);
 };
-PSIO1_REFLECT(LoginInterface, method(loginSys, rootHost))
+PSIO_REFLECT(LoginInterface, method(loginSys, rootHost))
 
 TEST_CASE("Test login")
 {

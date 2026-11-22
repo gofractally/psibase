@@ -11,5 +11,5 @@ namespace TestService
       static constexpr auto flags   = psibase::CodeRow::isPrivileged;
       void                  setWasmCfg(psibase::NativeTableNum table, psibase::WasmConfigRow row);
    };
-   PSIO1_REFLECT(SetWasmConfig, method(setWasmCfg, table, row))
+   PSIO_REFLECT(SetWasmConfig, method(setWasmCfg, table, row))
 }  // namespace TestService

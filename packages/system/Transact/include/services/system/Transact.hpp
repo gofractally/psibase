@@ -113,7 +113,7 @@ namespace SystemService
                        std::vector<psibase::AccountNumber> rejecters,
                        std::optional<ServiceMethod>        method);
    };
-   PSIO1_REFLECT(AuthInterface,
+   PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),
@@ -130,7 +130,7 @@ namespace SystemService
       // Gets the eventMerkle root and writes back any cached state
       auto saveMerkle() -> psibase::Checksum256;
    };
-   PSIO1_REFLECT(EventIndexerInterface, method(startBlock), method(sync), method(saveMerkle))
+   PSIO_REFLECT(EventIndexerInterface, method(startBlock), method(sync), method(saveMerkle))
 
    struct VerifyInterface
    {
@@ -138,7 +138,7 @@ namespace SystemService
                      psibase::Claim       claim,
                      std::vector<char>    proof);
    };
-   PSIO1_REFLECT(VerifyInterface, method(verifySys, transactionHash, claim, proof))
+   PSIO_REFLECT(VerifyInterface, method(verifySys, transactionHash, claim, proof))
 
    struct AuthTarget
    {

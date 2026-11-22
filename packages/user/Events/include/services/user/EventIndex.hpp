@@ -21,6 +21,6 @@ namespace UserService
       /// Runs in subjective mode at the end of each block
       void onBlock();
    };
-   PSIO1_REFLECT(EventIndex, method(update, db, service, event), method(sync), method(onBlock))
+   PSIO_REFLECT(EventIndex, method(update, db, service, event), method(sync), method(onBlock))
    PSIBASE_REFLECT_TABLES(EventIndex, EventsTables)
 }  // namespace UserService

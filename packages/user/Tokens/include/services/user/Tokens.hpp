@@ -406,7 +406,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO1_REFLECT(Tokens,
+   PSIO_REFLECT(Tokens,
       method(init),
       method(create, precision, maxIssuedSupply),
       method(mint, tokenId, amount, memo),

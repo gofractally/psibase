@@ -16,7 +16,7 @@ namespace TestService
       void setCodeRow(psibase::CodeRow row);
    };
 
-   PSIO1_REFLECT(RemoveCode,
+   PSIO_REFLECT(RemoveCode,
                 method(removeCode, codeHash, vmType, vmVersion),
                 method(setCodeRow, row))
 }  // namespace TestService

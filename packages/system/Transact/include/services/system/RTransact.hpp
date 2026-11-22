@@ -299,7 +299,7 @@ namespace SystemService
 
       std::optional<psibase::AccountNumber> getUser(psibase::HttpRequest request);
    };
-   PSIO1_REFLECT(RTransact,
+   PSIO_REFLECT(RTransact,
                 method(next),
                 method(preverify, transaction),
                 method(recv, transaction),

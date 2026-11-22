@@ -52,7 +52,7 @@ namespace TestService
       void subindex();
       void iterMulti();
    };
-   PSIO1_REFLECT(TestTable,
+   PSIO_REFLECT(TestTable,
                 method(getSingle),
                 method(getMulti),
                 method(getCompound),
