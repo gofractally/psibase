@@ -218,6 +218,16 @@ mod service {
         unimplemented!()
     }
 
+    /// Sets the most bytes of transactions a block may hold.
+    ///
+    /// A transaction counts for its packed size plus its proofs. A block
+    /// with a single transaction is exempt. This is a consensus rule and
+    /// applies from the next block.
+    #[action]
+    fn setMaxBlockSize(bytes: u32) {
+        unimplemented!()
+    }
+
     /// Adds a callback that will be run whenever the trigger happens.
     /// - onTransaction is run at the end of every transaction
     /// - onBlock runs at the end of every block
