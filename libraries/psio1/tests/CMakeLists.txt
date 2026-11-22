@@ -1,6 +1,7 @@
 add_compile_options( -Wall -Wstrict-aliasing -fstrict-aliasing )
 
 if(DEFINED IS_NATIVE)
+    link_directories(${ICU_LIBRARY_DIR})
     find_package(Threads REQUIRED)
     add_executable(psio-tests
         graphql.cpp
@@ -20,7 +21,8 @@ if(DEFINED IS_NATIVE)
         test_key.cpp
         canonical_glue_tests.cpp
     )
-    target_link_libraries(psio-tests psio1 Catch2::Catch2WithMain Threads::Threads )
+    # TEMPORARY: canonical_glue_tests.cpp pins the legacy forms of psibase's own records.
+    target_link_libraries(psio-tests psio1 psibase Catch2::Catch2WithMain Threads::Threads )
 
     add_executable(generate_test_data generate_test_data.cpp)
     target_link_libraries(generate_test_data psio1)
