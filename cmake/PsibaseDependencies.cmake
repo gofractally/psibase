@@ -29,7 +29,7 @@ function(psibase_declare_dependencies)
     endif()
     FetchContent_Declare(psio
         GIT_REPOSITORY https://github.com/gofractally/psio.git
-        GIT_TAG dfd0db179c9cba1523f8c68ca10a81a1250ceec2
+        GIT_TAG 224f80de2563939d93de7b685e1d174fe278b070
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/psio"
         ${psio_scope})
