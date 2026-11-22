@@ -1,7 +1,8 @@
 # Converting psibase from fracpack to PSIO / PSSZ
 
-This document records the first three slices of the conversion and slices 4a,
-2b and 4b (branch `claude/pssz`), the pattern they established, everything that remains, a
+This document records the first three slices of the conversion, slices 4a,
+2b and 4b and the follow-up to them on a newer PSIO (section 1.13) (branch
+`claude/pssz`), the pattern they established, everything that remains, a
 proposed order for the remaining slices, the decisions that need the owner's
 confirmation, and the places where PSIO lacks something psibase needs.
 
@@ -10,12 +11,12 @@ No in-tree copy, no fracpack, no compatibility layer. PSSZ on the wire, PSIO's
 `key` format for database keys, I-JSON (`psio::ijson`) for clients, PSIO's
 Schema IR for schemas. No chain data is migrated (fresh genesis).
 
-## 0. Where the tree is after slices 1–3, 4a, 2b and 4b
+## 0. Where the tree is after slices 1–3, 4a, 2b, 4b and the follow-up
 
 | | |
 |---|---|
 | Legacy library | `libraries/psio1`: include prefix `<psio1/…>`, namespace `psio1`, macros `PSIO1_…`, CMake target `psio1`, archive `libpsio1.a`. It is deleted at the end of the conversion. |
-| PSIO | `gofractally/psio` at `868e37bb7afc05235f105eb769fef1beedb164bb` (its `main`), pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b were built and tested on `86cf8c0f`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical to `868e37bb`: `git diff` of the two over those paths is empty. The final build and test run of slice 4b is on `868e37bb`.) |
+| PSIO | `gofractally/psio` at `dfd0db179c9cba1523f8c68ca10a81a1250ceec2` (topic branch `codex/psibase-core-evolution`, not its `main`), pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`.) |
 | Native | `libraries/CMakeLists.txt` calls `psibase_acquire_dependency(psio)`; `psibase` and `psio1` link `psio::psio`. PSIO fetches simdjson 5.2.0 by URL and SHA-256; configuration fails if any other simdjson target exists first. PSIO's own install rules are excluded from psibase's install tree. |
 | Guests | The `wasm/` project defines an INTERFACE target `psio` (`psio::psio`) over the same source tree: `PSIO_EXCEPTIONS_ENABLED=0`, `PSIO_HAVE_SIMDJSON=0`. The SDK installs PSIO's headers (`include/psio`, `include/psio/external/xxhash.h`); `psibase-config.cmake{,.build}` define the same target for SDK consumers. |
 | Slice 1: leaf types | `AccountNumber`, `MethodNumber`; `Seconds`, `MicroSeconds`, `TimePointSec`, `TimePointUSec`; `Checksum160/256/512` (sections 1.1–1.3). |
@@ -24,10 +25,11 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 | Slice 4a: method consumers | Everything psibase derives from a class's methods reads `psio::reflect<T>` directly: the call proxies (`Actor`, `transactor`, `EventEmitter`, `ActionViewBuilder`, the tester's `ServiceUser`) are `psio::reflect<T>::proxy<P>`; `dispatch` finds the action with `index_of_method_hash` and calls it with `invoke_method`; the action and event part of the service schema, `/pack_action`, `/action_templates` use `for_each_method` and `method_param_names<I>` (section 1.10). GraphQL still reads methods through `psio1` (slice 9). |
 | Slice 2b: the deferred records | 15 declarations: `Memo` and `Precision` are `transparent()` wrappers with an `invariant`; `Decimal` is a record with a text adapter; `XAdmin::Auth::Account`, `LocalUsername` and `AuthSig::PrivateKeyInfo` are `transparent()` wrappers; `TimerRow`, `UrlRow`, `TimerQueueRow`, `ServiceSchema`, `DynDepGroups`, `PsinodeServiceConfig`, `TypedAction<T>` and the two records of `debug_eos_vm` changed macro only (section 1.11). |
 | Slice 4b: data-member consumers | Everything psibase derives from a record's data members reads `psio::reflect<T>` directly: table keys and views (`Table.hpp`), table and key schemas (`schema.hpp`), `zip.cpp`, query strings (`Rpc.hpp`), `jwt.hpp`, XAdmin's option names, the data-member parts of `serveGraphQL.hpp` (section 1.12). Nothing outside `libraries/psio1` names `psio1::reflect`, `psio1::Reflected`, `MemberList`, `MemberPtrType`, `for_each_member`, `get_data_member` or `psio1::get_type_name`. |
+| Follow-up on PSIO `dfd0db17` | Section 1.13. `Precision`'s rejection names the value again (G21): no behaviour change of slice 2b is left. GraphQL names are `psio::fixed_string` (G19), key member lookup and key flattening use `index_of_member` / `member_types` (G20), `flatten_key` asks `psio::Reflected<T>` alone (G22), keyword-only includes removed (G14); `psio1::reflected_name` deleted, `psio1::FixedString` no longer named outside `psio1`. One owner-approved behaviour change: `Decimal::fromStr` rejects a quantity over 2^64 − 1 instead of wrapping (D17). |
 | Still declared with the legacy macro | 5 `PSIO1_REFLECT` sites and 1 `PSIO1_REFLECT_TYPENAME`, all in `rust/test_fracpack/tests/test.hpp` (the legacy library's own C++/Rust cross-check, deleted with it). Not reflected at all and still on legacy ADL hooks: `SubjectPublicKeyInfo`, `IPAddress`, `SocketEndpoint` (section 1.9). |
 | Temporary glue | Only in `libraries/psio1` (section 1.5). Every block is marked `// TEMPORARY: removed when psio1 is deleted`. |
-| Unchanged | Every wire, key, JSON and schema byte psibase produces: everything is still packed, keyed, written as JSON, described and dispatched by `psio1`, which reads the PSIO declarations through the glue. Evidence: after every slice all 68 generated `*-schema.json` files are byte-identical to the build before it (slices 2b and 4b: to the build of 0167a3056); pinned bytes, keys, JSON, GraphQL and schemas in `canonical_glue_tests.cpp` (sections 1.8, 1.10–1.12). |
-| Tests | ctest 92/92 after each slice, 2b and 4b and the two pin moves included. `psio-tests`: 67 test cases natively, 26 in the guest (2 added in 2b: the legacy forms of the 2b types, pinned before they were re-declared). `psibase-psio-tests`: 36 test cases, native and guest (7 added in 2b, `wrappers.cpp`; 2 in 4b, `tables.cpp`). |
+| Unchanged | Every wire, key, JSON and schema byte psibase produces (one text is no longer read: a `Decimal` whose quantity does not fit 64 bits, D17): everything is still packed, keyed, written as JSON, described and dispatched by `psio1`, which reads the PSIO declarations through the glue. Evidence: after every slice all 68 generated `*-schema.json` files are byte-identical to the build before it (slices 2b, 4b and the follow-up: to the build of 0167a3056); pinned bytes, keys, JSON, GraphQL and schemas in `canonical_glue_tests.cpp` (sections 1.8, 1.10–1.12). |
+| Tests | ctest 92/92 after each slice, 2b, 4b, the pin moves and the follow-up included. `psio-tests`: 67 test cases natively, 26 in the guest (2 added in 2b: the legacy forms of the 2b types, pinned before they were re-declared). `psibase-psio-tests`: 37 test cases, native and guest (7 added in 2b, `wrappers.cpp`; 2 in 4b, `tables.cpp`; 1 in the follow-up, the `Decimal` boundary). |
 
 ## 1. The conversion pattern
 
@@ -152,8 +154,7 @@ IR is `Custom{Array{u8, N}, "hex"}`. Nothing is declared in psibase.
 
 | File | What | Why |
 |---|---|---|
-| `psio1/reflect.hpp` (lines 35–40 and 892–1042) | `psio1::reflection_impl::canonical_reflect<T>` and a constrained `psio_get_reflect_impl` overload: `psio1::reflect<T>` is derived from `psio::reflect<T>` for any type reflected with PSIO. Everything read from `psio1::reflect` is provided with the type the legacy macro gives it: `is_defined`, `is_struct`, `definitionWillNotChange`, `name` (a `FixedString`), `data_members`, `data_member_names`, `member_functions`, `member_function_names`, and `proxy<P>`: the PSIO proxy over a projection that forwards `get<I, &T::field>()` to the legacy proxy object (the views). A PSIO `invariant` is bridged for a `transparent()` type only (static assertion). | fracpack, views, `to_key`, `to_bin`, the legacy schema builder, GraphQL and generic JSON, all inside `psio1`, read the data members; `psio1/graphql.hpp` also reads the methods. Since slice 4b nothing outside `psio1` reads `psio1::reflect`. Binary / key adapters are not bridged (static assertion). |
-| `psio1/reflect.hpp` (lines 1044–1057) | `psio1::reflected_name<T>`: the PSIO-reflected name as a `psio1::FixedString`. | Gap G19: psibase names GraphQL connection and edge types with a string that is a template argument and concatenates at compile time (`Connection<T, reflected_name<T> + "Connection", …>`); PSIO has no such string. 11 uses in `serveGraphQL.hpp` and `XPackages.cpp`; `psio1::FixedString` itself is named 6 times in `serveGraphQL.hpp` and `RPackages.cpp`. |
+| `psio1/reflect.hpp` (lines 35–40 and 892–1042) | `psio1::reflection_impl::canonical_reflect<T>` and a constrained `psio_get_reflect_impl` overload: `psio1::reflect<T>` is derived from `psio::reflect<T>` for any type reflected with PSIO. Everything read from `psio1::reflect` is provided with the type the legacy macro gives it: `is_defined`, `is_struct`, `definitionWillNotChange`, `name` (a `psio1::FixedString`, built by `canonical_name`, lines 903–912; read only inside `psio1`), `data_members`, `data_member_names`, `member_functions`, `member_function_names`, and `proxy<P>`: the PSIO proxy over a projection that forwards `get<I, &T::field>()` to the legacy proxy object (the views). A PSIO `invariant` is bridged for a `transparent()` type only (static assertion). | fracpack, views, `to_key`, `to_bin`, the legacy schema builder, GraphQL and generic JSON, all inside `psio1`, read the data members; `psio1/graphql.hpp` also reads the methods. Since slice 4b nothing outside `psio1` reads `psio1::reflect`. Binary / key adapters are not bridged (static assertion). |
 | `psio1/fracpack.hpp` (lines 11–29, 69–84) | `psio_unwrap_packable` for a PSIO `transparent()` type (its member), `psio_validate_packable` for its PSIO invariant, on an object and on a view; `packable_wrapped_t<T>`. A value that fails the invariant aborts with the invariant's own message. | Replaces the ADL hooks the 2b types no longer define: `Memo`, `Precision`, the XAdmin wrappers and `PrivateKeyInfo` pack, key and view exactly as before. |
 | `psio1/to_json.hpp` (333–351), `psio1/from_json.hpp` (599–626) | `to_json` / `from_json` overloads for any type with a PSIO `text_category` adapter, and for a `transparent()` type without one (its member; the invariant is checked after reading). | Replaces the ADL `to_json` / `from_json` the converted headers no longer define. For a text adapter `from_json` calls only `decode`, so legacy JSON keeps its historical leniency. |
 | `psio1/graphql.hpp` | `use_json_string_for_gql` is true for a type with a PSIO text adapter. | Replaces the ADL hook. |
@@ -284,7 +285,7 @@ each. Those still deferred work as before through the legacy hooks.
 | Type | Where | Reason | Blocked by | After slice 2b |
 |---|---|---|---|---|
 | `Memo` | `psibase/Memo.hpp` | A string that packs as its `contents` (`psio_unwrap_packable`), validates UTF-8 and ≤ 80 bytes on unpack (`psio_validate_packable`) and in JSON. Its canonical form is `psio::utf8_string<80>`, which changes the member API and is a wire decision. | D5; G3, G5 | Done: `transparent()`, `invariant(wellFormed)`. D5, D25. |
-| `Precision` | `Tokens/tokenTypes.hpp` | A `uint8_t` wrapper that packs as the integer and validates 0–8 on unpack and in JSON. | G3, G5 | Done: `transparent()`, `invariant(inRange)`. |
+| `Precision` | `Tokens/tokenTypes.hpp` | A `uint8_t` wrapper that packs as the integer and validates 0–8 on unpack and in JSON. | G3, G5 | Done: `transparent()`, `invariant(inRange)`; the message names the value (1.13). |
 | `Decimal` | `Tokens/tokenTypes.hpp` | A record (`Quantity`, `Precision`) whose JSON is a decimal string. It needs a text adapter whose `validate` reports instead of aborting (`Decimal::fromStr` calls `psibase::check`), and a decision on which spellings name a value (`"1.50"` and `"1.5"` are different values; `".5"`, `"5."`, `""`?). | D17; holds a `Precision` | Done: `PSIO_REFLECT` + `PSIO_ADAPTER(…, text_category, DecimalText)`. D17. |
 | `TypedAction<T>` | `psibase/Actor.hpp` | `psio1::nested<T>` member. | G7 | Done (macro). The member stays `psio1::nested<T>` until the flip, then `psio::nested<T>` (D16). |
 | `TimerRow` | `psibase/nativeTables.hpp` | `MonotonicTimePointUSec` member. | G2 | Done (macro). |
@@ -382,7 +383,8 @@ below, not taken from the change list: time points of clocks other than
 `psio::nested<T>` (G7), `std::pair` / `std::map` / `std::set` (G8), a text
 adapter for a `std::variant` (G4), `psio::pssz_mutable_view` (G6), a Schema
 as JSON (G1), the method metadata of a type without methods (G16) and
-`for_each_method(fn(index, name))` (G17). **G14 is not closed**: see section 5.
+`for_each_method(fn(index, name))` (G17). G14 was not closed at that pin; it
+is at `dfd0db17` (1.13).
 
 **A wrapper that is its member, with a rule.**
 
@@ -400,7 +402,7 @@ struct Memo {
 
 Nothing else: the `to_json`, `from_json`, two `psio_unwrap_packable` and two
 `psio_validate_packable` overloads are deleted, and the header includes only
-`<psio/…>`. `Precision` is the same over a `uint8_t` (`invariant(inRange)`).
+`<psio/reflect.hpp>` of PSIO. `Precision` is the same over a `uint8_t` (`invariant(inRange)`).
 In PSIO a `Memo` is its string in PSSZ, key and I-JSON, and every checking
 reader rejects text over 80 bytes or not UTF-8 with the invariant's message.
 `XAdmin::Auth::Account`, `LocalUsername` and `AuthSig::PrivateKeyInfo` are
@@ -421,7 +423,8 @@ PSIO_ADAPTER(UserService::Decimal, psio::text_category, UserService::DecimalText
 ```
 
 `Decimal::parse(std::string_view) noexcept -> std::optional<Decimal>` is new: the
-rules of `fromStr` without aborting (D17).
+rules of `fromStr` without aborting (D17). Since 1.13 the two accept exactly
+the same texts: `fromStr` no longer wraps a quantity that does not fit 64 bits.
 
 **Macro only.** `TimerRow`, `UrlRow`, `TimerQueueRow`, `ServiceSchema`,
 `DynDepGroups`, `PsinodeServiceConfig`, `TypedAction<T>`, `wasm_header`,
@@ -429,12 +432,12 @@ rules of `fromStr` without aborting (D17).
 
 What the glue does for these is in section 1.5. What changed in behaviour:
 
-* **One error text.** A `Precision` above 8 read from packed data or JSON
-  aborted with "Value 9 outside allowed Precision range: 0 to 8"; it now
-  aborts with "Value outside allowed Precision range: 0 to 8". A PSIO
-  invariant reports a `codec_status` whose message is a `std::string_view` of
-  static storage, so it cannot name the value (G21). The constructor
-  `Precision{9}` still gives the old text. `Memo`'s two messages are constant
+* **One error text — undone in 1.13.** A `Precision` above 8 read from packed
+  data or JSON aborts with "Value 9 outside allowed Precision range: 0 to 8".
+  Slice 2b had to make that a constant text ("Value outside allowed …"),
+  because a PSIO invariant could only report a message of static storage
+  (G21); with `psio::codec_fail_owned` the original text is back and the
+  pinned expectation with it. `Memo`'s two messages are constant
   and unchanged (`test_memo.cpp` checks them through a service).
 * **Newly reflected.** `Account`, `LocalUsername` and `PrivateKeyInfo` were
   not reflected; they are now, so `psio1` can also write them as JSON and
@@ -450,7 +453,7 @@ Tests:
   `DynDepGroups`, a `TypedAction`, `AuthResult` and `ServiceSchema`. The
   expected values were printed by the tree at 61d2e2b9f, before any of them
   was re-declared (kept in `~/psibase-pssz-snap-pre2b/pins.txt`), and pass
-  unchanged after, except the one message above.
+  unchanged after (the `Precision` message since 1.13).
 * `libraries/psibase/common/tests/wrappers.cpp` (permanent, native and
   guest): the PSIO form of the same types — a `Memo` is its text in PSSZ, key
   and I-JSON and is rejected by `validate_pssz` and the JSON reader when it
@@ -471,16 +474,16 @@ Checked after slice 2b:
 
 | Consumer | Before | Now |
 |---|---|---|
-| `Table.hpp`, `flatten_key<T>` (the key type of an index with a record in it) | `psio1::get_struct_tuple_impl<psio1::reflect<T>::data_members>` | `flatten_members<T>`: `tuple_cat` of `flatten_key_t<psio::reflect<T>::member_type<I>>` over `member_count`; for `psio::Reflected<T>` object types |
+| `Table.hpp`, `flatten_key<T>` (the key type of an index with a record in it) | `psio1::get_struct_tuple_impl<psio1::reflect<T>::data_members>` | `flatten_key_t<psio::reflect<T>::member_types>` for `psio::Reflected<T>` (since 1.13) |
 | `Table.hpp`, `detail::get_view_member` (a key read through a view of the packed row) | recursion over `psio1::MemberList<M...>` | recursion over `psio::reflect<C>::member_pointer<I>`; the view is still `psio1::view` |
-| `schema.hpp`, key paths of a table index | `get_member_index` over `psio1::MemberList`; `psio1::MemberPtrType<…>::ReturnType` for a member-function key | `get_member_index<T, K>` over `psio::reflect<T>::member_pointer<I>`; `psio::method_traits<…>::result` |
+| `schema.hpp`, key paths of a table index | `get_member_index` over `psio1::MemberList`; `psio1::MemberPtrType<…>::ReturnType` for a member-function key | `psio::reflect<T>::index_of_member(K)` (since 1.13; a member that is not reflected is a `static_assert`); `psio::method_traits<…>::result` |
 | `schema.hpp`, table names | `psio1::get_type_name<T>()` | `psio::get_type_name<T>()` |
 | `zip.cpp`, `readStruct` | `psio1::for_each_member` | `psio::reflect<T>::for_each_field` |
 | `Rpc.hpp` (query string → record), `serveGraphQL.hpp` (`SqlRow` JSON) | `psio1::get_data_member<T>(name, fn)` | `psio::reflect<T>::visit_field_by_name(obj, name, fn)` |
 | `XAdmin.cpp` (is this a host option name) | `psio1::get_data_member` with an empty callback | `psio::reflect<AdminOptionsRow>::index_of(name)` |
 | `jwt.hpp` | `requires psio1::Reflected<T>` | `requires psio::Reflected<T>` |
 | `serveGraphQL.hpp`, `has_block_member` | loop over `psio1::reflect<T>::data_member_names` | `psio::reflect<T>::index_of("block")` |
-| `serveGraphQL.hpp`, `XPackages.cpp`: connection and edge names | `psio1::reflect<T>::name + "Edge"` | `psio1::reflected_name<T> + "Edge"` (glue, G19) |
+| `serveGraphQL.hpp`, `XPackages.cpp`, `RPackages.cpp`: connection and edge names | `psio1::reflect<T>::name + "Edge"`, `psio1::FixedString` template parameters | `psio::reflect<T>::fixed_name + "Edge"`, `psio::fixed_string` template parameters (since 1.13; slice 4b itself used a glue helper, `psio1::reflected_name<T>`, now deleted) |
 
 `nativeTables.hpp` had nothing of its own to convert beyond `TimerRow`.
 Ten files no longer include `<psio1/reflect.hpp>`.
@@ -490,14 +493,14 @@ Differences that matter to a reader of the code:
 * `flatten_key` flattened every type `psio1` regards as reflected, which
   includes `std::pair` (the legacy library reflects it). It now flattens the
   types PSIO reflects. No table in the tree has a pair in a key.
-* `psio::Reflected<T&>` does not compile (G22), so `flatten_key`'s constraint
-  asks `std::is_class_v<T> && !std::is_const_v<T>` first.
-* Two things PSIO does not have were written with index sequences over
-  `member_pointer<I>` / `member_type<I>` where they are used: the index of a
-  member given its pointer, and the tuple of member types (G20).
-
-`psio1::FixedString` has no PSIO counterpart (G19). It stays in `psio1`, with
-one added helper, `psio1::reflected_name<T>`.
+* At the pin of slice 4b `psio::Reflected<T&>` did not compile (G22), PSIO had
+  no index of a member given its pointer and no tuple of member types (G20),
+  and no compile-time string (G19); slice 4b wrote a pre-check, two index
+  sequences and a glue helper for them. All four are gone since 1.13.
+* `get_view_member` (`Table.hpp:731`) still walks `member_pointer<I>` itself:
+  the member pointer it is given is a run-time value and the view accessor
+  needs the index as a constant, so `find_member_index` does not replace it.
+  It goes when views flip (`psio::pssz_view<C>::get<I>()`).
 
 Tests: `libraries/psibase/common/tests/tables.cpp` (permanent, native and
 guest): flattened key types, a key read through a view (two members of one
@@ -515,11 +518,70 @@ Checked after slice 4b (on PSIO `868e37bb`):
 | Generated `*-schema.json` (68) vs. the build of 0167a3056 | byte-identical (`~/psibase-pssz-build.compare-step2.log`) |
 | Service and test WASM binaries (103 in the build root) vs. slice 2b | 74 byte-identical, 29 differ: binaries with tables, GraphQL queries or query-string / JSON member lookups, where member lookup by name is now PSIO's generated perfect hash and the view member walk is different code, and the test binary that gained `tables.cpp`. Not examined one by one; as in slice 4a, the binaries are not the evidence of wire neutrality here — the schemas, the pinned forms and the service tests are. |
 
+### 1.13 Follow-up on PSIO `dfd0db17` (G14, G19–G22; Decimal overflow)
+
+The rule for this work: where PSIO lacks something, wait for PSIO and do not
+work around it. PSIO at `dfd0db179c9cba1523f8c68ca10a81a1250ceec2` closes
+five of the gaps slices 2b and 4b had to step around. Each was read in the
+pinned headers and is exercised by the tree, not taken from the change list.
+
+| Gap | PSIO now has | What psibase did with it |
+|---|---|---|
+| G21 | `psio::codec_fail_owned(text, byte_offset, format_name)` (`psio/error.hpp`): a status whose message is copied and travels with it. | `Precision::inRange` reports `Precision::outOfRange(value)`, the text the constructor aborts with: "Value 9 outside allowed Precision range: 0 to 8". `canonical_glue_tests.cpp` expects the text pinned before slice 2b again (`pins.txt`, reject e/f/g); `wrappers.cpp` checks the PSIO status carries it for 9 and for 200. |
+| G14 | `<psio/reflect.hpp>` includes `annotate.hpp` last; every `PSIO_REFLECT` keyword compiles with it alone. | Removed: `<psio/annotate.hpp>` from `SocketInfo.hpp`, `Memo.hpp`, `tokenTypes.hpp`; `<psio/transparent.hpp>` from `Memo.hpp`, `tokenTypes.hpp`, `XAdmin.hpp`, `PrivateKeyInfo.hpp`; `<psio/invariant.hpp>` from `Memo.hpp`, `tokenTypes.hpp`. No psibase header outside `psio1` includes any of the three. |
+| G19 | `psio::fixed_string<N>` (`psio/fixed_string.hpp`), `psio::reflect<T>::fixed_name`. | `Edge<Node, psio::fixed_string>`, `Connection<Node, psio::fixed_string, psio::fixed_string>` and `reflect<T>::fixed_name + "Connection"` in `serveGraphQL.hpp` (13 lines), `XPackages.cpp` (3), `RPackages.cpp` (2), `tests/tables.cpp` (2). `psio1::reflected_name<T>` is deleted. The legacy GraphQL engine reads these names through the `get_type_name` overloads in `serveGraphQL.hpp`, which return `const char*`, so nothing is converted at its boundary. `psio1::FixedString` remains inside `psio1` only (`psio1::reflect<T>::name`). |
+| G20 | `reflect<T>::member_types`, `index_of_member(ptr)`, `find_member_index(ptr)`, `method_types`, `index_of_method_pointer(ptr)`, `find_method_pointer_index(ptr)`. | `schema.hpp`: `get_member_index` and `is_equal_member` deleted, `index_of_member(K)` instead. `Table.hpp`: `flatten_members` deleted, `flatten_key_t<reflect<T>::member_types>` instead. Nothing in psibase needed the method forms. |
+| G22 | `psio::reflect<T>` / `psio::Reflected<T>` are well-formed and false for a reference, `void`, a function type; false for a cv-qualified type. | `flatten_key<T>` is constrained by `psio::Reflected<T>` alone (`Table.hpp:474`). No other pre-check of this kind existed. |
+
+Also in the new pin and checked against the tree: `psio::view<T, Fmt,
+storage::owning / shared / mut_borrow>` are compile errors — psibase names no
+`psio::view` with a storage kind (it still uses `psio1::view`); `emit_wit`
+writes `string` for a `utf8` string — psibase does not call `emit_wit`; the
+`lengthBound` fix for a nested member behind an alias is in `pssz_ir.hpp`,
+which psibase does not use yet. None of the three affects psibase today.
+
+**The one behaviour change (owner's decision, D17).** `Decimal::fromStr`
+added the fraction to the scaled integer part without a check, so a text
+whose quantity is over 2^64 − 1 only by its fraction wrapped
+(`"184467440737.09551616"` read as 0 at precision 8). It now aborts with
+"Invalid number: overflow", the message the neighbouring overflow checks of
+`fromStr` already used. `Decimal::parse` and `DecimalText::validate` already
+rejected such text, so every reader agrees now: `fromStr`, the legacy JSON
+reader (which calls `fromStr`), `parse`, and PSIO's checked JSON reader. The
+packed form is not affected: every 64-bit quantity is a `Decimal`.
+
+Tests added: `wrappers.cpp`, "Decimal: a quantity that does not fit 64 bits
+is rejected, not wrapped" — at precisions 0, 1, 2, 4, 7 and 8 the text of
+2^64 − 1 is read by `parse`, `fromStr`, `validate` and the I-JSON reader, and
+the text of 2^64 is rejected by each (natively `fromStr` is checked for its
+message; in the guest an abort cannot be observed), plus four texts further
+out; `canonical_glue_tests.cpp`: the legacy JSON reader accepts
+`"184467440737.09551615"` and aborts on `"184467440737.09551616"`.
+
+The Rust parser (`rust/psibase/src/services/tokens/quantity.rs:50`,
+`Quantity::from_str`, called by `Decimal::from_str`) was read, not changed
+and not run: it rejects an integer part that overflows when scaled
+(`checked_mul` → `TokensError::Overflow`) and a whole number over 2^64 − 1
+(`InvalidNumber`), but adds the two parts with a plain `+` (line 78). That
+is a panic where overflow checks are on (debug and test builds) and a silent
+wrap where they are off (release builds; no profile in the tree sets
+`overflow-checks`). So Rust has the wrap C++ had, for the same texts.
+
+Checked after the follow-up:
+
+| | |
+|---|---|
+| Full build | exit 0 (`~/psibase-pssz-build.build-g21.log`; the pin move alone: `~/psibase-pssz-build.build-g21-repin.log`, exit 0) |
+| `ctest -j4` | 92/92 (`~/psibase-pssz-build.ctest-g21.log`) |
+| Generated `*-schema.json` (68) vs. the build of 0167a3056 | byte-identical (`~/psibase-pssz-build.compare-g21.log`) |
+| Service and test WASM binaries (103 in the build root) vs. slice 4b | 82 byte-identical, 21 differ: the binaries with GraphQL connections (the names are template arguments of another type now), with a `Precision` or `Decimal`, with key schemas or record keys, and the test binaries. Not examined one by one. |
+
 ## 2. Inventory of what remains
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,
 `external/` and `doc/` (`git grep -P`). Section 2.1 is re-counted at the end
-of slice 4b; sections 2.2–2.9 are as counted at the end of slice 1 except
+of slice 4b (the `FixedString` row and the table of `psio1::` names below
+after the follow-up of 1.13); sections 2.2–2.9 are as counted at the end of slice 1 except
 where a row says "now" (re-counted at the end of slice 4b; the differences
 are small: slices 2–4b changed declarations and their consumers, not the
 packing call sites).
@@ -538,7 +600,7 @@ sources, 20 test files.
 | `PSIO1_REFLECT_TYPENAME` | was 125 / 38; now 1 / 1 (`rust/test_fracpack`) | `PSIO_REFLECT_TYPENAME`: 122 / 37 (table names) |
 | `psio1::reflect<…>` used directly | was 42 / 9; after slice 4a 19 / 5; now 0 | done in slice 4b (1.12) |
 | `psio1::MemberPtrType`, `MemberList`, `TypeList`, `apply_members`, `for_each_member`, `get_data_member`, `Reflected`, `get_type_name` | now 0 | done in slice 4b |
-| `psio1::FixedString` 6 / 2, `psio1::reflected_name<T>` 13 / 3 | `serveGraphQL.hpp`, `RPackages.cpp`, `XPackages.cpp`, `tests/tables.cpp` | G19; goes with the GraphQL engine swap (slice 9) at the latest |
+| `psio1::FixedString`, `psio1::reflected_name<T>` | were 6 / 2 and 13 / 3; now 0 | done in 1.13: `psio::fixed_string`, `psio::reflect<T>::fixed_name` |
 | `transparent()` 7 / 4 (5 declarations), `invariant(…)` 2 declarations | | PSIO keywords, final |
 | `PSIBASE_REFLECT_TABLES` 80, `…_HISTORY_EVENTS` 15, `…_KEY_TRANSFORM` 7, `…_MERKLE_EVENTS` 2 | 104 / 67 | psibase's own macros; they stay, re-implemented over `psio::reflect` |
 | `psibase/dispatch.hpp` + `PSIBASE_DISPATCH` | 80 / 79 | done in slice 4a: dispatcher over `reflect<Svc>::invoke_method` / `index_of_method_hash` |
@@ -546,6 +608,29 @@ sources, 20 test files.
 | Events (`EventEmitter`, `emit()`) | 39 / 8 | done in slice 4a: same proxy mechanism over the event structs |
 | ADL hooks: `psio_unwrap_packable` now 4 / 2 (`Spki.hpp`, `rust/test_fracpack`), `psio_validate_packable` now 1 / 1 (`Spki.hpp`), `psio_custom_schema` 2 / 2, `use_json_string_for_gql` now 2 / 2 (`Spki.hpp`, `SocketInfo.hpp`), `get_gql_name` 3 / 2 | | `SubjectPublicKeyInfo` (D26), the socket variants, `Action` / `ServiceMethod` custom ids (G13 is closed in PSIO: a schema id through `PSIO_INVARIANT(Type, fn, "Id")` or a text adapter; psibase moves these with the schema path) |
 | `#include <psio1/reflect.hpp>` | now 0 (was 15; the last 10 removed in slice 4b) | `<psio/reflect.hpp>` |
+
+Every `psio1::` name used outside `libraries/psio1`, `external/` and `doc/`
+after the follow-up of 1.13, by kind (`git grep -ohP
+'psio1::\w+(::\w+)?'`): 1,605 occurrences in 161 files, and 105
+`#include <psio1/…>` lines in 75 files. None of them is reflection.
+
+| Kind | Uses | Names |
+|---|---|---|
+| reflection (`reflect`, `Reflected`, `FixedString`, `reflected_name`, member lists, `get_type_name`) | 0 | |
+| fracpack packing, unpacking, validation | 296 | `to_frac` 88, `from_frac` 72, `convert_to_frac` 45, `prevalidated` 44, `fracpack_validate` 13, `fracpack_validate_strict` 11, `size_tag` 7, `nested` 6, `is_packable` 3, `PackableAs` 2, `from_frac_strict` 2, `unpack_numeric` 2, `fracpack_size` 1 |
+| views and shared packed values | 200 | `view` 132, `shared_view_ptr` 60, `get` 3, `remove_view_t` 2, `get_view_data` 1, `const_view` 1, `visit` 1 |
+| keys | 109 | `convert_to_key` 87, `composite_key` 12, `to_key` 10 |
+| JSON | 246 | `convert_to_json` 62, `convert_from_json` 51, `json::any` 34, `to_json` 33, `json_token_stream` 17, `json::any_object` 16, `from_json` 11, `json::any_array` 5, `write_str` 3, `from_json_object` 2, `json_token_type::…` 4, `nested_json` 1, `detail::write_field_name` 1, `json::null_t` 1, `json::from_json` 1, `json::entry` 1, `from_json_skip_value` 1, `parse_system_time` 1, `format_json` 1 |
+| the `bin` format | 279 | `to_bin` 145, `from_bin` 59, `varuint32_to_bin` 33, `varuint32_from_bin` 25, `sleb64_to_bin` 9, `sleb64_from_bin` 3, `varuint64_from_bin` 2, `convert_to_bin` 2, `convert_from_bin` 1 |
+| streams | 247 | `input_stream` 158, `vector_stream` 66, `StreamBase` 8, `size_stream` 7, `string_stream` 5, `fast_buf_stream` 2, `fixed_buf_stream` 1 |
+| schema | 130 | `schema_types::CompiledType` 23, `schema_types::AnyType` 21, `SchemaBuilder` 17, `FracStream` 16, `schema_types` 8, `schema_types::CustomTypes` 7, `schema_types::CompiledSchema` 7, `Schema` 5, `schema_types::Object` 5, `schema_types::matchCustomType` 4, `schema_types::FracParser` 4, `schema_types::CustomHandler` 3, `SchemaDifference::equivalent` 3, `schema_types::FunctionType` 2, `schema_types::TypeMatcher` 2, `schema_types::standard_types` 1, `schema_types::Struct` 1, `schema_types::Tuple` 1 |
+| GraphQL | 8 | `gql_query`, `gql_query_inline`, `gql_stream`, `get_gql_schema`, `generate_gql_whole_name`, `generate_gql_partial_name`, `fill_gql_schema_members`, `make_field_resolver`, 1 each |
+| hex | 17 | `to_hex` 6, `hex` 6, `from_hex` 3, `unhex` 2 |
+| utilities | 73 | `check` 36, `finally` 33, `is_std_optional` 3, `is_std_optional_v` 1 |
+
+(These are occurrences of the qualified name; sections 2.2–2.6 count call
+sites with their own patterns, which also match unqualified uses, so the
+numbers there differ.)
 
 ### 2.2 C++: binary (fracpack → PSSZ)
 
@@ -693,7 +778,8 @@ flip, for all languages at once.
 | 3 (done) | Every C++ service, events struct, interface and query root declared with `PSIO_REFLECT(..., method(...))`: 124 declarations (528 items) + 15 event-macro sites (28 items). `allowHashedMethods()` removed (inert). Glue: methods bridged into `psio1::reflect` (`member_functions`, `member_function_names`, `proxy` calls). | unchanged | method-metadata twins + 92/92 |
 | 2b (done) | Section 1.11. 15 declarations moved: `Memo`, `Precision` (transparent + invariant), `Decimal` (text adapter), `Account`, `LocalUsername`, `PrivateKeyInfo` (transparent), `TimerRow`, `UrlRow`, `TimerQueueRow`, `ServiceSchema`, `DynDepGroups`, `PsinodeServiceConfig`, `TypedAction<T>`, `debug_eos_vm` ×2; `RestartInfo`'s stale reflection deleted. Left: `SubjectPublicKeyInfo` (D26), `IPAddress` / `SocketEndpoint` (at the JSON flip), `rust/test_fracpack` (deleted with the legacy library). | unchanged (schemas byte-identical; pinned forms) | pinned legacy forms + PSIO forms + 92/92 |
 | 4a (done) | Section 1.10. As planned: **Method consumers** read `psio::reflect` directly. Unblocked now: all 139 declarations with methods are PSIO. `Actor.hpp` (`Actor`, `transactor`, `EventEmitter`, `ActionViewBuilder`: 13 uses of `reflect<T>::proxy`) → `psio::reflect<T>::proxy<P>`; `dispatch.hpp` → `index_of_method_hash<MethodHash>` + `invoke_method<I>` (a perfect hash instead of a linear scan; two methods of one service whose names collide become a compile error); `schema.hpp` (actions, events), `servePackAction.hpp`, `serveActionTemplates.hpp`, the tester, `test_util.cpp` → `for_each_method`, `method_param_names<I>`, `method_params<I>`. Two things to settle first: PSIO's proxy forwards references where the legacy proxy passes by value (psibase's four proxy objects deduce parameter types from the arguments: decide by-value explicitly), and `make_param_value_tuple` (strips `psio1::view<>` from parameters) needs a psibase-side equivalent until views flip. GraphQL's use of methods stays in `psio1/graphql.hpp` until slice 9. | unchanged | existing; compare schemas and WASM binaries with the previous build |
-| 4b (done) | Section 1.12. **Data-member consumers** read `psio::reflect` directly: `Table.hpp`, `schema.hpp` (tables, keys), `zip.cpp`, `Rpc.hpp`, `jwt.hpp`, `XAdmin.cpp`, the data-member parts of `serveGraphQL.hpp`. Nothing outside `psio1` names `psio1::reflect`. `psio1::FixedString` stays in `psio1` with `psio1::reflected_name<T>` (G19). | unchanged (schemas byte-identical) | existing + `tables.cpp` + 92/92 |
+| 4b (done) | Section 1.12. **Data-member consumers** read `psio::reflect` directly: `Table.hpp`, `schema.hpp` (tables, keys), `zip.cpp`, `Rpc.hpp`, `jwt.hpp`, `XAdmin.cpp`, the data-member parts of `serveGraphQL.hpp`. Nothing outside `psio1` names `psio1::reflect`. `psio1::FixedString` stayed in `psio1` with a helper, `psio1::reflected_name<T>` (G19; replaced in the follow-up). | unchanged (schemas byte-identical) | existing + `tables.cpp` + 92/92 |
+| follow-up (done) | Section 1.13. PSIO pin `dfd0db17`. `Precision` message restored (G21); `psio::fixed_string`, `index_of_member`, `member_types`, `Reflected<T&>`, keyword includes (G19, G20, G22, G14); `Decimal::fromStr` rejects overflow (D17). | unchanged, except that a `Decimal` text over 2^64 − 1 is rejected | pinned forms + boundary tests + 92/92 |
 | 5 | Rust prepared without source churn: the (dying) fracpack derive also emits PSIO impls, so every `Pack`/`Unpack`/`ToSchema`/`ToKey` type already has PSSZ, key and schema impls; Rust leaf types (`AccountNumber`, …) get the same text rules as C++ and a shared fixture (generated by C++, checked by Rust and JS) for names, times, digests. Python and JS codecs written and tested against the fixture. | unchanged | fixture tests in 3 languages |
 | 6 | **Keys**: C++ `to_key`/`composite_key`/`KeyView` → `psio::key`, `key_prefix`; Rust `ToKey` → PSIO key; native tables. First a test that the two formats agree on every key type in use (2.3); the types where they do not (if any are used) change in one commit for all languages. | unchanged where the formats agree | all tests |
 | 7 | **Wire flip**: transactions, blocks, tables rows, actions, events, host/guest ABI structs, P2P messages, snapshots, packages, boot image. C++ `to_frac`/`from_frac`/`view`/`shared_view_ptr`/`nested` → `psio::pssz` APIs; schema generation and schema-driven codecs → Schema IR + `pssz_ir`; Rust derives switch to PSIO's; JS pack endpoints; Python codec; fixtures with packed bytes or ids regenerated. | everything binary changes | all tests; fresh genesis |
@@ -728,7 +814,7 @@ What must exist before it:
    that the flip is checked by byte equality across languages, not by
    round trips alone.
 
-Working method for the wire-neutral slices (2b, 4a, 4b), as used in slices 2
+Working method for the wire-neutral slices (2b, 4a, 4b, the follow-up), as used in slices 2
 and 3: snapshot the generated `*-schema.json` files and the md5 of every
 `.wasm` in the build directory before the change, and compare after. A slice
 that only moves declarations leaves both byte-identical (slice 2 did); a
@@ -778,8 +864,8 @@ method may not share one).
 9. Delete the glue of section 1.5 that only serves packing:
    `psio1/fracpack.hpp` lines 11–29 and 69–84, `psio1/schema.hpp`
    1686–1709; the rest goes with the JSON flip (`to_json.hpp`,
-   `from_json.hpp`), the GraphQL swap (`graphql.hpp`, `reflected_name`,
-   `FixedString`, `canonical_reflect`) and the deletion of `psio1`.
+   `from_json.hpp`), the GraphQL swap (`graphql.hpp`, `canonical_reflect`
+   with its `FixedString` name) and the deletion of `psio1`.
 10. Still to declare before it: `SubjectPublicKeyInfo` (D26); the per-type
     PSSZ decisions of item 2 of the list above (`definitionWillNotChange`,
     `maxDynamicData`, bounds, `utf8_string`); the "everything encodes" test
@@ -813,7 +899,7 @@ commit itself.
 | D14 | `psio1` now requires PSIO headers and C++23 everywhere it is compiled (also `rust/test_fracpack`, previously `gnu++2a`). | Accepted (temporary). |
 | D15 | `tests/cmake/dependencies/README.md` was rewritten where it described PSIO as dormant. | — |
 | D16 | Which records count as convertible now (1.6): a record is declared with PSIO when its reflection line is final, even if a member's type is a legacy library type that changes at the flip (`shared_view_ptr`, `view`, `json::any`, `psio1::Schema`) or a deferred type. It is deferred only when its own declaration must change (a member with no PSIO value: `std::map`, `nested<T>`, monotonic time; or a legacy wrapper / validation / text hook on the type itself). The alternative — convert only records that already encode with PSIO — would have deferred `SignedTransaction`, the P2P block messages and everything holding a key, a `Precision` or a socket endpoint. | As described. |
-| D17 | `Decimal` text. (a) No standard. (b) psibase `fromStr`: digits with at most one `.`; at least one digit; at most 8 fraction digits (the precision); accepts `.5`, `5.`, leading zeros; aborts otherwise; **and wraps silently** when integer part × 10^p + fraction exceeds 2^64 − 1 (`"184467440737.09551616"` reads as 0 at precision 8: `quantity_val += …` is unchecked). (c) PSIO: the JSON reader calls the adapter's `validate`, then `decode`; `validate_strict` is for strict readers. Taken: `validate` = what `fromStr` reads, minus the overflow case (rejected); `validate_strict` = only the spelling `str()` writes; `decode` = `fromStr` unchanged, so the legacy JSON path (which calls only `decode`) behaves exactly as before, wrap included. Needed: confirm, and decide whether `fromStr` itself should reject the overflow (a behaviour change for C++ callers). `Precision` is done (transparent + invariant). | As described. |
+| D17 | `Decimal` text. (a) No standard. (b) psibase `fromStr`: digits with at most one `.`; at least one digit; at most 8 fraction digits (the precision); accepts `.5`, `5.`, leading zeros; aborts otherwise; **and wraps silently** when integer part × 10^p + fraction exceeds 2^64 − 1 (`"184467440737.09551616"` reads as 0 at precision 8: `quantity_val += …` is unchecked). (c) PSIO: the JSON reader calls the adapter's `validate`, then `decode`; `validate_strict` is for strict readers. Taken: `validate` = what `fromStr` reads, minus the overflow case (rejected); `validate_strict` = only the spelling `str()` writes; `decode` = `fromStr`. **Decided by the owner: overflow is rejected.** Since 1.13 `fromStr` aborts with "Invalid number: overflow" instead of wrapping, so the legacy JSON path rejects it too and all readers accept the same texts. The Rust parser still wraps in release builds (1.13); it is to be changed with the Rust slice. `Precision` is done (transparent + invariant). | Overflow rejected everywhere in C++. |
 | D18 | `PSIO_INTERFACE(Svc)` (the Schema IR's interface envelope) is not added to services in slice 3: nothing reads it until the schema path moves to the IR, and its item list (`types(…)`, `funcs(…)`) repeats what `PSIO_REFLECT` already states. Decide in the schema slice whether psibase derives interfaces from `psio::reflect<Svc>` methods (preferred: one declaration per service) or writes `PSIO_INTERFACE` 124 times. | Not added. |
 | D19 | `PSIO_REFLECT(RestartInfo, shouldRestart)` in `programs/psinode/main.cpp` listed a member that does not exist; the reflection was unused. | Deleted in slice 2b. |
 | D20 | The documentation examples (`doc/src/development/services/cpp-service`) and `demo/` taught and used `PSIO1_REFLECT`. | Converted in slice 4a (required: `PSIBASE_DISPATCH` no longer dispatches a legacy-declared service). The `demo/` service is built by its own script and was not rebuilt. |
@@ -821,13 +907,63 @@ commit itself.
 | D23 | Two reflected methods of one service with the same `MethodNumber`. (a) No standard. (b) psibase before: accepted; the first one listed was called, the second was unreachable (and the schema kept only the first). (c) PSIO: `index_of_method_hash` makes it a compile error. Taken: PSIO's behaviour; no service in the tree is affected. The check applies to services that are dispatched (`PSIBASE_DISPATCH`), not to events structs or interfaces. | Compile error. |
 | D24 | `EventEmitter::from(sender)` constructs `EventEmitter(sender, elog)`, a constructor `EventEmitter` does not have; it compiles only because nothing calls it. Not introduced by this work and left as found. Delete it or give `EventEmitter` the constructor. | Left. |
 | D25 | Which PSIO custom types the legacy schema marks `Custom`. (a) No standard. (b) psibase: `AccountNumber`, `MethodNumber`, `Action`, `ServiceMethod` and the time points, by ADL hook. (c) PSIO: every type with a text adapter or an invariant is `Custom{wire type, id}` in the Schema IR. Taken for the legacy schema (glue): only a type whose text adapter states a `schema_id`; so `Decimal`, `Memo`, `Precision` are not `Custom` in today's schemas (byte-identical) and become `Custom` in the Schema IR at the flip. Needed at the flip: are those three meant to be custom nodes for schema-driven tools (Rust, JS, Python must then know the ids `Decimal`, `Memo`, `Precision`), or plain wire types? | Legacy schema unchanged. |
-| D26 | `SubjectPublicKeyInfo` is the last wrapper on legacy hooks. Its canonical form is clear (`transparent()` over the DER bytes, an `invariant`, a PEM text adapter with `schema_id`), but both its validator and its PEM parser abort (Botan throws natively, aborts in a guest) and PSIO requires them to report. Needed: a reporting DER structure check and PEM check (in psibase; small), or a decision that key material is validated only where it is used. | Not converted. |
-| D27 | The message of an out-of-range `Precision` read from packed data or JSON lost the offending value (1.11). Accept, or keep the value by a table of constant messages. | Constant message. |
+| D26 | `SubjectPublicKeyInfo` is the last wrapper on legacy hooks. Its canonical form is clear (`transparent()` over the DER bytes, an `invariant`, a PEM text adapter with `schema_id`), but both its validator and its PEM parser abort (Botan throws natively, aborts in a guest) and PSIO requires them to report (stated in `psio/invariant.hpp` and `psio/adapter.hpp` at `dfd0db17`). Needed: a reporting DER structure check and PEM check (in psibase; small), or a decision that key material is validated only where it is used. The owner leans to the second: opaque bytes on the wire, parsed where used. What that involves and who relies on the decode-time check today is in the note below this table. | Not converted. |
+| D27 | The message of an out-of-range `Precision` read from packed data or JSON lost the offending value (1.11). | Resolved in 1.13 by PSIO (`codec_fail_owned`, G21): the message names the value again. |
 | D21 | `psio-tests` now links `psibase` (and through it the service headers) so that the glue test can pin psibase's own records. Temporary, deleted with `psio1`. | Accepted. |
+
+**Note on D26: `SubjectPublicKeyInfo` as opaque bytes.** Nothing was changed;
+this is what the conversion would be and what it would change.
+
+*The change.* In `packages/system/AuthSig/include/services/system/Spki.hpp`:
+`PSIO_REFLECT(SubjectPublicKeyInfo, transparent(), data)` in the struct;
+delete the two `psio_unwrap_packable` overloads (lines 29–36), `psio_validate_packable`
+(37–40) and `to_key` (55–58) — the glue of 1.5 gives a `transparent()` type
+its member's packed form, view and key, as it does for `PrivateKeyInfo`.
+`SubjectPublicKeyInfo::validate` stays as an ordinary function for callers
+that want the check. The PEM text form is a separate matter: the ADL
+`to_json` / `from_json` / `use_json_string_for_gql` (lines 47–62) either stay
+until the JSON flip (expected to keep winning over the glue's generic
+overloads for a `transparent()` type, as the type's own non-template
+overloads; not tried), or become a `text_category` adapter — whose
+`validate` must report, so a PEM / DER check that does not throw is still
+needed for the JSON side even without an invariant. Expected to be
+wire-, key- and schema-neutral (bytes are the member's; the legacy schema of
+a `PackableWrapper` is its wrapped type's); not built, so not verified.
+
+*What would change in behaviour.* Today every unpack and every
+`fracpack_validate` of a value containing a `SubjectPublicKeyInfo` runs
+`Botan::BER_Decoder` over it (`Spki.cpp:13`: SEQUENCE { AlgorithmIdentifier,
+BIT STRING }, nothing about the algorithm, the curve or the point) and
+aborts on bytes that are not that. Without the invariant such bytes are
+accepted at decode.
+
+*Who relies on the decode-time check.* Only the entry points that store or
+forward a key without looking at it:
+`AuthSig::setKey` and `AuthSig::newAccount` (`AuthSig.cpp:54`, `:77`) put
+the argument into `AuthTable` as it is; `Invite::createAccount`
+(`Invite.cpp:207`) fingerprints it and forwards it to `newAccount`;
+`XKeys::deleteKey` (`XKeys.cpp:92`) and `CredResThief::bill` hash it. For
+these the action-argument validation is the only thing that keeps bytes that
+are not a SubjectPublicKeyInfo out of `AuthTable`: an account could then set
+a key no signature can satisfy (it can already do that today with a
+well-formed structure holding an unusable key). Nothing that *uses* a key
+relies on it: `AuthSig::checkAuthSys` (`AuthSig.cpp:26`) compares the stored
+bytes with the claim's bytes; `VerifySig` (`VerifySig.cpp:25`) parses the
+claim's bytes itself with `Botan::X509::load_key` and fails there on a
+malformed key; `RAuthSig.cpp:36` and `parseSubjectPublicKeyInfoFromPem`
+call the PEM parser and `validate` explicitly. The Rust side already treats
+the type as opaque bytes: `SubjectPublicKeyInfo(pub Vec<u8>)`
+(`rust/psibase/src/services/auth_sig.rs:9`) derives `Pack` / `Unpack` with no
+structure check and checks only the PEM label in JSON. No test was found
+that expects a malformed key to be rejected at decode (searched the AuthSig,
+Invite, XKeys, Credentials and signature tests for such expectations; not an
+exhaustive proof). If the owner wants `setKey` / `newAccount` to keep
+refusing garbage, an explicit `SubjectPublicKeyInfo::validate(key.data)` in
+those two actions preserves it without any decode-time hook.
 
 ## 5. Where PSIO lacks something psibase needs
 
-| # | Header | Missing | Why psibase needs it | At `868e37bb` |
+| # | Header | Missing | Why psibase needs it | At `dfd0db17` (G1–G13, G15–G18: as found at `868e37bb`, not re-checked) |
 |---|---|---|---|---|
 | G1 | `psio/json.hpp`, `schema_ir.hpp` | A `psio::schema_types::Schema` cannot be written or read as JSON: `psio::encode(psio::json{}, schema)` fails to compile (`Box<AnyType>`: "unsupported type in encode_value"). Only the PSSZ form (`emit_pssz`) exists. | psibase publishes service schemas as JSON (`*-schema.json` in packages, `/schema` queries, the CLI, UIs). Either PSIO defines the IR's JSON form, or psibase ships IR bytes and every consumer decodes them. | Closed, verified: `psio::to_json(schema)` of a built `schema_types::Schema` compiles and runs. |
 | G2 | `psio/time.hpp` (static assertion, line 97) | Only `system_clock` time points are values. | `MonotonicTimePointSec/USec` are stored and passed by `nativeTables.hpp`, XTimer and XPeers (7 uses). Either PSIO accepts a caller-declared epoch-less clock (binary = ticks, JSON = ticks), or psibase stores these as durations. | Closed, verified and used: a time point of another clock is its tick count (`wrappers.cpp`). |
@@ -842,12 +978,13 @@ commit itself.
 | G11 | `psio/pssz.hpp:896` | `-Wall` warning (`unused type alias 'E'`) in every TU that encodes PSSZ. | psibase test targets build with `-Wall`; harmless, noisy. | Reported closed; not re-checked. |
 | G12 | PSIO GraphQL | Not in the pinned commit. | `psio1/graphql.hpp` (1,704 lines) serves 23 files of GraphQL users. | A GraphQL engine is in the pin (`psio/graphql.hpp`, `psio/graphql/`); not evaluated here (slice 9). |
 | G13 | `psio/adapter.hpp` (`schema_custom_v`), `schema_builder.hpp` | A custom schema id for a reflected record that has no text adapter. | `Action` and `ServiceMethod` are marked `psio_custom_schema` so that schema-driven tools recognise them (an action's `rawData` is decoded with the target service's schema). In PSIO a record is `Custom{…, id}` only when it has a text presentation. The legacy hooks still serve; the Schema IR path needs either this or name-based recognition in psibase's handlers. | Reported closed (a schema id through `PSIO_INVARIANT(Type, fn, "Id")`); not used or verified here. |
-| G14 | `psio/reflect.hpp` | `PSIO_REFLECT(T, definitionWillNotChange(), …)` does not compile with `<psio/reflect.hpp>` alone: the keyword expands to `psio::definition_will_not_change`, declared in `<psio/annotate.hpp>`. | A header that only reflects records must know to include `annotate.hpp` (`SocketInfo.hpp` does). `reflect.hpp` should include what its own keywords need. | **Open.** Reproduction: `#include <psio/reflect.hpp>` then `struct A { int x; }; PSIO_REFLECT(A, definitionWillNotChange(), x)` → "no member named 'definition_will_not_change' in namespace 'psio'"; the same with `transparent()` → "no member named 'transparent_spec' in namespace 'psio'". Both compile once `<psio/annotate.hpp>` is included. `invariant(fn)` compiles with `reflect.hpp` alone. psibase headers include `annotate.hpp` / `transparent.hpp` / `invariant.hpp` themselves. |
+| G14 | `psio/reflect.hpp` | `PSIO_REFLECT(T, definitionWillNotChange(), …)` does not compile with `<psio/reflect.hpp>` alone: the keyword expands to `psio::definition_will_not_change`, declared in `<psio/annotate.hpp>`. | A header that only reflects records must know to include `annotate.hpp` (`SocketInfo.hpp` does). `reflect.hpp` should include what its own keywords need. | Closed, verified and used: `reflect.hpp` includes `annotate.hpp` at its end. The psibase headers that included `annotate.hpp` / `transparent.hpp` / `invariant.hpp` for the keywords no longer do, and the tree builds (1.13). (Was: `PSIO_REFLECT(A, definitionWillNotChange(), x)` after `reflect.hpp` alone → "no member named 'definition_will_not_change' in namespace 'psio'".) |
 | G15 | `psio/reflect.hpp` (proxy) | The record proxy passes method arguments as forwarding references; there is no by-value mode. | psibase's call proxies deduce the packed parameter tuple and `PackableAs` checks from the argument types; the legacy proxy decays them first. Since slice 4a psibase's proxy objects decay the types themselves (D22) and the glue for it is deleted. Not a defect, a difference to design for. | By design; documented in `reflect.hpp`. |
 | G16 | `psio/reflect.hpp` (`PSIO_REFLECT_METHODS_EMPTY_`) | A type that lists no method has `method_count`, `method_names`, `method_type<I>`, `method_pointer<I>`, `method_name<I>`, the lookups and `for_each_method`, but not `method_param_names<I>`, `method_traits<I>`, `method_result<I>`, `method_args<I>`, `method_params<I>`, `method_is_static<I>`, `method_is_const<I>`, `invoke_method<I>`. | Generic code that names `psio::reflect<T>::method_param_names<I>` inside a per-method callback does not compile for a class without methods (`EmptyService`, a service with no actions), although the callback is never called: once `T` is known the name is looked up in a class that does not have it. Reproduction: `generateActionJsonTemplate<psibase::EmptyService>()` with `reflect::template method_param_names<I>` in the callback fails with "no member named 'method_param_names' in 'psio::reflect<psibase::EmptyService>'". Glue: `psio1::canonical_method_param_names<T, I>` (`psio1/reflect.hpp`, end of file), used by `schema.hpp`, `servePackAction.hpp`, `serveActionTemplates.hpp`. Fix in PSIO: declare the same member templates in the empty case, as it already does for `method_type` / `method_pointer` / `method_name`. | Closed, verified; glue deleted. |
 | G17 | `psio/reflect.hpp` (`for_each_method`) | `for_each_method(fn)` calls `fn(index, name, &T::method)`: the pointer is passed as a value, which odr-uses every reflected method. There is no walk that gives only the index (or the index and the name). | Code that describes a service without containing it — the `R*` query services that serve `/pack_action`, `/action_templates` and the schema of another service, and schema generation — would need every method's definition at link time. Reproduction: with `for_each_method` in `fracpackActionFromJson`, `RAccounts.wasm` fails to link: "wasm-ld: error: … RAccounts.cpp.obj: undefined symbol: SystemService::Accounts::init()" (and every other action). The legacy walk passed a null pointer of the method's type. Glue: `psio1::canonical_for_each_method_index<T>(fn)` (`psio1/reflect.hpp`, end of file), `fn(std::integral_constant<std::size_t, I>, name)`. Fix in PSIO: an index-only walk, or `for_each_method` passing the index and name only (the pointer is `method_pointer<I>`). | Closed, verified (`RAccounts.wasm` and the other query services link); glue deleted. |
 | G18 | `psio/reflect.hpp` (proxy) | `Projection::call<I, &T::method>` is told the index and the member pointer but not the reflected type `T`. For a method `T` inherits, `&T::method` has the type `R (Base::*)(…)`, so the proxy object can only recover `Base`, in whose reflection `I` means something else (or nothing). | psibase's proxy objects turn `(I, MemberPtr)` into the method's name (`methodNumber<I, MemberPtr>`). The legacy proxy had the same limitation (it also derived the class from the member pointer), so behaviour is unchanged and nothing is worked around; whether any class in the tree reflects an inherited method was not searched for. Such a method would fail to compile or, if the base is reflected too, name the wrong method. A `call<T, I>` form (or passing `T`) would remove the trap. | Reported closed (`psio::proxied_class<I, MemberPtr>`); psibase's proxy objects were not changed to use it. |
-| G19 | — | No compile-time string: a type usable as a template argument that holds text and concatenates in a constant expression. `psio::reflect<T>::name` is a `std::string_view`, which can be neither. | psibase names GraphQL types by concatenation in template arguments: `Connection<T, name<T> + "Connection", name<T> + "Edge">` (`serveGraphQL.hpp`, `XPackages.cpp`, `RPackages.cpp`). Reproduction: `template <auto Name> struct Edge {}; Edge<psio::reflect<T>::name> e;` does not compile (`std::string_view` is not a structural type), and there is no `operator+` to build "TEdge". Glue: `psio1::FixedString` (existing) and `psio1::reflected_name<T>` (`psio1/reflect.hpp`, end of file). | Open. Either PSIO provides one (e.g. `reflect<T>::name` as a fixed string, with `+`), or psibase names these types differently when GraphQL moves to PSIO's engine (slice 9). |
-| G20 | `psio/reflect.hpp` | No "index of the data member this pointer names" (`reflect<T>::index_of_member<&T::field>`) and no tuple of the member types (`reflect<T>::member_types`). | Table key schemas map a key's member pointer to a field index; a key that contains a record is flattened to the tuple of its member types. Both are written in psibase with `std::index_sequence` over `member_pointer<I>` / `member_type<I>` (`schema.hpp` `get_member_index`, `Table.hpp` `flatten_members`): ordinary use of the API, no glue. | Open, minor (convenience). |
-| G21 | `psio/error.hpp` (`codec_error::what` is a `std::string_view`) | An invariant cannot report a message computed from the value. | `Precision`'s legacy message named the offending value (1.11, D27). | Open, minor. |
-| G22 | `psio/reflect.hpp:228` | `psio::Reflected<T&>` is a hard error, not `false`: `reflect<T&>` forms `static_cast<T&*>`. Reproduction: `static_assert(!psio::Reflected<int&>);` → "'type' declared as a pointer to a reference of type 'int &'". | Constraints on generic code (`template <typename T> requires psio::Reflected<T>`) are tried with reference and cv-qualified types during partial-specialization matching (`flatten_key<T&>` in `Table.hpp`). psibase asks `std::is_class_v<T>` first. | Open. `Reflected` should strip or reject references quietly. |
+| G19 | — | No compile-time string: a type usable as a template argument that holds text and concatenates in a constant expression. `psio::reflect<T>::name` is a `std::string_view`, which can be neither. | psibase names GraphQL types by concatenation in template arguments: `Connection<T, name<T> + "Connection", name<T> + "Edge">` (`serveGraphQL.hpp`, `XPackages.cpp`, `RPackages.cpp`). Reproduction: `template <auto Name> struct Edge {}; Edge<psio::reflect<T>::name> e;` does not compile (`std::string_view` is not a structural type), and there is no `operator+` to build "TEdge". Glue was: `psio1::FixedString` and `psio1::reflected_name<T>`. | Closed, verified and used: `psio::fixed_string<N>`, `psio::reflect<T>::fixed_name`; the helper is deleted (1.13). |
+| G20 | `psio/reflect.hpp` | No "index of the data member this pointer names" (`reflect<T>::index_of_member<&T::field>`) and no tuple of the member types (`reflect<T>::member_types`). | Table key schemas map a key's member pointer to a field index; a key that contains a record is flattened to the tuple of its member types. Both are written in psibase with `std::index_sequence` over `member_pointer<I>` / `member_type<I>` (`schema.hpp` `get_member_index`, `Table.hpp` `flatten_members`). | Closed, verified and used: `index_of_member(ptr)`, `member_types`; both psibase helpers are deleted (1.13). The method forms (`method_types`, `index_of_method_pointer`) exist and are not needed by psibase. |
+| G21 | `psio/error.hpp` (`codec_error::what` is a `std::string_view`) | An invariant cannot report a message computed from the value. | `Precision`'s legacy message named the offending value (1.11, D27). | Closed, verified and used: `psio::codec_fail_owned` (1.13). A text adapter's `validate` must still return a message of static storage (`psio/adapter.hpp`); `DecimalText::validate` reports literals. |
+| G22 | `psio/reflect.hpp:228` | `psio::Reflected<T&>` is a hard error, not `false`: `reflect<T&>` forms `static_cast<T&*>`. Reproduction: `static_assert(!psio::Reflected<int&>);` → "'type' declared as a pointer to a reference of type 'int &'". | Constraints on generic code (`template <typename T> requires psio::Reflected<T>`) are tried with reference and cv-qualified types during partial-specialization matching (`flatten_key<T&>` in `Table.hpp`). psibase asked `std::is_class_v<T>` first. | Closed, verified and used: `Reflected<T&>` is `false`; the pre-check is deleted (1.13). |
+| G23 | `psio/json.hpp:2124` (`decode_json_checked(Fmt, std::span<const char> text, T& out)`) | Nothing missing; a trap. A string literal converts to `std::span<const char>` *with its terminating NUL*, so `psio::decode_json_checked(psio::ijson{}, "200", out)` compiles and reads the four bytes `2 0 0 \0`. | Found while writing the `Precision` test of 1.13: for a `std::uint8_t` (or a `transparent()` wrapper of one) the call fails with "json: integer is not a canonical in-range decimal", which reads as if 200 were out of range for 8 bits. With `std::string_view{"200"}` the same call succeeds. Reproduction: `std::uint8_t v; auto s = psio::decode_json_checked(psio::ijson{}, "200", v);` → not ok; `…, std::string_view{"200"}, v)` → ok. | New, minor. No psibase code is affected (the tests pass a `std::string_view`). A `std::string_view` overload, or rejecting a `const char[N]` argument, would remove it. |
