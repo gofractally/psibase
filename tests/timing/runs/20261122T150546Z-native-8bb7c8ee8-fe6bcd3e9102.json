@@ -1,0 +1,174 @@
+{
+ "schema": 1,
+ "suite": "native",
+ "label": "Mac; single-engine LLVM_AOT after the wasmtime merge; psizam 98eec58",
+ "recorded": "2026-11-22T15:05:46Z",
+ "source": {
+  "commit": "8bb7c8ee8c3129ef27d30bc34a163982bbac5368",
+  "branch": "claude/psitri-psizam",
+  "dirty": false,
+  "psitri": "a7c6660de883c6190135e213e2206d006286a7ee"
+ },
+ "system": {
+  "os": "Darwin",
+  "os_release": "25.3.0",
+  "machine": "arm64",
+  "os_version": "26.3.1",
+  "cpu": "Apple M5 Max",
+  "model": "Mac17,6",
+  "logical_cpus": 18,
+  "performance_cores": 6,
+  "memory_bytes": 137438953472,
+  "fingerprint": "fe6bcd3e9102",
+  "test_filesystem": {
+   "type": "APFS",
+   "solid_state": "Yes",
+   "protocol": "Apple Fabric"
+  }
+ },
+ "build": {
+  "type": "Release",
+  "compiler": "Homebrew clang version 22.1.2",
+  "flags": "",
+  "generator": "Ninja"
+ },
+ "ctest_arguments": [
+  "-R",
+  "Tests$|^test_|^n-|^py_|Darwin|CpuAccounting|PsizamAltTimeout",
+  "--timeout",
+  "900"
+ ],
+ "wall_seconds": 96.231,
+ "summary": {
+  "tests": 25,
+  "passed": 25,
+  "test_seconds": 96.168
+ },
+ "tests": [
+  {
+   "name": "CpuAccountingContract",
+   "status": "passed",
+   "seconds": 0.319289
+  },
+  {
+   "name": "DarwinCpuLifetimeIo",
+   "status": "passed",
+   "seconds": 0.547136
+  },
+  {
+   "name": "DarwinCpu_blocked",
+   "status": "passed",
+   "seconds": 0.0063405
+  },
+  {
+   "name": "DarwinCpu_previous",
+   "status": "passed",
+   "seconds": 0.00584354
+  },
+  {
+   "name": "DarwinCpu_replaced",
+   "status": "passed",
+   "seconds": 0.00565338
+  },
+  {
+   "name": "MountTests",
+   "status": "passed",
+   "seconds": 0.482538
+  },
+  {
+   "name": "NativeAotCacheTests",
+   "status": "passed",
+   "seconds": 0.0695678
+  },
+  {
+   "name": "PsitriDatabaseTests",
+   "status": "passed",
+   "seconds": 1.11384
+  },
+  {
+   "name": "PsizamAltTimeout",
+   "status": "passed",
+   "seconds": 0.920529
+  },
+  {
+   "name": "PsizamTests",
+   "status": "passed",
+   "seconds": 2.74357
+  },
+  {
+   "name": "SecrestsTests",
+   "status": "passed",
+   "seconds": 0.628449
+  },
+  {
+   "name": "StorageTimeoutTests",
+   "status": "passed",
+   "seconds": 1.56713
+  },
+  {
+   "name": "VmConsensusTests",
+   "status": "passed",
+   "seconds": 5.10232
+  },
+  {
+   "name": "WatchdogTests",
+   "status": "passed",
+   "seconds": 1.60326
+  },
+  {
+   "name": "n-psibase-common-tests",
+   "status": "passed",
+   "seconds": 0.227804
+  },
+  {
+   "name": "n-psio-tests",
+   "status": "passed",
+   "seconds": 0.19303
+  },
+  {
+   "name": "py_test_fracpack",
+   "status": "passed",
+   "seconds": 0.0759894
+  },
+  {
+   "name": "py_test_name",
+   "status": "passed",
+   "seconds": 0.0525939
+  },
+  {
+   "name": "py_test_psibase_types",
+   "status": "passed",
+   "seconds": 0.0576456
+  },
+  {
+   "name": "test_consensus",
+   "status": "passed",
+   "seconds": 64.2024
+  },
+  {
+   "name": "test_consensus-bft",
+   "status": "passed",
+   "seconds": 11.3686
+  },
+  {
+   "name": "test_consensus-cft",
+   "status": "passed",
+   "seconds": 2.9194
+  },
+  {
+   "name": "test_mock_timer",
+   "status": "passed",
+   "seconds": 0.0222064
+  },
+  {
+   "name": "test_random_timer",
+   "status": "passed",
+   "seconds": 1.67043
+  },
+  {
+   "name": "test_shortest_path_routing",
+   "status": "passed",
+   "seconds": 0.262713
+  }
+ ]
+}
