@@ -17,7 +17,9 @@
 #include <mutex>
 #include <optional>
 #include <psibase/ActionContext.hpp>
+#include <psibase/NativeAotCache.hpp>
 #include <psibase/PsizamPolicy.hpp>
+#include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
 #include <psio/finally.hpp>
 #include <psizam/wasmtime_admission.hpp>
@@ -135,8 +137,30 @@ namespace psibase
       std::uint32_t                                cacheSize;
       std::list<Entry>                             entries;
       std::map<Key, std::list<Entry>::iterator>    index;
+      // Compiled modules kept between runs. The directory is private to the
+      // user: wasmtime executes what it loads from here without checking it.
+      std::shared_ptr<NativeAotCache>              artifacts;
 
-      explicit WasmCacheImpl(std::uint32_t cacheSize) : cacheSize{cacheSize} {}
+      WasmCacheImpl(std::uint32_t cacheSize, const std::filesystem::path& path)
+          : cacheSize{cacheSize},
+            artifacts(path.empty() ? nativeAotCacheFromEnvironment()
+                                   : std::make_shared<NativeAotCache>(path))
+      {
+      }
+
+      // Everything that determines the compiled code: the service, the chain
+      // limits it was admitted and metered under, the engine's proposal set
+      // and float profile, and the wasmtime build.
+      static NativeAotCache::Key artifactKey(const Checksum256& hash, const VMOptions& vmOptions)
+      {
+         auto options = engineOptions();
+         auto digest  = sha256(std::tuple{
+             std::string("psibase-wasmtime-artifact-v1"), hash, vmOptions, options.features,
+             std::uint32_t(options.fp), std::string(wt::build_identity())});
+         NativeAotCache::Key key;
+         std::copy(digest.begin(), digest.end(), key.begin());
+         return key;
+      }
 
       std::optional<wt::module> get(const Checksum256& hash, const VMOptions& vmOptions)
       {
@@ -164,8 +188,8 @@ namespace psibase
       }
    };
 
-   WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path&)
-       : impl{std::make_shared<WasmCacheImpl>(cacheSize)}
+   WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath)
+       : impl{std::make_shared<WasmCacheImpl>(cacheSize, nativeArtifactPath)}
    {
    }
    WasmCache::WasmCache(const WasmCache& src) : impl{src.impl} {}
@@ -244,6 +268,23 @@ namespace psibase
          module      = cache.get(code.codeHash, vmOptions);
          if (!module)
          {
+            // An artifact stored under this key was admitted and compiled from
+            // this exact service under these exact limits by this build.
+            const auto key = WasmCacheImpl::artifactKey(code.codeHash, vmOptions);
+            if (cache.artifacts)
+               if (auto stored = cache.artifacts->load(key))
+                  try
+                  {
+                     module = vmRuntime().load(std::span(
+                         reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
+                  }
+                  catch (const std::exception&)
+                  {
+                     // Unreadable or from an incompatible build: compile again.
+                  }
+         }
+         if (!module)
+         {
             // Admission is psizam's: the same checks, in the same order, as
             // the psizam engines apply before they compile.
             NativeVMOptions policy{vmOptions};
@@ -254,8 +295,16 @@ namespace psibase
                    return wt::validate_and_cost(c->code, policy);
                 });
             module = vmRuntime().compile_metered(c->code, costs);
-            cache.add(code.codeHash, vmOptions, *module);
+            if (cache.artifacts)
+            {
+               auto artifact = module->serialize();
+               cache.artifacts->store(
+                   WasmCacheImpl::artifactKey(code.codeHash, vmOptions),
+                   std::span(reinterpret_cast<const char*>(artifact.data()), artifact.size()));
+            }
          }
+         if (!cache.get(code.codeHash, vmOptions))
+            cache.add(code.codeHash, vmOptions, *module);
       }
 
       std::pair<CodeRow, DbId> getCode(AccountNumber service)

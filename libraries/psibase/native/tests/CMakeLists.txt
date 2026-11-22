@@ -109,6 +109,13 @@ add_executable(VmConsensusReplay VmConsensusReplay.cpp)
 target_link_directories(VmConsensusReplay PRIVATE ${ICU_LIBRARY_DIR})
 target_link_libraries(VmConsensusReplay PRIVATE psibase Threads::Threads)
 
+if(PSIBASE_VM_BACKEND STREQUAL "WASMTIME")
+    # Reads module files; see the comment in the source for how it is used.
+    add_executable(VmAdmissionFuzz VmAdmissionFuzz.cpp)
+    target_link_directories(VmAdmissionFuzz PRIVATE ${ICU_LIBRARY_DIR})
+    target_link_libraries(VmAdmissionFuzz PRIVATE psibase Threads::Threads)
+endif()
+
 add_executable(NativeAotCacheTests NativeAotCacheTests.cpp ../src/NativeAotCache.cpp)
 target_include_directories(NativeAotCacheTests PRIVATE ../include)
 target_compile_definitions(NativeAotCacheTests PRIVATE PSIBASE_NATIVE_AOT_CACHE_TEST_IO)
