@@ -396,7 +396,21 @@ function(psibase_package)
         ${copy-contents}
         COMMAND cd ${outdir} && ${CMAKE_COMMAND} -E tar cf ${_OUTPUT} --format=zip ${contents}
     )
-    add_custom_target(${_NAME} ALL DEPENDS ${_OUTPUT})
+    # The package target is normally named after the package. If a service target
+    # has the same name in a different case ("Example" packaging "example"), the
+    # two share one CMakeFiles/<target>.dir on a case-insensitive filesystem and
+    # the Makefile generators overwrite each other's rules there.
+    set(package_target ${_NAME})
+    string(TOLOWER "${_NAME}" lower_name)
+    foreach(service IN LISTS _SERVICES)
+        if(_TARGET_${service})
+            string(TOLOWER "${_TARGET_${service}}" lower_target)
+            if(lower_target STREQUAL lower_name AND NOT _TARGET_${service} STREQUAL _NAME)
+                set(package_target ${_NAME}-package)
+            endif()
+        endif()
+    endforeach()
+    add_custom_target(${package_target} ALL DEPENDS ${_OUTPUT})
 endfunction()
 
 # Description:              - Use this function when you want to add additional details to a package that is 
