@@ -1,3 +1,6 @@
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <psibase/db.hpp>
 
 #include <boost/filesystem/operations.hpp>
@@ -748,6 +751,20 @@ namespace psibase
             assert(subjectiveRevisions.size() == 2);
             if (writeSession)
             {
+               // With PSIBASE_CALL_PROFILE set: how often a top-level subjective
+               // commit loses to a concurrent one and its caller has to run again.
+               static const bool             countCommits = std::getenv("PSIBASE_CALL_PROFILE") != nullptr;
+               static std::atomic<std::uint64_t> attempts{0}, conflicts{0};
+               bool                          counted = false;
+               if (countCommits)
+               {
+                  auto n = ++attempts;
+                  if (n % 2000 == 0)
+                     std::fprintf(stderr, "SUBJECTIVE commits=%llu conflicts=%llu\n",
+                                  (unsigned long long)n, (unsigned long long)conflicts.load());
+                  counted = true;
+               }
+               (void)counted;
                if (!shared.commitSubjective(
                        *writeSession, subjectiveRevisions.front().db, subjectiveRevisions.back().db,
                        std::move(subjectiveChanges), std::move(socketChanges), sockets, closing,
@@ -758,6 +775,8 @@ namespace psibase
                              shared.impl->callbacks->run(callbackFlags);
                        }))
                {
+                  if (countCommits)
+                     ++conflicts;
                   subjectiveRevisions[1].db              = subjectiveRevisions[0].db;
                   subjectiveRevisions[1].temporaryDb     = subjectiveRevisions[0].temporaryDb;
                   subjectiveRevisions[0].changeSetPos    = {};
