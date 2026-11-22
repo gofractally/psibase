@@ -6,8 +6,8 @@
 #include <psibase/block.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/zip.hpp>
-#include <psio/from_json.hpp>
-#include <psio/reflect.hpp>
+#include <psio1/from_json.hpp>
+#include <psio1/reflect.hpp>
 #include <services/user/Packages.hpp>
 #include <span>
 #include <string>
@@ -34,7 +34,7 @@ namespace psibase
       Checksum256                sha256;
       std::string                file;
    };
-   PSIO_REFLECT(PackageInfo,
+   PSIO1_REFLECT(PackageInfo,
                 name,
                 version,
                 scope,
@@ -56,7 +56,7 @@ namespace psibase
 
       std::uint64_t parseFlags() const;
    };
-   PSIO_REFLECT(ServiceInfo, flags, server, schema)
+   PSIO1_REFLECT(ServiceInfo, flags, server, schema)
 
    struct PackagedService
    {

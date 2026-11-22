@@ -2,8 +2,8 @@
 
 #include <optional>
 #include <psibase/check.hpp>
-#include <psio/from_json.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/from_json.hpp>
+#include <psio1/to_json.hpp>
 
 namespace psibase
 {
@@ -17,14 +17,14 @@ namespace psibase
    {
       auto result = decodeJWT(key, token);
       if (result)
-         return psio::convert_from_json<T>(*result);
+         return psio1::convert_from_json<T>(*result);
       return std::nullopt;
    }
 
    template <typename T>
-      requires psio::Reflected<T>
+      requires psio1::Reflected<T>
    std::string encodeJWT(const JWTKey& key, const T& token)
    {
-      return encodeJWT(key, psio::convert_to_json(token));
+      return encodeJWT(key, psio1::convert_to_json(token));
    }
 }  // namespace psibase

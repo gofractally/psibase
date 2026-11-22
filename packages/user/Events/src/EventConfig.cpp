@@ -6,7 +6,7 @@
 #include "SchemaCache.hpp"
 
 using namespace psibase;
-using namespace psio::schema_types;
+using namespace psio1::schema_types;
 using namespace UserService;
 using namespace SystemService;
 

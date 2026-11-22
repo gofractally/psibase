@@ -1,13 +1,13 @@
 #pragma once
 
 #include <psibase/check.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/from_json.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/from_json.hpp>
 
 namespace psibase
 {
    template <int i, typename... Ts>
-   bool fracpackActionFromJsonImpl(psio::json_token_stream&     stream,
+   bool fracpackActionFromJsonImpl(psio1::json_token_stream&     stream,
                                    std::string_view             name,
                                    std::span<const char* const> meta,
                                    std::tuple<Ts...>&           params)
@@ -34,19 +34,19 @@ namespace psibase
    {
       std::optional<std::vector<char>> result;
       std::size_t                      i = 0;
-      psio::for_each_member_type(
-          (typename psio::reflect<T>::member_functions*)nullptr,
+      psio1::for_each_member_type(
+          (typename psio1::reflect<T>::member_functions*)nullptr,
           [&](auto member)
           {
              using MemPtr                       = decltype(member);
-             std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
+             std::span<const char* const> names = psio1::reflect<T>::member_function_names[i];
              if (names[0] == name)
              {
-                using param_tuple = typename psio::make_param_value_tuple<MemPtr>::type;
+                using param_tuple = typename psio1::make_param_value_tuple<MemPtr>::type;
                 param_tuple       params{};
                 std::vector<char> j{json.begin(), json.end()};
                 j.push_back(0);
-                psio::json_token_stream stream{j.data()};
+                psio1::json_token_stream stream{j.data()};
                 from_json_object(  //
                     stream,
                     [&](std::string_view k)
@@ -55,7 +55,7 @@ namespace psibase
                           abortMessage("action '" + std::string(name) +
                                        "' does not have argument '" + std::string(k) + "'");
                     });
-                result = psio::convert_to_frac(params);
+                result = psio1::convert_to_frac(params);
              }
              ++i;
           });

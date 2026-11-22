@@ -11,7 +11,7 @@ namespace UserService
      public:
       static constexpr auto service = psibase::AccountNumber("chainmail");
 
-      Chainmail(psio::shared_view_ptr<psibase::Action> action);
+      Chainmail(psio1::shared_view_ptr<psibase::Action> action);
 
       void init();
 
@@ -49,7 +49,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO_REFLECT(Chainmail,
+   PSIO1_REFLECT(Chainmail,
       method(init),
       method(send, receiver, subject, body),
       method(archive, msg_id),

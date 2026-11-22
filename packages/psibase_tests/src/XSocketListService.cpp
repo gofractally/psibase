@@ -10,7 +10,7 @@ struct SocketListService : psibase::Service
 {
    std::optional<HttpReply> serveSys(const HttpRequest& req);
 };
-PSIO_REFLECT(SocketListService, method(serveSys, request))
+PSIO1_REFLECT(SocketListService, method(serveSys, request))
 PSIBASE_REFLECT_TABLES(SocketListService)
 
 namespace
@@ -22,11 +22,11 @@ namespace
       {
          checkoutSubjective();
          auto table =
-             Table<SocketRow, &SocketRow::fd>{SocketRow::db, psio::convert_to_key(socketTable)};
+             Table<SocketRow, &SocketRow::fd>{SocketRow::db, psio1::convert_to_key(socketTable)};
          return table.getIndex<0>();
       }
    };
-   PSIO_REFLECT(QueryRoot, method(sockets))
+   PSIO1_REFLECT(QueryRoot, method(sockets))
 
 }  // namespace
 

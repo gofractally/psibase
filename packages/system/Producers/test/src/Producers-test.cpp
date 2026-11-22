@@ -78,31 +78,31 @@ namespace
       AccountNumber issuer;
       AccountNumber owner;
    };
-   PSIO_REFLECT(Node, id, issuer, owner);
+   PSIO1_REFLECT(Node, id, issuer, owner);
 
    struct Edge
    {
       Node node;
    };
-   PSIO_REFLECT(Edge, node);
+   PSIO1_REFLECT(Edge, node);
 
    struct UserNfts
    {
       std::vector<Edge> edges;
    };
-   PSIO_REFLECT(UserNfts, edges);
+   PSIO1_REFLECT(UserNfts, edges);
 
    struct Data
    {
       UserNfts nfts;
    };
-   PSIO_REFLECT(Data, nfts);
+   PSIO1_REFLECT(Data, nfts);
 
    struct QueryRoot
    {
       Data data;
    };
-   PSIO_REFLECT(QueryRoot, data);
+   PSIO1_REFLECT(QueryRoot, data);
 
 }  // namespace
 
@@ -155,7 +155,7 @@ SCENARIO("Producers")
          return Action{.sender  = acc,
                        .service = Nft::service,
                        .method  = "mint"_m,
-                       .rawData = psio::to_frac(std::tuple())
+                       .rawData = psio1::to_frac(std::tuple())
 
          };
       };
@@ -175,7 +175,7 @@ SCENARIO("Producers")
 
          auto body = std::string(res.body.begin(), res.body.end());
          //psibase::writeConsole(body + "\n");
-         auto response_root = psio::convert_from_json<QueryRoot>(body);
+         auto response_root = psio1::convert_from_json<QueryRoot>(body);
 
          return response_root.data.nfts.edges.size();
       };

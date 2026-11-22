@@ -16,13 +16,13 @@ using SystemService::AuthSig::SubjectPublicKeyInfo;
 struct KeyData
 {
    std::optional<SystemService::AuthSig::AuthRecord> account;
-   PSIO_REFLECT(KeyData, account)
+   PSIO1_REFLECT(KeyData, account)
 };
 
 struct KeyReply
 {
    KeyData data;
-   PSIO_REFLECT(KeyReply, data)
+   PSIO1_REFLECT(KeyReply, data)
 };
 
 void CredResThief::create()
@@ -39,7 +39,7 @@ void CredResThief::create()
                     })
                     .value();
    auto ownerAccount =
-       psio::convert_from_json<KeyReply>(std::string(reply.body.begin(), reply.body.end()))
+       psio1::convert_from_json<KeyReply>(std::string(reply.body.begin(), reply.body.end()))
            .data.account;
    check(ownerAccount.has_value(), "Could not find owner key");
    auto id = to<Credentials>().issue(keyFingerprint(ownerAccount->pubkey), std::nullopt,

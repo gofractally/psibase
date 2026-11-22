@@ -3,9 +3,9 @@
 #include <psibase/ForkDb.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/net_base.hpp>
-#include <psio/finally.hpp>
-#include <psio/reflect.hpp>
-#include <psio/to_hex.hpp>
+#include <psio1/finally.hpp>
+#include <psio1/reflect.hpp>
+#include <psio1/to_hex.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -56,12 +56,12 @@ namespace psibase::net
                 " blocknum=" + std::to_string(xid.num());
       }
    };
-   PSIO_REFLECT(HelloRequest, xid, committed)
+   PSIO1_REFLECT(HelloRequest, xid, committed)
 
    struct BlockMessage
    {
       static constexpr unsigned          type = 34;
-      psio::shared_view_ptr<SignedBlock> block;
+      psio1::shared_view_ptr<SignedBlock> block;
       std::string                        to_string() const
       {
          BlockInfo info{block->block()};
@@ -73,7 +73,7 @@ namespace psibase::net
                 (block->auxConsensusData() ? " auxConsensusData" : "");
       }
    };
-   PSIO_REFLECT(BlockMessage, block)
+   PSIO1_REFLECT(BlockMessage, block)
 
    struct StateChecksumMessage
    {
@@ -89,12 +89,12 @@ namespace psibase::net
                 " native=" + loggers::to_string(state.nativeRoot);
       }
    };
-   PSIO_REFLECT(StateChecksumMessage, blockId, state, signature)
+   PSIO1_REFLECT(StateChecksumMessage, blockId, state, signature)
 
    struct BlockHeaderMessage
    {
       static constexpr unsigned          type = 44;
-      psio::shared_view_ptr<SignedBlock> block;
+      psio1::shared_view_ptr<SignedBlock> block;
       std::string                        to_string() const
       {
          BlockInfo info{block->block()};
@@ -106,7 +106,7 @@ namespace psibase::net
                 (block->auxConsensusData() ? " auxConsensusData" : "");
       }
    };
-   PSIO_REFLECT(BlockHeaderMessage, block)
+   PSIO1_REFLECT(BlockHeaderMessage, block)
 
    // snapshot protocol
    //
@@ -126,11 +126,11 @@ namespace psibase::net
       {
          return "snapshot part: blockid=" + loggers::to_string(blockId) +
                 " nrows=" + std::to_string(rows.size()) +
-                " db=" + std::to_string(static_cast<unsigned>(db)) + " [" + psio::to_hex(lowKey) +
-                "," + psio::to_hex(highKey) + ")";
+                " db=" + std::to_string(static_cast<unsigned>(db)) + " [" + psio1::to_hex(lowKey) +
+                "," + psio1::to_hex(highKey) + ")";
       }
    };
-   PSIO_REFLECT(SnapshotPartMessage, blockId, db, lowKey, highKey, rows)
+   PSIO1_REFLECT(SnapshotPartMessage, blockId, db, lowKey, highKey, rows)
 
    struct SnapshotVerifyMessage
    {
@@ -144,7 +144,7 @@ namespace psibase::net
                 " nsig=" + std::to_string(signatures.size());
       }
    };
-   PSIO_REFLECT(SnapshotVerifyMessage, blockId, hash, signatures)
+   PSIO1_REFLECT(SnapshotVerifyMessage, blockId, hash, signatures)
 
    // A producer-to-producer message with contents completely defined by services.
    struct WasmProducerMessage
@@ -156,7 +156,7 @@ namespace psibase::net
 
       std::string to_string() const { return "wasm prod: producer=" + producer.str(); }
    };
-   PSIO_REFLECT(WasmProducerMessage, data, producer, signer)
+   PSIO1_REFLECT(WasmProducerMessage, data, producer, signer)
 
    struct ConnectionStateStart
    {
@@ -519,7 +519,7 @@ namespace psibase::net
             auto header           = blockptr->block().header().unpack();
             auto signature        = blockptr->signature().unpack();
             auto auxConsensusData = blockptr->auxConsensusData().unpack();
-            auto headerptr        = psio::shared_view_ptr<SignedBlock>(SignedBlock{
+            auto headerptr        = psio1::shared_view_ptr<SignedBlock>(SignedBlock{
                 Block{std::move(header)}, std::move(signature), std::move(auxConsensusData)});
             state.blockNum        = *headerNum;
             network().async_send(connection.id, BlockHeaderMessage{std::move(headerptr)},
@@ -805,7 +805,7 @@ namespace psibase::net
             chain().start_block(
                 TimePointSec{duration_cast<Seconds>(block_start.time_since_epoch())}, self,
                 current_term, commit_index);
-            auto  cleanup = psio::finally{[&]
+            auto  cleanup = psio1::finally{[&]
                                          {
                                             if (!result)
                                             {
@@ -1330,7 +1330,7 @@ namespace psibase::net
       void     on_key_update() {}
       BlockNum light_verify(const LightHeaderState&                   state,
                             const BlockInfo&                          info,
-                            const psio::shared_view_ptr<SignedBlock>& block)
+                            const psio1::shared_view_ptr<SignedBlock>& block)
       {
          throw std::runtime_error("light verify: Unknown consensus algorithm");
       }

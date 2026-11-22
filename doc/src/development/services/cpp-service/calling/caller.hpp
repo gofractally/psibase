@@ -9,7 +9,7 @@ struct Caller
    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 };
 
-PSIO_REFLECT(  //
+PSIO1_REFLECT(  //
     Caller,
     method(mult_add, a, b, c, d),
     method(serveSys, request))

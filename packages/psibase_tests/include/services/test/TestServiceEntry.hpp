@@ -11,9 +11,9 @@ namespace TestService
       int                  id;
       int                  count;
    };
-   PSIO_REFLECT(CallCounterRow, id, count)
+   PSIO1_REFLECT(CallCounterRow, id, count)
    using CallCounterTable = psibase::Table<CallCounterRow, &CallCounterRow::id>;
-   PSIO_REFLECT_TYPENAME(CallCounterTable)
+   PSIO1_REFLECT_TYPENAME(CallCounterTable)
 
    struct TestServiceEntry : psibase::Service
    {
@@ -21,6 +21,6 @@ namespace TestService
       using Tables                  = psibase::ServiceTables<CallCounterTable>;
       int call(int number, std::string memo);
    };
-   PSIO_REFLECT(TestServiceEntry, method(call, number, memo))
+   PSIO1_REFLECT(TestServiceEntry, method(call, number, memo))
    PSIBASE_REFLECT_TABLES(TestServiceEntry, TestServiceEntry::Tables)
 }  // namespace TestService

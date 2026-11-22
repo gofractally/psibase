@@ -3,7 +3,7 @@
 #include <psibase/fileUtil.hpp>
 #include <psibase/package.hpp>
 #include <psibase/semver.hpp>
-#include <psio/schema.hpp>
+#include <psio1/schema.hpp>
 #include <services/local/XSites.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
@@ -62,8 +62,8 @@ namespace psibase
          std::string                      service;
          MethodNumber                     method;
          std::optional<std::vector<char>> rawData;
-         std::optional<psio::json::any>   data;
-         PSIO_REFLECT(PrettyAction, sender, service, method, rawData, data)
+         std::optional<psio1::json::any>   data;
+         PSIO1_REFLECT(PrettyAction, sender, service, method, rawData, data)
       };
 
       const ServiceSchema* getSchema(std::span<const PackagedService> packages,
@@ -92,13 +92,13 @@ namespace psibase
          {
             auto contents = package.archive.getEntry(*package.postinstallScript).read();
             contents.push_back('\0');
-            psio::json_token_stream stream(contents.data());
-            psio::from_json(result, stream);
+            psio1::json_token_stream stream(contents.data());
+            psio1::from_json(result, stream);
          }
          return result;
       }
 
-      AccountNumber accountFromJson(const psio::json::any& name)
+      AccountNumber accountFromJson(const psio1::json::any& name)
       {
          if (auto* s = name.get_if<std::string>())
          {
@@ -119,7 +119,7 @@ namespace psibase
          }
       }
 
-      MethodNumber methodFromJson(const psio::json::any& name)
+      MethodNumber methodFromJson(const psio1::json::any& name)
       {
          if (auto* s = name.get_if<std::string>())
          {
@@ -131,12 +131,12 @@ namespace psibase
          }
       }
 
-      std::vector<char> bytesFromJson(const psio::json::any& data)
+      std::vector<char> bytesFromJson(const psio1::json::any& data)
       {
          if (auto* s = data.get_if<std::string>())
          {
             std::vector<char> result;
-            if (!psio::from_hex(*s, result))
+            if (!psio1::from_hex(*s, result))
                abortMessage("expected hex string");
             return result;
          }
@@ -146,7 +146,7 @@ namespace psibase
          }
       }
 
-      psio::schema_types::CustomTypes action_types(
+      psio1::schema_types::CustomTypes action_types(
           const std::span<const PackagedService>* packages);
 
       struct PrettyActionRef
@@ -155,19 +155,19 @@ namespace psibase
          AccountNumber                    service;
          MethodNumber                     method;
          std::optional<std::vector<char>> rawData;
-         const psio::json::any*           data;
+         const psio1::json::any*           data;
       };
 
-      PrettyActionRef parsePrettyAction(const psio::schema_types::CompiledType* ty,
-                                        const psio::json::any&                  in)
+      PrettyActionRef parsePrettyAction(const psio1::schema_types::CompiledType* ty,
+                                        const psio1::json::any&                  in)
       {
          PrettyActionRef act;
-         auto*           obj = in.get_if<psio::json::any_object>();
+         auto*           obj = in.get_if<psio1::json::any_object>();
          check(obj != nullptr, "Expected object");
-         auto* objTy = std::get_if<psio::schema_types::Object>(&ty->original_type->value);
+         auto* objTy = std::get_if<psio1::schema_types::Object>(&ty->original_type->value);
          check(objTy != nullptr, "Expected object type");
          check(objTy->members.size() == 4, "wrong size");
-         auto getField = [&](std::string_view name, bool required = true) -> const psio::json::any*
+         auto getField = [&](std::string_view name, bool required = true) -> const psio1::json::any*
          {
             auto pos =
                 std::ranges::find_if(*obj, [&](const auto& entry) { return entry.key == name; });
@@ -189,20 +189,20 @@ namespace psibase
 
       struct ActionParser
       {
-         static bool match(const psio::schema_types::CompiledType* ty)
+         static bool match(const psio1::schema_types::CompiledType* ty)
          {
-            return psio::schema_types::matchCustomType(ty, (Action*)nullptr);
+            return psio1::schema_types::matchCustomType(ty, (Action*)nullptr);
          }
-         static bool frac2json(const psio::schema_types::CompiledType*,
-                               psio::FracStream& in,
-                               psio::StreamBase& out)
+         static bool frac2json(const psio1::schema_types::CompiledType*,
+                               psio1::FracStream& in,
+                               psio1::StreamBase& out)
          {
             abortMessage("not implemented");
          }
          static void json2frac(const std::span<const PackagedService>* packages,
-                               const psio::schema_types::CompiledType* ty,
-                               const psio::json::any&                  in,
-                               psio::StreamBase&                       out)
+                               const psio1::schema_types::CompiledType* ty,
+                               const psio1::json::any&                  in,
+                               psio1::StreamBase&                       out)
          {
             auto act = parsePrettyAction(ty, in);
 
@@ -214,11 +214,11 @@ namespace psibase
                auto pos = schema->actions.find(act.method.str());
                check(pos != schema->actions.end(), "Action not found");
                const auto&                        ty = pos->second.params;
-               psio::schema_types::CompiledSchema cschema{
+               psio1::schema_types::CompiledSchema cschema{
                    schema->types, action_types(packages), {&ty}};
                auto* cty = cschema.get(ty.resolve(schema->types));
                act.rawData.emplace();
-               psio::vector_stream stream{*act.rawData};
+               psio1::vector_stream stream{*act.rawData};
                to_frac(*cty, *act.data, stream, cschema.builtin);
             }
             if (!act.rawData)
@@ -231,17 +231,17 @@ namespace psibase
                            .rawData = act.rawData.value()},
                     out);
          }
-         static bool is_empty_container(const psio::schema_types::CompiledType*,
-                                        const psio::json::any& in)
+         static bool is_empty_container(const psio1::schema_types::CompiledType*,
+                                        const psio1::json::any& in)
          {
             return false;
          }
       };
 
-      psio::schema_types::CustomTypes action_types(const std::span<const PackagedService>* packages)
+      psio1::schema_types::CustomTypes action_types(const std::span<const PackagedService>* packages)
       {
          auto result = psibase_types();
-         result.insert("Action", psio::schema_types::CustomHandler{ActionParser{}, packages});
+         result.insert("Action", psio1::schema_types::CustomHandler{ActionParser{}, packages});
          return result;
       }
 
@@ -260,12 +260,12 @@ namespace psibase
          auto pos = schema->actions.find(act.method.str());
          check(pos != schema->actions.end(), "Action not found");
          const auto&                        ty = pos->second.params;
-         psio::schema_types::CompiledSchema cschema{schema->types, action_types(&packages), {&ty}};
+         psio1::schema_types::CompiledSchema cschema{schema->types, action_types(&packages), {&ty}};
          auto*                              cty = cschema.get(ty.resolve(schema->types));
          if (!act.data)
-            act.data = psio::json::any_object{};
+            act.data = psio1::json::any_object{};
          Action              result{act.sender, service, act.method};
-         psio::vector_stream stream{result.rawData};
+         psio1::vector_stream stream{result.rawData};
          to_frac(*cty, *act.data, stream, cschema.builtin);
          return result;
       }
@@ -280,19 +280,19 @@ namespace psibase
          std::span<const PackagedService> packages;
          std::vector<AccountNumber>&      accounts;
          std::vector<AccountNumber>&      services;
-         static bool                      match(const psio::schema_types::CompiledType* ty)
+         static bool                      match(const psio1::schema_types::CompiledType* ty)
          {
-            return psio::schema_types::matchCustomType(ty, (Action*)nullptr);
+            return psio1::schema_types::matchCustomType(ty, (Action*)nullptr);
          }
-         static bool frac2json(const psio::schema_types::CompiledType*,
-                               psio::FracStream& in,
-                               psio::StreamBase& out)
+         static bool frac2json(const psio1::schema_types::CompiledType*,
+                               psio1::FracStream& in,
+                               psio1::StreamBase& out)
          {
             abortMessage("not implemented");
          }
-         void json2frac(const psio::schema_types::CompiledType* ty,
-                        const psio::json::any&                  in,
-                        psio::StreamBase&                       out)
+         void json2frac(const psio1::schema_types::CompiledType* ty,
+                        const psio1::json::any&                  in,
+                        psio1::StreamBase&                       out)
          {
             auto act = parsePrettyAction(ty, in);
 
@@ -306,13 +306,13 @@ namespace psibase
             }
             to_frac(Action{}, out);
          }
-         static bool is_empty_container(const psio::schema_types::CompiledType*,
-                                        const psio::json::any& in)
+         static bool is_empty_container(const psio1::schema_types::CompiledType*,
+                                        const psio1::json::any& in)
          {
             return false;
          }
 
-         void collect(AccountNumber service, MethodNumber method, const psio::json::any& data)
+         void collect(AccountNumber service, MethodNumber method, const psio1::json::any& data)
          {
             auto* schema = getSchema(packages, service);
             if (!schema)
@@ -322,10 +322,10 @@ namespace psibase
             const auto& ty     = pos->second.params;
             auto        custom = psibase_types();
             custom.insert("Action", this);
-            psio::schema_types::CompiledSchema cschema{schema->types, std::move(custom), {&ty}};
+            psio1::schema_types::CompiledSchema cschema{schema->types, std::move(custom), {&ty}};
             auto*                              cty = cschema.get(ty.resolve(schema->types));
             std::vector<char>                  rawData;
-            psio::vector_stream                stream{rawData};
+            psio1::vector_stream                stream{rawData};
             to_frac(*cty, data, stream, cschema.builtin);
          }
       };
@@ -514,8 +514,8 @@ namespace psibase
       {
          auto metaContents = archive.getEntry(*meta_index).read();
          metaContents.push_back('\0');
-         psio::json_token_stream stream(metaContents.data());
-         psio::from_json(meta, stream);
+         psio1::json_token_stream stream(metaContents.data());
+         psio1::from_json(meta, stream);
       }
       for (const auto& [account, file] : service_files)
       {
@@ -528,8 +528,8 @@ namespace psibase
          {
             auto contents = archive.getEntry(pos->second).read();
             contents.push_back('\0');
-            psio::json_token_stream stream(contents.data());
-            psio::from_json(info, stream);
+            psio1::json_token_stream stream(contents.data());
+            psio1::from_json(info, stream);
          }
          services.push_back({account, file, info});
       }
@@ -684,7 +684,7 @@ namespace psibase
    std::vector<char> PackagedService::manifest()
    {
       std::vector<char>   manifest;
-      psio::vector_stream stream{manifest};
+      psio1::vector_stream stream{manifest};
       bool                first = true;
       stream.write('{');
       to_json("services", stream);
@@ -780,7 +780,7 @@ namespace psibase
       {
          auto index_json = readWholeFile(path + "/index.json");
          index_json.push_back('\0');
-         psio::json_token_stream stream(index_json.data());
+         psio1::json_token_stream stream(index_json.data());
          from_json(result, stream);
       }
       return result;

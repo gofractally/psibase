@@ -4,7 +4,7 @@
 #include <psibase/MethodNumber.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/time.hpp>
-#include <psio/shared_view_ptr.hpp>
+#include <psio1/shared_view_ptr.hpp>
 
 namespace psibase
 {
@@ -28,7 +28,7 @@ namespace psibase
       std::vector<char> rawData;  ///< Data for the method
       //
       friend bool operator==(const Action&, const Action&) = default;
-      PSIO_REFLECT(Action, sender, service, method, rawData)
+      PSIO1_REFLECT(Action, sender, service, method, rawData)
    };
    inline constexpr bool psio_custom_schema(Action*)
    {
@@ -42,7 +42,7 @@ namespace psibase
       uint8_t           vmType    = 0;
       uint8_t           vmVersion = 0;
       std::vector<char> code      = {};
-      PSIO_REFLECT(GenesisService, service, flags, vmType, vmVersion, code)
+      PSIO1_REFLECT(GenesisService, service, flags, vmType, vmVersion, code)
    };
 
    // The genesis action is the first action of the first transaction of
@@ -52,7 +52,7 @@ namespace psibase
    {
       std::string                 memo;
       std::vector<GenesisService> services;
-      PSIO_REFLECT(GenesisActionData, memo, services)
+      PSIO1_REFLECT(GenesisActionData, memo, services)
    };
 
    struct Claim
@@ -60,14 +60,14 @@ namespace psibase
       AccountNumber     service;
       std::vector<char> rawData;
       friend bool       operator==(const Claim&, const Claim&) = default;
-      PSIO_REFLECT(Claim, service, rawData)
+      PSIO1_REFLECT(Claim, service, rawData)
    };
 
    struct ClaimKey
    {
       AccountNumber     service;
       std::vector<char> rawData;
-      PSIO_REFLECT(ClaimKey, service, rawData)
+      PSIO1_REFLECT(ClaimKey, service, rawData)
    };
 
    // Rules for TAPOS:
@@ -101,7 +101,7 @@ namespace psibase
       uint32_t     refBlockSuffix = 0;
       uint16_t     flags          = 0;
       uint8_t      refBlockIndex  = 0;
-      PSIO_REFLECT(Tapos,
+      PSIO1_REFLECT(Tapos,
                    definitionWillNotChange(),
                    expiration,
                    refBlockSuffix,
@@ -115,7 +115,7 @@ namespace psibase
       Tapos               tapos;
       std::vector<Action> actions;
       std::vector<Claim>  claims;  // TODO: Is there standard terminology that we could use?
-      PSIO_REFLECT(Transaction, tapos, actions, claims)
+      PSIO1_REFLECT(Transaction, tapos, actions, claims)
    };
 
    // TODO: pruning proofs?
@@ -123,13 +123,13 @@ namespace psibase
    //       e.g. complication: there are at least 2 different header formats for gzip.
    struct SignedTransaction
    {
-      psio::shared_view_ptr<Transaction> transaction;
+      psio1::shared_view_ptr<Transaction> transaction;
 
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;
 
       std::optional<std::vector<std::vector<char>>> subjectiveData;
-      PSIO_REFLECT(SignedTransaction, transaction, proofs, subjectiveData)
+      PSIO1_REFLECT(SignedTransaction, transaction, proofs, subjectiveData)
    };
 
    using TermNum = uint32_t;
@@ -143,7 +143,7 @@ namespace psibase
       uint8_t     vmVersion                                 = 0;
       friend bool operator==(const BlockHeaderAuthAccount&,
                              const BlockHeaderAuthAccount&) = default;
-      PSIO_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
+      PSIO1_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
    };
 
    // The existing eos-vm implementation limits are:
@@ -168,7 +168,7 @@ namespace psibase
       std::uint32_t max_stack_bytes = 1024 * 1024;
 
       friend auto operator<=>(const VMOptions&, const VMOptions&) = default;
-      PSIO_REFLECT(VMOptions,
+      PSIO1_REFLECT(VMOptions,
                    max_mutable_global_bytes,
                    max_pages,
                    max_table_elements,
@@ -180,7 +180,7 @@ namespace psibase
       uint32_t    numExecutionMemories = 0;
       VMOptions   vmOptions            = {0, 0, 0, 0};
       friend bool operator==(const BlockHeaderWasmConfig&, const BlockHeaderWasmConfig&) = default;
-      PSIO_REFLECT(BlockHeaderWasmConfig, numExecutionMemories, vmOptions)
+      PSIO1_REFLECT(BlockHeaderWasmConfig, numExecutionMemories, vmOptions)
    };
 
    struct Producer
@@ -189,21 +189,21 @@ namespace psibase
       Claim         auth;
 
       friend bool operator==(const Producer&, const Producer&) = default;
-      PSIO_REFLECT(Producer, name, auth);
+      PSIO1_REFLECT(Producer, name, auth);
    };
 
    struct CftConsensus
    {
       std::vector<Producer> producers;
       friend bool           operator==(const CftConsensus&, const CftConsensus&) = default;
-      PSIO_REFLECT(CftConsensus, producers);
+      PSIO1_REFLECT(CftConsensus, producers);
    };
 
    struct BftConsensus
    {
       std::vector<Producer> producers;
       friend bool           operator==(const BftConsensus&, const BftConsensus&) = default;
-      PSIO_REFLECT(BftConsensus, producers);
+      PSIO1_REFLECT(BftConsensus, producers);
    };
 
    using ConsensusData = std::variant<CftConsensus, BftConsensus>;
@@ -219,7 +219,7 @@ namespace psibase
       std::vector<BlockHeaderAuthAccount> services;
       BlockHeaderWasmConfig               wasmConfig;
       friend bool                         operator==(const Consensus&, const Consensus&) = default;
-      PSIO_REFLECT(Consensus, data, services, wasmConfig)
+      PSIO1_REFLECT(Consensus, data, services, wasmConfig)
    };
 
    struct BlockHeaderCode
@@ -228,14 +228,14 @@ namespace psibase
       uint8_t vmVersion = 0;
 
       std::vector<uint8_t> code = {};
-      PSIO_REFLECT(BlockHeaderCode, vmType, vmVersion, code);
+      PSIO1_REFLECT(BlockHeaderCode, vmType, vmVersion, code);
    };
 
    struct PendingConsensus
    {
       Consensus consensus;
       BlockNum  blockNum;
-      PSIO_REFLECT(PendingConsensus, consensus, blockNum)
+      PSIO1_REFLECT(PendingConsensus, consensus, blockNum)
    };
 
    // This commits to all the state used to verify block signatures.
@@ -243,7 +243,7 @@ namespace psibase
    {
       Consensus                       current;
       std::optional<PendingConsensus> next;
-      PSIO_REFLECT(JointConsensus, current, next)
+      PSIO1_REFLECT(JointConsensus, current, next)
    };
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
@@ -283,7 +283,7 @@ namespace psibase
       // It MAY contain code that is unchanged from the previous block
       // authCode MUST NOT be included when calculating a block hash.
       std::optional<std::vector<BlockHeaderCode>> authCode;
-      PSIO_REFLECT(BlockHeader,
+      PSIO1_REFLECT(BlockHeader,
                    previous,
                    blockNum,
                    time,
@@ -310,7 +310,7 @@ namespace psibase
       // TODO: Is there ever a reason to prune an individual signature?
       Checksum256 signatureHash;
       Checksum256 subjectiveDataHash;
-      PSIO_REFLECT(TransactionInfo, transactionId, signatureHash, subjectiveDataHash)
+      PSIO1_REFLECT(TransactionInfo, transactionId, signatureHash, subjectiveDataHash)
    };
 
    // TODO: switch fields to shared_view_ptr?
@@ -318,7 +318,7 @@ namespace psibase
    {
       BlockHeader                    header;
       std::vector<SignedTransaction> transactions;
-      PSIO_REFLECT(Block, header, transactions)
+      PSIO1_REFLECT(Block, header, transactions)
    };
 
    /// TODO: you have signed block headers, not signed blocks
@@ -328,7 +328,7 @@ namespace psibase
       std::vector<char> signature;
       // Contains additional signatures if required by the consensus algorithm
       std::optional<std::vector<char>> auxConsensusData;
-      PSIO_REFLECT(SignedBlock, block, signature, auxConsensusData)
+      PSIO1_REFLECT(SignedBlock, block, signature, auxConsensusData)
    };
 
    struct BlockInfo
@@ -349,7 +349,7 @@ namespace psibase
 
       BlockInfo(const Block& b) : BlockInfo{b.header} {}
       static Checksum256 makeBlockId(BlockHeader header);
-      PSIO_REFLECT(BlockInfo, header, blockId)
+      PSIO1_REFLECT(BlockInfo, header, blockId)
    };
 
    struct BlockSignatureInfo

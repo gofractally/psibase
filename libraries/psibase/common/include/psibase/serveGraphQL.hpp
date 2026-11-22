@@ -5,15 +5,15 @@
 #include <rapidjson/writer.h>
 #include <psibase/Table.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/graphql.hpp>
-#include <psio/to_hex.hpp>
+#include <psio1/graphql.hpp>
+#include <psio1/to_hex.hpp>
 
 namespace psibase
 {
    struct GraphQLQuery
    {
       std::string query;
-      PSIO_REFLECT(GraphQLQuery, query);
+      PSIO1_REFLECT(GraphQLQuery, query);
    };
 
    /// Handle `/graphql` request
@@ -37,7 +37,7 @@ namespace psibase
    {
       auto doit = [&](std::string_view query, std::string_view variables)
       {
-         auto result = psio::gql_query(queryRoot, query, {});
+         auto result = psio1::gql_query(queryRoot, query, {});
          return HttpReply{
              .contentType = "application/json",
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
@@ -53,7 +53,7 @@ namespace psibase
          return doit(request.target.substr(pos + 7), {});
       else if (request.method == "GET")
       {
-         auto result = psio::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
+         auto result = psio1::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
          return HttpReply{
              .contentType = "text/plain",
              .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy,
@@ -69,7 +69,7 @@ namespace psibase
          else if (request.contentType == "application/json")
          {
             auto q =
-                psio::convert_from_json<GraphQLQuery>({request.body.data(), request.body.size()});
+                psio1::convert_from_json<GraphQLQuery>({request.body.data(), request.body.size()});
             return doit(q.query, {});
          }
       }
@@ -87,22 +87,22 @@ namespace psibase
       bool        hasNextPage     = false;
       std::string startCursor;
       std::string endCursor;
-      PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
+      PSIO1_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
    };
 
    /// GraphQL support for paging
    ///
    /// `node` contains the row data. `cursor` identifies where in the
    /// table the node is located.
-   template <typename Node, psio::FixedString EdgeName>
+   template <typename Node, psio1::FixedString EdgeName>
    struct Edge
    {
       Node        node;
       std::string cursor;
-      PSIO_REFLECT(Edge, node, cursor)
+      PSIO1_REFLECT(Edge, node, cursor)
    };
 
-   template <typename Node, psio::FixedString EdgeName>
+   template <typename Node, psio1::FixedString EdgeName>
    constexpr const char* get_type_name(const Edge<Node, EdgeName>*)
    {
       return EdgeName.c_str();
@@ -112,7 +112,7 @@ namespace psibase
    ///
    /// `edges` contain the matching rows. `pageInfo` gives clients information
    /// needed to resume paging.
-   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
+   template <typename Node, psio1::FixedString ConnectionName, psio1::FixedString EdgeName>
    struct Connection
    {
       using NodeType = Node;
@@ -120,10 +120,10 @@ namespace psibase
 
       std::vector<Edge> edges;
       PageInfo          pageInfo;
-      PSIO_REFLECT(Connection, edges, pageInfo)
+      PSIO1_REFLECT(Connection, edges, pageInfo)
    };
 
-   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
+   template <typename Node, psio1::FixedString ConnectionName, psio1::FixedString EdgeName>
    constexpr const char* get_type_name(const Connection<Node, ConnectionName, EdgeName>*)
    {
       return ConnectionName.c_str();
@@ -134,7 +134,7 @@ namespace psibase
    {
       std::optional<psibase::BlockNum>  blockNum;
       std::optional<psibase::BlockTime> blockTime;
-      PSIO_REFLECT(EventBlockInfo, blockNum, blockTime)
+      PSIO1_REFLECT(EventBlockInfo, blockNum, blockTime)
    };
 
    namespace detail
@@ -142,7 +142,7 @@ namespace psibase
       template <typename T>
       consteval bool has_block_member()
       {
-         for (const char* n : psio::reflect<T>::data_member_names)
+         for (const char* n : psio1::reflect<T>::data_member_names)
             if (std::string_view{n} == "block")
                return true;
          return false;
@@ -157,13 +157,13 @@ namespace psibase
                     "WithBlockContext<T>: T already has a 'block' field");
       EventBlockInfo block;
       T              data;
-      PSIO_REFLECT(WithBlockContext, block, data)
+      PSIO1_REFLECT(WithBlockContext, block, data)
    };
 
    template <typename T>
    const char* get_type_name(const WithBlockContext<T>*)
    {
-      static constexpr auto name = psio::reflect<T>::name + "WithBlockContext";
+      static constexpr auto name = psio1::reflect<T>::name + "WithBlockContext";
       return name.c_str();
    }
 
@@ -171,31 +171,31 @@ namespace psibase
    template <typename T, typename S>
    void fill_gql_schema_members(const WithBlockContext<T>*, S& stream, bool is_input)
    {
-      psio::write_str("    block: ", stream);
-      psio::write_str(psio::generate_gql_whole_name((EventBlockInfo*)nullptr, is_input), stream);
-      psio::write_str("\n", stream);
-      psio::fill_gql_schema_members((T*)nullptr, stream, is_input);
+      psio1::write_str("    block: ", stream);
+      psio1::write_str(psio1::generate_gql_whole_name((EventBlockInfo*)nullptr, is_input), stream);
+      psio1::write_str("\n", stream);
+      psio1::fill_gql_schema_members((T*)nullptr, stream, is_input);
    }
 
    // Resolve `block` from value.block, T's fields from value.data.
    template <typename T, typename OS, typename E>
    auto gql_query_inline(WithBlockContext<T>*,
                          const WithBlockContext<T>& value,
-                         psio::gql_stream&          input_stream,
+                         psio1::gql_stream&          input_stream,
                          OS&                        output_stream,
                          const E&                   error,
                          bool                       allow_unknown_members,
                          bool&                      first)
    {
       auto resolve_data =
-          psio::make_field_resolver(value.data, input_stream, output_stream, error, first);
-      return psio::gql_query_inline(
-          psio::generate_gql_partial_name((const WithBlockContext<T>*)nullptr, false),
+          psio1::make_field_resolver(value.data, input_stream, output_stream, error, first);
+      return psio1::gql_query_inline(
+          psio1::generate_gql_partial_name((const WithBlockContext<T>*)nullptr, false),
           [&](std::string_view field_name, std::string_view alias) -> bool
           {
              if (field_name == "block")
              {
-                psio::detail::write_field_name(alias, first, output_stream);
+                psio1::detail::write_field_name(alias, first, output_stream);
                 return gql_query(value.block, input_stream, output_stream, error, false);
              }
              return resolve_data(field_name, alias);
@@ -261,7 +261,7 @@ namespace psibase
    ///       return arg1 + secondaryKey + arg2 + moreData;
    ///    }
    /// };
-   /// PSIO_REFLECT(MyType,
+   /// PSIO1_REFLECT(MyType,
    ///    primaryKey, secondaryKey, moreData,
    ///    method(someFn, arg1, arg2))
    ///
@@ -280,7 +280,7 @@ namespace psibase
    ///       return MyTables{service}.open<MyTable>().getIndex<1>();
    ///    }
    /// };
-   /// PSIO_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
+   /// PSIO1_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
    ///
    /// struct ExampleService : psibase::Service
    /// {
@@ -293,7 +293,7 @@ namespace psibase
    ///       return std::nullopt;
    ///    }
    /// };
-   /// PSIO_REFLECT(ExampleService, method(serveSys, request))
+   /// PSIO1_REFLECT(ExampleService, method(serveSys, request))
    ///
    /// PSIBASE_DISPATCH(ExampleService)
    /// ```
@@ -370,7 +370,7 @@ namespace psibase
          if (!s || s->empty())
             return bytes;
          bytes.reserve(s->size() / 2);
-         if (!psio::from_hex(*s, bytes))
+         if (!psio1::from_hex(*s, bytes))
             bytes.clear();
          return bytes;
       };
@@ -398,7 +398,7 @@ namespace psibase
       Connection result;
       auto       add_edge = [&](const auto& it)
       {
-         auto cursor = psio::to_hex(it.keyWithoutPrefix());
+         auto cursor = psio1::to_hex(it.keyWithoutPrefix());
          result.edges.push_back(typename Connection::Edge{proj(it), std::move(cursor)});
       };
       // Rows are sized before they're read, so a page only exceeds the budget
@@ -672,7 +672,7 @@ namespace psibase
    constexpr auto gql_callable_fn(const TableIndex<T, K>*)
    {
       using Connection = psibase::Connection<  //
-          T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
+          T, psio1::reflect<T>::name + "Connection", psio1::reflect<T>::name + "Edge">;
       return &detail::makeConnectionFn<Connection, T, K>;
    }  // gql_callable_fn
 
@@ -688,7 +688,7 @@ namespace psibase
    {
       using R          = decltype(std::declval<F>()(std::declval<T>()));
       using Connection = psibase::Connection<  //
-          R, psio::reflect<R>::name + "Connection", psio::reflect<R>::name + "Edge">;
+          R, psio1::reflect<R>::name + "Connection", psio1::reflect<R>::name + "Edge">;
       return &detail::makeTransformedConnection<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
@@ -704,7 +704,7 @@ namespace psibase
    {
       using R          = decltype(std::declval<F>()(std::declval<T>()));
       using Connection = psibase::Connection<  //
-          R, psio::reflect<R>::name + "Connection", psio::reflect<R>::name + "Edge">;
+          R, psio1::reflect<R>::name + "Connection", psio1::reflect<R>::name + "Edge">;
       return &detail::makeTransformedConnectionView<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
@@ -712,14 +712,14 @@ namespace psibase
    {
       std::string sqlQuery(const std::string& squery, const std::vector<std::string>& params);
    };
-   PSIO_REFLECT(EventQueryInterface, method(sqlQuery, query, params))
+   PSIO1_REFLECT(EventQueryInterface, method(sqlQuery, query, params))
 
    template <typename T>
    struct SqlRow
    {
       uint64_t rowid;
       T        data;
-      PSIO_REFLECT(SqlRow, rowid, data)
+      PSIO1_REFLECT(SqlRow, rowid, data)
    };
 
    struct RowBlockStart
@@ -727,7 +727,7 @@ namespace psibase
       uint64_t  rowIndex;
       BlockNum  blockNum;
       BlockTime blockTime;
-      PSIO_REFLECT(RowBlockStart, rowIndex, blockNum, blockTime)
+      PSIO1_REFLECT(RowBlockStart, rowIndex, blockNum, blockTime)
    };
 
    namespace detail
@@ -786,7 +786,7 @@ namespace psibase
              " )",
              values);
          auto json = sql_query(sql, {}, debug);
-         return psio::convert_from_json<std::vector<RowBlockStart>>(json);
+         return psio1::convert_from_json<std::vector<RowBlockStart>>(json);
       }
    }  // namespace detail
 
@@ -899,14 +899,14 @@ namespace psibase
       /// Each node is wrapped in WithBlockContext<T> carrying block metadata.
       /// Returns error if both first and last are specified.
       Connection<WithBlockContext<T>,
-                 psio::reflect<T>::name + "Connection",
-                 psio::reflect<T>::name + "Edge">
+                 psio1::reflect<T>::name + "Connection",
+                 psio1::reflect<T>::name + "Edge">
       query() const
       {
          auto [rows, has_next_page, has_prev_page] = all_edges();
 
-         using ConnType = Connection<WithBlockContext<T>, psio::reflect<T>::name + "Connection",
-                                     psio::reflect<T>::name + "Edge">;
+         using ConnType = Connection<WithBlockContext<T>, psio1::reflect<T>::name + "Connection",
+                                     psio1::reflect<T>::name + "Edge">;
          using EdgeType = typename ConnType::Edge;
 
          std::vector<uint64_t> rowids;
@@ -959,7 +959,7 @@ namespace psibase
 
          auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
          auto json_str  = detail::sql_query(query_str, _params, _debug);
-         auto rows      = psio::convert_from_json<std::vector<SqlRow<T>>>(json_str);
+         auto rows      = psio1::convert_from_json<std::vector<SqlRow<T>>>(json_str);
 
          if (_debug)
          {
@@ -1082,7 +1082,7 @@ namespace psibase
                           }
                           else
                           {
-                             bool found = psio::get_data_member<T>(
+                             bool found = psio1::get_data_member<T>(
                                  key, [&](auto member) { from_json(s.data.*member, stream); });
                              if (!found)
                              {

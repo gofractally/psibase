@@ -1,7 +1,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio/chrono.hpp>
+#include <psio1/chrono.hpp>
 
 #include <chrono>
 
@@ -16,7 +16,7 @@ class MockCpuLimit : public psibase::Service
    std::chrono::nanoseconds getCpuTime() { return std::chrono::microseconds(100); }
    void                     setCpuLimit(std::optional<uint64_t> limit_ns) {}
 };
-PSIO_REFLECT(MockCpuLimit, method(getCpuTime), method(setCpuLimit, limit_ns))
+PSIO1_REFLECT(MockCpuLimit, method(getCpuTime), method(setCpuLimit, limit_ns))
 PSIBASE_REFLECT_TABLES(MockCpuLimit)
 
 PSIBASE_DISPATCH(MockCpuLimit)

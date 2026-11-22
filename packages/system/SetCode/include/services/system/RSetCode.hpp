@@ -12,6 +12,6 @@ namespace SystemService
       /// Sets the flags that a particular service must be run with
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest req);
    };
-   PSIO_REFLECT(RSetCode, method(serveSys, req))
+   PSIO1_REFLECT(RSetCode, method(serveSys, req))
    PSIBASE_REFLECT_TABLES(RSetCode)
 }  // namespace SystemService

@@ -7,15 +7,15 @@
 #include <psibase/headerValidation.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/testerApi.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/stream.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/stream.hpp>
 #include <vector>
 
 namespace psibase
 {
    struct ChainHandle
    {
-      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio::input_stream key)
+      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio1::input_stream key)
       {
          auto size = tester::raw::kvGet(id, db, key.pos, key.remaining());
          if (size == -1)
@@ -26,32 +26,32 @@ namespace psibase
       template <typename V, typename K>
       std::optional<V> kvGet(psibase::DbId db, const K& key)
       {
-         auto v = kvGetRaw(db, psio::convert_to_key(key));
+         auto v = kvGetRaw(db, psio1::convert_to_key(key));
          if (!v)
             return std::nullopt;
          // TODO: validate (allow opt-in or opt-out)
-         return psio::from_frac<V>(psio::prevalidated{*v});
+         return psio1::from_frac<V>(psio1::prevalidated{*v});
       }
 
-      void kvPutRaw(psibase::DbId db, psio::input_stream key, psio::input_stream value)
+      void kvPutRaw(psibase::DbId db, psio1::input_stream key, psio1::input_stream value)
       {
          tester::raw::kvPut(id, db, key.pos, key.remaining(), value.pos, value.remaining());
       }
       template <typename K, typename V>
-         requires(!psio::is_std_optional<V>::value)
+         requires(!psio1::is_std_optional<V>::value)
       void kvPut(DbId db, const K& key, const V& value)
       {
-         kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
+         kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));
       }
 
-      void kvRemoveRaw(psibase::DbId db, psio::input_stream key)
+      void kvRemoveRaw(psibase::DbId db, psio1::input_stream key)
       {
          tester::raw::kvRemove(id, db, key.pos, key.remaining());
       }
       template <typename K>
       void kvRemove(DbId db, const K& key)
       {
-         kvRemoveRaw(db, psio::convert_to_key(key));
+         kvRemoveRaw(db, psio1::convert_to_key(key));
       }
 
       std::uint32_t id;
@@ -79,15 +79,15 @@ namespace psibase
       Claim                     signer;
       // To save space, we're picking this apart and reconstituting it, while
       // assuming that the signature remains valid.
-      PSIO_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, signer)
+      PSIO1_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, signer)
    };
 
    Checksum256 makeSignatureHash(const CommitMessage& msg)
    {
       std::vector<char>   result;
-      psio::vector_stream stream{result};
+      psio1::vector_stream stream{result};
       stream.write(static_cast<char>(CommitMessage::type));
-      psio::to_frac(msg, stream);
+      psio1::to_frac(msg, stream);
       return sha256(result.data(), result.size());
    }
 
@@ -97,14 +97,14 @@ namespace psibase
       std::vector<char> signature;
       friend bool       operator==(const ProducerConfirm&, const ProducerConfirm&) = default;
    };
-   PSIO_REFLECT(ProducerConfirm, producer, signature)
+   PSIO1_REFLECT(ProducerConfirm, producer, signature)
 
    struct BlockConfirm
    {
       BlockNum                                    blockNum;
       std::vector<ProducerConfirm>                commits;
       std::optional<std::vector<ProducerConfirm>> nextCommits;
-      PSIO_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
+      PSIO1_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
    };
 
    inline std::size_t strongThreshold(const BftConsensus& c)
@@ -227,7 +227,7 @@ namespace psibase
                                   const SignedBlock&    block)
       {
          check(!!block.auxConsensusData, "BFT requires auxConsensusData to prove irreversibility");
-         auto confirms = psio::from_frac<BlockConfirm>(*block.auxConsensusData);
+         auto confirms = psio1::from_frac<BlockConfirm>(*block.auxConsensusData);
          auto blockId  = getBlockId(confirms.blockNum);
 
          check(confirms.commits.size() >= strongThreshold(consensus), "Not enough confirmations");
@@ -292,7 +292,7 @@ namespace psibase
          psibase::VerifyArgs args{hash, claim, signature};
          psibase::Action     act{.service = claim.service,
                                  .method  = MethodNumber{"verifySys"},
-                                 .rawData = psio::to_frac(args)};
+                                 .rawData = psio1::to_frac(args)};
          auto trace = tester::runAction(authServices.id, RunMode::verify, false, act);
 
          if (trace.error && !trace.error->empty())

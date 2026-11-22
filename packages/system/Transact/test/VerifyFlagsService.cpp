@@ -13,13 +13,13 @@ struct VerifyFlagsService : Service
    void sudo() { check(getSender() == sudoAccount, "wrong sender"); }
    void setRow()
    {
-      auto handle = kvOpen(DbId::writeOnly, psio::convert_to_key(getReceiver()), KvMode::write);
+      auto handle = kvOpen(DbId::writeOnly, psio1::convert_to_key(getReceiver()), KvMode::write);
       kvPutRaw(handle, {}, std::vector<char>{});
       kvClose(handle);
    }
    void recv() {}
 };
-PSIO_REFLECT(VerifyFlagsService,
+PSIO1_REFLECT(VerifyFlagsService,
              method(verifySys, transactionHash, claim, proof),
              method(sudo),
              method(setRow),
@@ -29,7 +29,7 @@ void VerifyFlagsService::verifySys(Checksum256       transactionHash,
                                    Claim             claim,
                                    std::vector<char> proof)
 {
-   auto flags = psio::from_frac<std::uint64_t>(proof);
+   auto flags = psio1::from_frac<std::uint64_t>(proof);
    if (flags & CodeRow::isPrivileged)
    {
       Native::tables().open<ConfigTable>().put({});

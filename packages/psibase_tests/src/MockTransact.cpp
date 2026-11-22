@@ -20,7 +20,7 @@ namespace TestService
                     std::uint32_t          newValueLen);
       void setConsensus(psibase::ConsensusData consensus);
    };
-   PSIO_REFLECT(MockTransact, method(kvNotify, service, db, keyLen, oldValueLen, newValueLen))
+   PSIO1_REFLECT(MockTransact, method(kvNotify, service, db, keyLen, oldValueLen, newValueLen))
 
 }  // namespace TestService
 
@@ -52,7 +52,7 @@ void MockTransact::setConsensus(ConsensusData consensus)
 extern "C" [[clang::export_name("processTransaction")]] void processTransaction()
 {
    auto top_act                = getCurrentActionView();
-   auto args                   = psio::view<const ProcessTransactionArgs>(top_act->rawData());
+   auto args                   = psio1::view<const ProcessTransactionArgs>(top_act->rawData());
    psibase::internal::receiver = Transact::service;
 
    for (auto act : args.transaction()->actions())
@@ -61,7 +61,7 @@ extern "C" [[clang::export_name("processTransaction")]] void processTransaction(
          continue;
       check(act.service() == Producers::service, "wrong service");
       check(act.method() == MethodNumber{"setConsensus"}, "wrong method");
-      auto [consensus] = psio::from_frac<std::tuple<ConsensusData>>(act.rawData());
+      auto [consensus] = psio1::from_frac<std::tuple<ConsensusData>>(act.rawData());
       MockTransact{}.setConsensus(std::move(consensus));
    }
 }

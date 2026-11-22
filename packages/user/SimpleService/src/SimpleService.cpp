@@ -9,7 +9,7 @@ namespace company
       void                                    hello() { psibase::writeConsole("hello world"); }
    };
 
-   PSIO_REFLECT(MinService, method(hello))
+   PSIO1_REFLECT(MinService, method(hello))
    PSIBASE_REFLECT_TABLES(MinService)
 }  // namespace company
 

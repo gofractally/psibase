@@ -2,7 +2,7 @@
 
 #include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio/chrono.hpp>
+#include <psio1/chrono.hpp>
 
 #include <chrono>
 
@@ -18,6 +18,6 @@ namespace SystemService
       std::chrono::nanoseconds getCpuTime();
       void                     setCpuLimit(std::optional<uint64_t> limit_ns);
    };
-   PSIO_REFLECT(CpuLimit, method(getCpuTime), method(setCpuLimit, limit_ns))
+   PSIO1_REFLECT(CpuLimit, method(getCpuTime), method(setCpuLimit, limit_ns))
    PSIBASE_REFLECT_TABLES(CpuLimit)
 }  // namespace SystemService

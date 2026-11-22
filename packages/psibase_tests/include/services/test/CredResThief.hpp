@@ -13,19 +13,19 @@ namespace TestService
    {
       psibase::AccountNumber account;
       std::uint32_t          id;
-      PSIO_REFLECT(CredIdRow, account, id)
+      PSIO1_REFLECT(CredIdRow, account, id)
    };
    using CredIdTable = psibase::Table<CredIdRow, &CredIdRow::account>;
-   PSIO_REFLECT_TYPENAME(CredIdTable)
+   PSIO1_REFLECT_TYPENAME(CredIdTable)
 
    struct BigDataRow
    {
       psibase::AccountNumber owner;
       std::vector<char>      data;
-      PSIO_REFLECT(BigDataRow, owner, data)
+      PSIO1_REFLECT(BigDataRow, owner, data)
    };
    using BigDataTable = psibase::Table<BigDataRow, &BigDataRow::owner>;
-   PSIO_REFLECT_TYPENAME(BigDataTable)
+   PSIO1_REFLECT_TYPENAME(BigDataTable)
 
    /// This service exploits the fact that Credentials checkAuthSys
    /// calls bill_to_sub and can be called by any service, to bill
@@ -59,7 +59,7 @@ namespace TestService
       // Stores n bytes of data to the database
       void useDisk(std::uint32_t n);
    };
-   PSIO_REFLECT(CredResThief,
+   PSIO1_REFLECT(CredResThief,
                 method(create),
                 method(buyRes, amount),
                 method(bill, key, method),

@@ -11,10 +11,10 @@ namespace psibase
 {
    std::optional<std::string> findDifference(const ServiceSchema& lhs, const ServiceSchema& rhs)
    {
-      auto matcher = psio::schema_types::TypeMatcher{
+      auto matcher = psio1::schema_types::TypeMatcher{
           lhs.types,
           rhs.types,
-          psio::SchemaDifference::equivalent,
+          psio1::SchemaDifference::equivalent,
       };
 
       for (const auto& [name, lty] : lhs.actions)

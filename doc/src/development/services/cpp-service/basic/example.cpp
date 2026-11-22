@@ -12,7 +12,7 @@ struct ExampleService
 
 // Reflect the service's methods. This enables
 // PSIBASE_DISPATCH and other mechanisms to operate.
-PSIO_REFLECT(ExampleService,  //
+PSIO1_REFLECT(ExampleService,  //
              method(add, a, b),
              method(multiply, a, b))
 

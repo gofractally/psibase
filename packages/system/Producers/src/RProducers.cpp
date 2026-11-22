@@ -76,7 +76,7 @@ struct ProducerQuery
       return config->maxProds;
    }
 };
-PSIO_REFLECT(ProducerQuery,
+PSIO1_REFLECT(ProducerQuery,
              method(candidatesInfo, names),
              method(allCandidates),
              method(producers),

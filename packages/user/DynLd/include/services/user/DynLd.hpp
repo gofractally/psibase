@@ -10,26 +10,26 @@ namespace UserService
    {
       std::string            name;
       psibase::AccountNumber service;
-      PSIO_REFLECT(DynDep, name, service)
+      PSIO1_REFLECT(DynDep, name, service)
    };
 
    struct DynDepGroups
    {
       psibase::AccountNumber                     service;
       std::map<std::string, std::vector<DynDep>> groups;
-      PSIO_REFLECT(DynDepGroups, service, groups)
+      PSIO1_REFLECT(DynDepGroups, service, groups)
    };
    using DynDepGroupsTable = psibase::Table<DynDepGroups, &DynDepGroups::service>;
-   PSIO_REFLECT_TYPENAME(DynDepGroupsTable)
+   PSIO1_REFLECT_TYPENAME(DynDepGroupsTable)
 
    struct DynDeps
    {
       psibase::AccountNumber service;
       std::vector<DynDep>    deps;
-      PSIO_REFLECT(DynDeps, service, deps)
+      PSIO1_REFLECT(DynDeps, service, deps)
    };
    using DynDepsTable = psibase::Table<DynDeps, &DynDeps::service>;
-   PSIO_REFLECT_TYPENAME(DynDepsTable)
+   PSIO1_REFLECT_TYPENAME(DynDepsTable)
 
    struct DynLd : psibase::Service
    {
@@ -40,6 +40,6 @@ namespace UserService
       void link(std::string group, std::vector<DynDep> deps);
       void unlink(std::string group);
    };
-   PSIO_REFLECT(DynLd, method(link, group, deps), method(unlink, group))
+   PSIO1_REFLECT(DynLd, method(link, group, deps), method(unlink, group))
    PSIBASE_REFLECT_TABLES(DynLd, DynLd::Tables)
 }  // namespace UserService

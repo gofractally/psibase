@@ -13,7 +13,7 @@ namespace SystemService
       psibase::AccountNumber user;
       psibase::AccountNumber app;
       std::string            path;
-      PSIO_REFLECT(WsTicketInfo, user, app, path)
+      PSIO1_REFLECT(WsTicketInfo, user, app, path)
    };
 
    struct WsAuth : psibase::Service
@@ -44,7 +44,7 @@ namespace SystemService
          return std::nullopt;
       }
    };
-   PSIO_REFLECT(WsAuth,
+   PSIO1_REFLECT(WsAuth,
                 method(serveSys, request, socket, user),
                 method(consume, ticket))
 }  // namespace SystemService

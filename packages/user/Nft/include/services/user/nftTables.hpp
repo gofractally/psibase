@@ -12,9 +12,9 @@ namespace UserService
    {
       NID next_id;
    };
-   PSIO_REFLECT(NftConfigRow, next_id)
+   PSIO1_REFLECT(NftConfigRow, next_id)
    using NftConfigTable = psibase::Table<NftConfigRow, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(NftConfigTable)
+   PSIO1_REFLECT_TYPENAME(NftConfigTable)
 
    struct NftHolderRecord
    {
@@ -23,9 +23,9 @@ namespace UserService
 
       auto operator<=>(const NftHolderRecord&) const = default;
    };
-   PSIO_REFLECT(NftHolderRecord, account, autodebit);
+   PSIO1_REFLECT(NftHolderRecord, account, autodebit);
    using NftHolderTable = psibase::Table<NftHolderRecord, &NftHolderRecord::account>;
-   PSIO_REFLECT_TYPENAME(NftHolderTable)
+   PSIO1_REFLECT_TYPENAME(NftHolderTable)
 
    struct NftRecord
    {
@@ -40,10 +40,10 @@ namespace UserService
 
       auto operator<=>(const NftRecord&) const = default;
    };
-   PSIO_REFLECT(NftRecord, id, issuer, owner);
+   PSIO1_REFLECT(NftRecord, id, issuer, owner);
    using NftTable =
        psibase::Table<NftRecord, &NftRecord::id, NftRecord::ByOwner{}, NftRecord::ByIssuer{}>;
-   PSIO_REFLECT_TYPENAME(NftTable)
+   PSIO1_REFLECT_TYPENAME(NftTable)
 
    struct CreditRecord
    {
@@ -56,12 +56,12 @@ namespace UserService
 
       auto operator<=>(const CreditRecord&) const = default;
    };
-   PSIO_REFLECT(CreditRecord, nftId, creditor, debitor);
+   PSIO1_REFLECT(CreditRecord, nftId, creditor, debitor);
    using CreditTable = psibase::Table<CreditRecord,
                                       &CreditRecord::nftId,
                                       CreditRecord::ByCreditor{},
                                       CreditRecord::ByDebitor{}>;
-   PSIO_REFLECT_TYPENAME(CreditTable)
+   PSIO1_REFLECT_TYPENAME(CreditTable)
 
    struct UserPendingRecord
    {
@@ -70,11 +70,11 @@ namespace UserService
 
       auto operator<=>(const UserPendingRecord&) const = default;
    };
-   PSIO_REFLECT(UserPendingRecord, user, nft_id);
+   PSIO1_REFLECT(UserPendingRecord, user, nft_id);
    using UserPendingTable =
        psibase::Table<UserPendingRecord,
                       psibase::CompositeKey<&UserPendingRecord::user, &UserPendingRecord::nft_id>{}>;
-   PSIO_REFLECT_TYPENAME(UserPendingTable)
+   PSIO1_REFLECT_TYPENAME(UserPendingTable)
 
    struct BurnedRecord
    {
@@ -82,8 +82,8 @@ namespace UserService
 
       auto operator<=>(const BurnedRecord&) const = default;
    };
-   PSIO_REFLECT(BurnedRecord, id);
+   PSIO1_REFLECT(BurnedRecord, id);
    using BurnedTable = psibase::Table<BurnedRecord, &BurnedRecord::id>;
-   PSIO_REFLECT_TYPENAME(BurnedTable)
+   PSIO1_REFLECT_TYPENAME(BurnedTable)
 
 }  // namespace UserService

@@ -5,7 +5,7 @@
 
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/to_json.hpp>
 
 using namespace psibase;
 
@@ -83,7 +83,7 @@ TEST_CASE("ec")
    CHECK(TraceResult(t.pushTransaction(signedTrx)).failed("proofs and claims must have same size"));
    t.startBlock(0);
 
-   auto              packed_ec_trx = psio::convert_to_frac(ec_trx);
+   auto              packed_ec_trx = psio1::convert_to_frac(ec_trx);
    auto              data = sign(priv_key2, sha256(packed_ec_trx.data(), packed_ec_trx.size()));
    SignedTransaction ec_signed = {
        .transaction = ec_trx,

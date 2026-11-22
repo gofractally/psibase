@@ -2,7 +2,7 @@
 
 #include <psibase/block.hpp>
 
-#include <psio/chrono.hpp>
+#include <psio1/chrono.hpp>
 
 namespace psibase
 {
@@ -16,26 +16,26 @@ namespace psibase
       std::chrono::nanoseconds   totalTime;  // includes time in inner actions
       std::optional<std::string> error;
    };
-   PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
+   PSIO1_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
 
    struct ConsoleTrace
    {
       std::string console;
    };
-   PSIO_REFLECT(ConsoleTrace, console)
+   PSIO1_REFLECT(ConsoleTrace, console)
 
    struct InnerTrace
    {
       std::variant<ConsoleTrace, ActionTrace> inner;
    };
-   PSIO_REFLECT(InnerTrace, inner)
+   PSIO1_REFLECT(InnerTrace, inner)
 
    struct TransactionTrace
    {
       std::vector<ActionTrace>   actionTraces;
       std::optional<std::string> error;
    };
-   PSIO_REFLECT(TransactionTrace, actionTraces, error)
+   PSIO1_REFLECT(TransactionTrace, actionTraces, error)
 
    void             trimRawData(ActionTrace& t, size_t max = 32);
    TransactionTrace trimRawData(TransactionTrace t, size_t max = 32);

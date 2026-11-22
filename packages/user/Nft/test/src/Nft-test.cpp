@@ -3,7 +3,7 @@
 #include <format>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/checkSchema.hpp>
-#include <psio/fracpack.hpp>
+#include <psio1/fracpack.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/commonErrors.hpp>
 #include <string>
@@ -24,38 +24,38 @@ namespace
    {
       NID firstAvailableId;
    };
-   PSIO_REFLECT(FirstIdData, firstAvailableId);
+   PSIO1_REFLECT(FirstIdData, firstAvailableId);
 
    struct FirstIdRoot
    {
       FirstIdData data;
    };
-   PSIO_REFLECT(FirstIdRoot, data);
+   PSIO1_REFLECT(FirstIdRoot, data);
 
    struct StatusNft
    {
       NID id;
    };
-   PSIO_REFLECT(StatusNft, id);
+   PSIO1_REFLECT(StatusNft, id);
 
    struct StatusData
    {
       string                state;
       optional<StatusNft>   nftDetail;
    };
-   PSIO_REFLECT(StatusData, state, nftDetail);
+   PSIO1_REFLECT(StatusData, state, nftDetail);
 
    struct StatusNode
    {
       StatusData nftStatus;
    };
-   PSIO_REFLECT(StatusNode, nftStatus);
+   PSIO1_REFLECT(StatusNode, nftStatus);
 
    struct StatusRoot
    {
       StatusNode data;
    };
-   PSIO_REFLECT(StatusRoot, data);
+   PSIO1_REFLECT(StatusRoot, data);
 
    NID firstAvailable(DefaultTestChain& t, NID begin)
    {
@@ -63,7 +63,7 @@ namespace
       auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
       auto body  = std::string(res.body.begin(), res.body.end());
       UNSCOPED_INFO(body);
-      return psio::convert_from_json<FirstIdRoot>(body).data.firstAvailableId;
+      return psio1::convert_from_json<FirstIdRoot>(body).data.firstAvailableId;
    }
 
    StatusData nftStatus(DefaultTestChain& t, NID id)
@@ -72,7 +72,7 @@ namespace
       auto res   = t.post(Nft::service, "/graphql", GraphQLBody{query});
       auto body  = std::string(res.body.begin(), res.body.end());
       UNSCOPED_INFO(body);
-      return psio::convert_from_json<StatusRoot>(body).data.nftStatus;
+      return psio1::convert_from_json<StatusRoot>(body).data.nftStatus;
    }
 }  // namespace
 

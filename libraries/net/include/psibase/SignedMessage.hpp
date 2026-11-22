@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psio/fracpack.hpp>
+#include <psio1/fracpack.hpp>
 #include <vector>
 
 namespace psibase::net
@@ -10,10 +10,10 @@ namespace psibase::net
    {
       static constexpr auto type = Msg::type;
 
-      psio::shared_view_ptr<Msg> data;
+      psio1::shared_view_ptr<Msg> data;
 
       std::vector<char> signature;
-      PSIO_REFLECT(SignedMessage, definitionWillNotChange(), data, signature)
+      PSIO1_REFLECT(SignedMessage, definitionWillNotChange(), data, signature)
       std::string to_string() const { return data->unpack().to_string(); }
    };
 

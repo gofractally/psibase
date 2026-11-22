@@ -3,8 +3,8 @@
 #include <psibase/SignedMessage.hpp>
 #include <psibase/block.hpp>
 
-#include <psio/fracpack.hpp>
-#include <psio/stream.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/stream.hpp>
 
 #include <vector>
 
@@ -20,10 +20,10 @@ namespace psibase::net
       static std::vector<char> serialize_unsigned_message(const Msg& msg)
       {
          static_assert(Msg::type < 128);
-         std::vector<char> result(psio::fracpack_size(msg) + 1);
+         std::vector<char> result(psio1::fracpack_size(msg) + 1);
          result[0] = Msg::type;
-         psio::fast_buf_stream s(result.data() + 1, result.size() - 1);
-         psio::to_frac(msg, s);
+         psio1::fast_buf_stream s(result.data() + 1, result.size() - 1);
+         psio1::to_frac(msg, s);
          return result;
       }
       template <NeedsSignature Msg>

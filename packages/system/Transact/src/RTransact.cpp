@@ -134,7 +134,7 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
 }
 
 std::optional<std::vector<std::optional<RunToken>>> RTransact::preverify(
-    psio::view<const SignedTransaction> trx)
+    psio1::view<const SignedTransaction> trx)
 {
    auto id = sha256(trx.transaction().data(), trx.transaction().size());
    PSIBASE_SUBJECTIVE_TX
@@ -164,7 +164,7 @@ namespace
          MethodNumber          method;   ///< Service method to execute
          std::span<const char> rawData;  ///< Data for the method
       };
-      PSIO_REFLECT(Action, sender, service, method, rawData)
+      PSIO1_REFLECT(Action, sender, service, method, rawData)
 
       struct ActionTrace
       {
@@ -174,26 +174,26 @@ namespace
          std::chrono::nanoseconds        totalTime;
          std::optional<std::string_view> error;
       };
-      PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
+      PSIO1_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
 
       struct ConsoleTrace
       {
          std::string_view console;
       };
-      PSIO_REFLECT(ConsoleTrace, console)
+      PSIO1_REFLECT(ConsoleTrace, console)
 
       struct InnerTrace
       {
          std::variant<ConsoleTrace, ActionTrace> inner;
       };
-      PSIO_REFLECT(InnerTrace, inner)
+      PSIO1_REFLECT(InnerTrace, inner)
 
       struct TransactionTrace
       {
          std::vector<ActionTrace>        actionTraces;
          std::optional<std::string_view> error;
       };
-      PSIO_REFLECT(TransactionTrace, actionTraces, error)
+      PSIO1_REFLECT(TransactionTrace, actionTraces, error)
    }  // namespace refs
    using ActionRef           = refs::Action;
    using ActionTraceRef      = refs::ActionTrace;
@@ -204,7 +204,7 @@ namespace
    struct PruneTrace
    {
       bool                            args = false;
-      std::optional<std::string_view> operator()(psio::view<const std::optional<std::string>> msg)
+      std::optional<std::string_view> operator()(psio1::view<const std::optional<std::string>> msg)
       {
          if (msg)
          {
@@ -215,7 +215,7 @@ namespace
             return {};
          }
       }
-      ActionRef operator()(psio::view<const Action> action)
+      ActionRef operator()(psio1::view<const Action> action)
       {
          return {
              .sender  = action.sender(),
@@ -224,11 +224,11 @@ namespace
              .rawData = args ? action.rawData() : std::span<const char>{},
          };
       }
-      auto operator()(psio::view<const ConsoleTrace> trace)
+      auto operator()(psio1::view<const ConsoleTrace> trace)
       {
          return ConsoleTraceRef{trace.console()};
       }
-      auto operator()(psio::view<const ActionTrace> at)
+      auto operator()(psio1::view<const ActionTrace> at)
       {
          ActionTraceRef pruned;
          pruned.error     = (*this)(at.error());
@@ -242,13 +242,13 @@ namespace
          }
          return pruned;
       }
-      InnerTraceRef operator()(psio::view<const InnerTrace> inner)
+      InnerTraceRef operator()(psio1::view<const InnerTrace> inner)
       {
-         return psio::visit([this](const auto& trace) { return InnerTraceRef{(*this)(trace)}; },
+         return psio1::visit([this](const auto& trace) { return InnerTraceRef{(*this)(trace)}; },
                             inner.inner());
       }
 
-      auto operator()(psio::view<const TransactionTrace> trace)
+      auto operator()(psio1::view<const TransactionTrace> trace)
       {
          TransactionTraceRef pruned;
          pruned.error = (*this)(trace.error());
@@ -457,7 +457,7 @@ namespace
       }
    }
 
-   void sendReply(const ClaimedSockets& clients, psio::view<const psibase::TransactionTrace> trace)
+   void sendReply(const ClaimedSockets& clients, psio1::view<const psibase::TransactionTrace> trace)
    {
       TransactionTraceRef pruned            = PruneTrace{true}(trace);
       const auto& [jsonClients, binClients] = clients;
@@ -475,7 +475,7 @@ namespace
 
          for (auto socket : jsonClients)
          {
-            psio::get<0>(action->rawData().value()) = socket;
+            psio1::get<0>(action->rawData().value()) = socket;
             call(action.data(), action.size());
          }
       }
@@ -488,7 +488,7 @@ namespace
 
          for (auto socket : binClients)
          {
-            psio::get<0>(action->rawData().value()) = socket;
+            psio1::get<0>(action->rawData().value()) = socket;
             call(action.data(), action.size());
          }
       }
@@ -496,7 +496,7 @@ namespace
 
    // This function should only be called for a transaction id that has clients waiting for it.
    void sendReply(const psibase::Checksum256&                 id,
-                  psio::view<const psibase::TransactionTrace> trace,
+                  psio1::view<const psibase::TransactionTrace> trace,
                   const ClientFilter&                         clientFilter = noFilter)
    {
       sendReply(claimClientReply(id, clientFilter), trace);
@@ -512,7 +512,7 @@ namespace
       for (auto id : txids)
       {
          std::shared_ptr<void>                             traceStorage;
-         std::optional<psio::view<const TransactionTrace>> traceView;
+         std::optional<psio1::view<const TransactionTrace>> traceView;
 
          if (auto tx = successfulTxs.getView(id))
          {
@@ -544,7 +544,7 @@ namespace
 
          if (!traceView)
          {
-            auto p = psio::shared_view_ptr<TransactionTrace>(
+            auto p = psio1::shared_view_ptr<TransactionTrace>(
                 TransactionTrace{.error = "Transaction expired"});
             traceView.emplace(*p);
             traceStorage = std::move(p).shared_data();
@@ -580,14 +580,14 @@ namespace
                if (failedTx.expiration <= finalizedTime)
                {
                   failed.remove(failedTx);
-                  trace   = psio::to_frac(failedTx.trace);
+                  trace   = psio1::to_frac(failedTx.trace);
                   claimed = claimClientReply(failedTx.id, noFilter);
                }
             }
          }
          if (trace)
          {
-            auto traceView = psio::view<const TransactionTrace>{psio::prevalidated{*trace}};
+            auto traceView = psio1::view<const TransactionTrace>{psio1::prevalidated{*trace}};
             sendReply(claimed, traceView);
          }
          else
@@ -625,7 +625,7 @@ namespace
          return client.waitFor == WaitFor::final_flag;
       }
    };
-   PSIO_REFLECT(WaitFor, wait_for)
+   PSIO1_REFLECT(WaitFor, wait_for)
 
    void cancelVerify(PendingVerifyTable& pendingVerifies, const UnverifiedTransactionRecord& tx)
    {
@@ -649,7 +649,7 @@ namespace
       }
    }
 
-   void reportSpeculativeFailure(psio::view<const TransactionTrace> trace,
+   void reportSpeculativeFailure(psio1::view<const TransactionTrace> trace,
                                  const Checksum256&                 id,
                                  TimePointSec                       expiration,
                                  std::optional<Checksum256>&        errorTxId)
@@ -674,7 +674,7 @@ namespace
 
 }  // namespace
 
-void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> trace)
+void RTransact::onTrx(const Checksum256& id, psio1::view<const TransactionTrace> trace)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
    printf("trace size: %zu\n", find_view_span(trace).size());
@@ -846,7 +846,7 @@ void RTransact::onBlock()
 }
 
 void RTransact::onVerify(std::uint64_t                      id,
-                         psio::view<const TransactionTrace> trace,
+                         psio1::view<const TransactionTrace> trace,
                          std::optional<RunToken>            token)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
@@ -930,7 +930,7 @@ void RTransact::onVerify(std::uint64_t                      id,
    }
 }
 
-void RTransact::onRequeue(std::uint64_t id, psio::view<const TransactionTrace> trace)
+void RTransact::onRequeue(std::uint64_t id, psio1::view<const TransactionTrace> trace)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
    PSIBASE_SUBJECTIVE_TX
@@ -939,7 +939,7 @@ void RTransact::onRequeue(std::uint64_t id, psio::view<const TransactionTrace> t
    }
 }
 
-void RTransact::onSpecTrx(std::uint64_t id, psio::view<const TransactionTrace> trace)
+void RTransact::onSpecTrx(std::uint64_t id, psio1::view<const TransactionTrace> trace)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
    auto                       speculative = open<SpeculativeTransactionTable>();
@@ -1156,7 +1156,7 @@ namespace
    {
       std::string rootHost;
    };
-   PSIO_REFLECT(LoginData, rootHost)
+   PSIO1_REFLECT(LoginData, rootHost)
 
    struct LoginTokenData
    {
@@ -1164,14 +1164,14 @@ namespace
       std::string   aud;
       std::int64_t  exp;
    };
-   PSIO_REFLECT(LoginTokenData, sub, aud, exp)
+   PSIO1_REFLECT(LoginTokenData, sub, aud, exp)
 
    struct LoginReply
    {
       std::string access_token;
       std::string token_type = "bearer";
    };
-   PSIO_REFLECT(LoginReply, access_token, token_type)
+   PSIO1_REFLECT(LoginReply, access_token, token_type)
 
    std::vector<char> getJWTKey()
    {
@@ -1214,12 +1214,12 @@ namespace
          body.reserve(request.body.size() + 1);
          body.insert(request.body.end(), request.body.begin(), request.body.end());
          body.push_back('\0');
-         psio::json_token_stream stream(body.data());
+         psio1::json_token_stream stream(body.data());
          from_json(result, stream);
       }
       else if (request.contentType == "application/octet-stream")
       {
-         psio::input_stream stream{request.body};
+         psio1::input_stream stream{request.body};
          from_frac(result, stream);
       }
       else
@@ -1345,7 +1345,7 @@ struct SnapInfo
    psibase::BlockTime lastSnapshot;
    uint32_t           snapshotInterval;
 };
-PSIO_REFLECT(SnapInfo, lastSnapshot, snapshotInterval);
+PSIO1_REFLECT(SnapInfo, lastSnapshot, snapshotInterval);
 
 struct TransactQuery
 {
@@ -1365,7 +1365,7 @@ struct TransactQuery
       return {};
    }
 };
-PSIO_REFLECT(TransactQuery, method(snapshotInfo));
+PSIO1_REFLECT(TransactQuery, method(snapshotInfo));
 
 std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  request,
                                              std::optional<std::int32_t>  socket,
@@ -1423,7 +1423,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          return make415("Expected fracpack encoded signed transaction (application/octet-stream)");
 
       auto query       = request.query<WaitFor>();
-      auto trx         = psio::from_frac<SignedTransaction>(request.body);
+      auto trx         = psio1::from_frac<SignedTransaction>(request.body);
       auto id          = psibase::sha256(trx.transaction.data(), trx.transaction.size());
       bool enforceAuth = validateTransaction(id, trx);
       bool json        = acceptJson(request.headers);
@@ -1441,7 +1441,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       auto loginAct = trx.transaction->actions()[0];
       auto sender   = loginAct.sender().unpack();
       auto app      = loginAct.service().unpack();
-      auto data     = psio::from_frac<LoginData>(loginAct.rawData());
+      auto data     = psio1::from_frac<LoginData>(loginAct.rawData());
       if (!checkExp(trx.transaction->tapos().expiration()))
          return make400("Login expired");
       if (data.rootHost == rootHost(request))
@@ -1475,7 +1475,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
                                                             .exp = exp.time_since_epoch().count()});
          HttpReply           reply{.contentType = "application/json",
                                    .headers     = allowCors(request, AccountNumber{"supervisor"})};
-         psio::vector_stream stream{reply.body};
+         psio1::vector_stream stream{reply.body};
          to_json(LoginReply{token}, stream);
          return reply;
       }
@@ -1512,7 +1512,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
           .contentType = "application/json",
           .headers     = allowCors(request, AccountNumber{"x-admin"}),
       };
-      psio::vector_stream stream{reply.body};
+      psio1::vector_stream stream{reply.body};
       TxStatsRecord       stats;
       PSIBASE_SUBJECTIVE_TX
       {

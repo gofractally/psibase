@@ -14,7 +14,7 @@ CompileFlags:
   CompilationDatabase: build
 ---
 If:
-  PathMatch: ^(.*/)?libraries/(psibase|psio)/.*$
+  PathMatch: ^(.*/)?libraries/(psibase|psio1)/.*$
 CompileFlags:
   CompilationDatabase: build/wasm
 ---

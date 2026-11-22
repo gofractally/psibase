@@ -1,6 +1,6 @@
 #pragma once
 
-#include <psio/fracpack.hpp>
+#include <psio1/fracpack.hpp>
 
 namespace psibase
 {
@@ -18,7 +18,7 @@ namespace psibase
    template <typename T>
    Checksum256 sha256(const T& obj)
    {
-      auto bin = psio::to_frac(obj);
+      auto bin = psio1::to_frac(obj);
       return sha256(bin.data(), bin.size());
    }
 
@@ -60,14 +60,14 @@ namespace psibase
       static Checksum256 hash_leaf(const T& value)
       {
          std::vector<char>   result{'\0'};
-         psio::vector_stream stream{result};
-         psio::to_frac(value, stream);
+         psio1::vector_stream stream{result};
+         psio1::to_frac(value, stream);
          return sha256(result.data(), result.size());
       }
 
       static Checksum256 combine(const Checksum256& lhs, const Checksum256& rhs);
       void               push_impl(const Checksum256& hash);
-      PSIO_REFLECT(Merkle, i, stack)
+      PSIO1_REFLECT(Merkle, i, stack)
    };
 
 }  // namespace psibase

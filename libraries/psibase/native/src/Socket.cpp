@@ -96,8 +96,8 @@ void AutoCloseSocket::replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&&
          other->closeLocks    = closeLocks;
          sockets->sockets[id] = std::move(other);
       }
-      sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
-                                        psio::to_frac(row));
+      sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio1::convert_to_key(row.key()),
+                                        psio1::to_frac(row));
    }
 }
 
@@ -106,7 +106,7 @@ void Socket::remove(Writer& writer)
    if (auto sockets = weak_sockets.lock())
    {
       auto key = socketKey(id);
-      sockets->sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
+      sockets->sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio1::convert_to_key(key));
       {
          std::lock_guard l{sockets->mutex};
          sockets->available.set(id);
@@ -122,8 +122,8 @@ void Socket::writeInfo(Writer& writer)
    if (auto sockets = weak_sockets.lock())
    {
       SocketRow row{id, info()};
-      sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
-                                        psio::to_frac(row));
+      sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio1::convert_to_key(row.key()),
+                                        psio1::to_frac(row));
    }
 }
 
@@ -237,7 +237,7 @@ Sockets::Sockets(SharedDatabase sharedDb) : sharedDb(std::move(sharedDb))
    Database db{this->sharedDb, sharedDb.emptyRevision()};
    auto     session = db.startRead();
    db.checkoutSubjective();
-   auto                   key       = psio::convert_to_key(socketPrefix());
+   auto                   key       = psio1::convert_to_key(socketPrefix());
    auto                   prefixLen = key.size();
    std::vector<SocketRow> rows;
    if (db.kvGreaterEqualRaw(SocketRow::db, key, prefixLen))
@@ -323,8 +323,8 @@ void Sockets::add(Writer&                        writer,
       }
       else
       {
-         sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
-                                  psio::to_frac(row));
+         sharedDb.kvPutSubjective(writer, SocketRow::db, psio1::convert_to_key(row.key()),
+                                  psio1::to_frac(row));
       }
    }
 }
@@ -362,8 +362,8 @@ void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>
    if (!existing)
    {
       SocketRow row{socket->id, socket->info()};
-      sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
-                               psio::to_frac(row));
+      sharedDb.kvPutSubjective(writer, SocketRow::db, psio1::convert_to_key(row.key()),
+                               psio1::to_frac(row));
    }
 }
 void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, Database* db)
@@ -387,7 +387,7 @@ void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, Data
       }
       else
       {
-         sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
+         sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio1::convert_to_key(key));
       }
    }
 }

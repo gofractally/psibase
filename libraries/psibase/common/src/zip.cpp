@@ -2,7 +2,7 @@
 #include <cstring>
 #include <iterator>
 #include <psibase/check.hpp>
-#include <psio/reflect.hpp>
+#include <psio1/reflect.hpp>
 #include <ranges>
 #include <span>
 #include <type_traits>
@@ -52,7 +52,7 @@ namespace psibase::zip
    bool readStruct(auto& iter, auto end, T& obj)
    {
       bool ok = true;
-      psio::for_each_member(&obj, (typename psio::reflect<T>::data_members*)nullptr,
+      psio1::for_each_member(&obj, (typename psio1::reflect<T>::data_members*)nullptr,
                             [&](auto& member) { ok = ok && read(iter, end, member); });
       return ok;
    }
@@ -84,7 +84,7 @@ namespace psibase::zip
       std::uint16_t         size;
       std::span<const char> data;
    };
-   PSIO_REFLECT(ExtraHeader, id, size)
+   PSIO1_REFLECT(ExtraHeader, id, size)
 
    bool read(auto& iter, auto end, ExtraHeader& out)
    {
@@ -229,7 +229,7 @@ namespace psibase::zip
       std::uint64_t         centralDirectoryOffset;
       std::span<const char> extData;
    };
-   PSIO_REFLECT(Zip64EndOfCentralDirectoryRecord,
+   PSIO1_REFLECT(Zip64EndOfCentralDirectoryRecord,
                 signature,
                 size,
                 diskno,
@@ -256,7 +256,7 @@ namespace psibase::zip
       std::uint32_t                numDisks;
       static constexpr std::size_t fixedSize = 20;
    };
-   PSIO_REFLECT(Zip64EndOfCentralDirectoryLocator,
+   PSIO1_REFLECT(Zip64EndOfCentralDirectoryLocator,
                 signature,
                 endOfCentralDirectoryDiskno,
                 endOfCentralDirectoryOffset,
@@ -281,7 +281,7 @@ namespace psibase::zip
       // char comment[];
       static constexpr std::size_t fixedSize = 22;
    };
-   PSIO_REFLECT(EndOfCentralDirectoryRecord,
+   PSIO1_REFLECT(EndOfCentralDirectoryRecord,
                 signature,
                 diskno,
                 centralDirectoryStartDisk,

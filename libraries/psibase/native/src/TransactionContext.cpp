@@ -6,7 +6,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
+#include <psio1/finally.hpp>
 #include <psizam/detail/execution_context.hpp>
 #include <thread>
 
@@ -144,7 +144,7 @@ namespace psibase
       try
       {
          auto& db   = self.blockContext.db;
-         auto  data = psio::from_frac_strict<GenesisActionData>(action.rawData);
+         auto  data = psio1::from_frac_strict<GenesisActionData>(action.rawData);
          for (auto& service : data.services)
          {
             check(service.service.value, "account 0 is reserved");
@@ -192,7 +192,7 @@ namespace psibase
       Action action{
           .sender  = AccountNumber(),
           .service = transactionServiceNum,
-          .rawData = psio::convert_to_frac(args),
+          .rawData = psio1::convert_to_frac(args),
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
@@ -252,7 +252,7 @@ namespace psibase
           .sender  = {},
           .service = data.claim.service,
           .method  = MethodNumber{"verifySys"},
-          .rawData = psio::convert_to_frac(data),
+          .rawData = psio1::convert_to_frac(data),
       };
       auto& atrace     = transactionTrace.actionTraces.emplace_back();
       atrace.action    = action;
@@ -357,7 +357,7 @@ namespace psibase
             impl->altMode       = true;
             dbMode.isSync       = flags == CallFlags::runModeCallback;
             dbMode.isSubjective = true;
-            return psio::finally{[this]
+            return psio1::finally{[this]
                                  {
                                     impl->altMode       = false;
                                     dbMode.isSync       = true;
@@ -479,7 +479,7 @@ namespace psibase
             return it->second;
       }
       impl->watchdog->pause();
-      auto resume = psio::finally{[&] { impl->watchdog->resume(); }};
+      auto resume = psio1::finally{[&] { impl->watchdog->resume(); }};
       {
          // A callback may have won the manager lock just before pause().
          std::lock_guard guard{impl->mutex};

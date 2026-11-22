@@ -99,7 +99,7 @@ auto makeBoot(const ConsensusData& producers, bool ec) -> std::vector<SignedTran
            Action{.sender  = AccountNumber{"psibase"},  // ignored
                   .service = AccountNumber{"psibase"},  // ignored
                   .method  = MethodNumber{"boot"},
-                  .rawData = psio::convert_to_frac(GenesisActionData{.services = services})}}}});
+                  .rawData = psio1::convert_to_frac(GenesisActionData{.services = services})}}}});
    result.push_back(
        {Transaction{.tapos   = {.expiration = TimePointSec{Seconds(2)}},
                     .actions = {transactor<Producers>(Producers::service, Producers::service)
@@ -194,8 +194,8 @@ TestBlock makeBlock(const BlockInfo&                   info,
          if (act.service() == Producers::service && act.method() == MethodNumber{"setConsensus"})
          {
             using param_tuple =
-                psio::make_param_value_tuple<decltype(&Producers::setConsensus)>::type;
-            auto params = psio::view<const param_tuple>(act.rawData());
+                psio1::make_param_value_tuple<decltype(&Producers::setConsensus)>::type;
+            auto params = psio1::view<const param_tuple>(act.rawData());
             newBlock.block.header.newConsensus =
                 Consensus{get<0>(params), newState.current.services, newState.current.wasmConfig};
             check(!newState.next, "Joint consensus is already running");
@@ -215,7 +215,7 @@ TestBlock makeBlock(const BlockInfo&                   info,
    newBlock.block.header.eventMerkleRoot = Checksum256{};
    if (auxData)
    {
-      newBlock.auxConsensusData = psio::to_frac(*auxData);
+      newBlock.auxConsensusData = psio1::to_frac(*auxData);
    }
    return {BlockMessage{newBlock}, newState};
 }

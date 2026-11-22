@@ -8,7 +8,7 @@ namespace SystemService
    {
       std::vector<psibase::Action> actions;
    };
-   PSIO_REFLECT(ActionList, actions)
+   PSIO1_REFLECT(ActionList, actions)
 
    struct StagedTx
    {
@@ -20,7 +20,7 @@ namespace SystemService
       ActionList             action_list;
       bool                   auto_exec;
    };
-   PSIO_REFLECT(StagedTx, id, txid, propose_block, propose_date, proposer, action_list, auto_exec)
+   PSIO1_REFLECT(StagedTx, id, txid, propose_block, propose_date, proposer, action_list, auto_exec)
 
    struct Response
    {
@@ -29,7 +29,7 @@ namespace SystemService
       uint64_t               seq;
       bool                   accepted;
    };
-   PSIO_REFLECT(Response, id, account, accepted)
+   PSIO1_REFLECT(Response, id, account, accepted)
 
    /// A service for staged transaction proposal and execution
    ///
@@ -108,7 +108,7 @@ namespace SystemService
    };
 
    // clang-format off
-   PSIO_REFLECT(StagedTxService,
+   PSIO1_REFLECT(StagedTxService,
       allowHashedMethods(),
       method(init),
       method(propose, actions, auto_exec),

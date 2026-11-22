@@ -20,20 +20,20 @@ namespace UserService
       SID                         symbolId;
       friend std::strong_ordering operator<=>(const Mapping&, const Mapping&) = default;
    };
-   PSIO_REFLECT(Mapping, tokenId, symbolId);
+   PSIO1_REFLECT(Mapping, tokenId, symbolId);
    using MappingByTokenTable = psibase::Table<Mapping, &Mapping::tokenId>;
-   PSIO_REFLECT_TYPENAME(MappingByTokenTable)
+   PSIO1_REFLECT_TYPENAME(MappingByTokenTable)
    using MappingBySymbolTable = psibase::Table<Mapping, &Mapping::symbolId>;
-   PSIO_REFLECT_TYPENAME(MappingBySymbolTable)
+   PSIO1_REFLECT_TYPENAME(MappingBySymbolTable)
 
    struct SymbolLengthRecord
    {
       uint8_t symbolLength;
       NID     nftId;
    };
-   PSIO_REFLECT(SymbolLengthRecord, symbolLength, nftId);
+   PSIO1_REFLECT(SymbolLengthRecord, symbolLength, nftId);
    using SymbolLengthTable = psibase::Table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;
-   PSIO_REFLECT_TYPENAME(SymbolLengthTable)
+   PSIO1_REFLECT_TYPENAME(SymbolLengthTable)
 
    struct SymbolRecord
    {
@@ -48,7 +48,7 @@ namespace UserService
 
       friend std::strong_ordering operator<=>(const SymbolRecord&, const SymbolRecord&) = default;
    };
-   PSIO_REFLECT(SymbolRecord, symbolId, ownerNft);
+   PSIO1_REFLECT(SymbolRecord, symbolId, ownerNft);
    using SymbolTable = psibase::Table<SymbolRecord, &SymbolRecord::symbolId>;
-   PSIO_REFLECT_TYPENAME(SymbolTable)
+   PSIO1_REFLECT_TYPENAME(SymbolTable)
 }  // namespace UserService

@@ -8,8 +8,8 @@
 #include <psibase/check.hpp>
 #include <psibase/fileUtil.hpp>
 #include <psibase/openssl.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/reflect.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/reflect.hpp>
 #include <vector>
 
 using namespace psibase;
@@ -262,14 +262,14 @@ namespace
       std::vector<char> key;
       std::vector<char> value;
       std::string_view  skey() const { return {key.data(), key.size()}; }
-      PSIO_REFLECT(KeyValue, key, value);
+      PSIO1_REFLECT(KeyValue, key, value);
    };
 
    DecryptedFile newEncryptedFile(std::string_view passphrase)
    {
       SCryptParams params;
       auto         key = deriveKey<32>(passphrase, params);
-      return {key, params, psio::to_frac(std::vector<KeyValue>())};
+      return {key, params, psio1::to_frac(std::vector<KeyValue>())};
    }
 
    struct EncryptedFileInfo
@@ -289,13 +289,13 @@ struct Secrets::Impl
                .key{std::move(contents.key)},
                .iv_invocation{0},
                .filename{path}}},
-         items(psio::from_frac<std::vector<KeyValue>>(contents.data))
+         items(psio1::from_frac<std::vector<KeyValue>>(contents.data))
    {
    }
    void flush()
    {
       if (file)
-         writeEncryptedFile(file->filename, psio::to_frac(items), file->params, file->key, 0,
+         writeEncryptedFile(file->filename, psio1::to_frac(items), file->params, file->key, 0,
                             file->iv_invocation++);
    }
    std::optional<EncryptedFileInfo> file;

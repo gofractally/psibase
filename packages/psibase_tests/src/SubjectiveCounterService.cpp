@@ -56,8 +56,8 @@ std::optional<HttpReply> SubjectiveCounterService::serveSys(const HttpRequest& r
             value = row->value;
       }
       HttpReply           result{.contentType = "application/json", .headers = allowCors()};
-      psio::vector_stream stream{result.body};
-      psio::to_json(value, stream);
+      psio1::vector_stream stream{result.body};
+      psio1::to_json(value, stream);
       return result;
    }
    return servePackAction<SubjectiveCounterService>(req);

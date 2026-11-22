@@ -18,29 +18,29 @@ namespace SystemService
 
       using Key = psibase::CompositeKey<&SitesContentRow::account, &SitesContentRow::path>;
    };
-   PSIO_REFLECT(SitesContentRow, account, path, contentType, contentHash, contentEncoding, csp)
+   PSIO1_REFLECT(SitesContentRow, account, path, contentType, contentHash, contentEncoding, csp)
    using SitesContentTable = psibase::Table<SitesContentRow, SitesContentRow::Key{}>;
-   PSIO_REFLECT_TYPENAME(SitesContentTable)
+   PSIO1_REFLECT_TYPENAME(SitesContentTable)
 
    struct SitesDataRow
    {
       psibase::Checksum256 hash;
       std::vector<char>    data;
    };
-   PSIO_REFLECT(SitesDataRow, hash, data)
+   PSIO1_REFLECT(SitesDataRow, hash, data)
 
    using SitesDataTable = psibase::Table<SitesDataRow, &SitesDataRow::hash>;
-   PSIO_REFLECT_TYPENAME(SitesDataTable)
+   PSIO1_REFLECT_TYPENAME(SitesDataTable)
 
    struct SitesDataRefRow
    {
       psibase::Checksum256 hash;
       std::uint32_t        refs;
    };
-   PSIO_REFLECT(SitesDataRefRow, hash, refs)
+   PSIO1_REFLECT(SitesDataRefRow, hash, refs)
 
    using SitesDataRefTable = psibase::Table<SitesDataRefRow, &SitesDataRefRow::hash>;
-   PSIO_REFLECT_TYPENAME(SitesDataRefTable)
+   PSIO1_REFLECT_TYPENAME(SitesDataRefTable)
 
    struct SiteConfigRow
    {
@@ -50,9 +50,9 @@ namespace SystemService
       std::optional<std::string>            globalCsp    = std::nullopt;
       std::optional<psibase::AccountNumber> proxyAccount = std::nullopt;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
+   PSIO1_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
-   PSIO_REFLECT_TYPENAME(SiteConfigTable)
+   PSIO1_REFLECT_TYPENAME(SiteConfigTable)
 
    /// Decompress content
    ///
@@ -70,7 +70,7 @@ namespace SystemService
       /// Decompresses content compressed with some algorithm
       std::vector<char> decompress(const std::vector<char>& content);
    };
-   PSIO_REFLECT(DecompressorInterface, method(decompress, content))
+   PSIO1_REFLECT(DecompressorInterface, method(decompress, content))
 
    /// Provide web hosting
    ///
@@ -184,7 +184,7 @@ namespace SystemService
                                                      std::string_view rootDomain);
    };
 
-   PSIO_REFLECT(Sites,
+   PSIO1_REFLECT(Sites,
                 method(serveSys, request, socket),
                 method(storeSys, path, contentType, contentEncoding, content),
                 method(hardlink, path, contentType, contentEncoding, contentHash),

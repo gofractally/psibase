@@ -18,28 +18,28 @@ namespace LocalService
       std::optional<psibase::TLSInfo>         tls;
       std::optional<psibase::SocketEndpoint>  endpoint;
       std::optional<std::vector<std::string>> bypassPrefixes;
-      PSIO_REFLECT(OriginServerRow, subdomain, host, tls, endpoint, bypassPrefixes)
+      PSIO1_REFLECT(OriginServerRow, subdomain, host, tls, endpoint, bypassPrefixes)
    };
    using OriginServerTable = psibase::Table<OriginServerRow, &OriginServerRow::subdomain>;
-   PSIO_REFLECT_TYPENAME(OriginServerTable)
+   PSIO1_REFLECT_TYPENAME(OriginServerTable)
 
    struct ProxyRow
    {
       std::int32_t socket1;
       std::int32_t socket2;
-      PSIO_REFLECT(ProxyRow, socket1, socket2)
+      PSIO1_REFLECT(ProxyRow, socket1, socket2)
    };
    using ProxyTable = psibase::Table<ProxyRow, &ProxyRow::socket1>;
-   PSIO_REFLECT_TYPENAME(ProxyTable)
+   PSIO1_REFLECT_TYPENAME(ProxyTable)
 
    struct WebSocketRow
    {
       std::int32_t from;
       std::int32_t to;
-      PSIO_REFLECT(WebSocketRow, from, to)
+      PSIO1_REFLECT(WebSocketRow, from, to)
    };
    using WebSocketTable = psibase::Table<WebSocketRow, &WebSocketRow::from, &WebSocketRow::to>;
-   PSIO_REFLECT_TYPENAME(WebSocketTable)
+   PSIO1_REFLECT_TYPENAME(WebSocketTable)
 
    struct XProxy : psibase::Service
    {
@@ -52,10 +52,10 @@ namespace LocalService
       void onReply(std::int32_t socket, psibase::HttpReply reply);
       void onAccept(std::int32_t socket, psibase::HttpReply reply);
       void onError(std::int32_t socket, std::optional<psibase::HttpReply> reply);
-      void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
+      void recv(std::int32_t socket, psio1::view<const std::vector<char>> data, std::uint32_t flags);
       void close(std::int32_t socket);
    };
-   PSIO_REFLECT(XProxy,
+   PSIO1_REFLECT(XProxy,
                 method(serveSys, request, socket),
                 method(onReply, socket, reply),
                 method(onAccept, socket, reply),

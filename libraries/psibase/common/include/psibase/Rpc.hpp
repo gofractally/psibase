@@ -2,7 +2,7 @@
 
 #include <psibase/RpcFwd.hpp>
 #include <psibase/block.hpp>
-#include <psio/nested.hpp>
+#include <psio1/nested.hpp>
 #include <string>
 #include <vector>
 
@@ -13,7 +13,7 @@ namespace psibase
    {
       std::string name;
       std::string value;
-      PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
+      PSIO1_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
 
       bool matches(std::string_view h) const;
 
@@ -47,7 +47,7 @@ namespace psibase
             while (!query.empty())
             {
                auto [key, value] = readQueryItem(query);
-               psio::get_data_member<T>(key, [&](auto m) { result.*m = std::move(value); });
+               psio1::get_data_member<T>(key, [&](auto m) { result.*m = std::move(value); });
             }
          }
          return result;
@@ -67,7 +67,7 @@ namespace psibase
       std::string             contentType;  ///< "application/json", "text/html", ...
       std::vector<HttpHeader> headers;      ///< HTTP Headers
       Body                    body;         ///< Request body, e.g. POST data
-      PSIO_REFLECT(BasicHttpRequest, host, method, target, contentType, headers, body)
+      PSIO1_REFLECT(BasicHttpRequest, host, method, target, contentType, headers, body)
 
       /// Parses the query component
       ///
@@ -242,7 +242,7 @@ namespace psibase
 
       static BasicHttpReply methodNotAllowed(const HttpRequest& req);
 
-      PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
+      PSIO1_REFLECT(BasicHttpReply, status, contentType, body, headers)
    };
 
    std::vector<HttpHeader> allowCors(std::string_view origin = "*");
@@ -257,10 +257,10 @@ namespace psibase
    using HttpReply = BasicHttpReply<std::vector<char>>;
 
    template <typename T>
-   using FracpackHttpReply = BasicHttpReply<psio::nested<T>>;
+   using FracpackHttpReply = BasicHttpReply<psio1::nested<T>>;
 
    template <typename T>
-   using JsonHttpReply = BasicHttpReply<psio::nested_json<T>>;
+   using JsonHttpReply = BasicHttpReply<psio1::nested_json<T>>;
 
    using HttpReplyRef = BasicHttpReply<std::span<const char>>;
 }  // namespace psibase

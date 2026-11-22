@@ -13,20 +13,20 @@ namespace LocalService
    struct AdminAccountRow
    {
       psibase::AccountNumber account;
-      PSIO_REFLECT(AdminAccountRow, account);
+      PSIO1_REFLECT(AdminAccountRow, account);
    };
    using AdminAccountTable = psibase::Table<AdminAccountRow, &AdminAccountRow::account>;
-   PSIO_REFLECT_TYPENAME(AdminAccountTable)
+   PSIO1_REFLECT_TYPENAME(AdminAccountTable)
 
    struct AdminOptionsRow
    {
       bool                     p2p = false;
       std::vector<std::string> hosts;
       std::vector<std::string> peers;
-      PSIO_REFLECT(AdminOptionsRow, p2p, hosts, peers)
+      PSIO1_REFLECT(AdminOptionsRow, p2p, hosts, peers)
    };
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(AdminOptionsTable)
+   PSIO1_REFLECT_TYPENAME(AdminOptionsTable)
 
    namespace Auth
    {
@@ -34,7 +34,7 @@ namespace LocalService
       {
          psibase::AccountNumber value;
       };
-      PSIO_REFLECT_TYPENAME(Account)
+      PSIO1_REFLECT_TYPENAME(Account)
       inline auto& psio_unwrap_packable(Account& obj)
       {
          return obj.value;
@@ -48,7 +48,7 @@ namespace LocalService
       {
          std::string value;
       };
-      PSIO_REFLECT_TYPENAME(LocalUsername)
+      PSIO1_REFLECT_TYPENAME(LocalUsername)
       inline auto& psio_unwrap_packable(LocalUsername& obj)
       {
          return obj.value;
@@ -60,7 +60,7 @@ namespace LocalService
       struct Unauthenticated
       {
          std::vector<std::string> challenges;
-         PSIO_REFLECT(Unauthenticated, challenges)
+         PSIO1_REFLECT(Unauthenticated, challenges)
       };
       using AuthResult = std::variant<Account, LocalUsername, Unauthenticated>;
 
@@ -92,7 +92,7 @@ namespace LocalService
       /// This action can be called inside a subjective tx
       AdminOptionsRow options();
    };
-   PSIO_REFLECT(XAdmin,
+   PSIO1_REFLECT(XAdmin,
                 method(isAdmin, account, socket),
                 method(checkAuth, req, socket),
                 method(serveSys, req, socket),

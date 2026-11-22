@@ -18,7 +18,7 @@
 #include <psibase/WebSocket.hpp>
 #include <psibase/http.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
+#include <psio1/finally.hpp>
 #include "server_state.hpp"
 
 namespace bhttp = boost::beast::http;
@@ -170,7 +170,7 @@ namespace
       {
          auto system = self->server.sharedState->getSystemContext();
 
-         psio::finally f{[&]() { self->server.sharedState->addSystemContext(std::move(system)); }};
+         psio1::finally f{[&]() { self->server.sharedState->addSystemContext(std::move(system)); }};
          BlockContext  bc{*system, system->sharedDatabase.getHead(),
                           system->sharedDatabase.createWriter(), true};
          bc.start();
@@ -206,8 +206,8 @@ namespace
          Action action{
              .sender  = AccountNumber(),
              .service = proxyServiceNum,
-             .rawData = psio::convert_to_frac(
-                 std::tuple(self->id, psio::to_frac(reply), std::uint32_t(0))),
+             .rawData = psio1::convert_to_frac(
+                 std::tuple(self->id, psio1::to_frac(reply), std::uint32_t(0))),
          };
 
          if (self->request && isWebSocketHandshake(*self->request, reply))

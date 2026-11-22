@@ -5,7 +5,7 @@
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/db.hpp>
-#include <psio/reflect.hpp>
+#include <psio1/reflect.hpp>
 #include <services/user/EventsTables.hpp>
 
 namespace UserService
@@ -95,7 +95,7 @@ namespace UserService
       /// Forwards to event-index::sync
       void sync();
    };
-   PSIO_REFLECT(EventConfig,
+   PSIO1_REFLECT(EventConfig,
                 method(init),
                 method(addIndex, db, service, event, column),
                 method(event, db, type, rawData),

@@ -179,7 +179,7 @@ std::optional<HttpReply> SubjectiveDb::serveSys(const HttpRequest& req)
    if (req.target == "/write")
    {
       auto row =
-          psio::convert_from_json<SubjectiveRow>(std::string(req.body.data(), req.body.size()));
+          psio1::convert_from_json<SubjectiveRow>(std::string(req.body.data(), req.body.size()));
       PSIBASE_SUBJECTIVE_TX
       {
          Tables{}.open<SubjectiveTable>().put(row);
@@ -189,7 +189,7 @@ std::optional<HttpReply> SubjectiveDb::serveSys(const HttpRequest& req)
    else if (req.target == "/read")
    {
       auto key =
-          psio::convert_from_json<std::string>(std::string(req.body.data(), req.body.size()));
+          psio1::convert_from_json<std::string>(std::string(req.body.data(), req.body.size()));
       std::optional<std::string> result;
       PSIBASE_SUBJECTIVE_TX
       {
@@ -197,8 +197,8 @@ std::optional<HttpReply> SubjectiveDb::serveSys(const HttpRequest& req)
             result = row->value;
       }
       HttpReply           response{.contentType = "application/json", .headers = allowCors()};
-      psio::vector_stream stream{response.body};
-      psio::to_json(result, stream);
+      psio1::vector_stream stream{response.body};
+      psio1::to_json(result, stream);
       return response;
    }
    return {};

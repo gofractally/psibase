@@ -17,9 +17,9 @@ namespace UserService
       std::uint64_t last_used_shared_bal_id;
       std::uint64_t last_used_subaccount_id;
    };
-   PSIO_REFLECT(TokensInitRecord, last_used_id, last_used_shared_bal_id, last_used_subaccount_id)
+   PSIO1_REFLECT(TokensInitRecord, last_used_id, last_used_shared_bal_id, last_used_subaccount_id)
    using TokensInitTable = psibase::Table<TokensInitRecord, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(TokensInitTable)
+   PSIO1_REFLECT_TYPENAME(TokensInitTable)
 
    struct TokenRecord
    {
@@ -33,7 +33,7 @@ namespace UserService
 
       auto operator<=>(const TokenRecord&) const = default;
    };
-   PSIO_REFLECT(TokenRecord,
+   PSIO1_REFLECT(TokenRecord,
                 id,
                 nft_id,
                 settings_value,
@@ -42,6 +42,6 @@ namespace UserService
                 burned_supply,
                 max_issued_supply);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
-   PSIO_REFLECT_TYPENAME(TokenTable)
+   PSIO1_REFLECT_TYPENAME(TokenTable)
 
 }  // namespace UserService

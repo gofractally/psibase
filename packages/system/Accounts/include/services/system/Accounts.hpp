@@ -3,7 +3,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/name.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio/chrono.hpp>
+#include <psio1/chrono.hpp>
 
 #include <optional>
 #include <string>
@@ -18,9 +18,9 @@ namespace SystemService
    {
       uint32_t totalAccounts = 0;
    };
-   PSIO_REFLECT(AccountsStatus, totalAccounts)
+   PSIO1_REFLECT(AccountsStatus, totalAccounts)
    using AccountsStatusTable = psibase::Table<AccountsStatus, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(AccountsStatusTable)
+   PSIO1_REFLECT_TYPENAME(AccountsStatusTable)
 
    /// Structure of an account
    ///
@@ -39,9 +39,9 @@ namespace SystemService
       /// infeasible.
       std::uint64_t authSequence;
    };
-   PSIO_REFLECT(Account, accountNum, authService, authSequence)
+   PSIO1_REFLECT(Account, accountNum, authService, authSequence)
    using AccountTable = psibase::Table<Account, &Account::accountNum>;
-   PSIO_REFLECT_TYPENAME(AccountTable)
+   PSIO1_REFLECT_TYPENAME(AccountTable)
 
    /// An account that is currently frozen.
    /// `authService` is the auth service to restore on unfreeze.
@@ -50,9 +50,9 @@ namespace SystemService
       psibase::AccountNumber account;
       psibase::AccountNumber authService;
    };
-   PSIO_REFLECT(FrozenAccount, account, authService)
+   PSIO1_REFLECT(FrozenAccount, account, authService)
    using FrozenTable = psibase::Table<FrozenAccount, &FrozenAccount::account>;
-   PSIO_REFLECT_TYPENAME(FrozenTable)
+   PSIO1_REFLECT_TYPENAME(FrozenTable)
 
    /// Determines the behavior of `newAccount` when the
    /// requested account already exists
@@ -165,7 +165,7 @@ namespace SystemService
       void assignAuth(psibase::AccountNumber name, psibase::AccountNumber authService);
    };
 
-   PSIO_REFLECT(Accounts,
+   PSIO1_REFLECT(Accounts,
                 method(init),
                 method(preapproveAcc, name),
                 method(newAccount, name, authService, mode),

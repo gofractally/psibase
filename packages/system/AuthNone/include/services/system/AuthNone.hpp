@@ -23,7 +23,7 @@ namespace SystemService
       bool isRejectSys(psibase::AccountNumber              sender,
                        std::vector<psibase::AccountNumber> rejecters);
    };
-   PSIO_REFLECT(AuthNone,  //
+   PSIO1_REFLECT(AuthNone,  //
                 method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),

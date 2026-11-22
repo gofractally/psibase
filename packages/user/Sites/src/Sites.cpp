@@ -503,7 +503,7 @@ namespace SystemService
          {
             std::string cspHeader =
                 getCspHeader(content, content->account, cspRootDomain(rootHost, request));
-            auto etag = psio::hex(content->contentHash.data(), content->contentHash.data() + 8);
+            auto etag = psio1::hex(content->contentHash.data(), content->contentHash.data() + 8);
 
             if (!notFound && useCache(content->account) && shouldCache(request, etag))
             {
@@ -830,7 +830,7 @@ namespace SystemService
          std::string            globalCsp = "";
          std::string            proxy     = "";
       };
-      PSIO_REFLECT(SiteConfig, account, spa, cache, globalCsp)
+      PSIO1_REFLECT(SiteConfig, account, spa, cache, globalCsp)
 
       struct Query
       {
@@ -883,7 +883,7 @@ namespace SystemService
             return result;
          }
       };
-      PSIO_REFLECT(Query,                                //
+      PSIO1_REFLECT(Query,                                //
                    method(getConfig, account),           //
                    method(getContent, account),          //
                    method(getContentAt, account, path),  //

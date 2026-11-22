@@ -39,7 +39,7 @@ namespace SystemService
             return to_hex((*codeByHasRow).code);
          }
 
-         PSIO_REFLECT(CodeRecord, codeNum, flags, codeHash, vmType, vmVersion, method(codeHex))
+         PSIO1_REFLECT(CodeRecord, codeNum, flags, codeHash, vmType, vmVersion, method(codeHex))
       };
 
       auto convertFlags(uint64_t flags) -> std::vector<std::string>
@@ -72,7 +72,7 @@ namespace SystemService
          return toCodeRecord(std::move(*codeRow));
       }
    };
-   PSIO_REFLECT(Query, method(code, account))
+   PSIO1_REFLECT(Query, method(code, account))
 
    std::optional<psibase::HttpReply> RSetCode::serveSys(psibase::HttpRequest request)
    {

@@ -10,14 +10,14 @@ namespace UserService
       std::string name;
       std::string version;
    };
-   PSIO_REFLECT(PackageRef, name, version)
+   PSIO1_REFLECT(PackageRef, name, version)
 
    struct PackageExport
    {
       std::string            name;
       psibase::AccountNumber service;
    };
-   PSIO_REFLECT(PackageExport, name, service)
+   PSIO1_REFLECT(PackageExport, name, service)
 
    struct PackageMeta
    {
@@ -30,7 +30,7 @@ namespace UserService
       std::vector<psibase::AccountNumber> services;
       std::vector<PackageExport>          exports;
    };
-   PSIO_REFLECT(PackageMeta,
+   PSIO1_REFLECT(PackageMeta,
                 name,
                 version,
                 scope,
@@ -58,7 +58,7 @@ namespace UserService
                                         &PublishedPackage::name,
                                         &PublishedPackage::version>;
    };
-   PSIO_REFLECT(PublishedPackage,
+   PSIO1_REFLECT(PublishedPackage,
                 owner,
                 name,
                 version,
@@ -76,21 +76,21 @@ namespace UserService
       std::optional<std::string>            url;
       std::optional<psibase::AccountNumber> account;
    };
-   PSIO_REFLECT(PackageSource, url, account)
+   PSIO1_REFLECT(PackageSource, url, account)
 
    struct PackageSources
    {
       psibase::AccountNumber     owner;
       std::vector<PackageSource> sources;
    };
-   PSIO_REFLECT(PackageSources, owner, sources)
+   PSIO1_REFLECT(PackageSources, owner, sources)
 
    struct PackageKey
    {
       std::string            name;
       psibase::AccountNumber owner;
    };
-   PSIO_REFLECT(PackageKey, name, owner)
+   PSIO1_REFLECT(PackageKey, name, owner)
 
    struct InstalledPackage
    {
@@ -105,7 +105,7 @@ namespace UserService
 
       using ByName = psibase::CompositeKey<&InstalledPackage::name, &InstalledPackage::owner>;
    };
-   PSIO_REFLECT(InstalledPackage,
+   PSIO1_REFLECT(InstalledPackage,
                 name,
                 version,
                 description,
@@ -121,7 +121,7 @@ namespace UserService
       psibase::AccountNumber service;
       std::string            filename;
    };
-   PSIO_REFLECT(PackageDataFile, account, service, filename)
+   PSIO1_REFLECT(PackageDataFile, account, service, filename)
 
    struct PackageManifest
    {
@@ -132,17 +132,17 @@ namespace UserService
 
       using ByName = psibase::CompositeKey<&PackageManifest::name, &PackageManifest::owner>;
    };
-   PSIO_REFLECT(PackageManifest, name, owner, data)
+   PSIO1_REFLECT(PackageManifest, name, owner, data)
 
    struct InstalledSchema
    {
       psibase::AccountNumber account;
       psibase::ServiceSchema schema;
    };
-   PSIO_REFLECT(InstalledSchema, account, schema)
+   PSIO1_REFLECT(InstalledSchema, account, schema)
 
    using InstalledSchemaTable = psibase::Table<InstalledSchema, &InstalledSchema::account>;
-   PSIO_REFLECT_TYPENAME(InstalledSchemaTable)
+   PSIO1_REFLECT_TYPENAME(InstalledSchemaTable)
 
    struct TransactionOrder
    {
@@ -152,18 +152,18 @@ namespace UserService
 
       using Key = psibase::CompositeKey<&TransactionOrder::owner, &TransactionOrder::id>;
    };
-   PSIO_REFLECT(TransactionOrder, owner, id, index)
+   PSIO1_REFLECT(TransactionOrder, owner, id, index)
 
    using InstalledPackageTable = psibase::Table<InstalledPackage, InstalledPackage::ByName{}>;
-   PSIO_REFLECT_TYPENAME(InstalledPackageTable)
+   PSIO1_REFLECT_TYPENAME(InstalledPackageTable)
    using PackageManifestTable = psibase::Table<PackageManifest, PackageManifest::ByName{}>;
-   PSIO_REFLECT_TYPENAME(PackageManifestTable)
+   PSIO1_REFLECT_TYPENAME(PackageManifestTable)
    using TransactionOrderTable = psibase::Table<TransactionOrder, TransactionOrder::Key{}>;
-   PSIO_REFLECT_TYPENAME(TransactionOrderTable)
+   PSIO1_REFLECT_TYPENAME(TransactionOrderTable)
    using PublishedPackageTable = psibase::Table<PublishedPackage, PublishedPackage::Key{}>;
-   PSIO_REFLECT_TYPENAME(PublishedPackageTable)
+   PSIO1_REFLECT_TYPENAME(PublishedPackageTable)
    using PackageSourcesTable = psibase::Table<PackageSources, &PackageSources::owner>;
-   PSIO_REFLECT_TYPENAME(PackageSourcesTable)
+   PSIO1_REFLECT_TYPENAME(PackageSourcesTable)
 
    struct Packages : psibase::Service
    {
@@ -191,7 +191,7 @@ namespace UserService
       void checkOrder(std::uint64_t id, std::uint32_t index);
       void removeOrder(std::uint64_t id);
    };
-   PSIO_REFLECT(Packages,
+   PSIO1_REFLECT(Packages,
                 method(postinstall, package, manifest),
                 method(setSchema, account, schema),
                 method(getSchema),

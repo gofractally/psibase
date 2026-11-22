@@ -14,7 +14,7 @@
 using namespace psibase;
 using namespace SystemService;
 using namespace UserService;
-using namespace psio::schema_types;
+using namespace psio1::schema_types;
 
 HttpRequest makeQuery(std::string_view s)
 {
@@ -34,8 +34,8 @@ std::vector<R> query(TestChain& chain, std::string_view s)
    CHECK(response.status == HttpStatus::ok);
    CHECK(response.contentType == "application/json");
    response.body.push_back('\0');
-   psio::json_token_stream stream(response.body.data());
-   return psio::from_json<std::vector<R>>(stream);
+   psio1::json_token_stream stream(response.body.data());
+   return psio1::from_json<std::vector<R>>(stream);
 }
 
 struct ExplainQueryPlan
@@ -44,7 +44,7 @@ struct ExplainQueryPlan
    std::int64_t parent;
    std::string  detail;
 };
-PSIO_REFLECT(ExplainQueryPlan, id, parent, detail)
+PSIO1_REFLECT(ExplainQueryPlan, id, parent, detail)
 
 void explain(TestChain& chain, std::string_view s)
 {
@@ -64,14 +64,14 @@ template <typename T>
    requires requires { typename T::json_stream_operator; }
 std::ostream& operator<<(std::ostream& os, const T& value)
 {
-   os << psio::convert_to_json(value) << std::endl;
+   os << psio1::convert_to_json(value) << std::endl;
    return os;
 }
 
 #define REFLECT_EVENT(name, ...)                               \
    using json_stream_operator                       = void;    \
    friend bool operator==(const name&, const name&) = default; \
-   PSIO_REFLECT(name, __VA_ARGS__)
+   PSIO1_REFLECT(name, __VA_ARGS__)
 
 struct TestEvent
 {
@@ -113,7 +113,7 @@ TEST_CASE("events")
    auto mallory     = chain.from(chain.addAccount("mallory"));
 
    auto schema = ServiceSchema::make<TestService>();
-   std::cout << psio::format_json(schema) << std::endl;
+   std::cout << psio1::format_json(schema) << std::endl;
    expect(testService.to<Packages>().setSchema(schema).trace());
    expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
    expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());

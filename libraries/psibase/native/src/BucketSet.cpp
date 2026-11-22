@@ -1,7 +1,7 @@
 #include <psibase/BucketSet.hpp>
 
 #include <psibase/check.hpp>
-#include <psio/to_hex.hpp>
+#include <psio1/to_hex.hpp>
 
 using namespace psibase;
 
@@ -17,7 +17,7 @@ std::vector<char> Bucket::key(std::span<const char> subkey) const
 std::string Bucket::to_string() const
 {
    return "db=" + std::to_string(static_cast<std::uint32_t>(db)) +
-          " prefix=" + psio::to_hex(prefix) +
+          " prefix=" + psio1::to_hex(prefix) +
           " mode=" + std::to_string(static_cast<std::uint32_t>(mode));
 }
 

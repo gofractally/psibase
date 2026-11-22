@@ -22,7 +22,7 @@ void NotifyService::onBlock()
 }
 
 void NotifyService::onTrx(const psibase::Checksum256& /*id*/,
-                          psio::view<const psibase::TransactionTrace> /*trace*/)
+                          psio1::view<const psibase::TransactionTrace> /*trace*/)
 {
    auto count = WriteOnly{getReceiver()}.open<TransactionCountTable>();
    auto row   = count.get({}).value_or(TransactionCountRow{});

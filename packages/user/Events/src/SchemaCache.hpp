@@ -8,7 +8,7 @@ namespace UserService
    struct SchemaCache
    {
       SchemaCache();
-      const psio::schema_types::CompiledType* getSchemaType(psibase::AccountNumber user,
+      const psio1::schema_types::CompiledType* getSchemaType(psibase::AccountNumber user,
                                                             psibase::EventDb       db,
                                                             psibase::AccountNumber service,
                                                             psibase::MethodNumber  event);
@@ -19,7 +19,7 @@ namespace UserService
          CacheEntry(psibase::ServiceSchema&& schema);
          psibase::ServiceSchema schema;
          // initialized lazily
-         std::optional<psio::schema_types::CompiledSchema> cschema;
+         std::optional<psio1::schema_types::CompiledSchema> cschema;
       };
       static SchemaCache&                          instance();
       std::map<psibase::AccountNumber, CacheEntry> cache;

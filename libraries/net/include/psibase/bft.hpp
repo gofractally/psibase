@@ -44,7 +44,7 @@ namespace psibase::net
          return "prepare: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
       }
    };
-   PSIO_REFLECT(PrepareMessage, block_id, producer, signer)
+   PSIO1_REFLECT(PrepareMessage, block_id, producer, signer)
 
    struct CommitMessage
    {
@@ -60,7 +60,7 @@ namespace psibase::net
    };
    // To save space, we're picking this apart and reconstituting it, while
    // assuming that the signature remains valid.
-   PSIO_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, signer)
+   PSIO1_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, signer)
 
    struct ProducerConfirm
    {
@@ -68,7 +68,7 @@ namespace psibase::net
       std::vector<char> signature;
       friend bool       operator==(const ProducerConfirm&, const ProducerConfirm&) = default;
    };
-   PSIO_REFLECT(ProducerConfirm, producer, signature)
+   PSIO1_REFLECT(ProducerConfirm, producer, signature)
 
    struct ViewChangeMessage
    {
@@ -95,7 +95,7 @@ namespace psibase::net
                 " prepared=" + loggers::to_string(best_prepared);
       }
    };
-   PSIO_REFLECT(ViewChangeMessage,
+   PSIO1_REFLECT(ViewChangeMessage,
                 term,
                 producer,
                 signer,
@@ -103,7 +103,7 @@ namespace psibase::net
                 best_prepared_term,
                 prepares,
                 nextPrepares)
-   inline auto by_best_prepared(psio::view<const ViewChangeMessage> message)
+   inline auto by_best_prepared(psio1::view<const ViewChangeMessage> message)
    {
       return std::tuple(message.best_prepared_term().unpack(), message.best_prepared().unpack());
    }
@@ -114,7 +114,7 @@ namespace psibase::net
 
       std::string to_string() const { return "request view"; }
    };
-   PSIO_REFLECT(RequestViewMessage);
+   PSIO1_REFLECT(RequestViewMessage);
 
    // TODO: consider using a multiparty signature scheme to save space
    struct BlockConfirm
@@ -123,7 +123,7 @@ namespace psibase::net
       std::vector<ProducerConfirm>                commits;
       std::optional<std::vector<ProducerConfirm>> nextCommits;
    };
-   PSIO_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
+   PSIO1_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
 
    template <typename Base, typename Timer>
    struct basic_bft_consensus : Base
@@ -778,7 +778,7 @@ namespace psibase::net
 
       void load_prepares(const BlockHeaderState*                        state,
                          const ProducerSet&                             prods,
-                         psio::view<const std::vector<ProducerConfirm>> prepares)
+                         psio1::view<const std::vector<ProducerConfirm>> prepares)
       {
          for (const ProducerConfirm& confirm : prepares)
          {
@@ -1017,8 +1017,8 @@ namespace psibase::net
       }
 
       bool compare_view_change(const ProducerSet&                  producers,
-                               psio::view<const ViewChangeMessage> lhs,
-                               psio::view<const ViewChangeMessage> rhs)
+                               psio1::view<const ViewChangeMessage> lhs,
+                               psio1::view<const ViewChangeMessage> rhs)
       {
          assert(lhs.producer() == rhs.producer());
          if (lhs.term() < rhs.term())
@@ -1329,7 +1329,7 @@ namespace psibase::net
          {
             std::sort(result.nextCommits->begin(), result.nextCommits->end(), compareProducer);
          }
-         chain().setBlockData(state->blockId(), psio::convert_to_frac(result));
+         chain().setBlockData(state->blockId(), psio1::convert_to_frac(result));
       }
       void verify_commit(const BlockHeaderState* state)
       {
@@ -1463,9 +1463,9 @@ namespace psibase::net
       }
 
       void validate_aux_consensus_data(const BlockHeaderState*             state,
-                                       psio::view<const std::vector<char>> aux)
+                                       psio1::view<const std::vector<char>> aux)
       {
-         auto        data   = psio::from_frac<BlockConfirm>(aux);
+         auto        data   = psio1::from_frac<BlockConfirm>(aux);
          const auto& header = state->info.header;
          check(data.blockNum >= header.commitNum && data.blockNum <= header.blockNum,
                "blockNum out of range");
@@ -1632,13 +1632,13 @@ namespace psibase::net
       }
       BlockNum light_verify(const LightHeaderState&                   state,
                             const BlockInfo&                          info,
-                            const psio::shared_view_ptr<SignedBlock>& block)
+                            const psio1::shared_view_ptr<SignedBlock>& block)
       {
          if (state.producers->algorithm == ConsensusAlgorithm::bft)
          {
             if (!block->auxConsensusData())
                throw std::runtime_error("Consensus data missing for producer change");
-            auto commits = psio::from_frac<BlockConfirm>(*block->auxConsensusData());
+            auto commits = psio1::from_frac<BlockConfirm>(*block->auxConsensusData());
 
             const ExtendedBlockId* committed = nullptr;
             for (auto& xid : state.pendingBlocks)

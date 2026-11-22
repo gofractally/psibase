@@ -4,8 +4,8 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
-#include <psio/from_json.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/from_json.hpp>
+#include <psio1/to_json.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 
@@ -93,7 +93,7 @@ namespace SystemService
                                                  after);
       }
    };
-   PSIO_REFLECT(AccountsQuery,
+   PSIO1_REFLECT(AccountsQuery,
                 method(getAccount, accountName),
                 method(getAccounts, accountNames),
                 method(accountsByPre, prefix, first, last, before, after),

@@ -121,7 +121,7 @@ namespace psibase
       uint32_t      db      = {};
 
       friend auto operator<=>(const KvResourceKey&, const KvResourceKey&) = default;
-      PSIO_REFLECT(KvResourceKey, definitionWillNotChange(), service, db)
+      PSIO1_REFLECT(KvResourceKey, definitionWillNotChange(), service, db)
    };
 
    struct KvResourceDelta
@@ -129,7 +129,7 @@ namespace psibase
       int64_t records    = 0;
       int64_t keyBytes   = 0;
       int64_t valueBytes = 0;
-      PSIO_REFLECT(KvResourceDelta, definitionWillNotChange(), records, keyBytes, valueBytes)
+      PSIO1_REFLECT(KvResourceDelta, definitionWillNotChange(), records, keyBytes, valueBytes)
    };
 
    struct KvResourcePair
@@ -139,7 +139,7 @@ namespace psibase
 
       KvResourcePair() = default;
       KvResourcePair(KvResourceKey first, KvResourceDelta second) : first{first}, second{second} {}
-      PSIO_REFLECT(KvResourcePair, definitionWillNotChange(), first, second)
+      PSIO1_REFLECT(KvResourcePair, definitionWillNotChange(), first, second)
    };
 
    enum class EventDb : std::uint8_t

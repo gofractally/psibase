@@ -32,7 +32,7 @@ struct message1
    std::string               to_string() const { return std::to_string(value); }
    friend auto               operator<=>(const message1&, const message1&) = default;
 };
-PSIO_REFLECT(message1, value)
+PSIO1_REFLECT(message1, value)
 
 std::ostream& operator<<(std::ostream& os, const message1& msg)
 {
@@ -233,13 +233,13 @@ struct ConsoleLog
    std::string filter = "Severity > critical";
    std::string format = "[{Severity}] [{Host}]{?:-[{RemoteEndpoint}]}: {Message}";
 };
-PSIO_REFLECT(ConsoleLog, type, filter, format);
+PSIO1_REFLECT(ConsoleLog, type, filter, format);
 
 struct Loggers
 {
    ConsoleLog stderr;
 };
-PSIO_REFLECT(Loggers, stderr);
+PSIO1_REFLECT(Loggers, stderr);
 
 int main(int argc, const char* const* argv)
 {
@@ -255,6 +255,6 @@ int main(int argc, const char* const* argv)
    if (int res = session.applyCommandLine(argc, argv))
       return res;
 
-   loggers::configure(psio::convert_from_json<loggers::Config>(psio::convert_to_json(logConfig)));
+   loggers::configure(psio1::convert_from_json<loggers::Config>(psio1::convert_to_json(logConfig)));
    return session.run();
 }

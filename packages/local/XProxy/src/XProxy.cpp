@@ -28,7 +28,7 @@ namespace
          }
          return result;
       }
-      PSIO_REFLECT(Query, method(originServers))
+      PSIO1_REFLECT(Query, method(originServers))
    };
 
    HttpReply makeError(HttpStatus status, std::string_view msg)
@@ -96,7 +96,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
             return makeError(HttpStatus::unsupportedMediaType, msg);
          }
          auto table = open<OriginServerTable>();
-         auto row   = psio::convert_from_json<OriginServerRow>(
+         auto row   = psio1::convert_from_json<OriginServerRow>(
              std::string(req.body.begin(), req.body.end()));
 
          if (row.host.empty())
@@ -124,7 +124,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
             std::string_view msg = "Content-Type must be application/json\n";
             return makeError(HttpStatus::unsupportedMediaType, msg);
          }
-         auto originSubdomain = psio::convert_from_json<AccountNumber>(
+         auto originSubdomain = psio1::convert_from_json<AccountNumber>(
              std::string(req.body.begin(), req.body.end()));
          auto table = open<OriginServerTable>();
          PSIBASE_SUBJECTIVE_TX
@@ -292,7 +292,7 @@ void XProxy::close(std::int32_t socket)
 }
 
 void XProxy::recv(std::int32_t                        socket,
-                  psio::view<const std::vector<char>> data,
+                  psio1::view<const std::vector<char>> data,
                   std::uint32_t                       flags)
 {
    check(getSender() == XHttp::service, "Wrong sender");

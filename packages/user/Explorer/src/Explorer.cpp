@@ -2,7 +2,7 @@
 
 #include <psibase/dispatch.hpp>
 #include <psibase/serveGraphQL.hpp>
-#include <psio/to_hex.hpp>
+#include <psio1/to_hex.hpp>
 #include <services/system/CommonApi.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
@@ -12,7 +12,7 @@
 using namespace psibase;
 using namespace SystemService;
 
-using SharedBlock = psio::shared_view_ptr<Block>;
+using SharedBlock = psio1::shared_view_ptr<Block>;
 
 struct TransactionAuthChecker
 {
@@ -36,11 +36,11 @@ struct TransactionAuthChecker
       }
       return pos->second;
    }
-   bool operator()(psio::view<const Action> action) const
+   bool operator()(psio1::view<const Action> action) const
    {
       return (*this)(action.sender()) || (*this)(action.service());
    }
-   bool operator()(psio::view<const Transaction> transaction) const
+   bool operator()(psio1::view<const Transaction> transaction) const
    {
       for (auto action : transaction.actions())
       {
@@ -49,7 +49,7 @@ struct TransactionAuthChecker
       }
       return false;
    }
-   bool operator()(psio::view<const SignedTransaction> transaction) const
+   bool operator()(psio1::view<const SignedTransaction> transaction) const
    {
       return (*this)(*transaction.transaction());
    }
@@ -57,21 +57,21 @@ struct TransactionAuthChecker
 
 struct ActionQuery
 {
-   psio::view<const Action> action;
+   psio1::view<const Action> action;
    AccountNumber            sender() const { return action.sender(); }
    AccountNumber            service() const { return action.service(); }
    MethodNumber             method() const { return action.method(); }
    std::string              rawData() const
    {
       std::span<const char> result = action.rawData();
-      return psio::to_hex(result);
+      return psio1::to_hex(result);
    }
-   PSIO_REFLECT(ActionQuery, method(sender), method(service), method(method), method(rawData))
+   PSIO1_REFLECT(ActionQuery, method(sender), method(service), method(method), method(rawData))
 };
 
 struct TransactionQuery
 {
-   psio::view<const Transaction> transaction;
+   psio1::view<const Transaction> transaction;
    std::vector<ActionQuery>      actions() const
    {
       std::vector<ActionQuery> result;
@@ -82,12 +82,12 @@ struct TransactionQuery
       }
       return result;
    }
-   PSIO_REFLECT(TransactionQuery, method(actions))
+   PSIO1_REFLECT(TransactionQuery, method(actions))
 };
 
 struct SignedTransactionQuery
 {
-   psio::view<const SignedTransaction> value;
+   psio1::view<const SignedTransaction> value;
    const TransactionAuthChecker*       censor;
    Checksum256 id() const { return sha256(value.transaction().data(), value.transaction().size()); }
    // Available even when the transaction is censored
@@ -111,7 +111,7 @@ struct SignedTransactionQuery
          result.reserve(value.proofs().size());
          for (std::span<const char> proof : value.proofs())
          {
-            result.push_back(psio::to_hex(proof));
+            result.push_back(psio1::to_hex(proof));
          }
          return result;
       }
@@ -120,7 +120,7 @@ struct SignedTransactionQuery
          return std::nullopt;
       }
    }
-   PSIO_REFLECT(SignedTransactionQuery,
+   PSIO1_REFLECT(SignedTransactionQuery,
                 method(id),
                 method(numActions),
                 method(transaction),
@@ -131,7 +131,7 @@ struct ServiceActionCount
 {
    AccountNumber service;
    std::uint32_t count;
-   PSIO_REFLECT(ServiceActionCount, service, count)
+   PSIO1_REFLECT(ServiceActionCount, service, count)
 };
 
 struct BlockQuery
@@ -170,7 +170,7 @@ struct BlockQuery
       }
       return result;
    }
-   PSIO_REFLECT(BlockQuery,
+   PSIO1_REFLECT(BlockQuery,
                 method(id),
                 method(header),
                 method(transactions),
@@ -182,7 +182,7 @@ struct TransactionLocation
    SharedBlock                         block;
    BlockHeader                         blockHeader;
    std::uint32_t                       txIndex;
-   psio::view<const SignedTransaction> value;
+   psio1::view<const SignedTransaction> value;
    const TransactionAuthChecker*       censor;
 
    BlockNum               blockNum() const { return blockHeader.blockNum; }
@@ -191,7 +191,7 @@ struct TransactionLocation
    AccountNumber          producer() const { return blockHeader.producer; }
    std::uint32_t          index() const { return txIndex; }
    SignedTransactionQuery transaction() const { return SignedTransactionQuery{value, censor}; }
-   PSIO_REFLECT(TransactionLocation,
+   PSIO1_REFLECT(TransactionLocation,
                 method(blockNum),
                 method(blockId),
                 method(blockTime),
@@ -213,7 +213,7 @@ static constexpr std::uint32_t blocksPageBytes = 6 * 1024 * 1024;
 static std::optional<Checksum256> parseChecksum(const std::string& hex)
 {
    std::vector<char> bytes;
-   if (!psio::from_hex(hex, bytes) || bytes.size() != Checksum256{}.size())
+   if (!psio1::from_hex(hex, bytes) || bytes.size() != Checksum256{}.size())
       return std::nullopt;
    Checksum256 result;
    std::memcpy(result.data(), bytes.data(), result.size());
@@ -283,7 +283,7 @@ struct Query
       return std::nullopt;
    }
 };
-PSIO_REFLECT(  //
+PSIO1_REFLECT(  //
     Query,
     method(blocks),
     method(block, blockNum),

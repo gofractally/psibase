@@ -84,8 +84,8 @@ namespace UserService
          requireAccount(owner);
 
          using Conn =
-             psibase::Connection<PublishedPackage, psio::FixedString{"PublishedPackageConnection"},
-                                 psio::FixedString{"PublishedPackageEdge"}>;
+             psibase::Connection<PublishedPackage, psio1::FixedString{"PublishedPackageConnection"},
+                                 psio1::FixedString{"PublishedPackageEdge"}>;
          auto published = Packages{}.open<PublishedPackageTable>().getIndex<0>();
          if (name)
          {
@@ -111,7 +111,7 @@ namespace UserService
          return {};
       }
    };
-   PSIO_REFLECT(  //
+   PSIO1_REFLECT(  //
        Query,
        method(installed),
        method(newAccounts, accounts, owner),
@@ -123,7 +123,7 @@ namespace UserService
    {
       std::string owner;
       std::string package;
-      PSIO_REFLECT(ManifestQuery, owner, package)
+      PSIO1_REFLECT(ManifestQuery, owner, package)
    };
 
    std::optional<psibase::HttpReply> servePackageManifest(psibase::HttpRequest& request)
@@ -153,7 +153,7 @@ namespace UserService
    struct SchemaQuery
    {
       std::string service;
-      PSIO_REFLECT(SchemaQuery, service)
+      PSIO1_REFLECT(SchemaQuery, service)
    };
 
    std::optional<psibase::HttpReply> serveSchema(psibase::HttpRequest& request)
@@ -169,8 +169,8 @@ namespace UserService
                 .contentType = "application/json",
                 .headers     = psibase::allowCors(),
             };
-            psio::vector_stream stream{reply.body};
-            psio::to_json(row->schema, stream);
+            psio1::vector_stream stream{reply.body};
+            psio1::to_json(row->schema, stream);
             return std::move(reply);
          }
          else

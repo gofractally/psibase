@@ -10,10 +10,10 @@ struct DelayRow
 {
    std::uint64_t id;
    std::int32_t  socket;
-   PSIO_REFLECT(DelayRow, id, socket)
+   PSIO1_REFLECT(DelayRow, id, socket)
 };
 using DelayTable = psibase::Table<DelayRow, &DelayRow::id>;
-PSIO_REFLECT_TYPENAME(DelayTable)
+PSIO1_REFLECT_TYPENAME(DelayTable)
 
 /// provides a single endpoint /wait?seconds=<int> for testing x-timer
 struct XDelay : psibase::Service
@@ -24,7 +24,7 @@ struct XDelay : psibase::Service
                                               std::optional<std::int32_t> socket);
    void                              ready(std::uint64_t id);
 };
-PSIO_REFLECT(XDelay, method(serveSys, request, socket), method(ready, id))
+PSIO1_REFLECT(XDelay, method(serveSys, request, socket), method(ready, id))
 PSIBASE_REFLECT_TABLES(XDelay, XDelay::Session)
 
 using namespace psibase;
@@ -34,7 +34,7 @@ struct WaitArgs
 {
    std::string seconds;
 };
-PSIO_REFLECT(WaitArgs, seconds)
+PSIO1_REFLECT(WaitArgs, seconds)
 
 std::optional<psibase::HttpReply> XDelay::serveSys(psibase::HttpRequest        request,
                                                    std::optional<std::int32_t> socket)
@@ -44,7 +44,7 @@ std::optional<psibase::HttpReply> XDelay::serveSys(psibase::HttpRequest        r
    {
       auto args       = request.query<WaitArgs>();
       auto expiration = std::chrono::time_point_cast<MicroSeconds>(
-          std::chrono::steady_clock::now() + psio::convert_from_json<Seconds>(args.seconds));
+          std::chrono::steady_clock::now() + psio1::convert_from_json<Seconds>(args.seconds));
       auto table = open<DelayTable>();
       PSIBASE_SUBJECTIVE_TX
       {

@@ -4,7 +4,7 @@
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
-#include <psio/reflect.hpp>
+#include <psio1/reflect.hpp>
 
 namespace UserService
 {
@@ -20,7 +20,7 @@ namespace UserService
                                                  std::optional<std::int32_t>           socket,
                                                  std::optional<psibase::AccountNumber> user);
    };
-   PSIO_REFLECT(REvents, method(sqlQuery, query, params), method(serveSys, request))
+   PSIO1_REFLECT(REvents, method(sqlQuery, query, params), method(serveSys, request))
    PSIBASE_REFLECT_TABLES(REvents)
 
 }  // namespace UserService

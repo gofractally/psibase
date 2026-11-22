@@ -23,9 +23,9 @@ namespace
                      const std::optional<std::string>& after) const
       {
          using NodeType = LocalPackage;
-         using EdgeType = Edge<NodeType, psio::reflect<NodeType>::name + "Edge">;
-         using ConnType = Connection<NodeType, psio::reflect<NodeType>::name + "Connection",
-                                     psio::reflect<NodeType>::name + "Edge">;
+         using EdgeType = Edge<NodeType, psio1::reflect<NodeType>::name + "Edge">;
+         using ConnType = Connection<NodeType, psio1::reflect<NodeType>::name + "Connection",
+                                     psio1::reflect<NodeType>::name + "Edge">;
          ConnType result;
          PSIBASE_SUBJECTIVE_TX
          {
@@ -35,7 +35,7 @@ namespace
          return result;
       }
    };
-   PSIO_REFLECT(Query, method(installed, gt, ge, lt, le, first, last, before, after))
+   PSIO1_REFLECT(Query, method(installed, gt, ge, lt, le, first, last, before, after))
 
    HttpReply error(const HttpRequest& req, HttpStatus status, std::string_view msg)
    {
@@ -69,7 +69,7 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
                       "Content-Type must be application/json\n");
       }
       auto package =
-          psio::convert_from_json<LocalPackage>(std::string(req.body.begin(), req.body.end()));
+          psio1::convert_from_json<LocalPackage>(std::string(req.body.begin(), req.body.end()));
       auto pendingTable = open<PendingLocalPackagesTable>();
       PSIBASE_SUBJECTIVE_TX
       {
@@ -97,7 +97,7 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
                       "Content-Type must be application/json\n");
       }
       auto package =
-          psio::convert_from_json<LocalPackage>(std::string(req.body.begin(), req.body.end()));
+          psio1::convert_from_json<LocalPackage>(std::string(req.body.begin(), req.body.end()));
       auto table        = open<LocalPackagesTable>();
       auto pendingTable = open<PendingLocalPackagesTable>();
       PSIBASE_SUBJECTIVE_TX

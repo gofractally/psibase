@@ -81,7 +81,7 @@ struct LoginInterface
 {
    void loginSys(std::string rootHost);
 };
-PSIO_REFLECT(LoginInterface, method(loginSys, rootHost))
+PSIO1_REFLECT(LoginInterface, method(loginSys, rootHost))
 
 TEST_CASE("Test login")
 {
@@ -289,7 +289,7 @@ TEST_CASE("Test push_transaction")
 
       // Count items in queue
       std::size_t                       queueSize = 0;
-      TableIndex<RunRow, std::uint64_t> runIndex{RunRow::db, psio::convert_to_key(runPrefix()),
+      TableIndex<RunRow, std::uint64_t> runIndex{RunRow::db, psio1::convert_to_key(runPrefix()),
                                                  false};
       for (auto _ : runIndex)
       {
@@ -380,7 +380,7 @@ TEST_CASE("Test push_transaction")
       auto   trx = t.makeTransaction({nop}, 5);
       trx.claims.push_back({.service = verifyFlags});
       auto strx =
-          SignedTransaction{psio::shared_view_ptr<Transaction>{trx}, {psio::to_frac(flags)}};
+          SignedTransaction{psio1::shared_view_ptr<Transaction>{trx}, {psio1::to_frac(flags)}};
 
       SECTION("run in transact mode")
       {

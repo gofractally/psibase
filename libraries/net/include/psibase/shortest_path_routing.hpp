@@ -36,7 +36,7 @@ namespace psibase::net
          return SequenceNumber{static_cast<std::uint16_t>(value + i)};
       }
    };
-   PSIO_REFLECT(SequenceNumber, definitionWillNotChange(), value)
+   PSIO1_REFLECT(SequenceNumber, definitionWillNotChange(), value)
 
    struct RouteMetric
    {
@@ -57,7 +57,7 @@ namespace psibase::net
       }
       friend auto operator<=>(const RouteMetric&, const RouteMetric&) = default;
    };
-   PSIO_REFLECT(RouteMetric, definitionWillNotChange(), value)
+   PSIO1_REFLECT(RouteMetric, definitionWillNotChange(), value)
 
    inline const RouteMetric RouteMetric::infinite = {0xffffu};
 
@@ -90,7 +90,7 @@ namespace psibase::net
                 " metric=" + std::to_string(metric.value);
       }
    };
-   PSIO_REFLECT(RouteUpdateMessage, producer, seqno, metric, router)
+   PSIO1_REFLECT(RouteUpdateMessage, producer, seqno, metric, router)
 
    struct RouteSeqnoRequest
    {
@@ -104,14 +104,14 @@ namespace psibase::net
                 " ttl=" + std::to_string(ttl);
       }
    };
-   PSIO_REFLECT(RouteSeqnoRequest, producer, seqno, ttl)
+   PSIO1_REFLECT(RouteSeqnoRequest, producer, seqno, ttl)
 
    struct RequestRoutesMessage
    {
       static constexpr unsigned type = 6;
       std::string               to_string() const { return "request routes"; }
    };
-   PSIO_REFLECT(RequestRoutesMessage)
+   PSIO1_REFLECT(RequestRoutesMessage)
 
    struct RoutingEnvelope
    {
@@ -123,7 +123,7 @@ namespace psibase::net
          return "to " + destination.str() + ": " + serializer->message_to_string(data);
       }
    };
-   PSIO_REFLECT(RoutingEnvelope, destination, data)
+   PSIO1_REFLECT(RoutingEnvelope, destination, data)
 
    template <typename Derived>
    struct shortest_path_routing : routing_base<Derived>

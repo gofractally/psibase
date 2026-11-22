@@ -1,11 +1,11 @@
 #include <services/test/TestMemo.hpp>
 
 #include <psibase/dispatch.hpp>
-#include <psio/from_json.hpp>
+#include <psio1/from_json.hpp>
 
 using namespace psibase;
 using namespace TestService;
-using namespace psio;
+using namespace psio1;
 
 std::string TestMemo::testValue(Memo memo)
 {
@@ -17,7 +17,7 @@ std::string TestMemo::testView(view<const Memo> memo)
 }
 void TestMemo::testJson(const std::string& data)
 {
-   psio::convert_from_json<Memo>(data);
+   psio1::convert_from_json<Memo>(data);
 }
 void TestMemo::testConstruct(const std::string& data)
 {

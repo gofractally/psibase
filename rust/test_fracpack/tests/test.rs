@@ -808,7 +808,7 @@ fn fuzzy_equal(lhs: &serde_json::Value, rhs: &serde_json::Value) -> bool {
 fn schema_json() -> Result<()> {
     let builtin = fracpack::standard_types();
     let all_tests: Vec<SchemaTestFile> = serde_json::from_str(include_str!(
-        "../../../libraries/psio/tests/fracpack-tests.json"
+        "../../../libraries/psio1/tests/fracpack-tests.json"
     ))
     .unwrap();
     for tests in all_tests {
@@ -894,7 +894,7 @@ where
 }
 
 test_fracpack_macros::include_tests!(
-    "${CARGO_MANIFEST_DIR}/../../libraries/psio/tests/fracpack-tests.json"
+    "${CARGO_MANIFEST_DIR}/../../libraries/psio1/tests/fracpack-tests.json"
 );
 
 #[test]

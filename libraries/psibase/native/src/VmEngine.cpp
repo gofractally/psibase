@@ -99,7 +99,7 @@ namespace psibase
                 AccountNumber      service,
                 uint8_t            vmType,
                 uint8_t            vmVersion,
-                psio::input_stream code)
+                psio1::input_stream code)
    {
       check(code.remaining(), "native setCode can't clear code");
       auto codeHash = sha256(code.pos, code.remaining());

@@ -14,7 +14,7 @@ struct mock_consensus
    {
       std::int32_t value;
       std::string  to_string() const { return std::to_string(value); }
-      PSIO_REFLECT(message1, value)
+      PSIO1_REFLECT(message1, value)
    };
    using message_type = std::variant<message1>;
    void connect(peer_id id)

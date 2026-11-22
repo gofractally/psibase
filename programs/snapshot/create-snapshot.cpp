@@ -98,7 +98,7 @@ void write_consensus_change_blocks(std::uint32_t             chain,
 {
    BlockNum          last = 0;
    Checksum256       lastId;
-   std::vector<char> key = psio::convert_to_key(psibase::consensusChangeKey(start));
+   std::vector<char> key = psio1::convert_to_key(psibase::consensusChangeKey(start));
    std::vector<char> value;
    std::vector<char> blockKey;
    std::vector<char> block;
@@ -107,27 +107,27 @@ void write_consensus_change_blocks(std::uint32_t             chain,
       if (num <= last || num >= end)
          return;
       blockKey.clear();
-      psio::vector_stream kstream{blockKey};
-      psio::to_key(num, kstream);
+      psio1::vector_stream kstream{blockKey};
+      psio1::to_key(num, kstream);
       auto size = raw::kvGet(chain, DbId::blockLog, blockKey.data(), blockKey.size());
       if (size == -1)
          psibase::abortMessage("Block " + std::to_string(num) + " is not in the block log");
       block.resize(size);
       raw::getResult(block.data(), size, 0);
-      auto block_view = psio::view<const psibase::Block>(psio::prevalidated{block});
+      auto block_view = psio1::view<const psibase::Block>(psio1::prevalidated{block});
       auto header     = block_view.header().unpack();
       lastId          = psibase::BlockInfo{header}.blockId;
       // Drop transactions. We don't need them
       {
          block.clear();
-         psio::vector_stream bstream{block};
-         psio::to_frac(psibase::Block{header}, bstream);
+         psio1::vector_stream bstream{block};
+         psio1::to_frac(psibase::Block{header}, bstream);
       }
       write_row(static_cast<std::uint32_t>(DbId::blockLog), blockKey, block, stream);
       last = num;
    };
-   psio::size_stream prefix_size;
-   psio::to_key(psibase::consensusChangePrefix(), prefix_size);
+   psio1::size_stream prefix_size;
+   psio1::to_key(psibase::consensusChangePrefix(), prefix_size);
    auto read_next = [&]() -> std::optional<psibase::ConsensusChangeRow>
    {
       auto size = raw::kvGreaterEqual(chain, psibase::ConsensusChangeRow::db, key.data(),
@@ -139,7 +139,7 @@ void write_consensus_change_blocks(std::uint32_t             chain,
       key.resize(raw::getKey(nullptr, 0));
       raw::getKey(key.data(), key.size());
       key.push_back('\0');
-      auto result = psio::from_frac<psibase::ConsensusChangeRow>(value);
+      auto result = psio1::from_frac<psibase::ConsensusChangeRow>(value);
       if (result.start >= end)
          return {};
       return result;
@@ -184,8 +184,8 @@ void write_block_signatures(std::uint32_t                chain,
    for (BlockNum num : signatures_required)
    {
       key.clear();
-      psio::vector_stream kstream{key};
-      psio::to_key(num, kstream);
+      psio1::vector_stream kstream{key};
+      psio1::to_key(num, kstream);
       auto size = raw::kvGet(chain, DbId::blockProof, key.data(), key.size());
       if (size != -1)
       {
@@ -205,8 +205,8 @@ void write_block_data(std::uint32_t                   chain,
    for (auto id : commit_required)
    {
       key.clear();
-      psio::vector_stream kstream{key};
-      psio::to_key(psibase::blockDataKey(id), kstream);
+      psio1::vector_stream kstream{key};
+      psio1::to_key(psibase::blockDataKey(id), kstream);
       auto size =
           raw::kvGreaterEqual(chain, DbId::nativeSubjective, key.data(), key.size(), key.size());
       if (size != -1)
@@ -229,9 +229,9 @@ void write_header(const SnapshotHeader& header, auto& stream)
 
 void write_footer(const SnapshotFooter& self, auto& stream)
 {
-   write_row(SnapshotFooter::id, self.hash->key(), psio::to_frac(*self.hash), stream);
+   write_row(SnapshotFooter::id, self.hash->key(), psio1::to_frac(*self.hash), stream);
    for (const auto& sig : self.signatures)
-      write_row(SnapshotFooter::id, sig.key(), psio::to_frac(sig), stream);
+      write_row(SnapshotFooter::id, sig.key(), psio1::to_frac(sig), stream);
 }
 
 static const char* usage_brief =
@@ -286,7 +286,7 @@ int main(int argc, const char* const* argv)
    psibase::TestChain chain(database_file, O_RDONLY);
    auto               handle = chain.nativeHandle();
    {
-      auto key       = psio::convert_to_key(psibase::snapshotPrefix());
+      auto key       = psio1::convert_to_key(psibase::snapshotPrefix());
       auto size      = raw::kvMax(handle, psibase::SnapshotRow::db, key.data(), key.size());
       auto prefixLen = key.size();
       while (true)
@@ -296,7 +296,7 @@ int main(int argc, const char* const* argv)
             std::cerr << "No verified snapshot available" << std::endl;
             return 1;
          }
-         auto snapshot = psio::from_frac<psibase::SnapshotRow>(psibase::getResult(size));
+         auto snapshot = psio1::from_frac<psibase::SnapshotRow>(psibase::getResult(size));
          key.resize(raw::getKey(nullptr, 0));
          raw::getKey(key.data(), key.size());
          raw::getFork(handle, snapshot.id);

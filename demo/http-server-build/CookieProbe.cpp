@@ -1,7 +1,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/dispatch.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/to_json.hpp>
 
 struct CookieProbe : psibase::Service
 {
@@ -10,7 +10,7 @@ struct CookieProbe : psibase::Service
                                               std::optional<std::int32_t> socket,
                                               std::optional<psibase::AccountNumber> user);
 };
-PSIO_REFLECT(CookieProbe, method(serveSys, req, socket, user))
+PSIO1_REFLECT(CookieProbe, method(serveSys, req, socket, user))
 PSIBASE_REFLECT_TABLES(CookieProbe)
 
 struct ProbeResult
@@ -21,7 +21,7 @@ struct ProbeResult
    std::vector<std::string> theme;
    std::vector<std::string> appSession;
 };
-PSIO_REFLECT(ProbeResult, user, authorization, sessionCookie, theme, appSession)
+PSIO1_REFLECT(ProbeResult, user, authorization, sessionCookie, theme, appSession)
 
 std::optional<psibase::HttpReply> CookieProbe::serveSys(
     psibase::HttpRequest req, std::optional<std::int32_t>,
@@ -42,7 +42,7 @@ std::optional<psibase::HttpReply> CookieProbe::serveSys(
          for (auto value : single.getCookie("session")) result.appSession.emplace_back(value);
       }
    }
-   auto json = psio::convert_to_json(result);
+   auto json = psio1::convert_to_json(result);
    return psibase::HttpReply{.contentType = "application/json", .body = {json.begin(), json.end()}};
 }
 PSIBASE_DISPATCH(CookieProbe)

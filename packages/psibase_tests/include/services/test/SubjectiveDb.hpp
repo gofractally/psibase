@@ -15,7 +15,7 @@ namespace TestService
       std::string key;
       std::string value;
    };
-   PSIO_REFLECT(SubjectiveRow, key, value)
+   PSIO1_REFLECT(SubjectiveRow, key, value)
 
    using SubjectiveTable = psibase::Table<SubjectiveRow, &SubjectiveRow::key>;
 
@@ -47,7 +47,7 @@ namespace TestService
 
       std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
    };
-   PSIO_REFLECT(SubjectiveDb,
+   PSIO1_REFLECT(SubjectiveDb,
                 method(write, key, value),
                 method(read, key),
                 method(abort, key, value, op),

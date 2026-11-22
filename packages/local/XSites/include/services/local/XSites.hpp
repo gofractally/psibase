@@ -20,7 +20,7 @@ namespace LocalService
 
       using Key = psibase::CompositeKey<&ContentRow::account, &ContentRow::path>;
 
-      PSIO_REFLECT(ContentRow,
+      PSIO1_REFLECT(ContentRow,
                    account,
                    path,
                    contentType,
@@ -30,7 +30,7 @@ namespace LocalService
                    csp)
    };
    using ContentTable = psibase::Table<ContentRow, ContentRow::Key{}>;
-   PSIO_REFLECT_TYPENAME(ContentTable)
+   PSIO1_REFLECT_TYPENAME(ContentTable)
 
    struct XSites : psibase::Service
    {
@@ -41,6 +41,6 @@ namespace LocalService
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest        req,
                                                  std::optional<std::int32_t> socket);
    };
-   PSIO_REFLECT(XSites, method(serveSys, req, socket))
+   PSIO1_REFLECT(XSites, method(serveSys, req, socket))
    PSIBASE_REFLECT_TABLES(XSites, XSites::Subjective)
 }  // namespace LocalService

@@ -14,10 +14,10 @@ struct CounterRow
    std::uint32_t value;
 };
 
-PSIO_REFLECT(CounterRow, key, value)
+PSIO1_REFLECT(CounterRow, key, value)
 
 using CounterTable = psibase::Table<CounterRow, &CounterRow::key>;
-PSIO_REFLECT_TYPENAME(CounterTable)
+PSIO1_REFLECT_TYPENAME(CounterTable)
 
 struct CounterService : psibase::Service
 {
@@ -26,7 +26,7 @@ struct CounterService : psibase::Service
    std::uint32_t                     inc(std::string key, std::uint32_t id);
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };
-PSIO_REFLECT(CounterService, method(inc, key, id), method(serveSys, req))
+PSIO1_REFLECT(CounterService, method(inc, key, id), method(serveSys, req))
 PSIBASE_REFLECT_TABLES(CounterService, CounterService::Tables)
 
 std::uint32_t CounterService::inc(std::string key, std::uint32_t id)

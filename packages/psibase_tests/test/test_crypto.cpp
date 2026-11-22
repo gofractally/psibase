@@ -1,6 +1,6 @@
 #include <psibase/crypto.hpp>
 
-#include <psio/from_json.hpp>
+#include <psio1/from_json.hpp>
 
 #include <psibase/tester.hpp>
 
@@ -13,7 +13,7 @@ Checksum256 c256(std::string_view s)
 {
    Checksum256 result;
    check(s.size() == 2 * result.size(), "wrong size for sha256");
-   check(psio::unhex(result.begin(), s.begin(), s.end()), "expected hex string");
+   check(psio1::unhex(result.begin(), s.begin(), s.end()), "expected hex string");
    return result;
 }
 

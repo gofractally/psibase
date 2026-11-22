@@ -14,7 +14,7 @@ struct ExampleService
    }
 };
 
-PSIO_REFLECT(ExampleService,  //
+PSIO1_REFLECT(ExampleService,  //
              method(add, a, b),
              method(multiply, a, b),
              method(serveSys, request))

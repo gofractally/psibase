@@ -13,10 +13,10 @@ namespace LocalService
       std::string                username;
       std::string                hash;
       std::optional<std::string> password;
-      PSIO_REFLECT(PasswordRow, username, hash, password)
+      PSIO1_REFLECT(PasswordRow, username, hash, password)
    };
    using PasswordTable = psibase::Table<PasswordRow, &PasswordRow::username>;
-   PSIO_REFLECT_TYPENAME(PasswordTable)
+   PSIO1_REFLECT_TYPENAME(PasswordTable)
 
    struct XBasic : psibase::Service
    {
@@ -25,6 +25,6 @@ namespace LocalService
       void       startSession();
       AuthResult checkAuth(const psibase::HttpRequest& req, std::optional<std::int32_t> socket);
    };
-   PSIO_REFLECT(XBasic, method(startSession), method(checkAuth, request, socket))
+   PSIO1_REFLECT(XBasic, method(startSession), method(checkAuth, request, socket))
    PSIBASE_REFLECT_TABLES(XBasic, XBasic::Session)
 }  // namespace LocalService

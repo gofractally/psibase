@@ -8,7 +8,7 @@ namespace psibase
    {
       return {.service = claim.service,
               .method  = MethodNumber{"verifySys"},
-              .rawData = psio::to_frac(std::tie(transactionHash, claim, proof))};
+              .rawData = psio1::to_frac(std::tie(transactionHash, claim, proof))};
    }
 
    Action makeVerify(const SignedTransaction& trx,

@@ -9,8 +9,8 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
-#include <psio/fracpack.hpp>
+#include <psio1/finally.hpp>
+#include <psio1/fracpack.hpp>
 #include <psibase/VmEngine.hpp>
 #include <psibase/NativeVM.hpp>
 #include <psizam/debug/debug.hpp>
@@ -51,7 +51,7 @@ namespace
       std::int32_t call(std::int32_t value) { return nested(value); }
       void         fail()
       {
-         auto cleanup = psio::finally{[&] { ++destructed; }};
+         auto cleanup = psio1::finally{[&] { ++destructed; }};
          auto payload = std::make_shared<int>(1);
          failurePayload = payload;
          throw TrackedHostFailure(std::move(payload));
@@ -117,7 +117,7 @@ TEST_CASE("Native psizam policy forwards every serialized VM option")
 {
    psibase::VMOptions       chain{4321, 2, 3, 32768};
    psibase::NativeVMOptions options(chain);
-   CHECK(psio::to_frac(static_cast<const psibase::VMOptions&>(options)) == psio::to_frac(chain));
+   CHECK(psio1::to_frac(static_cast<const psibase::VMOptions&>(options)) == psio1::to_frac(chain));
    CHECK(options.max_mutable_global_bytes == 4321);
    CHECK(options.max_pages == 2);
    CHECK(options.max_table_elements == 3);
@@ -280,7 +280,7 @@ TEST_CASE("LLVM raw host trampolines release caught exception ownership")
           return {};
        }};
    auto previous = context._host_trampoline_ptrs;
-   auto restore = psio::finally{[&] { context._host_trampoline_ptrs = previous; }};
+   auto restore = psio1::finally{[&] { context._host_trampoline_ptrs = previous; }};
    context._host_trampoline_ptrs = raw;
    psizam::native_value argument{reinterpret_cast<uint64_t>(&runtime.host)};
    auto invoke = [&]
@@ -313,7 +313,7 @@ TEST_CASE("CPU watchdog cancellation uses executing-thread TLS and permits cache
    Runtime runtime;
    auto&   timedOut = psizam::detail::timed_run_has_timed_out;
    REQUIRE_FALSE(timedOut.load());
-   auto restore = psio::finally{[&]
+   auto restore = psio1::finally{[&]
                                 {
                                    runtime.backend.get_module().allocator.enable_code(true);
                                    timedOut = false;
@@ -397,7 +397,7 @@ TEST_CASE("Watchdog completion and destruction cannot cancel the next backend ow
    Runtime                  runtime;
    psibase::WatchdogManager manager;
    auto&                    timedOut = psizam::detail::timed_run_has_timed_out;
-   auto                     restore  = psio::finally{[&]
+   auto                     restore  = psio1::finally{[&]
                                                      {
                                    runtime.backend.get_module().allocator.enable_code(true);
                                    timedOut = false;
@@ -466,7 +466,7 @@ namespace
          // span ABI, without teaching the fixture the serialization layout.
          auto patch = [&](std::string_view marker, std::uint64_t sender)
          {
-            auto nested = psio::to_frac(
+            auto nested = psio1::to_frac(
                 psibase::Action{.sender = psibase::AccountNumber{sender}, .service = peer});
             auto slot = std::search(code.begin(), code.end(), marker.begin(), marker.end());
             REQUIRE(slot != code.end());
@@ -487,7 +487,7 @@ namespace
             block.db.kvPut(row.db, row.key(), row);
             psibase::setCode(
                 block.db, account, 0, 0,
-                psio::input_stream(reinterpret_cast<const char*>(code.data()), code.size()));
+                psio1::input_stream(reinterpret_cast<const char*>(code.data()), code.size()));
          }
       }
       psibase::Action action(std::uint64_t sender = 0) const
@@ -572,9 +572,9 @@ TEST_CASE("Native config writes reject VM limits that cannot be instantiated")
           {.codeNum = fixture.service, .flags = psibase::CodeRow::isPrivileged}, &context};
       auto handle = host.kvOpen(static_cast<uint32_t>(psibase::DbId::native), {},
                                 static_cast<uint32_t>(psibase::KvMode::write));
-      auto key = psio::convert_to_key(psibase::WasmConfigRow::key(table));
+      auto key = psio1::convert_to_key(psibase::WasmConfigRow::key(table));
       psibase::WasmConfigRow valid;
-      auto expected = psio::to_frac(valid);
+      auto expected = psio1::to_frac(valid);
       // Seed the existing row through the fixture's database. The host writes
       // below must fail in validation before resource notifications execute.
       fixture.block.db.kvPut(psibase::DbId::native, valid.key(table), valid);
@@ -585,7 +585,7 @@ TEST_CASE("Native config writes reject VM limits that cannot be instantiated")
             invalid.vmOptions.max_pages = 65537;
          else
             invalid.vmOptions.max_stack_bytes = 0xffffffffu;
-         CHECK_THROWS(host.kvPut(handle, key, psio::to_frac(invalid)));
+         CHECK_THROWS(host.kvPut(handle, key, psio1::to_frac(invalid)));
          auto retained = fixture.block.db.kvGetRaw(psibase::DbId::native, key);
          REQUIRE(retained.has_value());
          CHECK(std::ranges::equal(std::span(retained->pos, retained->end), expected));
@@ -629,7 +629,7 @@ namespace
       psibase::RunMode     mode;
       psibase::Action      action;
       psibase::Checksum256 context;
-      PSIO_REFLECT(PreverifiedToken, success, mode, action, context)
+      PSIO1_REFLECT(PreverifiedToken, success, mode, action, context)
    };
 }  // namespace
 
@@ -640,7 +640,7 @@ TEST_CASE("Preverified proof tokens skip only the matching verification request"
    psibase::Transaction unsignedTransaction;
    unsignedTransaction.claims.push_back({.service = fixture.service});
    psibase::SignedTransaction transaction{
-       psio::shared_view_ptr<psibase::Transaction>{unsignedTransaction},
+       psio1::shared_view_ptr<psibase::Transaction>{unsignedTransaction},
        {{'p', 'r', 'o', 'o', 'f'}}};
    auto id     = psibase::sha256(transaction.transaction.data(), transaction.transaction.size());
    auto verify = psibase::makeVerify(transaction, id, 0);

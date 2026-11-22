@@ -2,13 +2,13 @@
 
 #include <psibase/nativeTables.hpp>
 #include <psibase/schema.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/to_json.hpp>
 
 namespace psibase
 {
    namespace
    {
-      psio::schema_types::CustomTypes trace_types(const GetSchemaFn* schemas);
+      psio1::schema_types::CustomTypes trace_types(const GetSchemaFn* schemas);
 
       template <typename S>
       struct PruneFormatter
@@ -64,13 +64,13 @@ namespace psibase
                to_json(std::string(pruned) + "…", base);
             }
          }
-         void operator()(const psio::json::any_array& a)
+         void operator()(const psio1::json::any_array& a)
          {
             base.write('[');
             format_list(a, *this);
             base.write(']');
          }
-         void operator()(const psio::json::any_object& o)
+         void operator()(const psio1::json::any_object& o)
          {
             base.write('{');
             format_list(o,
@@ -82,13 +82,13 @@ namespace psibase
                         });
             base.write('}');
          }
-         void operator()(const psio::json::null_t&) { base.write("null", 4); }
+         void operator()(const psio1::json::null_t&) { base.write("null", 4); }
          void operator()(const auto& value) { to_json(value, base); }
-         void operator()(const psio::json::any& value) { std::visit(*this, value.value()); }
+         void operator()(const psio1::json::any& value) { std::visit(*this, value.value()); }
       };
-      void prettyValue(std::string& dest, const psio::json::any& value)
+      void prettyValue(std::string& dest, const psio1::json::any& value)
       {
-         PruneFormatter{psio::string_stream{dest}}(value);
+         PruneFormatter{psio1::string_stream{dest}}(value);
       }
 
       const std::string& prettyMethod(const GetSchemaFn& schemas,
@@ -126,19 +126,19 @@ namespace psibase
       {
          AccountNumber service;
          std::string   method;
-         PSIO_REFLECT(PrettyServiceMethod, service, method)
+         PSIO1_REFLECT(PrettyServiceMethod, service, method)
       };
 
       struct ServiceMethodFormatter
       {
-         static bool match(const psio::schema_types::CompiledType* ty)
+         static bool match(const psio1::schema_types::CompiledType* ty)
          {
-            return psio::schema_types::matchCustomType(ty, (ServiceMethod*)nullptr);
+            return psio1::schema_types::matchCustomType(ty, (ServiceMethod*)nullptr);
          }
          static bool frac2json(const GetSchemaFn* schemas,
-                               const psio::schema_types::CompiledType*,
-                               psio::FracStream& in,
-                               psio::StreamBase& out)
+                               const psio1::schema_types::CompiledType*,
+                               psio1::FracStream& in,
+                               psio1::StreamBase& out)
          {
             ServiceMethod act;
             if (!in.unpack<true, true>(&act))
@@ -149,14 +149,14 @@ namespace psibase
                     out);
             return true;
          }
-         static void json2frac(const psio::schema_types::CompiledType*,
-                               const psio::json::any& in,
-                               psio::StreamBase&      out)
+         static void json2frac(const psio1::schema_types::CompiledType*,
+                               const psio1::json::any& in,
+                               psio1::StreamBase&      out)
          {
             abortMessage("not implemented");
          }
-         static bool is_empty_container(const psio::schema_types::CompiledType*,
-                                        const psio::json::any& in)
+         static bool is_empty_container(const psio1::schema_types::CompiledType*,
+                                        const psio1::json::any& in)
          {
             return false;
          }
@@ -164,20 +164,20 @@ namespace psibase
 
       struct ActionFormatter
       {
-         static bool match(const psio::schema_types::CompiledType* ty)
+         static bool match(const psio1::schema_types::CompiledType* ty)
          {
-            return psio::schema_types::matchCustomType(ty, (Action*)nullptr);
+            return psio1::schema_types::matchCustomType(ty, (Action*)nullptr);
          }
          static bool frac2json(const GetSchemaFn* schemas,
-                               const psio::schema_types::CompiledType*,
-                               psio::FracStream& in,
-                               psio::StreamBase& out)
+                               const psio1::schema_types::CompiledType*,
+                               psio1::FracStream& in,
+                               psio1::StreamBase& out)
          {
             Action act;
             if (!in.unpack<true, true>(&act))
                return false;
 
-            const psio::Schema*                     types        = nullptr;
+            const psio1::Schema*                     types        = nullptr;
             ServiceSchema::ActionMap::const_pointer actionSchema = nullptr;
             if (schemas)
             {
@@ -212,11 +212,11 @@ namespace psibase
             {
                auto& ty = actionSchema->second.params;
                auto  cschema =
-                   psio::schema_types::CompiledSchema{*types, trace_types(schemas), {&ty}};
+                   psio1::schema_types::CompiledSchema{*types, trace_types(schemas), {&ty}};
                auto* cty = cschema.get(ty.resolve(*types));
                to_json("data", out);
                write_colon(out);
-               auto parser = psio::schema_types::FracParser{psio::FracStream{act.rawData}, cty,
+               auto parser = psio1::schema_types::FracParser{psio1::FracStream{act.rawData}, cty,
                                                             cschema.builtin};
                to_json(parser, out);
             }
@@ -229,25 +229,25 @@ namespace psibase
             out.write('}');
             return true;
          }
-         static void json2frac(const psio::schema_types::CompiledType*,
-                               const psio::json::any& in,
-                               psio::StreamBase&      out)
+         static void json2frac(const psio1::schema_types::CompiledType*,
+                               const psio1::json::any& in,
+                               psio1::StreamBase&      out)
          {
             abortMessage("not implemented");
          }
-         static bool is_empty_container(const psio::schema_types::CompiledType*,
-                                        const psio::json::any& in)
+         static bool is_empty_container(const psio1::schema_types::CompiledType*,
+                                        const psio1::json::any& in)
          {
             return false;
          }
       };
 
-      psio::schema_types::CustomTypes trace_types(const GetSchemaFn* schemas)
+      psio1::schema_types::CustomTypes trace_types(const GetSchemaFn* schemas)
       {
          auto result = psibase_types();
          result.insert("ServiceMethod",
-                       psio::schema_types::CustomHandler{ServiceMethodFormatter{}, schemas});
-         result.insert("Action", psio::schema_types::CustomHandler{ActionFormatter{}, schemas});
+                       psio1::schema_types::CustomHandler{ServiceMethodFormatter{}, schemas});
+         result.insert("Action", psio1::schema_types::CustomHandler{ActionFormatter{}, schemas});
          return result;
       }
 
@@ -318,17 +318,17 @@ namespace psibase
             auto        extraTypes = std::vector{&ty};
             if (rty)
                extraTypes.push_back(&*rty);
-            psio::schema_types::CompiledSchema cschema{schema->types, trace_types(&schemas),
+            psio1::schema_types::CompiledSchema cschema{schema->types, trace_types(&schemas),
                                                        extraTypes};
-            psio::schema_types::FracParser     parser{psio::FracStream{atrace.action.rawData},
+            psio1::schema_types::FracParser     parser{psio1::FracStream{atrace.action.rawData},
                                                       cschema.get(ty.resolve(schema->types)),
                                                       cschema.builtin};
             std::string                        tmp;
-            auto                               stream = psio::string_stream{tmp};
+            auto                               stream = psio1::string_stream{tmp};
             to_json(parser, stream);
-            auto args = psio::convert_from_json<psio::json::any>(std::move(tmp));
+            auto args = psio1::convert_from_json<psio1::json::any>(std::move(tmp));
 
-            if (auto* args_obj = args.get_if<psio::json::any_object>())
+            if (auto* args_obj = args.get_if<psio1::json::any_object>())
             {
                for (const auto& [name, value] : *args_obj)
                {
@@ -351,13 +351,13 @@ namespace psibase
             {
                dest += indent;
                dest += "    retval: ";
-               psio::schema_types::FracParser parser{psio::FracStream{atrace.rawRetval},
+               psio1::schema_types::FracParser parser{psio1::FracStream{atrace.rawRetval},
                                                      cschema.get(rty->resolve(schema->types)),
                                                      cschema.builtin};
                std::string                    tmp;
-               auto                           stream = psio::string_stream{tmp};
+               auto                           stream = psio1::string_stream{tmp};
                to_json(parser, stream);
-               auto retval = psio::convert_from_json<psio::json::any>(std::move(tmp));
+               auto retval = psio1::convert_from_json<psio1::json::any>(std::move(tmp));
                prettyValue(dest, retval);
                dest += "\n";
             }

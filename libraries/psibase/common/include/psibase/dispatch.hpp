@@ -3,22 +3,22 @@
 #include <psibase/Service.hpp>
 #include <psibase/api.hpp>
 #include <psibase/export.hpp>
-#include <psio/fracpack.hpp>
+#include <psio1/fracpack.hpp>
 
 namespace psibase
 {
 
    template <typename T>
-   std::span<const char> find_view_span(psio::view<T> v)
+   std::span<const char> find_view_span(psio1::view<T> v)
    {
-      const char*   start       = psio::get_view_data(v);
+      const char*   start       = psio1::get_view_data(v);
       bool          has_unknown = false;
       bool          known_end;
       std::uint32_t pos = 0;
-      if (!psio::is_packable<std::remove_cv_t<T>>::template unpack<false, true>(
+      if (!psio1::is_packable<std::remove_cv_t<T>>::template unpack<false, true>(
               nullptr, has_unknown, known_end, start, pos, 0xffffffffu))
       {
-         static_assert(!psio::is_std_optional_v<std::remove_cv_t<T>>,
+         static_assert(!psio1::is_std_optional_v<std::remove_cv_t<T>>,
                        "Optional members are not stored in contiguous memory");
          assert(!"View must be valid");
          __builtin_unreachable();
@@ -32,7 +32,7 @@ namespace psibase
    template <typename T>
    constexpr bool is_view_v = false;
    template <typename T>
-   constexpr bool is_view_v<psio::view<T>> = true;
+   constexpr bool is_view_v<psio1::view<T>> = true;
 
    template <typename R, typename T, typename MemberPtr, typename... Args>
    void callMethod(T& service, MemberPtr method, Args&&... args)
@@ -48,13 +48,13 @@ namespace psibase
       {
          std::vector<KvHandle> handles;
          auto                  result = (service.*method)(static_cast<decltype(args)>(args)...);
-         psio::shared_view_ptr<exportType<R>> p(psibaseExport(result, handles));
+         psio1::shared_view_ptr<exportType<R>> p(psibaseExport(result, handles));
          raw::setRetval(p.data(), p.size());
          exportHandles(handles);
       }
       else
       {
-         psio::shared_view_ptr<R> p((service.*method)(static_cast<decltype(args)>(args)...));
+         psio1::shared_view_ptr<R> p((service.*method)(static_cast<decltype(args)>(args)...));
          raw::setRetval(p.data(), p.size());
       }
    }
@@ -62,7 +62,7 @@ namespace psibase
    template <typename F, typename T, std::size_t... I>
    decltype(auto) tuple_call(F&& f, T&& t, std::index_sequence<I...>)
    {
-      return f(psio::get<I>(t)...);
+      return f(psio1::get<I>(t)...);
    }
 
    template <typename F, typename T>
@@ -75,7 +75,7 @@ namespace psibase
    /**
     *  This method is called when a service receives a call and will
     *  and will call the proper method on Contact assuming Service has
-    *  used the PSIO_REFLECT macro.
+    *  used the PSIO1_REFLECT macro.
     */
    template <typename Service>
    void dispatch(AccountNumber sender, AccountNumber receiver)
@@ -89,7 +89,7 @@ namespace psibase
 
       auto makeService = [&]()
       {
-         if constexpr (std::is_constructible<Service, psio::shared_view_ptr<psibase::Action>>{})
+         if constexpr (std::is_constructible<Service, psio1::shared_view_ptr<psibase::Action>>{})
          {
             return Service{act};
          }
@@ -100,19 +100,19 @@ namespace psibase
       };
       auto service{makeService()};
 
-      bool called = psio::get_member_function<Service>(
+      bool called = psio1::get_member_function<Service>(
           act->method().value(),
           [&](auto member, auto /*names*/)
           {
-             using result_type = decltype(psio::result_of(member));
-             using param_tuple = typename psio::make_param_value_tuple<decltype(member)>::type;
+             using result_type = decltype(psio1::result_of(member));
+             using param_tuple = typename psio1::make_param_value_tuple<decltype(member)>::type;
 
              auto param_data = std::span<const char>{act->rawData().data(), act->rawData().size()};
-             psibase::check(psio::fracpack_validate<param_tuple>(param_data),
+             psibase::check(psio1::fracpack_validate<param_tuple>(param_data),
                             "invalid argument encoding for " + act->method().unpack().str());
 
-             psio::view<const param_tuple> param_view(
-                 psio::prevalidated<std::span<const char>>{param_data});
+             psio1::view<const param_tuple> param_view(
+                 psio1::prevalidated<std::span<const char>>{param_data});
 
              tuple_call(
                  [&](auto... args)
@@ -132,7 +132,7 @@ namespace psibase
       if (!called)
          abortMessage("unknown service action: " + act->method().unpack().str());
       internal::sender = prevSender;
-      // psio::member_proxy
+      // psio1::member_proxy
    }  // dispatch
 
 }  // namespace psibase
@@ -181,7 +181,7 @@ namespace psibase
          {
             service = Service::service;
          }
-         std::cout << psio::convert_to_json(ServiceSchema::make<Service>(service));
+         std::cout << psio1::convert_to_json(ServiceSchema::make<Service>(service));
       }
       else
       {

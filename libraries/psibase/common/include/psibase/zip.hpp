@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <psio/reflect.hpp>
+#include <psio1/reflect.hpp>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -35,7 +35,7 @@ namespace psibase::zip
 
       Zip64ExtendedInfo zip64() const;
    };
-   PSIO_REFLECT(LocalFileHeader,
+   PSIO1_REFLECT(LocalFileHeader,
                 signature,
                 version,
                 flags,
@@ -74,7 +74,7 @@ namespace psibase::zip
       bool              isFile() const;
       Zip64ExtendedInfo zip64() const;
    };
-   PSIO_REFLECT(FileHeader,
+   PSIO1_REFLECT(FileHeader,
                 signature,
                 versionMadeBy,
                 versionNeededToExtract,

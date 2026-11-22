@@ -6,7 +6,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio/schema.hpp>
+#include <psio1/schema.hpp>
 #include <regex>
 #include <services/local/XAdmin.hpp>
 #include <services/system/HttpServer.hpp>
@@ -19,7 +19,7 @@
 #include "types.hpp"
 
 using namespace psibase;
-using namespace psio::schema_types;
+using namespace psio1::schema_types;
 using namespace UserService;
 
 template <typename T>
@@ -104,7 +104,7 @@ void getColumns(const CompiledType* ctype, const Object& type, auto& stream)
 
 void getColumns(const CompiledType*, const auto& type, auto&)
 {
-   abortMessage("Unsupported row type: " + psio::convert_to_json(AnyType{type}));
+   abortMessage("Unsupported row type: " + psio1::convert_to_json(AnyType{type}));
 }
 
 void getColumns(const CompiledType* type, auto& stream)
@@ -120,7 +120,7 @@ struct EventVTab : sqlite3_vtab
    {
       auto secondary = SecondaryIndexTable(
           DbId::writeOnly,
-          psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexReadyTableNum)));
+          psio1::convert_to_key(std::tuple(EventIndex::service, secondaryIndexReadyTableNum)));
       if (auto row = secondary.getIndex<0>().get(std::tuple(db, service, event)))
          indexes = std::move(row->indexes);
       else
@@ -129,7 +129,7 @@ struct EventVTab : sqlite3_vtab
    EventIndexTable                 index;
    std::vector<SecondaryIndexInfo> indexes;
    const CompiledType*             rowType;
-   std::vector<char>               key() const { return psio::convert_to_key(index); }
+   std::vector<char>               key() const { return psio1::convert_to_key(index); }
    std::string_view                get_collation(int column) const
    {
       if (const char* const* collate =
@@ -295,14 +295,14 @@ int scalar_to_sql(const auto&, std::span<const char>, sqlite3_context* ctx)
 
 struct SqlCustomHandler
 {
-   int (*to_sql)(const CompiledType*, psio::FracStream&, sqlite3_context* ctx);
+   int (*to_sql)(const CompiledType*, psio1::FracStream&, sqlite3_context* ctx);
    explicit operator bool() const { return to_sql != nullptr; }
 };
 
-int bool_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context* ctx)
+int bool_to_sql(const CompiledType* type, psio1::FracStream& in, sqlite3_context* ctx)
 {
    bool value;
-   if (!psio::is_packable<bool>::unpack<true, true>(&value, in.has_unknown, in.known_end, in.src,
+   if (!psio1::is_packable<bool>::unpack<true, true>(&value, in.has_unknown, in.known_end, in.src,
                                                     in.pos, in.end_pos))
    {
       sqlite3_result_text(ctx, "Not a valid bool value", -1, SQLITE_STATIC);
@@ -312,10 +312,10 @@ int bool_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context*
    return SQLITE_OK;
 }
 
-int string_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context* ctx)
+int string_to_sql(const CompiledType* type, psio1::FracStream& in, sqlite3_context* ctx)
 {
    std::uint32_t size;
-   if (!psio::unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
+   if (!psio1::unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
    {
       sqlite3_result_text(ctx, "cannot read string size", -1, SQLITE_STATIC);
       return SQLITE_ERROR;
@@ -331,12 +331,12 @@ int string_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_contex
    return SQLITE_OK;
 }
 
-int blob_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context* ctx)
+int blob_to_sql(const CompiledType* type, psio1::FracStream& in, sqlite3_context* ctx)
 {
    if (type->is_container())
    {
       std::uint32_t size;
-      if (!psio::unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
+      if (!psio1::unpack_numeric<true>(&size, in.src, in.pos, in.end_pos))
       {
          sqlite3_result_text(ctx, "cannot read container size", -1, SQLITE_STATIC);
          return SQLITE_ERROR;
@@ -370,10 +370,10 @@ int blob_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context*
    }
 }
 
-int account_to_sql(const CompiledType* type, psio::FracStream& in, sqlite3_context* ctx)
+int account_to_sql(const CompiledType* type, psio1::FracStream& in, sqlite3_context* ctx)
 {
    AccountNumber value;
-   if (!psio::is_packable<AccountNumber>::unpack<true, true>(&value, in.has_unknown, in.known_end,
+   if (!psio1::is_packable<AccountNumber>::unpack<true, true>(&value, in.has_unknown, in.known_end,
                                                              in.src, in.pos, in.end_pos))
    {
       sqlite3_result_text(ctx, "Not a valid AccountNumber", -1, SQLITE_STATIC);
@@ -399,7 +399,7 @@ std::string_view jsonPrefix("\x2f\x0a\xc4\x5b\xc1\xe1\x4d\xcc\x60\x02\xd4\xbe\x6
 int event_column(sqlite3_vtab_cursor* cursor, sqlite3_context* ctx, int n)
 {
    auto*      c = static_cast<EventCursor*>(cursor);
-   FracParser parser(psio::FracStream{c->data}, c->vtab()->rowType, psibase_builtins);
+   FracParser parser(psio1::FracStream{c->data}, c->vtab()->rowType, psibase_builtins);
    auto       item = parser.select_child(n);
    switch (item.kind)
    {
@@ -424,7 +424,7 @@ int event_column(sqlite3_vtab_cursor* cursor, sqlite3_context* ctx, int n)
             }
             else
             {
-               psio::FracStream tmpin{item.data};
+               psio1::FracStream tmpin{item.data};
                return handler->to_sql(item.type, tmpin, ctx);
             }
          }
@@ -432,7 +432,7 @@ int event_column(sqlite3_vtab_cursor* cursor, sqlite3_context* ctx, int n)
    // json as text
    parser.push(std::move(item));
    std::vector<char>   result(jsonPrefix.begin(), jsonPrefix.end());
-   psio::vector_stream stream{result};
+   psio1::vector_stream stream{result};
    to_json(parser, stream);
    sqlite3_result_text64(ctx, result.data(), result.size(), SQLITE_TRANSIENT, SQLITE_UTF8);
    return SQLITE_OK;
@@ -487,7 +487,7 @@ int event_connect(sqlite3*           db,
       return SQLITE_ERROR;
    auto                vtab = std::make_unique<EventVTab>(event_db, service, event, type);
    std::vector<char>   index;
-   psio::vector_stream stream{index};
+   psio1::vector_stream stream{index};
    stream.write("CREATE TABLE e(", 15);
    getColumns(vtab->rowType, stream);
    stream.write(")", 2);
@@ -731,7 +731,7 @@ KeyResult sql_to_key(const Int& type, sqlite3_value* key, std::vector<char>& out
 
 KeyResult double_to_key(const Float& type, double value, std::vector<char>& out)
 {
-   psio::vector_stream stream{out};
+   psio1::vector_stream stream{out};
    if (type == Float{.exp = 11, .mantissa = 53})
    {
       to_key(value, stream);
@@ -784,12 +784,12 @@ KeyResult sql_to_key(const Float& type, sqlite3_value* key, std::vector<char>& o
 
 KeyResult sql_to_key(const auto& type, sqlite3_value* key, std::vector<char>& out)
 {
-   abortMessage("Not implemented: " + psio::convert_to_json(AnyType{type}));
+   abortMessage("Not implemented: " + psio1::convert_to_json(AnyType{type}));
 }
 
 KeyResult string_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
 {
-   psio::vector_stream stream(out);
+   psio1::vector_stream stream(out);
    to_key(std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
                            static_cast<std::size_t>(sqlite3_value_bytes(key))},
           stream);
@@ -798,7 +798,7 @@ KeyResult string_to_key(const CompiledType* type, sqlite3_value* key, std::vecto
 
 KeyResult account_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
 {
-   psio::vector_stream stream(out);
+   psio1::vector_stream stream(out);
    auto                s = std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
                                             static_cast<std::size_t>(sqlite3_value_bytes(key))};
    to_key(AccountNumber{s}, stream);
@@ -807,7 +807,7 @@ KeyResult account_to_key(const CompiledType* type, sqlite3_value* key, std::vect
 
 KeyResult blob_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
 {
-   psio::vector_stream stream(out);
+   psio1::vector_stream stream(out);
    to_key(std::string_view{reinterpret_cast<const char*>(sqlite3_value_blob(key)),
                            static_cast<std::size_t>(sqlite3_value_bytes(key))},
           stream);
@@ -842,7 +842,7 @@ KeyResult sql_to_key(const CompiledType* type, sqlite3_value* key, std::vector<c
             return handler->to_key(type, key, out);
          }
          abortMessage("Not implemented: " + std::to_string(type->custom_id) + " " +
-                      psio::convert_to_json(*type->original_type));
+                      psio1::convert_to_json(*type->original_type));
    }
 }
 
@@ -1110,7 +1110,7 @@ static std::vector<char> sqlQueryImpl(AccountNumber                   user,
       check(query.size() <= std::numeric_limits<int>::max(), "Query too large");
       const char*         ptr = query.data();
       const char*         end = query.data() + query.size();
-      psio::vector_stream stream{result};
+      psio1::vector_stream stream{result};
       bool                firstRow = true;
       stream.write('[');
       while (ptr != end)

@@ -25,7 +25,7 @@ struct TestService : psibase::Service
       };
    };
 };
-PSIO_REFLECT(TestService,
+PSIO1_REFLECT(TestService,
              method(send, i, d, v, s),
              method(sendOptional, opt),
              method(sendOptional8, opt),

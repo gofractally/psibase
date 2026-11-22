@@ -9,7 +9,7 @@
 #include <psibase/api.hpp>
 #include <psibase/db.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio/to_key.hpp>
+#include <psio1/to_key.hpp>
 #include <thread>
 using namespace psibase;
 namespace

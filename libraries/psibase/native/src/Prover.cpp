@@ -1,6 +1,6 @@
 #include <psibase/Prover.hpp>
 #include <psibase/block.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/to_json.hpp>
 #include <stdexcept>
 
 namespace psibase
@@ -69,7 +69,7 @@ namespace psibase
       auto result = next->prove(data, claim);
       if (result.empty() && claim.service != AccountNumber{})
       {
-         throw std::runtime_error("No key found for " + psio::convert_to_json(claim));
+         throw std::runtime_error("No key found for " + psio1::convert_to_json(claim));
       }
       return result;
    }

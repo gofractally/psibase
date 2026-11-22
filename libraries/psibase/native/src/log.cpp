@@ -3,8 +3,8 @@
 #include <psibase/log.hpp>
 #include <psibase/trace.hpp>
 
-#include <psio/json/any.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/json/any.hpp>
+#include <psio1/to_json.hpp>
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/local/datagram_protocol.hpp>
@@ -155,12 +155,12 @@ namespace psibase::loggers
 
          if (auto attr = boost::log::extract<std::string>("Host", rec))
          {
-            os << ",\"host\":" << psio::convert_to_json(*attr);
+            os << ",\"host\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = rec[boost::log::expressions::smessage])
          {
-            os << ",\"short_message\":" << psio::convert_to_json(*attr);
+            os << ",\"short_message\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto timestamp =
@@ -184,22 +184,22 @@ namespace psibase::loggers
 
          if (auto attr = boost::log::extract<std::string>("RemoteEndpoint", rec))
          {
-            os << ",\"_remote_endpoint\":" << psio::convert_to_json(*attr);
+            os << ",\"_remote_endpoint\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<Checksum256>("BlockId", rec))
          {
-            os << ",\"_block_id\":" << psio::convert_to_json(*attr);
+            os << ",\"_block_id\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<BlockHeader>("BlockHeader", rec))
          {
-            os << ",\"_block_header\":" << psio::convert_to_json(*attr);
+            os << ",\"_block_header\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<Checksum256>("TransactionId", rec))
          {
-            os << ",\"_transaction_id\":" << psio::convert_to_json(*attr);
+            os << ",\"_transaction_id\":" << psio1::convert_to_json(*attr);
          }
 
          os << '}';
@@ -212,17 +212,17 @@ namespace psibase::loggers
 
          if (auto attr = rec[boost::log::expressions::smessage])
          {
-            os << "\"Message\":" << psio::convert_to_json(*attr);
+            os << "\"Message\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<std::string>("Host", rec))
          {
-            os << ",\"Host\":" << psio::convert_to_json(*attr);
+            os << ",\"Host\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<std::string>("Process", rec))
          {
-            os << ",\"Process\":" << psio::convert_to_json(*attr);
+            os << ",\"Process\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<boost::log::process_id>("ProcessId", rec))
@@ -270,34 +270,34 @@ namespace psibase::loggers
 
          if (auto attr = boost::log::extract<std::string>("RemoteEndpoint", rec))
          {
-            os << ",\"RemoteEndpoint\":" << psio::convert_to_json(*attr);
+            os << ",\"RemoteEndpoint\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<Checksum256>("BlockId", rec))
          {
-            os << ",\"BlockId\":" << psio::convert_to_json(*attr);
+            os << ",\"BlockId\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<BlockHeader>("BlockHeader", rec))
          {
-            os << ",\"BlockHeader\":" << psio::convert_to_json(*attr);
+            os << ",\"BlockHeader\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<Checksum256>("TransactionId", rec))
          {
-            os << ",\"TransactionId\":" << psio::convert_to_json(*attr);
+            os << ",\"TransactionId\":" << psio1::convert_to_json(*attr);
          }
 
          if (auto attr = boost::log::extract<std::string>("RequestMethod", rec))
          {
-            os << ",\"Request\":{\"Method\":" << psio::convert_to_json(*attr);
+            os << ",\"Request\":{\"Method\":" << psio1::convert_to_json(*attr);
             if (auto target = boost::log::extract<std::string>("RequestTarget", rec))
             {
-               os << ",\"Target\":" << psio::convert_to_json(*target);
+               os << ",\"Target\":" << psio1::convert_to_json(*target);
             }
             if (auto host = boost::log::extract<std::string>("RequestHost", rec))
             {
-               os << ",\"Host\":" << psio::convert_to_json(*host);
+               os << ",\"Host\":" << psio1::convert_to_json(*host);
             }
             os << "}";
          }
@@ -647,7 +647,7 @@ namespace psibase::loggers
 
       void from_json(LogReaderConfig& obj, auto& stream)
       {
-         psio::from_json_object(stream,
+         psio1::from_json_object(stream,
                                 [&](std::string_view key)
                                 {
                                    if (key == "format")
@@ -660,13 +660,13 @@ namespace psibase::loggers
                                    }
                                    else
                                    {
-                                      psio::from_json_skip_value(stream);
+                                      psio1::from_json_skip_value(stream);
                                    }
                                 });
       }
 
       // searchable with string_view
-      using sink_args_type = std::map<std::string, psio::json::any, std::less<>>;
+      using sink_args_type = std::map<std::string, psio1::json::any, std::less<>>;
 
       struct ConsoleSinkConfig
       {
@@ -957,7 +957,7 @@ namespace psibase::loggers
                throw std::runtime_error("Invalid repeating interval");
             }
             repeating_interval result;
-            psio::input_stream stream(s.substr(2));
+            psio1::input_stream stream(s.substr(2));
             if (!parse_timestamp(result.base, stream))
             {
                throw std::runtime_error("Invalid time point");
@@ -1158,49 +1158,49 @@ namespace psibase::loggers
          if (!obj.filename.empty())
          {
             stream.write(',');
-            psio::to_json("filename", stream);
+            psio1::to_json("filename", stream);
             stream.write(':');
-            psio::to_json(obj.filename.native(), stream);
+            psio1::to_json(obj.filename.native(), stream);
          }
          if (!obj.target.empty())
          {
             stream.write(',');
-            psio::to_json("target", stream);
+            psio1::to_json("target", stream);
             stream.write(':');
-            psio::to_json(obj.target.native(), stream);
+            psio1::to_json(obj.target.native(), stream);
          }
          if (obj.rotationSize != std::numeric_limits<std::uint64_t>::max())
          {
             stream.write(',');
-            psio::to_json("rotationSize", stream);
+            psio1::to_json("rotationSize", stream);
             stream.write(':');
-            psio::to_json(obj.rotationSize, stream);
+            psio1::to_json(obj.rotationSize, stream);
          }
          if (!obj.rotationTime.empty())
          {
             stream.write(',');
-            psio::to_json("rotationTime", stream);
+            psio1::to_json("rotationTime", stream);
             stream.write(':');
-            psio::to_json(obj.rotationTime, stream);
+            psio1::to_json(obj.rotationTime, stream);
          }
          if (obj.maxFiles != std::numeric_limits<std::uint64_t>::max())
          {
             stream.write(',');
-            psio::to_json("maxFiles", stream);
+            psio1::to_json("maxFiles", stream);
             stream.write(':');
-            psio::to_json(obj.maxFiles, stream);
+            psio1::to_json(obj.maxFiles, stream);
          }
          if (obj.maxSize != std::numeric_limits<std::uint64_t>::max())
          {
             stream.write(',');
-            psio::to_json("maxSize", stream);
+            psio1::to_json("maxSize", stream);
             stream.write(':');
-            psio::to_json(obj.maxSize, stream);
+            psio1::to_json(obj.maxSize, stream);
          }
          stream.write(',');
-         psio::to_json("flush", stream);
+         psio1::to_json("flush", stream);
          stream.write(':');
-         psio::to_json(obj.flush, stream);
+         psio1::to_json(obj.flush, stream);
       }
 
       struct LocalSocketBackend
@@ -1283,9 +1283,9 @@ namespace psibase::loggers
       void to_json(const LocalSocketSinkConfig& obj, auto& stream)
       {
          stream.write(',');
-         psio::to_json("path", stream);
+         psio1::to_json("path", stream);
          stream.write(':');
-         psio::to_json(obj.path.native(), stream);
+         psio1::to_json(obj.path.native(), stream);
       }
 
       struct PipeBackend
@@ -1372,7 +1372,7 @@ namespace psibase::loggers
       void from_json(sink_config& obj, auto& stream)
       {
          sink_args_type args;
-         psio::from_json_object(stream,
+         psio1::from_json_object(stream,
                                 [&](std::string_view key)
                                 {
                                    if (key == "format")
@@ -1393,8 +1393,8 @@ namespace psibase::loggers
                                    }
                                    else
                                    {
-                                      psio::json::any val;
-                                      psio::json::from_json(val, stream);
+                                      psio1::json::any val;
+                                      psio1::json::from_json(val, stream);
                                       args.try_emplace(std::string(key), std::move(val));
                                    }
                                 });
@@ -1419,20 +1419,20 @@ namespace psibase::loggers
       void to_json(const sink_config& obj, auto& stream)
       {
          stream.write('{');
-         psio::to_json("type", stream);
+         psio1::to_json("type", stream);
          stream.write(':');
-         psio::to_json(obj.type, stream);
+         psio1::to_json(obj.type, stream);
          if (!obj.filter_str.empty())
          {
             stream.write(',');
-            psio::to_json("filter", stream);
+            psio1::to_json("filter", stream);
             stream.write(':');
-            psio::to_json(obj.filter_str, stream);
+            psio1::to_json(obj.filter_str, stream);
          }
          stream.write(',');
-         psio::to_json("format", stream);
+         psio1::to_json("format", stream);
          stream.write(':');
-         psio::to_json(obj.format_str, stream);
+         psio1::to_json(obj.format_str, stream);
          if (auto* backend = std::get_if<FileSinkConfig>(&obj.backend))
          {
             to_json(*backend, stream);
@@ -2293,7 +2293,7 @@ namespace psibase::loggers
       {
          return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
          {
-            psio::input_stream                    stream(value);
+            psio1::input_stream                    stream(value);
             std::chrono::system_clock::time_point v;
             // TODO: allow optional subseconds
             if (!parse_timestamp(v, stream) || stream.remaining())
@@ -2313,7 +2313,7 @@ namespace psibase::loggers
          return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
          {
             Checksum256 v;
-            if (value.size() != v.size() * 2 || !psio::unhex(v.begin(), value.begin(), value.end()))
+            if (value.size() != v.size() * 2 || !psio1::unhex(v.begin(), value.begin(), value.end()))
             {
                throw std::runtime_error("Invalid value for " + name.string());
             }
@@ -2486,7 +2486,7 @@ namespace psibase::loggers
             {
                if (auto attr = boost::log::extract<BlockHeader>(name, rec))
                {
-                  stream << psio::convert_to_json(*attr);
+                  stream << psio1::convert_to_json(*attr);
                }
             };
          };
@@ -2505,7 +2505,7 @@ namespace psibase::loggers
             {
                if (auto attr = boost::log::extract<TransactionTrace>(name, rec))
                {
-                  stream << psio::convert_to_json(*attr);
+                  stream << psio1::convert_to_json(*attr);
                }
             };
          };
@@ -2949,7 +2949,7 @@ namespace psibase::loggers
             {
                first = false;
             }
-            psio::to_json(name, stream);
+            psio1::to_json(name, stream);
             stream.write(':');
             to_json(sink.first, stream);
          }
@@ -2980,7 +2980,7 @@ namespace psibase::loggers
    std::string get_config()
    {
       std::string         result;
-      psio::string_stream stream{result};
+      psio1::string_stream stream{result};
       to_json(log_config::instance(), stream);
       return result;
    }
@@ -3014,7 +3014,7 @@ namespace psibase::loggers
       }
    }
 
-   void from_json(Config& obj, psio::json_token_stream& stream)
+   void from_json(Config& obj, psio1::json_token_stream& stream)
    {
       if (!obj.impl)
       {
@@ -3037,7 +3037,7 @@ namespace psibase::loggers
                        });
    }
 
-   void to_json(const Config& obj, psio::vector_stream& stream)
+   void to_json(const Config& obj, psio1::vector_stream& stream)
    {
       if (!obj.impl)
       {
@@ -3235,7 +3235,7 @@ namespace psibase::loggers
 
    void LogReader::config(std::string_view json)
    {
-      auto cfg = psio::convert_from_json<LogReaderConfig>(std::string(json));
+      auto cfg = psio1::convert_from_json<LogReaderConfig>(std::string(json));
       impl->sink->set_filter(cfg.filter);
       impl->sink->set_formatter(cfg.format);
       if (!impl->registered)

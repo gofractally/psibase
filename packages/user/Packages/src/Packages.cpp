@@ -12,7 +12,7 @@ namespace UserService
 {
    namespace
    {
-      using namespace psio::schema_types;
+      using namespace psio1::schema_types;
 
       const AnyType* getFieldType(const Object& ty, std::uint32_t index)
       {

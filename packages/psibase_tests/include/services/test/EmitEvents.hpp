@@ -13,7 +13,7 @@ namespace TestService
 
       auto operator<=>(const ExampleRecord& other) const = default;
    };
-   PSIO_REFLECT(ExampleRecord, count, value, message);
+   PSIO1_REFLECT(ExampleRecord, count, value, message);
 
    struct EmitEvents : psibase::Service
    {
@@ -43,7 +43,7 @@ namespace TestService
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
    };
 
-   PSIO_REFLECT(EmitEvents,  //
+   PSIO1_REFLECT(EmitEvents,  //
                 method(init),
                 method(foo, s, i),
                 method(foo2, s, i),

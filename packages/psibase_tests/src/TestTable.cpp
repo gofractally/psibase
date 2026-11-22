@@ -14,7 +14,7 @@ namespace TestService
    {
       int key;
    };
-   PSIO_REFLECT(IntKey, key)
+   PSIO1_REFLECT(IntKey, key)
 
    void TestTable::getSingle()
    {

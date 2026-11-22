@@ -124,17 +124,17 @@ struct ConsoleLog
    std::string format =
        "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {BlockId}: {BlockHeader}}";
 };
-PSIO_REFLECT(ConsoleLog, type, filter, format);
+PSIO1_REFLECT(ConsoleLog, type, filter, format);
 
 struct Loggers
 {
    ConsoleLog stderr;
 };
-PSIO_REFLECT(Loggers, stderr);
+PSIO1_REFLECT(Loggers, stderr);
 
 void init_logging(const Loggers& logConfig)
 {
-   loggers::configure(psio::convert_from_json<loggers::Config>(psio::convert_to_json(logConfig)));
+   loggers::configure(psio1::convert_from_json<loggers::Config>(psio1::convert_to_json(logConfig)));
 
    // Replace timestamp with mock clock
    {

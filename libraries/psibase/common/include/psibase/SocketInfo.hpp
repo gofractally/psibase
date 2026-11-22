@@ -3,7 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
-#include <psio/reflect.hpp>
+#include <psio1/reflect.hpp>
 #include <string>
 #include <variant>
 
@@ -13,14 +13,14 @@ namespace psibase
    {
       std::array<std::uint8_t, 4> bytes;
       friend bool                 operator==(const IPV4Address&, const IPV4Address&) = default;
-      PSIO_REFLECT(IPV4Address, definitionWillNotChange(), bytes)
+      PSIO1_REFLECT(IPV4Address, definitionWillNotChange(), bytes)
    };
    struct IPV6Address
    {
       std::array<std::uint8_t, 16> bytes;
       std::uint32_t                zone;
       friend bool                  operator==(const IPV6Address&, const IPV6Address&) = default;
-      PSIO_REFLECT(IPV6Address, definitionWillNotChange(), bytes, zone)
+      PSIO1_REFLECT(IPV6Address, definitionWillNotChange(), bytes, zone)
    };
    using IPAddress = std::variant<IPV4Address, IPV6Address>;
 
@@ -52,20 +52,20 @@ namespace psibase
       IPV4Address   address;
       std::uint16_t port;
       friend bool   operator==(const IPV4Endpoint&, const IPV4Endpoint&) = default;
-      PSIO_REFLECT(IPV4Endpoint, definitionWillNotChange(), address, port)
+      PSIO1_REFLECT(IPV4Endpoint, definitionWillNotChange(), address, port)
    };
    struct IPV6Endpoint
    {
       IPV6Address   address;
       std::uint16_t port;
       friend bool   operator==(const IPV6Endpoint&, const IPV6Endpoint&) = default;
-      PSIO_REFLECT(IPV6Endpoint, definitionWillNotChange(), address, port)
+      PSIO1_REFLECT(IPV6Endpoint, definitionWillNotChange(), address, port)
    };
    struct LocalEndpoint
    {
       std::string path;
       friend bool operator==(const LocalEndpoint&, const LocalEndpoint&) = default;
-      PSIO_REFLECT(LocalEndpoint, definitionWillNotChange(), path)
+      PSIO1_REFLECT(LocalEndpoint, definitionWillNotChange(), path)
    };
 
    using SocketEndpoint = std::variant<IPV4Endpoint, IPV6Endpoint, LocalEndpoint>;
@@ -117,40 +117,40 @@ namespace psibase
       bool contains(const LocalEndpoint& endpoint) const;
       bool contains(const SocketEndpoint& endpoint) const;
 
-      PSIO_REFLECT(IPAddressPrefix, address, prefixLen)
+      PSIO1_REFLECT(IPAddressPrefix, address, prefixLen)
    };
 
    std::optional<IPAddressPrefix> parseIPAddressPrefix(std::string_view s);
 
    struct TLSInfo
    {
-      PSIO_REFLECT(TLSInfo)
+      PSIO1_REFLECT(TLSInfo)
       friend bool operator==(const TLSInfo&, const TLSInfo&) = default;
    };
 
    struct ProducerMulticastSocketInfo
    {
-      PSIO_REFLECT(ProducerMulticastSocketInfo)
+      PSIO1_REFLECT(ProducerMulticastSocketInfo)
       friend bool operator==(const ProducerMulticastSocketInfo&,
                              const ProducerMulticastSocketInfo&) = default;
    };
    struct LogSocketInfo
    {
-      PSIO_REFLECT(LogSocketInfo)
+      PSIO1_REFLECT(LogSocketInfo)
       friend bool operator==(const LogSocketInfo&, const LogSocketInfo&) = default;
    };
    struct HttpSocketInfo
    {
       std::optional<SocketEndpoint> endpoint;
       std::optional<TLSInfo>        tls;
-      PSIO_REFLECT(HttpSocketInfo, endpoint, tls)
+      PSIO1_REFLECT(HttpSocketInfo, endpoint, tls)
       friend bool operator==(const HttpSocketInfo&, const HttpSocketInfo&) = default;
    };
    struct WebSocketInfo
    {
       std::optional<SocketEndpoint> endpoint;
       std::optional<TLSInfo>        tls;
-      PSIO_REFLECT(WebSocketInfo, endpoint, tls)
+      PSIO1_REFLECT(WebSocketInfo, endpoint, tls)
       friend bool operator==(const WebSocketInfo&, const WebSocketInfo&) = default;
    };
 
@@ -158,7 +158,7 @@ namespace psibase
    {
       std::optional<SocketEndpoint> endpoint;
       std::optional<TLSInfo>        tls;
-      PSIO_REFLECT(HttpClientSocketInfo, endpoint, tls)
+      PSIO1_REFLECT(HttpClientSocketInfo, endpoint, tls)
       friend bool operator==(const HttpClientSocketInfo&, const HttpClientSocketInfo&) = default;
    };
 
@@ -166,7 +166,7 @@ namespace psibase
    {
       std::optional<SocketEndpoint> endpoint;
       std::optional<TLSInfo>        tls;
-      PSIO_REFLECT(P2PSocketInfo, endpoint, tls)
+      PSIO1_REFLECT(P2PSocketInfo, endpoint, tls)
       friend bool operator==(const P2PSocketInfo&, const P2PSocketInfo&) = default;
    };
 

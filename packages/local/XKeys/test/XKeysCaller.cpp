@@ -17,10 +17,10 @@ std::optional<psibase::HttpReply> XKeysCaller::serveSys(psibase::HttpRequest req
    }
    else if (path == "/sign")
    {
-      auto actions = psio::convert_from_json<std::vector<Action>>(
+      auto actions = psio1::convert_from_json<std::vector<Action>>(
           std::string(request.body.begin(), request.body.end()));
       return HttpReply{.contentType = "application/octet-stream",
-                       .body        = psio::to_frac(to<XKeys>().signTx(actions))};
+                       .body        = psio1::to_frac(to<XKeys>().signTx(actions))};
    }
    return {};
 }

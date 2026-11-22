@@ -1,6 +1,6 @@
 # JSON Format
 
-Both C++ and Rust services support typed JSON serialization. C++ services use `psio::to_json` and `psio::from_json`. Rust services use [serde_json](https://docs.rs/serde_json/latest/serde_json/).
+Both C++ and Rust services support typed JSON serialization. C++ services use `psio1::to_json` and `psio1::from_json`. Rust services use [serde_json](https://docs.rs/serde_json/latest/serde_json/).
 
 ## Structs
 

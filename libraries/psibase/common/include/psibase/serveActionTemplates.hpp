@@ -1,8 +1,8 @@
 #pragma once
 
 #include <psibase/Rpc.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/to_json.hpp>
 
 namespace psibase
 {
@@ -39,16 +39,16 @@ namespace psibase
    std::vector<char> generateActionJsonTemplate()
    {
       std::vector<char>   json;
-      psio::vector_stream s{json};
+      psio1::vector_stream s{json};
       s.write('{');
       bool        needComma = false;
       std::size_t i         = 0;
-      psio::for_each_member_type(
-          (typename psio::reflect<T>::member_functions*)nullptr,
+      psio1::for_each_member_type(
+          (typename psio1::reflect<T>::member_functions*)nullptr,
           [&](auto member)
           {
              using MemPtr = decltype(member);
-             auto names   = psio::reflect<T>::member_function_names[i];
+             auto names   = psio1::reflect<T>::member_function_names[i];
              if (needComma)
                 s.write(',');
              needComma = true;
@@ -56,7 +56,7 @@ namespace psibase
              s.write(':');
              s.write('{');
              generateActionJsonTemplate(
-                 (typename psio::make_param_value_tuple<MemPtr>::type*)nullptr, false,
+                 (typename psio1::make_param_value_tuple<MemPtr>::type*)nullptr, false,
                  names.begin() + 1, names.end(), s);
              s.write('}');
              ++i;

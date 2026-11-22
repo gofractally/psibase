@@ -6,7 +6,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
+#include <psio1/finally.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XPackages.hpp>
 
@@ -27,7 +27,7 @@ namespace
       {
          if (flags != 0)
             abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
-         auto reply = psio::from_frac<HttpReply>(data);
+         auto reply = psio1::from_frac<HttpReply>(data);
          if (reply.status == HttpStatus::ok)
          {
             okay = true;
@@ -53,7 +53,7 @@ namespace
                               .method      = "POST",
                               .target      = "/register_server",
                               .contentType = "application/json"};
-      psio::vector_stream stream{req.body};
+      psio1::vector_stream stream{req.body};
       to_json(server, stream);
       return req;
    }
@@ -132,7 +132,7 @@ void load_local_packages(TransactionContext&           tc,
           .target      = "/postinstall",
           .contentType = "application/json",
       };
-      psio::vector_stream stream(postinstall.body);
+      psio1::vector_stream stream(postinstall.body);
       to_json(
           LocalPackage{
               .name        = package.meta.name,
@@ -163,7 +163,7 @@ void load_local_packages(TransactionContext&           tc,
       Action action{
           .sender  = AccountNumber(),
           .service = proxyServiceNum,
-          .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(request))),
+          .rawData = psio1::convert_to_frac(std::tuple(socket->id, std::move(request))),
       };
       socket->okay = false;
       tc.execServe(action, atrace);
@@ -206,10 +206,10 @@ void initialize_database(SystemContext& context, const std::string& template_)
    TransactionContext tc{bc, trx, trace, DbMode::rpc()};
 
    auto cleanup =
-       psio::finally{[&, saved = bc.db.saveSubjective()] { bc.db.restoreSubjective(saved); }};
+       psio1::finally{[&, saved = bc.db.saveSubjective()] { bc.db.restoreSubjective(saved); }};
    bc.db.checkoutSubjective();
 
-   auto key = psio::convert_to_key(codePrefix());
+   auto key = psio1::convert_to_key(codePrefix());
    if (!bc.db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
    {
       DirectoryRegistry registry{package_path().string()};

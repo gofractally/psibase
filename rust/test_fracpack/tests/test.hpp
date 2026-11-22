@@ -11,8 +11,8 @@
 #pragma GCC diagnostic ignored "-Wunused-local-typedef"
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 #pragma GCC diagnostic ignored "-Wambiguous-reversed-operator"
-#include <psio/fracpack.hpp>
-#include <psio/shared_view_ptr.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/shared_view_ptr.hpp>
 #pragma GCC diagnostic pop
 
 #define NAMED_WRAPPER(Name, Type)                                 \
@@ -21,15 +21,15 @@
       Type        value;                                          \
       friend bool operator==(const Name&, const Name&) = default; \
    };                                                             \
-   PSIO_REFLECT_TYPENAME(Name)                                    \
+   PSIO1_REFLECT_TYPENAME(Name)                                    \
    void to_json(const Name& obj, auto& stream)                    \
    {                                                              \
-      using psio::to_json;                                        \
+      using psio1::to_json;                                        \
       to_json(obj.value, stream);                                 \
    }                                                              \
    void from_json(Name& obj, auto& stream)                        \
    {                                                              \
-      using psio::from_json;                                      \
+      using psio1::from_json;                                      \
       from_json(obj.value, stream);                               \
    }                                                              \
    inline auto& psio_unwrap_packable(Name& obj)                   \
@@ -65,7 +65,7 @@ struct DefWontChangeInnerStruct
 
    auto operator<=>(const DefWontChangeInnerStruct& b) const = default;
 };
-PSIO_REFLECT(DefWontChangeInnerStruct,
+PSIO1_REFLECT(DefWontChangeInnerStruct,
              definitionWillNotChange(),
              field_bool,
              field_u32,
@@ -93,7 +93,7 @@ struct InnerStruct
 
    auto operator<=>(const InnerStruct& b) const = default;
 };
-PSIO_REFLECT(InnerStruct,
+PSIO1_REFLECT(InnerStruct,
              inner_u32,
              var,
              inner_option_u32,
@@ -111,7 +111,7 @@ struct SimpleWithString
 
    auto operator<=>(const SimpleWithString& b) const = default;
 };
-PSIO_REFLECT(SimpleWithString, definitionWillNotChange(), a, b, c, s, f)
+PSIO1_REFLECT(SimpleWithString, definitionWillNotChange(), a, b, c, s, f)
 
 struct SimpleWithNoString
 {
@@ -122,7 +122,7 @@ struct SimpleWithNoString
 
    auto operator<=>(const SimpleWithNoString& b) const = default;
 };
-PSIO_REFLECT(SimpleWithNoString, definitionWillNotChange(), a, b, c, f)
+PSIO1_REFLECT(SimpleWithNoString, definitionWillNotChange(), a, b, c, f)
 
 struct OuterStruct
 {
@@ -162,7 +162,7 @@ struct OuterStruct
 
    auto operator<=>(const OuterStruct& b) const = default;
 };
-PSIO_REFLECT(OuterStruct,
+PSIO1_REFLECT(OuterStruct,
              field_u8,
              field_u16,
              field_u32,

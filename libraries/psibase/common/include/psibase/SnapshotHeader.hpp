@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <psibase/block.hpp>
-#include <psio/to_key.hpp>
+#include <psio1/to_key.hpp>
 #include <vector>
 
 namespace psibase::snapshot
@@ -19,11 +19,11 @@ namespace psibase::snapshot
    struct StateChecksum
    {
       static constexpr std::uint16_t table = 0;
-      auto        key() const { return psio::composite_key(table, primaryIndex); }
+      auto        key() const { return psio1::composite_key(table, primaryIndex); }
       Checksum256 serviceRoot                                            = {};
       Checksum256 nativeRoot                                             = {};
       friend bool operator==(const StateChecksum&, const StateChecksum&) = default;
-      PSIO_REFLECT(StateChecksum, serviceRoot, nativeRoot);
+      PSIO1_REFLECT(StateChecksum, serviceRoot, nativeRoot);
    };
 
    struct StateSignature
@@ -32,8 +32,8 @@ namespace psibase::snapshot
       AccountNumber                  account;
       Claim                          claim;
       std::vector<char>              rawData;
-      auto key() const { return psio::composite_key(table, primaryIndex, account); }
-      PSIO_REFLECT(StateSignature, account, claim, rawData)
+      auto key() const { return psio1::composite_key(table, primaryIndex, account); }
+      PSIO1_REFLECT(StateSignature, account, claim, rawData)
    };
 
    struct StateSignatureInfo

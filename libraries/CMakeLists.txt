@@ -1,6 +1,6 @@
 enable_testing()
 
-add_subdirectory(psio)
+add_subdirectory(psio1)
 add_subdirectory(psibase)
 
 if(DEFINED IS_NATIVE)

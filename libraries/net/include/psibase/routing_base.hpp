@@ -6,8 +6,8 @@
 #include <psibase/log.hpp>
 #include <psibase/message_serializer.hpp>
 #include <psibase/net_base.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/reflect.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/reflect.hpp>
 #include <random>
 #include <string>
 #include <type_traits>
@@ -27,7 +27,7 @@ namespace psibase::net
 
       std::string to_string() const { return "init: version=" + std::to_string(version); }
    };
-   PSIO_REFLECT(InitMessage, version);
+   PSIO1_REFLECT(InitMessage, version);
 
    template <typename T>
    concept has_block_id = requires(T& t) { t.block_id; };
@@ -97,12 +97,12 @@ namespace psibase::net
          return true;
       }
       template <typename T>
-      void try_recv_impl(peer_id peer, psio::input_stream& s)
+      void try_recv_impl(peer_id peer, psio1::input_stream& s)
       {
          try
          {
             using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
-            return derived().recv(peer, psio::from_frac<message_type>({s.pos, s.end}));
+            return derived().recv(peer, psio1::from_frac<message_type>({s.pos, s.end}));
          }
          catch (std::exception& e)
          {
@@ -113,7 +113,7 @@ namespace psibase::net
       template <template <typename...> class L, typename... T>
       void recv_impl(peer_id peer, int key, std::vector<char>&& msg, L<T...>*)
       {
-         psio::input_stream s(msg.data() + 1, msg.size() - 1);
+         psio1::input_stream s(msg.data() + 1, msg.size() - 1);
          ((key == T::type ? try_recv_impl<T>(peer, s) : (void)0), ...);
       }
       void recv(peer_id peer, std::vector<char>&& msg)
@@ -135,15 +135,15 @@ namespace psibase::net
          return result;
       }
       template <typename T, typename F>
-      void handle_message_impl(psio::input_stream& s, F&& f)
+      void handle_message_impl(psio1::input_stream& s, F&& f)
       {
          using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
-         f(psio::from_frac<message_type>({s.pos, s.end}));
+         f(psio1::from_frac<message_type>({s.pos, s.end}));
       }
       template <typename F, template <typename...> class L, typename... T>
       void handle_message_impl(int key, const std::vector<char>& msg, F&& f, L<T...>*)
       {
-         psio::input_stream s(msg.data() + 1, msg.size() - 1);
+         psio1::input_stream s(msg.data() + 1, msg.size() - 1);
          ((key == T::type ? handle_message_impl<T>(s, f) : (void)0), ...);
       }
       template <typename F>

@@ -36,7 +36,7 @@ namespace LocalService
       // This MUST called by the callback, and MUST NOT be called by anthing else.
       void finish(std::uint64_t id);
    };
-   PSIO_REFLECT(XRun,
+   PSIO1_REFLECT(XRun,
                 method(post, mode, action, maxTime, callback),
                 method(verify, transactionHash, claim, proof, maxTime, callback),
                 method(cancel, id, callback),

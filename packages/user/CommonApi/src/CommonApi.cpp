@@ -3,7 +3,7 @@
 #include <psibase/check.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/to_json.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/Transact.hpp>
 
@@ -24,7 +24,7 @@ namespace SystemService
       int         maxAge   = 0;
       bool        httpOnly = false;
    };
-   PSIO_REFLECT(CookieData, name, value, maxAge, httpOnly);
+   PSIO1_REFLECT(CookieData, name, value, maxAge, httpOnly);
 
    namespace
    {
@@ -32,8 +32,8 @@ namespace SystemService
       T extractData(HttpRequest& request)
       {
          request.body.push_back(0);
-         psio::json_token_stream jstream{request.body.data()};
-         auto                    result = psio::from_json<T>(jstream);
+         psio1::json_token_stream jstream{request.body.data()};
+         auto                    result = psio1::from_json<T>(jstream);
          request.body.pop_back();
          return result;
       }
@@ -126,7 +126,7 @@ namespace SystemService
    {
       auto to_json = [](const auto& obj)
       {
-         auto json = psio::convert_to_json(obj);
+         auto json = psio1::convert_to_json(obj);
          return HttpReply{
              .contentType = "application/json",
              .body        = {json.begin(), json.end()},
@@ -203,7 +203,7 @@ namespace SystemService
                return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
-                .body        = psio::convert_to_frac(extractData<Transaction>(request)),
+                .body        = psio1::convert_to_frac(extractData<Transaction>(request)),
                 .headers     = allowCors(),
             };
          }
@@ -213,7 +213,7 @@ namespace SystemService
                return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
-                .body        = psio::convert_to_frac(extractData<SignedTransaction>(request)),
+                .body        = psio1::convert_to_frac(extractData<SignedTransaction>(request)),
                 .headers     = allowCors(),
             };
          }

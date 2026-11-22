@@ -459,7 +459,7 @@ namespace psibase::http
    void HttpConnector::operator()(std::span<const char> args, const AddSocketFn& add)
    {
       using Args = std::tuple<HttpRequest, std::optional<TLSInfo>, std::optional<SocketEndpoint>>;
-      auto [request, tls, endpoint] = psio::from_frac<Args>(args);
+      auto [request, tls, endpoint] = psio1::from_frac<Args>(args);
       if (!endpoint)
       {
          std::string_view target = request.target;

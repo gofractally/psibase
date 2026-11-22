@@ -113,7 +113,7 @@ namespace SystemService
                        std::vector<psibase::AccountNumber> rejecters,
                        std::optional<ServiceMethod>        method);
    };
-   PSIO_REFLECT(AuthInterface,
+   PSIO1_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),
@@ -130,7 +130,7 @@ namespace SystemService
       // Gets the eventMerkle root and writes back any cached state
       auto saveMerkle() -> psibase::Checksum256;
    };
-   PSIO_REFLECT(EventIndexerInterface, method(startBlock), method(sync), method(saveMerkle))
+   PSIO1_REFLECT(EventIndexerInterface, method(startBlock), method(sync), method(saveMerkle))
 
    struct VerifyInterface
    {
@@ -138,13 +138,13 @@ namespace SystemService
                      psibase::Claim       claim,
                      std::vector<char>    proof);
    };
-   PSIO_REFLECT(VerifyInterface, method(verifySys, transactionHash, claim, proof))
+   PSIO1_REFLECT(VerifyInterface, method(verifySys, transactionHash, claim, proof))
 
    struct AuthTarget
    {
       psibase::AccountNumber                sender;
       std::optional<psibase::ServiceMethod> action;
-      PSIO_REFLECT(AuthTarget, sender, action)
+      PSIO1_REFLECT(AuthTarget, sender, action)
    };
 
    struct TransactStatus
@@ -153,17 +153,17 @@ namespace SystemService
 
       std::optional<std::vector<psibase::Checksum256>> bootTransactions;
    };
-   PSIO_REFLECT(TransactStatus, enforceAuth, bootTransactions)
+   PSIO1_REFLECT(TransactStatus, enforceAuth, bootTransactions)
    using TransactStatusTable = psibase::Table<TransactStatus, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(TransactStatusTable)
+   PSIO1_REFLECT_TYPENAME(TransactStatusTable)
 
    struct ResMonitoringConfig
    {
       bool enabled = false;
    };
-   PSIO_REFLECT(ResMonitoringConfig, enabled)
+   PSIO1_REFLECT(ResMonitoringConfig, enabled)
    using ResMonitoringConfigTable = psibase::Table<ResMonitoringConfig, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(ResMonitoringConfigTable)
+   PSIO1_REFLECT_TYPENAME(ResMonitoringConfigTable)
 
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary
@@ -171,9 +171,9 @@ namespace SystemService
       std::array<uint32_t, 256> blockSuffixes;
       std::uint32_t             blockNum;
    };
-   PSIO_REFLECT(BlockSummary, blockSuffixes, blockNum)
+   PSIO1_REFLECT(BlockSummary, blockSuffixes, blockNum)
    using BlockSummaryTable = psibase::Table<BlockSummary, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(BlockSummaryTable)
+   PSIO1_REFLECT_TYPENAME(BlockSummaryTable)
 
    // This table tracks transaction IDs to detect duplicates.
    struct IncludedTrx
@@ -183,9 +183,9 @@ namespace SystemService
 
       using Key = psibase::CompositeKey<&IncludedTrx::expiration, &IncludedTrx::id>;
    };
-   PSIO_REFLECT(IncludedTrx, expiration, id)
+   PSIO1_REFLECT(IncludedTrx, expiration, id)
    using IncludedTrxTable = psibase::Table<IncludedTrx, IncludedTrx::Key{}>;
-   PSIO_REFLECT_TYPENAME(IncludedTrxTable)
+   PSIO1_REFLECT_TYPENAME(IncludedTrxTable)
 
    enum class CallbackType : std::uint32_t
    {
@@ -199,27 +199,27 @@ namespace SystemService
       CallbackType                 type;
       std::vector<psibase::Action> actions;
    };
-   PSIO_REFLECT(Callbacks, type, actions)
+   PSIO1_REFLECT(Callbacks, type, actions)
 
    using CallbacksTable = psibase::Table<Callbacks, &Callbacks::type>;
-   PSIO_REFLECT_TYPENAME(CallbacksTable)
+   PSIO1_REFLECT_TYPENAME(CallbacksTable)
 
    struct EventIndexer
    {
       psibase::AccountNumber service;
    };
-   PSIO_REFLECT(EventIndexer, service)
+   PSIO1_REFLECT(EventIndexer, service)
    using EventIndexerTable = psibase::Table<EventIndexer, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(EventIndexerTable)
+   PSIO1_REFLECT_TYPENAME(EventIndexerTable)
 
    struct SnapshotInfo
    {
       psibase::BlockTime lastSnapshot;
       psibase::Seconds   snapshotInterval;
    };
-   PSIO_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
+   PSIO1_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
    using SnapshotInfoTable = psibase::Table<SnapshotInfo, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(SnapshotInfoTable)
+   PSIO1_REFLECT_TYPENAME(SnapshotInfoTable)
 
    /// All transactions enter the chain through this service
    ///
@@ -254,7 +254,7 @@ namespace SystemService
       /// the node operator is committing as part of the boot sequence. The subsequent
       /// transactions listed must then be pushed in order, and no other transactions
       /// will be accepted until [finishBoot] is run.
-      void startBoot(psio::view<const std::vector<psibase::Checksum256>> bootTransactions);
+      void startBoot(psio1::view<const std::vector<psibase::Checksum256>> bootTransactions);
 
       /// Only called once during chain initialization
       ///
@@ -269,7 +269,7 @@ namespace SystemService
       void startBlock();
 
       /// Called by RTransact to execute a transaction speculatively
-      void execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
+      void execTrx(psio1::view<const psio1::shared_view_ptr<psibase::Transaction>> trx,
                    bool                                                          speculative);
 
       /// Called by native code on objective writes to the database
@@ -340,7 +340,7 @@ namespace SystemService
 
       /// Checks authorization for the sender of the first action
       bool checkFirstAuth(psibase::Checksum256                   id,
-                          psio::view<const psibase::Transaction> transaction);
+                          psio1::view<const psibase::Transaction> transaction);
 
       /// Enable/disable resource monitoring
       void resMonitoring(bool enable);
@@ -376,7 +376,7 @@ namespace SystemService
       void setWork(bool work);
 
       /// Get the currently executing transaction
-      psio::view<const psibase::Transaction> getTransaction() const;
+      psio1::view<const psibase::Transaction> getTransaction() const;
 
       /// Returns true if running a transaction
       bool isTransaction() const;
@@ -403,7 +403,7 @@ namespace SystemService
          };
       };
    };
-   PSIO_REFLECT(Transact,
+   PSIO1_REFLECT(Transact,
                 allowHashedMethods(),
                 method(startBoot, bootTransactions),
                 method(finishBoot),
@@ -530,12 +530,12 @@ namespace SystemService
          return {0, 0};  // Usable for transactions in the genesis block
    }
 
-   inline bool isStartBlock(psio::view<const psibase::Action> act)
+   inline bool isStartBlock(psio1::view<const psibase::Action> act)
    {
       return act.sender() == psibase::AccountNumber{} && act.service() == Transact::service &&
              act.method() == psibase::MethodNumber{"startBlock"};
    }
-   inline bool isStartBlock(psio::view<const psibase::Transaction> tx)
+   inline bool isStartBlock(psio1::view<const psibase::Transaction> tx)
    {
       return tx.actions().size() == 1 && isStartBlock(tx.actions()[0]);
    }

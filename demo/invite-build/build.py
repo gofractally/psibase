@@ -15,7 +15,7 @@ SOURCE = ROOT / f'packages/user/Invite/src/{NAME}.cpp'
 includes = [ROOT / 'packages/user/Invite/include']
 includes += [p for p in sorted((ROOT / 'packages').glob('**/include')) if 'target' not in p.parts]
 includes += [ROOT / 'libraries/psibase/common/include', ROOT / 'libraries/psibase/wasm32-psibase',
-             ROOT / 'libraries/psio/include', REL / 'include', REL / 'include/wasm32-psibase', REL / 'include/botan-3']
+             ROOT / 'libraries/psio1/include', REL / 'include', REL / 'include/wasm32-psibase', REL / 'include/botan-3']
 flags = ['--target=wasm32-wasip1', '-std=c++23', '-O2', '-fno-exceptions',
          '-DCOMPILING_SERVICE', '-DCOMPILING_WASM', '-mthread-model', 'single',
          '-msign-ext', '-mnontrapping-fptoint', '-msimd128', '-mbulk-memory']
@@ -26,7 +26,7 @@ builtins = next((SDK / 'lib/clang').glob('*/lib/wasm32-unknown-wasip1/libclang_r
 common = [str(CLANG), *flags, str(SOURCE), str(ROOT / 'libraries/psibase/service/src/exceptions.cpp'), '-L', str(lib)]
 service = ['-Wl,--stack-first', '-Wl,--entry,start', '-Wl,--export=called',
            '-Wl,-z,stack-size=32768', '-Wl,--no-merge-data-segments', '-nostdlib',
-           '-Wl,--strip-all', '-lpsibase-service-base', '-lSpki', '-lPrivateKeyInfo', '-lbotan-3', '-lpsibase', '-lpsio',
+           '-Wl,--strip-all', '-lpsibase-service-base', '-lSpki', '-lPrivateKeyInfo', '-lbotan-3', '-lpsibase', '-lpsio1',
            '-lcrypto', '-lz', '-lc++', '-lc++abi-replacements', '-lc-simple-malloc', '-lc',
            '-lpsibase-service-wasi-polyfill', str(builtins)]
 cmd = [*common, *service, '-o', str(OUT / f'{NAME}.wasm')]
@@ -38,7 +38,7 @@ print(OUT / f'{NAME}.wasm')
 test_flags = [f for f in flags if f != '-DCOMPILING_SERVICE']
 schema_cmd = [str(CLANG), *test_flags, '-DCOMPILING_TESTS', '-DPSIBASE_GENERATE_SCHEMA',
               str(SOURCE), '-L', str(lib), '-Wl,--entry,_start', '-nostdlib',
-              '-Wl,--strip-all', '-lpsibase', '-lcrypto', '-lpsio', '-lz',
+              '-Wl,--strip-all', '-lpsibase', '-lcrypto', '-lpsio1', '-lz',
               '-lc++', '-lc++abi', '-lc', '-lpsitestlib', '-lSpki', '-lPrivateKeyInfo',
               str(builtins), str(SDK / 'share/wasi-sysroot/lib/wasm32-wasip1/crt1.o'),
               '-o', str(OUT / f'{NAME}-schema-gen.wasm')]

@@ -10,5 +10,5 @@ namespace TestService
       static constexpr auto             service = psibase::AccountNumber{"x-keyscall"};
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
    };
-   PSIO_REFLECT(XKeysCaller, method(serveSys, request))
+   PSIO1_REFLECT(XKeysCaller, method(serveSys, request))
 }  // namespace TestService

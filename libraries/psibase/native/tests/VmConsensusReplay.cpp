@@ -40,7 +40,7 @@ namespace
       std::vector<std::string> verifiedTransactionIds;
       std::vector<replay::NamespaceCount> namespaces;
    };
-   PSIO_REFLECT(Result, passed, profile, inputBlockSha256, inputBeforeSha256,
+   PSIO1_REFLECT(Result, passed, profile, inputBlockSha256, inputBeforeSha256,
                 expectedAfterSha256, actualAfterSha256, blockHeaderSha256,
                 transactionTraceSha256, proofTraceSha256, traceScope,
                 transactions, proofClaims, proofTimeoutMs, verifiedTransactionIds, namespaces)
@@ -69,7 +69,7 @@ namespace
    {
       std::ofstream output(path);
       output.exceptions(std::ios::badbit | std::ios::failbit);
-      output << psio::convert_to_json(result) << '\n';
+      output << psio1::convert_to_json(result) << '\n';
    }
 
    std::string profile()
@@ -88,7 +88,7 @@ namespace
    void run(const std::filesystem::path& input, const std::filesystem::path& output)
    {
       auto manifestBytes = readFile(input / "manifest.json");
-      auto manifest = psio::convert_from_json<replay::Manifest>(
+      auto manifest = psio1::convert_from_json<replay::Manifest>(
           std::string(manifestBytes.data(), manifestBytes.size()));
       check(manifest.version == 1, "unsupported replay capture version");
       check(manifest.proofClaims > 0 && manifest.transactions > 0,
@@ -103,7 +103,7 @@ namespace
       // digest. No chain namespace can be dropped to make equality pass.
       replay::readSnapshot(input / "after.rows", false, [](auto, auto&, auto&) {});
       auto blockBytes = readFile(input / "block.frac");
-      auto source = psio::from_frac<Block>(blockBytes);
+      auto source = psio1::from_frac<Block>(blockBytes);
       check(source.header.blockNum == manifest.blockNum &&
                 source.transactions.size() == manifest.transactions,
             "replay block does not match its manifest");
@@ -149,7 +149,7 @@ namespace
 
       ExecutionContext::registerHostFunctions();
       SystemContext system{shared, WasmCache{128}, {}, std::make_shared<WatchdogManager>(), sockets};
-      const auto expectedHeader = psio::to_frac(source.header);
+      const auto expectedHeader = psio1::to_frac(source.header);
       BlockContext block(system, shared.getHead(), writer, false);
       block.start(std::move(source));
       Checksum256 transactionDigest{}, proofDigest{};
@@ -176,20 +176,20 @@ namespace
       }
       auto [after, id] = block.writeRevision(NullProver{}, Claim{});
       shared.setHead(*writer, after);
-      result.blockHeaderSha256 = replay::hex(sha256(psio::to_frac(block.current.header)));
+      result.blockHeaderSha256 = replay::hex(sha256(psio1::to_frac(block.current.header)));
       result.transactionTraceSha256 = replay::hex(transactionDigest);
       result.proofTraceSha256 = replay::hex(proofDigest);
       result.namespaces = replay::snapshot(shared, after, output / "actual-after.rows", false);
       result.actualAfterSha256 = replay::fileHash(output / "actual-after.rows");
       saveResult(output / "result.json", result);
       check(result.proofClaims == manifest.proofClaims, "replay verified a different proof count");
-      check(psio::to_frac(block.current.header) == expectedHeader,
+      check(psio1::to_frac(block.current.header) == expectedHeader,
             "replay changed block header/transaction/event/consensus commitments");
       check(replay::sameFile(input / "after.rows", output / "actual-after.rows"),
             "replay changed objective database bytes");
       result.passed = true;
       saveResult(output / "result.json", result);
-      std::cout << psio::convert_to_json(result) << '\n';
+      std::cout << psio1::convert_to_json(result) << '\n';
    }
 }
 

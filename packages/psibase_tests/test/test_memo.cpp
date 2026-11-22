@@ -7,7 +7,7 @@
 
 using namespace psibase;
 using namespace TestService;
-using namespace psio;
+using namespace psio1;
 
 TEST_CASE("memo")
 {
@@ -35,7 +35,7 @@ TEST_CASE("memo")
    CHECK(convert_to_json(Memo{shortData}) == convert_to_json(shortData));
    CHECK(t.from(TestMemo::service)
              .to<TestMemo>()
-             .testJson(psio::convert_to_json(longData))
+             .testJson(psio1::convert_to_json(longData))
              .failed("Memo exceeds 80 bytes"));
 
    CHECK(t.from(TestMemo::service)

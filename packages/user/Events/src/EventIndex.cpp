@@ -3,7 +3,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio/schema.hpp>
+#include <psio1/schema.hpp>
 #include <regex>
 #include <services/user/Events.hpp>
 
@@ -12,7 +12,7 @@
 #include "types.hpp"
 
 using namespace psibase;
-using namespace psio::schema_types;
+using namespace psio1::schema_types;
 using namespace UserService;
 
 void EventIndex::update(EventDb db, psibase::AccountNumber service, psibase::MethodNumber event)
@@ -58,7 +58,7 @@ namespace
       SchemaCache&        cache = SchemaCache::instance();
       SecondaryIndexTable secondary{
           DbId::writeOnly,
-          psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum))};
+          psio1::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum))};
       EventWrapper     wrapper{nullptr};
       EventIndexHandle handle{KvMode::write};
       bool             operator()(EventTable& events, EventDb db, std::uint64_t eventNum)
@@ -71,7 +71,7 @@ namespace
          if (!ctype)
             return true;
 
-         FracParser parser(psio::FracStream{row->rawData()}, ctype, psibase_builtins, false);
+         FracParser parser(psio1::FracStream{row->rawData()}, ctype, psibase_builtins, false);
 
          // validate remaining data
          while (auto item = parser.next())
@@ -86,7 +86,7 @@ namespace
             indexes.emplace(SecondaryIndexRecord{.indexes = std::vector{SecondaryIndexInfo{}}});
          for (const auto& index : indexes->indexes)
          {
-            psio::vector_stream stream{key};
+            psio1::vector_stream stream{key};
             to_key(EventIndexTable{db, row->service(), row->type()}, stream);
             to_key(index.indexNum, stream);
             for (const auto& column : index.columns())
@@ -124,7 +124,7 @@ namespace
    {
       EventIndexTable id{item.db, item.service, item.event};
       auto            handle = EventIndexHandle{KvMode::readWrite};
-      auto            key    = psio::convert_to_key(id);
+      auto            key    = psio1::convert_to_key(id);
       if (item.endKey != 0)
       {
          key.push_back(0xff);
@@ -175,9 +175,9 @@ namespace
                 auto event = events.getView(eventNum);
                 if (!event)
                    return true;
-                FracParser parser{psio::FracStream{event->rawData()}, ctype, psibase_builtins,
+                FracParser parser{psio1::FracStream{event->rawData()}, ctype, psibase_builtins,
                                   false};
-                psio::vector_stream stream{subkey};
+                psio1::vector_stream stream{subkey};
                 for (const auto& column : item.info.columns())
                 {
                    parser.set_pos(0);
@@ -196,7 +196,7 @@ namespace
             // mark index as ready
             auto secondary = SecondaryIndexTable{
                 DbId::writeOnly,
-                psio::convert_to_key(std::tuple(EventIndex::service, secondaryIndexReadyTableNum)),
+                psio1::convert_to_key(std::tuple(EventIndex::service, secondaryIndexReadyTableNum)),
                 KvMode::readWrite};
             auto row = lookupIndexRecord(secondary, std::tuple(item.db, item.service, item.event));
             row.indexes.push_back(item.info);
@@ -328,7 +328,7 @@ void queueIndexChanges()
             if (!existing)
             {
                auto key =
-                   psio::convert_to_key(EventIndexTable{dirty.db, dirty.service, dirty.event});
+                   psio1::convert_to_key(EventIndexTable{dirty.db, dirty.service, dirty.event});
                if (add)
                {
                   key.push_back(0xFF);

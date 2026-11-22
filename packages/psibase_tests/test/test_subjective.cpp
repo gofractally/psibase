@@ -9,7 +9,7 @@
 #include <services/test/XSudo.hpp>
 
 using namespace psibase;
-using namespace psio;
+using namespace psio1;
 using namespace SystemService;
 using namespace TestService;
 

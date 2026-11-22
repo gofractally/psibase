@@ -8,7 +8,7 @@ struct payload
    int         number;
    std::string memo;
 };
-PSIO_REFLECT(payload, number, memo)
+PSIO1_REFLECT(payload, number, memo)
 
 int ctors_called = 0;
 int start_called = 0;
@@ -39,7 +39,7 @@ extern "C" void called(AccountNumber this_service, AccountNumber sender)
 {
    psibase::internal::receiver = this_service;
    auto act                    = getCurrentAction();
-   auto pl                     = psio::from_frac_strict<payload>(act.rawData);
+   auto pl                     = psio1::from_frac_strict<payload>(act.rawData);
    check(ctors_called == 1, "ctors != 1");
    check(start_called == 1, "start != 1");
    check(this_service == TestServiceEntry::service, "called: this_service = " + this_service.str());
@@ -63,11 +63,11 @@ extern "C" void called(AccountNumber this_service, AccountNumber sender)
    }
    if (pl.number)
    {
-      auto r = psio::from_frac<int>(call({
+      auto r = psio1::from_frac<int>(call({
           .sender  = this_service,
           .service = this_service,
           .method  = act.method,
-          .rawData = psio::convert_to_frac(payload{
+          .rawData = psio1::convert_to_frac(payload{
               .number = pl.number - 1,
               .memo   = pl.memo,
           }),

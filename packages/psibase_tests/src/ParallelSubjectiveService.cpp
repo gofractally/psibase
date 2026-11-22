@@ -14,19 +14,19 @@ struct ParallelSubjectiveRow
    std::string   key;
    std::uint32_t value;
 };
-PSIO_REFLECT(ParallelSubjectiveRow, key, value)
+PSIO1_REFLECT(ParallelSubjectiveRow, key, value)
 
 using ParallelSubjectiveTable = psibase::Table<ParallelSubjectiveRow, &ParallelSubjectiveRow::key>;
-PSIO_REFLECT_TYPENAME(ParallelSubjectiveTable)
+PSIO1_REFLECT_TYPENAME(ParallelSubjectiveTable)
 
 struct GeRow
 {
    std::uint32_t key;
 };
-PSIO_REFLECT(GeRow, key)
+PSIO1_REFLECT(GeRow, key)
 
 using GeTable = Table<GeRow, &GeRow::key>;
-PSIO_REFLECT_TYPENAME(GeTable)
+PSIO1_REFLECT_TYPENAME(GeTable)
 
 struct ParallelSubjectiveService : psibase::Service
 {
@@ -35,7 +35,7 @@ struct ParallelSubjectiveService : psibase::Service
    static constexpr auto             serviceFlags = psibase::CodeRow::isPrivileged;
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };
-PSIO_REFLECT(ParallelSubjectiveService, method(serveSys, req))
+PSIO1_REFLECT(ParallelSubjectiveService, method(serveSys, req))
 PSIBASE_REFLECT_TABLES(ParallelSubjectiveService, ParallelSubjectiveService::Tables)
 
 volatile int dummy;
@@ -53,20 +53,20 @@ struct IncResponse
    std::uint32_t attempts = 0;
    std::uint32_t value    = 0;
 };
-PSIO_REFLECT(IncResponse, attempts, value)
+PSIO1_REFLECT(IncResponse, attempts, value)
 
 template <typename T>
 T convert_from_json(const std::vector<char>& data)
 {
-   return psio::convert_from_json<T>(std::string(data.data(), data.size()));
+   return psio1::convert_from_json<T>(std::string(data.data(), data.size()));
 }
 
 template <typename T>
 HttpReply json_reply(const T& body)
 {
    HttpReply           response{.contentType = "application/json", .headers = allowCors()};
-   psio::vector_stream stream{response.body};
-   psio::to_json(body, stream);
+   psio1::vector_stream stream{response.body};
+   psio1::to_json(body, stream);
    return response;
 }
 

@@ -30,6 +30,6 @@ namespace UserService
       std::optional<std::vector<uint32_t>> gmp(uint32_t              population,
                                                std::vector<uint32_t> allowed_groups);
    };
-   PSIO_REFLECT(SubgroupsService, method(gmp, population, allowed_groups));
+   PSIO1_REFLECT(SubgroupsService, method(gmp, population, allowed_groups));
 
 }  // namespace UserService

@@ -89,9 +89,9 @@ using namespace SystemService::AuthSig;
 psibase::TransactionTrace psibase::tester::pushTransaction(std::uint32_t            chain,
                                                            const SignedTransaction& signedTrx)
 {
-   std::vector<char> packed_trx = psio::convert_to_frac(signedTrx);
+   std::vector<char> packed_trx = psio1::convert_to_frac(signedTrx);
    auto size = tester::raw::pushTransaction(chain, packed_trx.data(), packed_trx.size());
-   return psio::from_frac<TransactionTrace>(getResult(size));
+   return psio1::from_frac<TransactionTrace>(getResult(size));
 }
 
 psibase::TransactionTrace psibase::tester::runAction(std::uint32_t chain,
@@ -99,10 +99,10 @@ psibase::TransactionTrace psibase::tester::runAction(std::uint32_t chain,
                                                      bool          head,
                                                      const Action& act)
 {
-   auto packedAction = psio::to_frac(act);
+   auto packedAction = psio1::to_frac(act);
    auto traceSize =
        tester::raw::runAction(chain, mode, head, packedAction.data(), packedAction.size());
-   return psio::from_frac<TransactionTrace>(psibase::getResult(traceSize));
+   return psio1::from_frac<TransactionTrace>(psibase::getResult(traceSize));
 }
 
 psibase::TraceResult::TraceResult(TransactionTrace&& t) : _t(t) {}
@@ -181,7 +181,7 @@ namespace
    {
       using namespace psibase;
       using namespace LocalService;
-      auto prefix = psio::convert_to_key(codePrefix());
+      auto prefix = psio1::convert_to_key(codePrefix());
       if (self.kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
          return;
       auto serviceRoot = std::getenv("PSIBASE_DATADIR");
@@ -222,7 +222,7 @@ namespace
                                        .method      = "POST",
                                        .target      = "/register_server",
                                        .contentType = "application/json"};
-               psio::vector_stream stream{req.body};
+               psio1::vector_stream stream{req.body};
                to_json(RegisteredServiceRow{account, *serviceInfo.server}, stream);
                if (account == XPackages::service)
                   early_requests.push_back(std::move(req));
@@ -248,7 +248,7 @@ namespace
          requests.push_back(HttpRequest{
              .host        = XPackages::service.str() + "." + rootHost,
              .method      = "PUT",
-             .target      = "/manifest/" + psio::hex(package.sha256.begin(), package.sha256.end()),
+             .target      = "/manifest/" + psio1::hex(package.sha256.begin(), package.sha256.end()),
              .contentType = "application/json",
              .body        = package.manifest(),
          });
@@ -258,7 +258,7 @@ namespace
              .target      = "/postinstall",
              .contentType = "application/json",
          };
-         psio::vector_stream stream(postinstall.body);
+         psio1::vector_stream stream(postinstall.body);
          to_json(
              LocalPackage{
                  .name        = package.meta.name,
@@ -323,7 +323,7 @@ namespace
               .sender  = {},
               .service = psibase::transactionServiceNum,
               .method  = psibase::MethodNumber("startBlock"),
-              .rawData = psio::to_frac(std::tuple()),
+              .rawData = psio1::to_frac(std::tuple()),
           }},
       }}};
    }
@@ -412,7 +412,7 @@ void psibase::TestChain::startBlock(std::string_view time)
 {
    std::int64_t  sec;
    std::uint32_t nsec;
-   if (!psio::parse_system_time(time, sec, nsec))
+   if (!psio1::parse_system_time(time, sec, nsec))
       abortMessage("bad time");
    startBlock(TimePointUSec{Seconds{sec} + MicroSeconds{nsec / 1000}});
 }
@@ -520,7 +520,7 @@ namespace
       psibase::RunMode     mode;
       psibase::Action      action;
       psibase::Checksum256 context;
-      PSIO_REFLECT(RunTokenData, success, mode, action, context)
+      PSIO1_REFLECT(RunTokenData, success, mode, action, context)
    };
 
    psibase::Checksum256 makeRunContext(psibase::TestChain&                      chain,
@@ -569,19 +569,19 @@ namespace
          {
             check(act.sender == AccountNumber{} && act.rawData.empty(),
                   "Invalid preverifyTransaction callback");
-            act.rawData = psio::to_frac(std::tuple(trx));
+            act.rawData = psio1::to_frac(std::tuple(trx));
             auto trace  = tester::runAction(chain.nativeHandle(), RunMode::callback, false, act);
             if (trace.error)
                abortMessage("preverify failed: " + *trace.error);
             check(trace.actionTraces.size() == 1, "Wrong number of action traces");
-            if (auto result = psio::from_frac<std::optional<std::vector<std::optional<RunToken>>>>(
+            if (auto result = psio1::from_frac<std::optional<std::vector<std::optional<RunToken>>>>(
                     trace.actionTraces.front().rawRetval))
             {
                for (const auto& token : *result)
                {
                   if (token)
                   {
-                     tokens.push_back(psio::from_frac<RunTokenData>(*token));
+                     tokens.push_back(psio1::from_frac<RunTokenData>(*token));
                   }
                   else
                   {
@@ -607,7 +607,7 @@ namespace
          {
             check(act.sender == AccountNumber{} && act.rawData.empty(),
                   "Invalid rejectTransaction callback");
-            act.rawData = psio::to_frac(std::tie(id, trace));
+            act.rawData = psio1::to_frac(std::tie(id, trace));
             auto trace  = tester::runAction(chain.nativeHandle(), RunMode::callback, false, act);
             if (trace.error)
                abortMessage("onTransaction failed: " + *trace.error);
@@ -634,7 +634,7 @@ namespace
          Action     act{.sender  = AccountNumber{},
                         .service = claim.service(),
                         .method  = MethodNumber("verifySys"),
-                        .rawData = psio::to_frac(args)};
+                        .rawData = psio1::to_frac(args)};
          if (token && token->success && token->mode == RunMode::verify && token->action == act &&
              token->context == verifyContext)
          {
@@ -691,8 +691,8 @@ void psibase::TestChain::pushBlock(const SignedBlock& block)
    if (info.blockId != status->head->blockId)
    {
       abortMessage(std::format("block header does not match: {} != {}",
-                               psio::convert_to_json(info.header),
-                               psio::convert_to_json(status->head->header)));
+                               psio1::convert_to_json(info.header),
+                               psio1::convert_to_json(status->head->header)));
    }
 }
 
@@ -704,12 +704,12 @@ std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction
       {
          check(act.sender == AccountNumber{} && act.rawData.empty(),
                "Invalid nextTransaction callback");
-         act.rawData = psio::to_frac(std::tuple());
+         act.rawData = psio1::to_frac(std::tuple());
          auto trace  = tester::runAction(id, RunMode::callback, false, act);
          if (trace.error)
             abortMessage("nextTransaction failed:\n" + prettyTrace(trace));
          check(trace.actionTraces.size() == 1, "Wrong number of action traces");
-         if (auto tx = psio::from_frac<std::optional<SignedTransaction>>(
+         if (auto tx = psio1::from_frac<std::optional<SignedTransaction>>(
                  trace.actionTraces.front().rawRetval))
          {
             return pushTransaction(*tx);
@@ -722,13 +722,13 @@ std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction
 bool psibase::TestChain::runQueueItem()
 {
    if (auto row = kvGreaterEqual<RunRow>(RunRow::db, runPrefix(),
-                                         psio::convert_to_key(runPrefix()).size()))
+                                         psio1::convert_to_key(runPrefix()).size()))
    {
       auto trace = tester::runAction(id, row->mode, true, row->action);
-      auto token = psio::to_frac(RunTokenData{!trace.error, row->mode, row->action,
+      auto token = psio1::to_frac(RunTokenData{!trace.error, row->mode, row->action,
                                               makeRunContext(*this, row->mode, status)});
       auto continuationArgs =
-          psio::to_frac(std::tuple(row->id, std::move(trace), std::move(token)));
+          psio1::to_frac(std::tuple(row->id, std::move(trace), std::move(token)));
       auto continuation      = Action{.service = row->continuation.service,
                                       .method  = row->continuation.method,
                                       .rawData = std::move(continuationArgs)};
@@ -755,7 +755,7 @@ psibase::AsyncHttpReply psibase::TestChain::asyncHttp(const HttpRequest& request
    if (producing && isAutoBlockStart)
       finishBlock();
 
-   std::vector<char> packed_request = psio::convert_to_frac(request);
+   std::vector<char> packed_request = psio1::convert_to_frac(request);
    auto fd = tester::raw::httpRequest(id, packed_request.data(), packed_request.size());
    if (isAutoRun)
       runAll();
@@ -779,7 +779,7 @@ std::optional<psibase::HttpReply> psibase::AsyncHttpReply::poll()
    }
 
    fd = -1;
-   return psio::from_frac<HttpReply>(getResult(size));
+   return psio1::from_frac<HttpReply>(getResult(size));
 }
 
 psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
@@ -802,7 +802,7 @@ namespace
    {
       void loginSys(std::string rootHost) {}
    };
-   PSIO_REFLECT(LoginInterface, method(loginSys, rootHost))
+   PSIO1_REFLECT(LoginInterface, method(loginSys, rootHost))
 }  // namespace
 
 std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
@@ -820,7 +820,7 @@ std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
 }
 
 std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId      db,
-                                                              psio::input_stream key)
+                                                              psio1::input_stream key)
 {
    auto size = tester::raw::kvGet(id, db, key.pos, key.remaining());
    if (size == -1)
@@ -829,7 +829,7 @@ std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId     
 }
 
 std::optional<std::vector<char>> psibase::TestChain::kvGreaterEqualRaw(DbId               db,
-                                                                       psio::input_stream key,
+                                                                       psio1::input_stream key,
                                                                        uint32_t matchKeySize)
 {
    auto size = tester::raw::kvGreaterEqual(id, db, key.pos, key.remaining(), matchKeySize);
@@ -838,7 +838,7 @@ std::optional<std::vector<char>> psibase::TestChain::kvGreaterEqualRaw(DbId     
    return psibase::getResult(size);
 }
 
-void psibase::TestChain::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
+void psibase::TestChain::kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value)
 {
    tester::raw::kvPut(id, db, key.pos, key.remaining(), value.pos, value.remaining());
 }

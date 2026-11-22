@@ -1,7 +1,7 @@
 #pragma once
-#include <psio/from_json.hpp>
-#include <psio/reflect.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/from_json.hpp>
+#include <psio1/reflect.hpp>
+#include <psio1/to_json.hpp>
 
 namespace psibase
 {
@@ -46,19 +46,19 @@ namespace psibase
       /// [str] will return a string which doesn't match `s`.
       /// Many, but not all, invalid names produce a hashed value.
       /// Some produce 0.
-      constexpr explicit MethodNumber(std::string_view s) : value(psio::detail::method_to_number(s))
+      constexpr explicit MethodNumber(std::string_view s) : value(psio1::detail::method_to_number(s))
       {
       }
 
       /// Get string (name)
-      std::string str() const { return psio::detail::number_to_method(value); }
+      std::string str() const { return psio1::detail::number_to_method(value); }
 
       /// Comparisons
       ///
       /// Compares by 64-bit `value`. This does not sort by the
       /// string (name) form.
       auto operator<=>(const MethodNumber&) const = default;
-      PSIO_REFLECT(MethodNumber, definitionWillNotChange(), value)
+      PSIO1_REFLECT(MethodNumber, definitionWillNotChange(), value)
    };
 
    template <typename S>

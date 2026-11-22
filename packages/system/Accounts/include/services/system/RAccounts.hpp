@@ -10,6 +10,6 @@ namespace SystemService
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
    };
-   PSIO_REFLECT(RAccounts, method(serveSys, request))
+   PSIO1_REFLECT(RAccounts, method(serveSys, request))
    PSIBASE_REFLECT_TABLES(RAccounts)
 }  // namespace SystemService

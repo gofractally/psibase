@@ -15,17 +15,17 @@ namespace SystemService
       std::string            endpoint;
       psibase::Claim         claim;
    };
-   PSIO_REFLECT(CandidateInfo, account, endpoint, claim)
+   PSIO1_REFLECT(CandidateInfo, account, endpoint, claim)
    using CandidateInfoTable = psibase::Table<CandidateInfo, &CandidateInfo::account>;
-   PSIO_REFLECT_TYPENAME(CandidateInfoTable)
+   PSIO1_REFLECT_TYPENAME(CandidateInfoTable)
 
    struct ProdsConfig
    {
       uint8_t maxProds;
    };
-   PSIO_REFLECT(ProdsConfig, maxProds)
+   PSIO1_REFLECT(ProdsConfig, maxProds)
    using ProdsConfigTable = psibase::Table<ProdsConfig, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(ProdsConfigTable)
+   PSIO1_REFLECT_TYPENAME(ProdsConfigTable)
 
    // This service manages the active producers.
    // It must have native write permission
@@ -110,7 +110,7 @@ namespace SystemService
       bool isRejectSys(psibase::AccountNumber              sender,
                        std::vector<psibase::AccountNumber> rejecters);
    };
-   PSIO_REFLECT(Producers,
+   PSIO1_REFLECT(Producers,
                 method(init),
                 method(setConsensus, consensus),
                 method(setProducers, producers),

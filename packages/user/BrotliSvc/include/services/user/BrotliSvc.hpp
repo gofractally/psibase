@@ -1,7 +1,7 @@
 #pragma once
 
 #include <psibase/psibase.hpp>
-#include <psio/view.hpp>
+#include <psio1/view.hpp>
 #include <vector>
 
 namespace UserService
@@ -17,5 +17,5 @@ namespace UserService
       std::vector<char> decompress(const std::vector<char>& content);
    };
 
-   PSIO_REFLECT(Brotli, method(decompress, content), );
+   PSIO1_REFLECT(Brotli, method(decompress, content), );
 }  // namespace UserService

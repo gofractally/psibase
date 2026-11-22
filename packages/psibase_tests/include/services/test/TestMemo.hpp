@@ -20,11 +20,11 @@ namespace TestService
 #endif
 
       std::string testValue(Memo memo);
-      std::string testView(psio::view<const Memo> memo);
+      std::string testView(psio1::view<const Memo> memo);
       void        testJson(const std::string& data);
       void        testConstruct(const std::string& data);
    };
-   PSIO_REFLECT(TestMemo,
+   PSIO1_REFLECT(TestMemo,
                 method(testValue, memo),
                 method(testView, memo),
                 method(testJson, memo),

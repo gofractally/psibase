@@ -56,7 +56,7 @@ namespace SystemService
             return account;
          }
       };
-      PSIO_REFLECT(AuthQuery,
+      PSIO1_REFLECT(AuthQuery,
                    method(accWithKey, pubkeyPem, gt, ge, lt, le, first, last, before, after),
                    method(account, name)
                    //

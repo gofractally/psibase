@@ -12,8 +12,8 @@ namespace LocalService
       static constexpr auto   service = psibase::AccountNumber{"x-db"};
       static constexpr auto   flags   = psibase::CodeRow::isPrivileged;
       psibase::UniqueKvHandle open(psibase::DbId                       db,
-                                   psio::view<const std::vector<char>> prefix,
+                                   psio1::view<const std::vector<char>> prefix,
                                    psibase::KvMode                     mode);
    };
-   PSIO_REFLECT(XDb, method(open, db, prefix, mode))
+   PSIO1_REFLECT(XDb, method(open, db, prefix, mode))
 }  // namespace LocalService

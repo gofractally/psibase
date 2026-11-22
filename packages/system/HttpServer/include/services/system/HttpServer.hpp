@@ -11,27 +11,27 @@ namespace SystemService
       std::int32_t           socket;
       psibase::AccountNumber owner;
    };
-   PSIO_REFLECT(PendingRequestRow, socket, owner)
+   PSIO1_REFLECT(PendingRequestRow, socket, owner)
    using PendingRequestTable = psibase::Table<PendingRequestRow, &PendingRequestRow::socket>;
-   PSIO_REFLECT_TYPENAME(PendingRequestTable)
+   PSIO1_REFLECT_TYPENAME(PendingRequestTable)
 
    struct RegisteredServiceRow
    {
       psibase::AccountNumber service;
       psibase::AccountNumber server;
    };
-   PSIO_REFLECT(RegisteredServiceRow, service, server)
+   PSIO1_REFLECT(RegisteredServiceRow, service, server)
    using RegServTable = psibase::Table<RegisteredServiceRow, &RegisteredServiceRow::service>;
-   PSIO_REFLECT_TYPENAME(RegServTable)
+   PSIO1_REFLECT_TYPENAME(RegServTable)
 
    struct RedirectRow
    {
       psibase::AccountNumber account;
       psibase::AccountNumber destination;
    };
-   PSIO_REFLECT(RedirectRow, account, destination)
+   PSIO1_REFLECT(RedirectRow, account, destination)
    using RedirectTable = psibase::Table<RedirectRow, &RedirectRow::account>;
-   PSIO_REFLECT_TYPENAME(RedirectTable)
+   PSIO1_REFLECT_TYPENAME(RedirectTable)
 
    /// The `http-server` service routes HTTP requests to the appropriate service
    ///
@@ -100,13 +100,13 @@ namespace SystemService
       std::optional<psibase::AccountNumber> getServer(psibase::AccountNumber service);
 
       // Entry point for messages
-      void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
+      void recv(std::int32_t socket, psio1::view<const std::vector<char>> data, std::uint32_t flags);
 
       // Entry point for HTTP requests
       void serve(std::int32_t socket, psibase::HttpRequest req);
 
       /// Returns the root host for a given host
-      std::string rootHost(psio::view<const std::string> host);
+      std::string rootHost(psio1::view<const std::string> host);
 
       /// Constructs a URL for a sibling subdomain under the same root host.
       /// If `keepTarget` is true, the original path and query are preserved;
@@ -131,7 +131,7 @@ namespace SystemService
       /// Removes the redirect set with `setRedirect` for the sender's subdomain. No-op if none is set.
       void clearRedirect();
    };
-   PSIO_REFLECT(HttpServer,
+   PSIO1_REFLECT(HttpServer,
                 method(sendProds, action),
                 method(deferReply, socket),
                 method(claimReply, socket),

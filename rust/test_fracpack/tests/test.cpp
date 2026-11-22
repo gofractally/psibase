@@ -1,5 +1,5 @@
 #include "test_fracpack/tests/test.hpp"
-#include <psio/schema.hpp>
+#include <psio1/schema.hpp>
 
 using namespace std::literals;
 
@@ -257,10 +257,10 @@ OuterStruct tests1_data[] = {
 void check_same(const auto& rust, const auto& cpp)
 {
    printf("        rust: %s\n",
-          psio::convert_to_json(
+          psio1::convert_to_json(
               std::vector<char>((const char*)rust.data(), (const char*)(rust.data() + rust.size())))
               .c_str());
-   printf("        cpp:  %s\n", psio::convert_to_json(cpp).c_str());
+   printf("        cpp:  %s\n", psio1::convert_to_json(cpp).c_str());
    if (rust.size() == cpp.size() && !memcmp(rust.data(), cpp.data(), rust.size()))
       return;
    throw std::runtime_error("rust and c++ packed differ");
@@ -269,7 +269,7 @@ void check_same(const auto& rust, const auto& cpp)
 template <typename T>
 void round_trip(const T& data, rust::Slice<const uint8_t> blob)
 {
-   psio::shared_view_ptr<T> p(data);
+   psio1::shared_view_ptr<T> p(data);
    check_same(blob, p);
    if (!p.validate())
       throw std::runtime_error("c++ packed does not validate");
@@ -335,25 +335,25 @@ void round_trip_with_schema(std::size_t                index,
    std::span schema_data{reinterpret_cast<const char*>(schema_packed.data()), schema_packed.size()};
    std::span input{reinterpret_cast<const char*>(blob.data()), blob.size()};
 
-   auto                               schema = psio::from_frac<psio::Schema>(schema_data);
-   psio::schema_types::CompiledSchema cschema{schema};
-   psio::schema_types::FracParser     parser{input, cschema, "OuterStruct"};
+   auto                               schema = psio1::from_frac<psio1::Schema>(schema_data);
+   psio1::schema_types::CompiledSchema cschema{schema};
+   psio1::schema_types::FracParser     parser{input, cschema, "OuterStruct"};
 
-   auto expected_schema = psio::SchemaBuilder{}.insert<OuterStruct>("OuterStruct").build();
+   auto expected_schema = psio1::SchemaBuilder{}.insert<OuterStruct>("OuterStruct").build();
    if (auto diff = match(schema, expected_schema,
                          {{*schema.get("OuterStruct"), *expected_schema.get("OuterStruct")}});
-       diff != psio::SchemaDifference::equivalent)
+       diff != psio1::SchemaDifference::equivalent)
    {
-      printf("        rust schema: %s\n", psio::convert_to_json(schema).c_str());
-      printf("        cpp schema: %s\n", psio::convert_to_json(expected_schema).c_str());
+      printf("        rust schema: %s\n", psio1::convert_to_json(schema).c_str());
+      printf("        cpp schema: %s\n", psio1::convert_to_json(expected_schema).c_str());
       printf("        difference: %x\n", static_cast<unsigned>(diff));
       throw std::runtime_error("Rust schema is not equivalent to C++ schema");
    }
 
    std::string         schema_result;
-   psio::string_stream stream{schema_result};
+   psio1::string_stream stream{schema_result};
    to_json(parser, stream);
-   std::string direct_result = psio::convert_to_json(tests1_data[index]);
+   std::string direct_result = psio1::convert_to_json(tests1_data[index]);
    if (direct_result != schema_result)
       throw std::runtime_error(schema_result + " != " + direct_result);
 }

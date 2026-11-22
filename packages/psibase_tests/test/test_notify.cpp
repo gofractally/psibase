@@ -29,7 +29,7 @@ TEST_CASE("notify onBlock")
           .addCallback(CallbackType::onBlock, false,
                        Action{.service = service,
                               .method  = MethodNumber{"onBlock"},
-                              .rawData = psio::to_frac(std::tuple())});
+                              .rawData = psio1::to_frac(std::tuple())});
    }
    t.finishBlock();
    auto table1 = NotifyService{}.open<BlockCountTable>();

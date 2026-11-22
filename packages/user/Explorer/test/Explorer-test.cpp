@@ -13,42 +13,42 @@ struct BlocksAction
    AccountNumber sender;
    AccountNumber service;
    MethodNumber  method;
-   PSIO_REFLECT(BlocksAction, sender, service, method)
+   PSIO1_REFLECT(BlocksAction, sender, service, method)
 };
 struct BlocksTransaction
 {
    std::vector<BlocksAction> actions;
-   PSIO_REFLECT(BlocksTransaction, actions)
+   PSIO1_REFLECT(BlocksTransaction, actions)
 };
 struct BlocksSignedTransaction
 {
    std::optional<BlocksTransaction> transaction;
-   PSIO_REFLECT(BlocksSignedTransaction, transaction)
+   PSIO1_REFLECT(BlocksSignedTransaction, transaction)
 };
 struct BlocksNode
 {
    std::vector<BlocksSignedTransaction> transactions;
-   PSIO_REFLECT(BlocksNode, transactions)
+   PSIO1_REFLECT(BlocksNode, transactions)
 };
 struct BlocksEdge
 {
    BlocksNode node;
-   PSIO_REFLECT(BlocksEdge, node)
+   PSIO1_REFLECT(BlocksEdge, node)
 };
 struct BlocksBlocks
 {
    std::vector<BlocksEdge> edges;
-   PSIO_REFLECT(BlocksBlocks, edges)
+   PSIO1_REFLECT(BlocksBlocks, edges)
 };
 struct BlocksData
 {
    BlocksBlocks blocks;
-   PSIO_REFLECT(BlocksData, blocks)
+   PSIO1_REFLECT(BlocksData, blocks)
 };
 struct BlocksRoot
 {
    BlocksData data;
-   PSIO_REFLECT(BlocksRoot, data)
+   PSIO1_REFLECT(BlocksRoot, data)
 };
 
 TEST_CASE("test authenticated user")
@@ -97,45 +97,45 @@ struct CountsTransaction
    std::string                      id;
    std::uint32_t                    numActions;
    std::optional<BlocksTransaction> transaction;
-   PSIO_REFLECT(CountsTransaction, id, numActions, transaction)
+   PSIO1_REFLECT(CountsTransaction, id, numActions, transaction)
 };
 struct ServiceCount
 {
    AccountNumber service;
    std::uint32_t count;
-   PSIO_REFLECT(ServiceCount, service, count)
+   PSIO1_REFLECT(ServiceCount, service, count)
 };
 struct CountsHeader
 {
    BlockNum blockNum;
-   PSIO_REFLECT(CountsHeader, blockNum)
+   PSIO1_REFLECT(CountsHeader, blockNum)
 };
 struct CountsNode
 {
    CountsHeader                   header;
    std::vector<ServiceCount>      actionsReceived;
    std::vector<CountsTransaction> transactions;
-   PSIO_REFLECT(CountsNode, header, actionsReceived, transactions)
+   PSIO1_REFLECT(CountsNode, header, actionsReceived, transactions)
 };
 struct CountsEdge
 {
    CountsNode node;
-   PSIO_REFLECT(CountsEdge, node)
+   PSIO1_REFLECT(CountsEdge, node)
 };
 struct CountsBlocks
 {
    std::vector<CountsEdge> edges;
-   PSIO_REFLECT(CountsBlocks, edges)
+   PSIO1_REFLECT(CountsBlocks, edges)
 };
 struct CountsData
 {
    CountsBlocks blocks;
-   PSIO_REFLECT(CountsData, blocks)
+   PSIO1_REFLECT(CountsData, blocks)
 };
 struct CountsRoot
 {
    CountsData data;
-   PSIO_REFLECT(CountsRoot, data)
+   PSIO1_REFLECT(CountsRoot, data)
 };
 
 constexpr std::string_view countsQuery =
@@ -188,33 +188,33 @@ struct PagedInfo
    bool        hasNextPage;
    std::string startCursor;
    std::string endCursor;
-   PSIO_REFLECT(PagedInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
+   PSIO1_REFLECT(PagedInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
 };
 struct PagedNode
 {
    CountsHeader header;
-   PSIO_REFLECT(PagedNode, header)
+   PSIO1_REFLECT(PagedNode, header)
 };
 struct PagedEdge
 {
    PagedNode node;
-   PSIO_REFLECT(PagedEdge, node)
+   PSIO1_REFLECT(PagedEdge, node)
 };
 struct PagedBlocks
 {
    std::vector<PagedEdge> edges;
    PagedInfo              pageInfo;
-   PSIO_REFLECT(PagedBlocks, edges, pageInfo)
+   PSIO1_REFLECT(PagedBlocks, edges, pageInfo)
 };
 struct PagedData
 {
    PagedBlocks blocks;
-   PSIO_REFLECT(PagedData, blocks)
+   PSIO1_REFLECT(PagedData, blocks)
 };
 struct PagedRoot
 {
    PagedData data;
-   PSIO_REFLECT(PagedRoot, data)
+   PSIO1_REFLECT(PagedRoot, data)
 };
 
 TEST_CASE("pages of large blocks are cut short")
@@ -298,13 +298,13 @@ TEST_CASE("pages of large blocks are cut short")
 struct LookupHeader
 {
    BlockNum blockNum;
-   PSIO_REFLECT(LookupHeader, blockNum)
+   PSIO1_REFLECT(LookupHeader, blockNum)
 };
 struct LookupBlock
 {
    LookupHeader                   header;
    std::vector<CountsTransaction> transactions;
-   PSIO_REFLECT(LookupBlock, header, transactions)
+   PSIO1_REFLECT(LookupBlock, header, transactions)
 };
 struct LookupLocation
 {
@@ -312,19 +312,19 @@ struct LookupLocation
    std::uint32_t     index;
    AccountNumber     producer;
    CountsTransaction transaction;
-   PSIO_REFLECT(LookupLocation, blockNum, index, producer, transaction)
+   PSIO1_REFLECT(LookupLocation, blockNum, index, producer, transaction)
 };
 struct LookupData
 {
    std::optional<LookupHeader>   head;
    std::optional<LookupBlock>    block;
    std::optional<LookupLocation> transaction;
-   PSIO_REFLECT(LookupData, head, block, transaction)
+   PSIO1_REFLECT(LookupData, head, block, transaction)
 };
 struct LookupRoot
 {
    LookupData data;
-   PSIO_REFLECT(LookupRoot, data)
+   PSIO1_REFLECT(LookupRoot, data)
 };
 
 TEST_CASE("block and transaction lookups")

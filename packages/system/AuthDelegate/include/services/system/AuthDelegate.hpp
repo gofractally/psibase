@@ -5,7 +5,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/block.hpp>
-#include <psio/reflect.hpp>
+#include <psio1/reflect.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/Transact.hpp>
 #include <vector>
@@ -21,10 +21,10 @@ namespace SystemService
       using Secondary =
           psibase::CompositeKey<&AuthDelegateRecord::owner, &AuthDelegateRecord::account>;
    };
-   PSIO_REFLECT(AuthDelegateRecord, account, owner)
+   PSIO1_REFLECT(AuthDelegateRecord, account, owner)
    using AuthDelegateTable = psibase::
        Table<AuthDelegateRecord, &AuthDelegateRecord::account, AuthDelegateRecord::Secondary{}>;
-   PSIO_REFLECT_TYPENAME(AuthDelegateTable)
+   PSIO1_REFLECT_TYPENAME(AuthDelegateTable)
 
    /// The `auth-delegate` service is an auth service that can be used to authenticate actions for accounts.
    ///
@@ -110,7 +110,7 @@ namespace SystemService
      private:
       psibase::Actor<AuthInterface> authServiceOf(psibase::AccountNumber account);
    };
-   PSIO_REFLECT(AuthDelegate,  //
+   PSIO1_REFLECT(AuthDelegate,  //
                 method(checkAuthSys, flags, sender, action, claims),
                 method(canAuthUserSys, user),
                 method(getDlgsSys, sender),

@@ -377,8 +377,8 @@ namespace psibase
          else
          {
             tmpKey.clear();
-            psio::vector_stream stream{tmpKey};
-            psio::to_key(snapshotKey(id), stream);
+            psio1::vector_stream stream{tmpKey};
+            psio1::to_key(snapshotKey(id), stream);
             if (!writer.get(nativeSubjective, tmpKey))
                writer.remove(proposed, key);
          }
@@ -391,7 +391,7 @@ namespace psibase
          // no longer present.
          std::vector<storage::shared_root> roots;
          std::vector<char>                 statusBytes;
-         auto                              sk = psio::convert_to_key(statusKey());
+         auto                              sk = psio1::convert_to_key(statusKey());
          while (writer.get_greater_equal(proposed, key, &key, nullptr, &roots))
          {
             if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)
@@ -399,7 +399,7 @@ namespace psibase
             check(roots.size() == numChainDatabases, "wrong number of roots in fork");
             if (!writer.get(roots[(int)StatusRow::db], sk, &statusBytes, nullptr))
                throw std::runtime_error("Status row missing in fork");
-            auto status = psio::from_frac<StatusRow>(psio::prevalidated{statusBytes});
+            auto status = psio1::from_frac<StatusRow>(psio1::prevalidated{statusBytes});
             if (!status.head)
                throw std::runtime_error("Status row is missing head information in fork");
             if (!writer.get(proposed, revisionById(status.head->header.previous), nullptr, nullptr))
@@ -980,7 +980,7 @@ namespace psibase
       impl->clearTemporary();
    }
 
-   void Database::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
+   void Database::kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value)
    {
       impl->write(
           [&](auto& session, auto& revision)
@@ -993,7 +993,7 @@ namespace psibase
           });
    }
 
-   void Database::kvRemoveRaw(DbId db, psio::input_stream key)
+   void Database::kvRemoveRaw(DbId db, psio1::input_stream key)
    {
       impl->write(
           [&](auto& session, auto& revision)
@@ -1006,10 +1006,10 @@ namespace psibase
           });
    }
 
-   std::optional<psio::input_stream> Database::kvGetRaw(DbId db, psio::input_stream key)
+   std::optional<psio1::input_stream> Database::kvGetRaw(DbId db, psio1::input_stream key)
    {
       return impl->read(
-          [&](auto& session, auto& revision) -> std::optional<psio::input_stream>
+          [&](auto& session, auto& revision) -> std::optional<psio1::input_stream>
           {
              if (auto* changes = impl->getChangeSet(db))
              {
@@ -1027,7 +1027,7 @@ namespace psibase
    }  // Database::kvGetRaw
 
    std::optional<Database::KVResult> Database::kvGreaterEqualRaw(DbId               db,
-                                                                 psio::input_stream key,
+                                                                 psio1::input_stream key,
                                                                  size_t             matchKeySize)
    {
       return impl->read(
@@ -1054,7 +1054,7 @@ namespace psibase
    }  // Database::kvGreaterEqualRaw
 
    std::optional<Database::KVResult> Database::kvLessThanRaw(DbId               db,
-                                                             psio::input_stream key,
+                                                             psio1::input_stream key,
                                                              size_t             matchKeySize)
    {
       return impl->read(
@@ -1080,7 +1080,7 @@ namespace psibase
           });
    }  // Database::kvLessThanRaw
 
-   std::optional<Database::KVResult> Database::kvMaxRaw(DbId db, psio::input_stream key)
+   std::optional<Database::KVResult> Database::kvMaxRaw(DbId db, psio1::input_stream key)
    {
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>

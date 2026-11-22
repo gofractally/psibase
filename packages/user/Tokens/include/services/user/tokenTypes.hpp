@@ -5,10 +5,10 @@
 #include <compare>
 #include <limits>
 #include <psibase/check.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/from_json.hpp>
-#include <psio/to_json.hpp>
-#include <psio/view.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/from_json.hpp>
+#include <psio1/to_json.hpp>
+#include <psio1/view.hpp>
 #include <string>
 #include <tuple>
 
@@ -38,7 +38,7 @@ namespace UserService
       }
 
       friend std::strong_ordering operator<=>(const Precision&, const Precision&) = default;
-      PSIO_REFLECT(Precision, value);
+      PSIO1_REFLECT(Precision, value);
    };
 
    inline uint8_t& psio_unwrap_packable(Precision& s)
@@ -55,7 +55,7 @@ namespace UserService
       return Precision::validate(p.value);
    }
 
-   inline bool psio_validate_packable(psio::view<const Precision> p)
+   inline bool psio_validate_packable(psio1::view<const Precision> p)
    {
       return Precision::validate(p.value());
    }
@@ -135,7 +135,7 @@ namespace UserService
          return value == static_cast<Quantity_t>(otherValue);
       }
    };  // namespace UserService
-   PSIO_REFLECT(Quantity, value);
+   PSIO1_REFLECT(Quantity, value);
 
    struct Decimal
    {
@@ -278,7 +278,7 @@ namespace UserService
          return fraction_value * multiplier;
       }
    };
-   PSIO_REFLECT(Decimal, quantity, precision);
+   PSIO1_REFLECT(Decimal, quantity, precision);
 
    void from_json(Decimal& d, auto& stream)
    {

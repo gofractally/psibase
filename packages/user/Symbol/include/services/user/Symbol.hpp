@@ -20,7 +20,7 @@ namespace UserService
       static constexpr auto service        = psibase::AccountNumber("symbol");
       static constexpr auto sysTokenSymbol = SID{"psi"};
 
-      Symbol(psio::shared_view_ptr<psibase::Action> action);
+      Symbol(psio1::shared_view_ptr<psibase::Action> action);
 
       void init();
 
@@ -54,7 +54,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO_REFLECT(Symbol,
+   PSIO1_REFLECT(Symbol,
       method(init),
       method(create, newSymbol),
       method(admin_create, newSymbol, recipient),

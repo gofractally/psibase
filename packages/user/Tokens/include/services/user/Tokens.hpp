@@ -28,7 +28,7 @@ namespace UserService
       static constexpr uint8_t unrecallable   = 1;
       static constexpr uint8_t autoDebit      = 0;
 
-      Tokens(psio::shared_view_ptr<psibase::Action> action);
+      Tokens(psio1::shared_view_ptr<psibase::Action> action);
 
       void init();
 
@@ -406,7 +406,7 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO_REFLECT(Tokens,
+   PSIO1_REFLECT(Tokens,
       method(init),
       method(create, precision, maxIssuedSupply),
       method(mint, tokenId, amount, memo),

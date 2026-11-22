@@ -4,7 +4,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/psibase.hpp>
 #include <psibase/webServices.hpp>
-#include <psio/fracpack.hpp>
+#include <psio1/fracpack.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/HttpServerRequest.hpp>
@@ -74,13 +74,13 @@ namespace SystemService
    }
 
    void HttpServer::recv(std::int32_t                        socket,
-                         psio::view<const std::vector<char>> data,
+                         psio1::view<const std::vector<char>> data,
                          std::uint32_t                       flags)
    {
       check(getSender() == XHttp::service, "Wrong sender");
       if (socket == producer_multicast)
       {
-         auto act = psio::from_frac<Action>(data);
+         auto act = psio1::from_frac<Action>(data);
          checkRecvAuth(act);
          auto _ = recurse();
          psibase::call(act);
@@ -92,7 +92,7 @@ namespace SystemService
       if (getSender() != act.service)
          psibase::abortMessage(getSender().str() + " cannot send messages to " + act.service.str());
       checkRecvAuth(act);
-      to<XHttp>().send(producer_multicast, psio::to_frac(act), 0);
+      to<XHttp>().send(producer_multicast, psio1::to_frac(act), 0);
    }
 
    namespace
@@ -130,7 +130,7 @@ namespace SystemService
          std::int32_t                              socket;
          psibase::AccountNumber                    owner;
          std::optional<std::vector<AccountNumber>> prevOwners;
-         PSIO_REFLECT(TempPendingRequestRow, socket, owner, prevOwners)
+         PSIO1_REFLECT(TempPendingRequestRow, socket, owner, prevOwners)
       };
       using TempPendingRequestTable =
           psibase::Table<TempPendingRequestRow, &TempPendingRequestRow::socket>;
@@ -373,7 +373,7 @@ namespace SystemService
       }
    }  // serve()
 
-   std::string HttpServer::rootHost(psio::view<const std::string> host)
+   std::string HttpServer::rootHost(psio1::view<const std::string> host)
    {
       return to<XHttp>().rootHost(host);
    }

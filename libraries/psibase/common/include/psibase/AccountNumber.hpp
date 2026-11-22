@@ -1,8 +1,8 @@
 #pragma once
 #include <compare>
 #include <psibase/name.hpp>
-#include <psio/from_json.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/from_json.hpp>
+#include <psio1/to_json.hpp>
 
 namespace psibase
 {
@@ -62,7 +62,7 @@ namespace psibase
       /// Compares by 64-bit `value`. This does not sort by the
       /// string (name) form.
       friend auto operator<=>(const AccountNumber&, const AccountNumber&) = default;
-      PSIO_REFLECT(AccountNumber, definitionWillNotChange(), value)
+      PSIO1_REFLECT(AccountNumber, definitionWillNotChange(), value)
    };
 
    template <typename S>

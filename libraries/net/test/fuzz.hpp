@@ -72,7 +72,7 @@ struct basic_fuzz_routing : psibase::net::message_serializer<Derived>
          PSIBASE_LOG(logger, warning) << e.what();
       }
    }
-   void recv(const psio::shared_view_ptr<psibase::SignedBlock>& message)
+   void recv(const psio1::shared_view_ptr<psibase::SignedBlock>& message)
    {
       recv(psibase::net::BlockMessage{message});
    }
@@ -360,7 +360,7 @@ struct NetworkBase
       }
    }
 
-   std::vector<psio::shared_view_ptr<psibase::SignedBlock>>               blocks;
+   std::vector<psio1::shared_view_ptr<psibase::SignedBlock>>               blocks;
    std::set<psibase::Checksum256>                                         blockIds;
    std::vector<psibase::net::SignedMessage<psibase::net::PrepareMessage>> prepares;
    std::vector<psibase::net::SignedMessage<psibase::net::CommitMessage>>  commits;

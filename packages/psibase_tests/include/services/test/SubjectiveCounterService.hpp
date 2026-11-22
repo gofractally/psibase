@@ -17,10 +17,10 @@ namespace TestService
       std::uint32_t value;
    };
 
-   PSIO_REFLECT(SubjectiveCounterRow, key, value)
+   PSIO1_REFLECT(SubjectiveCounterRow, key, value)
 
    using SubjectiveCounterTable = psibase::Table<SubjectiveCounterRow, &SubjectiveCounterRow::key>;
-   PSIO_REFLECT_TYPENAME(SubjectiveCounterTable)
+   PSIO1_REFLECT_TYPENAME(SubjectiveCounterTable)
 
    struct SubjectiveCounterService : psibase::Service
    {
@@ -33,7 +33,7 @@ namespace TestService
       std::uint32_t incImpl(std::string key, std::uint32_t id);
       std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
    };
-   PSIO_REFLECT(SubjectiveCounterService,
+   PSIO1_REFLECT(SubjectiveCounterService,
                 method(inc, key, id),
                 method(checkIncRpc, key, id, expected),
                 method(checkIncCallback, key, id, expected),

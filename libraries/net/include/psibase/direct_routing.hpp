@@ -11,7 +11,7 @@
 #include <psibase/log.hpp>
 #include <psibase/net_base.hpp>
 #include <psibase/routing_base.hpp>
-#include <psio/fracpack.hpp>
+#include <psio1/fracpack.hpp>
 #include <queue>
 #include <random>
 #include <vector>
@@ -24,7 +24,7 @@ namespace psibase::net
       producer_id               producer;
       std::string               to_string() const { return "producer: " + producer.str(); }
    };
-   PSIO_REFLECT(ProducerMessage, producer)
+   PSIO1_REFLECT(ProducerMessage, producer)
 
    // This requires all producers to be peers
    template <typename Derived>

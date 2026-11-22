@@ -400,7 +400,7 @@ struct BlockArg
    {
    }
    operator psibase::BlockInfo() const { return info; }
-   BlockArg(const psio::shared_view_ptr<psibase::SignedBlock>& block) : info(block->block()) {}
+   BlockArg(const psio1::shared_view_ptr<psibase::SignedBlock>& block) : info(block->block()) {}
    psibase::BlockInfo      info;
    psibase::JointConsensus state;
 };

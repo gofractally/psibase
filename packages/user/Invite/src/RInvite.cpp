@@ -19,7 +19,7 @@ namespace UserService
          AccountNumber actor;
          std::string   event;
       };
-      PSIO_REFLECT(InviteEvent, inviteId, actor, event);
+      PSIO1_REFLECT(InviteEvent, inviteId, actor, event);
 
       struct InviteDetails
       {
@@ -34,7 +34,7 @@ namespace UserService
          {
             return to<Invite>().getExpDate(this->inviteId);
          }
-         PSIO_REFLECT(InviteDetails,
+         PSIO1_REFLECT(InviteDetails,
                       inviteId,
                       cid,
                       inviter,
@@ -106,7 +106,7 @@ namespace UserService
                 .query();
          }
       };
-      PSIO_REFLECT(Query,
+      PSIO1_REFLECT(Query,
                    method(inviteById, inviteId),
                    method(invitesByInviter, inviter),
                    method(getInviteCost, numAccounts),
@@ -128,7 +128,7 @@ namespace UserService
             return std::nullopt;
          }
       };
-      PSIO_REFLECT(RInvite, method(serveSys, request))
+      PSIO1_REFLECT(RInvite, method(serveSys, request))
       PSIBASE_REFLECT_TABLES(RInvite)
    }  // namespace InviteNs
 }  // namespace UserService

@@ -7,10 +7,10 @@ namespace LocalService
    struct TimerIdRow
    {
       std::uint64_t next;
-      PSIO_REFLECT(TimerIdRow, next)
+      PSIO1_REFLECT(TimerIdRow, next)
    };
    using TimerIdTable = psibase::Table<TimerIdRow, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(TimerIdTable)
+   PSIO1_REFLECT_TYPENAME(TimerIdTable)
 
    struct TimerQueueRow
    {
@@ -18,13 +18,13 @@ namespace LocalService
       psibase::MonotonicTimePointUSec expiration;
       psibase::AccountNumber          service;
       psibase::MethodNumber           method;
-      PSIO_REFLECT(TimerQueueRow, id, expiration, service, method)
+      PSIO1_REFLECT(TimerQueueRow, id, expiration, service, method)
    };
    using TimerQueueTable =
        psibase::Table<TimerQueueRow,
                       &TimerQueueRow::id,
                       psibase::CompositeKey<&TimerQueueRow::expiration, &TimerQueueRow::id>{}>;
-   PSIO_REFLECT_TYPENAME(TimerQueueTable)
+   PSIO1_REFLECT_TYPENAME(TimerQueueTable)
 
    struct XTimer : psibase::Service
    {
@@ -53,6 +53,6 @@ namespace LocalService
       // Internal callback
       void runOne();
    };
-   PSIO_REFLECT(XTimer, method(runAt, time, callback), method(cancel, id), method(runOne))
+   PSIO1_REFLECT(XTimer, method(runAt, time, callback), method(cancel, id), method(runOne))
    PSIBASE_REFLECT_TABLES(XTimer, XTimer::Session)
 }  // namespace LocalService

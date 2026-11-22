@@ -5,8 +5,8 @@
 #include <psibase/crypto.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
-#include <psio/from_json.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/from_json.hpp>
+#include <psio1/to_json.hpp>
 #include <openssl/evp.h>
 
 #include <algorithm>
@@ -87,7 +87,7 @@ namespace psibase::vm_consensus_replay
       uint64_t rows;
       uint64_t bytes;
    };
-   PSIO_REFLECT(NamespaceCount, db, rows, bytes)
+   PSIO1_REFLECT(NamespaceCount, db, rows, bytes)
 
    struct Manifest
    {
@@ -102,7 +102,7 @@ namespace psibase::vm_consensus_replay
       std::vector<NamespaceCount> beforeNamespaces;
       std::vector<NamespaceCount> afterNamespaces;
    };
-   PSIO_REFLECT(Manifest, version, chainName, blockNum, transactions, proofClaims,
+   PSIO1_REFLECT(Manifest, version, chainName, blockNum, transactions, proofClaims,
                 blockSha256, beforeSha256, afterSha256, beforeNamespaces, afterNamespaces)
 
    inline std::vector<DbId> namespaces(bool independent)
@@ -284,7 +284,7 @@ namespace psibase::vm_consensus_replay
          manifest.proofClaims = claims;
          manifest.afterNamespaces = snapshot(shared, after, directory / "after.rows", false);
          manifest.afterSha256 = fileHash(directory / "after.rows");
-         auto bytes = psio::to_frac(block);
+         auto bytes = psio1::to_frac(block);
          std::ofstream out(directory / "block.frac", std::ios::binary);
          out.exceptions(std::ios::badbit | std::ios::failbit);
          out.write(bytes.data(), bytes.size());
@@ -292,7 +292,7 @@ namespace psibase::vm_consensus_replay
          manifest.blockSha256 = fileHash(directory / "block.frac");
          std::ofstream json(directory / "manifest.json");
          json.exceptions(std::ios::badbit | std::ios::failbit);
-         json << psio::convert_to_json(manifest) << '\n';
+         json << psio1::convert_to_json(manifest) << '\n';
          json.close();
          complete = true;
       }

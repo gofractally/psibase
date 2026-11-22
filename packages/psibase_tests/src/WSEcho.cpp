@@ -6,12 +6,12 @@
 struct WSEcho : psibase::Service
 {
    static constexpr auto service = psibase::AccountNumber{"x-echo"};
-   void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
+   void recv(std::int32_t socket, psio1::view<const std::vector<char>> data, std::uint32_t flags);
    void close(std::int32_t socket);
    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest        request,
                                               std::optional<std::int32_t> socket);
 };
-PSIO_REFLECT(WSEcho,
+PSIO1_REFLECT(WSEcho,
              method(recv, socket, data, flags),
              method(close, socket),
              method(serveSys, request, socket))
@@ -47,7 +47,7 @@ std::optional<HttpReply> WSEcho::serveSys(HttpRequest request, std::optional<std
 void WSEcho::close(std::int32_t socket) {}
 
 void WSEcho::recv(std::int32_t                        socket,
-                  psio::view<const std::vector<char>> data,
+                  psio1::view<const std::vector<char>> data,
                   std::uint32_t                       flags)
 {
    check(getSender() == XHttp::service, "Wrong sender");

@@ -2,7 +2,7 @@
 
 #include <memory>
 #include <optional>
-#include <psio/stream.hpp>
+#include <psio1/stream.hpp>
 
 #include <eosio/vm/types.hpp>
 
@@ -116,16 +116,16 @@ namespace dwarf
       const subprogram*  get_subprogram(uint32_t address) const;
    };
 
-   psio::input_stream wasm_exclude_custom(psio::input_stream stream);
-   info               get_info_from_wasm(psio::input_stream stream);
-   bool               has_debug_info(psio::input_stream stream);
+   psio1::input_stream wasm_exclude_custom(psio1::input_stream stream);
+   info               get_info_from_wasm(psio1::input_stream stream);
+   bool               has_debug_info(psio1::input_stream stream);
 
    struct debugger_registration;
    std::shared_ptr<debugger_registration> register_with_debugger(  //
        info&                    info,
        const jit_info&          reloc,
        const eosio::vm::module& mod,
-       psio::input_stream       wasm_source);
+       psio1::input_stream       wasm_source);
 
    // Sets up just the symtab and nothing else, which is sufficient
    // for generating backtraces correctly.

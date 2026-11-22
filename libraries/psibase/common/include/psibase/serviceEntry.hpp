@@ -10,8 +10,8 @@ namespace psibase
 
    struct ProcessTransactionArgs
    {
-      psio::shared_view_ptr<Transaction> transaction;
-      PSIO_REFLECT(ProcessTransactionArgs, transaction)
+      psio1::shared_view_ptr<Transaction> transaction;
+      PSIO1_REFLECT(ProcessTransactionArgs, transaction)
    };
 
    struct VerifyArgs
@@ -19,7 +19,7 @@ namespace psibase
       Checksum256       transactionHash;
       Claim             claim;
       std::vector<char> proof;
-      PSIO_REFLECT(VerifyArgs, transactionHash, claim, proof)
+      PSIO1_REFLECT(VerifyArgs, transactionHash, claim, proof)
    };
 
    Action makeVerify(const Checksum256&    transactionHash,

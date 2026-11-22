@@ -12,5 +12,5 @@ namespace TestService
       static constexpr auto flags   = psibase::CodeRow::isPrivileged;
       void                  asRpc(psibase::Action action);
    };
-   PSIO_REFLECT(AsRpc, method(asRpc, action))
+   PSIO1_REFLECT(AsRpc, method(asRpc, action))
 }  // namespace TestService

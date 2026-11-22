@@ -2,9 +2,9 @@
 
 #include <psibase/time.hpp>
 
-psio::schema_types::CustomTypes psibase::psibase_types()
+psio1::schema_types::CustomTypes psibase::psibase_types()
 {
-   auto result = psio::schema_types::standard_types();
+   auto result = psio1::schema_types::standard_types();
    result.insert<AccountNumber>("AccountNumber");
    result.insert<MethodNumber>("MethodNumber");
    return result;
@@ -12,7 +12,7 @@ psio::schema_types::CustomTypes psibase::psibase_types()
 
 namespace
 {
-   const psio::schema_types::AnyType* getFieldType(const psio::schema_types::Object& ty,
+   const psio1::schema_types::AnyType* getFieldType(const psio1::schema_types::Object& ty,
                                                    std::uint32_t                     index,
                                                    const char*&                      msg)
    {
@@ -23,7 +23,7 @@ namespace
       }
       return &ty.members[index].type;
    }
-   const psio::schema_types::AnyType* getFieldType(const psio::schema_types::Struct& ty,
+   const psio1::schema_types::AnyType* getFieldType(const psio1::schema_types::Struct& ty,
                                                    std::uint32_t                     index,
                                                    const char*&                      msg)
    {
@@ -34,7 +34,7 @@ namespace
       }
       return &ty.members[index].type;
    }
-   const psio::schema_types::AnyType* getFieldType(const psio::schema_types::Tuple& ty,
+   const psio1::schema_types::AnyType* getFieldType(const psio1::schema_types::Tuple& ty,
                                                    std::uint32_t                    index,
                                                    const char*&                     msg)
    {
@@ -45,7 +45,7 @@ namespace
       }
       return &ty.members[index];
    }
-   const psio::schema_types::AnyType* getFieldType(const auto&   ty,
+   const psio1::schema_types::AnyType* getFieldType(const auto&   ty,
                                                    std::uint32_t index,
                                                    const char*&  msg)
    {
@@ -53,12 +53,12 @@ namespace
       return nullptr;
    }
 
-   const psio::schema_types::AnyType* getFieldType(const psio::Schema&                schema,
-                                                   const psio::schema_types::AnyType& ty,
+   const psio1::schema_types::AnyType* getFieldType(const psio1::Schema&                schema,
+                                                   const psio1::schema_types::AnyType& ty,
                                                    const psibase::FieldId&            field,
                                                    const char*&                       msg)
    {
-      const psio::schema_types::AnyType* result = &ty;
+      const psio1::schema_types::AnyType* result = &ty;
       for (auto idx : field.path)
       {
          result = result->resolve(schema);
@@ -72,7 +72,7 @@ namespace
       return result;
    }
 
-   void checkEvents(const psio::Schema& types, const psibase::ServiceSchema::EventMap& events)
+   void checkEvents(const psio1::Schema& types, const psibase::ServiceSchema::EventMap& events)
    {
       for (const auto& [name, type] : events)
       {

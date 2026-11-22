@@ -15,7 +15,7 @@ namespace UserService
      private:
       std::optional<psibase::HttpReply> _serveRestEndpoints(psibase::HttpRequest& request);
    };
-   PSIO_REFLECT(RTokens, method(serveSys, request, socket, user))
+   PSIO1_REFLECT(RTokens, method(serveSys, request, socket, user))
    PSIBASE_REFLECT_TABLES(RTokens)
 
 }  // namespace UserService

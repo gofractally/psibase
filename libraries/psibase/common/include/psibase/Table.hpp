@@ -9,7 +9,7 @@
 #include <psibase/api.hpp>
 #include <psibase/blob.hpp>
 #include <psibase/serviceState.hpp>
-#include <psio/to_key.hpp>
+#include <psio1/to_key.hpp>
 #include <span>
 #include <string_view>
 #include <type_traits>
@@ -50,8 +50,8 @@ namespace psibase
       }
 
       friend UniqueKvHandle psibaseImport(const UniqueKvHandle*,
-                                          psio::view<const std::uint32_t>         value,
-                                          psio::view<const std::vector<KvHandle>> handles)
+                                          psio1::view<const std::uint32_t>         value,
+                                          psio1::view<const std::vector<KvHandle>> handles)
       {
          return UniqueKvHandle{handles.at(value.unpack())};
       }
@@ -139,7 +139,7 @@ namespace psibase
          }
       }
       template <typename T>
-      void read(psio::shared_view_ptr<T>& p) const
+      void read(psio1::shared_view_ptr<T>& p) const
       {
          std::uint32_t sz = raw::kvGet(db, key.data(), key.size());
          check(sz != std::uint32_t(-1), "no such key");
@@ -150,7 +150,7 @@ namespace psibase
             sz = raw::kvGet(db, buf.data(), buf.size());
             check(sz != std::uint32_t(-1), "primary key not found");
          }
-         p = psio::shared_view_ptr<T>(psio::size_tag{sz});
+         p = psio1::shared_view_ptr<T>(psio1::size_tag{sz});
          raw::getResult(p.data(), p.size(), 0);
       }
       std::uint32_t value_size() const
@@ -330,11 +330,11 @@ namespace psibase
       ///
       /// This reads an object from the database. It does not cache; it returns a fresh object
       /// each time it's used.
-      T operator*() const { return psio::from_frac<T>(psio::prevalidated{*base}); }
+      T operator*() const { return psio1::from_frac<T>(psio1::prevalidated{*base}); }
 
-      psio::shared_view_ptr<T> view() const
+      psio1::shared_view_ptr<T> view() const
       {
-         psio::shared_view_ptr<T> result;
+         psio1::shared_view_ptr<T> result;
          base.read(result);
          return result;
       }
@@ -469,11 +469,11 @@ namespace psibase
       using type = tuple_cat_t<flatten_key_t<T>...>;
    };
    template <typename T>
-      requires psio::Reflected<T>
+      requires psio1::Reflected<T>
    struct flatten_key<T>
    {
       using type = flatten_key_t<
-          typename psio::get_struct_tuple_impl<typename psio::reflect<T>::data_members>::type>;
+          typename psio1::get_struct_tuple_impl<typename psio1::reflect<T>::data_members>::type>;
    };
 
    UniqueKvHandle proxyKvOpen(DbId db, std::span<const char> prefix, KvMode mode);
@@ -534,7 +534,7 @@ namespace psibase
       KvIterator<T> lower_bound(K2&& k) const
       {
          KeyView       key_base{{prefix.data(), prefix.size()}};
-         auto          key = psio::composite_key(key_base, k);
+         auto          key = psio1::composite_key(key_base, k);
          auto          res = raw::kvGreaterEqual(db, key.data(), key.size(), prefix.size());
          KvIterator<T> result(db, std::move(key), prefix.size(), is_secondary, true);
          result.moveTo(res);
@@ -551,7 +551,7 @@ namespace psibase
       KvIterator<T> upper_bound(K2&& k) const
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
-         auto    key = psio::composite_key(key_base, k);
+         auto    key = psio1::composite_key(key_base, k);
          while (true)
          {
             if (key.size() <= prefix.size())
@@ -581,7 +581,7 @@ namespace psibase
       TableIndex<T, KeySuffix<K2, K>> subindex(K2&& k)
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
-         auto    key = psio::composite_key(key_base, k);
+         auto    key = psio1::composite_key(key_base, k);
          return TableIndex<T, KeySuffix<K2, K>>(db, std::move(key), is_secondary);
       }
 
@@ -594,7 +594,7 @@ namespace psibase
       TableIndex<T, SubKey> subindex(K2&& k)
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
-         auto    key = psio::composite_key(key_base, k);
+         auto    key = psio1::composite_key(key_base, k);
          return TableIndex<T, SubKey>(db, std::move(key), is_secondary);
       }
 
@@ -630,9 +630,9 @@ namespace psibase
       }
 
       template <compatible_key<K> K2 = K>
-      psio::shared_view_ptr<T> getView(K2&& k) const
+      psio1::shared_view_ptr<T> getView(K2&& k) const
       {
-         return getImpl<psio::shared_view_ptr<T>, true>(std::forward<K2>(k));
+         return getImpl<psio1::shared_view_ptr<T>, true>(std::forward<K2>(k));
       }
 
      private:
@@ -640,7 +640,7 @@ namespace psibase
       R getImpl(K2&& k) const
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
-         auto    buffer = psio::composite_key(key_base, k);
+         auto    buffer = psio1::composite_key(key_base, k);
          int     res    = raw::kvGet(db, buffer.data(), buffer.size());
          if (res < 0)
          {
@@ -655,7 +655,7 @@ namespace psibase
          }
          if constexpr (View)
          {
-            psio::shared_view_ptr<T> v{psio::size_tag{static_cast<std::uint32_t>(res)}};
+            psio1::shared_view_ptr<T> v{psio1::size_tag{static_cast<std::uint32_t>(res)}};
             raw::getResult(v.data(), v.size(), 0);
             return v;
          }
@@ -663,7 +663,7 @@ namespace psibase
          {
             buffer.resize(res);
             raw::getResult(buffer.data(), buffer.size(), 0);
-            return psio::from_frac<T>(psio::prevalidated{buffer});
+            return psio1::from_frac<T>(psio1::prevalidated{buffer});
          }
       }
       UniqueKvHandle    db;
@@ -726,15 +726,15 @@ namespace psibase
       }
 
       template <std::uint32_t I, typename C, typename T>
-      constexpr auto get_view_member(psio::view<const C> v, T C::* m, psio::MemberList<>*)
-          -> psio::view<const T>
+      constexpr auto get_view_member(psio1::view<const C> v, T C::* m, psio1::MemberList<>*)
+          -> psio1::view<const T>
       {
          abortMessage("Member was not reflected");
       }
 
       template <std::uint32_t I, typename C, typename T, auto M0, auto... M>
-      constexpr auto get_view_member(psio::view<const C> v, T C::* m, psio::MemberList<M0, M...>*)
-          -> psio::view<const T>
+      constexpr auto get_view_member(psio1::view<const C> v, T C::* m, psio1::MemberList<M0, M...>*)
+          -> psio1::view<const T>
       {
          if constexpr (std::is_same_v<decltype(m), decltype(M0)>)
          {
@@ -743,13 +743,13 @@ namespace psibase
                return v.psio_get_proxy().template get<I, M0>();
             }
          }
-         return get_view_member<I + 1>(v, m, (psio::MemberList<M...>*)nullptr);
+         return get_view_member<I + 1>(v, m, (psio1::MemberList<M...>*)nullptr);
       }
 
       template <typename T, typename C>
-      decltype(auto) invoke(T C::* f, psio::view<const C> value)
+      decltype(auto) invoke(T C::* f, psio1::view<const C> value)
       {
-         return get_view_member<0>(value, f, (typename psio::reflect<C>::data_members*)nullptr);
+         return get_view_member<0>(value, f, (typename psio1::reflect<C>::data_members*)nullptr);
       }
       template <typename R, typename C, typename... A>
       decltype(auto) invoke(R (C::*f)(A...) const, const C& value, A&&... a)
@@ -843,7 +843,7 @@ namespace psibase
    /// Each secondary index is numbered `1 <= i <= 255` above. The secondary indexes
    /// point to the primary index.
    ///
-   /// `Table` serializes keys using `psio::to_key`. It serializes `T` using fracpack.
+   /// `Table` serializes keys using `psio1::to_key`. It serializes `T` using fracpack.
    template <typename T, auto Primary, auto... Secondary>
    class Table
    {
@@ -900,17 +900,17 @@ namespace psibase
       {
          if constexpr (std::is_same_v<U, T>)
          {
-            auto serialized = psio::convert_to_frac(value);
+            auto serialized = psio1::convert_to_frac(value);
             putImpl<false, T>(value, serialized);
          }
-         else if constexpr (std::is_same_v<U, psio::shared_view_ptr<T>> ||
-                            std::is_same_v<U, psio::shared_view_ptr<const T>>)
+         else if constexpr (std::is_same_v<U, psio1::shared_view_ptr<T>> ||
+                            std::is_same_v<U, psio1::shared_view_ptr<const T>>)
          {
-            putImpl<true, psio::view<const T>>(*value, value.data_without_size_prefix());
+            putImpl<true, psio1::view<const T>>(*value, value.data_without_size_prefix());
          }
-         else if constexpr (psio::PackableAs<U, T>)
+         else if constexpr (psio1::PackableAs<U, T>)
          {
-            put(psio::shared_view_ptr<T>::from_compatible(value));
+            put(psio1::shared_view_ptr<T>::from_compatible(value));
          }
          else
          {
@@ -943,9 +943,9 @@ namespace psibase
       void remove(const T& oldValue) { removeImpl(oldValue); }
 
       /// Remove object from table
-      void remove(psio::view<const T> oldValue) { removeImpl(oldValue); }
+      void remove(psio1::view<const T> oldValue) { removeImpl(oldValue); }
       /// Remove object from table
-      void remove(psio::view<T> oldValue) { remove(static_cast<psio::view<const T>>(oldValue)); }
+      void remove(psio1::view<T> oldValue) { remove(static_cast<psio1::view<const T>>(oldValue)); }
 
       // TODO: get index by name
       /// Get a primary or secondary index
@@ -1000,7 +1000,7 @@ namespace psibase
             {
                std::vector<char> buffer(sz);
                raw::getResult(buffer.data(), buffer.size(), 0);
-               auto data              = psio::from_frac<T>(psio::prevalidated{std::move(buffer)});
+               auto data              = psio1::from_frac<T>(psio1::prevalidated{std::move(buffer)});
                auto replace_secondary = [&](uint8_t& idx, auto wrapped)
                {
                   auto old_key = detail::invoke(decltype(wrapped)::value, data);
@@ -1008,10 +1008,10 @@ namespace psibase
                   if (old_key != new_key)
                   {
                      key_buffer.back() = idx;
-                     psio::convert_to_key(old_key, key_buffer);
+                     psio1::convert_to_key(old_key, key_buffer);
                      raw::kvRemove(db, key_buffer.data(), key_buffer.size());
                      key_buffer.resize(prefix.size() + 1);
-                     psio::convert_to_key(new_key, key_buffer);
+                     psio1::convert_to_key(new_key, key_buffer);
                      kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
                      key_buffer.resize(prefix.size() + 1);
                   }
@@ -1026,7 +1026,7 @@ namespace psibase
                {
                   auto key          = detail::invoke(decltype(wrapped)::value, value);
                   key_buffer.back() = idx;
-                  psio::convert_to_key(key, key_buffer);
+                  psio1::convert_to_key(key, key_buffer);
                   kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
                   key_buffer.resize(prefix.size() + 1);
                   ++idx;
@@ -1046,7 +1046,7 @@ namespace psibase
          {
             auto key          = detail::invoke(decltype(wrapped)::value, oldValue);
             key_buffer.back() = idx;
-            psio::convert_to_key(key, key_buffer);
+            psio1::convert_to_key(key, key_buffer);
             raw::kvRemove(db, key_buffer.data(), key_buffer.size());
             key_buffer.resize(prefix.size() + 1);
             ++idx;
@@ -1058,7 +1058,7 @@ namespace psibase
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
-         return psio::composite_key(key_base, idx, k);
+         return psio1::composite_key(key_base, idx, k);
       }
       UniqueKvHandle    db;
       std::vector<char> prefix;
@@ -1140,7 +1140,7 @@ namespace psibase
       template <std::uint16_t Table>
       auto open() const
       {
-         std::vector<char> key_prefix = psio::composite_key(account, Table);
+         std::vector<char> key_prefix = psio1::composite_key(account, Table);
          return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(
              Db, std::move(key_prefix), mode);
       }
@@ -1222,7 +1222,7 @@ namespace psibase
       template <std::uint16_t Table>
       auto open() const
       {
-         std::vector<char> key_prefix = psio::convert_to_key(Table);
+         std::vector<char> key_prefix = psio1::convert_to_key(Table);
          return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(
              handle, std::move(key_prefix), mode);
       }

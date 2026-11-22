@@ -4,7 +4,7 @@
 #include "types.hpp"
 
 using namespace psibase;
-using namespace psio::schema_types;
+using namespace psio1::schema_types;
 
 namespace UserService
 {

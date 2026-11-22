@@ -125,7 +125,7 @@ namespace debug_eos_vm
    std::shared_ptr<dwarf::debugger_registration> enable_debug(std::vector<uint8_t>& code,
                                                               Backend&              backend,
                                                               dwarf::info&          dwarf_info,
-                                                              psio::input_stream    wasm_source)
+                                                              psio1::input_stream    wasm_source)
    {
       auto& module = backend.get_module();
       auto& alloc  = module.allocator;

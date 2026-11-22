@@ -14,8 +14,8 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/WebSocket.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio/finally.hpp>
-#include <psio/to_json.hpp>
+#include <psio1/finally.hpp>
+#include <psio1/to_json.hpp>
 #include <unordered_set>
 
 namespace beast     = boost::beast;
@@ -341,7 +341,7 @@ namespace psibase::http
             abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
          if (replySent.exchange(true))
             return;
-         auto result = psio::from_frac<HttpReply>(data);
+         auto result = psio1::from_frac<HttpReply>(data);
          if (result.status == HttpStatus::switchingProtocols)
          {
             if (isWebsocketUpgrade(req, result))
@@ -499,8 +499,8 @@ namespace psibase::http
                        if constexpr (!std::is_same_v<std::decay_t<decltype(body)>, std::string>)
                        {
                           std::vector<char>   data;
-                          psio::vector_stream stream{data};
-                          psio::to_json(body, stream);
+                          psio1::vector_stream stream{data};
+                          psio1::to_json(body, stream);
                           return builder.ok(std::move(data), "application/json");
                        }
                        else
@@ -519,8 +519,8 @@ namespace psibase::http
                           [builder = HttpReplyBuilder{session->server, req}](auto&& result)
                           {
                              std::vector<char>   data;
-                             psio::vector_stream stream{data};
-                             psio::to_json(result, stream);
+                             psio1::vector_stream stream{data};
+                             psio1::to_json(result, stream);
                              return builder.ok(std::move(data), "application/json");
                           });
       }
@@ -633,7 +633,7 @@ namespace psibase::http
                   }
                }
                std::vector<char>   body;
-               psio::vector_stream stream{body};
+               psio1::vector_stream stream{body};
                to_json(status, stream);
                send(builder.ok(std::move(body), "application/json"));
             }
@@ -818,7 +818,7 @@ namespace psibase::http
             // TODO: time limit
             auto system = server.sharedState->getSystemContext();
 
-            psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
+            psio1::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
             bc.start();
@@ -851,7 +851,7 @@ namespace psibase::http
                system->sockets->add(*bc.writer, socket, &tc.ownedSockets);
                // these can't throw and should run iff sockets->add succeeds
                send.pause_read = true;
-               auto setStatus  = psio::finally(
+               auto setStatus  = psio1::finally(
                    [&]
                    {
                       auto endExecTime = steady_clock::now();
@@ -875,7 +875,7 @@ namespace psibase::http
                   Action action{
                       .sender  = AccountNumber(),
                       .service = proxyServiceNum,
-                      .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
+                      .rawData = psio1::convert_to_frac(std::tuple(socket->id, std::move(data))),
                   };
                   tc.execServe(action, atrace);
                }

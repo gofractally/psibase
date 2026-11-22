@@ -16,20 +16,20 @@ struct AsyncResponseRow
    HttpReply                  reply;
    std::optional<std::string> error;
 };
-PSIO_REFLECT(AsyncResponseRow, socket, reply, error)
+PSIO1_REFLECT(AsyncResponseRow, socket, reply, error)
 
 using AsyncResponseTable = psibase::Table<AsyncResponseRow, &AsyncResponseRow::socket>;
-PSIO_REFLECT_TYPENAME(AsyncResponseTable)
+PSIO1_REFLECT_TYPENAME(AsyncResponseTable)
 
 struct CounterRow
 {
    std::uint32_t value;
 };
 
-PSIO_REFLECT(CounterRow, value)
+PSIO1_REFLECT(CounterRow, value)
 
 using CounterTable = psibase::Table<CounterRow, SingletonKey{}>;
-PSIO_REFLECT_TYPENAME(CounterTable)
+PSIO1_REFLECT_TYPENAME(CounterTable)
 
 struct AsyncQueryService : psibase::Service
 {
@@ -40,7 +40,7 @@ struct AsyncQueryService : psibase::Service
    auto                  serveSys(const HttpRequest& req, std::optional<std::int32_t> socket)
        -> std::optional<HttpReply>;
 };
-PSIO_REFLECT(AsyncQueryService, method(onBlock), method(serveSys, request, socket))
+PSIO1_REFLECT(AsyncQueryService, method(onBlock), method(serveSys, request, socket))
 PSIBASE_REFLECT_TABLES(AsyncQueryService, AsyncQueryService::Subjective, AsyncQueryService::Session)
 
 void wait_until(std::chrono::steady_clock::time_point end)

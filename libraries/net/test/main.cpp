@@ -16,13 +16,13 @@ struct ConsoleLog
        "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {TransactionId}}{?: {BlockId}: "
        "{BlockHeader}}{Indent:4:{TraceConsole}}";
 };
-PSIO_REFLECT(ConsoleLog, type, filter, format);
+PSIO1_REFLECT(ConsoleLog, type, filter, format);
 
 struct Loggers
 {
    ConsoleLog stderr;
 };
-PSIO_REFLECT(Loggers, stderr);
+PSIO1_REFLECT(Loggers, stderr);
 
 std::optional<std::size_t> dataIndex;
 
@@ -48,7 +48,7 @@ int main(int argc, const char* const* argv)
    if (auto seed = session.configData().rngSeed)
       psibase::test::global_random::set_global_seed(seed);
 
-   loggers::configure(psio::convert_from_json<loggers::Config>(psio::convert_to_json(logConfig)));
+   loggers::configure(psio1::convert_from_json<loggers::Config>(psio1::convert_to_json(logConfig)));
 
    // Replace timestamp with mock clock
    {

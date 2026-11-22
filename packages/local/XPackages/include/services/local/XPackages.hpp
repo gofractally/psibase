@@ -17,9 +17,9 @@ namespace LocalService
       std::vector<psibase::PackageExport> exports;
       psibase::Checksum256                sha256;
    };
-   PSIO_REFLECT(LocalPackage, name, version, description, depends, accounts, services, exports, sha256)
+   PSIO1_REFLECT(LocalPackage, name, version, description, depends, accounts, services, exports, sha256)
    using LocalPackagesTable = psibase::Table<LocalPackage, &LocalPackage::name>;
-   PSIO_REFLECT_TYPENAME(LocalPackagesTable)
+   PSIO1_REFLECT_TYPENAME(LocalPackagesTable)
 
    struct PendingLocalPackage
    {
@@ -37,7 +37,7 @@ namespace LocalService
                                            &PendingLocalPackage::version,
                                            &PendingLocalPackage::sha256>;
    };
-   PSIO_REFLECT(PendingLocalPackage,
+   PSIO1_REFLECT(PendingLocalPackage,
                 name,
                 version,
                 description,
@@ -49,7 +49,7 @@ namespace LocalService
                 removing)
    using PendingLocalPackagesTable =
        psibase::Table<PendingLocalPackage, PendingLocalPackage::ByName{}>;
-   PSIO_REFLECT_TYPENAME(PendingLocalPackagesTable)
+   PSIO1_REFLECT_TYPENAME(PendingLocalPackagesTable)
 
    struct XPackages : psibase::Service
    {
@@ -58,6 +58,6 @@ namespace LocalService
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest        request,
                                                  std::optional<std::int32_t> socket);
    };
-   PSIO_REFLECT(XPackages, method(serveSys, request))
+   PSIO1_REFLECT(XPackages, method(serveSys, request))
    PSIBASE_REFLECT_TABLES(XPackages, XPackages::Subjective)
 }  // namespace LocalService

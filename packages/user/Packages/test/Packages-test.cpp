@@ -15,14 +15,14 @@ namespace
    {
       std::uint32_t value;
    };
-   PSIO_REFLECT(TableKey, value)
+   PSIO1_REFLECT(TableKey, value)
 
    struct TableKeyExtended
    {
       std::uint32_t                value;
       std::optional<std::uint32_t> o;
    };
-   PSIO_REFLECT(TableKeyExtended, value, o)
+   PSIO1_REFLECT(TableKeyExtended, value, o)
 
    struct TableRowV1
    {
@@ -30,16 +30,16 @@ namespace
       TableKey k2;
       TableKey k3;
    };
-   PSIO_REFLECT(TableRowV1, k1, k2, k3);
+   PSIO1_REFLECT(TableRowV1, k1, k2, k3);
    using TableV1 = Table<TableRowV1, &TableRowV1::k1, &TableRowV1::k2>;
-   PSIO_REFLECT_TYPENAME(TableV1)
+   PSIO1_REFLECT_TYPENAME(TableV1)
 
    struct ServiceV1 : Service
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableV1>;
    };
-   PSIO_REFLECT(ServiceV1)
+   PSIO1_REFLECT(ServiceV1)
    PSIBASE_REFLECT_TABLES(ServiceV1, ServiceV1::Tables)
 
    // Valid extension
@@ -50,16 +50,16 @@ namespace
       TableKeyExtended             k3;
       std::optional<std::uint32_t> o;
    };
-   PSIO_REFLECT(TableRowV2, k1, k2, k3, o);
+   PSIO1_REFLECT(TableRowV2, k1, k2, k3, o);
    using TableV2 = Table<TableRowV2, &TableRowV2::k1, &TableRowV2::k2>;
-   PSIO_REFLECT_TYPENAME(TableV2)
+   PSIO1_REFLECT_TYPENAME(TableV2)
 
    struct ServiceV2 : Service
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableV2, TableV1>;
    };
-   PSIO_REFLECT(ServiceV2)
+   PSIO1_REFLECT(ServiceV2)
    PSIBASE_REFLECT_TABLES(ServiceV2, ServiceV2::Tables)
 
    // Add non-optional field
@@ -70,55 +70,55 @@ namespace
       TableKey      k3;
       std::uint32_t o;
    };
-   PSIO_REFLECT(TableRowV3, k1, k2, k3, o);
+   PSIO1_REFLECT(TableRowV3, k1, k2, k3, o);
    using TableV3 = Table<TableRowV3, &TableRowV3::k1, &TableRowV3::k2>;
-   PSIO_REFLECT_TYPENAME(TableV3)
+   PSIO1_REFLECT_TYPENAME(TableV3)
 
    struct ServiceV3 : Service
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableV3>;
    };
-   PSIO_REFLECT(ServiceV3)
+   PSIO1_REFLECT(ServiceV3)
    PSIBASE_REFLECT_TABLES(ServiceV3, ServiceV3::Tables)
 
    // Add index
    using TableRowV4 = TableRowV1;
    using TableV4    = Table<TableRowV4, &TableRowV4::k1, &TableRowV4::k2, &TableRowV4::k3>;
-   PSIO_REFLECT_TYPENAME(TableV4)
+   PSIO1_REFLECT_TYPENAME(TableV4)
 
    struct ServiceV4 : Service
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableV4>;
    };
-   PSIO_REFLECT(ServiceV4)
+   PSIO1_REFLECT(ServiceV4)
    PSIBASE_REFLECT_TABLES(ServiceV4, ServiceV4::Tables)
 
    // Remove index
    using TableRowV5 = TableRowV1;
    using TableV5    = Table<TableRowV5, &TableRowV5::k1>;
-   PSIO_REFLECT_TYPENAME(TableV5)
+   PSIO1_REFLECT_TYPENAME(TableV5)
 
    struct ServiceV5 : Service
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableV5>;
    };
-   PSIO_REFLECT(ServiceV5)
+   PSIO1_REFLECT(ServiceV5)
    PSIBASE_REFLECT_TABLES(ServiceV5, ServiceV5::Tables)
 
    // Change index
    using TableRowV6 = TableRowV1;
    using TableV6    = Table<TableRowV6, &TableRowV6::k1, &TableRowV6::k3>;
-   PSIO_REFLECT_TYPENAME(TableV6)
+   PSIO1_REFLECT_TYPENAME(TableV6)
 
    struct ServiceV6 : Service
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableV6>;
    };
-   PSIO_REFLECT(ServiceV6)
+   PSIO1_REFLECT(ServiceV6)
    PSIBASE_REFLECT_TABLES(ServiceV6, ServiceV6::Tables)
 
    // Change key type
@@ -128,16 +128,16 @@ namespace
       TableKeyExtended k2;
       TableKey         k3;
    };
-   PSIO_REFLECT(TableRowV7, k1, k2, k3);
+   PSIO1_REFLECT(TableRowV7, k1, k2, k3);
    using TableV7 = Table<TableRowV7, &TableRowV7::k1, &TableRowV7::k2>;
-   PSIO_REFLECT_TYPENAME(TableV7)
+   PSIO1_REFLECT_TYPENAME(TableV7)
 
    struct ServiceV7 : Service
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableV7>;
    };
-   PSIO_REFLECT(ServiceV7)
+   PSIO1_REFLECT(ServiceV7)
    PSIBASE_REFLECT_TABLES(ServiceV7, ServiceV7::Tables)
 
 }  // namespace
@@ -194,7 +194,7 @@ namespace
       auto     outer() const { return k; }
       auto     rev() const { return ~k.value; }
    };
-   PSIO_REFLECT(TableRowXForm, k)
+   PSIO1_REFLECT(TableRowXForm, k)
    PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXForm::inner, "inner")
    PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXForm::outer, "outer")
    PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXForm::rev, "rev")
@@ -204,60 +204,60 @@ namespace
       auto             inner() const { return k.value; }
       auto             outer() const { return k; }
    };
-   PSIO_REFLECT(TableRowXFormExtended, k)
+   PSIO1_REFLECT(TableRowXFormExtended, k)
    PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXFormExtended::inner, "inner")
    PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXFormExtended::outer, "outer")
 
    using TableXFormIV1 = Table<TableRowXForm, &TableRowXForm::inner>;
-   PSIO_REFLECT_TYPENAME(TableXFormIV1)
+   PSIO1_REFLECT_TYPENAME(TableXFormIV1)
    struct ServiceXFormIV1
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableXFormIV1>;
    };
-   PSIO_REFLECT(ServiceXFormIV1)
+   PSIO1_REFLECT(ServiceXFormIV1)
    PSIBASE_REFLECT_TABLES(ServiceXFormIV1, ServiceXFormIV1::Tables)
 
    // Upgrade without affecting the key
    using TableXFormIV2 = Table<TableRowXFormExtended, &TableRowXFormExtended::inner>;
-   PSIO_REFLECT_TYPENAME(TableXFormIV2)
+   PSIO1_REFLECT_TYPENAME(TableXFormIV2)
    struct ServiceXFormIV2
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableXFormIV2>;
    };
-   PSIO_REFLECT(ServiceXFormIV2)
+   PSIO1_REFLECT(ServiceXFormIV2)
    PSIBASE_REFLECT_TABLES(ServiceXFormIV2, ServiceXFormIV2::Tables)
 
    // Change transform
    using TableXFormIV3 = Table<TableRowXForm, &TableRowXForm::rev>;
-   PSIO_REFLECT_TYPENAME(TableXFormIV3)
+   PSIO1_REFLECT_TYPENAME(TableXFormIV3)
    struct ServiceXFormIV3
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableXFormIV3>;
    };
-   PSIO_REFLECT(ServiceXFormIV3)
+   PSIO1_REFLECT(ServiceXFormIV3)
    PSIBASE_REFLECT_TABLES(ServiceXFormIV3, ServiceXFormIV3::Tables)
 
    // Upgrade that changes the key
    using TableXFormOV1 = Table<TableRowXForm, &TableRowXForm::outer>;
-   PSIO_REFLECT_TYPENAME(TableXFormOV1)
+   PSIO1_REFLECT_TYPENAME(TableXFormOV1)
    struct ServiceXFormOV1
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableXFormOV1>;
    };
-   PSIO_REFLECT(ServiceXFormOV1)
+   PSIO1_REFLECT(ServiceXFormOV1)
    PSIBASE_REFLECT_TABLES(ServiceXFormOV1, ServiceXFormOV1::Tables)
    using TableXFormOV2 = Table<TableRowXFormExtended, &TableRowXFormExtended::outer>;
-   PSIO_REFLECT_TYPENAME(TableXFormOV2)
+   PSIO1_REFLECT_TYPENAME(TableXFormOV2)
    struct ServiceXFormOV2
    {
       static constexpr AccountNumber service{"alice"};
       using Tables = psibase::ServiceTables<TableXFormOV2>;
    };
-   PSIO_REFLECT(ServiceXFormOV2)
+   PSIO1_REFLECT(ServiceXFormOV2)
    PSIBASE_REFLECT_TABLES(ServiceXFormOV2, ServiceXFormOV2::Tables)
 }  // namespace
 
@@ -300,7 +300,7 @@ namespace
          };
       };
    };
-   PSIO_REFLECT(EventsV1)
+   PSIO1_REFLECT(EventsV1)
    PSIBASE_REFLECT_HISTORY_EVENTS(EventsV1, method(e1))
    PSIBASE_REFLECT_TABLES(EventsV1)
 
@@ -317,7 +317,7 @@ namespace
          };
       };
    };
-   PSIO_REFLECT(EventsV2)
+   PSIO1_REFLECT(EventsV2)
    PSIBASE_REFLECT_HISTORY_EVENTS(EventsV2, method(e1, o), method(e2, i))
    PSIBASE_REFLECT_TABLES(EventsV2)
 
@@ -333,7 +333,7 @@ namespace
          };
       };
    };
-   PSIO_REFLECT(EventsV3)
+   PSIO1_REFLECT(EventsV3)
    PSIBASE_REFLECT_HISTORY_EVENTS(EventsV3, method(e1, i))
    PSIBASE_REFLECT_TABLES(EventsV3)
 
@@ -342,7 +342,7 @@ namespace
    {
       static constexpr AccountNumber service{"alice"};
    };
-   PSIO_REFLECT(EventsV4)
+   PSIO1_REFLECT(EventsV4)
    PSIBASE_REFLECT_TABLES(EventsV4)
 
 }  // namespace

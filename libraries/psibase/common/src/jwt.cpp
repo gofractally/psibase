@@ -6,7 +6,7 @@
 #include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/jwt.hpp>
-#include <psio/reflect.hpp>
+#include <psio1/reflect.hpp>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -23,7 +23,7 @@ namespace psibase
       std::string alg{"HS256"};
       friend bool operator==(const token_header&, const token_header&) = default;
    };
-   PSIO_REFLECT(token_header, typ, alg);
+   PSIO1_REFLECT(token_header, typ, alg);
    std::optional<std::string> decodeJWT(const JWTKey& key, std::string_view token)
    {
       auto end_header = token.find('.');
@@ -43,7 +43,7 @@ namespace psibase
           std::memcmp(signature.data(), mac.data(), mac.size()) != 0)
          return std::nullopt;
 
-      auto header = psio::convert_from_json<token_header>(fromBase64Url(encoded_header));
+      auto header = psio1::convert_from_json<token_header>(fromBase64Url(encoded_header));
       if (header != token_header{})
          return std::nullopt;
 
@@ -52,7 +52,7 @@ namespace psibase
    std::string encodeJWT(const JWTKey& key, std::string_view token)
    {
       std::string result =
-          toBase64Url(psio::convert_to_json(token_header{})) + "." + toBase64Url(token);
+          toBase64Url(psio1::convert_to_json(token_header{})) + "." + toBase64Url(token);
       auto mac = hmacSha256(key, result);
       return result + "." + toBase64Url(mac.data(), mac.size());
    }

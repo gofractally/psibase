@@ -1,8 +1,8 @@
 #pragma once
 
 #include <psibase/check.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/view.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/view.hpp>
 
 #include <string>
 #include <string_view>
@@ -43,7 +43,7 @@ namespace psibase
          }
          return true;
       }
-      PSIO_REFLECT(Memo, contents);
+      PSIO1_REFLECT(Memo, contents);
    };
 
    void from_json(Memo& s, auto& stream)
@@ -71,7 +71,7 @@ namespace psibase
       return Memo::validate(str.contents);
    }
 
-   inline bool psio_validate_packable(psio::view<const Memo> str)
+   inline bool psio_validate_packable(psio1::view<const Memo> str)
    {
       return Memo::validate(str.contents());
    }

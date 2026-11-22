@@ -3,8 +3,8 @@
 #include_next <psibase/db.hpp>
 
 #include <psibase/blob.hpp>
-#include <psio/fracpack.hpp>
-#include <psio/to_key.hpp>
+#include <psio1/fracpack.hpp>
+#include <psio1/to_key.hpp>
 #include <psibase/storage.hpp>
 
 #include <array>
@@ -160,8 +160,8 @@ namespace psibase
 
       struct KVResult
       {
-         psio::input_stream key;
-         psio::input_stream value;
+         psio1::input_stream key;
+         psio1::input_stream value;
       };
 
       struct Session
@@ -249,35 +249,35 @@ namespace psibase
       // TODO: kvPutRaw, kvRemoveRaw: return deltas
       // TODO: getters: pass in input buffers instead of returning KVResult
 
-      void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value);
-      void kvRemoveRaw(DbId db, psio::input_stream key);
-      std::optional<psio::input_stream> kvGetRaw(DbId db, psio::input_stream key);
+      void kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value);
+      void kvRemoveRaw(DbId db, psio1::input_stream key);
+      std::optional<psio1::input_stream> kvGetRaw(DbId db, psio1::input_stream key);
       std::optional<KVResult>           kvGreaterEqualRaw(DbId               db,
-                                                          psio::input_stream key,
+                                                          psio1::input_stream key,
                                                           size_t             matchKeySize);
-      std::optional<KVResult> kvLessThanRaw(DbId db, psio::input_stream key, size_t matchKeySize);
-      std::optional<KVResult> kvMaxRaw(DbId db, psio::input_stream key);
+      std::optional<KVResult> kvLessThanRaw(DbId db, psio1::input_stream key, size_t matchKeySize);
+      std::optional<KVResult> kvMaxRaw(DbId db, psio1::input_stream key);
 
       template <typename K, typename V>
       auto kvPut(DbId db, const K& key, const V& value)
-          -> std::enable_if_t<!psio::is_std_optional<V>(), void>
+          -> std::enable_if_t<!psio1::is_std_optional<V>(), void>
       {
-         kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
+         kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));
       }
 
       template <typename K>
       void kvRemove(DbId db, const K& key)
       {
-         kvRemoveRaw(db, psio::convert_to_key(key));
+         kvRemoveRaw(db, psio1::convert_to_key(key));
       }
 
       template <typename V, typename K>
       std::optional<V> kvGet(DbId db, const K& key)
       {
-         auto s = kvGetRaw(db, psio::convert_to_key(key));
+         auto s = kvGetRaw(db, psio1::convert_to_key(key));
          if (!s)
             return std::nullopt;
-         return psio::from_frac<V>(psio::prevalidated{s->pos, s->end});
+         return psio1::from_frac<V>(psio1::prevalidated{s->pos, s->end});
       }
 
       template <typename V, typename K>

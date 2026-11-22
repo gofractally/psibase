@@ -67,8 +67,8 @@ namespace psibase
 
       class Config;
       void configure(const Config&);
-      void from_json(Config&, psio::json_token_stream&);
-      void to_json(const Config&, psio::vector_stream&);
+      void from_json(Config&, psio1::json_token_stream&);
+      void to_json(const Config&, psio1::vector_stream&);
       void to_config(const Config& obj, ConfigFile& file);
       class Config
       {
@@ -76,8 +76,8 @@ namespace psibase
          static Config get();
 
         private:
-         friend void from_json(Config&, psio::json_token_stream&);
-         friend void to_json(const Config&, psio::vector_stream&);
+         friend void from_json(Config&, psio1::json_token_stream&);
+         friend void to_json(const Config&, psio1::vector_stream&);
          friend void configure(const Config&);
          friend void to_config(const Config& obj, ConfigFile& file);
 

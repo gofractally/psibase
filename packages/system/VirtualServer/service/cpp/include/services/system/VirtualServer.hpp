@@ -13,7 +13,7 @@ namespace SystemService
    {
       uint64_t net_bps;
       uint64_t storage_bytes;
-      PSIO_REFLECT(ServerSpecs, net_bps, storage_bytes);
+      PSIO1_REFLECT(ServerSpecs, net_bps, storage_bytes);
    };
 
    struct NetworkVariables
@@ -22,7 +22,7 @@ namespace SystemService
       uint64_t per_block_sys_cpu_ns;
       uint64_t obj_storage_bytes;
       uint64_t subj_storage_bytes;
-      PSIO_REFLECT(NetworkVariables,
+      PSIO1_REFLECT(NetworkVariables,
                    block_replay_factor,
                    per_block_sys_cpu_ns,
                    obj_storage_bytes,
@@ -33,7 +33,7 @@ namespace SystemService
    {
       uint8_t  threshold_percent;
       uint64_t capacity;
-      PSIO_REFLECT(BufferConfig, threshold_percent, capacity);
+      PSIO1_REFLECT(BufferConfig, threshold_percent, capacity);
    };
 
    /// Virtual Server Service
@@ -423,7 +423,7 @@ namespace SystemService
       };
    };
 
-   PSIO_REFLECT(VirtualServer,
+   PSIO1_REFLECT(VirtualServer,
                 allowHashedMethods(),
                 method(init),
                 method(init_billing, fee_receiver),

@@ -18,34 +18,34 @@ namespace
    struct ConnectRequest
    {
       std::string url;
-      PSIO_REFLECT(ConnectRequest, url)
+      PSIO1_REFLECT(ConnectRequest, url)
    };
 
    struct ConnectReply
    {
       std::int32_t id;
       std::string  endpoint;
-      PSIO_REFLECT(ConnectReply, id, endpoint)
+      PSIO1_REFLECT(ConnectReply, id, endpoint)
    };
 
    struct DisconnectRequest
    {
       std::int32_t id;
-      PSIO_REFLECT(DisconnectRequest, id)
+      PSIO1_REFLECT(DisconnectRequest, id)
    };
 
    struct UserRequest
    {
       AccountNumber account;
       bool          accept = true;
-      PSIO_REFLECT(UserRequest, account, accept)
+      PSIO1_REFLECT(UserRequest, account, accept)
    };
 
    struct AuthorizationRequest
    {
       std::string                url;
       std::optional<std::string> token;
-      PSIO_REFLECT(AuthorizationRequest, url, token)
+      PSIO1_REFLECT(AuthorizationRequest, url, token)
    };
 
    std::vector<HttpHeader> allowCorsCredentials(const HttpRequest& req, AccountNumber account)
@@ -245,25 +245,25 @@ namespace
       static const std::uint8_t type = 64;
       std::uint64_t             nodeId;
       std::int32_t              connectionId;
-      PSIO_REFLECT(IdMessage, nodeId, connectionId)
+      PSIO1_REFLECT(IdMessage, nodeId, connectionId)
    };
    struct DuplicateConnectionMessage
    {
       static const std::uint8_t type = 65;
       std::int32_t              connectionId;
       bool                      secure;
-      PSIO_REFLECT(DuplicateConnectionMessage, connectionId, secure)
+      PSIO1_REFLECT(DuplicateConnectionMessage, connectionId, secure)
    };
    struct HostnamesMessage
    {
       static const std::uint8_t type = 66;
       std::vector<std::string>  hosts;
-      PSIO_REFLECT(HostnamesMessage, hosts)
+      PSIO1_REFLECT(HostnamesMessage, hosts)
    };
    struct CheckDuplicatesMessage
    {
       static const std::uint8_t type = 67;
-      PSIO_REFLECT(CheckDuplicatesMessage)
+      PSIO1_REFLECT(CheckDuplicatesMessage)
    };
 
    template <typename T>
@@ -271,15 +271,15 @@ namespace
    {
       std::vector<char> result;
       result.push_back(T::type);
-      psio::vector_stream stream{result};
-      psio::to_frac(psio::nested<const T&>{msg}, stream);
+      psio1::vector_stream stream{result};
+      psio1::to_frac(psio1::nested<const T&>{msg}, stream);
       return result;
    }
 
    template <typename T>
    T deserializeMessage(std::span<const char> msg)
    {
-      return psio::from_frac<psio::nested<T>>(msg.subspan(1)).value;
+      return psio1::from_frac<psio1::nested<T>>(msg.subspan(1)).value;
    }
 
    bool hasCommonHost(const PeerConnection& lhs, const PeerConnection& rhs)
@@ -363,7 +363,7 @@ namespace
 
    void recvMessage(std::int32_t socket, IdMessage&& msg)
    {
-      printf("Id %s\n", psio::convert_to_json(msg).c_str());
+      printf("Id %s\n", psio1::convert_to_json(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -390,7 +390,7 @@ namespace
 
    void recvMessage(std::int32_t socket, HostnamesMessage&& msg)
    {
-      printf("Hostnames %s\n", psio::convert_to_json(msg).c_str());
+      printf("Hostnames %s\n", psio1::convert_to_json(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -419,7 +419,7 @@ namespace
    // on a different socket will work correctly.
    void recvMessage(std::int32_t socket, CheckDuplicatesMessage&& msg)
    {
-      printf("CheckDuplicates %s\n", psio::convert_to_json(msg).c_str());
+      printf("CheckDuplicates %s\n", psio1::convert_to_json(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -435,7 +435,7 @@ namespace
    }
    void recvMessage(std::int32_t socket, DuplicateConnectionMessage&& msg)
    {
-      printf("DuplicateConnection %s\n", psio::convert_to_json(msg).c_str());
+      printf("DuplicateConnection %s\n", psio1::convert_to_json(msg).c_str());
       auto table = XPeers{}.open<PeerConnectionTable>();
       PSIBASE_SUBJECTIVE_TX
       {
@@ -512,7 +512,7 @@ namespace
              },
              row->info);
       }
-      PSIO_REFLECT(GQLPeerConnection, id, urls, hosts, method(endpoint))
+      PSIO1_REFLECT(GQLPeerConnection, id, urls, hosts, method(endpoint))
    };
 
    struct GQLUrl
@@ -521,7 +521,7 @@ namespace
       std::uint32_t refcount;
       bool          hasToken() const { return XPeers{}.open<UrlAuthTable>().get(url).has_value(); }
       bool          connected() const { return refcount != 0; }
-      PSIO_REFLECT(GQLUrl, url, method(hasToken), method(connected))
+      PSIO1_REFLECT(GQLUrl, url, method(hasToken), method(connected))
    };
 
    struct Query
@@ -542,7 +542,7 @@ namespace
              [](UrlRow&& row) { return GQLUrl{std::move(row.url), std::move(row.refcount)}; }};
       }
       auto users() const { return XPeers{}.open<PeerUsernameTable>().getIndex<0>(); }
-      PSIO_REFLECT(Query, method(peers), method(urls), method(users))
+      PSIO1_REFLECT(Query, method(peers), method(urls), method(users))
    };
 
 }  // namespace
@@ -625,7 +625,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       }
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
-      auto body = psio::convert_from_json<ConnectRequest>(
+      auto body = psio1::convert_from_json<ConnectRequest>(
           std::string(request.body.begin(), request.body.end()));
       connect(body.url, socket, &request);
 
@@ -643,7 +643,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
 
-      auto body = psio::convert_from_json<DisconnectRequest>(
+      auto body = psio1::convert_from_json<DisconnectRequest>(
           std::string(request.body.begin(), request.body.end()));
 
       auto                          table = XPeers{}.open<PeerConnectionTable>();
@@ -676,7 +676,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
 
-      auto body = psio::convert_from_json<UserRequest>(
+      auto body = psio1::convert_from_json<UserRequest>(
           std::string(request.body.begin(), request.body.end()));
 
       auto table = open<PeerUsernameTable>();
@@ -700,7 +700,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
 
-      auto body = psio::convert_from_json<AuthorizationRequest>(
+      auto body = psio1::convert_from_json<AuthorizationRequest>(
           std::string(request.body.begin(), request.body.end()));
 
       auto table = open<UrlAuthTable>();
@@ -729,7 +729,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
          }
       }
       HttpReply           reply{.status = HttpStatus::ok, .contentType = "application/json"};
-      psio::vector_stream stream{reply.body};
+      psio1::vector_stream stream{reply.body};
       to_json(result, stream);
       return reply;
    }
@@ -745,7 +745,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
          }
       }
       HttpReply           reply{.status = HttpStatus::ok, .contentType = "application/json"};
-      psio::vector_stream stream{reply.body};
+      psio1::vector_stream stream{reply.body};
       to_json(result, stream);
       return reply;
    }
@@ -856,7 +856,7 @@ void XPeers::onP2P(std::int32_t socket, HttpReply reply)
           .contentType = "application/json",
           .headers     = std::move(request->replyHeaders),
       };
-      psio::vector_stream stream(reply.body);
+      psio1::vector_stream stream(reply.body);
       to_json(*replyBody, stream);
       to<XHttp>().sendReply(request->requestSocket, std::move(reply));
    }
@@ -903,7 +903,7 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
 }
 
 void XPeers::recvP2P(std::int32_t                        socket,
-                     psio::view<const std::vector<char>> data,
+                     psio1::view<const std::vector<char>> data,
                      std::uint32_t                       flags)
 {
    check(getSender() == XHttp::service, "Wrong sender");

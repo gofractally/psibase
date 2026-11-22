@@ -16,7 +16,7 @@ namespace
          auto table = DynLd{}.open<DynDepsTable>();
          return table.get(service);
       }
-      PSIO_REFLECT(Query, method(depsFor, service))
+      PSIO1_REFLECT(Query, method(depsFor, service))
    };
 }  // namespace
 

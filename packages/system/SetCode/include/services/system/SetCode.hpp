@@ -16,10 +16,10 @@ namespace SystemService
                                         &CodeRefCountRow::vmType,
                                         &CodeRefCountRow::vmVersion>;
       auto key() const { return Key{}(*this); }
-      PSIO_REFLECT(CodeRefCountRow, codeHash, vmType, vmVersion)
+      PSIO1_REFLECT(CodeRefCountRow, codeHash, vmType, vmVersion)
    };
    using CodeRefCountTable = psibase::Table<CodeRefCountRow, CodeRefCountRow::Key{}>;
-   PSIO_REFLECT_TYPENAME(CodeRefCountTable)
+   PSIO1_REFLECT_TYPENAME(CodeRefCountTable)
 
    struct StagedCodeRow
    {
@@ -33,18 +33,18 @@ namespace SystemService
       using Key =
           psibase::CompositeKey<&StagedCodeRow::from, &StagedCodeRow::id, &StagedCodeRow::service>;
       auto key() const { return Key{}(*this); }
-      PSIO_REFLECT(StagedCodeRow, from, service, id, codeHash, vmType, vmVersion)
+      PSIO1_REFLECT(StagedCodeRow, from, service, id, codeHash, vmType, vmVersion)
    };
    using StagedCodeTable = psibase::Table<StagedCodeRow, StagedCodeRow::Key{}>;
-   PSIO_REFLECT_TYPENAME(StagedCodeTable)
+   PSIO1_REFLECT_TYPENAME(StagedCodeTable)
 
    struct VerifySequenceRow
    {
       std::uint64_t seq;
-      PSIO_REFLECT(VerifySequenceRow, seq)
+      PSIO1_REFLECT(VerifySequenceRow, seq)
    };
    using VerifySequenceTable = psibase::Table<VerifySequenceRow, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(VerifySequenceTable)
+   PSIO1_REFLECT_TYPENAME(VerifySequenceTable)
 
    /// The execution policy version stamped on code that is deployed without
    /// asking for one. Absent until the chain sets it; then
@@ -52,10 +52,10 @@ namespace SystemService
    struct DefaultVmVersionRow
    {
       std::uint8_t vmVersion = psibase::defaultVmVersion;
-      PSIO_REFLECT(DefaultVmVersionRow, vmVersion)
+      PSIO1_REFLECT(DefaultVmVersionRow, vmVersion)
    };
    using DefaultVmVersionTable = psibase::Table<DefaultVmVersionRow, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(DefaultVmVersionTable)
+   PSIO1_REFLECT_TYPENAME(DefaultVmVersionTable)
 
    /// All compiled code is uploaded to the chain through this service
    struct SetCode : psibase::Service
@@ -135,7 +135,7 @@ namespace SystemService
       /// the verify services change.
       std::uint64_t verifySeq();
    };
-   PSIO_REFLECT(SetCode,
+   PSIO1_REFLECT(SetCode,
                 method(init),
                 method(setCode, service, vmType, vmVersion, code),
                 method(stageCode, service, id, vmType, vmVersion, code),

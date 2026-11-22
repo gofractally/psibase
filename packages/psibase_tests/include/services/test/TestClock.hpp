@@ -17,7 +17,7 @@ struct TestClock : psibase::Service
    void testHiRes(bool indirect);
 };
 
-PSIO_REFLECT(TestClock,
+PSIO1_REFLECT(TestClock,
              method(testReal, indirect),
              method(testMono, indirect),
              method(testCpu, indirect),
