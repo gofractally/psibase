@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <map>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -19,6 +20,7 @@
 #include <thread>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace psibase::storage
 {
@@ -172,12 +174,17 @@ namespace psibase::storage
       }
    };
 
+   inline std::atomic<std::uint64_t> nextStateId{1};
    struct State
    {
       SerializedNativeAccess                 access;  // the single writer; never taken by reads
       std::shared_ptr<Engine::database>      engine;
       std::shared_ptr<Engine::write_session> writer;
       ReaderPool                             readers;
+      // One engine reader per thread that has read this database.
+      std::mutex                                                           threadReadersMutex;
+      std::map<std::thread::id, std::shared_ptr<Engine::read_session>>     threadReaders;
+      const std::uint64_t id = nextStateId.fetch_add(1, std::memory_order_relaxed);
       std::filesystem::path                  path;
       bool                                   readonly  = false;
       bool                                   temporary = false;
@@ -187,6 +194,7 @@ namespace psibase::storage
              [&]
              {
                 readers.close();
+                threadReaders.clear();
                 writer.reset();
                 engine.reset();
              },
@@ -243,72 +251,64 @@ namespace psibase::storage
       bool                   publish = true;
    };
 
-   // A storage session's own engine reader. The session's holder (one thread or
-   // strand at a time) reads through it directly. `busy` only detects misuse: if
-   // two threads ever read through one session object at once, the second falls
-   // back to the shared pool instead of sharing an engine session.
-   struct session_reader
+   // An engine reader may be used by one thread at a time, so each thread takes
+   // one per database the first time it reads and keeps it. Requests come and go
+   // (psibase makes a storage session per request); the thread's reader stays.
+   // A strand that moves between threads simply uses whichever thread it is on.
+   // The shared pool is only the fallback when the engine has no session slot left.
+   Engine::read_session* threadReader(State& state)
    {
-      std::shared_ptr<State>                state;  // keeps the engine open
-      std::atomic<bool>                     busy{false};
-      bool                                  unavailable = false;
-      std::shared_ptr<Engine::read_session> session;
-      ~session_reader()
+      struct Cached
       {
-         if (session)
-            state->access.invoke([&] { session.reset(); }, true);
-      }
-   };
-
-   // Run a read on the caller's thread through the session's own reader.
-   struct session_reading
-   {
-      template <class F>
-      static auto run(read_session& owner, const shared_root& source, F&& function)
+         const State*          state;
+         std::uint64_t         id;
+         Engine::read_session* session;
+      };
+      thread_local std::vector<Cached> cache;
+      for (const auto& entry : cache)
+         if (entry.state == &state && entry.id == state.id)
+            return entry.session;
+      Engine::read_session* session = nullptr;
       {
-         accounting::check();
-         auto& state = *source->state;
-         auto  body  = [&](Engine::read_session& session)
+         std::lock_guard lock(state.threadReadersMutex);
+         auto&           slot = state.threadReaders[std::this_thread::get_id()];
+         if (!slot)
          {
-            decltype(auto) result = std::forward<F>(function)(session);
-            accounting::check();
-            return result;
-         };
-         if (!owner.reader)
-         {
-            owner.reader        = std::make_shared<session_reader>();
-            owner.reader->state = source->state;
-         }
-         auto& own = *owner.reader;
-         if (!own.busy.exchange(true, std::memory_order_acquire))
-         {
-            struct Release
+            try
             {
-               std::atomic<bool>& busy;
-               ~Release() { busy.store(false, std::memory_order_release); }
-            } release{own.busy};
-            if (!own.session && !own.unavailable)
-            {
-               try
-               {
-                  own.session = state.engine->start_read_session();
-               }
-               catch (const std::runtime_error&)
-               {
-                  // The engine is out of session slots; share the pool instead.
-                  own.unavailable = true;
-               }
+               slot = state.engine->start_read_session();
             }
-            if (own.session)
-               return body(*own.session);
+            catch (const std::runtime_error&)
+            {
+               state.threadReaders.erase(std::this_thread::get_id());
+               return nullptr;
+            }
          }
-         return state.readers.use(*state.engine, body);
+         session = slot.get();
       }
-   };
+      // A few entries at most: one per database this thread reads. Entries for
+      // closed databases can never match again (ids are never reused).
+      if (cache.size() >= 8)
+         cache.erase(cache.begin());
+      cache.push_back({&state, state.id, session});
+      return session;
+   }
+
+   // Run a read on the caller's thread through that thread's reader.
    template <class F>
-   auto reading(read_session& owner, const shared_root& source, F&& function)
+   auto reading(const shared_root& source, F&& function)
    {
-      return session_reading::run(owner, source, std::forward<F>(function));
+      accounting::check();
+      auto& state = *source->state;
+      auto  body  = [&](Engine::read_session& session)
+      {
+         decltype(auto) result = std::forward<F>(function)(session);
+         accounting::check();
+         return result;
+      };
+      if (auto* session = threadReader(state))
+         return body(*session);
+      return state.readers.use(*state.engine, body);
    }
 
    void readValue(const shared_root&        source,
@@ -365,10 +365,10 @@ namespace psibase::storage
          return false;
       if (source->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return reading(*this, source,
+      return reading(source,
                      [&](Engine::read_session& session)
                      {
-                        auto c = session.create_cursor(source->tree);
+                        auto c = session.borrow_cursor(source->tree);
                         if (!c.lower_bound(bytes(key)) || c.key() != bytes(key))
                            return false;
                         readValue(source, c, value, roots);
@@ -390,8 +390,7 @@ namespace psibase::storage
       less,
       max
    };
-   bool seek(read_session&             owner,
-             const shared_root&        source,
+   bool seek(const shared_root&        source,
              std::span<const char>     key,
              Seek                      kind,
              std::vector<char>*        outKey,
@@ -401,10 +400,10 @@ namespace psibase::storage
       if (!source)
          return false;
       return reading(
-          owner, source,
+          source,
           [&](Engine::read_session& session)
           {
-             auto c     = session.create_cursor(source->tree);
+             auto c     = session.borrow_cursor(source->tree);
              bool found = false;
              if (kind == Seek::lower)
                 found = c.lower_bound(bytes(key));
@@ -434,7 +433,7 @@ namespace psibase::storage
    {
       if (r && r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return seek(*this, r, k, Seek::lower, o, v, s);
+      return seek(r, k, Seek::lower, o, v, s);
    }
    bool read_session::get_less_than(const shared_root&        r,
                                     std::span<const char>     k,
@@ -444,7 +443,7 @@ namespace psibase::storage
    {
       if (r && r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return seek(*this, r, k, Seek::less, o, v, s);
+      return seek(r, k, Seek::less, o, v, s);
    }
    bool read_session::get_max(const shared_root&        r,
                               std::span<const char>     k,
@@ -454,7 +453,7 @@ namespace psibase::storage
    {
       if (r && r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return seek(*this, r, k, Seek::max, o, v, s);
+      return seek(r, k, Seek::max, o, v, s);
    }
    bool read_session::is_empty(const shared_root&    r,
                                std::span<const char> lower,
@@ -464,10 +463,10 @@ namespace psibase::storage
          return true;
       if (r->state != view->state)
          throw std::runtime_error("foreign storage root");
-      return reading(*this, r,
+      return reading(r,
                      [&](Engine::read_session& session)
                      {
-                        auto c = session.create_cursor(r->tree);
+                        auto c = session.borrow_cursor(r->tree);
                         return !c.lower_bound(bytes(lower)) ||
                                (!upper.empty() && c.key() >= bytes(upper));
                      });
@@ -511,11 +510,11 @@ namespace psibase::storage
          return is_empty(a, lower, upper);
       if (a->state != b->state || a->state != view->state)
          throw std::runtime_error("foreign storage roots");
-      return reading(*this, a,
+      return reading(a,
                      [&](Engine::read_session& session)
                      {
-                        return equalCursors(session.create_cursor(a->tree),
-                                            session.create_cursor(b->tree), bytes(lower),
+                        return equalCursors(session.borrow_cursor(a->tree),
+                                            session.borrow_cursor(b->tree), bytes(lower),
                                             bytes(upper));
                      });
    }
@@ -920,6 +919,7 @@ namespace psibase::storage
                 [&]
                 {
                    owner->readers.close();
+                   owner->threadReaders.clear();
                    owner->writer.reset();
                    owner->engine.reset();
                 },
