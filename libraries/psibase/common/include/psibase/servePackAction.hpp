@@ -1,16 +1,19 @@
 #pragma once
 
+#include <psibase/MethodArgs.hpp>
 #include <psibase/check.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/fracpack.hpp>
 #include <psio1/from_json.hpp>
+#include <psio1/reflect.hpp>
 
 namespace psibase
 {
    template <int i, typename... Ts>
-   bool fracpackActionFromJsonImpl(psio1::json_token_stream&     stream,
-                                   std::string_view             name,
-                                   std::span<const char* const> meta,
-                                   std::tuple<Ts...>&           params)
+   bool fracpackActionFromJsonImpl(psio1::json_token_stream&         stream,
+                                   std::string_view                  name,
+                                   std::span<const std::string_view> meta,
+                                   std::tuple<Ts...>&                params)
    {
       if constexpr (i < std::tuple_size<std::tuple<Ts...>>())
       {
@@ -32,32 +35,29 @@ namespace psibase
    std::optional<std::vector<char>> fracpackActionFromJson(std::string_view name,
                                                            std::string_view json)
    {
+      using reflect = psio::reflect<T>;
       std::optional<std::vector<char>> result;
-      std::size_t                      i = 0;
-      psio1::for_each_member_type(
-          (typename psio1::reflect<T>::member_functions*)nullptr,
-          [&](auto member)
+      psio1::canonical_for_each_method_index<T>(
+          [&](auto index, std::string_view methodName)
           {
-             using MemPtr                       = decltype(member);
-             std::span<const char* const> names = psio1::reflect<T>::member_function_names[i];
-             if (names[0] == name)
+             if (methodName == name)
              {
-                using param_tuple = typename psio1::make_param_value_tuple<MemPtr>::type;
-                param_tuple       params{};
-                std::vector<char> j{json.begin(), json.end()};
+                constexpr std::size_t                                 I = decltype(index)::value;
+                MethodArgs<typename reflect::template method_type<I>> params{};
+                std::vector<char>                                     j{json.begin(), json.end()};
                 j.push_back(0);
                 psio1::json_token_stream stream{j.data()};
                 from_json_object(  //
                     stream,
                     [&](std::string_view k)
                     {
-                       if (!fracpackActionFromJsonImpl<0>(stream, k, names.subspan(1), params))
+                       if (!fracpackActionFromJsonImpl<0>(
+                               stream, k, psio1::canonical_method_param_names<T, I>, params))
                           abortMessage("action '" + std::string(name) +
                                        "' does not have argument '" + std::string(k) + "'");
                     });
                 result = psio1::convert_to_frac(params);
              }
-             ++i;
           });
       return result;
    }

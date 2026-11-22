@@ -6,7 +6,7 @@ To define a service:
 
 - Make a struct or class. It may optionally publicly inherit from [psibase::Service] to gain several convenience methods.
 - Define or declare the set of methods
-- Reflect the methods using `PSIO1_REFLECT`. Only reflected methods become actions; these are available for transactions and for other services to call using [psibase::Actor] or [psibase::call].
+- Reflect the methods using `PSIO_REFLECT`. Only reflected methods become actions; these are available for transactions and for other services to call using [psibase::Actor] or [psibase::call].
 
 ### Example with convenience base class:
 
@@ -21,7 +21,7 @@ struct MyService: psibase::Service
    std::string somethingElse(uint32_t x, psibase::AccountNumber y);
 };
 
-PSIO1_REFLECT(MyService,
+PSIO_REFLECT(MyService,
              method(doSomething, str),
              method(somethingElse, x, y))
 ```

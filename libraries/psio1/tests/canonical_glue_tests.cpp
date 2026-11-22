@@ -673,9 +673,9 @@ TEST_CASE("psibase records: GraphQL", "[canonical][records]")
 // ---------------------------------------------------------------------------
 // Methods. A class whose methods are listed with PSIO's `method(name,
 // params...)` has, in this library, the method metadata of the same class
-// declared with PSIO1_REFLECT: psibase's dispatcher, call proxies (Actor,
-// transactor, EventEmitter), schema generation, pack endpoints and GraphQL
-// all read it from psio1::reflect.
+// declared with PSIO1_REFLECT. GraphQL reads it from psio1::reflect; psibase's
+// dispatcher, call proxies, schema generation and pack endpoints read
+// psio::reflect directly (libraries/psibase/common/tests/methods.cpp).
 // ---------------------------------------------------------------------------
 namespace glue
 {
@@ -784,28 +784,6 @@ namespace glue
    using Notes_EventsHistory = Notes::Events::History;
    PSIO_REFLECT(Notes_EventsHistory, method(noted, who, text))
 
-   // What a call proxy (psibase::Actor and friends) is given.
-   struct CallRecorder
-   {
-      std::vector<std::string>* log;
-
-      template <std::uint32_t idx, auto MemberPtr, typename... Args>
-      auto call(Args&&... args) const
-      {
-         using Class  = decltype(psio1::class_of_member(MemberPtr));
-         using Params = typename psio1::make_param_value_tuple<decltype(MemberPtr)>::type;
-         std::string entry = *psio1::reflect<Class>::member_function_names[idx].begin();
-         entry += "#" + std::to_string(idx) + "(";
-         ((entry += std::is_reference_v<Args> ? "ref," : "value,"), ...);
-         entry += ")";
-         // The arguments, packed as the method's parameter tuple.
-         for (unsigned char c : psio1::convert_to_frac(Params(std::forward<Args>(args)...)))
-            entry += "0123456789abcdef"[c >> 4], entry += "0123456789abcdef"[c & 15];
-         log->push_back(std::move(entry));
-         return idx;
-      }
-   };
-
    // Everything psio1::reflect says about the methods of T, as text.
    template <typename T>
    std::vector<std::string> methodMetadata()
@@ -836,8 +814,8 @@ namespace glue
       return f(psio1::get<I>(view)...);
    }
 
-   // psibase's dispatcher: find the method by its hashed name, validate the
-   // packed parameter tuple, read it through a view, call.
+   // Find the method by its hashed name, validate the packed parameter
+   // tuple, read it through a view, call.
    template <typename T>
    std::string dispatch(std::uint64_t method, const std::vector<char>& packed)
    {
@@ -973,47 +951,6 @@ TEST_CASE("PSIO-declared methods: lookup by name and by hashed name", "[canonica
    CHECK(typed == 2);
 }
 
-TEST_CASE("PSIO-declared methods: call proxies", "[canonical][methods]")
-{
-   std::vector<std::string> newLog, oldLog;
-   psio1::reflect<Ledger>::proxy<CallRecorder>    newProxy{&newLog};
-   psio1::reflect<OldLedger>::proxy<CallRecorder> oldProxy{&oldLog};
-   CHECK(newProxy.psio_get_proxy().log == &newLog);
-
-   const Tag         who{9};
-   std::string       memo = "rent";
-   const Point       at{4, "here", std::nullopt};
-   // lvalues, const lvalues, temporaries, convertible arguments, no arguments
-   CHECK(newProxy.init() == 0u);
-   CHECK(oldProxy.init() == 0u);
-   CHECK(newProxy.transfer(who, memo, 5) == 1u);
-   CHECK(oldProxy.transfer(who, memo, 5) == 1u);
-   CHECK(newProxy.transfer(Tag{1}, "lit", std::nullopt) == 1u);
-   CHECK(oldProxy.transfer(Tag{1}, "lit", std::nullopt) == 1u);
-   CHECK(newProxy.balance(who) == 2u);
-   CHECK(oldProxy.balance(who) == 2u);
-   CHECK(newProxy.locate(at, 3) == 3u);
-   CHECK(oldProxy.locate(at, 3) == 3u);
-   CHECK(newProxy.unnamed(6, 7) == 4u);
-   CHECK(oldProxy.unnamed(6, 7) == 4u);
-   CHECK(memo == "rent");
-
-   // The proxy object saw the same method, index, argument categories and
-   // argument values either way.
-   CHECK(newLog == oldLog);
-   REQUIRE(newLog.size() == 6);
-   CHECK(newLog[0] == "init#0()0000");  // an empty parameter tuple
-   CHECK(newLog[1].starts_with("transfer#1(value,value,value,)"));
-   CHECK(newLog[5].starts_with("unnamed#4(value,value,)"));
-
-   // An events proxy over an aliased events struct.
-   std::vector<std::string>                                  eventLog;
-   psio1::reflect<Notes::Events::History>::proxy<CallRecorder> events{&eventLog};
-   CHECK(events.noted(who, "text") == 0u);
-   CHECK(eventLog.size() == 1);
-   CHECK(eventLog[0].starts_with("noted#0(value,value,)"));
-}
-
 TEST_CASE("PSIO-declared methods: dispatch by hashed name over packed arguments",
           "[canonical][methods]")
 {
@@ -1083,10 +1020,4 @@ TEST_CASE("PSIO-declared methods: names that do not compress", "[canonical][meth
    CHECK(dispatch<OldStaged>(setHash, text) == R"(set_network_variables:"v!")");
    // The hash is of the whole name: a compressed prefix is another method.
    CHECK(dispatch<Staged>(psio1::hash_name("get_staged"), id) == "unknown");
-
-   std::vector<std::string> newLog, oldLog;
-   psio1::reflect<Staged>::proxy<CallRecorder>{&newLog}.set_network_variables("v");
-   psio1::reflect<OldStaged>::proxy<CallRecorder>{&oldLog}.set_network_variables("v");
-   CHECK(newLog == oldLog);
-   CHECK(newLog.size() == 1);
 }

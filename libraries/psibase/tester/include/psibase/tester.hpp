@@ -669,13 +669,13 @@ namespace psibase
          AccountNumber receiver;
          KeyList       keys;
 
-         template <uint32_t idx, auto MemberPtr, typename... Args>
+         template <std::size_t I, auto MemberPtr, typename... Args>
          auto call(Args&&... args) const
          {
-            using result_type = decltype(psio1::result_of(MemberPtr));
+            using result_type = typename psio::method_traits<decltype(MemberPtr)>::result;
 
             auto act = action_builder_proxy(sender, receiver)
-                           .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
+                           .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
 
             if (chain.isAutoBlockStart)
             {
@@ -687,9 +687,9 @@ namespace psibase
       };
 
       template <typename Service>
-      struct ServiceUser : public psio1::reflect<Service>::template proxy<PushTransactionProxy>
+      struct ServiceUser : public psio::reflect<Service>::template proxy<PushTransactionProxy>
       {
-         using base = typename psio1::reflect<Service>::template proxy<PushTransactionProxy>;
+         using base = typename psio::reflect<Service>::template proxy<PushTransactionProxy>;
          using base::base;
       };
 

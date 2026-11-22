@@ -3,6 +3,7 @@
 #include <map>
 #include <optional>
 #include <psibase/AccountNumber.hpp>
+#include <psibase/MethodArgs.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/db.hpp>
@@ -93,24 +94,23 @@ namespace psibase
       std::optional<std::map<std::string, ServiceDatabaseSchema>> database;
 
      private:
-      template <typename M>
-      static auto makeParams(psio1::SchemaBuilder& builder, std::span<const char* const> ref)
-          -> psio1::schema_types::Object
+      // An object with one member per element of the argument tuple. A
+      // parameter that the reflection does not name is called c<position>.
+      template <typename... P>
+      static auto makeParams(psio1::SchemaBuilder&             builder,
+                             std::span<const std::string_view> names,
+                             std::tuple<P...>*) -> psio1::schema_types::Object
       {
          psio1::schema_types::Object type;
-         auto                       nameIter = ref.begin();
-         auto                       nameEnd  = ref.end();
-         auto                       i        = ref.size();
-         forEachType(typename M::SimplifiedArgTypes{},
-                     [&](auto* t)
-                     {
-                        std::string name =
-                            nameIter == nameEnd ? "c" + std::to_string(i++) : *nameIter++;
-                        type.members.push_back(
-                            {std::move(name),
-                             builder.insert<std::remove_cv_t<
-                                 psio1::remove_view_t<std::remove_pointer_t<decltype(t)>>>>()});
-                     });
+         std::size_t                 i   = 0;
+         auto                        add = [&](psio1::schema_types::AnyType&& param)
+         {
+            type.members.push_back(
+                {i < names.size() ? std::string(names[i]) : "c" + std::to_string(i),
+                 std::move(param)});
+            ++i;
+         };
+         (add(builder.insert<P>()), ...);
          return type;
       }
       template <typename T>
@@ -123,7 +123,7 @@ namespace psibase
          }
          else
          {
-            return builder.insert<std::remove_cv_t<psio1::remove_view_t<T>>>();
+            return builder.insert<T>();
          }
       }
       template <typename T>
@@ -131,40 +131,25 @@ namespace psibase
                               ActionMap&                                 out,
                               std::vector<psio1::schema_types::AnyType*>& eventTypes)
       {
-         std::size_t i = 0;
-         psio1::for_each_member_type(
-             (typename psio1::reflect<T>::member_functions*)nullptr,
-             [&](auto member)
+         using reflect = psio::reflect<T>;
+         psio1::canonical_for_each_method_index<T>(
+             [&](auto index, std::string_view name)
              {
-                std::span<const char* const> names = psio1::reflect<T>::member_function_names[i];
-                using m                            = psio1::MemberPtrType<decltype(member)>;
-                auto [pos, inserted]               = out.try_emplace(
-                    names[0],
-                    psio1::schema_types::FunctionType{makeParams<m>(builder, names.subspan(1)),
-                                                     makeResult<typename m::ReturnType>(builder)});
+                constexpr std::size_t I = decltype(index)::value;
+                using Method            = typename reflect::template method_type<I>;
+                auto [pos, inserted]    = out.try_emplace(
+                    std::string(name),
+                    psio1::schema_types::FunctionType{
+                        makeParams(builder, psio1::canonical_method_param_names<T, I>,
+                                   (MethodArgs<Method>*)nullptr),
+                        makeResult<MethodResult<Method>>(builder)});
                 if (inserted)
                 {
                    eventTypes.push_back(&pos->second.params);
                    if (pos->second.result)
                       eventTypes.push_back(&*pos->second.result);
                 }
-                ++i;
              });
-      }
-
-      template <typename T, auto... E>
-      static std::span<const std::string_view> makeEventsAccess(T*, psio1::MemberList<E...>*)
-      {
-         if constexpr (sizeof...(E) > 0)
-         {
-            static constexpr std::string_view result[] = {
-                eventAccess((T*)nullptr, static_cast<nt_wrap<E>*>(nullptr))...};
-            return result;
-         }
-         else
-         {
-            return {};
-         }
       }
 
       template <typename T>
@@ -172,26 +157,22 @@ namespace psibase
                              EventMap&                                  out,
                              std::vector<psio1::schema_types::AnyType*>& eventTypes)
       {
-         std::size_t i = 0;
-         auto        access =
-             makeEventsAccess((T*)nullptr, (typename psio1::reflect<T>::member_functions*)nullptr);
-         psio1::for_each_member_type(
-             (typename psio1::reflect<T>::member_functions*)nullptr,
-             [&](auto member)
+         using reflect = psio::reflect<T>;
+         psio1::canonical_for_each_method_index<T>(
+             [&](auto index, std::string_view name)
              {
-                std::span<const char* const> names = psio1::reflect<T>::member_function_names[i];
-                using m                            = psio1::MemberPtrType<decltype(member)>;
-                if constexpr (m::isFunction)
+                constexpr std::size_t I = decltype(index)::value;
+                using Method            = typename reflect::template method_type<I>;
+                using Event             = nt_wrap<reflect::template method_pointer<I>>;
+                auto [pos, inserted]    = out.try_emplace(
+                    std::string(name),
+                    EventType{.type = makeParams(builder, psio1::canonical_method_param_names<T, I>,
+                                                 (MethodArgs<Method>*)nullptr),
+                              .access = std::string(eventAccess((T*)nullptr, (Event*)nullptr))});
+                if (inserted)
                 {
-                   auto [pos, inserted] = out.try_emplace(
-                       names[0], EventType{.type   = makeParams<m>(builder, names.subspan(1)),
-                                           .access = std::string(access[i])});
-                   if (inserted)
-                   {
-                      eventTypes.push_back(&pos->second.type);
-                   }
+                   eventTypes.push_back(&pos->second.type);
                 }
-                ++i;
              });
       }
 

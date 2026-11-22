@@ -1,65 +1,63 @@
 #pragma once
 
+#include <psibase/MethodArgs.hpp>
 #include <psibase/Rpc.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/fracpack.hpp>
+#include <psio1/reflect.hpp>
 #include <psio1/to_json.hpp>
 
 namespace psibase
 {
    template <typename S>
    void generateActionJsonTemplate(std::tuple<>*,
-                                   bool               needComma,
-                                   const char* const* begin,
-                                   const char* const* end,
-                                   S&                 stream)
+                                   bool                              needComma,
+                                   std::span<const std::string_view> names,
+                                   S&                                stream)
    {
    }
 
    template <typename T, typename... Ts, typename S>
    void generateActionJsonTemplate(std::tuple<T, Ts...>*,
-                                   bool               needComma,
-                                   const char* const* begin,
-                                   const char* const* end,
-                                   S&                 stream)
+                                   bool                              needComma,
+                                   std::span<const std::string_view> names,
+                                   S&                                stream)
    {
       if (needComma)
          stream.write(',');
-      if (begin != end)
-         to_json(*begin, stream);
+      if (!names.empty())
+         to_json(names.front(), stream);
       else
          to_json("error_missing_arg_name", stream);
       stream.write(':');
       T empty = {};
       to_json(empty, stream);
       generateActionJsonTemplate((std::tuple<Ts...>*)nullptr, true,
-                                 begin != end ? begin + 1 : begin, end, stream);
+                                 names.empty() ? names : names.subspan(1), stream);
    }
 
    template <typename T>
    std::vector<char> generateActionJsonTemplate()
    {
-      std::vector<char>   json;
+      using reflect = psio::reflect<T>;
+      std::vector<char>    json;
       psio1::vector_stream s{json};
       s.write('{');
-      bool        needComma = false;
-      std::size_t i         = 0;
-      psio1::for_each_member_type(
-          (typename psio1::reflect<T>::member_functions*)nullptr,
-          [&](auto member)
+      bool needComma = false;
+      psio1::canonical_for_each_method_index<T>(
+          [&](auto index, std::string_view name)
           {
-             using MemPtr = decltype(member);
-             auto names   = psio1::reflect<T>::member_function_names[i];
+             constexpr std::size_t I = decltype(index)::value;
              if (needComma)
                 s.write(',');
              needComma = true;
-             to_json(*names.begin(), s);
+             to_json(name, s);
              s.write(':');
              s.write('{');
              generateActionJsonTemplate(
-                 (typename psio1::make_param_value_tuple<MemPtr>::type*)nullptr, false,
-                 names.begin() + 1, names.end(), s);
+                 (MethodArgs<typename reflect::template method_type<I>>*)nullptr, false,
+                 psio1::canonical_method_param_names<T, I>, s);
              s.write('}');
-             ++i;
           });
       s.write('}');
       return json;

@@ -10,7 +10,7 @@ struct CookieProbe : psibase::Service
                                               std::optional<std::int32_t> socket,
                                               std::optional<psibase::AccountNumber> user);
 };
-PSIO1_REFLECT(CookieProbe, method(serveSys, req, socket, user))
+PSIO_REFLECT(CookieProbe, method(serveSys, req, socket, user))
 PSIBASE_REFLECT_TABLES(CookieProbe)
 
 struct ProbeResult
@@ -21,7 +21,7 @@ struct ProbeResult
    std::vector<std::string> theme;
    std::vector<std::string> appSession;
 };
-PSIO1_REFLECT(ProbeResult, user, authorization, sessionCookie, theme, appSession)
+PSIO_REFLECT(ProbeResult, user, authorization, sessionCookie, theme, appSession)
 
 std::optional<psibase::HttpReply> CookieProbe::serveSys(
     psibase::HttpRequest req, std::optional<std::int32_t>,

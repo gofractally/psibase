@@ -10,12 +10,12 @@ if(DEFINED IS_NATIVE)
     set_target_properties(psibase-common-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
     native_test(psibase-common-tests)
 
-    add_executable(psibase-psio-tests psio.cpp leaf_types.cpp)
+    add_executable(psibase-psio-tests psio.cpp leaf_types.cpp methods.cpp)
     target_link_libraries(psibase-psio-tests psibase Catch2::Catch2WithMain Threads::Threads )
 endif()
 
 if(DEFINED IS_WASM)
-    add_executable(psibase-psio-tests psio.cpp leaf_types.cpp)
+    add_executable(psibase-psio-tests psio.cpp leaf_types.cpp methods.cpp)
     target_link_libraries(psibase-psio-tests psibase catch2 boost psitestlib )
 endif()
 

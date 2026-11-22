@@ -14,7 +14,7 @@ struct Arithmetic
 };
 
 // The header does the reflection
-PSIO1_REFLECT(  //
+PSIO_REFLECT(  //
     Arithmetic,
     method(add, a, b),
     method(multiply, a, b),

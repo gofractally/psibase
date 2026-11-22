@@ -193,8 +193,7 @@ TestBlock makeBlock(const BlockInfo&                   info,
       {
          if (act.service() == Producers::service && act.method() == MethodNumber{"setConsensus"})
          {
-            using param_tuple =
-                psio1::make_param_value_tuple<decltype(&Producers::setConsensus)>::type;
+            using param_tuple = MethodArgs<decltype(&Producers::setConsensus)>;
             auto params = psio1::view<const param_tuple>(act.rawData());
             newBlock.block.header.newConsensus =
                 Consensus{get<0>(params), newState.current.services, newState.current.wasmConfig};
