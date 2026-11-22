@@ -14,11 +14,49 @@
 
 namespace psibase
 {
+   namespace
+   {
+      // A process that names no cache still gets one, private to the process and
+      // removed when it exits. Without it every backend construction is a full
+      // native compile: a test that starts many nodes compiles the same services
+      // once per node per case.
+      std::shared_ptr<NativeAotCache> processNativeAotCache()
+      {
+         struct Temporary
+         {
+            std::filesystem::path           path;
+            std::shared_ptr<NativeAotCache> cache;
+            Temporary()
+            {
+               std::error_code ignored;
+               auto pattern = (std::filesystem::weakly_canonical(
+                                   std::filesystem::temp_directory_path(ignored), ignored) /
+                               "psibase-native-aot-XXXXXX")
+                                  .string();
+               if (!ignored && ::mkdtemp(pattern.data()))
+               {
+                  path  = pattern;
+                  cache = std::make_shared<NativeAotCache>(path);
+               }
+            }
+            ~Temporary()
+            {
+               cache.reset();
+               std::error_code ignored;
+               if (!path.empty())
+                  std::filesystem::remove_all(path, ignored);
+            }
+         };
+         static Temporary temporary;
+         return temporary.cache;
+      }
+   }  // namespace
+
    std::shared_ptr<NativeAotCache> nativeAotCacheFromEnvironment()
    {
       if (const char* path = std::getenv("PSIBASE_NATIVE_AOT_CACHE"); path && *path)
          return std::make_shared<NativeAotCache>(path);
-      return {};
+      return processNativeAotCache();
    }
 
    NativeVMOptions::NativeVMOptions(const VMOptions& options,
