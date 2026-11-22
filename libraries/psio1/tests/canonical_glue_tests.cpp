@@ -35,6 +35,7 @@
 
 
 #include <chrono>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -866,6 +867,10 @@ TEST_CASE("psibase records: the types slice 2b declared with PSIO, read", "[cano
          "Value 9 outside allowed Precision range: 0 to 8");
    CHECK(rejection([&] { (void)psio1::convert_from_json<Decimal>("\"1.2.3\""); }) ==
          "Invalid number: parse error");
+   // A quantity over 2^64 - 1 is rejected (it wrapped: this text read as 0
+   // before the owner's decision D17).
+   CHECK(rejection([&] { (void)psio1::convert_from_json<Decimal>("\"184467440737.09551616\""); }) ==
+         "Invalid number: overflow");
    CHECK(rejection([&] { (void)psio1::fracpack_validate<std::tuple<std::uint32_t, Memo>>(psio1::convert_to_frac(std::tuple{std::uint32_t{1}, std::string(81, 'a')})); }) ==
          "Memo exceeds 80 bytes");
 #endif
@@ -876,6 +881,8 @@ TEST_CASE("psibase records: the types slice 2b declared with PSIO, read", "[cano
    roundTrips(root.decimal);
    roundTrips(root.timer);
    CHECK(psio1::convert_from_json<Decimal>("\"0.50\"").quantity.value == 50);
+   CHECK(psio1::convert_from_json<Decimal>("\"184467440737.09551615\"").quantity.value ==
+         std::numeric_limits<std::uint64_t>::max());
    CHECK(psio1::convert_from_json<Decimal>("\".5\"").precision.value == 1);
    CHECK(psio1::convert_from_json<Memo>("\"x\"").contents == "x");
 

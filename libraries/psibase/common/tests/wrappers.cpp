@@ -22,6 +22,8 @@
 
 #include <catch2/catch_all.hpp>
 
+#include <exception>
+#include <limits>
 #include <map>
 #include <span>
 #include <string>
@@ -200,6 +202,72 @@ TEST_CASE("Decimal: a record whose text is the decimal number", "[wrappers]")
    CHECK(!strict("007.10"));
    CHECK(!readsJson<Decimal>("\"1.2.3\""));
    CHECK(!readsJson<Decimal>("{\"quantity\":1,\"precision\":0}"));
+}
+
+TEST_CASE("Decimal: a quantity that does not fit 64 bits is rejected, not wrapped", "[wrappers]")
+{
+   constexpr std::uint64_t max = std::numeric_limits<std::uint64_t>::max();
+   struct Boundary
+   {
+      std::uint8_t     precision;
+      std::string_view largest;  // 2^64 - 1 at this precision
+      std::string_view next;     // 2^64: one unit more
+   };
+   const Boundary boundaries[] = {
+       {0, "18446744073709551615", "18446744073709551616"},
+       {1, "1844674407370955161.5", "1844674407370955161.6"},
+       {2, "184467440737095516.15", "184467440737095516.16"},
+       {4, "1844674407370955.1615", "1844674407370955.1616"},
+       {7, "1844674407370.9551615", "1844674407370.9551616"},
+       {8, "184467440737.09551615", "184467440737.09551616"},
+   };
+   auto validates = [](std::string_view s)
+   {
+      return UserService::DecimalText::validate(std::span<const char>{s.data(), s.size()}).ok();
+   };
+   auto quoted = [](std::string_view s) { return "\"" + std::string(s) + "\""; };
+   for (const auto& b : boundaries)
+   {
+      INFO(b.largest);
+      // the largest quantity is read, by every reader, as itself
+      CHECK(Decimal{Quantity{max}, Precision{b.precision}}.str() == b.largest);
+      REQUIRE(Decimal::parse(b.largest).has_value());
+      CHECK(Decimal::parse(b.largest)->quantity.value == max);
+      CHECK(Decimal::parse(b.largest)->precision.value == b.precision);
+      CHECK(Decimal::fromStr(b.largest).quantity.value == max);
+      CHECK(Decimal::fromStr(b.largest).precision.value == b.precision);
+      CHECK(validates(b.largest));
+      CHECK(readsJson<Decimal>(quoted(b.largest)));
+      // one more is not a Decimal
+      CHECK(!Decimal::parse(b.next).has_value());
+      CHECK(!validates(b.next));
+      CHECK(!readsJson<Decimal>(quoted(b.next)));
+#ifndef COMPILING_WASM
+      // fromStr aborts (an exception natively) instead of wrapping to 0
+      std::string message;
+      try
+      {
+         (void)Decimal::fromStr(b.next);
+      }
+      catch (std::exception& e)
+      {
+         message = e.what();
+      }
+      CHECK(message ==
+            (b.precision == 0 ? "Invalid number: parse error" : "Invalid number: overflow"));
+#endif
+   }
+   // further out: the integer part alone, or a carry out of the fraction
+   for (std::string_view s : {"184467440738.00000000", "184467440737.99999999",
+                              "1844674407370955162.0", "99999999999999999999.9"})
+   {
+      INFO(s);
+      CHECK(!Decimal::parse(s).has_value());
+      CHECK(!validates(s));
+      CHECK(!readsJson<Decimal>(quoted(s)));
+   }
+   // the packed form has no such value: every 64-bit quantity is one
+   CHECK(psio::validate_pssz<Decimal>(psio::to_pssz(Decimal{Quantity{max}, Precision{8}})).ok());
 }
 
 TEST_CASE("Rows with a monotonic time point: ticks, in PSSZ, key and I-JSON", "[wrappers]")

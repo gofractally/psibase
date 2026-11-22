@@ -193,6 +193,8 @@ namespace UserService
                         Precision{static_cast<uint8_t>(fraction.size())}};
       }
 
+      /// The value `s` spells; aborts if `s` is not a decimal number (the
+      /// rules of `parse`: a quantity that does not fit 64 bits is not one).
       static Decimal fromStr(std::string_view s)
       {
          validate_decimal_string(s);
@@ -206,7 +208,10 @@ namespace UserService
          }
          if (!fraction_part.empty())
          {
-            quantity_val += parse_fraction_part(fraction_part, precision_val);
+            const uint64_t fraction_val = parse_fraction_part(fraction_part, precision_val);
+            psibase::check(fraction_val <= std::numeric_limits<uint64_t>::max() - quantity_val,
+                           "Invalid number: overflow");
+            quantity_val += fraction_val;
          }
 
          return Decimal{Quantity{quantity_val}, prec};
