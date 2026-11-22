@@ -17,7 +17,6 @@ p.add_argument('--cc', required=True)
 p.add_argument('--cxx', required=True)
 p.add_argument('--build-dir', default='build-storage-performance')
 p.add_argument('--jobs', default='4')
-p.add_argument('--triedent', action='store_true')
 a = p.parse_args()
 root = Path(__file__).resolve().parents[5]
 build = root / a.build_dir
@@ -29,12 +28,7 @@ report = {'platform': platform.platform(), 'machine': platform.machine(), 'comma
           'passed': False}
 report['host_load_at_start'] = list(os.getloadavg())
 report['host_context'] = 'Shared host; concurrent builds may run. Relative matched microbenchmark, no idle-host absolute-performance claim.'
-report['triedent_comparison'] = a.triedent
 report['compiler_optimization'] = 'CMake Release; no extra ISA tuning or LTO in this standalone fixture'
-if a.triedent:
-    for source in sorted((root / 'libraries/triedent').rglob('*')):
-        if source.is_file():
-            report['source_sha256'][str(source.relative_to(root))] = hashlib.sha256(source.read_bytes()).hexdigest()
 for relative in ['cmake/psitri.cmake', 'libraries/psibase/native/tests/storage',
                  'cmake/dependencies', 'libraries/psibase/native/src/psitriStorage.cpp',
                  'libraries/psibase/native/src/Watchdog.cpp']:
@@ -73,7 +67,6 @@ try:
         run('hardware', ['sysctl', 'machdep.cpu.brand_string', 'hw.memsize', 'hw.ncpu'])
     run('configure', ['cmake', '-S', 'libraries/psibase/native/tests/storage', '-B', build, '-G', 'Ninja',
                       '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_C_COMPILER=' + a.cc,
-                      '-DPSIBASE_STORAGE_BENCHMARK_TRIEDENT=' + ('ON' if a.triedent else 'OFF'),
                       '-DCMAKE_CXX_COMPILER=' + a.cxx,
                       '-DFETCHCONTENT_SOURCE_DIR_PSIBASE_PSITRI=' + str(root / '.caches/psitri-sources/psitri'),
                       '-DFETCHCONTENT_SOURCE_DIR_PSIBASE_UCC=' + str(root / '.caches/psitri-sources/ucc')])
@@ -83,8 +76,6 @@ try:
     report['host_load_after_benchmark'] = list(os.getloadavg())
     report['measurements'] = data
     kinds = ['direct_read', 'facade_read', 'direct_write', 'facade_write']
-    if a.triedent:
-        kinds += ['triedent_read', 'triedent_write']
     report['median_nanoseconds_per_operation'] = {
         kind: statistics.median(row[kind + '_wall_ns'] for row in data['rounds']) /
               data['reads_per_round' if kind.endswith('read') else 'updates_per_round']

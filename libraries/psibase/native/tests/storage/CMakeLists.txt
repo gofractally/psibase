@@ -52,15 +52,3 @@ if(APPLE)
 endif()
 add_executable(storage_benchmark EXCLUDE_FROM_ALL storage_benchmark.cpp)
 target_link_libraries(storage_benchmark PRIVATE psibase_storage psibase_cpu_clock psibase::storage_engine)
-option(PSIBASE_STORAGE_BENCHMARK_TRIEDENT "Compare the preserved triedent implementation in the same fixture" OFF)
-if(PSIBASE_STORAGE_BENCHMARK_TRIEDENT)
-  set(reference_triedent "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../libraries/triedent")
-  add_library(psibase_reference_triedent STATIC
-      "${reference_triedent}/src/database.cpp" "${reference_triedent}/src/mapping.cpp"
-      "${reference_triedent}/src/gc_queue.cpp" "${reference_triedent}/src/ring_allocator.cpp"
-      "${reference_triedent}/src/region_allocator.cpp" "${reference_triedent}/src/cache_allocator.cpp")
-  target_include_directories(psibase_reference_triedent PUBLIC "${reference_triedent}/include")
-  target_link_libraries(psibase_reference_triedent PUBLIC Threads::Threads)
-  target_compile_definitions(storage_benchmark PRIVATE PSIBASE_COMPARE_TRIEDENT=1)
-  target_link_libraries(storage_benchmark PRIVATE psibase_reference_triedent)
-endif()

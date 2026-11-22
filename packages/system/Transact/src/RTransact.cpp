@@ -81,7 +81,7 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
    }
    else
    {
-      // Soft limit for boot blocks (hard limit imposed by triedent
+      // Soft limit for boot blocks (hard limit imposed by native storage
       // is 16 MiB for the packed block)
       constexpr std::uint32_t blockLimit = 8 * 1024 * 1024;
       if (auto sizeRow = open<BlockSizeTable>().get({}))

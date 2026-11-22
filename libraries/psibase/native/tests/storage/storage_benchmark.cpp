@@ -6,9 +6,6 @@
 #include <psibase/storage.hpp>
 #include <psitri/engines/big.hpp>
 #include <string>
-#ifdef PSIBASE_COMPARE_TRIEDENT
-#include <triedent/database.hpp>
-#endif
 
 using namespace std::chrono;
 using Engine = psitri::big_engine;
@@ -49,19 +46,6 @@ int main(int argc, char** argv)
    auto                          session = facade.start_write_session();
    psibase::storage::shared_root root;
    const std::string             value(128, 'v');
-#ifdef PSIBASE_COMPARE_TRIEDENT
-   auto baseline = std::make_shared<triedent::database>(
-       parent / "triedent", triedent::database::config{1 << 25, 1 << 25, 1 << 25, 1 << 25},
-       triedent::open_mode::create_new);
-   auto                  baselineSession = baseline->start_write_session();
-   triedent::shared_root baselineRoot;
-   const auto            populateBaseline = measure(
-       [&]
-       {
-          for (unsigned i = 0; i < records; ++i)
-             baselineSession->upsert(baselineRoot, key(i), value);
-       });
-#endif
    auto populateDirect = measure(
        [&]
        {
@@ -123,25 +107,6 @@ int main(int argc, char** argv)
              for (unsigned i = 0; i < updates; ++i)
                 session->upsert(root, key((i * 7919) % records), value);
           });
-#ifdef PSIBASE_COMPARE_TRIEDENT
-      const auto baselineRead = measure(
-          [&]
-          {
-             for (unsigned i = 0; i < reads; ++i)
-             {
-                auto found = baselineSession->get(baselineRoot, key((i * 7919) % records));
-                if (!found || found->size() != 128)
-                   throw std::runtime_error("triedent lookup mismatch");
-                checksum += found->size();
-             }
-          });
-      const auto baselineWrite = measure(
-          [&]
-          {
-             for (unsigned i = 0; i < updates; ++i)
-                baselineSession->upsert(baselineRoot, key((i * 7919) % records), value);
-          });
-#endif
       if (round)
          std::cout << ',';
       std::cout << "{\"direct_read_wall_ns\":" << directRead.first
@@ -152,12 +117,6 @@ int main(int argc, char** argv)
                 << ",\"facade_write_wall_ns\":" << facadeWrite.first
                 << ",\"direct_write_cpu_ns\":" << directWrite.second
                 << ",\"facade_write_cpu_ns\":" << facadeWrite.second;
-#ifdef PSIBASE_COMPARE_TRIEDENT
-      std::cout << ",\"triedent_read_wall_ns\":" << baselineRead.first
-                << ",\"triedent_read_cpu_ns\":" << baselineRead.second
-                << ",\"triedent_write_wall_ns\":" << baselineWrite.first
-                << ",\"triedent_write_cpu_ns\":" << baselineWrite.second;
-#endif
       std::cout << '}';
    }
    auto directCommit = measure(
@@ -172,12 +131,5 @@ int main(int argc, char** argv)
              << ",\"populate_facade_wall_ns\":" << populateFacade.first
              << ",\"direct_commit_wall_ns\":" << directCommit.first
              << ",\"facade_commit_wall_ns\":" << facadeCommit.first << ",\"checksum\":" << checksum;
-#ifdef PSIBASE_COMPARE_TRIEDENT
-   const auto baselineCommit = measure([&] { baselineSession->set_top_root(baselineRoot); });
-   std::cout << ",\"populate_triedent_wall_ns\":" << populateBaseline.first
-             << ",\"triedent_commit_wall_ns\":" << baselineCommit.first
-             << ",\"triedent_legacy_tier_bytes\":[33554432,33554432,33554432,33554432]"
-             << ",\"triedent_pressure_slow\":" << (baseline->is_slow() ? "true" : "false");
-#endif
    std::cout << "}\n";
 }

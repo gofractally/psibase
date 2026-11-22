@@ -2083,7 +2083,7 @@ int main(int argc, char* argv[])
                                  [](const std::string&)
                                  {
                                     throw std::runtime_error(
-                                        "database-cache-size is a removed triedent control; "
+                                        "database-cache-size is a removed control; "
                                         "replace it with database-cache-policy=disabled (psitri "
                                         "read promotion off, pinned-cache budget 0 MiB)");
                                  }));
