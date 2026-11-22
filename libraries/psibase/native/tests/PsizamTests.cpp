@@ -746,3 +746,59 @@ TEST_CASE("Alt context deadlines and errors preserve transaction and cache owner
       }
    }
 }
+
+TEST_CASE("A block being produced takes transactions up to the chain's size limit")
+{
+   NativeService fixture;
+   auto&         block = fixture.block;
+   auto          sized = [](std::size_t bytes, std::size_t proofBytes = 0)
+   {
+      psibase::Transaction transaction;
+      transaction.actions.push_back(psibase::Action{.rawData = std::vector<char>(bytes)});
+      psibase::SignedTransaction result;
+      result.transaction = transaction;
+      if (proofBytes)
+         result.proofs.push_back(std::vector<char>(proofBytes));
+      return result;
+   };
+   // A transaction counts for its packed size plus its proofs.
+   const auto small = sized(100);
+   const auto base  = psibase::BlockContext::blockBytes(small);
+   CHECK(base >= 100);
+   CHECK(psibase::BlockContext::blockBytes(sized(100, 40)) == base + 40);
+   auto withSubjective           = sized(100);
+   withSubjective.subjectiveData = {std::vector<char>(5000)};
+   CHECK(psibase::BlockContext::blockBytes(withSubjective) == base);
+
+   block.maxBlockSize     = 1000;
+   block.transactionBytes = 0;
+   block.current.transactions.clear();
+   // The first transaction always fits, however large.
+   CHECK(block.fits(sized(100000)));
+   // After that, only what stays within the limit.
+   block.current.transactions.push_back(small);
+   block.transactionBytes = base;
+   CHECK(block.fits(sized(100)));
+   CHECK(block.fits(sized(1000 - 2 * base + 100)));
+   CHECK_FALSE(block.fits(sized(1000 - 2 * base + 101)));
+   CHECK_FALSE(block.fits(sized(100000)));
+   // Exactly full takes nothing more.
+   block.transactionBytes = 1000;
+   CHECK_FALSE(block.fits(sized(0)));
+
+   // What a validator requires of a block it receives.
+   auto received = [&](std::size_t count, std::uint64_t bytes, bool genesis)
+   {
+      block.isGenesisBlock = genesis;
+      block.current.transactions.assign(count, small);
+      block.transactionBytes = bytes;
+      block.checkBlockSize();
+   };
+   CHECK_NOTHROW(received(0, 0, false));
+   CHECK_NOTHROW(received(5, 1000, false));
+   CHECK_THROWS_WITH(received(5, 1001, false), "block exceeds maxBlockSize");
+   CHECK_THROWS_WITH(received(2, 100000, false), "block exceeds maxBlockSize");
+   // One transaction is allowed whatever its size, and so is the genesis block.
+   CHECK_NOTHROW(received(1, 100000, false));
+   CHECK_NOTHROW(received(40, 100000, true));
+}

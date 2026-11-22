@@ -285,6 +285,14 @@ namespace SystemService
       /// setting because snapshots are signed by the block producers.
       void setSnapTime(uint32_t seconds);
 
+      /// Sets the most bytes of transactions a block may hold
+      ///
+      /// A transaction counts for its packed size plus its proofs. A block
+      /// with a single transaction is exempt, so one large transaction can
+      /// always be included. This is a consensus rule: validators reject a
+      /// block that breaks it. The new limit applies from the next block.
+      void setMaxBlockSize(uint32_t bytes);
+
       /// Adds a callback that will be run whenever the trigger happens.
       /// - onTransaction is run at the end of every transaction
       /// - onBlock runs at the end of every block
@@ -403,6 +411,7 @@ namespace SystemService
                 method(execTrx, transaction, speculative),
                 method(kvNotify, service, db, keyLen, oldValueLen, newValueLen),
                 method(setSnapTime, seconds),
+                method(setMaxBlockSize, bytes),
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),
                 method(regEvIdx, service),
