@@ -8,12 +8,14 @@ add_test(NAME WatchdogTests COMMAND WatchdogTests)
 set_tests_properties(WatchdogTests PROPERTIES PROCESSORS 2)
 
 add_executable(CpuAccountingContract storage/cpu_accounting_contract.cpp)
+target_link_directories(CpuAccountingContract PRIVATE ${ICU_LIBRARY_DIR})
 target_link_libraries(CpuAccountingContract PRIVATE psibase Threads::Threads)
 add_test(NAME CpuAccountingContract COMMAND CpuAccountingContract)
 set_tests_properties(CpuAccountingContract PROPERTIES TIMEOUT 30)
 
 if(APPLE)
     add_executable(DarwinCpuContract storage/darwin_cpu_contract.cpp)
+    target_link_directories(DarwinCpuContract PRIVATE ${ICU_LIBRARY_DIR})
     target_link_libraries(DarwinCpuContract PRIVATE psibase Threads::Threads)
     add_test(NAME DarwinCpuLifetimeIo COMMAND DarwinCpuContract)
     foreach(mode previous blocked replaced)
@@ -67,6 +69,7 @@ add_executable(PsizamTests PsizamTests.cpp "${PSIZAM_POLICY_WASM}" "${PSIZAM_SER
 target_compile_definitions(PsizamTests PRIVATE
     PSIBASE_PSIZAM_POLICY_WASM="${PSIZAM_POLICY_WASM}"
     PSIBASE_PSIZAM_SERVICE_WASM="${PSIZAM_SERVICE_WASM}")
+target_link_directories(PsizamTests PRIVATE ${ICU_LIBRARY_DIR})
 target_link_libraries(PsizamTests psibase Catch2::Catch2WithMain Threads::Threads)
 add_test(NAME PsizamTests COMMAND PsizamTests)
 set_tests_properties(PsizamTests PROPERTIES TIMEOUT 30)
