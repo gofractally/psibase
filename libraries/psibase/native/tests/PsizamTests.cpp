@@ -11,6 +11,7 @@
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
 #include <psio/fracpack.hpp>
+#include <psibase/VmEngine.hpp>
 #include <psibase/NativeVM.hpp>
 #include <psizam/debug/debug.hpp>
 #include <thread>
@@ -521,6 +522,11 @@ namespace
 TEST_CASE("Node execution owns cached backends exclusively and resets each transaction")
 {
    NativeService fixture;
+   // The psizam engines check a compiled backend out of the cache for the
+   // length of a transaction, so the cache's mappings come and go. wasmtime
+   // owns its code mappings and shares one compiled module between
+   // transactions, so its cache never reports any.
+   const bool checkedOut = psibase::vm::selected().name != "wasmtime";
    {
       psibase::TransactionContext first{fixture.block, fixture.signedTransaction, fixture.trace,
                                         psibase::DbMode::transaction()};
@@ -533,23 +539,12 @@ TEST_CASE("Node execution owns cached backends exclusively and resets each trans
          CHECK(NativeService::value(fixture.run(second)) == 8);
          CHECK(fixture.cache.span().empty());
       }
-#if defined(PSIBASE_VM_WASMTIME)
+      CHECK(fixture.cache.span().empty() != checkedOut);
    }
-   // wasmtime owns its code mappings and shares one compiled module between
-   // transactions, so there is no checked-out backend to account for. What
-   // still holds is that each transaction starts from fresh service state.
-   {
-      psibase::TransactionContext next{fixture.block, fixture.signedTransaction, fixture.trace,
-                                       psibase::DbMode::transaction()};
-      CHECK(NativeService::value(fixture.run(next)) == 8);
-   }
-   CHECK(fixture.cache.span().empty());
-#else
-      CHECK_FALSE(fixture.cache.span().empty());
-   }
-   REQUIRE_FALSE(fixture.cache.span().empty());
+   CHECK(fixture.cache.span().empty() != checkedOut);
    auto compiled = fixture.cache.span();
    {
+      // Each transaction starts from fresh service state on every engine.
       psibase::TransactionContext next{fixture.block, fixture.signedTransaction, fixture.trace,
                                        psibase::DbMode::transaction()};
       CHECK(NativeService::value(fixture.run(next)) == 8);
@@ -559,7 +554,6 @@ TEST_CASE("Node execution owns cached backends exclusively and resets each trans
    for (auto bytes : reused)
       CHECK(std::ranges::any_of(compiled,
                                 [&](auto previous) { return bytes.data() == previous.data(); }));
-#endif
 }
 
 TEST_CASE("Native config writes reject VM limits that cannot be instantiated")

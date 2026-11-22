@@ -20,14 +20,37 @@
 #include <psibase/db.hpp>
 #include <psio/finally.hpp>
 #include <psibase/NativeVM.hpp>
+#include <psibase/VmEngine.hpp>
 #include <psizam/debug/debug.hpp>
+
+// This file is one engine per psizam profile. A build with several engines
+// compiles it once for each, so everything in it lives in the namespace of the
+// profile it was compiled for.
+#if defined(PSIBASE_VM_ADAPTER_JIT1)
+#define PSIBASE_VM_ENGINE_NS vm_jit1
+#define PSIBASE_VM_ENGINE_NAME "jit1"
+#elif defined(PSIBASE_VM_ADAPTER_JIT2)
+#define PSIBASE_VM_ENGINE_NS vm_jit2
+#define PSIBASE_VM_ENGINE_NAME "jit2"
+#elif defined(PSIBASE_VM_LLVM_AOT)
+#define PSIBASE_VM_ENGINE_NS vm_llvm_aot
+#define PSIBASE_VM_ENGINE_NAME "llvm-aot"
+#elif defined(PSIBASE_VM_JIT2)
+#define PSIBASE_VM_ENGINE_NS vm_jit2
+#define PSIBASE_VM_ENGINE_NAME "jit2"
+#elif defined(PSIBASE_VM_JIT1)
+#define PSIBASE_VM_ENGINE_NS vm_jit1
+#define PSIBASE_VM_ENGINE_NAME "jit1"
+#else
+#error A psizam profile must be selected for this engine
+#endif
 
 namespace bmi = boost::multi_index;
 
 using std::span;
 namespace dwarf = psizam::debug;
 
-namespace psibase
+namespace psibase::PSIBASE_VM_ENGINE_NS
 {
    struct ExecutionContextImpl;
    using rhf_t  = psizam::registered_host_functions<ExecutionContextImpl>;
@@ -49,37 +72,6 @@ namespace psibase
       }
    }
 
-   // Only useful for genesis
-   void setCode(Database&          database,
-                AccountNumber      service,
-                uint8_t            vmType,
-                uint8_t            vmVersion,
-                psio::input_stream code)
-   {
-      check(code.remaining(), "native setCode can't clear code");
-      auto codeHash = sha256(code.pos, code.remaining());
-
-      auto account = database.kvGet<CodeRow>(CodeRow::db, codeKey(service));
-      check(account.has_value(), "setCode: unknown service account");
-      check(account->codeHash == Checksum256{}, "native setCode can't replace code");
-      account->codeHash  = codeHash;
-      account->vmType    = vmType;
-      account->vmVersion = vmVersion;
-      database.kvPut(CodeRow::db, account->key(), *account);
-
-      auto codeObj = database.kvGet<CodeByHashRow>(CodeByHashRow::db,
-                                                   codeByHashKey(codeHash, vmType, vmVersion));
-      if (!codeObj)
-      {
-         codeObj.emplace();
-         codeObj->codeHash  = codeHash;
-         codeObj->vmType    = vmType;
-         codeObj->vmVersion = vmVersion;
-         codeObj->code.assign(code.pos, code.end);
-      }
-      database.kvPut(CodeByHashRow::db, codeObj->key(), *codeObj);
-   }  // setCode
-
    struct BackendEntry
    {
       Checksum256                hash;
@@ -100,11 +92,11 @@ namespace psibase
        bmi::indexed_by<bmi::sequenced<bmi::tag<ByAge>>,
                        bmi::ordered_non_unique<bmi::tag<ByHash>, bmi::key<&BackendEntry::byHash>>>>;
 
-   struct WasmCacheImpl
+   struct WasmCacheImpl : vm::Cache
    {
-      std::mutex       mutex;
-      uint32_t         cacheSize;
-      BackendContainer backends;
+      mutable std::mutex mutex;
+      uint32_t           cacheSize;
+      BackendContainer   backends;
       std::shared_ptr<NativeAotCache> nativeArtifacts;
 
       WasmCacheImpl(uint32_t cacheSize, const std::filesystem::path& path)
@@ -144,8 +136,9 @@ namespace psibase
       void compileAhead(const Checksum256&    hash,
                         std::span<const char> code,
                         const VMOptions&      options,
-                        std::uint8_t          vmVersion);
-      void runCompiles();
+                        std::uint8_t          vmVersion) override;
+      std::vector<std::span<const char>> span() const override;
+      void                               runCompiles();
 
       // Blocks until a compile started for this code, if any, has finished.
       void awaitCompile(const Checksum256& hash, const VMOptions& options, std::uint8_t vmVersion)
@@ -276,28 +269,11 @@ namespace psibase
       }
    }
 
-   void WasmCache::compileAhead(const Checksum256&    hash,
-                                std::span<const char> code,
-                                const VMOptions&      options,
-                                std::uint8_t          vmVersion)
-   {
-      impl->compileAhead(hash, code, options, vmVersion);
-   }
-
-   WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath)
-       : impl{std::make_shared<WasmCacheImpl>(cacheSize, nativeArtifactPath)} {}
-
-   WasmCache::WasmCache(const WasmCache& src) : impl{src.impl} {}
-
-   WasmCache::WasmCache(WasmCache&& src) : impl{std::move(src.impl)} {}
-
-   WasmCache::~WasmCache() {}
-
-   std::vector<std::span<const char>> WasmCache::span() const
+   std::vector<std::span<const char>> WasmCacheImpl::span() const
    {
       std::vector<std::span<const char>> result;
-      std::lock_guard                    lock{impl->mutex};
-      for (const auto& backend : impl->backends)
+      std::lock_guard                    lock{mutex};
+      for (const auto& backend : backends)
       {
          auto& alloc = backend.backend->get_module().allocator;
          if (alloc._base)
@@ -309,31 +285,16 @@ namespace psibase
       return result;
    }
 
-   struct ExecutionMemoryImpl
+   struct ExecutionMemoryImpl : vm::Memory
    {
       psizam::wasm_allocator wa;
+      std::span<const char>  span() const override { return wa.span(); }
    };
 
-   std::unique_ptr<ExecutionMemoryImpl> impl;
-
-   ExecutionMemory::ExecutionMemory()
-   {
-      impl = std::make_unique<ExecutionMemoryImpl>();
-   }
-   ExecutionMemory::ExecutionMemory(ExecutionMemory&& src)
-   {
-      impl = std::move(src.impl);
-   }
-   ExecutionMemory::~ExecutionMemory() {}
-
-   std::span<const char> ExecutionMemory::span() const
-   {
-      return impl->wa.span();
-   }
-
    // TODO: debugger
-   struct ExecutionContextImpl : NativeFunctions
+   struct ExecutionContextImpl : NativeFunctions, vm::Context
    {
+      WasmCacheImpl&                                wasmCache;
       NativeVMOptions                               vmOptions;
       psizam::wasm_allocator&                       wa;
       BackendEntry                                  backend;
@@ -341,15 +302,16 @@ namespace psibase
       std::atomic<bool>                             timedOut    = false;
       bool                                          initialized = false;
 
-      ExecutionContextImpl(TransactionContext& transactionContext,
-                           const VMOptions&    vmOptions,
-                           ExecutionMemory&    memory,
-                           AccountNumber       service)
+      ExecutionContextImpl(TransactionContext&  transactionContext,
+                           const VMOptions&     vmOptions,
+                           ExecutionMemoryImpl& memory,
+                           WasmCacheImpl&       wasmCache,
+                           AccountNumber        service)
           : NativeFunctions{transactionContext.blockContext.db, transactionContext,
                             transactionContext.dbMode},
-            vmOptions{vmOptions,
-                      transactionContext.blockContext.systemContext.wasmCache.impl->nativeArtifacts},
-            wa{memory.impl->wa}
+            wasmCache{wasmCache},
+            vmOptions{vmOptions, wasmCache.nativeArtifacts},
+            wa{memory.wa}
       {
          database.checkoutSubjective();
          psio::finally _{[&] { database.abortSubjective(); }};
@@ -375,7 +337,7 @@ namespace psibase
          rethrowVMExcept(
              [&]
              {
-                auto& cache = *transactionContext.blockContext.systemContext.wasmCache.impl;
+                auto& cache = wasmCache;
                 cache.awaitCompile(code.codeHash, vmOptions, code.vmVersion);
                 backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
                 if (!backend.backend)
@@ -404,7 +366,7 @@ namespace psibase
 
       ~ExecutionContextImpl()
       {
-         transactionContext.blockContext.systemContext.wasmCache.impl->add(std::move(backend));
+         wasmCache.add(std::move(backend));
       }
 
       psizam::detail::stack_manager& getAltStack() { return transactionContext.getAltStack(); }
@@ -464,7 +426,7 @@ namespace psibase
       };
 
       template <typename F>
-      void exec(ActionContext& actionContext, F f)
+      void run(ActionContext& actionContext, F f)
       {
          auto prev         = currentActContext;
          currentActContext = &actionContext;
@@ -503,25 +465,16 @@ namespace psibase
          std::swap(transactionContext.exportedHandles, transactionContext.importedHandles);
       }
 
+      void rebind(ExecutionContext* self) override { currentExecContext = self; }
+      std::uint32_t remainingStack() const override;
+      void          execProcessTransaction(ActionContext& actionContext) override;
+      void          execCalled(uint64_t callerFlags, ActionContext& actionContext) override;
+      void          execServe(ActionContext& actionContext) override;
+      void          exec(ActionContext& actionContext, std::string_view fn) override;
+      void          asyncTimeout() override;
    };  // ExecutionContextImpl
 
-   ExecutionContext::ExecutionContext(TransactionContext& transactionContext,
-                                      const VMOptions&    vmOptions,
-                                      ExecutionMemory&    memory,
-                                      AccountNumber       service)
-   {
-      impl = std::make_unique<ExecutionContextImpl>(transactionContext, vmOptions, memory, service);
-      impl->currentExecContext = this;
-   }
-
-   ExecutionContext::ExecutionContext(ExecutionContext&& src)
-   {
-      impl                     = std::move(src.impl);
-      impl->currentExecContext = this;
-   }
-   ExecutionContext::~ExecutionContext() {}
-
-   void ExecutionContext::registerHostFunctions()
+   static void registerHostFunctions()
    {
       // TODO: enable linking to disabled functions below after we finalize
       //       their interfaces. Disabling now simplifies future upgrades.
@@ -557,53 +510,74 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::readFile>("env", "readFile");
    }
 
-   std::uint32_t ExecutionContext::remainingStack() const
+   std::uint32_t ExecutionContextImpl::remainingStack() const
    {
-      return impl->backend.backend->get_context().get_remaining_call_depth();
+      return backend.backend->get_context().get_remaining_call_depth();
    }
 
-   void ExecutionContext::execProcessTransaction(ActionContext& actionContext)
+   void ExecutionContextImpl::execProcessTransaction(ActionContext& actionContext)
    {
-      impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "processTransaction");
+      run(actionContext, [&] {  //
+         (*backend.backend)(getAltStack(), *this, "env", "processTransaction");
       });
    }
 
-   void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
+   void ExecutionContextImpl::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
-      impl->onTransferControl(callerFlags);
-      auto cleanup = psio::finally{[&] { impl->onTransferControl(callerFlags); }};
+      onTransferControl(callerFlags);
+      auto cleanup = psio::finally{[&] { onTransferControl(callerFlags); }};
 
-      if ((callerFlags & (callerSudo | isLocal)) == callerSudo)
+      if ((callerFlags & (ExecutionContext::callerSudo | ExecutionContext::isLocal)) ==
+          ExecutionContext::callerSudo)
       {
-         check((impl->code.flags & (isLocal | CodeRow::isReplacement)) != isLocal,
+         check((code.flags & (ExecutionContext::isLocal | CodeRow::isReplacement)) !=
+                   ExecutionContext::isLocal,
                "on-chain service cannot sudo when calling a node-local service");
       }
 
-      impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "called",
+      run(actionContext, [&] {  //
+         (*backend.backend)(getAltStack(), *this, "env", "called",
                                   actionContext.action.service.value,
                                   actionContext.action.sender.value);
       });
    }
 
-   void ExecutionContext::execServe(ActionContext& actionContext)
+   void ExecutionContextImpl::execServe(ActionContext& actionContext)
    {
-      impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "serve");
+      run(actionContext, [&] {  //
+         (*backend.backend)(getAltStack(), *this, "env", "serve");
       });
    }
 
-   void ExecutionContext::exec(ActionContext& actionContext, std::string_view fn)
+   void ExecutionContextImpl::exec(ActionContext& actionContext, std::string_view fn)
    {
-      impl->exec(actionContext, [&] {  //
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", fn);
+      run(actionContext, [&] {  //
+         (*backend.backend)(getAltStack(), *this, "env", fn);
       });
    }
 
-   void ExecutionContext::asyncTimeout()
+   void ExecutionContextImpl::asyncTimeout()
    {
-      impl->timedOut = true;
-      impl->backend.backend->get_module().allocator.disable_code();
+      timedOut = true;
+      backend.backend->get_module().allocator.disable_code();
    }
-}  // namespace psibase
+
+   const vm::Engine& engine()
+   {
+      static const vm::Engine result{
+          PSIBASE_VM_ENGINE_NAME,
+          &registerHostFunctions,
+          +[](std::uint32_t cacheSize, const std::filesystem::path& path) -> std::shared_ptr<vm::Cache>
+          { return std::make_shared<WasmCacheImpl>(cacheSize, path); },
+          +[]() -> std::unique_ptr<vm::Memory> { return std::make_unique<ExecutionMemoryImpl>(); },
+          +[](TransactionContext& transactionContext, const VMOptions& vmOptions,
+              vm::Memory& memory, vm::Cache& cache,
+              AccountNumber service) -> std::unique_ptr<vm::Context>
+          {
+             return std::make_unique<ExecutionContextImpl>(
+                 transactionContext, vmOptions, static_cast<ExecutionMemoryImpl&>(memory),
+                 static_cast<WasmCacheImpl&>(cache), service);
+          }};
+      return result;
+   }
+}  // namespace psibase::PSIBASE_VM_ENGINE_NS

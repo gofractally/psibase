@@ -204,12 +204,10 @@ function(add suffix)
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)
-        # One engine adapter is built; both implement ExecutionContext.hpp.
-        if(PSIBASE_VM_BACKEND STREQUAL "WASMTIME")
-            target_sources(psibase${suffix} PRIVATE native/src/ExecutionContextWasmtime.cpp)
-        else()
-            target_sources(psibase${suffix} PRIVATE native/src/ExecutionContext.cpp)
-        endif()
+        # The engine adapters this build has (external/psizam-core.cmake), and
+        # the engine-neutral implementation of ExecutionContext.hpp over them.
+        get_property(vm_engine_sources GLOBAL PROPERTY PSIBASE_VM_ENGINE_SOURCES)
+        target_sources(psibase${suffix} PRIVATE native/src/VmEngine.cpp ${vm_engine_sources})
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
             native/src/BucketSet.cpp

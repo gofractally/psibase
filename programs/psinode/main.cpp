@@ -25,6 +25,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/log/core/core.hpp>
 #include <boost/preprocessor/stringize.hpp>
+#include <psibase/VmEngine.hpp>
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
@@ -2072,6 +2073,22 @@ int main(int argc, char* argv[])
    auto add_cmdonly = [](auto& opts)
    { opts.add_options()("help,h", "Show this message")("version,V", "Print version information"); };
    add_cmdonly(desc);
+   po::options_description engine_opts("Execution engine");
+   {
+      std::string engines;
+      for (auto* engine : psibase::vm::engines())
+         engines += (engines.empty() ? "" : ", ") + std::string(engine->name);
+      // A property of this node, not of the chain: every engine computes the
+      // same results, so it is not something a config file should pin.
+      engine_opts.add_options()(
+          "vm-engine",
+          po::value<std::string>()->value_name("name")->notifier(
+              [](const std::string& name) { psibase::vm::select(name); }),
+          ("Execution engine for services. This build has: " + engines +
+           ". Default: the first, or PSIBASE_VM_ENGINE")
+              .c_str());
+   }
+   desc.add(engine_opts);
 
    // Options that are only allowed in the config file
    po::options_description cfg_opts("psinode");
@@ -2160,7 +2177,7 @@ int main(int argc, char* argv[])
    {
       add_cmdonly(common_opts);
       std::cerr << usage << "\n\n";
-      std::cerr << common_opts << "\n";
+      std::cerr << common_opts << "\n" << engine_opts << "\n";
       return 1;
    }
 

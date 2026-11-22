@@ -42,22 +42,41 @@ def scenario(producer, validator, extra_blocks, root):
         b = cluster.make_node(executable=ENGINES[validator])
         b.psibase = CLI
         b.connect(a)
-        target = a.get_block_header()['blockNum'] + extra_blocks
-        deadline = time.time() + 180
-        while time.time() < deadline:
+        # A node that has not synced yet cannot answer queries: the service
+        # that answers them arrives with the chain.
+        def header(node, num=-1):
             try:
-                hb = b.get_block_header()['blockNum']
+                return node.get_block_header(num)
             except Exception:
-                hb = 0
-            if hb >= target:
+                return None
+        target = a.get_block_header()['blockNum'] + extra_blocks
+        deadline = time.time() + 300
+        hb = None
+        progress, stalled = -1, 0
+        while time.time() < deadline:
+            hb = header(b)
+            if hb is not None and hb['blockNum'] >= target:
                 break
+            # The peer connection can drop during the initial sync (a large
+            # boot block can exceed the message size limit). Reconnect when
+            # the validator stops advancing.
+            now = hb['blockNum'] if hb is not None else 0
+            stalled = 0 if now != progress else stalled + 1
+            progress = now
+            if stalled >= 8:
+                stalled = 0
+                try:
+                    b.connect(a)
+                except Exception:
+                    pass
             time.sleep(1)
         ha = a.get_block_header()
-        hb = b.get_block_header()
+        if hb is None:
+            hb = {'blockNum': 0}
         common = min(ha['blockNum'], hb['blockNum'])
-        ia = a.get_block_header(common)
-        ib = b.get_block_header(common)
-        same = ia == ib
+        ia = header(a, common) if common else None
+        ib = header(b, common) if common else None
+        same = ia is not None and ia == ib
         print('%s: boot %.1fs, producer head %d, validator head %d, header at %d identical: %s'
               % (label, boot_seconds, ha['blockNum'], hb['blockNum'], common, same), flush=True)
         if not same or hb['blockNum'] < target:
@@ -70,15 +89,27 @@ def scenario(producer, validator, extra_blocks, root):
                 for l in lines[-8:]:
                     print('    ' + l[:300])
         ok = same and hb['blockNum'] >= target
+        # A dump is of the latest signed checkpoint, and the producer always
+        # has its newest one slightly before anyone else. Stop making new
+        # checkpoints and let a few more blocks through, so that the newest
+        # one is the same on both nodes.
+        a.push_action('transact', 'transact', 'setSnapTime', {"seconds": 1000000})
+        settle = a.get_block_header()['blockNum'] + 6
+        for _ in range(60):
+            hb2 = header(b)
+            if hb2 is not None and hb2['blockNum'] >= settle:
+                break
+            time.sleep(1)
         # Stop the producer, let the validator reach the final block, then dump
         # each node's full chain state and compare the dumps byte for byte.
         a.shutdown()
         final = None
         for _ in range(30):
-            hb = b.get_block_header()
-            if final is not None and hb['blockNum'] == final:
-                break
-            final = hb['blockNum']
+            hb = header(b)
+            if hb is not None:
+                if final is not None and hb['blockNum'] == final:
+                    break
+                final = hb['blockNum']
             time.sleep(1)
         b.shutdown()
         time.sleep(1)

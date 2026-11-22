@@ -1,4 +1,4 @@
-// The node's execution engine when PSIBASE_VM_BACKEND=WASMTIME.
+// The wasmtime execution engine (see VmEngine.hpp).
 //
 // wasmtime (Cranelift) executes; psizam decides what may execute. Every
 // service still passes validateNativeWasm and psizam's parser under
@@ -6,8 +6,7 @@
 // parse also yields psizam's per-function stack costs, which are compiled into
 // the module so the stack-overflow point is the same as on psizam's engines.
 //
-// This file implements the same interface as ExecutionContext.cpp; exactly one
-// of the two is built.
+// ExecutionContext.cpp is the psizam counterpart of this file.
 
 #include <psibase/NativeFunctions.hpp>
 
@@ -19,6 +18,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/NativeAotCache.hpp>
 #include <psibase/PsizamPolicy.hpp>
+#include <psibase/VmEngine.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
 #include <psio/finally.hpp>
@@ -43,7 +43,7 @@ struct wt::detail::value_traits<psizam::detail::argument_proxy<T*>>
    }
 };
 
-namespace psibase
+namespace psibase::vm_wasmtime
 {
    struct ExecutionContextImpl;
 
@@ -56,7 +56,7 @@ namespace psibase
       constexpr std::uint64_t nativeStackBytes     = std::uint64_t(256) << 20;
       constexpr std::uint64_t nativeBytesPerBudget = 16;
 
-      wt::engine_options engineOptions()
+      wt::engine_options engineOptions(psizam::float_profile profile)
       {
          wt::engine_options o;
          // Mirrors NativeVMOptions; psizam's validator has the final word.
@@ -64,16 +64,23 @@ namespace psibase
                       wt::feature::sign_extension | wt::feature::saturating_float_to_int |
                       wt::feature::reference_types | wt::feature::multi_value |
                       wt::feature::threads;
-         o.fp                 = wt::float_profile::performance;
+         o.fp                 = profile == psizam::float_profile::strict
+                                    ? wt::float_profile::strict
+                                    : wt::float_profile::performance;
          o.native_stack       = nativeStackBytes;
          o.epoch_interruption = true;
          return o;
       }
 
-      wt::runtime<ExecutionContextImpl>& vmRuntime()
+      // One wasmtime engine per float profile: the profile a service runs
+      // under comes from the version its code was deployed with.
+      wt::runtime<ExecutionContextImpl>& vmRuntime(psizam::float_profile profile)
       {
-         static wt::runtime<ExecutionContextImpl> runtime{engineOptions()};
-         return runtime;
+         static wt::runtime<ExecutionContextImpl> strict{
+             engineOptions(psizam::float_profile::strict)};
+         static wt::runtime<ExecutionContextImpl> performance{
+             engineOptions(psizam::float_profile::performance)};
+         return profile == psizam::float_profile::strict ? strict : performance;
       }
 
       // psizam reports the reason separately from the kind of error.
@@ -91,43 +98,13 @@ namespace psibase
       }
    }  // namespace
 
-   // Only useful for genesis
-   void setCode(Database&          database,
-                AccountNumber      service,
-                uint8_t            vmType,
-                uint8_t            vmVersion,
-                psio::input_stream code)
-   {
-      check(code.remaining(), "native setCode can't clear code");
-      auto codeHash = sha256(code.pos, code.remaining());
-
-      auto account = database.kvGet<CodeRow>(CodeRow::db, codeKey(service));
-      check(account.has_value(), "setCode: unknown service account");
-      check(account->codeHash == Checksum256{}, "native setCode can't replace code");
-      account->codeHash  = codeHash;
-      account->vmType    = vmType;
-      account->vmVersion = vmVersion;
-      database.kvPut(CodeRow::db, account->key(), *account);
-
-      auto codeObj = database.kvGet<CodeByHashRow>(CodeByHashRow::db,
-                                                   codeByHashKey(codeHash, vmType, vmVersion));
-      if (!codeObj)
-      {
-         codeObj.emplace();
-         codeObj->codeHash  = codeHash;
-         codeObj->vmType    = vmType;
-         codeObj->vmVersion = vmVersion;
-         codeObj->code.assign(code.pos, code.end);
-      }
-      database.kvPut(CodeByHashRow::db, codeObj->key(), *codeObj);
-   }  // setCode
-
    // Compiled modules, most recently used last. A wasmtime module is shared:
    // any number of transactions run instances of it at once, so entries are
    // copied out rather than checked out.
-   struct WasmCacheImpl
+   struct WasmCacheImpl : vm::Cache
    {
-      using Key = std::pair<Checksum256, VMOptions>;
+      // Code under different versions compiles differently from the same bytes.
+      using Key = std::tuple<Checksum256, VMOptions, std::uint8_t>;
       struct Entry
       {
          Key        key;
@@ -151,31 +128,51 @@ namespace psibase
       // Everything that determines the compiled code: the service, the chain
       // limits it was admitted and metered under, the engine's proposal set
       // and float profile, and the wasmtime build.
-      static NativeAotCache::Key artifactKey(const Checksum256& hash, const VMOptions& vmOptions)
+      static NativeAotCache::Key artifactKey(const Checksum256&    hash,
+                                             const VMOptions&      vmOptions,
+                                             std::uint8_t          vmVersion,
+                                             psizam::float_profile profile)
       {
-         auto options = engineOptions();
+         auto options = engineOptions(profile);
          auto digest  = sha256(std::tuple{
-             std::string("psibase-wasmtime-artifact-v1"), hash, vmOptions, options.features,
-             std::uint32_t(options.fp), std::string(wt::build_identity())});
+             std::string("psibase-wasmtime-artifact-v2"), hash, vmOptions, vmVersion,
+             options.features, std::uint32_t(options.fp), std::string(wt::build_identity())});
          NativeAotCache::Key key;
          std::copy(digest.begin(), digest.end(), key.begin());
          return key;
       }
 
-      std::optional<wt::module> get(const Checksum256& hash, const VMOptions& vmOptions)
+      std::optional<wt::module> get(const Checksum256& hash,
+                                    const VMOptions&   vmOptions,
+                                    std::uint8_t       vmVersion)
       {
          std::lock_guard lock{mutex};
-         auto            it = index.find(Key{hash, vmOptions});
+         auto            it = index.find(Key{hash, vmOptions, vmVersion});
          if (it == index.end())
             return std::nullopt;
          entries.splice(entries.end(), entries, it->second);
          return it->second->module;
       }
 
-      void add(const Checksum256& hash, const VMOptions& vmOptions, const wt::module& module)
+      // wasmtime owns its code and memory mappings.
+      std::vector<std::span<const char>> span() const override { return {}; }
+
+      // Nothing to do ahead of time: Cranelift compiles a service in tens of
+      // milliseconds, at its first use, and the result is kept on disk.
+      void compileAhead(const Checksum256&,
+                        std::span<const char>,
+                        const VMOptions&,
+                        std::uint8_t) override
+      {
+      }
+
+      void add(const Checksum256& hash,
+               const VMOptions&   vmOptions,
+               std::uint8_t       vmVersion,
+               const wt::module&  module)
       {
          std::lock_guard lock{mutex};
-         Key             key{hash, vmOptions};
+         Key             key{hash, vmOptions, vmVersion};
          if (index.count(key))
             return;
          entries.push_back(Entry{key, module});
@@ -188,48 +185,20 @@ namespace psibase
       }
    };
 
-   WasmCache::WasmCache(uint32_t cacheSize, const std::filesystem::path& nativeArtifactPath)
-       : impl{std::make_shared<WasmCacheImpl>(cacheSize, nativeArtifactPath)}
+   // Linear memory belongs to each wasmtime instance. The pool of memory slots
+   // still bounds how many services run at once.
+   struct ExecutionMemoryImpl : vm::Memory
    {
-   }
-   WasmCache::WasmCache(const WasmCache& src) : impl{src.impl} {}
-   WasmCache::WasmCache(WasmCache&& src) : impl{std::move(src.impl)} {}
-   WasmCache::~WasmCache() {}
-
-   // Nothing to do ahead of time: Cranelift compiles a service in tens of
-   // milliseconds, at its first use.
-   void WasmCache::compileAhead(const Checksum256&, std::span<const char>, const VMOptions&) {}
-
-   // wasmtime owns its code and memory mappings.
-   std::vector<std::span<const char>> WasmCache::span() const
-   {
-      return {};
-   }
-
-   // Linear memory belongs to each wasmtime instance. The pool of these still
-   // bounds how many services run at once.
-   struct ExecutionMemoryImpl
-   {
+      std::span<const char> span() const override { return {}; }
    };
-   ExecutionMemory::ExecutionMemory()
-   {
-      impl = std::make_unique<ExecutionMemoryImpl>();
-   }
-   ExecutionMemory::ExecutionMemory(ExecutionMemory&& src)
-   {
-      impl = std::move(src.impl);
-   }
-   ExecutionMemory::~ExecutionMemory() {}
-   std::span<const char> ExecutionMemory::span() const
-   {
-      return {};
-   }
 
-   struct ExecutionContextImpl : NativeFunctions
+   struct ExecutionContextImpl : NativeFunctions, vm::Context
    {
       VMOptions                                              vmOptions;
+      psizam::float_profile floatProfile = psizam::float_profile::strict;
       std::optional<wt::module>                              module;
-      std::optional<wt::instance<ExecutionContextImpl>>      instance;
+      // Reading the stack counter goes through the store, which is not const.
+      mutable std::optional<wt::instance<ExecutionContextImpl>> instance;
       // Guards the interrupter, which another thread fires on timeout.
       std::mutex                                             interruptMutex;
       std::optional<wt::interrupter>                         interrupter;
@@ -238,7 +207,7 @@ namespace psibase
 
       ExecutionContextImpl(TransactionContext& transactionContext,
                            const VMOptions&    vmOptions,
-                           ExecutionMemory&,
+                           WasmCacheImpl&      cache,
                            AccountNumber       service)
           : NativeFunctions{transactionContext.blockContext.db, transactionContext,
                             transactionContext.dbMode},
@@ -253,7 +222,11 @@ namespace psibase
              db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
          check(c.has_value(), "service code record is missing");
          check(c->vmType == 0, "vmType is not 0");
-         check(c->vmVersion == 0, "vmVersion is not 0");
+         // The version a service was deployed under selects the execution
+         // policy its code keeps until it is next deployed.
+         auto profile = nativeFloatProfile(c->vmVersion);
+         check(profile.has_value(), "vmVersion is not supported");
+         floatProfile = *profile;
          if (transactionContext.dbMode.verifyOnly)
          {
             check(code.flags & CodeRow::isVerify,
@@ -264,18 +237,18 @@ namespace psibase
          check(std::uint64_t(vmOptions.max_stack_bytes) * nativeBytesPerBudget <= nativeStackBytes,
                "max_stack_bytes is larger than the wasmtime engine's native stack allows");
 
-         auto& cache = *transactionContext.blockContext.systemContext.wasmCache.impl;
-         module      = cache.get(code.codeHash, vmOptions);
+         module      = cache.get(code.codeHash, vmOptions, code.vmVersion);
          if (!module)
          {
             // An artifact stored under this key was admitted and compiled from
             // this exact service under these exact limits by this build.
-            const auto key = WasmCacheImpl::artifactKey(code.codeHash, vmOptions);
+            const auto key = WasmCacheImpl::artifactKey(code.codeHash, vmOptions, code.vmVersion,
+                                                        floatProfile);
             if (cache.artifacts)
                if (auto stored = cache.artifacts->load(key))
                   try
                   {
-                     module = vmRuntime().load(std::span(
+                     module = vmRuntime(floatProfile).load(std::span(
                          reinterpret_cast<const std::uint8_t*>(stored->data()), stored->size()));
                   }
                   catch (const std::exception&)
@@ -287,24 +260,25 @@ namespace psibase
          {
             // Admission is psizam's: the same checks, in the same order, as
             // the psizam engines apply before they compile.
-            NativeVMOptions policy{vmOptions};
+            NativeVMOptions policy{vmOptions, {}, code.vmVersion};
             auto            costs = withDetail(
                 [&]
                 {
                    validateNativeWasm(c->code, policy);
                    return wt::validate_and_cost(c->code, policy);
                 });
-            module = vmRuntime().compile_metered(c->code, costs);
+            module = vmRuntime(floatProfile).compile_metered(c->code, costs);
             if (cache.artifacts)
             {
                auto artifact = module->serialize();
                cache.artifacts->store(
-                   WasmCacheImpl::artifactKey(code.codeHash, vmOptions),
+                   WasmCacheImpl::artifactKey(code.codeHash, vmOptions, code.vmVersion,
+                                              floatProfile),
                    std::span(reinterpret_cast<const char*>(artifact.data()), artifact.size()));
             }
          }
-         if (!cache.get(code.codeHash, vmOptions))
-            cache.add(code.codeHash, vmOptions, *module);
+         if (!cache.get(code.codeHash, vmOptions, code.vmVersion))
+            cache.add(code.codeHash, vmOptions, code.vmVersion, *module);
       }
 
       std::pair<CodeRow, DbId> getCode(AccountNumber service)
@@ -337,7 +311,7 @@ namespace psibase
              .max_memory_bytes   = std::uint64_t(vmOptions.max_pages) * 65536,
              .max_table_elements = vmOptions.max_table_elements,
          };
-         instance.emplace(vmRuntime(), *module, *this, limits);
+         instance.emplace(vmRuntime(floatProfile), *module, *this, limits);
          {
             std::lock_guard lock{interruptMutex};
             interrupter.emplace(instance->make_interrupter());
@@ -367,7 +341,7 @@ namespace psibase
       };
 
       template <typename F>
-      void exec(ActionContext& actionContext, F f)
+      void run(ActionContext& actionContext, F f)
       {
          auto prev         = currentActContext;
          currentActContext = &actionContext;
@@ -413,111 +387,125 @@ namespace psibase
          std::swap(transactionContext.exportedHandles, transactionContext.importedHandles);
       }
 
+      void rebind(ExecutionContext* self) override { currentExecContext = self; }
+      std::uint32_t remainingStack() const override;
+      void          execProcessTransaction(ActionContext& actionContext) override;
+      void          execCalled(uint64_t callerFlags, ActionContext& actionContext) override;
+      void          execServe(ActionContext& actionContext) override;
+      void          exec(ActionContext& actionContext, std::string_view fn) override;
+      void          asyncTimeout() override;
    };  // ExecutionContextImpl
 
-   ExecutionContext::ExecutionContext(TransactionContext& transactionContext,
-                                      const VMOptions&    vmOptions,
-                                      ExecutionMemory&    memory,
-                                      AccountNumber       service)
-   {
-      impl = std::make_unique<ExecutionContextImpl>(transactionContext, vmOptions, memory, service);
-      impl->currentExecContext = this;
-   }
-
-   ExecutionContext::ExecutionContext(ExecutionContext&& src)
-   {
-      impl                     = std::move(src.impl);
-      impl->currentExecContext = this;
-   }
-   ExecutionContext::~ExecutionContext() {}
-
-   void ExecutionContext::registerHostFunctions()
+   static void registerHostFunctions()
    {
       static std::once_flag once;
       std::call_once(
           once,
           []
           {
-             auto& rt = vmRuntime();
-             rt.add<&ExecutionContextImpl::getResult>("env", "getResult");
-             rt.add<&ExecutionContextImpl::getKey>("env", "getKey");
-             rt.add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
-             rt.add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
-             rt.add<&ExecutionContextImpl::clockTimeGet>("env", "clockTimeGet");
-             rt.add<&ExecutionContextImpl::getRandom>("env", "getRandom");
-             rt.add<&ExecutionContextImpl::setMaxCpuTime>("env", "setMaxCpuTime");
-             rt.add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
-             rt.add<&ExecutionContextImpl::call>("env", "call");
-             rt.add<&ExecutionContextImpl::setRetval>("env", "setRetval");
-             rt.add<&ExecutionContextImpl::kvOpen>("env", "kvOpen");
-             rt.add<&ExecutionContextImpl::kvOpenAt>("env", "kvOpenAt");
-             rt.add<&ExecutionContextImpl::kvClose>("env", "kvClose");
-             rt.add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
-             rt.add<&ExecutionContextImpl::importHandles>("env", "importHandles");
-             rt.add<&ExecutionContextImpl::kvPut>("env", "kvPut");
-             rt.add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
-             rt.add<&ExecutionContextImpl::kvGet>("env", "kvGet");
-             rt.add<&ExecutionContextImpl::kvGreaterEqual>("env", "kvGreaterEqual");
-             rt.add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
-             rt.add<&ExecutionContextImpl::kvMax>("env", "kvMax");
-             rt.add<&ExecutionContextImpl::checkoutSubjective>("env", "checkoutSubjective");
-             rt.add<&ExecutionContextImpl::commitSubjective>("env", "commitSubjective");
-             rt.add<&ExecutionContextImpl::abortSubjective>("env", "abortSubjective");
-             rt.add<&ExecutionContextImpl::socketOpen>("env", "socketOpen");
-             rt.add<&ExecutionContextImpl::socketSend>("env", "socketSend");
-             rt.add<&ExecutionContextImpl::socketSetFlags>("env", "socketSetFlags");
-             rt.add<&ExecutionContextImpl::readFile>("env", "readFile");
-             rt.link();
+             for (auto profile :
+                  {psizam::float_profile::strict, psizam::float_profile::performance})
+             {
+                auto& rt = vmRuntime(profile);
+                rt.add<&ExecutionContextImpl::getResult>("env", "getResult");
+                rt.add<&ExecutionContextImpl::getKey>("env", "getKey");
+                rt.add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
+                rt.add<&ExecutionContextImpl::abortMessage>("env", "abortMessage");
+                rt.add<&ExecutionContextImpl::clockTimeGet>("env", "clockTimeGet");
+                rt.add<&ExecutionContextImpl::getRandom>("env", "getRandom");
+                rt.add<&ExecutionContextImpl::setMaxCpuTime>("env", "setMaxCpuTime");
+                rt.add<&ExecutionContextImpl::getCurrentAction>("env", "getCurrentAction");
+                rt.add<&ExecutionContextImpl::call>("env", "call");
+                rt.add<&ExecutionContextImpl::setRetval>("env", "setRetval");
+                rt.add<&ExecutionContextImpl::kvOpen>("env", "kvOpen");
+                rt.add<&ExecutionContextImpl::kvOpenAt>("env", "kvOpenAt");
+                rt.add<&ExecutionContextImpl::kvClose>("env", "kvClose");
+                rt.add<&ExecutionContextImpl::exportHandles>("env", "exportHandles");
+                rt.add<&ExecutionContextImpl::importHandles>("env", "importHandles");
+                rt.add<&ExecutionContextImpl::kvPut>("env", "kvPut");
+                rt.add<&ExecutionContextImpl::kvRemove>("env", "kvRemove");
+                rt.add<&ExecutionContextImpl::kvGet>("env", "kvGet");
+                rt.add<&ExecutionContextImpl::kvGreaterEqual>("env", "kvGreaterEqual");
+                rt.add<&ExecutionContextImpl::kvLessThan>("env", "kvLessThan");
+                rt.add<&ExecutionContextImpl::kvMax>("env", "kvMax");
+                rt.add<&ExecutionContextImpl::checkoutSubjective>("env", "checkoutSubjective");
+                rt.add<&ExecutionContextImpl::commitSubjective>("env", "commitSubjective");
+                rt.add<&ExecutionContextImpl::abortSubjective>("env", "abortSubjective");
+                rt.add<&ExecutionContextImpl::socketOpen>("env", "socketOpen");
+                rt.add<&ExecutionContextImpl::socketSend>("env", "socketSend");
+                rt.add<&ExecutionContextImpl::socketSetFlags>("env", "socketSetFlags");
+                rt.add<&ExecutionContextImpl::readFile>("env", "readFile");
+                rt.link();
+             }
           });
    }
 
-   std::uint32_t ExecutionContext::remainingStack() const
+   std::uint32_t ExecutionContextImpl::remainingStack() const
    {
-      return impl->instance ? impl->instance->stack_remaining()
-                            : impl->transactionContext.remainingStack;
+      return instance ? instance->stack_remaining()
+                            : transactionContext.remainingStack;
    }
 
-   void ExecutionContext::execProcessTransaction(ActionContext& actionContext)
+   void ExecutionContextImpl::execProcessTransaction(ActionContext& actionContext)
    {
-      impl->exec(actionContext,
-                 [&] { impl->instance->call_discarding_results("processTransaction"); });
+      run(actionContext,
+                 [&] { instance->call_discarding_results("processTransaction"); });
    }
 
-   void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
+   void ExecutionContextImpl::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
-      impl->onTransferControl(callerFlags);
-      auto cleanup = psio::finally{[&] { impl->onTransferControl(callerFlags); }};
+      onTransferControl(callerFlags);
+      auto cleanup = psio::finally{[&] { onTransferControl(callerFlags); }};
 
-      if ((callerFlags & (callerSudo | isLocal)) == callerSudo)
+      if ((callerFlags & (ExecutionContext::callerSudo | ExecutionContext::isLocal)) ==
+          ExecutionContext::callerSudo)
       {
-         check((impl->code.flags & (isLocal | CodeRow::isReplacement)) != isLocal,
+         check((code.flags & (ExecutionContext::isLocal | CodeRow::isReplacement)) !=
+                   ExecutionContext::isLocal,
                "on-chain service cannot sudo when calling a node-local service");
       }
 
-      impl->exec(actionContext,
+      run(actionContext,
                  [&]
                  {
-                    impl->instance->call_discarding_results(
+                    instance->call_discarding_results(
                         "called", actionContext.action.service.value,
                         actionContext.action.sender.value);
                  });
    }
 
-   void ExecutionContext::execServe(ActionContext& actionContext)
+   void ExecutionContextImpl::execServe(ActionContext& actionContext)
    {
-      impl->exec(actionContext, [&] { impl->instance->call_discarding_results("serve"); });
+      run(actionContext, [&] { instance->call_discarding_results("serve"); });
    }
 
-   void ExecutionContext::exec(ActionContext& actionContext, std::string_view fn)
+   void ExecutionContextImpl::exec(ActionContext& actionContext, std::string_view fn)
    {
-      impl->exec(actionContext, [&] { impl->instance->call_discarding_results(fn); });
+      run(actionContext, [&] { instance->call_discarding_results(fn); });
    }
 
-   void ExecutionContext::asyncTimeout()
+   void ExecutionContextImpl::asyncTimeout()
    {
-      impl->timedOut = true;
-      std::lock_guard lock{impl->interruptMutex};
-      if (impl->interrupter)
-         impl->interrupter->fire();
+      timedOut = true;
+      std::lock_guard lock{interruptMutex};
+      if (interrupter)
+         interrupter->fire();
    }
-}  // namespace psibase
+
+   const vm::Engine& engine()
+   {
+      static const vm::Engine result{
+          "wasmtime",
+          &registerHostFunctions,
+          +[](std::uint32_t cacheSize, const std::filesystem::path& path) -> std::shared_ptr<vm::Cache>
+          { return std::make_shared<WasmCacheImpl>(cacheSize, path); },
+          +[]() -> std::unique_ptr<vm::Memory> { return std::make_unique<ExecutionMemoryImpl>(); },
+          +[](TransactionContext& transactionContext, const VMOptions& vmOptions, vm::Memory&,
+              vm::Cache& cache, AccountNumber service) -> std::unique_ptr<vm::Context>
+          {
+             return std::make_unique<ExecutionContextImpl>(
+                 transactionContext, vmOptions, static_cast<WasmCacheImpl&>(cache), service);
+          }};
+      return result;
+   }
+}  // namespace psibase::vm_wasmtime
