@@ -5,7 +5,7 @@ psibase_declare_dependencies()
 find_package(Git REQUIRED)
 set(psitri_expected a7d92aabb6a7fa0d73ff4f689e16a5507c026d09)
 set(ucc_expected d79166da0290fdf9d1f9d5880d4dfb45b2822cf3)
-set(psizam_expected 4da50574dfeecece12bfc75e0f204031835d9db8)
+set(psizam_expected 4ab1ee57c0dbf3f048bf1374859411a79a6c8ba3)
 foreach(name psitri ucc psizam)
     psibase_acquire_dependency(${name})
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env GIT_OPTIONAL_LOCKS=0
