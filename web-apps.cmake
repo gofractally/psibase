@@ -1,3 +1,23 @@
+# The web UIs are built with Yarn's Plug'n'Play loader, which is tied to the Node
+# release it runs under. Under Node 25 the pinned Yarn (4.18) gives ESLint a
+# `require` without a cache and every UI build fails deep inside lint with
+# "Cannot convert undefined or null to object". Say so here instead.
+# .nvmrc names the supported release.
+find_program(PSIBASE_NODE node)
+if(PSIBASE_NODE)
+    execute_process(COMMAND "${PSIBASE_NODE}" --version
+        OUTPUT_VARIABLE psibase_node_version OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    string(REGEX MATCH "^v([0-9]+)" psibase_node_match "${psibase_node_version}")
+    option(PSIBASE_ALLOW_UNTESTED_NODE "Build the web UIs with a Node release newer than the supported one" OFF)
+    if(CMAKE_MATCH_1 AND CMAKE_MATCH_1 GREATER 24 AND NOT PSIBASE_ALLOW_UNTESTED_NODE)
+        message(FATAL_ERROR
+            "Node ${psibase_node_version} (${PSIBASE_NODE}) cannot build the web UIs: the pinned Yarn "
+            "Plug'n'Play loader does not support it. Put Node 22 first on PATH (see .nvmrc; "
+            "with Homebrew: PATH=\"$(brew --prefix node@22)/bin:$PATH\") and configure again, "
+            "or pass -DPSIBASE_ALLOW_UNTESTED_NODE=ON to try anyway.")
+    endif()
+endif()
+
 include(ExternalProject)
 
 # Static (not built) resource dependencies
