@@ -1,0 +1,124 @@
+{
+ "schema": 1,
+ "suite": "native",
+ "label": "x86 cloud; psitri a7d92aa",
+ "recorded": "2026-11-22T01:22:48Z",
+ "source": {
+  "commit": "37a19a903f9e252477a6af51415e90776e533c0f",
+  "branch": "HEAD",
+  "dirty": false,
+  "psitri": "a7d92aabb6a7fa0d73ff4f689e16a5507c026d09"
+ },
+ "system": {
+  "os": "Linux",
+  "os_release": "6.17.0-22-generic",
+  "machine": "x86_64",
+  "cpu": "AMD EPYC-Turin Processor",
+  "logical_cpus": 16,
+  "memory_bytes": 130497327104,
+  "fingerprint": "9504829d18fa",
+  "test_filesystem": {
+   "type": "ext4"
+  }
+ },
+ "build": {
+  "type": "Release",
+  "compiler": "Ubuntu clang version 20.1.8 (0ubuntu4)",
+  "flags": "",
+  "generator": "Ninja"
+ },
+ "ctest_arguments": [
+  "-R",
+  "Tests$|^test_|^n-|^py_",
+  "--timeout",
+  "900"
+ ],
+ "wall_seconds": 80.757,
+ "summary": {
+  "tests": 16,
+  "passed": 16,
+  "test_seconds": 80.745
+ },
+ "tests": [
+  {
+   "name": "MountTests",
+   "status": "passed",
+   "seconds": 0.0146454
+  },
+  {
+   "name": "PsitriDatabaseTests",
+   "status": "passed",
+   "seconds": 1.002
+  },
+  {
+   "name": "SecrestsTests",
+   "status": "passed",
+   "seconds": 0.329467
+  },
+  {
+   "name": "StorageTimeoutTests",
+   "status": "passed",
+   "seconds": 0.091632
+  },
+  {
+   "name": "WatchdogTests",
+   "status": "passed",
+   "seconds": 1.08133
+  },
+  {
+   "name": "n-psibase-common-tests",
+   "status": "passed",
+   "seconds": 0.0028115
+  },
+  {
+   "name": "n-psio-tests",
+   "status": "passed",
+   "seconds": 0.0941699
+  },
+  {
+   "name": "py_test_fracpack",
+   "status": "passed",
+   "seconds": 0.0377721
+  },
+  {
+   "name": "py_test_name",
+   "status": "passed",
+   "seconds": 0.0270101
+  },
+  {
+   "name": "py_test_psibase_types",
+   "status": "passed",
+   "seconds": 0.0314016
+  },
+  {
+   "name": "test_consensus",
+   "status": "passed",
+   "seconds": 63.3664
+  },
+  {
+   "name": "test_consensus-bft",
+   "status": "passed",
+   "seconds": 10.3822
+  },
+  {
+   "name": "test_consensus-cft",
+   "status": "passed",
+   "seconds": 2.73144
+  },
+  {
+   "name": "test_mock_timer",
+   "status": "passed",
+   "seconds": 0.00208575
+  },
+  {
+   "name": "test_random_timer",
+   "status": "passed",
+   "seconds": 1.54676
+  },
+  {
+   "name": "test_shortest_path_routing",
+   "status": "passed",
+   "seconds": 0.00351263
+  }
+ ]
+}
