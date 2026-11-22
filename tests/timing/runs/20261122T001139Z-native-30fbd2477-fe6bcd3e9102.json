@@ -1,0 +1,132 @@
+{
+ "schema": 1,
+ "suite": "native",
+ "label": "psitri a7d92aa; reads outside the writer; local root",
+ "recorded": "2026-11-22T00:11:39Z",
+ "source": {
+  "commit": "30fbd24770c55b1fed16c783c34f1e6adb4c8c28",
+  "branch": "claude/psitri-review-fixes",
+  "dirty": true,
+  "psitri": "a7d92aabb6a7fa0d73ff4f689e16a5507c026d09"
+ },
+ "system": {
+  "os": "Darwin",
+  "os_release": "25.3.0",
+  "machine": "arm64",
+  "os_version": "26.3.1",
+  "cpu": "Apple M5 Max",
+  "model": "Mac17,6",
+  "logical_cpus": 18,
+  "performance_cores": 6,
+  "memory_bytes": 137438953472,
+  "fingerprint": "fe6bcd3e9102",
+  "test_filesystem": {
+   "type": "APFS",
+   "solid_state": "Yes",
+   "protocol": "Apple Fabric"
+  }
+ },
+ "build": {
+  "type": "Release",
+  "compiler": "Homebrew clang version 22.1.2",
+  "flags": "",
+  "generator": "Ninja"
+ },
+ "ctest_arguments": [
+  "-R",
+  "Tests$|^test_|^n-|^py_"
+ ],
+ "wall_seconds": 62.312,
+ "summary": {
+  "tests": 17,
+  "passed": 16,
+  "test_seconds": 62.286
+ },
+ "tests": [
+  {
+   "name": "DarwinCpuVmTrapTests",
+   "status": "passed",
+   "seconds": 0.642816
+  },
+  {
+   "name": "MountTests",
+   "status": "fail",
+   "seconds": 0.572018
+  },
+  {
+   "name": "PsitriDatabaseTests",
+   "status": "passed",
+   "seconds": 0.751048
+  },
+  {
+   "name": "SecrestsTests",
+   "status": "passed",
+   "seconds": 0.845828
+  },
+  {
+   "name": "StorageTimeoutTests",
+   "status": "passed",
+   "seconds": 0.0953586
+  },
+  {
+   "name": "WatchdogTests",
+   "status": "passed",
+   "seconds": 1.13838
+  },
+  {
+   "name": "n-psibase-common-tests",
+   "status": "passed",
+   "seconds": 0.331391
+  },
+  {
+   "name": "n-psio-tests",
+   "status": "passed",
+   "seconds": 1.22684
+  },
+  {
+   "name": "py_test_fracpack",
+   "status": "passed",
+   "seconds": 0.039514
+  },
+  {
+   "name": "py_test_name",
+   "status": "passed",
+   "seconds": 0.0296885
+  },
+  {
+   "name": "py_test_psibase_types",
+   "status": "passed",
+   "seconds": 0.0318948
+  },
+  {
+   "name": "test_consensus",
+   "status": "passed",
+   "seconds": 43.6988
+  },
+  {
+   "name": "test_consensus-bft",
+   "status": "passed",
+   "seconds": 8.10063
+  },
+  {
+   "name": "test_consensus-cft",
+   "status": "passed",
+   "seconds": 1.75989
+  },
+  {
+   "name": "test_mock_timer",
+   "status": "passed",
+   "seconds": 0.51227
+  },
+  {
+   "name": "test_random_timer",
+   "status": "passed",
+   "seconds": 1.91933
+  },
+  {
+   "name": "test_shortest_path_routing",
+   "status": "passed",
+   "seconds": 0.59045
+  }
+ ]
+}
