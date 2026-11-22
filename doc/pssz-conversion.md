@@ -1,10 +1,14 @@
 # Converting psibase from fracpack to PSIO / PSSZ
 
 This document records the first three slices of the conversion, slices 4a,
-2b and 4b and the follow-up to them on a newer PSIO (section 1.13) (branch
-`claude/pssz`), the pattern they established, everything that remains, a
-proposed order for the remaining slices, the decisions that need the owner's
-confirmation, and the places where PSIO lacks something psibase needs.
+2b and 4b and the follow-up to them on a newer PSIO (sections 1.13, 1.14)
+(branch `claude/pssz`), the pattern they established, everything that
+remains, a proposed order for the remaining slices, the decisions that need
+the owner's confirmation, and the places where PSIO lacks something psibase
+needs. Section 6 is the Rust side: the survey, the plan in slices R1–R9, the
+old → new mapping, what PSIO's Rust crate lacks, and slice R1 (written and
+tested, not committed: linking the `psio` crate breaks existing JSON code,
+gap RG9); sections 6.11 and 6.12 are JavaScript and Python.
 
 End state: one serialization library, [gofractally/psio](https://github.com/gofractally/psio).
 No in-tree copy, no fracpack, no compatibility layer. PSSZ on the wire, PSIO's
@@ -16,7 +20,8 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 | | |
 |---|---|
 | Legacy library | `libraries/psio1`: include prefix `<psio1/…>`, namespace `psio1`, macros `PSIO1_…`, CMake target `psio1`, archive `libpsio1.a`. It is deleted at the end of the conversion. |
-| PSIO | `gofractally/psio` at `dfd0db179c9cba1523f8c68ca10a81a1250ceec2` (topic branch `codex/psibase-core-evolution`, not its `main`), pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`.) |
+| PSIO | `gofractally/psio` at `224f80de2563939d93de7b685e1d174fe278b070`, which is its `main`, pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`, a topic branch; the pin moved to `main` in section 1.14.) |
+| Rust | Unchanged: nothing in Rust uses PSIO yet. The plan is section 6. Slice R1 (the `psio` crate from that same checkout, `AccountNumber` and `MethodNumber` declared with it) is written and its 12 tests pass, but it is not in the tree: depending on `psio` turns on a `serde_json` feature for every crate, which breaks two existing tests and changes JSON number handling tree-wide (gap RG9, section 6.10). The change is kept as `~/psibase-pssz-r1-blocked.patch`. |
 | Native | `libraries/CMakeLists.txt` calls `psibase_acquire_dependency(psio)`; `psibase` and `psio1` link `psio::psio`. PSIO fetches simdjson 5.2.0 by URL and SHA-256; configuration fails if any other simdjson target exists first. PSIO's own install rules are excluded from psibase's install tree. |
 | Guests | The `wasm/` project defines an INTERFACE target `psio` (`psio::psio`) over the same source tree: `PSIO_EXCEPTIONS_ENABLED=0`, `PSIO_HAVE_SIMDJSON=0`. The SDK installs PSIO's headers (`include/psio`, `include/psio/external/xxhash.h`); `psibase-config.cmake{,.build}` define the same target for SDK consumers. |
 | Slice 1: leaf types | `AccountNumber`, `MethodNumber`; `Seconds`, `MicroSeconds`, `TimePointSec`, `TimePointUSec`; `Checksum160/256/512` (sections 1.1–1.3). |
@@ -29,7 +34,7 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 | Still declared with the legacy macro | 5 `PSIO1_REFLECT` sites and 1 `PSIO1_REFLECT_TYPENAME`, all in `rust/test_fracpack/tests/test.hpp` (the legacy library's own C++/Rust cross-check, deleted with it). Not reflected at all and still on legacy ADL hooks: `SubjectPublicKeyInfo`, `IPAddress`, `SocketEndpoint` (section 1.9). |
 | Temporary glue | Only in `libraries/psio1` (section 1.5). Every block is marked `// TEMPORARY: removed when psio1 is deleted`. |
 | Unchanged | Every wire, key, JSON and schema byte psibase produces (one text is no longer read: a `Decimal` whose quantity does not fit 64 bits, D17): everything is still packed, keyed, written as JSON, described and dispatched by `psio1`, which reads the PSIO declarations through the glue. Evidence: after every slice all 68 generated `*-schema.json` files are byte-identical to the build before it (slices 2b, 4b and the follow-up: to the build of 0167a3056); pinned bytes, keys, JSON, GraphQL and schemas in `canonical_glue_tests.cpp` (sections 1.8, 1.10–1.12). |
-| Tests | ctest 92/92 after each slice, 2b, 4b, the pin moves and the follow-up included. `psio-tests`: 67 test cases natively, 26 in the guest (2 added in 2b: the legacy forms of the 2b types, pinned before they were re-declared). `psibase-psio-tests`: 37 test cases, native and guest (7 added in 2b, `wrappers.cpp`; 2 in 4b, `tables.cpp`; 1 in the follow-up, the `Decimal` boundary). |
+| Tests | ctest 92/92 after each slice, 2b, 4b, the earlier pin moves and the follow-up included. On the pin of section 1.14 no single run was clean (91/92 three times: an intermittent failure of `psinode_test_crash` in the storage engine; every test passed in some run; see there). `psio-tests`: 67 test cases natively, 26 in the guest (2 added in 2b: the legacy forms of the 2b types, pinned before they were re-declared). `psibase-psio-tests`: 37 test cases, native and guest (7 added in 2b, `wrappers.cpp`; 2 in 4b, `tables.cpp`; 1 in the follow-up, the `Decimal` boundary). |
 
 ## 1. The conversion pattern
 
@@ -576,6 +581,39 @@ Checked after the follow-up:
 | Generated `*-schema.json` (68) vs. the build of 0167a3056 | byte-identical (`~/psibase-pssz-build.compare-g21.log`) |
 | Service and test WASM binaries (103 in the build root) vs. slice 4b | 82 byte-identical, 21 differ: the binaries with GraphQL connections (the names are template arguments of another type now), with a `Precision` or `Decimal`, with key schemas or record keys, and the test binaries. Not examined one by one. |
 
+### 1.14 Pin moved to PSIO `main` (`224f80de`)
+
+The pin is `224f80de2563939d93de7b685e1d174fe278b070`, `main` of
+gofractally/psio (it was `dfd0db17`, a topic branch); three files state it:
+`cmake/PsibaseDependencies.cmake` and, under `tests/cmake/dependencies`,
+`CMakeLists.txt` and `README.md`. No psibase source changed.
+
+What differs in the C++ headers between the two commits
+(`git diff dfd0db17..224f80de -- cpp/include`: three files, 111 lines), read
+there:
+
+| Change | Where | Effect on psibase |
+|---|---|---|
+| A `std::tuple`, a `std::pair` and a `std::variant` have an inferred size bound (a tuple: its header plus each element's payload and offset slot; a variant: one selector byte plus its widest alternative), so their automatic pSSZ width can be 1 or 2 where it was always 4. | `psio/max_size.hpp` (+62), and the same rule for the schema-driven codec in `psio/pssz_ir.hpp` | None today: psibase packs nothing with pSSZ outside its tests, and no psibase source asserts an automatic width (`auto_pssz_width` / `max_encoded_size` do not occur outside `libraries/psio1`). It decides bytes at the flip: `MethodArgs<M>` is a tuple, so an action whose arguments are all bounded gets a narrow argument frame. |
+| The fail-fast `psio::decode` refuses a member outside its declared `length_bound`, as `validate` and the encoder already did. | `psio/pssz.hpp` (+9) | None: no psibase record declares a `length_bound` yet. |
+
+The other changes named for this pin — `view<T, Fmt, storage::owning |
+shared>` as compile errors, pSSZ decode / validate speed, SSZ without
+exceptions, `emit_wit` writing `string` for a UTF-8 string — are not in this
+diff: they were already in `dfd0db17` (section 1.13 lists the first and the
+last). The rest of the 93 changed files are the Rust crate (66 files; section
+6), JS, the conformance vectors and a benchmark.
+
+Checked:
+
+| | |
+|---|---|
+| Full build | exit 0 (`~/psibase-pssz-build.build-repin-main.log`). Rebuilt: four guest objects (`psio-tests`: `canonical_glue_tests`; `psibase-psio-tests`: `leaf_types`, `psio`, `wrappers`), four native objects (three in `libraries/psibase`, one in `libraries/psio1`) and what links them. |
+| Generated `*-schema.json` (68) vs. the build of 0167a3056 | byte-identical (`~/psibase-pssz-build.compare-repin-main.log`); none was regenerated, because no service binary changed |
+| wasm binaries (420 in the build directory) vs. the build on `dfd0db17` | 419 byte-identical; `psibase-psio-tests.wasm` differs (it encodes pSSZ) |
+| `ctest -j4` | **No single clean run: 91 / 92 three times.** (1) On the pin move, `psinode_test_crash` failed (`~/psibase-pssz-build.ctest-repin-main.log`). (2) With the Rust slice R1 applied, `psinode_test_crash` passed and `rs-tests` failed for the reason in 6.10 (`…ctest-r1.log`). (3) On the committed tree, R1 removed, `rs-tests` passed and `psinode_test_crash` failed again (`…ctest-final.log`). Every one of the 92 tests has passed on this pin, in one run or another. |
+| `psinode_test_crash` | Intermittent in a parallel run (2 of 3), not alone: run by itself it passed 4 of 4 (`…ctest-repin-main-rerun-crash.log`, `…ctest-crash-repeat.log`), also at a load average of 66. It passed in all eleven earlier logged full runs of this work. The failure: a node that was shut down does not start again (`test_shutdown_all_bft`; in run 3 also `test_unlock_bft`). In run 3 the node's log shows psinode aborting while it reopens its database: `std::runtime_error: reference count exceeded limits`, thrown by psitri (`external/psitri/libraries/sal/include/sal/control_block.hpp:141`); the log kept from run 1 does not contain the node's last line. The pin move recompiled four native objects, all of them test sources; psinode and its libraries were not recompiled, so the node is the code of the build of 25751d95e, which passed. This is the storage engine at restart, not serialization. Reported; not investigated further. |
+
 ## 2. Inventory of what remains
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,
@@ -724,6 +762,10 @@ I-JSON differs from the legacy JSON visibly to clients:
 
 ### 2.7 Rust
 
+Superseded by section 6: the exact inventory is in 6.1 (the counts below
+matched single-line derive lists only: the tree has 331 `Pack` derives in 87
+files, not 288 / 81), the replacements in 6.6, the plan in 6.4.
+
 | Legacy | Sites / files | Canonical replacement |
 |---|---|---|
 | `rust/fracpack` crate | 4,369 lines (`fracpack.rs`, `view.rs`, `nested.rs`, `schema.rs`) | `psio` crate (`external/psio/rust/psio`, 0.1.0) |
@@ -741,11 +783,13 @@ I-JSON differs from the legacy JSON visibly to clients:
 | `rust/psibase/src/{to_bin,from_bin}.rs` | | `psio` bin format or removal |
 | `rust/test_fracpack`, `rust/test_fracpack_macros` | | deleted with fracpack; PSIO's conformance corpus replaces the C++/Rust cross-check |
 
-Rust acquires PSIO how? `external/psio/rust/psio` is not published; the Cargo
-workspace needs a pinned `git` dependency at the same commit as the CMake pin
-(decision D11).
+Rust is to acquire PSIO by a path dependency into the pinned checkout
+(`external/psio/rust/psio`): decisions D11, D28. Not in the tree yet (RG9).
 
 ### 2.8 JavaScript / TypeScript
+
+The survey with counts, what PSIO's JS package offers and what is missing is
+in section 6.11.
 
 | Legacy | Where | Replacement |
 |---|---|---|
@@ -755,6 +799,9 @@ workspace needs a pinned `git` dependency at the same commit as the CMake pin
 | Every UI and plugin that reads service JSON | not counted here | I-JSON; inventory belongs to the JSON slice |
 
 ### 2.9 Python
+
+The users of the codec, the tests that depend on it and the size of a
+replacement are in section 6.12.
 
 `programs/psinode/tests/fracpack.py` (1,246 lines: a schema-driven fracpack
 codec) is imported by `psibase.py`, `psinode.py`, `services.py`,
@@ -780,7 +827,7 @@ flip, for all languages at once.
 | 4a (done) | Section 1.10. As planned: **Method consumers** read `psio::reflect` directly. Unblocked now: all 139 declarations with methods are PSIO. `Actor.hpp` (`Actor`, `transactor`, `EventEmitter`, `ActionViewBuilder`: 13 uses of `reflect<T>::proxy`) → `psio::reflect<T>::proxy<P>`; `dispatch.hpp` → `index_of_method_hash<MethodHash>` + `invoke_method<I>` (a perfect hash instead of a linear scan; two methods of one service whose names collide become a compile error); `schema.hpp` (actions, events), `servePackAction.hpp`, `serveActionTemplates.hpp`, the tester, `test_util.cpp` → `for_each_method`, `method_param_names<I>`, `method_params<I>`. Two things to settle first: PSIO's proxy forwards references where the legacy proxy passes by value (psibase's four proxy objects deduce parameter types from the arguments: decide by-value explicitly), and `make_param_value_tuple` (strips `psio1::view<>` from parameters) needs a psibase-side equivalent until views flip. GraphQL's use of methods stays in `psio1/graphql.hpp` until slice 9. | unchanged | existing; compare schemas and WASM binaries with the previous build |
 | 4b (done) | Section 1.12. **Data-member consumers** read `psio::reflect` directly: `Table.hpp`, `schema.hpp` (tables, keys), `zip.cpp`, `Rpc.hpp`, `jwt.hpp`, `XAdmin.cpp`, the data-member parts of `serveGraphQL.hpp`. Nothing outside `psio1` names `psio1::reflect`. `psio1::FixedString` stayed in `psio1` with a helper, `psio1::reflected_name<T>` (G19; replaced in the follow-up). | unchanged (schemas byte-identical) | existing + `tables.cpp` + 92/92 |
 | follow-up (done) | Section 1.13. PSIO pin `dfd0db17`. `Precision` message restored (G21); `psio::fixed_string`, `index_of_member`, `member_types`, `Reflected<T&>`, keyword includes (G19, G20, G22, G14); `Decimal::fromStr` rejects overflow (D17). | unchanged, except that a `Decimal` text over 2^64 − 1 is rejected | pinned forms + boundary tests + 92/92 |
-| 5 | Rust prepared without source churn: the (dying) fracpack derive also emits PSIO impls, so every `Pack`/`Unpack`/`ToSchema`/`ToKey` type already has PSSZ, key and schema impls; Rust leaf types (`AccountNumber`, …) get the same text rules as C++ and a shared fixture (generated by C++, checked by Rust and JS) for names, times, digests. Python and JS codecs written and tested against the fixture. | unchanged | fixture tests in 3 languages |
+| 5 | Rust: replaced by slices R1–R5 of section 6.4 (R1 written, blocked by RG9). The earlier idea here — the dying fracpack derive also emits the PSIO impls — is a macro wrapper and is ruled out; types gain the official derives beside the legacy ones instead (6.3). Python and JS: sections 6.11, 6.12. | unchanged | 6.4, 6.5 |
 | 6 | **Keys**: C++ `to_key`/`composite_key`/`KeyView` → `psio::key`, `key_prefix`; Rust `ToKey` → PSIO key; native tables. First a test that the two formats agree on every key type in use (2.3); the types where they do not (if any are used) change in one commit for all languages. | unchanged where the formats agree | all tests |
 | 7 | **Wire flip**: transactions, blocks, tables rows, actions, events, host/guest ABI structs, P2P messages, snapshots, packages, boot image. C++ `to_frac`/`from_frac`/`view`/`shared_view_ptr`/`nested` → `psio::pssz` APIs; schema generation and schema-driven codecs → Schema IR + `pssz_ir`; Rust derives switch to PSIO's; JS pack endpoints; Python codec; fixtures with packed bytes or ids regenerated. | everything binary changes | all tests; fresh genesis |
 | 8 | **JSON flip**: `to_json`/`from_json` → `ijson` in C++; Rust services, CLI, plugins; JS UIs. Client-visible. Can be done before slice 7 as well; it is independent of the binary form. | JSON changes | all tests incl. UI builds |
@@ -893,7 +940,7 @@ commit itself.
 | D8 | `KeyView` (pre-encoded key prefix) has no PSIO type; psibase keeps a small own type that concatenates bytes with `psio::to_key` output. | — |
 | D9 | `psio1::finally` is not serialization; it needs a home in psibase. | — |
 | D10 | Rust code that only exchanges JSON over HTTP: keep serde with I-JSON-conforming impls for psibase types, or move to `psio::JsonText`. | — |
-| D11 | Rust acquisition of PSIO: Cargo `git` dependency pinned to the CMake pin's commit (and a check that the two agree). | — |
+| D11 | Rust acquisition of PSIO: Cargo `git` dependency pinned to the CMake pin's commit (and a check that the two agree). | Superseded by D28 (a path dependency into the checkout CMake pins). |
 | D12 | JS: keep server-side pack endpoints, or pack in the client with PSIO's JS package and the service's Schema IR. | — |
 | D13 | PSIO's `-Werror=unused-result` (an INTERFACE option of `psio::psio`) now applies to every psibase native target. The tree builds clean with it. | Accepted. |
 | D14 | `psio1` now requires PSIO headers and C++23 everywhere it is compiled (also `rust/test_fracpack`, previously `gnu++2a`). | Accepted (temporary). |
@@ -909,6 +956,11 @@ commit itself.
 | D25 | Which PSIO custom types the legacy schema marks `Custom`. (a) No standard. (b) psibase: `AccountNumber`, `MethodNumber`, `Action`, `ServiceMethod` and the time points, by ADL hook. (c) PSIO: every type with a text adapter or an invariant is `Custom{wire type, id}` in the Schema IR. Taken for the legacy schema (glue): only a type whose text adapter states a `schema_id`; so `Decimal`, `Memo`, `Precision` are not `Custom` in today's schemas (byte-identical) and become `Custom` in the Schema IR at the flip. Needed at the flip: are those three meant to be custom nodes for schema-driven tools (Rust, JS, Python must then know the ids `Decimal`, `Memo`, `Precision`), or plain wire types? | Legacy schema unchanged. |
 | D26 | `SubjectPublicKeyInfo` is the last wrapper on legacy hooks. Its canonical form is clear (`transparent()` over the DER bytes, an `invariant`, a PEM text adapter with `schema_id`), but both its validator and its PEM parser abort (Botan throws natively, aborts in a guest) and PSIO requires them to report (stated in `psio/invariant.hpp` and `psio/adapter.hpp` at `dfd0db17`). Needed: a reporting DER structure check and PEM check (in psibase; small), or a decision that key material is validated only where it is used. The owner leans to the second: opaque bytes on the wire, parsed where used. What that involves and who relies on the decode-time check today is in the note below this table. | Not converted. |
 | D27 | The message of an out-of-range `Precision` read from packed data or JSON lost the offending value (1.11). | Resolved in 1.13 by PSIO (`codec_fail_owned`, G21): the message names the value again. |
+| D28 | How Rust gets the `psio` crate. (a) PSIO: the crate is `rust/psio` in the repository, version 0.1.0, not published; its derives name `::psio`. (b) psibase: every Rust dependency of its own is a path dependency; `fracpack` is reached through `psibase`. (c) Proposed, and what the R1 patch does: `psio = { path = "../external/psio/rust/psio" }` in `rust/Cargo.toml` — the checkout CMake fetches and verifies against the one pin, so C++ and Rust cannot use different PSIO commits and no second copy exists. Cost: Cargo works only in a configured tree. Open: services built outside the tree (RG10). | Proposed: path into the pinned checkout. Not in the tree (RG9). |
+| D29 | `Hex<T>` and the PSIO declaration of records that hold it. (a) PSIO: `Vec<u8>` and `[u8; N]` are hex strings in I-JSON; no wrapper is needed. (b) psibase: `Hex<Vec<u8>>` / `Hex<[u8; 32]>` (65 uses) exist so that serde writes hex. (c) Recommended: the member type becomes `Vec<u8>` / `[u8; N]` when the record's serde derives become `psio::Serde` (R8); until then a record with a `Hex` member either waits with its PSIO derives or `Hex<T>` is given `#[psio(transparent)]` for the interval. The second adds a line that R8 deletes; the owner's call. | Not decided. |
+| D30 | `rust/psibase_names`: `account_number_from_str` panicked on a subaccount that is not a number from 0 to 255 (`"alice+"`), and the hash-form parser of `method_number_from_str` underflowed on a character outside the alphabet. (a) PSIO: a text form reports (`TextForm::from_text` returns `None`). (b) psibase: text that is not a name is value 0 for every other malformed input. (c) In the R1 patch: both return 0. Reachable today from any JSON that names an account or method. The fix does not depend on PSIO and can be committed alone if the owner wants it now. | Not fixed in the tree. |
+| D31 | Rust additive declarations (6.3): types carry the official PSIO derives beside the legacy ones until the flip deletes the legacy names. The alternative is to change declarations and wire in one commit. | Recommended: additive. R1 is written that way. |
+| D32 | Rust text of `MethodNumber` and `AccountNumber` under PSIO is C++'s (D2, D3): strict account names, lenient method names. serde (what services and the CLI use today) stays lenient until R8; then `ExactAccountNumber` is deleted. | Proposed: as C++ (so in the R1 patch). |
 | D21 | `psio-tests` now links `psibase` (and through it the service headers) so that the glue test can pin psibase's own records. Temporary, deleted with `psio1`. | Accepted. |
 
 **Note on D26: `SubjectPublicKeyInfo` as opaque bytes.** Nothing was changed;
@@ -963,6 +1015,10 @@ those two actions preserves it without any decode-time hook.
 
 ## 5. Where PSIO lacks something psibase needs
 
+C++ (G1–G23) below. What PSIO's Rust crate lacks is in section 6.8
+(RG1–RG11; RG9 blocks every Rust slice); JavaScript in 6.11; Python is G9
+and 6.12.
+
 | # | Header | Missing | Why psibase needs it | At `dfd0db17` (G1–G13, G15–G18: as found at `868e37bb`, not re-checked) |
 |---|---|---|---|---|
 | G1 | `psio/json.hpp`, `schema_ir.hpp` | A `psio::schema_types::Schema` cannot be written or read as JSON: `psio::encode(psio::json{}, schema)` fails to compile (`Box<AnyType>`: "unsupported type in encode_value"). Only the PSSZ form (`emit_pssz`) exists. | psibase publishes service schemas as JSON (`*-schema.json` in packages, `/schema` queries, the CLI, UIs). Either PSIO defines the IR's JSON form, or psibase ships IR bytes and every consumer decodes them. | Closed, verified: `psio::to_json(schema)` of a built `schema_types::Schema` compiles and runs. |
@@ -973,7 +1029,7 @@ those two actions preserves it without any decode-time hook.
 | G6 | `psio/mutable_view.hpp` | `mutable_view` is a forward declaration only. | 3 call sites mutate fixed-size fields through `psio1::view<T>` in place. They can be rewritten as decode–modify–encode. | Closed, verified by a probe: `psio::pssz_mutable_view<T>` overwrites a fixed-size member. Not used yet (flip). |
 | G7 | `psio/wrappers.hpp` | No C++ `nested<T>` (a member that is the PSSZ bytes of a `T`, typed). Rust has `nested.rs`. | `Actor.hpp` (typed action arguments inside `Action::rawData`), `Rpc.hpp` (`FracpackHttpReply`), XPeers. | Closed, verified by a probe: `psio::nested<T>`. Not used yet (flip). |
 | G8 | `psio/pssz.hpp`, `json.hpp`, `key.hpp` | `std::pair`, `std::map` and `std::set` are not values in PSSZ, JSON or key (`shapes.hpp` only detects them); there is no JSON object with dynamic keys. | 3 `std::pair` and 4 `std::map`/`std::set` members in public headers; `to_json/map.hpp` users (package metadata, config). Pairs become tuples and maps become sorted lists of records; both change bytes or JSON, so they change at the flips. | Closed, verified: `std::pair`, `std::map`, `std::set` encode in PSSZ, key and I-JSON; a string-keyed map is a JSON object, another map a list of pairs. Used (`DynDepGroups`). |
-| G9 | — | No Python implementation. | `programs/psinode/tests/fracpack.py` drives the node tests. psibase must write a schema-driven PSSZ + I-JSON codec in Python, or drive the tests through server-side pack endpoints. | Open (not a C++ matter). |
+| G9 | — | No Python implementation. | `programs/psinode/tests/fracpack.py` drives the node tests. psibase must write a schema-driven PSSZ + I-JSON codec in Python, or drive the tests through server-side pack endpoints. | Open (not a C++ matter). Sized in section 6.12: 1,000–1,500 lines for what the tests use, 2,500–4,000 for a conformance-grade codec. |
 | G10 | repository root | No `LICENSE` file at the pinned commit. | The SDK installs a licence file for every bundled dependency (`share/psibase/licenses`); PSIO's headers are now installed without one. | Not re-checked. |
 | G11 | `psio/pssz.hpp:896` | `-Wall` warning (`unused type alias 'E'`) in every TU that encodes PSSZ. | psibase test targets build with `-Wall`; harmless, noisy. | Reported closed; not re-checked. |
 | G12 | PSIO GraphQL | Not in the pinned commit. | `psio1/graphql.hpp` (1,704 lines) serves 23 files of GraphQL users. | A GraphQL engine is in the pin (`psio/graphql.hpp`, `psio/graphql/`); not evaluated here (slice 9). |
@@ -988,3 +1044,600 @@ those two actions preserves it without any decode-time hook.
 | G21 | `psio/error.hpp` (`codec_error::what` is a `std::string_view`) | An invariant cannot report a message computed from the value. | `Precision`'s legacy message named the offending value (1.11, D27). | Closed, verified and used: `psio::codec_fail_owned` (1.13). A text adapter's `validate` must still return a message of static storage (`psio/adapter.hpp`); `DecimalText::validate` reports literals. |
 | G22 | `psio/reflect.hpp:228` | `psio::Reflected<T&>` is a hard error, not `false`: `reflect<T&>` forms `static_cast<T&*>`. Reproduction: `static_assert(!psio::Reflected<int&>);` → "'type' declared as a pointer to a reference of type 'int &'". | Constraints on generic code (`template <typename T> requires psio::Reflected<T>`) are tried with reference and cv-qualified types during partial-specialization matching (`flatten_key<T&>` in `Table.hpp`). psibase asked `std::is_class_v<T>` first. | Closed, verified and used: `Reflected<T&>` is `false`; the pre-check is deleted (1.13). |
 | G23 | `psio/json.hpp:2124` (`decode_json_checked(Fmt, std::span<const char> text, T& out)`) | Nothing missing; a trap. A string literal converts to `std::span<const char>` *with its terminating NUL*, so `psio::decode_json_checked(psio::ijson{}, "200", out)` compiles and reads the four bytes `2 0 0 \0`. | Found while writing the `Precision` test of 1.13: for a `std::uint8_t` (or a `transparent()` wrapper of one) the call fails with "json: integer is not a canonical in-range decimal", which reads as if 200 were out of range for 8 bits. With `std::string_view{"200"}` the same call succeeds. Reproduction: `std::uint8_t v; auto s = psio::decode_json_checked(psio::ijson{}, "200", v);` → not ok; `…, std::string_view{"200"}, v)` → ok. | New, minor. No psibase code is affected (the tests pass a `std::string_view`). A `std::string_view` overload, or rejecting a `const char[N]` argument, would remove it. |
+
+## 6. Rust, JavaScript and Python
+
+Rust is the largest piece left before the wire flip: many user services
+exist only in Rust, and `rust/psibase/src/services` restates the interface
+of every C++ service for Rust callers. The owner's rules for it: one PSIO;
+the official derives, no wrapper macros; no compatibility layer; code as if
+PSIO had always been there; a Rust `String` is a C++ `psio::utf8_string` and
+a Rust `psio::pssz::RawString` a C++ `std::string`; a service's own table
+rows are trusted on read, action arguments and data from other services are
+validated; where psibase would need its own alias or wrapper around a PSIO
+thing, that is a PSIO gap to report (6.8), not something to add.
+
+PSIO's Rust crate was read at `224f80de` (`external/psio/rust/psio`,
+`psio-macros`; `src/lib.rs`, `pssz.rs`, `key.rs`, `json.rs`, `time.rs`,
+`pssz_schema_ir.rs`, `pssz_view.rs`, `buffer.rs`, `serde_attrs.rs`,
+`serde_bridge.rs`, `attrs.rs`) and exercised with a scratch crate outside the
+tree (psibase-shaped types; what it showed is quoted where it matters).
+
+### 6.1 Inventory
+
+All counts are over tracked `*.rs` outside `external/` (596 files). Derive
+lists were parsed whole; section 2.7's earlier counts matched single-line
+lists only and were low.
+
+| | Sites / files |
+|---|---|
+| `#[derive(… Pack …)]` | 331 / 87 |
+| `#[derive(… Unpack …)]` | 328 / 84 |
+| `#[derive(… ToSchema …)]` | 288 / 71 |
+| `#[derive(… ToKey …)]` | 25 / 6 |
+| `#[derive(… View …)]` (fracpack) | 18 / 2, all in `rust/test_fracpack` and the macro's documentation |
+| `serde::Serialize` / `Deserialize` derives | 376 / 92, 522 / 136 |
+| `async_graphql` `SimpleObject` / `InputObject` / `Union` / `Enum` derives | 147 / 53, 26 / 9, 2, 2 |
+| `#[fracpack(...)]` | 149 / 34: `fracpack_mod` 134, `definition_will_not_change` 17, `custom = "…"` 3, `skip` 1, `view_name` 1 |
+| `#[to_key(psibase_mod = "crate")]` | 25 / 6 |
+| `#[serde(...)]` | 184 / 57: `rename_all` 65, `deserialize_with` 45, `deny_unknown_fields` 30, `default` 24, `rename` 15, `untagged` 2, `tag`+`content` 2, `borrow` 1 |
+| `#[psibase::service]` / `#[psibase::service_tables]` | 76 / 72, 34 / 34 |
+| `#[action]`, `#[table(`, `#[event(` | 809 / 115, 154 / 40, 81 / 34 |
+| `#[primary_key]`, `#[secondary_key` | 151 / 39, 52 / 21 |
+| Hand-written `impl Pack`, `impl Unpack`, `impl ToSchema`, `impl ToKey` outside `rust/fracpack` and its tests | 3, 4, 2, 16: `db.rs`, `hex.rs`, `memo.rs`, `tokens/precision.rs`, `Permissions/plugin/src/types.rs`; keys in `to_key.rs`, `hex.rs`, `table.rs` |
+| Hand-written `impl Serialize` / `Deserialize` | 12 / 6, 9 / 8; `serialize_as_str!` for the name types; `async_graphql::scalar!` 6 / 5 |
+| Calls, outside `rust/fracpack` and its tests: `.packed()` | 198 / 67 |
+| — `T::unpacked(…)` | 62 / 25 |
+| — `unpack(&mut FracInputStream)` (hand-written codecs) | 32 / 8 |
+| — `verify(…)` | 23 / 12 |
+| — `Pack` / `Unpack` / `UnpackOwned` as bounds of generic code | 41 bounds in `rust/psibase/src` and `rust/psibase_plugin` (`table.rs`, `service.rs`, `native.rs`, `tester.rs`, `db.rs`); `fracpack::Pack` is named by path 104 times, mostly imports |
+| — `.to_key()` 31 / 13, `append_key` 47 / 7, `RawKey` 88 / 22, `KeyView` 6 / 2 | |
+| — `SchemaBuilder` 17 / 6, `AnyType` 170 / 8, `CompiledSchema` 100 / 5 | |
+| — `serde_json::to_*` 101 / 39, `from_*` 182 / 76, `Value` / `json!` 343 / 49 | |
+| `Nested<T>` | 1 use: `transact::execTrx(trx: Nested<Transaction>, …)` |
+| Leaf types: `Hex<` 65 / 25, `Checksum256` 101 / 29, `TimePointSec/USec` 141 / 37, `Seconds` / `MicroSeconds` 71 / 19, `Memo` 120 / 22 | |
+
+Where they are:
+
+| Area | `Pack` derives / files | `#[action]` | `#[table(` | `#[event(` | `.packed()` | `unpacked(` |
+|---|---|---|---|---|---|---|
+| `rust/psibase/src` without `services` (blocks, transactions, native tables, traces, HTTP, packages, schema, leaf types) | 84 / 10 | 1 | 0 | 0 | 46 | 20 |
+| `rust/psibase/src/services` (the Rust view of 45 services, most of them C++) | 42 / 21 | 422 | 9 | 32 | 0 | 0 |
+| `packages/system` services and query services | 25 / 7 | 80 | 20 | 4 | 8 | 1 |
+| `packages/user` services and query services | 123 / 29 | 274 | 115 | 37 | 11 | 2 |
+| `packages/user` plugins (wasm components run in the browser) | 22 / 10 | 0 | 0 | 0 | 94 | 35 |
+| `packages/system` plugins | 0 | 0 | 0 | 0 | 31 | 1 |
+| `rust/test_*`, `package-templates`, `psibase_macros` (tests and docs) | 30 / 7 | 30 | 10 | 8 | 25 | 9 |
+| `rust/fracpack` | 5 / 2 | | | | | |
+
+Shapes of the 331 declarations (types deriving `Pack` or `Unpack`, by what
+else they derive): 147 are `Pack + Unpack + ToSchema + Serialize +
+Deserialize`; 80 add `SimpleObject`; 25 add `SimpleObject + InputObject`
+(10 of those also `ToKey`); 18 are `Pack + Unpack` alone; the rest are small
+variations. Five enums derive `Pack` (`ConsensusData`, `IPAddress`,
+`SocketEndpoint`, `SocketInfo`, `InnerTraceEnum`); every variant of each
+holds exactly one unnamed field. Actions take 0–9 arguments (0: 106, 1: 302,
+2: 213, 3: 105, 4: 44, 5: 22, 6: 7, 7: 6, 9: 1), events 0–7.
+
+### 6.2 What the macros generate
+
+`#[psibase::service]` (`rust/psibase_macros/psibase-macros-lib/src/service_macro`,
+1,257 lines) turns a module of `#[action]` functions into:
+
+* `action_structs::<name>`: one record per action holding its arguments,
+  deriving `Pack, Unpack, fracpack::ToSchema, serde::Serialize,
+  serde::Deserialize` (and `async_graphql::SimpleObject` on request), with
+  `#[fracpack(fracpack_mod = "…")]`;
+* `Actions<T: Caller>`: one method per action, which packs **the tuple of
+  the arguments** (`self.caller.call(method, (a, b, c))`), not the action
+  record. In fracpack, and in pSSZ, a tuple and a record of the same members
+  have the same bytes (checked for pSSZ in the scratch crate, including
+  trailing optionals and the empty case);
+* `Wrapper` with `call*`, `push*`, `pack*` (inline call, tester transaction,
+  `Action` value) over three `Caller`s in `psibase/src/service.rs` and the
+  tester, each doing `args.packed()` and `Ret::unpacked(&ret)`;
+* `dispatch(act: SharedAction)`: an `if act.method == MethodNumber::new(method_raw!("name"))`
+  chain; the matching branch runs `action_structs::name::unpacked(&act.rawData)?`,
+  calls the function and `set_retval(&val)`. Two actions with one method
+  number are not detected (the first wins);
+* schema: `ToActionsSchema` / `ToEventsSchema`, which fill an
+  `IndexMap<MethodString, FunctionType>` with `builder.insert::<action_structs::name>()`
+  and the result type;
+* events (`#[event(history | ui | merkle)]`): `event_structs::…` records and
+  emitters that pack the tuple of the arguments and call the `events`
+  service;
+* GraphQL: nothing of its own beyond a `Union` over event records; queries
+  are hand-written `async_graphql` objects.
+
+`#[psibase::service_tables]` (715 lines) turns `#[table(name = …, index = …)]`
+records with `#[primary_key]` / `#[secondary_key(n)]` methods into
+`TableRecord` impls (keys as `RawKey` through `ToKey`), table wrappers with
+typed index getters, and `ToIndexSchema` / `ToDatabaseSchema` (the key's
+field paths, read from the body of the key method).
+
+The derives are psibase's own (`psibase-macros-derive`): `Pack`, `Unpack`,
+`View` (`fracpack_macro.rs`, `view_macro.rs`), `ToSchema`
+(`schema_macro.rs`), `ToKey` (`to_key_macro.rs`); `rust/fracpack` re-exports
+the first four and depends on `psibase_macros` for them. Everything generic
+is bounded by fracpack's traits: `TableRecord: Pack + UnpackOwned`,
+`Caller::call<Ret: UnpackOwned, Args: Pack>`, `kv_get<V: UnpackOwned, K: ToKey>`.
+`kv_get` validates every row it reads (`V::unpacked`): today nothing is
+trusted.
+
+Build: four Cargo workspaces (`rust/`, `packages/system`, `packages/user`,
+and `packages/` for the plugins) and a few single crates with their own lock
+file (the XAdmin wasm helper, the EthBridge relayer, `demo/`).
+Every service crate depends on `psibase` by path; `psibase` re-exports
+`fracpack` (`pub use fracpack`), and the derives default to the path
+`psibase::fracpack`, so no service names the `fracpack` crate in its
+manifest. Nothing is taken from crates.io under a psibase name
+(`publish = false`). CMake builds 28 Rust packages with `cargo-psibase
+package` (each into its own target directory) and the CLI tools with
+`cargo build`.
+
+### 6.3 Can Rust have a wire-neutral declaration slice, as C++ did?
+
+**Not in the C++ sense.** In C++ a type moved to its final declaration
+(`PSIO_REFLECT`) while the legacy library kept producing the bytes, because
+`PSIO_REFLECT` produces *reflection*, and 150 lines of glue inside `psio1`
+derived `psio1::reflect<T>` from `psio::reflect<T>`. Rust has no such seam:
+
+* A derive is the implementation. `#[derive(psio::PsszPack)]` emits `impl
+  PsszPack<F> for T` and nothing a second library can read; PSIO's Rust
+  crate has no reflection trait (each PSIO derive parses the declaration
+  again). So a type declared only with the official derives has no
+  `fracpack::Pack`, and `Table<T>`, `Caller`, `kv_get` cannot use it while
+  they still write fracpack.
+* Glue confined to `rust/fracpack` could only be a blanket
+  `impl<T: PsszPack<Pssz> + ToPsszSchema> Pack for T` that encodes pSSZ and
+  transcodes it to fracpack through the Schema IR at run time. It overlaps
+  fracpack's own impls for every primitive and container (Rust coherence
+  forbids it without rewriting those too), needs a pSSZ ↔ fracpack
+  transcoder and an IR → legacy-schema converter (some 2,000 lines written
+  to be deleted), changes the cost of every row and action inside the
+  services, and can differ from today's bytes wherever the two type systems
+  do not map one to one. Rejected.
+* A psibase derive named `PsszPack` that also emits the fracpack impl is the
+  macro wrapper the owner ruled out.
+
+**What Rust can do instead: additive declarations.** A type keeps its legacy
+derive names and *gains* the PSIO ones:
+
+```rust
+#[derive(Pack, Unpack, ToKey, ToSchema,                                   // deleted at the flip
+         psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key)]
+#[fracpack(definition_will_not_change, fracpack_mod = "fracpack", custom = "AccountNumber")]
+#[psio(definition_will_not_change, custom = "AccountNumber")]             // final
+pub struct AccountNumber { pub value: u64 }
+```
+
+It is wire-neutral (nothing in production calls the PSIO impls; fracpack
+writes every byte as before) and it adds nothing temporary anywhere: the
+PSIO half is the final declaration, the legacy half is what is in the tree
+today and is deleted by the flip. No glue is needed, in `rust/fracpack` or
+elsewhere.
+
+Trade-off:
+
+| | Additive declarations first (R1–R5), then the flip | Declarations and wire together at the flip |
+|---|---|---|
+| Size of the flip commit in Rust | call sites, generic bounds and the macro's output switch; the legacy derive names and `#[fracpack]` lines are deleted. No type is described for the first time. | 331 declarations + 809 generated action records + the runtime + the schema path, in one commit with C++, JS and Python. |
+| When PSIO's Rust gaps are found | Now, type by type, by the compiler (a member with no PSIO value fails the derive). This is how "Rust catches up to C++" gets a concrete list. | In the flip commit. |
+| Cross-language evidence before the flip | Rust tests pin the same pSSZ, key and I-JSON vectors as the C++ tests, per type, before anything depends on them. | Round trips after the flip. |
+| Cost | Each declaration is touched twice (add, then delete the old names). Two attribute lines side by side meanwhile. Every service compiles two codecs until the flip (the `psio` crate itself: about 1 % of a cold service build, 6.10; the per-type derive cost grows with R3–R5 and was not measured). | Once. |
+| What it cannot do | The text side. `psio::JsonText` / `psio::Serde` replace `serde::Serialize` / `Deserialize` (two impls of one trait cannot coexist) and change the JSON a client sees, so they move at the JSON flip, not before. `ToPsszSchema` can be added now for all but 2 of the 263 `ToSchema` types checked: only `package::Meta` (`#[serde(default)]`) and `accounts::Account` (`deserialize_with`) carry a serde attribute the PSIO text derives reject (the other ~100 such attributes are on plugin, CLI and configuration types that are not on the wire). | — |
+| Member types that are themselves replaced (`TimePointSec` → `psio::time::TimePoint<Seconds>`, `Hex<Vec<u8>>` → `Vec<u8>`) | The record's PSIO derive needs the member to be a PSIO value now. For time that is blocked by gap RG3; `Hex<T>` would need a `#[psio(transparent)]` it loses again at the JSON flip. Such records wait, or take the member change with them. | No intermediate state. |
+
+**Recommendation: additive declarations, bottom-up, for the binary and
+schema derives; the flip then deletes the legacy half.** The decisive
+reasons are the second and third rows: the flip is the one commit that
+cannot be made small, and the only way to keep unknowns out of it is to have
+had the compiler and a shared set of vectors pass over every Rust type
+first. The cost is mechanical. Records whose members are still to be
+replaced are not forced: they join when their member type is settled.
+
+**One blocker, found by doing R1.** The declarations are wire-neutral; the
+dependency is not. Linking `psio` changes how `serde_json` handles numbers
+in every crate of the program, and that breaks code psibase has today (RG9,
+6.10). It is not particular to the additive route: the flip links the same
+crate. Until PSIO stops requiring that feature, no Rust slice that depends
+on `psio` can be committed green, so R1 waits and R2–R5 behind it.
+
+### 6.4 Slices
+
+| Slice | Content | Size | Wire | Verified by |
+|---|---|---|---|---|
+| R1 (written, not committed: RG9; 6.10) | The `psio` crate acquired from the pinned checkout. `AccountNumber`, `MethodNumber`: PSIO derives, `custom` id, text form. Two panics in the name parsers removed. | 2 types; 7 lock files | unchanged | `psio_leaf_types.rs` (the C++ vectors of `leaf_types.cpp`): 12 / 12. ctest: 91 / 92 — `rs-tests` fails in `test_fracpack` because of RG9 |
+| R2 | The other leaf and wrapper types of `rust/psibase`: time (`TimePointSec`, `TimePointUSec`, `Seconds`, `MicroSeconds` → `psio::time`; blocked by RG3), `Hex<T>` and `Checksum256` (→ `Vec<u8>` / `[u8; N]`, which are hex in I-JSON by PSIO's rule; the member type changes with the JSON flip, D29), `Memo` (`transparent` + `invariant`, as C++), `tokens::{Precision, Quantity, Decimal}` (with the overflow fix of D17: `quantity.rs:78` still wraps in release builds), `SubjectPublicKeyInfo` (D26), `MethodString`, `ExactAccountNumber` (deleted: PSIO's `AccountNumber` text is exact). | ~12 types, 400 uses | unchanged | the C++ vectors of `leaf_types.cpp` and `wrappers.cpp` restated in Rust; a shared fixture file if the owner wants one source for both |
+| R3 | Records of `rust/psibase/src` outside `services`: blocks, transactions, actions, claims, native table rows, traces, HTTP, package metadata. Additive `PsszPack, PsszUnpack, PsszView, ToPsszSchema` (+ `Key` where `ToKey`). A record holding an `IndexMap` takes the map type C++ has for it (`BTreeMap` ⇔ `std::map`). | 84 derives / 10 files | unchanged | Rust pins the pSSZ bytes C++ pins for the same records (C++ side: the "everything encodes" test of section 3, item 1, which is not written yet — it and R3 should share vectors) |
+| R4 | The macros. `action_structs` and `event_structs` gain the PSIO derives (`#[psio(crate = "…")]` where the macro names the crate today); callers and emitters build the action record instead of a tuple (same bytes in fracpack; removes the dependence on tuple ≡ record and gives argument caps a place to live, RG6); `service_tables` emits `psio::Key` bounds beside `ToKey`; the dispatcher refuses two actions with one method number at macro time (C++ D23). | 2 macros, ~2,000 lines; 809 action and 81 event records generated | unchanged | `rs-test-psibase-macros`, `psibase-macros-lib` tests, every `rs-test-*`; generated schemas of the 28 packages compared before / after |
+| R5 | Service declarations: `rust/psibase/src/services` (42 derives, 422 actions: the Rust statement of C++ interfaces), `packages/system` (25), `packages/user` (123 + 22 in plugins). Each crate that derives gets `psio` in its manifest (`psio.workspace = true`; the derives resolve `::psio`). Per type, the decisions that select bytes: `definition_will_not_change`, `String` vs `RawString` against the C++ parameter (99 `String` in 22 files of `services/` against C++ signatures that say `std::string` today), bounds (RG6). | 212 derives / 67 files | unchanged | as R4; per service that exists in both languages, action bytes pinned once and asserted in both |
+| R6 | Keys. A test that `ToKey` and `psio::Key` agree for every table key type in the tree (25 `ToKey` derives, 151 primary and 52 secondary keys); then `table.rs`, `native.rs` and the macro use `psio::to_key`, `psio::key::key_prefix`; `RawKey` / `KeyView` implement `psio::key::KeyPack` (D8). With C++ slice 6. | `to_key.rs` 286 lines, `to_key_macro.rs` deleted | unchanged where the formats agree | the agreement test; all service tests |
+| R7 | **The wire flip, with C++ slice 7.** `Pack` / `UnpackOwned` bounds → `psio::Encode<Pssz>` / `Decode<Pssz>`; `.packed()` → `psio::to_pssz`; action arguments and cross-service data → `psio::from_pssz` (validates); own rows → `psio::from_pssz_trusted`; `Nested`, `SharedAction`; schemas → Schema IR (`schema.rs`, 563 lines; the macros' schema output; `trace.rs` and `package.rs` onto `psio::pssz::dynamic`); the legacy derive names, `#[fracpack]`, `#[to_key]` and the 25 hand-written codec and key impls deleted; plugins and the XAdmin wasm rebuilt. | 198 + 62 + 32 call sites; 41 generic bounds; 331 derive lists | everything binary changes | all tests; fresh genesis; cross-language vectors for transactions and blocks |
+| R8 | **The JSON flip, with C++ slice 8.** Wire types: `serde::Serialize, Deserialize` → `psio::JsonText, psio::Serde`; `serialize_as_str!` → `TextForm` + `psio::Serde`; `Hex<T>` deleted; serde attributes PSIO's text rejects removed where the type is on the wire; `serde_json::to_string(&wire)` → `psio::to_ijson`. Plugins, CLI and configuration types that only talk JSON keep serde (D10). | 376 / 522 derives to classify; 283 `serde_json` conversion calls | JSON changes | all tests; UI builds |
+| R9 | Delete `rust/fracpack`, `rust/test_fracpack`, `rust/test_fracpack_macros`, the four legacy derives in `psibase-macros-derive`, `to_bin.rs` / `from_bin.rs` if nothing needs the `bin` format. | ~6,500 lines | none | |
+
+R1–R5 are independent of the C++ slices and of each other's order beyond
+bottom-up. All of them wait for RG9; R2's time types and R4's argument caps
+also wait for RG3 and RG6.
+
+### 6.5 What the tests cover, and what they do not
+
+How the 92 ctest tests exercise Rust:
+
+| ctest | Runs | Covers |
+|---|---|---|
+| `rs-tests` | `cargo test -r -p test_fracpack -p psibase -p cargo-psibase -p psibase-macros-lib -p psibase-macros-derive -p psibase_plugin` (native) | the legacy codec against the C++ legacy library (`test_fracpack`: 21 tests, among them the schema-driven JSON vectors that caught RG9), psibase's unit tests (95: names, hex, time, schema, packages, depgraph), the macro expansion tests; `psio_leaf_types.rs` once R1 lands |
+| `rs-test-psibase-macros`, `rs-subjective-test`, `rs-test-contract`, `rs-test-contract-2`, `rs-test-package`, `rs-test-panic` | `cargo-psibase test` on the test crates: services built to wasm and run in `psitest` | the service macro, tables, events, subjective database, package build |
+| 22 × `rs-test-<Package>` (AuthDyn, AuthRecover, Credentials, StagedTx, VirtualServer, WsAuth, Branding, BrotliSvc, Chainmail, DiffAdjust, Evaluations, FaucetTok, Fractals, Guilds, Identity, NameMarket, Profiles, Registry, Subgroups, TokenStream, TokenSwap, Tokens) | `cargo-psibase test` per package: the Rust service and the system services it calls, in `psitest`, on a booted chain | actions, tables, events and cross-service calls of those services, Rust ↔ C++ in both directions |
+| 15 × `psinode_test_*`, 20 × `t-<Service>-test`, `t-psibase-tests` | a node with the default packages installed (Rust and C++ services together) | boot, package install, transactions through Rust services |
+
+Not covered by any test:
+
+* **Six Rust service packages are not even compiled by the build**: `BtcBridge`,
+  `BtcRelay`, `EthBridge`, `EthRelay`, `Exchange`, `Signing` (52 `.rs`
+  files; members of the `packages/user` workspace, no `cargo_psibase_package`
+  in `CMakeLists.txt`). Only `cargo check --workspace` in `packages/user`
+  reaches them. A Rust slice must run that explicitly.
+* Six more packages are built but have no test of their own: `Symbol`,
+  `Nft` (their C++ tests run), `Favor`, `FractalGen`, `SingleProd`,
+  `FractalTester`.
+* **Plugins** (wasm components run by the Supervisor in a browser; 125
+  `.packed()` in 41 files, 36 `unpacked(` in 11): built, never run by a
+  test. They pack action arguments for transactions.
+* The XAdmin wasm helper (`packages/local/XAdmin/ui/wasm`: packs boot
+  transactions, unpacks traces): built by the UI build, not tested.
+* `rust/psibase`'s CLI paths that pack (`boot`, `install`, `push`) are
+  exercised only through the node tests' use of the `psibase` binary.
+* The query services (`r-*`, GraphQL over HTTP) of the Rust packages are
+  covered only where a package's own test queries them.
+* `demo/`, `experiments/`, `package-templates/` are not built.
+
+### 6.6 Mapping, old → new
+
+Every Rust API psibase code uses from the legacy stack and what replaces it.
+Right-hand names were checked against the crate at `224f80de`.
+
+| Legacy | PSIO |
+|---|---|
+| **Derives** | |
+| `Pack` | `psio::PsszPack` |
+| `Unpack` | `psio::PsszUnpack` (also gives the validator, `PsszValidate`) |
+| `fracpack::View` | `psio::PsszView`: accessors come from a generated trait, `<Type>PsszAccessors`, which the caller imports |
+| `ToSchema` | `psio::ToPsszSchema` |
+| `ToKey` | `psio::Key` (`KeyPack`, `KeyUnpack`, `CompositeKey`) |
+| `serde::Serialize, serde::Deserialize` on a wire type | `psio::JsonText, psio::Serde` (serde impls with PSIO's I-JSON rules) |
+| `serialize_as_str!(T, …)` (psibase macro: serde through `FromStr` / `Display`, plus `async_graphql::scalar!`) | `impl psio::json::TextForm for T` + `psio::json_text_form!(T)` + `psio::Serde`; `scalar!` stays |
+| **Attributes** | |
+| `#[fracpack(definition_will_not_change)]` | `#[psio(definition_will_not_change)]` |
+| `#[fracpack(custom = "Id")]` | `#[psio(custom = "Id")]` and a `TextForm` |
+| `#[fracpack(skip)]` | `#[psio(skip)]` |
+| `#[fracpack(fracpack_mod = "…")]`, `#[to_key(psibase_mod = "…")]` | none; `#[psio(crate = "…")]` only on what a macro generates into a crate without a `psio` dependency |
+| a tuple struct `struct MethodString(pub String)` | `#[psio(transparent)]` |
+| `psio_validate_packable`-style checks in hand-written `Unpack` | `#[psio(invariant = "path")]` |
+| `#[serde(rename_all = …)]`, `#[serde(rename = …)]` | unchanged: the PSIO derives read them (or `#[psio(rename_all / name)]`) |
+| `#[serde(deny_unknown_fields)]`, `default`, `deserialize_with`, `untagged`, `tag`/`content` on a wire type | removed: compile errors on `JsonText`, `Serde`, `ToPsszSchema` (PSIO skips unknown members, a missing non-optional member is an error, text is defined by the member's type, a variant is `{"Name": value}`). `deserialize_with = "deserialize_number_from_string"` exists because C++ writes 64-bit integers as strings; I-JSON reads both forms |
+| (new) | `#[pssz(max_dynamic_data = N)]`; member bounds when PSIO Rust has them (RG6) |
+| **Functions and types** | |
+| `value.packed()` | `psio::to_pssz(&value)` (`try_to_pssz` for a value that may violate a bound or invariant) |
+| `T::unpacked(bytes)?` on action arguments, return values, anything from another service or a client | `psio::from_pssz::<T>(bytes)?` |
+| `T::unpacked(bytes)` on the service's own rows (`kv_get`, `Table`) | `psio::from_pssz_trusted::<T>(bytes)` |
+| `T::verify_no_extra(bytes)` | `psio::validate_pssz::<T>(bytes)` |
+| `Pack::pack(&self, &mut Vec<u8>)` | `psio::to_pssz_into(&value, &mut out)` |
+| `T: Pack` / `T: UnpackOwned` in generic code | `T: psio::Encode<psio::Pssz>` / `T: psio::Decode<psio::Pssz>` |
+| `fracpack::Result`, `fracpack::Error` | `psio::pssz::PsszResult`, `psio::pssz::PsszError` |
+| hand-written `impl Pack / Unpack` with `FracInputStream` (`Hex`, `db.rs`, `Memo`, `Precision`, the schema custom handlers) | none: the type is declared (`transparent`, `custom`, `invariant`) or is a PSIO type |
+| `fracpack::Nested<T>` | `psio::pssz::Nested<T>` |
+| `SharedAction<'a>`, `SharedGenesisActionData<'a>`, `SharedGenesisService<'a>`: records that borrow (`Hex<&'a [u8]>`) so that packing and unpacking do not copy (`Unpack<'a>`) | writing: the record derives `PsszPack` over its reference members (`psio::to_pssz` takes `&T`, `str`, `[T]`); reading: `psio::PsszView<'a, Action>` — `PsszUnpack` yields owned values only. Owned packed values: `psio::PsszBuffer<T>`, `psio::SharedPssz<T>` |
+| views (`T::View`, generated `…View` types) | `psio::PsszView::<T>::new(bytes)?` (validates) / `::trusted(bytes)`; `psio::PsszMutView` |
+| `key.to_key()` | `psio::to_key(&key)` |
+| `ToKey::append_key` | `psio::key::KeyPack::key_pack` / `psio::to_key_into` |
+| a key prefix built by hand (`(a, b).to_key()` then truncation, `RawKey` concatenation) | `psio::key::key_prefix::<Key, _>(&(a, b))`, `psio::key::key_prefix_upper_bound` |
+| `RawKey`, `KeyView` (already-encoded key bytes) | psibase's own two types, implementing `psio::key::KeyPack` (D8; checked in the scratch crate: such a type composes in a tuple key) |
+| `fracpack::SchemaBuilder`, `AnyType`, `Schema`, `FunctionType` | `psio::pssz::schema_ir::{SchemaBuilder, AnyType, Schema, FunctionType, Func, Interface}`, `schema_for::<T>()` |
+| `CompiledSchema`, `CompiledType`, `CustomHandler`, `CustomTypes`, `to_value` / `from_value` | `psio::pssz::dynamic` (`decode_exact`, `decode_compatible`, `encode`, `validate`, `to_key`, `json::pssz_to_json` / `json_to_pssz`, `CustomHandlers`, `Options`) |
+| `SchemaMatcher`, `SchemaDifference` | `psio::pssz::upgrade` (`validate_optional_upgrade`), `psio::pssz::pssz_evolves_from` |
+| `serde_json::to_string(&wire_value)` / `from_str::<WireType>` | `psio::to_ijson(&v)` / `psio::from_ijson::<T>(text)?` (`serde_json` stays for free-form `Value`s and non-wire types) |
+| `to_bin.rs` / `from_bin.rs` (`ToBin`, `FromBin`: 13 uses in 3 files) | removed, or PSIO's `bin` if a consumer remains (not examined) |
+| **Types** | |
+| `String` | `String` (⇔ C++ `psio::utf8_string`: UTF-8 enforced) |
+| a string that C++ declares `std::string` | `psio::pssz::RawString` (borrowed: `RawStr`) |
+| `Hex<Vec<u8>>`, `Hex<[u8; N]>`, `Checksum256` | `Vec<u8>`, `[u8; N]` (hex in I-JSON by PSIO's rule) |
+| `TimePointSec`, `TimePointUSec` | `psio::time::TimePoint<Seconds>`, `TimePoint<Micros>` (RG3) |
+| `Seconds`, `MicroSeconds` | `psio::time::Duration<Seconds>`, `Duration<Micros>` |
+| `Option<T>`, `Vec<T>`, `[T; N]`, tuples, `Box<T>`, `bool`, integers, floats | the same |
+| `indexmap::IndexMap<K, V>` | `BTreeMap<K, V>` (⇔ `std::map`); bounded: `psio::pssz::BoundedMap` |
+| `psibase::Memo` | the same type, `#[psio(transparent, invariant = "…")]` over `String` |
+| `AccountNumber`, `MethodNumber` | the same types (R1) |
+
+### 6.7 Behaviour of PSIO's Rust crate that the plan relies on (checked)
+
+In a scratch crate against `224f80de`:
+
+* `AccountNumber` declared as in 6.3 gives the bytes C++ pins: pSSZ
+  `00b82a1b83aedf04`, key `04dfae831b2ab800`, I-JSON `"alice"`, composite
+  key and `key_prefix` as in `leaf_types.cpp`; its schema is
+  `Custom{Object{value: Int{64}} [definitionWillNotChange], "AccountNumber"}`.
+* A record equals the tuple of its members in pSSZ (with fixed members, a
+  string, trailing optionals, one member, none), and `auto_pssz_width`
+  agrees.
+* `psio::to_pssz` accepts `str`, `[T]`, `&T` and tuples of references: a
+  caller does not clone to pack.
+* A field-less enum needs `#[repr(int)]` (it is its integer) or
+  `#[psio(variant)]`; an enum with payloads is a variant.
+* `BTreeMap`, `HashMap`, `Box<T>`, `Nested<T>`, `RawString`, `Option<bool>`
+  are values; `Rc<T>` / `Arc<T>` and tuples of more than 12 elements are not
+  (fracpack had both; psibase packs neither).
+* `psio::from_pssz_trusted`, `PsszView::trusted` exist for own rows.
+* `pssz::dynamic` decodes, validates and writes JSON under the automatic
+  profile (`docs/compatibility.md` still says it supports the explicit
+  widths only).
+* With `psio` in the dependency graph `serde_json` is built with
+  `arbitrary_precision` and `raw_value` for every crate (Cargo unifies
+  features; `psio` requires both unconditionally). This is **not** harmless
+  for psibase; what it changes is RG9.
+
+### 6.8 Where PSIO's Rust crate lacks something psibase needs
+
+RG9 blocks everything: psibase cannot depend on the crate at all until it
+is closed. RG3 blocks the time types, RG5 any record that carries a schema,
+RG6 the declaration of bounds; RG1 and RG2 are parity with C++; the rest
+are small.
+
+| # | Missing | Why psibase needs it | Reproduction / precise description |
+|---|---|---|---|
+| RG1 | **Methods and interfaces.** Rust has no counterpart of `PSIO_REFLECT(T, method(name, args…))` or `PSIO_INTERFACE`: nothing declares a function, derives its argument record or lists an interface's functions. The IR has the records (`Interface`, `Func`, `FunctionType`), `SchemaBuilder` has `insert::<T>()` only. | The service macro derives all of it itself from the `#[action]` functions (argument records, callers, dispatch, the action schema). That stays psibase's macro either way; what it needs from PSIO is the piece that makes Rust and C++ agree: (a) a builder call that adds an interface with its functions (C++ `SchemaBuilder::insert_interface`), given a name and, per function, the argument record type and result type; (b) one stated rule for the pSSZ of a function's arguments (C++ packs `std::tuple<params…>`; Rust would pack a record; equal bytes today, but argument caps, RG6, must select the same width in both). | `psio::pssz::schema_ir::SchemaBuilder` has no method that returns or fills an `Interface`; `grep -n interface rust/psio-macros/src/*.rs` finds nothing. |
+| RG2 | **Name compression.** C++ has `psio/compress_name.hpp` (`method_to_number`, `number_to_method`, used by `psibase::MethodNumber`), JS has `compress-name.ts`. Rust has none. | The method-name half of `rust/psibase_names` (`method_number.rs`, `method_to_number_converter.rs`, `number_to_string_converter.rs`, `frequency.rs`, the model table) is psibase's own second implementation of what C++ takes from PSIO; R1 found a panic in its hash-form parser (6.10). The account-name coder is psibase's own in C++ as well (`psibase/name.hpp`) and stays. | `grep -rn "compress_name\|method_to_number" rust/psio/src` → nothing. |
+| RG3 | **Time values cannot replace psibase's.** (a) `psio::time::TimePoint` / `Duration` have `checked_add` / `checked_sub` / `checked_duration_since` and no operators, no conversion between units (`seconds → micros`, floor / ceil), no `FromStr` / `Display` (only `to_rfc3339` / `from_rfc3339`). (b) They are foreign types to psibase, so psibase cannot give them `async_graphql` scalar impls or `chrono` conversions (orphan rule), and a wrapper is what the owner ruled out. | `TimePointSec` / `TimePointUSec` are used 141 times in 37 files, as members of `SimpleObject` and `InputObject` records (GraphQL) and with `+ Seconds`, `.seconds()`, `.microseconds()`, `From<chrono::DateTime<Utc>>`. | `#[derive(async_graphql::SimpleObject)] struct S { t: psio::time::TimePoint<psio::time::Seconds> }` cannot compile in psibase: `OutputType` is not implemented for the member and only `psio` or `async-graphql` may implement it. `TimePoint::<Seconds>::from_ticks(1) + Duration::<Seconds>::from_ticks(1)`: no `Add`. Needed: the operators and unit conversions in `psio::time`, and a way for a PSIO value to be a GraphQL scalar through its text (an optional `async-graphql` feature in `psio`, or PSIO's own GraphQL for Rust). The same applies to every PSIO type psibase would put in a GraphQL object: `RawString`, `Nested<T>`, the bounded strings. |
+| RG4 | **A user type may claim a reserved time id.** `#[psio(custom = "time-point-seconds")]` on a record is accepted and its schema is `Custom{Object{…}, "time-point-seconds"}`, which schema-driven codecs read as a time point over a non-integer. | Found while checking whether psibase could keep its own time structs under PSIO's schema ids (it cannot, correctly; the derive should say so). | `#[derive(PsszPack, PsszUnpack, ToPsszSchema)] #[psio(definition_will_not_change, custom = "time-point-seconds")] struct T { seconds: i64 }` + `schema_for::<T>()` → `Ok`. |
+| RG5 | **The IR's own records have no schema.** `Schema`, `AnyType`, `FunctionType`, `Member`, … derive `PsszPack`, `PsszUnpack`, `JsonText` but not `ToPsszSchema` (JS has `PsszSchema.meta()`). | psibase passes schemas as values: the `Packages` service stores and takes a service schema as an action argument, so an action record with a schema member cannot derive `ToPsszSchema`. | `psio::pssz::schema_ir::schema_for::<psio::pssz::schema_ir::Schema>()` → "the trait bound `Schema: ToPsszSchema` is not satisfied". |
+| RG6 | **Member bounds and argument caps** (known to be coming: nested bounds such as `#[psio(max = 8, element(max = 16))]` and caps on method arguments are being added to C++ and Rust mirrors them). Today Rust has bounded *types* only (`BoundedString<N>`, `BoundedRawString<N>`, `BoundedList<T, N>`, `BoundedMap`, `BoundedSet`) and `#[pssz(max_dynamic_data = N)]` on a type. | Not worked around; psibase waits. Where psibase Rust would use them is listed in 6.9. | `docs/pssz-rust-profile.md`: "Field-level annotations are not supported; bounds are expressed with bounded types." |
+| RG7 | **`JsonText` for enums is narrower than `PsszPack`.** A variant must hold exactly one unnamed field; a unit alternative or a struct variant is encodable in pSSZ and has a schema, but no text. | No psibase enum on the wire needs it today (all five have one field per variant); it will be met by the first service that declares `enum E { None, Some(u32) }`. | `#[derive(psio::JsonText)] enum E { Unit, One(u32) }` → "a JsonText variant holds exactly one unnamed field". |
+| RG8 | **The documentation of the Rust crate is behind the crate.** `docs/pssz-rust-profile.md` says the crate-root `Pack` / `Unpack` / `ToSchema` are legacy fracpack and writes `#[pssz(definition_will_not_change)]` (now an error naming `#[psio(...)]`); `docs/compatibility.md` says the Rust schema-driven codec rejects the automatic profile (it works). `lib.rs` is current. | psibase's plan was written from `lib.rs` and the source because of it. | as stated |
+| RG9 | **Blocking. Depending on `psio` changes `serde_json` for the whole program.** `rust/psio/Cargo.toml` requires `serde_json` with `arbitrary_precision` and `raw_value` unconditionally (the serde bridge wants the text of a number); Cargo's feature unification applies both to every crate in the graph. With `arbitrary_precision` a number reaches serde's buffered deserializers (untagged and tagged enums, `flatten`) as a one-member map, not a number, and a float is no longer recovered from it. | With no PSIO call anywhere, linking the crate (a) breaks reading a float through `serde_aux::deserialize_number_from_string` (psibase uses that function 65 times; on floats in `rust/fracpack/src/schema.rs:2065, 2072`, the schema-driven JSON → binary path behind the CLI and traces); (b) changes the text of an `f32` written to JSON (shortest `f32` digits instead of the widened `f64`: `1e-45` for `1.401298464324817e-45`), which no longer matches what C++ writes; (c) makes `serde_json::Value` keep a number's source digits (`1e2` is forwarded as `1e+2`, an integer beyond 64 bits as its digits, where both became floats; `Value` / `json!` occur 343 times in 49 files, mostly CLI and plugins). (a) and (b) fail `rs-tests` (`test_fracpack`: `generated_test0::run_tests`, `schema_json`). psibase cannot opt out of a dependency's feature. | A crate with `psio`, `serde`, `serde_json = "1"` and `serde-aux = "4"`: `#[derive(Deserialize)] struct D { #[serde(deserialize_with = "serde_aux::prelude::deserialize_number_from_string")] x: f64 }` and `serde_json::from_str::<D>(r#"{"x":1.5}"#)` → `Err("data did not match any variant of untagged enum StringOrInt")`; without `psio` → `Ok`. `serde_json::to_value(f32::from_bits(1))` → `1e-45`; without → `1.401298464324817e-45`. Integers are unaffected (`u64` through the same function, untagged and adjacently tagged enums, `flatten` were probed and read the same). Wanted: `psio` without `arbitrary_precision` in its default features — the bridge behind an opt-in feature, or reading the number text another way. |
+| RG10 | **Distribution.** The crate is not on crates.io and its derives resolve `::psio`. | In the tree a path dependency into the pinned checkout is exact (D28). A service developed outside the tree (`cargo psibase` with the SDK, `package-templates`) needs `psio` from somewhere at the same commit as its `psibase`: a published crate, or the SDK shipping the Rust sources. To decide before the flip, not for R1–R5. | `package-templates/…/Cargo.toml.liquid` names `psibase.workspace = true` and gets it by path today. |
+| RG11 | **Every dependent compiles every format.** There are no features for capnp, flatbuf, wit, pjson, ssz and the beacon-chain types: a service that needs pSSZ, keys and JSON compiles all of it and sees the crate's 6 warnings (`unused imports: ssz_struct_dwnc and ssz_struct`, …). | Build time and noise, in each of the 28 package target directories. Measured at about 1 % of a cold service build (6.10). Not a correctness matter. | `cargo build` of any dependent prints the warnings; `[features]` has only `experimental-frac` and bench switches. |
+
+Not gaps: tuples stop at 12 elements (psibase's largest action has 9
+arguments, and R4 stops packing tuples); `Rc` / `Arc` are not pSSZ values
+(psibase packs none); a field-less enum needs `#[repr]` (a decision per
+enum).
+
+Not evaluated: whether `psio::pssz::dynamic` with `CustomHandlers` can carry
+what `trace.rs` does today (an action's `rawData` is decoded with the *target
+service's* schema, fetched asynchronously, 500 lines), and whether
+`psio::pssz::upgrade` answers what `SchemaMatcher` answers for package
+upgrades. Both belong to R7 and need their own probe.
+
+### 6.9 Where psibase Rust would declare bounds and caps (RG6)
+
+Nothing in Rust declares a size today (fracpack has no bounds); limits are
+run-time checks inside actions. When PSIO Rust has member annotations and
+argument caps, these are the places, to be stated identically in C++ where
+the type exists there:
+
+* `Memo` (80 bytes, UTF-8): the member behind `transparent`; 120 uses.
+* `Precision` (0–8) is an invariant, not a bound.
+* Registry: an app has at most 3 tags of at most 30 bytes each
+  (`MAX_APP_TAGS`, `MAX_TAG_LENGTH`, checked in `tables.rs`) — exactly the
+  nested form, `#[psio(max = 3, element(max = 30))]` on the tag list — and
+  names of at most 30 (`MAX_NAME_SIZE`).
+* Profiles: the avatar, at most 100 KiB (`MAX_AVATAR_SIZE`).
+* BtcBridge (`tx.input.len() <= 256`, a cursor of at most 73 bytes),
+  BtcRelay (`headers.len() <= 32`, a context of at most 2027 bytes),
+  EthRelay (`fact_json.len() <= 32768`, `network_json.len() <= 8192`),
+  Exchange (page text of at most 2048 bytes).
+* 69 length comparisons were found in service code and `rust/psibase`
+  (`git grep -P 'len\(\)\s*(<=|<|>|>=)'`); the list above is those whose
+  constant or assertion message says they limit data the service accepts.
+  Whether each is an action argument or a row member, and the rest of the
+  69, were not classified.
+* Every action record: an argument cap, so that a call's argument frame has
+  a narrow width where its members allow; C++ `MethodArgs<M>` and the Rust
+  action record must then agree (RG1 b).
+* Table rows with a natural cap (`#[pssz(max_dynamic_data = N)]` exists
+  already): not started; a per-table decision at R5.
+
+### 6.10 Slice R1 (written and tested; not committed)
+
+R1 was implemented and run. It is not in the tree, because with it
+`rs-tests` fails, and the failure is PSIO's to fix (RG9), not something to
+work around in psibase. The change is kept as
+`~/psibase-pssz-r1-blocked.patch` (14 files; it applies cleanly to this
+commit) so that it can be applied the day the pinned PSIO no longer forces
+`serde_json/arbitrary_precision`.
+
+**Subset and why.** `AccountNumber` and `MethodNumber`: they are in nearly
+every record and action (2,036 and 169 uses), so nothing else can be
+declared before them; they are the best-specified types of the conversion
+(C++ slice 1 pinned their bytes, keys, texts and rejections in
+`leaf_types.cpp`); and they exercise the whole PSIO Rust surface a psibase
+type needs — fixed-layout record, custom text form, key, view, schema — on
+two types small enough to check by hand. Time, the other leaf type of C++
+slice 1, is blocked (RG3).
+
+**Acquisition** (decision D28). `rust/Cargo.toml` declares
+`psio = { path = "../external/psio/rust/psio" }` and `rust/psibase` depends
+on it. `external/psio` is the checkout CMake fetches and verifies against
+the pin on every configure (head equal to the pinned commit, clean tree), so
+Rust and C++ build one PSIO source and cannot drift; the pin is still stated
+once. Cargo writes nothing into the checkout (its lock and target
+directories belong to the dependent workspace; checked: the checkout was
+clean after the builds). The other workspaces reach `psio` through
+`psibase`; their seven lock files gain `psio`, `psio-macros` and
+`xxhash-rust` (28 lines each) and nothing else. A Cargo `git` dependency
+(D11's first thought) would fetch a second copy into Cargo's cache and state
+the commit in eight more places. Consequence: `cargo` in a tree that was
+never configured fails with "failed to read
+…/external/psio/rust/psio/Cargo.toml"; configure once.
+
+**Declarations.** Both types keep `Pack, Unpack, ToKey, ToSchema` and gain
+`psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema,
+psio::Key` with `#[psio(definition_will_not_change, custom = "…")]` (the ids
+`AccountNumber` and `MethodNumber`), and a text form
+(`impl psio::json::TextForm`, `psio::json_text_form!`):
+
+* `AccountNumber`: strict, as in C++ (D2). `from_text` is
+  `AccountNumber::from_exact`: exactly the text `Display` writes.
+* `MethodNumber`: as in C++ (D3). The empty text; a `#` form only if it is
+  the one `Display` writes for that value; any other text if it names a
+  method (value ≠ 0).
+
+serde is untouched (`serialize_as_str!`, lenient `FromStr`): JSON as the
+services and the CLI read it today does not change until R8.
+`ExactAccountNumber` stays until then.
+
+**Two panics removed in `rust/psibase_names`** (decision D30), because a
+PSIO text form must report, not abort. Both are in the tree today and
+reachable from JSON; the fix is in the patch, independent of PSIO, and could
+be committed on its own:
+
+* `account_number_from_str("alice+")` (also `+x`, `+256`) calls
+  `sub.parse::<u8>().unwrap()`. Fixed: it returns 0, the value every other
+  non-name already has.
+* `method_number_from_str("#abc#abc#abc#abc#")` (17 characters starting with
+  `#`, one of them outside the alphabet) computes `table[c] - 1` on 0: a
+  panic where overflow checks are on, a wrapped symbol otherwise. Fixed: it
+  is not a hash form, and reads as 0 like other invalid text.
+
+**Tests.** `rust/psibase/tests/psio_leaf_types.rs`, 12 tests: the vectors of
+`leaf_types.cpp` for both types — pSSZ bytes and sizes, rejected lengths,
+key bytes, key order over the same value lists, composite key and prefix,
+I-JSON text in both directions, the hash form of a method that does not
+compress, every rejected text of the C++ lists (plus `"alice+x"` and the
+malformed hash form above), the schema node and its custom id — and one test
+that the forms in use are unchanged (fracpack bytes, legacy keys, lenient
+serde). All 12 pass: Rust and C++ produce the same bytes, keys and texts for
+these two types and reject the same texts.
+
+**What was checked with R1 applied.**
+
+| | |
+|---|---|
+| Full build | exit 0 (`~/psibase-pssz-build.build-r1.log`); `psio` builds for `wasm32-wasip1` inside every service |
+| `psio_leaf_types.rs` | 12 / 12 |
+| C++ | untouched: all 103 service and test wasm binaries in the build root byte-identical to the build before R1 |
+| `ctest -j4` | **91 / 92** (`~/psibase-pssz-build.ctest-r1.log`). The 28 service tests (`rs-test-*`, `rs-subjective-test`), the node tests and the C++ tests pass. `rs-tests` fails: 2 of the 21 tests of `test_fracpack` |
+| The six packages the build never compiles (6.5) | `cargo check --target wasm32-wasip1` of their 11 service and query crates: exit 0 (`~/psibase-pssz-build.r1-check-unbuilt.log`; needs `CC_wasm32_wasip1` set to the WASI SDK's clang for `secp256k1-sys`) |
+| Build cost | a cold release build of one service's dependency graph for `wasm32-wasip1` (`cargo build -r -p test-contract`): 258.6 s of CPU with R1, 256.1 s before |
+
+**Why it is not committed: RG9.** No psibase code that R1 adds is involved.
+`psio` requires `serde_json`'s `arbitrary_precision`; Cargo turns it on for
+every crate; and with it
+
+* `test_fracpack::generated_test0::run_tests` fails at the first `f32`
+  vector with "data did not match any variant of untagged enum StringOrInt":
+  the legacy schema-driven codec reads 64-bit integers and floats through
+  `serde_aux::deserialize_number_from_string`, which no longer reads a float;
+* `test_fracpack::schema_json` fails with "`1e-45` != `1.401298464324817e-45`":
+  an `f32` is written to JSON with other digits than C++ writes.
+
+Beyond the two tests, with R1 applied:
+
+* `serde_json::Value` preserves a number's digits:
+  `{"a":1.0,"b":10000000000000000000000,"c":1e2}` is written back as
+  `{"a":1.0,"b":10000000000000000000000,"c":1e+2}` where it was
+  `{"a":1.0,"b":1e22,"c":100.0}`. JSON passes through a `Value` on its way
+  to a service in the CLI and in plugins.
+* Of the 37 plugin components the build produces, 11 were byte-identical,
+  8 differed at the same size and 18 changed size; the 26 that differed
+  totalled 8,869,991 bytes against 8,809,526 before (+0.7 %; largest:
+  `packages` +36,744, `explorer` +28,360, `host-http` +8,686; six were
+  2–4 KB smaller). Why each differed was not examined. Plugins are not run
+  by any test (6.5), so a behaviour change there would not have been seen.
+* The 28 Rust service packages were rebuilt; their wasm was not compared
+  with the previous build (no copy of it was kept).
+
+The float path could be patched inside `rust/fracpack`, the one place
+temporary code may live, but that would only silence the two tests: the
+feature would still be on for the CLI, the plugins and every service, where
+nothing tests JSON numbers. The rule for this work is to wait for PSIO, so
+R1 waits.
+
+### 6.11 JavaScript / TypeScript
+
+Surveyed over tracked `*.ts, *.tsx, *.js, *.mjs` outside `external/`.
+
+**Where binary is produced or read.** There is no fracpack codec in JS: no
+schema-driven packer, no `wasm-bindgen`. The browser gets packed bytes three
+ways:
+
+| Path | Where | What |
+|---|---|---|
+| Server pack endpoints | `packages/user/CommonApi/common/packages/common-lib/src/rpc.ts` (399 lines): `packAction` → `POST <service>/pack_action/<method>` (line 211), `packTransaction` → `/common/pack/Transaction` (229), `packSignedTransaction` → `/common/pack/SignedTransaction` (265), `packAndDigestTransaction` / `signTransaction` (SHA-256 of the returned bytes, client side), `pushPackedSignedTransaction` → `transact/push_transaction` | JSON in, packed bytes out; the client never lays out a byte. Only `SimpleUI.mjs` calls these outside common-lib. |
+| Hand-written bytes | `common-lib/src/key-conversions.ts`: `publicKeyPairToFracpack` (179–196), `signatureToFracpack` (242–258) write a fracpack variant by hand (`[4,0,0,0]`, index, size, bytes) | **Neither is called anywhere in the tree.** Delete at the flip. |
+| Rust compiled to wasm | Plugins (162 tracked `.rs` under `packages/**/plugin*`: `.packed()` 125 / 41, `unpacked(` 36 / 11) and the XAdmin helper (`packages/local/XAdmin/ui/wasm/src/lib.rs`: boot transactions packed, `TransactionTrace::unpacked`) | The real client-side packing. It moves with Rust (R5, R7), not with JS. |
+
+Packed data otherwise appears as hex (`rawData`, 53 uses in 17 files):
+action arguments shown by the Explorer UI, which prefers the server-decoded
+`data` and has no decoder, and claim / key bytes in XAdmin and Config (DER,
+not fracpack).
+
+**What PSIO's JS package offers** (`external/psio/js`, package `psio` 0.1.0,
+ESM, no runtime dependencies, ~7,500 lines, 19 test files): a schema-driven
+codec — `PsszSchema`, `PsszType.encode / decode / validate / view`,
+`jsonToPssz` / `psszToJson` (I-JSON and JSON), keys (`encodeKey`,
+`encodeKeyPrefix`, `keyPrefixUpperBound`), read-only views, typed
+definitions that generate the Schema IR (`record`, `variant`, `list`,
+`optional`, `nested`, `transparent`, `custom`, `timePoint`, …), custom
+handlers by id (its README's example is `AccountNumber`), time text, hex,
+name compression (`nameToNumber`, `numberToName`, `hashName`).
+
+**What a move to client-side packing would need** (decision D12 is still
+open; nothing forces it — the pack endpoints can simply return pSSZ):
+
+| Need | PSIO JS | Whose |
+|---|---|---|
+| Pack action arguments, `Transaction`, `SignedTransaction`; decode a trace | codec present | psibase: fetch the service schema (Schema IR JSON), declare or fetch the transaction types, register handlers |
+| `AccountNumber` text ↔ u64 | Not established. `compress-name.ts` is headed as a port of the *method*-name compressor (its model table matches `psio/compress_name.hpp`); psibase account names use a different coder (`psibase/name.hpp`, 36 symbols, 10 characters, `+N` subaccounts). The README row "Account names → `nameToNumber`" does not look right for psibase. Read, not run. | PSIO to clarify; otherwise psibase supplies the handler |
+| SHA-256, ECDSA, key text formats | none, by design | psibase keeps `hash.js` / WebCrypto and `key-conversions.ts` |
+| Hex case | `toHex` writes lower case; `uint8ArrayToHex` upper case | psibase; whether a consumer depends on the case was not checked |
+| Distribution | `dist/` is not committed and the package is not in psibase's yarn workspace; whether it is on npm was not verified | both |
+
+**Tests.** No ctest test runs JavaScript. The UI packages are built
+(`web-apps.cmake`: 15 UIs, common-lib) and 16 JS test files exist (vitest
+and `node --test`, run only by per-package scripts); none of them touches
+packing. PSIO's JS tests were not run here.
+
+### 6.12 Python
+
+`programs/psinode/tests/fracpack.py` (1,246 lines) is a schema-driven
+fracpack codec: type objects (`Int`, `Float`, `Struct`, `Object`, `Array`,
+`List`, `Option`, `Variant`, `Tuple`, `FracPack` (nested), `Custom`, `Type`),
+custom adapters (`Bool`, `String`, `Hex`, `Map`), a schema loader for the
+legacy schema JSON, and schema compatibility. Values are JSON-shaped Python
+objects.
+
+| User | Uses |
+|---|---|
+| `psibase.py` | `AccountNumber`, `MethodNumber` (with `name.py`, 451 lines), `TimePointSec`, `Action` (packs `data` with the target service's schema), `Tapos`, `Claim`, `Transaction`, `SignedTransaction`, `ServiceSchema` |
+| `psinode.py` | fetches `/schema?service=X` from `packages`, `pack_transaction`, `pack_signed_transaction`, `sign_transaction` (SHA-256, P-256), `push_transaction`, `push_action`, `set_producers` |
+| `services.py`, `test_shutdown.py`, `test_subjective.py` | one declared record (`LoginData`), `push_action`, one `unpack` of a `u32` return value |
+| `test_fracpack.py` | the codec's own tests against `libraries/psio1/tests/fracpack-tests.json` (153 values) |
+| `test_psibase_types.py` | three golden hex strings for `Action` and `Transaction` |
+| `packages/user/Exchange/test_math.py`, `test_stops.py` | not users: they search Rust source for a comment containing "Fracpack" |
+
+Of the 18 Python ctest tests, `py_test_fracpack` and `py_test_psibase_types`
+test the codec itself, `py_test_name` does not touch it, and all 15
+`psinode_test_*` import it through `testutil` → `psinode`; eight of them
+pack in the test file itself (`connect`, `psibase`, `subjective`, `txqueue`,
+`shutdown`, `snapshot`, `block_signing`, `crash`). Boot and package install
+go through the `psibase` CLI, not Python.
+
+**The need** (PSIO has no Python: G9). A replacement must load the Schema IR
+that `/schema` will return, encode JSON-shaped values — records with
+trailing-optional pruning, lists, optionals, variants as `{"Name": value}`,
+tuples, arrays, nested values, byte strings from hex, strings, booleans,
+integers to 64 bits — under the automatic width profile (which means
+computing inferred bounds and caps as `docs/pssz-type-width.md` states
+them), decode at least a `u32`, and carry four custom types
+(`AccountNumber`, `MethodNumber`, a time point, `Action` with its context).
+Keys, views and the other formats are not used by any test. Estimate, not a
+measurement: 1,000–1,500 lines for that subset; 2,500–4,000 for a codec that
+replays PSIO's conformance vectors (`conformance/pssz-vectors.json`, 5,167
+vectors; the JS equivalent, `pssz-core.ts` + `pssz-json.ts` + `pssz.ts`, is
+about 4,150 lines). The alternative that needs no Python codec: the tests
+call the node's pack endpoints, as the JS client does; they would then test
+less (no independent encoder) but need nothing from PSIO. Not determined:
+the exact argument shapes of the actions the tests push (whether any holds a
+map, which would pull the key encoding into the subset).
