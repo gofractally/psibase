@@ -30,6 +30,27 @@ set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_
 
 find_package(Python COMPONENTS Interpreter)
 if(Python_Interpreter_FOUND)
+    # These tests would otherwise fail one by one with ModuleNotFoundError.
+    execute_process(
+        COMMAND ${Python_EXECUTABLE} -c "import requests, urllib3, websockets, cryptography"
+        RESULT_VARIABLE psinode_test_modules_missing OUTPUT_QUIET ERROR_VARIABLE psinode_test_modules_error)
+    if(psinode_test_modules_missing)
+        string(REGEX MATCH "No module named '[^']+'" psinode_test_module "${psinode_test_modules_error}")
+        message(WARNING
+            "The psinode tests will fail: ${Python_EXECUTABLE} is missing Python modules "
+            "(${psinode_test_module}). Install them with\n"
+            "  ${Python_EXECUTABLE} -m pip install -r ${CMAKE_CURRENT_SOURCE_DIR}/tests/requirements.txt\n"
+            "or configure with -DPython_EXECUTABLE=<a python that has them>.")
+    endif()
+    if(NOT LIBSOFTHSM2)
+        find_library(LIBSOFTHSM2 libsofthsm2.so PATH_SUFFIXES softhsm)
+    endif()
+    find_program(SOFTHSM2_UTIL softhsm2-util)
+    if(NOT LIBSOFTHSM2 OR NOT SOFTHSM2_UTIL)
+        message(WARNING
+            "SoftHSM 2 was not found (softhsm2-util and libsofthsm2.so): the psinode tests that "
+            "sign with a hardware key (test_crash, test_psibase) will fail.")
+    endif()
     find_library(LIBSOFTHSM2 libsofthsm2.so PATH_SUFFIXES softhsm)
     if(LIBSOFTHSM2)
         set(LIBSOFTHSM2_ARG --libsofthsm2=${LIBSOFTHSM2})
