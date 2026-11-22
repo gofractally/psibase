@@ -7,6 +7,22 @@ add_test(NAME WatchdogTests COMMAND WatchdogTests)
 
 set_tests_properties(WatchdogTests PROPERTIES PROCESSORS 2)
 
+add_executable(CpuAccountingContract storage/cpu_accounting_contract.cpp)
+target_link_libraries(CpuAccountingContract PRIVATE psibase Threads::Threads)
+add_test(NAME CpuAccountingContract COMMAND CpuAccountingContract)
+set_tests_properties(CpuAccountingContract PROPERTIES TIMEOUT 30)
+
+if(APPLE)
+    add_executable(DarwinCpuContract storage/darwin_cpu_contract.cpp)
+    target_link_libraries(DarwinCpuContract PRIVATE psibase Threads::Threads)
+    add_test(NAME DarwinCpuLifetimeIo COMMAND DarwinCpuContract)
+    foreach(mode previous blocked replaced)
+        add_test(NAME DarwinCpu_${mode} COMMAND DarwinCpuContract ${mode})
+    endforeach()
+    set_tests_properties(DarwinCpuLifetimeIo DarwinCpu_previous DarwinCpu_blocked
+        DarwinCpu_replaced PROPERTIES TIMEOUT 30)
+endif()
+
 add_executable(saturatingTests saturatingTests.cpp)
 target_link_directories(saturatingTests PRIVATE ${ICU_LIBRARY_DIR})
 target_link_libraries(saturatingTests psibase)
@@ -44,3 +60,27 @@ if(APPLE)
   add_test(NAME DarwinCpuVmTrapTests COMMAND DarwinCpuVmTrapTests)
   set_tests_properties(DarwinCpuVmTrapTests PROPERTIES TIMEOUT 30)
 endif()
+
+# The fixture exercises the actual registered-host ABI and native code writer.
+find_program(PSIZAM_WAT2WASM NAMES wat2wasm REQUIRED)
+set(PSIZAM_POLICY_WASM "${CMAKE_CURRENT_BINARY_DIR}/psizam-policy.wasm")
+set(PSIZAM_SERVICE_WASM "${CMAKE_CURRENT_BINARY_DIR}/psizam-service.wasm")
+foreach(fixture policy service)
+    add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/psizam-${fixture}.wasm"
+        COMMAND "${PSIZAM_WAT2WASM}" "${CMAKE_CURRENT_SOURCE_DIR}/psizam-${fixture}.wat"
+            -o "${CMAKE_CURRENT_BINARY_DIR}/psizam-${fixture}.wasm"
+        DEPENDS "psizam-${fixture}.wat" VERBATIM)
+endforeach()
+add_executable(PsizamTests PsizamTests.cpp "${PSIZAM_POLICY_WASM}" "${PSIZAM_SERVICE_WASM}")
+target_compile_definitions(PsizamTests PRIVATE
+    PSIBASE_PSIZAM_POLICY_WASM="${PSIZAM_POLICY_WASM}"
+    PSIBASE_PSIZAM_SERVICE_WASM="${PSIZAM_SERVICE_WASM}")
+target_link_libraries(PsizamTests psibase Catch2::Catch2WithMain Threads::Threads)
+add_test(NAME PsizamTests COMMAND PsizamTests)
+set_tests_properties(PsizamTests PROPERTIES TIMEOUT 30)
+
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_test(NAME PsizamAltTimeout
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/run_psizam_alt_timeout.py"
+        "$<TARGET_FILE:PsizamTests>")
+set_tests_properties(PsizamAltTimeout PROPERTIES TIMEOUT 15 PROCESSORS 2)

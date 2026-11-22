@@ -5,27 +5,26 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index_container.hpp>
-#include <debug_eos_vm/debug_eos_vm.hpp>
-#include <eosio/vm/backend.hpp>
 #include <mutex>
 #include <psibase/ActionContext.hpp>
+#include <psibase/PsizamPolicy.hpp>
 #include <psibase/db.hpp>
 #include <psio/finally.hpp>
+#include <psizam/backend.hpp>
+#include <psizam/debug/debug.hpp>
 
 namespace bmi = boost::multi_index;
 
-using eosio::vm::span;
+using std::span;
+namespace dwarf = psizam::debug;
 
 namespace psibase
 {
    struct ExecutionContextImpl;
-   using rhf_t = eosio::vm::registered_host_functions<ExecutionContextImpl>;
-#ifdef __x86_64__
-   using impl_t = eosio::vm::jit_profile;
-#else
-   using impl_t = eosio::vm::interpreter;
-#endif
-   using backend_t = eosio::vm::backend<rhf_t, impl_t, VMOptions>;
+   using rhf_t  = psizam::registered_host_functions<ExecutionContextImpl>;
+   using impl_t = psizam::jit_profile;
+   using backend_t =
+       psizam::backend<rhf_t, impl_t, NativeVMOptions, psizam::debug::debug_instr_map>;
 
    // Rethrow with detailed info
    template <typename F>
@@ -35,7 +34,7 @@ namespace psibase
       {
          f();
       }
-      catch (const eosio::vm::exception& e)
+      catch (const psizam::exception& e)
       {
          throw std::runtime_error(std::string(e.what()) + ": " + e.detail());
       }
@@ -76,10 +75,8 @@ namespace psibase
    {
       Checksum256                hash;
       VMOptions                  vmOptions;
-      std::unique_ptr<backend_t> backend;
-#ifdef __x86_64__
+      std::unique_ptr<backend_t>                    backend;
       std::shared_ptr<dwarf::debugger_registration> debug;
-#endif
 
       auto byHash() const { return std::tie(hash, vmOptions); }
    };
@@ -139,15 +136,18 @@ namespace psibase
       for (const auto& backend : impl->backends)
       {
          auto& alloc = backend.backend->get_module().allocator;
-         result.push_back({alloc._base, alloc._capacity});
-         result.push_back({alloc._code_base, alloc._code_size});
+         if (alloc._base)
+            result.push_back({alloc._base, alloc._capacity});
+         auto code = alloc.get_code_span();
+         if (!code.empty())
+            result.push_back({reinterpret_cast<const char*>(code.data()), code.size()});
       }
       return result;
    }
 
    struct ExecutionMemoryImpl
    {
-      eosio::vm::wasm_allocator wa;
+      psizam::wasm_allocator wa;
    };
 
    std::unique_ptr<ExecutionMemoryImpl> impl;
@@ -164,16 +164,14 @@ namespace psibase
 
    std::span<const char> ExecutionMemory::span() const
    {
-      auto        raw         = impl->wa.get_base_ptr<const char>();
-      std::size_t syspagesize = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
-      return {raw - syspagesize, eosio::vm::max_memory + 2 * syspagesize};
+      return impl->wa.span();
    }
 
    // TODO: debugger
    struct ExecutionContextImpl : NativeFunctions
    {
-      VMOptions                                     vmOptions;
-      eosio::vm::wasm_allocator&                    wa;
+      NativeVMOptions                               vmOptions;
+      psizam::wasm_allocator&                       wa;
       BackendEntry                                  backend;
       std::shared_ptr<dwarf::debugger_registration> dbg;
       std::atomic<bool>                             timedOut    = false;
@@ -212,26 +210,24 @@ namespace psibase
                     code.codeHash, vmOptions);
                 if (!backend.backend)
                 {
-                   psio::input_stream s{reinterpret_cast<const char*>(c->code.data()),
-                                        c->code.size()};
-#ifdef __x86_64__
+                   validateNativeWasm(c->code, this->vmOptions);
+                   psizam::debug::binary::input_stream s{
+                       reinterpret_cast<const char*>(c->code.data()), c->code.size()};
                    if (dwarf::has_debug_info(s))
                    {
-                      debug_eos_vm::debug_instr_map debug;
+                      psizam::debug::debug_instr_map debug;
                       backend.backend =
-                          std::make_unique<backend_t>(c->code, nullptr, vmOptions, debug);
+                          std::make_unique<backend_t>(c->code, nullptr, this->vmOptions, debug);
                       auto info     = dwarf::get_info_from_wasm(s);
                       backend.debug = dwarf::register_with_debugger(
                           info, debug.locs, backend.backend->get_module(), s);
                    }
                    else
                    {
-                      backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
+                      backend.backend =
+                          std::make_unique<backend_t>(c->code, nullptr, this->vmOptions);
                       backend.debug = dwarf::register_with_debugger(backend.backend->get_module());
                    }
-#else
-                   backend.backend = std::make_unique<backend_t>(c->code, nullptr, vmOptions);
-#endif
                 }
              });
       }
@@ -241,7 +237,7 @@ namespace psibase
          transactionContext.blockContext.systemContext.wasmCache.impl->add(std::move(backend));
       }
 
-      eosio::vm::stack_manager& getAltStack() { return transactionContext.getAltStack(); }
+      psizam::detail::stack_manager& getAltStack() { return transactionContext.getAltStack(); }
 
       std::pair<CodeRow, DbId> getCode(AccountNumber service)
       {
@@ -302,6 +298,7 @@ namespace psibase
       {
          auto prev         = currentActContext;
          currentActContext = &actionContext;
+         auto             restore = psio::finally{[&] { currentActContext = prev; }};
          RecordActionTime timer{actionContext};
          try
          {
@@ -323,7 +320,6 @@ namespace psibase
                throw TimeoutException{};
             throw;
          }
-         currentActContext = prev;
       }
 
       void onTransferControl(std::uint64_t callerFlags)

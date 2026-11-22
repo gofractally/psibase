@@ -1,0 +1,18 @@
+{
+  "source_commit": "1c4c20d3b73a6ed2288caba2f99dffd78c82d34d",
+  "cpu_correction_commit": "cb5a6e567a8ab444acc99377d87a7727ec15a948",
+  "purpose": "Qualify target-thread CPU accounting and watchdog enforcement with the native psizam VM",
+  "active_storage": "Triedent",
+  "active_wire": "legacyFracpack",
+  "files": {
+    "libraries/psibase/native/include/psibase/CpuAccounting.hpp": "1fed01cfc7ee97284179ac245af8db2eb322e43fdf059ef5d514cb18e8dc57a2",
+    "libraries/psibase/native/include/psibase/DarwinCpuClock.hpp": "76ed14494822b09965e2aa49e40491765258cc0c8ae1ddb9cd726763f3bb11b8",
+    "libraries/psibase/native/include/psibase/DarwinWatchdogWake.hpp": "58636983979aacd5f9827700d7f56d9088ba3cd233ce86d3878e99f19f94f3b4",
+    "libraries/psibase/native/include/psibase/NativeThreadClock.hpp": "286a41eefb45ebc027f0a2a00075891ec1fc989fad0684634c6584488b760cdc",
+    "libraries/psibase/native/include/psibase/Watchdog.hpp": "7d03c0283b11e8e961e91b76664d1b3631f312b53e496fb34c1570338bcbcd00",
+    "libraries/psibase/native/src/Watchdog.cpp": "2ca8b95a5547f288cb1a983978964c50813f02e81d38722af78803bfb6590d6e",
+    "libraries/psibase/native/tests/WatchdogTests.cpp": "a649ce3669f02b98ec86fb01eec0d03cb38c75c85742192adeb20476f6ebaa1b",
+    "libraries/psibase/native/tests/storage/cpu_accounting_contract.cpp": "e755bfbd80ab88bbb0c936d98ad3dd492a6bcd294fc3fec9583ebee51c75ef97",
+    "libraries/psibase/native/tests/storage/darwin_cpu_contract.cpp": "b1820d961fd75baa686ec35951295772e062dce77303455a7eb50ae05900a955"
+  }
+}

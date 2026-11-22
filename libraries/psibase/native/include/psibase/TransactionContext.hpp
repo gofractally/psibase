@@ -6,7 +6,7 @@
 #include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
 
-namespace eosio::vm
+namespace psizam::detail
 {
    struct stack_manager;
 }
@@ -73,7 +73,7 @@ namespace psibase
       const WasmConfigRow& getWasmConfig() const;
 
       // Returns the alt stack for wasm execution.
-      eosio::vm::stack_manager& getAltStack();
+      psizam::detail::stack_manager& getAltStack();
 
       void incCodeRef(const Checksum256& codeHash,
                       std::uint8_t       vmType,

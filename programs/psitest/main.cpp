@@ -1,9 +1,9 @@
 #include <boost/filesystem/operations.hpp>
-#include <debug_eos_vm/debug_eos_vm.hpp>
 #include <psibase/ActionContext.hpp>
 #include <psibase/LogSocket.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
+#include <psibase/PsizamPolicy.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/api.hpp>
@@ -15,6 +15,7 @@
 #include <psio/to_bin.hpp>
 #include <psio/to_json.hpp>
 #include <psio/view.hpp>
+#include <psizam/debug/debug.hpp>
 
 #include <stdio.h>
 #include <time.h>
@@ -39,12 +40,13 @@ static char** host_environment()
 
 using namespace std::literals;
 
-using eosio::vm::span;
+using std::span;
+namespace dwarf = psizam::debug;
 using psibase::WatchdogManager;
 using psio::convert_to_bin;
 
 struct callbacks;
-using rhf_t = eosio::vm::registered_host_functions<callbacks>;
+using rhf_t = psizam::registered_host_functions<callbacks>;
 
 using cl_flags_t = std::bitset<16>;
 enum cl_flags
@@ -54,33 +56,18 @@ enum cl_flags
 
 void backtrace();
 
-struct vm_options
+struct vm_options : psibase::NativeVMOptions
 {
-   static constexpr bool          enable_simd          = true;
-   static constexpr bool          enable_bulk_memory   = true;
    static constexpr std::uint32_t max_func_local_bytes = 1024 * 1024;
-   static constexpr std::uint32_t max_stack_bytes      = 1024 * 1024;
+   vm_options()
+       : NativeVMOptions(psibase::VMOptions{std::numeric_limits<std::uint32_t>::max(), 65536,
+                                            std::numeric_limits<std::uint32_t>::max(), 1024 * 1024})
+   {
+   }
 };
 
-#ifdef __x86_64__
-template <>
-void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, true>,
-                                    true>::on_unreachable()
-{
-   backtrace();
-   eosio::vm::throw_<wasm_interpreter_exception>("unreachable");
-}
-#endif
-
-using backend_t = eosio::vm::backend<  //
-    rhf_t,
-#ifdef __x86_64__
-    eosio::vm::jit_profile,
-#else
-    eosio::vm::interpreter,
-#endif
-    vm_options,
-    debug_eos_vm::debug_instr_map>;
+using backend_t =
+    psizam::backend<rhf_t, psizam::jit_profile, vm_options, psizam::debug::debug_instr_map>;
 
 inline constexpr int max_backtrace_frames = 512;
 
@@ -227,7 +214,7 @@ struct state
 {
    const char*                              wasm;
    dwarf::info&                             dwarf_info;
-   eosio::vm::wasm_allocator&               wa;
+   psizam::wasm_allocator&                  wa;
    backend_t&                               backend;
    std::vector<std::string>                 args;
    cl_flags_t                               additional_args;
@@ -242,7 +229,7 @@ struct state
 };
 
 template <typename T>
-using wasm_ptr = eosio::vm::argument_proxy<T*>;
+using wasm_ptr = psizam::argument_proxy<T*>;
 
 struct test_chain;
 
@@ -706,7 +693,7 @@ struct callbacks
    void check_bounds(void* data, size_t size)
    {
       volatile auto check = *((const char*)data + size - 1);
-      eosio::vm::ignore_unused_variable_warning(check);
+      psizam::ignore_unused_variable_warning(check);
    }
 
    std::string span_str(span<const char> str) { return {str.data(), str.size()}; }
@@ -793,7 +780,7 @@ struct callbacks
       auto pages = state.backend.get_context().current_linear_memory();
       if (pages < 0)
          return wasi_errno_fault;
-      std::size_t end = static_cast<std::size_t>(pages) * eosio::vm::page_size;
+      std::size_t end = static_cast<std::size_t>(pages) * psizam::page_size;
       if (env > end || buf > end)
          return wasi_errno_fault;
       char* memory = state.backend.get_context().linear_memory();
@@ -1630,7 +1617,7 @@ struct callbacks
       }
    }
 
-   uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset)
+   uint32_t getResult(std::span<char> dest, uint32_t offset)
    {
       if (offset < state.result_value.size() && dest.size())
          memcpy(dest.data(), state.result_value.data() + offset,
@@ -1638,7 +1625,7 @@ struct callbacks
       return state.result_value.size();
    }
 
-   uint32_t getKey(eosio::vm::span<char> dest)
+   uint32_t getKey(std::span<char> dest)
    {
       if (!state.result_key.empty())
          memcpy(dest.data(), state.result_key.data(),
@@ -1646,17 +1633,17 @@ struct callbacks
       return state.result_key.size();
    }
 
-   uint32_t kvGet(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
+   uint32_t kvGet(std::uint32_t chain_index, uint32_t db, std::span<const char> key)
    {
       auto& chain = assert_chain(chain_index);
       return setResult(
           chain.database().kvGetRaw(getDbRead(chain, db).db, {key.data(), key.size()}));
    }
 
-   uint32_t kvGreaterEqual(std::uint32_t               chain_index,
-                           uint32_t                    db,
-                           eosio::vm::span<const char> key,
-                           uint32_t                    matchKeySize)
+   uint32_t kvGreaterEqual(std::uint32_t         chain_index,
+                           uint32_t              db,
+                           std::span<const char> key,
+                           uint32_t              matchKeySize)
    {
       psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
       auto& chain = assert_chain(chain_index);
@@ -1664,10 +1651,10 @@ struct callbacks
                                                           {key.data(), key.size()}, matchKeySize));
    }
 
-   uint32_t kvLessThan(std::uint32_t               chain_index,
-                       uint32_t                    db,
-                       eosio::vm::span<const char> key,
-                       uint32_t                    matchKeySize)
+   uint32_t kvLessThan(std::uint32_t         chain_index,
+                       uint32_t              db,
+                       std::span<const char> key,
+                       uint32_t              matchKeySize)
    {
       psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
       auto& chain = assert_chain(chain_index);
@@ -1675,17 +1662,17 @@ struct callbacks
                                                       {key.data(), key.size()}, matchKeySize));
    }
 
-   uint32_t kvMax(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
+   uint32_t kvMax(std::uint32_t chain_index, uint32_t db, std::span<const char> key)
    {
       auto& chain = assert_chain(chain_index);
       return setResult(
           chain.database().kvMaxRaw(getDbRead(chain, db).db, {key.data(), key.size()}));
    }
 
-   void kvPut(std::uint32_t               chain_index,
-              uint32_t                    db,
-              eosio::vm::span<const char> key,
-              eosio::vm::span<const char> value)
+   void kvPut(std::uint32_t         chain_index,
+              uint32_t              db,
+              std::span<const char> key,
+              std::span<const char> value)
    {
       auto& chain = assert_chain(chain_index);
       state.result_key.clear();
@@ -1694,7 +1681,7 @@ struct callbacks
                                 {value.data(), value.size()});
    }
 
-   void kvRemove(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
+   void kvRemove(std::uint32_t chain_index, uint32_t db, std::span<const char> key)
    {
       auto& chain = assert_chain(chain_index);
       state.result_key.clear();
@@ -1800,7 +1787,7 @@ void fill_substitutions(::state& state, const std::map<std::string, std::string>
       std::vector<uint8_t> bcode;
       try
       {
-         acode = eosio::vm::read_wasm(a);
+         acode = psizam::read_wasm(a);
       }
       catch (...)
       {
@@ -1809,7 +1796,7 @@ void fill_substitutions(::state& state, const std::map<std::string, std::string>
       }
       try
       {
-         bcode = eosio::vm::read_wasm(b);
+         bcode = psizam::read_wasm(b);
       }
       catch (...)
       {
@@ -1829,13 +1816,15 @@ static void run(const char*                               wasm,
                 const std::map<std::string, std::string>& substitutions,
                 const cl_flags_t&                         additional_args)
 {
-   eosio::vm::wasm_allocator wa;
-   auto                      code = eosio::vm::read_wasm(wasm);
-   backend_t                 backend(code, nullptr);
-   psio::input_stream        s{(const char*)code.data(), code.size()};
+   psizam::wasm_allocator wa;
+   auto                   code = psizam::read_wasm(wasm);
+   vm_options             options;
+   psibase::validateNativeWasm(code, options);
+   backend_t backend(code, nullptr, options);
+   psizam::debug::binary::input_stream s{(const char*)code.data(), code.size()};
    //
    auto dwarf_info = dwarf::get_info_from_wasm(s);
-   auto reg        = debug_eos_vm::enable_debug(code, backend, dwarf_info, s);
+   auto reg        = psizam::debug::enable_debug(code, backend, dwarf_info, s);
 
    ::state state{wasm, dwarf_info, wa, backend, args, additional_args};
    fill_substitutions(state, substitutions);
@@ -1846,6 +1835,23 @@ static void run(const char*                               wasm,
    state.files.emplace_back();  // reserve space for fd 3: root dir
    backend.set_wasm_allocator(&wa);
 
+   psizam::detail::scoped_trap_observer observe_traps{
+       +[](const char* message, void* data) noexcept
+       {
+          auto& cb = *static_cast<callbacks*>(data);
+          if (std::string_view(message) == "unreachable" &&
+              psizam::detail::active_code_allocator == &cb.state.backend.get_module().allocator)
+          {
+             try
+             {
+                cb.backtrace();
+             }
+             catch (...)
+             {
+             }
+          }
+       },
+       &cb};
    rhf_t::resolve(backend.get_module());
    backend.initialize(&cb);
    backend(cb, "env", "_start");
@@ -2007,7 +2013,7 @@ int main(int argc, char* argv[])
    {
       std::cerr << "tester wasm asserted: " << e.what() << "\n";
    }
-   catch (eosio::vm::exception& e)
+   catch (psizam::exception& e)
    {
       std::cerr << "vm::exception: " << e.detail() << "\n";
    }
