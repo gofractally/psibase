@@ -497,15 +497,18 @@ class Node(API):
             args.append('--p2p')
         if database_cache_policy is not None:
             args.extend(['--database-cache-policy', str(database_cache_policy)])
-        kw = {}
-        if len(self.env) != 0:
-            env = dict(os.environ)
-            for (k, v) in self.env.items():
-                if v is None:
-                    del env[k]
-                else:
-                    env[k] = v
-            kw['env'] = env
+        env = dict(os.environ)
+        # Each test node has a new database directory, and with it a new, empty
+        # cache of compiled services. Share the user's cache so a service is
+        # compiled once, not once per node per test.
+        cache_home = env.get('XDG_CACHE_HOME') or os.path.join(os.path.expanduser('~'), '.cache')
+        env.setdefault('PSIBASE_NATIVE_AOT_CACHE', os.path.join(cache_home, 'psibase', 'native-aot'))
+        for (k, v) in self.env.items():
+            if v is None:
+                env.pop(k, None)
+            else:
+                env[k] = v
+        kw = {'env': env}
         with open(self.logpath, 'a') as logfile:
             self.child = subprocess.Popen(args, stderr=logfile, **kw)
         self._wait_for_startup()

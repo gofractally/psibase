@@ -4,6 +4,7 @@
 #include <psibase/NativeAotCache.hpp>
 #include <psibase/crypto.hpp>
 #include <cstdlib>
+#include <filesystem>
 #include <tuple>
 #include <unistd.h>
 #if defined(PSIBASE_VM_LLVM_AOT)
@@ -16,10 +17,24 @@ namespace psibase
 {
    namespace
    {
-      // A process that names no cache still gets one, private to the process and
-      // removed when it exits. Without it every backend construction is a full
-      // native compile: a test that starts many nodes compiles the same services
-      // once per node per case.
+      // A process that names no cache shares one per user. An artifact is
+      // keyed by the module, every option that shapes its code, and the
+      // compiler build, so any process may reuse what another compiled.
+      // Without this each test process and each test node compiled the same
+      // services again, seconds per service.
+      std::filesystem::path userCacheDirectory()
+      {
+         const char* base = std::getenv("XDG_CACHE_HOME");
+         if (base && *base == '/')
+            return std::filesystem::path(base) / "psibase" / "native-aot";
+         const char* home = std::getenv("HOME");
+         if (home && *home == '/')
+            return std::filesystem::path(home) / ".cache" / "psibase" / "native-aot";
+         return {};
+      }
+
+      // Used only when the user has no cache directory: private to the
+      // process and removed when it exits.
       std::shared_ptr<NativeAotCache> processNativeAotCache()
       {
          struct Temporary
@@ -29,10 +44,9 @@ namespace psibase
             Temporary()
             {
                std::error_code ignored;
-               auto pattern = (std::filesystem::weakly_canonical(
-                                   std::filesystem::temp_directory_path(ignored), ignored) /
-                               "psibase-native-aot-XXXXXX")
-                                  .string();
+               auto pattern =
+                   (std::filesystem::temp_directory_path(ignored) / "psibase-native-aot-XXXXXX")
+                       .string();
                if (!ignored && ::mkdtemp(pattern.data()))
                {
                   path  = pattern;
@@ -52,10 +66,18 @@ namespace psibase
       }
    }  // namespace
 
-   std::shared_ptr<NativeAotCache> nativeAotCacheFromEnvironment()
+   std::filesystem::path nativeAotCachePath(const std::filesystem::path& fallback)
    {
       if (const char* path = std::getenv("PSIBASE_NATIVE_AOT_CACHE"); path && *path)
-         return std::make_shared<NativeAotCache>(path);
+         return path;
+      return fallback;
+   }
+
+   std::shared_ptr<NativeAotCache> nativeAotCacheFromEnvironment()
+   {
+      if (auto path = nativeAotCachePath(userCacheDirectory()); !path.empty())
+         if (auto cache = std::make_shared<NativeAotCache>(path); cache->usable())
+            return cache;
       return processNativeAotCache();
    }
 

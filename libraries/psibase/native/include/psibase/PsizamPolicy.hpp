@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <psibase/block.hpp>
 #include <psizam/config.hpp>
 #include <psizam/options.hpp>
@@ -11,6 +12,10 @@
 namespace psibase
 {
    class NativeAotCache;
+   /// PSIBASE_NATIVE_AOT_CACHE when set, otherwise `fallback`.
+   std::filesystem::path nativeAotCachePath(const std::filesystem::path& fallback);
+   /// The cache for a process that configures none: PSIBASE_NATIVE_AOT_CACHE,
+   /// else one shared by the user's processes.
    std::shared_ptr<NativeAotCache> nativeAotCacheFromEnvironment();
 
    // Keep chain VMOptions and its wire reflection unchanged. These native-only

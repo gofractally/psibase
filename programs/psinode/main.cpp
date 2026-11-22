@@ -1,3 +1,4 @@
+#include <psibase/PsizamPolicy.hpp>
 #include <psibase/ConfigFile.hpp>
 #include <psibase/LogSocket.hpp>
 #include <psibase/Mount.hpp>
@@ -1249,7 +1250,8 @@ void run(const std::string&              db_path,
            {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes,
             db_conf.sync},
            psibase::storage::open_mode::resize},
-       WasmCache{128, std::filesystem::path(db_path) / "cache" / "llvm-aot"});
+       WasmCache{128, psibase::nativeAotCachePath(std::filesystem::path(db_path) / "cache" /
+                                                     "llvm-aot")});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
 
