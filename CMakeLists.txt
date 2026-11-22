@@ -140,7 +140,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate RDynLd REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
-        Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
+        Transact VerifySig XAdmin XBasic XDb XHttp XKeys XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
         XPackages XPeers XProxy XSocketListService WSEcho XDelay ServerId)
