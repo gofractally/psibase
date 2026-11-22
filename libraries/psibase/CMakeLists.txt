@@ -204,11 +204,16 @@ function(add suffix)
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)
+        # One engine adapter is built; both implement ExecutionContext.hpp.
+        if(PSIBASE_VM_BACKEND STREQUAL "WASMTIME")
+            target_sources(psibase${suffix} PRIVATE native/src/ExecutionContextWasmtime.cpp)
+        else()
+            target_sources(psibase${suffix} PRIVATE native/src/ExecutionContext.cpp)
+        endif()
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
             native/src/BucketSet.cpp
             native/src/ConfigFile.cpp
-            native/src/ExecutionContext.cpp
             native/src/ForkDb.cpp
             native/src/log.cpp
             native/src/LogSocket.cpp

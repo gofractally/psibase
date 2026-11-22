@@ -29,8 +29,8 @@ target_link_libraries(psibase-psizam PUBLIC softfloat ucc::ucc)
 # backend traps ("wasm memory out-of-bounds") in CpuLimit-schema-gen.wasm, which
 # stops a from-scratch build while it generates service schemas. AOT is meant to
 # be a cache in front of JIT2, not a replacement for it.
-set(PSIBASE_VM_BACKEND "JIT2" CACHE STRING "Native VM: LLVM_AOT, JIT2 or JIT1")
-set_property(CACHE PSIBASE_VM_BACKEND PROPERTY STRINGS LLVM_AOT JIT2 JIT1)
+set(PSIBASE_VM_BACKEND "JIT2" CACHE STRING "Native VM: LLVM_AOT, JIT2, JIT1 or WASMTIME")
+set_property(CACHE PSIBASE_VM_BACKEND PROPERTY STRINGS LLVM_AOT JIT2 JIT1 WASMTIME)
 if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
     find_package(LLVM REQUIRED CONFIG)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|X86_64|amd64|AMD64)$")
@@ -117,6 +117,15 @@ elseif(PSIBASE_VM_BACKEND STREQUAL "JIT2")
     target_compile_definitions(psibase-psizam PUBLIC PSIBASE_VM_JIT2)
 elseif(PSIBASE_VM_BACKEND STREQUAL "JIT1")
     target_compile_definitions(psibase-psizam PUBLIC PSIBASE_VM_JIT1)
+elseif(PSIBASE_VM_BACKEND STREQUAL "WASMTIME")
+    # The node executes services with wasmtime. psizam still validates every
+    # module and supplies its stack costs, and the tester keeps a psizam engine.
+    if(NOT EXISTS "${PSIBASE_PSIZAM_SOURCE_DIR}/wasmtime/CMakeLists.txt")
+        message(FATAL_ERROR "The selected psizam source has no wasmtime backend")
+    endif()
+    add_subdirectory("${PSIBASE_PSIZAM_SOURCE_DIR}/wasmtime" psizam-wasmtime)
+    target_link_libraries(psibase-psizam PUBLIC psizam-wasmtime)
+    target_compile_definitions(psibase-psizam PUBLIC PSIBASE_VM_WASMTIME)
 else()
     message(FATAL_ERROR "Unsupported PSIBASE_VM_BACKEND=${PSIBASE_VM_BACKEND}")
 endif()

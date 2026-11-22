@@ -533,6 +533,18 @@ TEST_CASE("Node execution owns cached backends exclusively and resets each trans
          CHECK(NativeService::value(fixture.run(second)) == 8);
          CHECK(fixture.cache.span().empty());
       }
+#if defined(PSIBASE_VM_WASMTIME)
+   }
+   // wasmtime owns its code mappings and shares one compiled module between
+   // transactions, so there is no checked-out backend to account for. What
+   // still holds is that each transaction starts from fresh service state.
+   {
+      psibase::TransactionContext next{fixture.block, fixture.signedTransaction, fixture.trace,
+                                       psibase::DbMode::transaction()};
+      CHECK(NativeService::value(fixture.run(next)) == 8);
+   }
+   CHECK(fixture.cache.span().empty());
+#else
       CHECK_FALSE(fixture.cache.span().empty());
    }
    REQUIRE_FALSE(fixture.cache.span().empty());
@@ -547,6 +559,7 @@ TEST_CASE("Node execution owns cached backends exclusively and resets each trans
    for (auto bytes : reused)
       CHECK(std::ranges::any_of(compiled,
                                 [&](auto previous) { return bytes.data() == previous.data(); }));
+#endif
 }
 
 TEST_CASE("Native config writes reject VM limits that cannot be instantiated")
