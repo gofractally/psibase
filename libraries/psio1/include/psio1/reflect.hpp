@@ -1036,39 +1036,3 @@ namespace psio1::reflection_impl
       requires ::psio::Reflected<T>
    canonical_reflect<T> psio_get_reflect_impl(T*, ReflectDummyParam*);
 }  // namespace psio1::reflection_impl
-
-// TEMPORARY: removed when PSIO closes gaps G16 and G17
-// (doc/pssz-conversion.md).
-namespace psio1
-{
-   // G16. The parameter names of method I of a type reflected with PSIO. For
-   // a type that lists no method, psio::reflect<T> has no member template
-   // `method_param_names` at all (it has `method_pointer`, `method_type` and
-   // `method_name`), so generic code that names it inside a per-method
-   // callback does not compile for such a type even though the callback is
-   // never called. Naming it here, where the type is a template parameter,
-   // defers the lookup to an index that exists.
-   template <typename T, std::size_t I>
-   inline constexpr const auto& canonical_method_param_names =
-       ::psio::reflect<T>::template method_param_names<I>;
-
-   // G17. f(std::integral_constant<std::size_t, I>, name) for each method of
-   // a type reflected with PSIO. psio::reflect<T>::for_each_method also hands
-   // f the pointer to the method, which odr-uses every reflected method: code
-   // that only describes a service (its schema, its pack and template
-   // endpoints) would have to be linked with the service's implementation.
-   namespace reflection_impl
-   {
-      template <typename T, typename F, std::size_t... I>
-      constexpr void canonical_for_each_method_index(F& f, std::index_sequence<I...>)
-      {
-         (f(std::integral_constant<std::size_t, I>{}, ::psio::reflect<T>::method_names[I]), ...);
-      }
-   }  // namespace reflection_impl
-   template <typename T, typename F>
-   constexpr void canonical_for_each_method_index(F&& f)
-   {
-      reflection_impl::canonical_for_each_method_index<T>(
-          f, std::make_index_sequence<::psio::reflect<T>::method_count>{});
-   }
-}  // namespace psio1

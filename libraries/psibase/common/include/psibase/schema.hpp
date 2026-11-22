@@ -132,7 +132,7 @@ namespace psibase
                               std::vector<psio1::schema_types::AnyType*>& eventTypes)
       {
          using reflect = psio::reflect<T>;
-         psio1::canonical_for_each_method_index<T>(
+         reflect::for_each_method(
              [&](auto index, std::string_view name)
              {
                 constexpr std::size_t I = decltype(index)::value;
@@ -140,7 +140,7 @@ namespace psibase
                 auto [pos, inserted]    = out.try_emplace(
                     std::string(name),
                     psio1::schema_types::FunctionType{
-                        makeParams(builder, psio1::canonical_method_param_names<T, I>,
+                        makeParams(builder, reflect::template method_param_names<I>,
                                    (MethodArgs<Method>*)nullptr),
                         makeResult<MethodResult<Method>>(builder)});
                 if (inserted)
@@ -158,7 +158,7 @@ namespace psibase
                              std::vector<psio1::schema_types::AnyType*>& eventTypes)
       {
          using reflect = psio::reflect<T>;
-         psio1::canonical_for_each_method_index<T>(
+         reflect::for_each_method(
              [&](auto index, std::string_view name)
              {
                 constexpr std::size_t I = decltype(index)::value;
@@ -166,7 +166,7 @@ namespace psibase
                 using Event             = nt_wrap<reflect::template method_pointer<I>>;
                 auto [pos, inserted]    = out.try_emplace(
                     std::string(name),
-                    EventType{.type = makeParams(builder, psio1::canonical_method_param_names<T, I>,
+                    EventType{.type = makeParams(builder, reflect::template method_param_names<I>,
                                                  (MethodArgs<Method>*)nullptr),
                               .access = std::string(eventAccess((T*)nullptr, (Event*)nullptr))});
                 if (inserted)

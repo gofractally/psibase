@@ -44,7 +44,7 @@ namespace psibase
       psio1::vector_stream s{json};
       s.write('{');
       bool needComma = false;
-      psio1::canonical_for_each_method_index<T>(
+      reflect::for_each_method(
           [&](auto index, std::string_view name)
           {
              constexpr std::size_t I = decltype(index)::value;
@@ -56,7 +56,7 @@ namespace psibase
              s.write('{');
              generateActionJsonTemplate(
                  (MethodArgs<typename reflect::template method_type<I>>*)nullptr, false,
-                 psio1::canonical_method_param_names<T, I>, s);
+                 reflect::template method_param_names<I>, s);
              s.write('}');
           });
       s.write('}');

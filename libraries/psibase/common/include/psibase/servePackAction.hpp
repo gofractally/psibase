@@ -37,7 +37,7 @@ namespace psibase
    {
       using reflect = psio::reflect<T>;
       std::optional<std::vector<char>> result;
-      psio1::canonical_for_each_method_index<T>(
+      reflect::for_each_method(
           [&](auto index, std::string_view methodName)
           {
              if (methodName == name)
@@ -52,7 +52,7 @@ namespace psibase
                     [&](std::string_view k)
                     {
                        if (!fracpackActionFromJsonImpl<0>(
-                               stream, k, psio1::canonical_method_param_names<T, I>, params))
+                               stream, k, reflect::template method_param_names<I>, params))
                           abortMessage("action '" + std::string(name) +
                                        "' does not have argument '" + std::string(k) + "'");
                     });
