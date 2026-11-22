@@ -29,6 +29,25 @@ file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
 
+# Homebrew keeps ICU outside the linker's default search path, and Boost's
+# static libraries name it without one. Find it rather than leave every
+# native link to fail with "library 'icudata' not found".
+if(APPLE AND NOT ICU_LIBRARY_DIR)
+    # `brew --prefix icu4c` names the newest formula even when an older one
+    # is what is installed, so look for the library itself.
+    execute_process(COMMAND brew --prefix
+        OUTPUT_VARIABLE brew_prefix OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    file(GLOB icu_candidates "${brew_prefix}/opt/icu4c/lib" "${brew_prefix}/opt/icu4c@*/lib"
+        "/opt/homebrew/opt/icu4c*/lib" "/usr/local/opt/icu4c*/lib")
+    foreach(candidate IN LISTS icu_candidates)
+        file(GLOB icu_data "${candidate}/libicudata.*")
+        if(icu_data)
+            set(ICU_LIBRARY_DIR "${candidate}" CACHE PATH "Directory holding the ICU libraries")
+            break()
+        endif()
+    endforeach()
+endif()
+
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
