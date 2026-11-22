@@ -113,6 +113,18 @@ namespace glue
    };
    PSIO1_REFLECT(OldPoint, x, label, z)
 
+   // A record without members (psibase has several: TLSInfo, ...).
+   struct Nothing
+   {
+      friend bool operator==(const Nothing&, const Nothing&) = default;
+   };
+   PSIO_REFLECT(Nothing)
+   struct OldNothing
+   {
+      friend bool operator==(const OldNothing&, const OldNothing&) = default;
+   };
+   PSIO1_REFLECT(OldNothing)
+
    using Time = std::chrono::time_point<std::chrono::system_clock,
                                         std::chrono::duration<std::int64_t, std::micro>>;
 
@@ -174,6 +186,26 @@ TEST_CASE("PSIO-declared types: reflection", "[canonical]")
    CHECK(std::string_view{psio1::get_type_name<Point>()} == "Point");
    CHECK(std::string_view{psio1::get_type_name<std::vector<Tag>>()} == "Tag[]");
    CHECK(std::string_view{psio1::reflect<Point>::data_member_names[1]} == "label");
+   // The name is the FixedString a legacy declaration has; psibase builds
+   // GraphQL type names from it at compile time.
+   static_assert(std::is_same_v<decltype(psio1::reflect<Point>::name),
+                                const psio1::FixedString<5>>);
+   static_assert(std::string_view{psio1::reflect<Point>::name + "Edge"} == "PointEdge");
+   static_assert(std::string_view{psio1::reflect<OldPoint>::name + "Edge"} == "OldPointEdge");
+
+   // The member names are an array of exactly the members; psibase iterates it.
+   static_assert(std::size(psio1::reflect<Point>::data_member_names) == 3);
+   std::string names;
+   for (const char* name : psio1::reflect<Point>::data_member_names)
+      names += name;
+   CHECK(names == "xlabelz");
+   static_assert(sizeof(psio1::reflect<Nothing>::data_member_names) ==
+                 sizeof(psio1::reflect<OldNothing>::data_member_names));
+   CHECK(psio1::convert_to_frac(Nothing{}) == psio1::convert_to_frac(OldNothing{}));
+   CHECK(psio1::convert_to_json(Nothing{}) == psio1::convert_to_json(OldNothing{}));
+   CHECK(psio1::convert_to_frac(std::optional<Nothing>{Nothing{}}) ==
+         psio1::convert_to_frac(std::optional<OldNothing>{OldNothing{}}));
+   CHECK(psio1::from_frac<Nothing>(psio1::convert_to_frac(Nothing{})) == Nothing{});
 }
 
 TEST_CASE("PSIO-declared types: fracpack bytes are those of the legacy declaration", "[canonical]")

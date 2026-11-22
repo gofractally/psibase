@@ -896,13 +896,16 @@ namespace psio1::reflection_impl
 // PSIO1_REFLECT. Only data members are bridged.
 namespace psio1::reflection_impl
 {
-   struct canonical_name
+   // The type's name as PSIO1_REFLECT gives it: a FixedString, which code
+   // concatenates at compile time (`reflect<T>::name + "Edge"`).
+   template <unsigned N>
+   constexpr FixedString<N> canonical_name(std::string_view text)
    {
-      const char* text;
-      constexpr const char* c_str() const { return text; }
-      constexpr             operator const char*() const { return text; }
-      constexpr             operator std::string_view() const { return text; }
-   };
+      char buf[N + 1] = {};
+      for (unsigned i = 0; i < N; ++i)
+         buf[i] = text[i];
+      return FixedString<N>{buf};
+   }
 
    // The projection a PSIO record proxy inherits; it forwards to the proxy
    // object this library's proxies hold.
@@ -922,12 +925,27 @@ namespace psio1::reflection_impl
       }
    };
 
+   // The member names, in an array of exactly as many elements as members
+   // (code iterates over it); empty for a record without members, as the
+   // array PSIO1_REFLECT declares is.
+   template <typename T, std::size_t... I>
+   struct canonical_data_names
+   {
+      static constexpr const char* data_member_names[] = {
+          ::psio::reflect<T>::template member_name<I>.data()...};
+   };
+   template <typename T>
+   struct canonical_data_names<T>
+   {
+      static constexpr const char* data_member_names[] = {};
+   };
+
    template <typename T,
              typename = std::make_index_sequence<::psio::reflect<T>::member_count>>
    struct canonical_reflect;
 
    template <typename T, std::size_t... I>
-   struct canonical_reflect<T, std::index_sequence<I...>>
+   struct canonical_reflect<T, std::index_sequence<I...>> : canonical_data_names<T, I...>
    {
       static_assert(::psio::reflect<T>::method_count == 0,
                     "psio1 does not bridge the methods of a type reflected with PSIO");
@@ -939,11 +957,10 @@ namespace psio1::reflection_impl
       static constexpr bool is_struct               = true;
       static constexpr bool definitionWillNotChange = ::psio::is_dwnc_v<T>;
       static constexpr bool requires_compressed_method_names() { return true; }
-      static constexpr canonical_name name{::psio::reflect<T>::name.data()};
+      static constexpr auto name =
+          canonical_name<static_cast<unsigned>(::psio::reflect<T>::name.size())>(
+              ::psio::reflect<T>::name);
       using data_members = MemberList<::psio::reflect<T>::template member_pointer<I>...>;
-      // One extra element: an empty record must not declare an empty array.
-      static constexpr const char* data_member_names[sizeof...(I) + 1] = {
-          ::psio::reflect<T>::template member_name<I>.data()..., nullptr};
       using member_functions = MemberList<>;
       static constexpr std::initializer_list<const char*> member_function_names[1] = {};
       static constexpr auto member_pointers()
