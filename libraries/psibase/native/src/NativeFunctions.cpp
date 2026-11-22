@@ -2,6 +2,7 @@
 
 #include <psibase/ActionContext.hpp>
 #include <psibase/Mount.hpp>
+#include <psibase/PsizamPolicy.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/saturating.hpp>
@@ -184,6 +185,9 @@ namespace psibase
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "WasmConfigRow has incorrect key");
+         // Reject an unusable execution policy while the privileged write can
+         // still fail, rather than accepting a row that prevents its repair.
+         static_cast<void>(NativeVMOptions{row.vmOptions});
       }
 
       void verifyNotifyTableRow(psio::input_stream key, psio::input_stream value)

@@ -4,18 +4,29 @@
 #include <cstring>
 #include <functional>
 #include <psibase/PsizamPolicy.hpp>
+#include <psibase/NativeFunctions.hpp>
+#include <psibase/ActionContext.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
 #include <psio/fracpack.hpp>
-#include <psizam/backend.hpp>
+#include <psibase/NativeVM.hpp>
 #include <psizam/debug/debug.hpp>
 #include <thread>
 #include "TempDirectory.hpp"
 
 namespace
 {
+   struct TrackedHostFailure : std::runtime_error
+   {
+      std::shared_ptr<int> payload;
+      explicit TrackedHostFailure(std::shared_ptr<int> value)
+          : std::runtime_error("host exception"), payload(std::move(value))
+      {
+      }
+   };
+
    struct Host
    {
       unsigned                                  spans      = 0;
@@ -23,6 +34,7 @@ namespace
       unsigned                                  destructed = 0;
       std::string                               seen;
       std::function<std::int32_t(std::int32_t)> nested;
+      std::weak_ptr<int> failurePayload;
       std::uint64_t span(std::span<const char> value, std::uint32_t salt)
       {
          ++spans;
@@ -39,13 +51,15 @@ namespace
       void         fail()
       {
          auto cleanup = psio::finally{[&] { ++destructed; }};
-         throw std::runtime_error("host exception");
+         auto payload = std::make_shared<int>(1);
+         failurePayload = payload;
+         throw TrackedHostFailure(std::move(payload));
       }
       double nan() { return std::bit_cast<double>(0x7ff0000000000001ull); }
    };
    using Functions = psizam::registered_host_functions<Host>;
    using Backend   = psizam::backend<Functions,
-                                     psizam::jit_profile,
+                                     psibase::NativeVM,
                                      psibase::NativeVMOptions,
                                      psizam::debug::debug_instr_map>;
 
@@ -136,6 +150,61 @@ TEST_CASE("Native declaration preflight rejects unsupported resource and import 
    }
 }
 
+namespace
+{
+   struct AllowedProposals : psibase::NativeVMOptions
+   {
+      static constexpr bool enable_atomics = true;
+      static constexpr bool enable_relaxed_simd = true;
+      static constexpr bool enable_tail_calls = true;
+      AllowedProposals() : NativeVMOptions({}) {}
+   };
+}
+
+TEST_CASE("Native engines share the explicit supported proposal profile")
+{
+   // A valid () -> () function, with no imports or exported host ABI.
+   auto make = [](std::vector<uint8_t> instructions)
+   {
+      std::vector<uint8_t> body{0};  // zero local declarations
+      body.insert(body.end(), instructions.begin(), instructions.end());
+      body.push_back(0x0b);
+      REQUIRE(body.size() < 126);
+      psizam::wasm_code code{0, 'a', 's', 'm', 1, 0, 0, 0,
+                             1, 4, 1, 0x60, 0, 0, 3, 2, 1, 0,
+                             10, static_cast<uint8_t>(body.size() + 2), 1,
+                             static_cast<uint8_t>(body.size())};
+      code.insert(code.end(), body.begin(), body.end());
+      return code;
+   };
+   std::vector<std::vector<uint8_t>> functions{
+       {0xfe, 3, 0},  // atomic.fence
+       {0x12, 0}      // return_call to the valid () -> () self function
+   };
+   std::vector<uint8_t> swizzle;
+   for (int i = 0; i < 2; ++i)
+   {
+      swizzle.insert(swizzle.end(), {0xfd, 0x0c});  // v128.const
+      swizzle.insert(swizzle.end(), 16, 0);
+   }
+   swizzle.insert(swizzle.end(), {0xfd, 0x80, 2, 0x1a});  // relaxed_swizzle; drop
+   functions.push_back(std::move(swizzle));
+   const std::array enabled{psibase::NativeVMOptions::enable_atomics,
+                            psibase::NativeVMOptions::enable_tail_calls,
+                            psibase::NativeVMOptions::enable_relaxed_simd};
+   for (size_t i = 0; i < functions.size(); ++i)
+   {
+      auto code = make(functions[i]);
+      using Validator = psizam::backend<std::nullptr_t, psizam::null_backend, AllowedProposals>;
+      REQUIRE_NOTHROW(Validator(code, nullptr, AllowedProposals{}));
+      if (enabled[i])
+         CHECK_NOTHROW(Backend(code, nullptr, psibase::NativeVMOptions({})));
+      else
+         CHECK_THROWS_AS(Backend(code, nullptr, psibase::NativeVMOptions({})),
+                         psizam::wasm_parse_exception);
+   }
+}
+
 TEST_CASE("Registered native spans and unaligned pointer proxies keep their WASM ABI")
 {
    Runtime runtime;
@@ -192,9 +261,42 @@ TEST_CASE("Host exceptions unwind native objects and the backend remains reusabl
    Runtime runtime;
    CHECK_THROWS_WITH(runtime.run("throw"), "host exception");
    CHECK(runtime.host.destructed == 1);
+   CHECK(runtime.host.failurePayload.expired());
    runtime.backend.get_context().set_max_call_depth(runtime.options.max_stack_bytes);
    CHECK(runtime.integer("value") == 42);
 }
+
+#if defined(PSIBASE_VM_LLVM_AOT)
+TEST_CASE("LLVM raw host trampolines release caught exception ownership")
+{
+   Runtime runtime;
+   CHECK(runtime.integer("value") == 42);
+   auto& context = runtime.backend.get_context();
+   psizam::host_trampoline_t raw[] = {
+       +[](void*, psizam::native_value* args, char*) -> psizam::native_value
+       {
+          reinterpret_cast<Host*>(args[0].i64)->fail();
+          return {};
+       }};
+   auto previous = context._host_trampoline_ptrs;
+   auto restore = psio::finally{[&] { context._host_trampoline_ptrs = previous; }};
+   context._host_trampoline_ptrs = raw;
+   psizam::native_value argument{reinterpret_cast<uint64_t>(&runtime.host)};
+   auto invoke = [&]
+   {
+      psizam::detail::invoke_with_signal_handler(
+          [&] { __psizam_call_host(&context, 0, &argument, 1); },
+          [](int) { throw std::runtime_error("unexpected signal in raw host callback"); },
+          runtime.backend.get_module().allocator, &runtime.memory);
+   };
+   // This callback throws normally into the LLVM helper's own exception
+   // boundary, instead of escaping inside the registered-host trampoline.
+   CHECK_THROWS_WITH(invoke(), "host exception");
+   CHECK(runtime.host.destructed == 1);
+   CHECK(runtime.host.failurePayload.expired());
+   CHECK(psizam::detail::saved_exception == nullptr);
+}
+#endif
 
 TEST_CASE("Native psizam enforces byte stack limits and deterministic floating point")
 {
@@ -445,6 +547,43 @@ TEST_CASE("Node execution owns cached backends exclusively and resets each trans
    for (auto bytes : reused)
       CHECK(std::ranges::any_of(compiled,
                                 [&](auto previous) { return bytes.data() == previous.data(); }));
+}
+
+TEST_CASE("Native config writes reject VM limits that cannot be instantiated")
+{
+   for (auto table : {psibase::transactionWasmConfigTable, psibase::proofWasmConfigTable})
+   {
+      NativeService fixture;
+      auto mode = psibase::DbMode::transaction();
+      psibase::TransactionContext transaction{fixture.block, fixture.signedTransaction,
+                                               fixture.trace, mode};
+      auto action = fixture.action();
+      psibase::ActionTrace trace;
+      psibase::ActionContext context{transaction, action, trace};
+      psibase::NativeFunctions host{
+          fixture.block.db, transaction, mode,
+          {.codeNum = fixture.service, .flags = psibase::CodeRow::isPrivileged}, &context};
+      auto handle = host.kvOpen(static_cast<uint32_t>(psibase::DbId::native), {},
+                                static_cast<uint32_t>(psibase::KvMode::write));
+      auto key = psio::convert_to_key(psibase::WasmConfigRow::key(table));
+      psibase::WasmConfigRow valid;
+      auto expected = psio::to_frac(valid);
+      // Seed the existing row through the fixture's database. The host writes
+      // below must fail in validation before resource notifications execute.
+      fixture.block.db.kvPut(psibase::DbId::native, valid.key(table), valid);
+      for (bool pages : {true, false})
+      {
+         auto invalid = valid;
+         if (pages)
+            invalid.vmOptions.max_pages = 65537;
+         else
+            invalid.vmOptions.max_stack_bytes = 0xffffffffu;
+         CHECK_THROWS(host.kvPut(handle, key, psio::to_frac(invalid)));
+         auto retained = fixture.block.db.kvGetRaw(psibase::DbId::native, key);
+         REQUIRE(retained.has_value());
+         CHECK(std::ranges::equal(std::span(retained->pos, retained->end), expected));
+      }
+   }
 }
 
 TEST_CASE("Node host bounds traps and watchdog timeouts leave cached code reusable")
