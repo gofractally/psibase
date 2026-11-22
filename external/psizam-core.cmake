@@ -25,11 +25,7 @@ target_compile_options(psibase-psizam PUBLIC
     $<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-fbracket-depth=1024>)
 target_link_libraries(psibase-psizam PUBLIC softfloat ucc::ucc)
 
-# JIT2 is the default until LLVM_AOT runs every module JIT2 does: today the AOT
-# backend traps ("wasm memory out-of-bounds") in CpuLimit-schema-gen.wasm, which
-# stops a from-scratch build while it generates service schemas. AOT is meant to
-# be a cache in front of JIT2, not a replacement for it.
-set(PSIBASE_VM_BACKEND "JIT2" CACHE STRING "Native VM: LLVM_AOT, JIT2 or JIT1")
+set(PSIBASE_VM_BACKEND "LLVM_AOT" CACHE STRING "Native VM: LLVM_AOT, JIT2 or JIT1")
 set_property(CACHE PSIBASE_VM_BACKEND PROPERTY STRINGS LLVM_AOT JIT2 JIT1)
 if(PSIBASE_VM_BACKEND STREQUAL "LLVM_AOT")
     find_package(LLVM REQUIRED CONFIG)
