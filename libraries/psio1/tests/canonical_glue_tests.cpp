@@ -156,7 +156,7 @@ namespace glue
       Holder holder;
       Tag    echo(Tag tag) const { return tag; }
    };
-   PSIO1_REFLECT(Root, holder, method(echo, tag))
+   PSIO_REFLECT(Root, holder, method(echo, tag))
 }  // namespace glue
 
 PSIO_ADAPTER(glue::Tag, psio::text_category, glue::TagText)
@@ -668,4 +668,425 @@ TEST_CASE("psibase records: GraphQL", "[canonical][records]")
                           "services { codeNum vmType } } } }",
                           "") ==
          R"({"data": {"nft":{"id":42,"issuer":"alice","owner":"bob"},"header":{"blockNum":7,"producer":"prod","time":"2026-11-22T10:15:30.123456Z","term":3,"newConsensus":{"wasmConfig":{"numExecutionMemories":3},"services":[{"codeNum":"verify-sig","vmType":1}]}}}})");
+}
+
+// ---------------------------------------------------------------------------
+// Methods. A class whose methods are listed with PSIO's `method(name,
+// params...)` has, in this library, the method metadata of the same class
+// declared with PSIO1_REFLECT: psibase's dispatcher, call proxies (Actor,
+// transactor, EventEmitter), schema generation, pack endpoints and GraphQL
+// all read it from psio1::reflect.
+// ---------------------------------------------------------------------------
+namespace glue
+{
+   struct Ledger
+   {
+      std::uint32_t version = 1;
+
+      void         init() {}
+      std::string  transfer(Tag from, const std::string& memo, std::optional<std::int32_t> amount)
+      {
+         return std::to_string(from.value) + "/" + memo + "/" + std::to_string(amount.value_or(-1));
+      }
+      std::int32_t balance(Tag who) const { return static_cast<std::int32_t>(who.value) + 1; }
+      Point        locate(psio1::view<const Point> at, std::int32_t dx) const
+      {
+         return Point{at.x() + dx, std::string{std::string_view{at.label()}}, std::nullopt};
+      }
+      std::int32_t unnamed(std::int32_t a, std::int32_t b) const { return a * b; }
+   };
+   PSIO_REFLECT(Ledger,
+                version,
+                method(init),
+                method(transfer, from, memo, amount),
+                method(balance, who),
+                method(locate, at, dx),
+                method(unnamed))
+
+   struct OldLedger
+   {
+      std::uint32_t version = 1;
+
+      void         init() {}
+      std::string  transfer(Tag from, const std::string& memo, std::optional<std::int32_t> amount)
+      {
+         return std::to_string(from.value) + "/" + memo + "/" + std::to_string(amount.value_or(-1));
+      }
+      std::int32_t balance(Tag who) const { return static_cast<std::int32_t>(who.value) + 1; }
+      Point        locate(psio1::view<const Point> at, std::int32_t dx) const
+      {
+         return Point{at.x() + dx, std::string{std::string_view{at.label()}}, std::nullopt};
+      }
+      std::int32_t unnamed(std::int32_t a, std::int32_t b) const { return a * b; }
+   };
+   PSIO1_REFLECT(OldLedger,
+                 version,
+                 method(init),
+                 method(transfer, from, memo, amount),
+                 method(balance, who),
+                 method(locate, at, dx),
+                 method(unnamed))
+
+   // A GraphQL query root: const methods are fields with arguments.
+   struct Catalog
+   {
+      std::uint32_t version = 1;
+      std::int32_t  balance(Tag who) const { return static_cast<std::int32_t>(who.value) + 1; }
+      Point         at(std::int32_t x, std::optional<std::string> label) const
+      {
+         return Point{x, label.value_or("none"), std::nullopt};
+      }
+   };
+   PSIO_REFLECT(Catalog, version, method(balance, who), method(at, x, label))
+
+   struct OldCatalog
+   {
+      std::uint32_t version = 1;
+      std::int32_t  balance(Tag who) const { return static_cast<std::int32_t>(who.value) + 1; }
+      Point         at(std::int32_t x, std::optional<std::string> label) const
+      {
+         return Point{x, label.value_or("none"), std::nullopt};
+      }
+   };
+   PSIO1_REFLECT(OldCatalog, version, method(balance, who), method(at, x, label))
+
+   // Method names that do not compress into a name are addressed by a hash.
+   // The legacy declaration says allowHashedMethods() for them; that keyword
+   // only silences a check nothing instantiates, and PSIO has none.
+   struct Staged
+   {
+      std::int32_t get_staged_tx(std::int32_t id) const { return id + 1; }
+      std::string  set_network_variables(std::string variables) { return variables + "!"; }
+   };
+   PSIO_REFLECT(Staged, method(get_staged_tx, id), method(set_network_variables, variables))
+
+   struct OldStaged
+   {
+      std::int32_t get_staged_tx(std::int32_t id) const { return id + 1; }
+      std::string  set_network_variables(std::string variables) { return variables + "!"; }
+   };
+   PSIO1_REFLECT(OldStaged,
+                 allowHashedMethods(),
+                 method(get_staged_tx, id),
+                 method(set_network_variables, variables))
+
+   // Events are reflected through an alias (PSIBASE_REFLECT_HISTORY_EVENTS).
+   struct Notes
+   {
+      struct Events
+      {
+         struct History
+         {
+            void noted(Tag who, std::string text) {}
+         };
+      };
+   };
+   using Notes_EventsHistory = Notes::Events::History;
+   PSIO_REFLECT(Notes_EventsHistory, method(noted, who, text))
+
+   // What a call proxy (psibase::Actor and friends) is given.
+   struct CallRecorder
+   {
+      std::vector<std::string>* log;
+
+      template <std::uint32_t idx, auto MemberPtr, typename... Args>
+      auto call(Args&&... args) const
+      {
+         using Class  = decltype(psio1::class_of_member(MemberPtr));
+         using Params = typename psio1::make_param_value_tuple<decltype(MemberPtr)>::type;
+         std::string entry = *psio1::reflect<Class>::member_function_names[idx].begin();
+         entry += "#" + std::to_string(idx) + "(";
+         ((entry += std::is_reference_v<Args> ? "ref," : "value,"), ...);
+         entry += ")";
+         // The arguments, packed as the method's parameter tuple.
+         for (unsigned char c : psio1::convert_to_frac(Params(std::forward<Args>(args)...)))
+            entry += "0123456789abcdef"[c >> 4], entry += "0123456789abcdef"[c & 15];
+         log->push_back(std::move(entry));
+         return idx;
+      }
+   };
+
+   // Everything psio1::reflect says about the methods of T, as text.
+   template <typename T>
+   std::vector<std::string> methodMetadata()
+   {
+      std::vector<std::string> out;
+      std::size_t              i = 0;
+      psio1::for_each_member_type(
+          (typename psio1::reflect<T>::member_functions*)nullptr,
+          [&](auto member)
+          {
+             using M = psio1::MemberPtrType<decltype(member)>;
+             std::string entry;
+             for (const char* name : psio1::reflect<T>::member_function_names[i])
+                entry += std::string{name} + " ";
+             entry += M::isConstFunction ? "const " : "mutable ";
+             entry += std::to_string(M::numArgs) + " ";
+             entry += psio1::get_type_name<
+                 typename psio1::make_param_value_tuple<decltype(member)>::type>();
+             out.push_back(std::move(entry));
+             ++i;
+          });
+      return out;
+   }
+
+   template <typename F, typename V, std::size_t... I>
+   decltype(auto) callWithView(F&& f, V&& view, std::index_sequence<I...>)
+   {
+      return f(psio1::get<I>(view)...);
+   }
+
+   // psibase's dispatcher: find the method by its hashed name, validate the
+   // packed parameter tuple, read it through a view, call.
+   template <typename T>
+   std::string dispatch(std::uint64_t method, const std::vector<char>& packed)
+   {
+      std::string result = "unknown";
+      T           service;
+      psio1::get_member_function<T>(
+          method,
+          [&](auto member, auto names)
+          {
+             using Params = typename psio1::make_param_value_tuple<decltype(member)>::type;
+             using R      = decltype(psio1::result_of(member));
+             if (!psio1::fracpack_validate<Params>(packed))
+             {
+                result = "invalid";
+                return;
+             }
+             psio1::view<const Params> view{psio1::prevalidated{packed}};
+             result = std::string{*names.begin()} + ":";
+             callWithView(
+                 [&](auto... args)
+                 {
+                    if constexpr (std::is_void_v<R>)
+                       (service.*member)(std::forward<decltype(args)>(args)...);
+                    else
+                       result += psio1::convert_to_json(
+                           (service.*member)(std::forward<decltype(args)>(args)...));
+                 },
+                 view, std::make_index_sequence<std::tuple_size_v<Params>>{});
+          });
+      return result;
+   }
+}  // namespace glue
+
+TEST_CASE("PSIO-declared methods: metadata is that of the legacy declaration", "[canonical][methods]")
+{
+   using New = psio1::reflect<Ledger>;
+   using Old = psio1::reflect<OldLedger>;
+   static_assert(psio::reflect<Ledger>::method_count == 5);
+   static_assert(std::is_same_v<decltype(New::member_function_names[0]),
+                                decltype(Old::member_function_names[0])>);
+
+   // Names, parameter names, constness, arity and parameter tuple.
+   const auto metadata = methodMetadata<Ledger>();
+   CHECK(metadata == methodMetadata<OldLedger>());
+   REQUIRE(metadata.size() == 5);
+   CHECK(metadata[0] == "init mutable 0 tuple");
+   CHECK(metadata[1] == "transfer from memo amount mutable 3 tuple_Tag_string_int32?");
+   CHECK(metadata[2] == "balance who const 1 tuple_Tag");
+   CHECK(metadata[3] == "locate at dx const 2 tuple_Point_int32");
+   // Parameter names are optional.
+   CHECK(metadata[4] == "unnamed const 2 tuple_int32_int32");
+
+   static_assert(std::is_same_v<psio1::make_param_value_tuple<decltype(&Ledger::locate)>::type,
+                                std::tuple<Point, std::int32_t>>);
+   static_assert(std::is_same_v<decltype(psio1::result_of(&Ledger::transfer)), std::string>);
+
+   // The data member beside the methods is still the record's only member.
+   CHECK(psio1::convert_to_frac(Ledger{7}) == psio1::convert_to_frac(OldLedger{7}));
+   CHECK(psio1::convert_to_json(Ledger{7}) == psio1::convert_to_json(OldLedger{7}));
+   CHECK(std::string_view{New::data_member_names[0]} == "version");
+
+   // An events struct reflected through an alias keeps the alias as its name.
+   CHECK(std::string_view{psio1::get_type_name<Notes::Events::History>()} ==
+         "Notes_EventsHistory");
+   CHECK(methodMetadata<Notes::Events::History>() ==
+         std::vector<std::string>{"noted who text mutable 2 tuple_Tag_string"});
+}
+
+TEST_CASE("PSIO-declared methods: lookup by name and by hashed name", "[canonical][methods]")
+{
+   auto indexByHash = [](auto* type, std::uint64_t hash)
+   {
+      using T   = std::remove_pointer_t<decltype(type)>;
+      int found = -1;
+      bool hit  = psio1::get_member_function<T>(
+          hash,
+          [&](auto, auto names)
+          {
+             for (int i = 0; i < 5; ++i)
+                if (*psio1::reflect<T>::member_function_names[i].begin() == *names.begin())
+                   found = i;
+          });
+      CHECK(hit == (found >= 0));
+      return found;
+   };
+   auto indexByName = [](auto* type, std::string_view name)
+   {
+      using T   = std::remove_pointer_t<decltype(type)>;
+      int found = -1;
+      psio1::get_member_function<T>(
+          name,
+          [&](auto, std::span<const char* const> names)
+          {
+             for (int i = 0; i < 5; ++i)
+                if (*psio1::reflect<T>::member_function_names[i].begin() == names[0])
+                   found = i;
+          });
+      return found;
+   };
+   int expected = 0;
+   for (const char* name : {"init", "transfer", "balance", "locate", "unnamed"})
+   {
+      const auto hash = psio1::hash_name(name);
+      CHECK(psio1::is_compressed_name(hash));
+      CHECK(indexByHash((Ledger*)nullptr, hash) == expected);
+      CHECK(indexByHash((OldLedger*)nullptr, hash) == expected);
+      CHECK(indexByName((Ledger*)nullptr, name) == expected);
+      CHECK(indexByName((OldLedger*)nullptr, name) == expected);
+      // PSIO's own lookup, with psibase's method-name hash, agrees.
+      struct MethodHash
+      {
+         constexpr std::uint64_t operator()(std::string_view n) const
+         {
+            return psio::detail::method_to_number(n);
+         }
+      };
+      CHECK(psio::reflect<Ledger>::index_of_method_hash<MethodHash>(hash) ==
+            std::optional<std::size_t>(expected));
+      ++expected;
+   }
+   CHECK(indexByHash((Ledger*)nullptr, psio1::hash_name("version")) == -1);
+   CHECK(indexByHash((Ledger*)nullptr, psio1::hash_name("nope")) == -1);
+   CHECK(indexByName((Ledger*)nullptr, "nope") == -1);
+
+   int typed = 0;
+   CHECK(psio1::get_member_function_type<Ledger>(
+       psio1::hash_name("balance"),
+       [&](auto member, auto names)
+       {
+          typed += std::is_same_v<decltype(member), std::int32_t (Ledger::*)(Tag) const>;
+          typed += names.size() == 2;
+       }));
+   CHECK(typed == 2);
+}
+
+TEST_CASE("PSIO-declared methods: call proxies", "[canonical][methods]")
+{
+   std::vector<std::string> newLog, oldLog;
+   psio1::reflect<Ledger>::proxy<CallRecorder>    newProxy{&newLog};
+   psio1::reflect<OldLedger>::proxy<CallRecorder> oldProxy{&oldLog};
+   CHECK(newProxy.psio_get_proxy().log == &newLog);
+
+   const Tag         who{9};
+   std::string       memo = "rent";
+   const Point       at{4, "here", std::nullopt};
+   // lvalues, const lvalues, temporaries, convertible arguments, no arguments
+   CHECK(newProxy.init() == 0u);
+   CHECK(oldProxy.init() == 0u);
+   CHECK(newProxy.transfer(who, memo, 5) == 1u);
+   CHECK(oldProxy.transfer(who, memo, 5) == 1u);
+   CHECK(newProxy.transfer(Tag{1}, "lit", std::nullopt) == 1u);
+   CHECK(oldProxy.transfer(Tag{1}, "lit", std::nullopt) == 1u);
+   CHECK(newProxy.balance(who) == 2u);
+   CHECK(oldProxy.balance(who) == 2u);
+   CHECK(newProxy.locate(at, 3) == 3u);
+   CHECK(oldProxy.locate(at, 3) == 3u);
+   CHECK(newProxy.unnamed(6, 7) == 4u);
+   CHECK(oldProxy.unnamed(6, 7) == 4u);
+   CHECK(memo == "rent");
+
+   // The proxy object saw the same method, index, argument categories and
+   // argument values either way.
+   CHECK(newLog == oldLog);
+   REQUIRE(newLog.size() == 6);
+   CHECK(newLog[0] == "init#0()0000");  // an empty parameter tuple
+   CHECK(newLog[1].starts_with("transfer#1(value,value,value,)"));
+   CHECK(newLog[5].starts_with("unnamed#4(value,value,)"));
+
+   // An events proxy over an aliased events struct.
+   std::vector<std::string>                                  eventLog;
+   psio1::reflect<Notes::Events::History>::proxy<CallRecorder> events{&eventLog};
+   CHECK(events.noted(who, "text") == 0u);
+   CHECK(eventLog.size() == 1);
+   CHECK(eventLog[0].starts_with("noted#0(value,value,)"));
+}
+
+TEST_CASE("PSIO-declared methods: dispatch by hashed name over packed arguments",
+          "[canonical][methods]")
+{
+   const auto transferArgs = psio1::convert_to_frac(
+       std::tuple{Tag{3}, std::string{"memo"}, std::optional<std::int32_t>{12}});
+   const auto balanceArgs = psio1::convert_to_frac(std::tuple{Tag{41}});
+   const auto locateArgs  = psio1::convert_to_frac(std::tuple{Point{1, "p", 2}, std::int32_t{10}});
+   const auto noArgs      = psio1::convert_to_frac(std::tuple{});
+
+   for (auto&& [name, packed] :
+        std::vector<std::pair<const char*, std::vector<char>>>{{"init", noArgs},
+                                                              {"transfer", transferArgs},
+                                                              {"balance", balanceArgs},
+                                                              {"locate", locateArgs},
+                                                              {"balance", {}},
+                                                              {"missing", noArgs}})
+   {
+      CHECK(dispatch<Ledger>(psio1::hash_name(name), packed) ==
+            dispatch<OldLedger>(psio1::hash_name(name), packed));
+   }
+   CHECK(dispatch<Ledger>(psio1::hash_name("transfer"), transferArgs) ==
+         R"(transfer:"3/memo/12")");
+   CHECK(dispatch<Ledger>(psio1::hash_name("balance"), balanceArgs) == "balance:42");
+   CHECK(dispatch<Ledger>(psio1::hash_name("locate"), locateArgs) ==
+         R"(locate:{"x":11,"label":"p","z":null})");
+   CHECK(dispatch<Ledger>(psio1::hash_name("balance"), {}) == "invalid");
+   CHECK(dispatch<Ledger>(psio1::hash_name("missing"), noArgs) == "unknown");
+}
+
+TEST_CASE("PSIO-declared methods: GraphQL", "[canonical][methods]")
+{
+   const Catalog    catalog{3};
+   const OldCatalog old{3};
+   const char*      query =
+       R"({ version balance(who: "@41") at(x: 5, label: "here") { x label } other: at(x: 6) { label } })";
+   const auto text = psio1::gql_query(catalog, query, "");
+   CHECK(text == psio1::gql_query(old, query, ""));
+   CHECK(text ==
+         R"({"data": {"version":3,"balance":42,"at":{"x":5,"label":"here"},"other":{"label":"none"}}})");
+
+   // The generated GraphQL schema differs in the type name only.
+   auto schema = psio1::get_gql_schema<OldCatalog>();
+   for (auto at = schema.find("OldCatalog"); at != std::string::npos; at = schema.find("OldCatalog"))
+      schema.erase(at, 3);
+   CHECK(psio1::get_gql_schema<Catalog>() == schema);
+   CHECK(schema.find("balance(who: String!): Int!") != std::string::npos);
+}
+
+TEST_CASE("PSIO-declared methods: names that do not compress", "[canonical][methods]")
+{
+   const auto getHash = psio1::hash_name("get_staged_tx");
+   const auto setHash = psio1::hash_name("set_network_variables");
+   CHECK_FALSE(psio1::is_compressed_name(getHash));
+   CHECK_FALSE(psio1::is_compressed_name(setHash));
+   CHECK(getHash != setHash);
+
+   CHECK(methodMetadata<Staged>() == methodMetadata<OldStaged>());
+   CHECK(methodMetadata<Staged>() ==
+         std::vector<std::string>{"get_staged_tx id const 1 tuple_int32",
+                                  "set_network_variables variables mutable 1 tuple_string"});
+
+   const auto id   = psio1::convert_to_frac(std::tuple{std::int32_t{41}});
+   const auto text = psio1::convert_to_frac(std::tuple{std::string{"v"}});
+   CHECK(dispatch<Staged>(getHash, id) == "get_staged_tx:42");
+   CHECK(dispatch<OldStaged>(getHash, id) == "get_staged_tx:42");
+   CHECK(dispatch<Staged>(setHash, text) == R"(set_network_variables:"v!")");
+   CHECK(dispatch<OldStaged>(setHash, text) == R"(set_network_variables:"v!")");
+   // The hash is of the whole name: a compressed prefix is another method.
+   CHECK(dispatch<Staged>(psio1::hash_name("get_staged"), id) == "unknown");
+
+   std::vector<std::string> newLog, oldLog;
+   psio1::reflect<Staged>::proxy<CallRecorder>{&newLog}.set_network_variables("v");
+   psio1::reflect<OldStaged>::proxy<CallRecorder>{&oldLog}.set_network_variables("v");
+   CHECK(newLog == oldLog);
+   CHECK(newLog.size() == 1);
 }
