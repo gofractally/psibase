@@ -32,11 +32,25 @@ namespace psibase
       cond.notify_one();
       worker.join();
    }
+   // A budget is CPU time, which passes no faster than the clock the worker
+   // sleeps on, so a budget with `remaining` left cannot run out before
+   // now + remaining. If the worker is already due by then there is nothing
+   // to tell it. Waking it regardless made it run, and take this mutex, on
+   // every pause and resume of every transaction: several times per action.
+   void WatchdogManager::checkWithin(CpuClock::duration remaining)
+   {
+      const auto now = std::chrono::steady_clock::now();
+      if (nextCheck > now && remaining < nextCheck - now)
+      {
+         nextCheck = {};
+         cond.notify_one();
+      }
+   }
    void WatchdogManager::add(Watchdog* wd)
    {
       std::lock_guard l{mutex};
       children.push_back(wd);
-      cond.notify_one();
+      checkWithin(wd->wait_duration());
    }
    void WatchdogManager::remove(Watchdog* wd)
    {
@@ -67,6 +81,8 @@ namespace psibase
             }
          }
          children.erase(iter, children.end());
+         nextCheck = std::chrono::steady_clock::now() +
+                     std::chrono::duration_cast<std::chrono::steady_clock::duration>(earliest);
          cond.wait_for(l, earliest);
       }
    }
@@ -93,17 +109,12 @@ namespace psibase
    void Watchdog::setLimit(CpuClock::duration dur)
    {
       assert(dur.count() >= 0);
-      bool notify;
-      {
-         std::lock_guard l{manager->mutex};
-         notify = dur < limit;
-         limit  = dur;
-         publishBudget();
-      }
-      if (notify)
-      {
-         manager->cond.notify_one();
-      }
+      std::lock_guard l{manager->mutex};
+      const bool      sooner = dur < limit;
+      limit                  = dur;
+      publishBudget();
+      if (sooner)
+         manager->checkWithin(remaining());
    }
    void Watchdog::pause()
    {
@@ -116,13 +127,11 @@ namespace psibase
    void Watchdog::resume()
    {
       assert(paused);
-      {
-         std::lock_guard l{manager->mutex};
-         paused         = false;
-         elapsedOrStart = logicalNow() - elapsedOrStart;
-         publishBudget();
-      }
-      manager->cond.notify_one();
+      std::lock_guard l{manager->mutex};
+      paused         = false;
+      elapsedOrStart = logicalNow() - elapsedOrStart;
+      publishBudget();
+      manager->checkWithin(remaining());
    }
    CpuClock::duration Watchdog::elapsed()
    {
