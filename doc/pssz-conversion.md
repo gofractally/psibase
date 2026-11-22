@@ -1,7 +1,7 @@
 # Converting psibase from fracpack to PSIO / PSSZ
 
-This document records the first three slices of the conversion (branch
-`claude/pssz`), the pattern they established, everything that remains, a
+This document records the first three slices of the conversion and slice 4a
+(branch `claude/pssz`), the pattern they established, everything that remains, a
 proposed order for the remaining slices, the decisions that need the owner's
 confirmation, and the places where PSIO lacks something psibase needs.
 
@@ -10,7 +10,7 @@ No in-tree copy, no fracpack, no compatibility layer. PSSZ on the wire, PSIO's
 `key` format for database keys, I-JSON (`psio::ijson`) for clients, PSIO's
 Schema IR for schemas. No chain data is migrated (fresh genesis).
 
-## 0. Where the tree is after slices 1–3
+## 0. Where the tree is after slices 1–3 and 4a
 
 | | |
 |---|---|
@@ -21,10 +21,11 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 | Slice 1: leaf types | `AccountNumber`, `MethodNumber`; `Seconds`, `MicroSeconds`, `TimePointSec`, `TimePointUSec`; `Checksum160/256/512` (sections 1.1–1.3). |
 | Slice 2: data records | 416 records moved from `PSIO1_REFLECT` to `PSIO_REFLECT` in 106 files. With slice 1's and the tests' own, the tree has 422 data declarations with `PSIO_REFLECT` in 111 files (`libraries/psibase` 107, `libraries/net` 33, `libraries/psibase_http` 1, `programs/*` 20, `packages/system` 75, `packages/user` 105, `packages/local` 37, `packages/psibase_tests` 43, `tests/cmake` 1); 122 table names declared with `PSIO_REFLECT_TYPENAME` in 37 files. 10 records deferred (section 1.9). |
 | Slice 3: services | 124 `PSIO_REFLECT` declarations with methods in 108 files (every C++ service, its events, the query roots and the interfaces), 528 `method(...)` items, plus 15 `PSIBASE_REFLECT_{HISTORY,MERKLE}_EVENTS` sites (28 items), which now expand to `PSIO_REFLECT`. No service is deferred. |
-| Still declared with the legacy macro | 19 `PSIO1_REFLECT` sites in 12 files: the 10 deferred records, and 9 outside the scope of slices 2–3 (`rust/test_fracpack` 5, `libraries/debug_eos_vm` 2, `demo/` 2). 3 `PSIO1_REFLECT_TYPENAME` (2 XAdmin wrappers, 1 in `rust/test_fracpack`). |
+| Slice 4a: method consumers | Everything psibase derives from a class's methods reads `psio::reflect<T>` directly: the call proxies (`Actor`, `transactor`, `EventEmitter`, `ActionViewBuilder`, the tester's `ServiceUser`) are `psio::reflect<T>::proxy<P>`; `dispatch` finds the action with `index_of_method_hash` and calls it with `invoke_method`; the action and event part of the service schema, `/pack_action`, `/action_templates` use `for_each_method` and `method_param_names<I>` (section 1.10). GraphQL still reads methods through `psio1` (slice 9). |
+| Still declared with the legacy macro | 17 `PSIO1_REFLECT` sites in 11 files: the 10 deferred records, and 7 outside the scope of slices 2–3 (`rust/test_fracpack` 5, `libraries/debug_eos_vm` 2). 3 `PSIO1_REFLECT_TYPENAME` (2 XAdmin wrappers, 1 in `rust/test_fracpack`). No class with methods is declared with the legacy macro any more (`demo/` and the documentation examples moved in slice 4a: a service declared with `PSIO1_REFLECT` can no longer be dispatched). |
 | Temporary glue | Only in `libraries/psio1` (section 1.5). Every block is marked `// TEMPORARY: removed when psio1 is deleted`. |
 | Unchanged | Every wire, key, JSON and schema byte psibase produces: everything is still packed, keyed, written as JSON, described and dispatched by `psio1`, which reads the PSIO declarations through the glue. Evidence: after both slices all 68 generated `*-schema.json` files are byte-identical to the build of the tree before slice 2 (071fff6eb); after slice 2 every service and test WASM binary was byte-identical too; after slice 3 half of them still are (section 1.8). |
-| Tests | ctest 92/92 after each slice. `psio-tests` grew from 52 to 66 test cases natively and from 11 to 25 in the guest: pinned legacy bytes of psibase's own records, and legacy method metadata of PSIO-declared classes against legacy twins. |
+| Tests | ctest 92/92 after each slice, 4a included. `psio-tests` grew from 52 to 66 test cases natively and from 11 to 25 in the guest: pinned legacy bytes of psibase's own records, and legacy method metadata of PSIO-declared classes against legacy twins. |
 
 ## 1. The conversion pattern
 
@@ -149,13 +150,13 @@ IR is `Custom{Array{u8, N}, "hex"}`. Nothing is declared in psibase.
 
 | File | What | Why |
 |---|---|---|
-| `psio1/reflect.hpp` (end of file) | `psio1::reflection_impl::canonical_reflect<T>` and a constrained `psio_get_reflect_impl` overload: `psio1::reflect<T>` is derived from `psio::reflect<T>` for any type reflected with PSIO. Everything psibase reads from `psio1::reflect` is provided with the type the legacy macro gives it: `is_defined`, `is_struct`, `definitionWillNotChange`, `name` (a `FixedString`, concatenated at compile time for GraphQL names), `data_members`, `data_member_names` (exactly one element per member; iterated), `member_functions` (a `MemberList` of the method pointers), `member_function_names` (an array of `initializer_list{"method", "param"...}`), and `proxy<P>`: the PSIO proxy over a projection that forwards `get<I, &T::field>()` and `call<I, &T::method>(args...)` to the legacy proxy object, passing arguments by value as the legacy proxy does. | fracpack, views, `to_key`, `to_bin`, schema, GraphQL and generic JSON read the data members; `dispatch.hpp`, `Actor.hpp` (`Actor`, `transactor`, `EventEmitter`, `ActionViewBuilder`), `schema.hpp`, `servePackAction.hpp`, `serveActionTemplates.hpp`, the tester and GraphQL read the methods (`get_member_function` by name and by hashed name, `for_each_member_type`, `make_param_value_tuple`). Binary / key adapters are not bridged (static assertion). `member_pointers()` (read by nothing) lists data members, then methods; the legacy macro interleaves them as written. |
+| `psio1/reflect.hpp` (end of file) | `psio1::reflection_impl::canonical_reflect<T>` and a constrained `psio_get_reflect_impl` overload: `psio1::reflect<T>` is derived from `psio::reflect<T>` for any type reflected with PSIO. Everything read from `psio1::reflect` is provided with the type the legacy macro gives it: `is_defined`, `is_struct`, `definitionWillNotChange`, `name` (a `FixedString`, concatenated at compile time for GraphQL names), `data_members`, `data_member_names` (exactly one element per member; iterated), `member_functions` (a `MemberList` of the method pointers), `member_function_names` (an array of `initializer_list{"method", "param"...}`), and `proxy<P>`: the PSIO proxy over a projection that forwards `get<I, &T::field>()` to the legacy proxy object (the views). | fracpack, views, `to_key`, `to_bin`, schema (tables, keys), GraphQL and generic JSON read the data members. Since slice 4a only `psio1/graphql.hpp` reads the methods (`member_functions`, `member_function_names`, `get_member_function`): the half of the projection that forwarded `call<I, &T::method>(args...)` by value to a legacy call proxy is deleted, with its tests. Binary / key adapters are not bridged (static assertion). `member_pointers()` (read by nothing) lists data members, then methods; the legacy macro interleaves them as written. |
 | `psio1/to_json.hpp`, `psio1/from_json.hpp` | `to_json` / `from_json` overloads for any type with a PSIO `text_category` adapter. | Replaces the ADL `to_json` / `from_json` the converted headers no longer define. `from_json` calls only the adapter's `decode`, so legacy JSON keeps its historical leniency. |
 | `psio1/graphql.hpp` | `use_json_string_for_gql` is true for a type with a PSIO text adapter. | Replaces the ADL hook. |
 | `psio1/schema.hpp` | `psio_custom_schema` is true for `psio::schema_custom_v<T>`; the custom id is `psio::schema_custom_id<T>()`. | Replaces the ADL hook; the ids (`AccountNumber`, `MethodNumber`) are the ones the legacy schemas already used. |
 | `psio1/fracpack.hpp` (last line) | includes `psio1/chrono.hpp`. | `psibase/time.hpp` no longer includes a legacy header. |
 | `libraries/psio1/CMakeLists.txt` | `psio1` links `psio::psio`. | The glue includes PSIO headers. |
-| `libraries/psio1/tests/canonical_glue_tests.cpp` | Each PSIO-declared test type has a twin declared with `PSIO1_REFLECT`; fracpack bytes, views, JSON, keys, schema and GraphQL must be identical. psibase's own records (action, transaction, signed transaction, block header with and without trailing optionals, consensus variant, traces, native rows, an Nft row with its secondary keys, an event payload) are pinned to the bytes, keys, JSON and schemas the tree produced before slice 2. Service-like classes declared with PSIO have the legacy method metadata of their twins: names, parameter names, lookup by name and hashed name, dispatch over packed arguments, proxy call recording, GraphQL. Native and guest. | Deleted with `psio1`. |
+| `libraries/psio1/tests/canonical_glue_tests.cpp` | Each PSIO-declared test type has a twin declared with `PSIO1_REFLECT`; fracpack bytes, views, JSON, keys, schema and GraphQL must be identical. psibase's own records (action, transaction, signed transaction, block header with and without trailing optionals, consensus variant, traces, native rows, an Nft row with its secondary keys, an event payload) are pinned to the bytes, keys, JSON and schemas the tree produced before slice 2. Service-like classes declared with PSIO have the legacy method metadata of their twins: names, parameter names, lookup by name and hashed name, dispatch over packed arguments, GraphQL (the proxy call recording twins went with the call glue in slice 4a). Native and guest. | Deleted with `psio1`. |
 | `libraries/psio1/tests/CMakeLists.txt` | `psio-tests` links `psibase` natively (the guest build already did). | The pinned records are psibase's. |
 
 Because of the glue, `psio1` headers need PSIO on the include path and C++23:
@@ -237,10 +238,9 @@ structs (through psibase's own `PSIBASE_REFLECT_*_EVENTS`, which now expand to
 (`ServerInterface`, `AuthInterface`, …) and GraphQL query roots, which mix
 data members and methods. PSIO accepts the trailing comma several sites have.
 
-The consumers of method metadata are not rewritten yet (slice 4). They read
-`psio1::reflect<T>`, which the glue derives from `psio::reflect<T>`:
-`method_pointer<I>`, `method_name<I>`, `method_param_names<I>`, and
-`reflect<T>::proxy<P>`.
+The consumers of method metadata read `psio::reflect<T>` directly since
+slice 4a (section 1.10); only GraphQL still reads them through
+`psio1::reflect<T>`, which the glue derives from `psio::reflect<T>`.
 
 * **`allowHashedMethods()`** is gone. It was inert: the legacy macro places the
   check "every method name compresses" inside a member function,
@@ -294,18 +294,77 @@ work as before through the legacy macro.
 
 Outside the scope of slices 2–3 and still on the legacy macro:
 `libraries/debug_eos_vm/dwarf.cpp` (2 sites; the legacy `bin` format with
-custom `to_bin`/`from_bin` and a `psio1::input_stream` member),
-`demo/http-server-build/CookieProbe.cpp` (2 sites, one service; built by its
-own script, not by the tree), `rust/test_fracpack/tests/test.hpp` (5 sites;
-the legacy library's own C++/Rust cross-check, deleted with it), and the C++
-examples under `doc/src/development/services/cpp-service` (6 sites in 5 files;
-they are compiled against the SDK and work either way).
+custom `to_bin`/`from_bin` and a `psio1::input_stream` member) and
+`rust/test_fracpack/tests/test.hpp` (5 sites; the legacy library's own
+C++/Rust cross-check, deleted with it). `demo/http-server-build/CookieProbe.cpp`
+(2 sites, one service; built by its own script, not by the tree) and the C++
+examples under `doc/src/development/services/cpp-service` (4 services and the
+snippet in `reference/services-events.md`; compiled against the SDK by the
+tree) moved to `PSIO_REFLECT` in slice 4a, because `PSIBASE_DISPATCH` reads
+PSIO reflection now.
 
 One declaration is wrong today and was converted as it stands:
 `PSIO_REFLECT(RestartInfo, shouldRestart)` in `programs/psinode/main.cpp`
 names a member the struct does not have (it has `args`, `keysChanged`,
 `configChanged`). Both macros only fail when the reflection is used, and
 nothing uses it. Decision D19.
+
+### 1.10 Method consumers (slice 4a)
+
+Everything psibase derives from the methods of a reflected class reads
+`psio::reflect<T>`:
+
+| Consumer | Reads |
+|---|---|
+| `psibase/MethodArgs.hpp` (new) | `MethodArgs<M>`: the tuple a method's arguments are packed as, from `psio::method_traits<M>::params` with a view parameter replaced by the type it views (what `psio1::make_param_value_tuple` did; the view is still `psio1::view` until the flip). `MethodResult<M>`: the packed result type. |
+| `Actor.hpp` | `Actor`, `transactor`, `EventEmitter`, `ActionViewBuilder` derive from `psio::reflect<T>::proxy<P>`; the five proxy objects implement `call<I, &T::method>(args...)`. The method's number is `methodNumber<I, MemberPtr>` = `MethodNumber{reflect<class>::method_name<I>}`, a constant. |
+| `tester.hpp` | `ServiceUser` derives from `psio::reflect<Service>::proxy<PushTransactionProxy>`. |
+| `dispatch.hpp` | `findAction<Service>(MethodNumber)` = `reflect<Service>::index_of_method_hash<MethodNumberOf>(number)`: PSIO's compile-time perfect hash over the method numbers of the reflected names. The index selects `callAction<Service, I>` from a constant table of function pointers; that validates the packed `MethodArgs`, reads them through a view and calls `reflect<Service>::invoke_method<I>`. |
+| `schema.hpp` (actions, events) | `method_names`, `method_type<I>`, `method_pointer<I>` (as the template argument of the event-access hook), parameter names. Tables and keys still read `psio1::reflect` (slice 4b). |
+| `servePackAction.hpp`, `serveActionTemplates.hpp` | `method_names`, `method_type<I>`, parameter names. |
+| `libraries/net/test/test_util.cpp` | `MethodArgs<decltype(&Producers::setConsensus)>`. |
+
+What changed in behaviour, all at compile time or inside one service call:
+
+* **Arguments of a call proxy.** PSIO's proxy forwards references (G15). The
+  proxy objects do not copy: `action_builder_proxy` and `EventEmitterProxy`
+  construct the parameter tuple from the forwarded arguments, as before;
+  `ActionViewProxy` decides per argument whether it can be packed as it is
+  (`PackableAs`) from `std::decay_t` of its type — the type the legacy
+  by-value proxy deduced — and takes it by `const&`. The packed bytes are the
+  same; one copy or move per argument is gone. Decision D22.
+* **Lookup.** The legacy dispatcher compared the action's number with the
+  hash of each method name in turn, at run time, and took the first match. Now
+  two reflected methods of one dispatched service whose names have the same
+  `MethodNumber` do not compile ("psio: two names of one type collide under
+  the supplied hash"). No service in the tree has such a pair. Decision D23.
+* **A proxy inherits its proxy object.** `psio::reflect<T>::proxy<P>` derives
+  from `P`, so a reflected method named like a member of the proxy object
+  (`sender`, `receiver`, `flags`) hides that member in the proxy; psibase
+  reaches those members through `psio_get_proxy()` only.
+
+Two things PSIO lacks were found and are covered by 35 lines of temporary glue
+at the end of `psio1/reflect.hpp` (gaps G16, G17): parameter names of a type
+without methods, and a walk over the methods that does not odr-use them.
+
+Tests: `libraries/psibase/common/tests/methods.cpp` (permanent; part of
+`psibase-psio-tests`, native and guest): the argument tuple and result types,
+action lookup by number including a hashed name and a class without methods,
+`transactor` and `ActionViewBuilder` bytes for lvalue, const, temporary and
+convertible arguments, `/pack_action` from JSON, the action template text,
+and the action and event part of a service schema (parameter names, unnamed
+parameters, event access).
+
+Checked after slice 4a:
+
+| | |
+|---|---|
+| Full build | exit 0 (`~/psibase-pssz-build.build-slice4a.log`) |
+| `ctest -j4` | 92/92 passed (`~/psibase-pssz-build.ctest-slice4a.log`) |
+| `psibase-psio-tests` test cases (native / guest) | 27 / 27, 7 of them `[methods]` (20 / 20 before) |
+| `psio-tests` test cases (native / guest) | 65 / 24 (66 / 25 before: the proxy call recording case is deleted) |
+| Generated `*-schema.json` (68 files) vs. the build of a94bd5111 | byte-identical |
+| Service and test WASM binaries (103 in the build root) vs. the build of a94bd5111 | 2 byte-identical (`Nop`, `VerifySig`: no dispatcher), 101 differ. Expected: every service's dispatcher is different code (table lookup and indirect call instead of a compare chain), and every caller's proxies no longer copy their arguments. Unlike slices 2 and 3, the binaries are therefore not evidence of wire neutrality here; the schemas, the pinned bytes in `methods.cpp` and `canonical_glue_tests.cpp`, and the service tests are. |
 
 ## 2. Inventory of what remains
 
@@ -326,12 +385,12 @@ sources, 20 test files.
 | `definitionWillNotChange()` | 25 / 13, all in `PSIO_REFLECT` now | same keyword |
 | `allowHashedMethods()` | was 4 / 3; now 0 | removed: it was inert (1.7). Decision D7. |
 | `PSIO1_REFLECT_TYPENAME` | was 125 / 38; now 3 / 2 (two XAdmin wrappers, `rust/test_fracpack`) | `PSIO_REFLECT_TYPENAME`: 122 / 37 (table names) |
-| `psio1::reflect<…>` used directly | 42 / 9 (`dispatch.hpp`, `Actor.hpp`, `Table.hpp`, `schema.hpp`, `serveGraphQL.hpp`, `serveActionTemplates.hpp`, tester) | `psio::reflect<T>` |
+| `psio1::reflect<…>` used directly | was 42 / 9; after slice 4a 19 / 5, all data-member uses: `serveGraphQL.hpp` 9, `XPackages.cpp` 3 (`name`, `data_member_names`), `Table.hpp` 2, `schema.hpp` 1 (table keys), `zip.cpp` 1 (`data_members`) | `psio::reflect<T>` (slice 4b) |
 | `MemberPtrType`, `TypeList`, `apply_members`, `for_each_member`, `member_function_names`, `FixedString` | 24 / 6 | `psio::reflect<T>::for_each_field` / `for_each_method`, `psio::method_traits` |
 | `PSIBASE_REFLECT_TABLES` 80, `…_HISTORY_EVENTS` 15, `…_KEY_TRANSFORM` 7, `…_MERKLE_EVENTS` 2 | 104 / 67 | psibase's own macros; they stay, re-implemented over `psio::reflect` |
-| `psibase/dispatch.hpp` + `PSIBASE_DISPATCH` | 80 / 79 | dispatcher over `reflect<Svc>::invoke_method` / `index_of_method_hash` |
-| `Actor<>` / `at<>` | 30 / 10 | `psio::reflect<Svc>::proxy<P>` (`P::call<I, &Svc::m>(args...)`) |
-| Events (`EventEmitter`, `emit()`) | 39 / 8 | same proxy mechanism over the event structs |
+| `psibase/dispatch.hpp` + `PSIBASE_DISPATCH` | 80 / 79 | done in slice 4a: dispatcher over `reflect<Svc>::invoke_method` / `index_of_method_hash` |
+| `Actor<>` / `at<>` | 30 / 10 | done in slice 4a: `psio::reflect<Svc>::proxy<P>` (`P::call<I, &Svc::m>(args...)`) |
+| Events (`EventEmitter`, `emit()`) | 39 / 8 | done in slice 4a: same proxy mechanism over the event structs |
 | ADL hooks `psio_unwrap_packable` 14/6, `psio_validate_packable` 5/3, `psio_custom_schema` 2/2, `use_json_string_for_gql` 3/3, `get_gql_name` 3/2 | | adapters (`PSIO_ADAPTER`), bounded wrappers; see G3, G4, G13 |
 | `#include <psio1/reflect.hpp>` | 8 / 8 (was 15) | `<psio/reflect.hpp>`: the 13 headers and sources that included the legacy header for the macro include PSIO's; 6 of them no longer include the legacy one |
 
@@ -480,8 +539,8 @@ flip, for all languages at once.
 | 2 (done) | Data records declared with `PSIO_REFLECT`: 422 in 111 files across `libraries/psibase`, `libraries/net`, `libraries/psibase_http`, `programs/*`, `packages/**`; 122 table names with `PSIO_REFLECT_TYPENAME`. 10 records deferred (1.9). Glue: legacy `name` and `data_member_names` shapes. | unchanged (schemas and WASM binaries byte-identical) | pinned records + 92/92 |
 | 3 (done) | Every C++ service, events struct, interface and query root declared with `PSIO_REFLECT(..., method(...))`: 124 declarations (528 items) + 15 event-macro sites (28 items). `allowHashedMethods()` removed (inert). Glue: methods bridged into `psio1::reflect` (`member_functions`, `member_function_names`, `proxy` calls). | unchanged | method-metadata twins + 92/92 |
 | 2b | The deferred types of 1.9, as PSIO closes G2, G3, G5, G7, G8 (the pin moves) or the owner decides D5, D17: `Memo` → `psio::utf8_string<80>` (99 uses), `Precision`, `Decimal`, `SubjectPublicKeyInfo` / `PrivateKeyInfo`, `TimerRow` / `UrlRow` / `TimerQueueRow`, `TypedAction<T>`, `DynDepGroups`, `PsinodeServiceConfig`, the two XAdmin wrappers, `IPAddress` / `SocketEndpoint` text. Each needs the glue to pack the new PSIO type in its legacy form (`utf8_string<N>` as a string, a transparent wrapper as its inner type) until the flip. Also `demo/`, `debug_eos_vm` and the documentation examples. | unchanged | glue twins per new kind |
-| 4a | **Method consumers** read `psio::reflect` directly. Unblocked now: all 139 declarations with methods are PSIO. `Actor.hpp` (`Actor`, `transactor`, `EventEmitter`, `ActionViewBuilder`: 13 uses of `reflect<T>::proxy`) → `psio::reflect<T>::proxy<P>`; `dispatch.hpp` → `index_of_method_hash<MethodHash>` + `invoke_method<I>` (a perfect hash instead of a linear scan; two methods of one service whose names collide become a compile error); `schema.hpp` (actions, events), `servePackAction.hpp`, `serveActionTemplates.hpp`, the tester, `test_util.cpp` → `for_each_method`, `method_param_names<I>`, `method_params<I>`. Two things to settle first: PSIO's proxy forwards references where the legacy proxy passes by value (psibase's four proxy objects deduce parameter types from the arguments: decide by-value explicitly), and `make_param_value_tuple` (strips `psio1::view<>` from parameters) needs a psibase-side equivalent until views flip. GraphQL's use of methods stays in `psio1/graphql.hpp` until slice 9. | unchanged | existing; compare schemas and WASM binaries with the previous build |
-| 4b | **Data-member consumers** read `psio::reflect` directly: `Table.hpp`, `serveGraphQL.hpp`, `schema.hpp` (tables, keys), `nativeTables`. Blocked on 2b: they are instantiated with the deferred records (`TimerRow`, `UrlRow`, `TimerQueueRow`, `TokenRecord`→`Precision`, …), which `psio::reflect` cannot see while they are declared with the legacy macro. `psio1::FixedString` (compile-time name concatenation, 24 uses in 6 files) needs a home in psibase. After 4a + 4b nothing outside `psio1` names `psio1::reflect` (42 uses in 9 files today). | unchanged | existing |
+| 4a (done) | Section 1.10. As planned: **Method consumers** read `psio::reflect` directly. Unblocked now: all 139 declarations with methods are PSIO. `Actor.hpp` (`Actor`, `transactor`, `EventEmitter`, `ActionViewBuilder`: 13 uses of `reflect<T>::proxy`) → `psio::reflect<T>::proxy<P>`; `dispatch.hpp` → `index_of_method_hash<MethodHash>` + `invoke_method<I>` (a perfect hash instead of a linear scan; two methods of one service whose names collide become a compile error); `schema.hpp` (actions, events), `servePackAction.hpp`, `serveActionTemplates.hpp`, the tester, `test_util.cpp` → `for_each_method`, `method_param_names<I>`, `method_params<I>`. Two things to settle first: PSIO's proxy forwards references where the legacy proxy passes by value (psibase's four proxy objects deduce parameter types from the arguments: decide by-value explicitly), and `make_param_value_tuple` (strips `psio1::view<>` from parameters) needs a psibase-side equivalent until views flip. GraphQL's use of methods stays in `psio1/graphql.hpp` until slice 9. | unchanged | existing; compare schemas and WASM binaries with the previous build |
+| 4b | **Data-member consumers** read `psio::reflect` directly: `Table.hpp`, `serveGraphQL.hpp`, `schema.hpp` (tables, keys), `nativeTables`. Blocked on 2b: they are instantiated with the deferred records (`TimerRow`, `UrlRow`, `TimerQueueRow`, `TokenRecord`→`Precision`, …), which `psio::reflect` cannot see while they are declared with the legacy macro. `psio1::FixedString` (compile-time name concatenation, 24 uses in 6 files) needs a home in psibase. Also the member-function key in `schema.hpp` (`psio1::MemberPtrType<…>::ReturnType`, 1 use). After 4b nothing outside `psio1` names `psio1::reflect` (19 uses in 5 files after 4a; 42 in 9 before). | unchanged | existing |
 | 5 | Rust prepared without source churn: the (dying) fracpack derive also emits PSIO impls, so every `Pack`/`Unpack`/`ToSchema`/`ToKey` type already has PSSZ, key and schema impls; Rust leaf types (`AccountNumber`, …) get the same text rules as C++ and a shared fixture (generated by C++, checked by Rust and JS) for names, times, digests. Python and JS codecs written and tested against the fixture. | unchanged | fixture tests in 3 languages |
 | 6 | **Keys**: C++ `to_key`/`composite_key`/`KeyView` → `psio::key`, `key_prefix`; Rust `ToKey` → PSIO key; native tables. First a test that the two formats agree on every key type in use (2.3); the types where they do not (if any are used) change in one commit for all languages. | unchanged where the formats agree | all tests |
 | 7 | **Wire flip**: transactions, blocks, tables rows, actions, events, host/guest ABI structs, P2P messages, snapshots, packages, boot image. C++ `to_frac`/`from_frac`/`view`/`shared_view_ptr`/`nested` → `psio::pssz` APIs; schema generation and schema-driven codecs → Schema IR + `pssz_ir`; Rust derives switch to PSIO's; JS pack endpoints; Python codec; fixtures with packed bytes or ids regenerated. | everything binary changes | all tests; fresh genesis |
@@ -559,7 +618,10 @@ commit itself.
 | D17 | `Decimal` (Tokens) has a decimal-string JSON form. As a PSIO text adapter it needs a `validate` that reports instead of aborting, and a rule for which spellings are accepted (`"1.5"` and `"1.50"` are different values — precision is part of the value; `".5"`, `"5."`, leading zeros?). `Precision` (0–8, validated on unpack) needs G3/G5 or a bounded integer type. | Not converted. |
 | D18 | `PSIO_INTERFACE(Svc)` (the Schema IR's interface envelope) is not added to services in slice 3: nothing reads it until the schema path moves to the IR, and its item list (`types(…)`, `funcs(…)`) repeats what `PSIO_REFLECT` already states. Decide in the schema slice whether psibase derives interfaces from `psio::reflect<Svc>` methods (preferred: one declaration per service) or writes `PSIO_INTERFACE` 124 times. | Not added. |
 | D19 | `PSIO_REFLECT(RestartInfo, shouldRestart)` in `programs/psinode/main.cpp` lists a member that does not exist; the reflection is unused. Delete it or list the real members. | Converted as written. |
-| D20 | The documentation examples (`doc/src/development/services/cpp-service`, 6 sites) and `demo/` still teach and use `PSIO1_REFLECT`. They should follow once the SDK surface (`PSIBASE_DISPATCH`, `Actor`) reads PSIO reflection (slice 4a), so that the examples need no legacy header. | Not converted. |
+| D20 | The documentation examples (`doc/src/development/services/cpp-service`) and `demo/` taught and used `PSIO1_REFLECT`. | Converted in slice 4a (required: `PSIBASE_DISPATCH` no longer dispatches a legacy-declared service). The `demo/` service is built by its own script and was not rebuilt. |
+| D22 | Call proxies and argument copies. (a) No standard applies. (b) psibase before: the legacy proxy took every argument by value and handed the proxy object rvalues of the decayed types; `ActionViewProxy` chose "pack as given" or "convert to the parameter type" from those types. (c) PSIO: the proxy forwards references and has no by-value mode (G15). Taken: the proxy objects keep the decision on the decayed type (same bytes, same accepted argument types) but no longer copy — an lvalue argument is read in place. The alternative is an explicit by-value hop in each proxy object, which reproduces the old code exactly at the cost of a copy or move per argument. | By reference, decayed types. |
+| D23 | Two reflected methods of one service with the same `MethodNumber`. (a) No standard. (b) psibase before: accepted; the first one listed was called, the second was unreachable (and the schema kept only the first). (c) PSIO: `index_of_method_hash` makes it a compile error. Taken: PSIO's behaviour; no service in the tree is affected. The check applies to services that are dispatched (`PSIBASE_DISPATCH`), not to events structs or interfaces. | Compile error. |
+| D24 | `EventEmitter::from(sender)` constructs `EventEmitter(sender, elog)`, a constructor `EventEmitter` does not have; it compiles only because nothing calls it. Not introduced by this work and left as found. Delete it or give `EventEmitter` the constructor. | Left. |
 | D21 | `psio-tests` now links `psibase` (and through it the service headers) so that the glue test can pin psibase's own records. Temporary, deleted with `psio1`. | Accepted. |
 
 ## 5. Where PSIO lacks something psibase needs
@@ -580,4 +642,7 @@ commit itself.
 | G12 | PSIO GraphQL | Not in the pinned commit. | `psio1/graphql.hpp` (1,704 lines) serves 23 files of GraphQL users. |
 | G13 | `psio/adapter.hpp` (`schema_custom_v`), `schema_builder.hpp` | A custom schema id for a reflected record that has no text adapter. | `Action` and `ServiceMethod` are marked `psio_custom_schema` so that schema-driven tools recognise them (an action's `rawData` is decoded with the target service's schema). In PSIO a record is `Custom{…, id}` only when it has a text presentation. The legacy hooks still serve; the Schema IR path needs either this or name-based recognition in psibase's handlers. |
 | G14 | `psio/reflect.hpp` | `PSIO_REFLECT(T, definitionWillNotChange(), …)` does not compile with `<psio/reflect.hpp>` alone: the keyword expands to `psio::definition_will_not_change`, declared in `<psio/annotate.hpp>`. | A header that only reflects records must know to include `annotate.hpp` (`SocketInfo.hpp` does). `reflect.hpp` should include what its own keywords need. |
-| G15 | `psio/reflect.hpp` (proxy) | The record proxy passes method arguments as forwarding references; there is no by-value mode. | psibase's call proxies deduce the packed parameter tuple and `PackableAs` checks from the argument types; the legacy proxy decays them first. The glue restores by-value passing; in slice 4a psibase's proxy objects must do it themselves. Not a defect, a difference to design for. |
+| G15 | `psio/reflect.hpp` (proxy) | The record proxy passes method arguments as forwarding references; there is no by-value mode. | psibase's call proxies deduce the packed parameter tuple and `PackableAs` checks from the argument types; the legacy proxy decays them first. Since slice 4a psibase's proxy objects decay the types themselves (D22) and the glue for it is deleted. Not a defect, a difference to design for. |
+| G16 | `psio/reflect.hpp` (`PSIO_REFLECT_METHODS_EMPTY_`) | A type that lists no method has `method_count`, `method_names`, `method_type<I>`, `method_pointer<I>`, `method_name<I>`, the lookups and `for_each_method`, but not `method_param_names<I>`, `method_traits<I>`, `method_result<I>`, `method_args<I>`, `method_params<I>`, `method_is_static<I>`, `method_is_const<I>`, `invoke_method<I>`. | Generic code that names `psio::reflect<T>::method_param_names<I>` inside a per-method callback does not compile for a class without methods (`EmptyService`, a service with no actions), although the callback is never called: once `T` is known the name is looked up in a class that does not have it. Reproduction: `generateActionJsonTemplate<psibase::EmptyService>()` with `reflect::template method_param_names<I>` in the callback fails with "no member named 'method_param_names' in 'psio::reflect<psibase::EmptyService>'". Glue: `psio1::canonical_method_param_names<T, I>` (`psio1/reflect.hpp`, end of file), used by `schema.hpp`, `servePackAction.hpp`, `serveActionTemplates.hpp`. Fix in PSIO: declare the same member templates in the empty case, as it already does for `method_type` / `method_pointer` / `method_name`. |
+| G17 | `psio/reflect.hpp` (`for_each_method`) | `for_each_method(fn)` calls `fn(index, name, &T::method)`: the pointer is passed as a value, which odr-uses every reflected method. There is no walk that gives only the index (or the index and the name). | Code that describes a service without containing it — the `R*` query services that serve `/pack_action`, `/action_templates` and the schema of another service, and schema generation — would need every method's definition at link time. Reproduction: with `for_each_method` in `fracpackActionFromJson`, `RAccounts.wasm` fails to link: "wasm-ld: error: … RAccounts.cpp.obj: undefined symbol: SystemService::Accounts::init()" (and every other action). The legacy walk passed a null pointer of the method's type. Glue: `psio1::canonical_for_each_method_index<T>(fn)` (`psio1/reflect.hpp`, end of file), `fn(std::integral_constant<std::size_t, I>, name)`. Fix in PSIO: an index-only walk, or `for_each_method` passing the index and name only (the pointer is `method_pointer<I>`). |
+| G18 | `psio/reflect.hpp` (proxy) | `Projection::call<I, &T::method>` is told the index and the member pointer but not the reflected type `T`. For a method `T` inherits, `&T::method` has the type `R (Base::*)(…)`, so the proxy object can only recover `Base`, in whose reflection `I` means something else (or nothing). | psibase's proxy objects turn `(I, MemberPtr)` into the method's name (`methodNumber<I, MemberPtr>`). The legacy proxy had the same limitation (it also derived the class from the member pointer), so behaviour is unchanged and nothing is worked around; whether any class in the tree reflects an inherited method was not searched for. Such a method would fail to compile or, if the base is reflected too, name the wrong method. A `call<T, I>` form (or passing `T`) would remove the trap. |
