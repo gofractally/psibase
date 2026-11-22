@@ -1026,6 +1026,19 @@ namespace psibase
           });
    }  // Database::kvGetRaw
 
+   bool Database::kvContains(DbId db, psio::input_stream key)
+   {
+      return impl->read(
+          [&](auto& session, auto& revision) -> bool
+          {
+             if (auto* changes = impl->getChangeSet(db))
+             {
+                changes->onRead(key.string_view());
+             }
+             return session.get(impl->db(revision, db), key.string_view(), nullptr, nullptr);
+          });
+   }
+
    std::optional<Database::KVResult> Database::kvGreaterEqualRaw(DbId               db,
                                                                  psio::input_stream key,
                                                                  size_t             matchKeySize)
