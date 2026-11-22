@@ -775,16 +775,32 @@ async fn build_service(
     spawn_blocking(move || process(&schema_gen_file, None, TESTER_EXPORTS, &schema_gen_file))
         .await??;
 
+    // The schema is newer than the service once it exists, and is then not
+    // generated again. Write it under another name until psitest has
+    // succeeded: a run that fails, or cannot start, must not leave an empty
+    // schema behind that every later build takes for the real one.
+    let mut partial = schema_file.as_os_str().to_owned();
+    partial.push(".partial");
+    let partial = PathBuf::from(partial);
     let status = tokio::process::Command::new(&args.psitest)
         .arg(&schema_gen[0])
-        .stdout(File::create(&schema_file)?)
+        .stdout(File::create(&partial)?)
         .status()
-        .await?;
-
-    if !status.success() {
-        exit(status.code().unwrap());
+        .await;
+    match status {
+        Ok(status) if status.success() => {
+            std::fs::rename(&partial, schema_file)?;
+            Ok(())
+        }
+        Ok(status) => {
+            let _ = std::fs::remove_file(&partial);
+            exit(status.code().unwrap_or(1));
+        }
+        Err(e) => {
+            let _ = std::fs::remove_file(&partial);
+            Err(e).with_context(|| format!("Failed to run {}", args.psitest.to_string_lossy()))
+        }
     }
-    Ok(())
 }
 
 #[derive(Clone)]
