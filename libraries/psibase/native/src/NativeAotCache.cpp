@@ -118,17 +118,7 @@ namespace psibase
       {
          if (requested.empty())
             return;
-         // Resolve links in the part of the path that already exists before the
-         // no-follow walk below. System temporary directories are reached through
-         // links on macOS (/tmp, /var), and refusing them left every test and any
-         // node under such a path without a cache, recompiling each module on
-         // every use. The walk still refuses a link swapped in afterwards, and the
-         // final directory must still be private to this user.
-         std::error_code                ignored;
-         const std::filesystem::path path =
-             std::filesystem::weakly_canonical(std::filesystem::absolute(requested), ignored);
-         if (ignored || path.empty())
-            return;
+         const std::filesystem::path path = std::filesystem::absolute(requested);
          Fd current(::open(path.is_absolute() ? "/" : ".",
                            O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC));
          if (current.value == -1)
@@ -143,7 +133,17 @@ namespace psibase
                return;
             Fd next(::openat(current.value, part.c_str(),
                              O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC));
-            if (next.value == -1 && errno == ENOENT)
+            // A link only the system can have made is followed: macOS reaches
+            // its temporary directories through /tmp and /var, and refusing
+            // those left every node under them without a cache, recompiling
+            // each module on every start. A link owned by anyone else is still
+            // refused, so no user can redirect the cache.
+            struct stat link;
+            if (next.value == -1 &&
+                ::fstatat(current.value, part.c_str(), &link, AT_SYMLINK_NOFOLLOW) == 0 &&
+                S_ISLNK(link.st_mode) && link.st_uid == 0)
+               next.value = ::openat(current.value, part.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+            else if (next.value == -1 && errno == ENOENT)
             {
                if (::mkdirat(current.value, part.c_str(), 0700) == -1 && errno != EEXIST)
                   return;
