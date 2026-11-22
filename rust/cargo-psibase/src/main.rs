@@ -365,12 +365,26 @@ async fn get_files(
                 print!("{}", msg.message.rendered.unwrap());
             }
             Message::CompilerArtifact(artifact) => {
-                for p in &artifact.filenames {
-                    if p.extension() == Some("rmeta") {
-                        if let Some(parent) = p.parent() {
-                            result.dep_dirs.insert(parent.as_std_path().to_path_buf());
-                        }
-                    }
+                // The directory rustc must search for this crate. With
+                // per-package build directories every library, including a
+                // procedural macro (a dylib with no .rmeta), is in its own.
+                // When both are listed the .rmeta is the one beside the
+                // hashed library; the .rlib may be a copy lifted to the
+                // profile directory.
+                let library = |extension| {
+                    artifact
+                        .filenames
+                        .iter()
+                        .find(|p| p.extension() == Some(extension))
+                };
+                if let Some(parent) = library("rmeta")
+                    .or_else(|| library("rlib"))
+                    .or_else(|| library("dylib"))
+                    .or_else(|| library("so"))
+                    .or_else(|| library("dll"))
+                    .and_then(|p| p.parent())
+                {
+                    result.dep_dirs.insert(parent.as_std_path().to_path_buf());
                 }
                 if let Some(idx) = packages
                     .iter()
