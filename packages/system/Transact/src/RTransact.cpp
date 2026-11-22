@@ -164,7 +164,7 @@ namespace
          MethodNumber          method;   ///< Service method to execute
          std::span<const char> rawData;  ///< Data for the method
       };
-      PSIO1_REFLECT(Action, sender, service, method, rawData)
+      PSIO_REFLECT(Action, sender, service, method, rawData)
 
       struct ActionTrace
       {
@@ -174,26 +174,26 @@ namespace
          std::chrono::nanoseconds        totalTime;
          std::optional<std::string_view> error;
       };
-      PSIO1_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
+      PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
 
       struct ConsoleTrace
       {
          std::string_view console;
       };
-      PSIO1_REFLECT(ConsoleTrace, console)
+      PSIO_REFLECT(ConsoleTrace, console)
 
       struct InnerTrace
       {
          std::variant<ConsoleTrace, ActionTrace> inner;
       };
-      PSIO1_REFLECT(InnerTrace, inner)
+      PSIO_REFLECT(InnerTrace, inner)
 
       struct TransactionTrace
       {
          std::vector<ActionTrace>        actionTraces;
          std::optional<std::string_view> error;
       };
-      PSIO1_REFLECT(TransactionTrace, actionTraces, error)
+      PSIO_REFLECT(TransactionTrace, actionTraces, error)
    }  // namespace refs
    using ActionRef           = refs::Action;
    using ActionTraceRef      = refs::ActionTrace;
@@ -625,7 +625,7 @@ namespace
          return client.waitFor == WaitFor::final_flag;
       }
    };
-   PSIO1_REFLECT(WaitFor, wait_for)
+   PSIO_REFLECT(WaitFor, wait_for)
 
    void cancelVerify(PendingVerifyTable& pendingVerifies, const UnverifiedTransactionRecord& tx)
    {
@@ -1156,7 +1156,7 @@ namespace
    {
       std::string rootHost;
    };
-   PSIO1_REFLECT(LoginData, rootHost)
+   PSIO_REFLECT(LoginData, rootHost)
 
    struct LoginTokenData
    {
@@ -1164,14 +1164,14 @@ namespace
       std::string   aud;
       std::int64_t  exp;
    };
-   PSIO1_REFLECT(LoginTokenData, sub, aud, exp)
+   PSIO_REFLECT(LoginTokenData, sub, aud, exp)
 
    struct LoginReply
    {
       std::string access_token;
       std::string token_type = "bearer";
    };
-   PSIO1_REFLECT(LoginReply, access_token, token_type)
+   PSIO_REFLECT(LoginReply, access_token, token_type)
 
    std::vector<char> getJWTKey()
    {
@@ -1345,7 +1345,7 @@ struct SnapInfo
    psibase::BlockTime lastSnapshot;
    uint32_t           snapshotInterval;
 };
-PSIO1_REFLECT(SnapInfo, lastSnapshot, snapshotInterval);
+PSIO_REFLECT(SnapInfo, lastSnapshot, snapshotInterval);
 
 struct TransactQuery
 {

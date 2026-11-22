@@ -78,31 +78,31 @@ namespace
       AccountNumber issuer;
       AccountNumber owner;
    };
-   PSIO1_REFLECT(Node, id, issuer, owner);
+   PSIO_REFLECT(Node, id, issuer, owner);
 
    struct Edge
    {
       Node node;
    };
-   PSIO1_REFLECT(Edge, node);
+   PSIO_REFLECT(Edge, node);
 
    struct UserNfts
    {
       std::vector<Edge> edges;
    };
-   PSIO1_REFLECT(UserNfts, edges);
+   PSIO_REFLECT(UserNfts, edges);
 
    struct Data
    {
       UserNfts nfts;
    };
-   PSIO1_REFLECT(Data, nfts);
+   PSIO_REFLECT(Data, nfts);
 
    struct QueryRoot
    {
       Data data;
    };
-   PSIO1_REFLECT(QueryRoot, data);
+   PSIO_REFLECT(QueryRoot, data);
 
 }  // namespace
 

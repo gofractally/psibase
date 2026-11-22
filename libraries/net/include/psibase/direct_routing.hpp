@@ -24,7 +24,7 @@ namespace psibase::net
       producer_id               producer;
       std::string               to_string() const { return "producer: " + producer.str(); }
    };
-   PSIO1_REFLECT(ProducerMessage, producer)
+   PSIO_REFLECT(ProducerMessage, producer)
 
    // This requires all producers to be peers
    template <typename Derived>

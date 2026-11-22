@@ -46,14 +46,14 @@ struct ExampleRecordQuery
 {
    ExampleRecord r;
 };
-PSIO1_REFLECT(ExampleRecordQuery, r);
+PSIO_REFLECT(ExampleRecordQuery, r);
 
 struct FooEventRecord
 {
    std::string s;
    int         i;
 };
-PSIO1_REFLECT(FooEventRecord, s, i);
+PSIO_REFLECT(FooEventRecord, s, i);
 
 struct Query
 {

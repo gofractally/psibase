@@ -124,13 +124,13 @@ struct ConsoleLog
    std::string format =
        "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {BlockId}: {BlockHeader}}";
 };
-PSIO1_REFLECT(ConsoleLog, type, filter, format);
+PSIO_REFLECT(ConsoleLog, type, filter, format);
 
 struct Loggers
 {
    ConsoleLog stderr;
 };
-PSIO1_REFLECT(Loggers, stderr);
+PSIO_REFLECT(Loggers, stderr);
 
 void init_logging(const Loggers& logConfig)
 {

@@ -20,7 +20,7 @@ namespace UserService
    {
       EventDb              type;
       psibase::EventNumber nextEventNumber;
-      PSIO1_REFLECT(EventNumberRecord, type, nextEventNumber)
+      PSIO_REFLECT(EventNumberRecord, type, nextEventNumber)
    };
    using EventNumberTable = psibase::Table<EventNumberRecord, &EventNumberRecord::type>;
    PSIO1_REFLECT_TYPENAME(EventNumberTable)
@@ -31,7 +31,7 @@ namespace UserService
       psibase::AccountNumber service;
       psibase::MethodNumber  type;
       std::vector<char>      rawData;
-      PSIO1_REFLECT(EventRecord, id, service, type, rawData);
+      PSIO_REFLECT(EventRecord, id, service, type, rawData);
    };
    using EventTable = psibase::Table<EventRecord, &EventRecord::id>;
    PSIO1_REFLECT_TYPENAME(EventTable)
@@ -39,7 +39,7 @@ namespace UserService
    struct EventMerkleRecord
    {
       psibase::Merkle merkle;
-      PSIO1_REFLECT(EventMerkleRecord, merkle)
+      PSIO_REFLECT(EventMerkleRecord, merkle)
    };
    using EventMerkleTable = psibase::Table<EventMerkleRecord, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(EventMerkleTable)
@@ -64,7 +64,7 @@ namespace UserService
       }
       friend auto operator<=>(const SecondaryIndexInfo&, const SecondaryIndexInfo&) = default;
    };
-   PSIO1_REFLECT(SecondaryIndexInfo, indexNum)
+   PSIO_REFLECT(SecondaryIndexInfo, indexNum)
 
    struct SecondaryIndexRecord
    {
@@ -76,7 +76,7 @@ namespace UserService
                                                &SecondaryIndexRecord::service,
                                                &SecondaryIndexRecord::event>;
    };
-   PSIO1_REFLECT(SecondaryIndexRecord, db, service, event, indexes);
+   PSIO_REFLECT(SecondaryIndexRecord, db, service, event, indexes);
 
    // The queue of indexes being added or removed
    struct PendingIndexRecord
@@ -98,7 +98,7 @@ namespace UserService
                                             &PendingIndexRecord::info>;
       auto byIndex() const { return ByIndex{}(*this); }
    };
-   PSIO1_REFLECT(PendingIndexRecord, seq, db, service, event, info, nextKey, endKey)
+   PSIO_REFLECT(PendingIndexRecord, seq, db, service, event, info, nextKey, endKey)
 
    // For each db, tracks the lowest event number that has not been indexed.
    struct DbIndexStatus
@@ -106,7 +106,7 @@ namespace UserService
       EventDb       db;
       std::uint64_t nextEventNumber;
    };
-   PSIO1_REFLECT(DbIndexStatus, db, nextEventNumber);
+   PSIO_REFLECT(DbIndexStatus, db, nextEventNumber);
 
    // Used to pass information about index changes from objective to subjective.
    //
@@ -121,7 +121,7 @@ namespace UserService
           CompositeKey<&IndexDirtyRecord::db, &IndexDirtyRecord::service, &IndexDirtyRecord::event>;
       auto primaryKey() const { return PrimaryKey{}(*this); }
    };
-   PSIO1_REFLECT(IndexDirtyRecord, db, service, event)
+   PSIO_REFLECT(IndexDirtyRecord, db, service, event)
 
    using ServiceSchemaTable = psibase::Table<ServiceSchema, &ServiceSchema::service>;
    using DbIndexStatusTable = psibase::Table<DbIndexStatus, &DbIndexStatus::db>;

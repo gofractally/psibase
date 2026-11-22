@@ -26,7 +26,7 @@ namespace LocalService
       psibase::AccountNumber service;
       psibase::MethodNumber  method;
       psibase::MethodNumber  err;
-      PSIO1_REFLECT(ResponseHandlerRow, socket, type, service, method, err)
+      PSIO_REFLECT(ResponseHandlerRow, socket, type, service, method, err)
    };
    using ResponseHandlerTable = psibase::Table<ResponseHandlerRow, &ResponseHandlerRow::socket>;
    PSIO1_REFLECT_TYPENAME(ResponseHandlerTable)

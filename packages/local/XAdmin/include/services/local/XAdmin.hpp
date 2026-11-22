@@ -13,7 +13,7 @@ namespace LocalService
    struct AdminAccountRow
    {
       psibase::AccountNumber account;
-      PSIO1_REFLECT(AdminAccountRow, account);
+      PSIO_REFLECT(AdminAccountRow, account);
    };
    using AdminAccountTable = psibase::Table<AdminAccountRow, &AdminAccountRow::account>;
    PSIO1_REFLECT_TYPENAME(AdminAccountTable)
@@ -23,7 +23,7 @@ namespace LocalService
       bool                     p2p = false;
       std::vector<std::string> hosts;
       std::vector<std::string> peers;
-      PSIO1_REFLECT(AdminOptionsRow, p2p, hosts, peers)
+      PSIO_REFLECT(AdminOptionsRow, p2p, hosts, peers)
    };
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(AdminOptionsTable)
@@ -60,7 +60,7 @@ namespace LocalService
       struct Unauthenticated
       {
          std::vector<std::string> challenges;
-         PSIO1_REFLECT(Unauthenticated, challenges)
+         PSIO_REFLECT(Unauthenticated, challenges)
       };
       using AuthResult = std::variant<Account, LocalUsername, Unauthenticated>;
 

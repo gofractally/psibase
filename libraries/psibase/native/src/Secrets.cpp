@@ -262,7 +262,7 @@ namespace
       std::vector<char> key;
       std::vector<char> value;
       std::string_view  skey() const { return {key.data(), key.size()}; }
-      PSIO1_REFLECT(KeyValue, key, value);
+      PSIO_REFLECT(KeyValue, key, value);
    };
 
    DecryptedFile newEncryptedFile(std::string_view passphrase)

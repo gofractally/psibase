@@ -34,7 +34,7 @@ namespace psibase
       Checksum256                sha256;
       std::string                file;
    };
-   PSIO1_REFLECT(PackageInfo,
+   PSIO_REFLECT(PackageInfo,
                 name,
                 version,
                 scope,
@@ -56,7 +56,7 @@ namespace psibase
 
       std::uint64_t parseFlags() const;
    };
-   PSIO1_REFLECT(ServiceInfo, flags, server, schema)
+   PSIO_REFLECT(ServiceInfo, flags, server, schema)
 
    struct PackagedService
    {

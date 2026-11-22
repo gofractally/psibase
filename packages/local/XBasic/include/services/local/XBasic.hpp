@@ -13,7 +13,7 @@ namespace LocalService
       std::string                username;
       std::string                hash;
       std::optional<std::string> password;
-      PSIO1_REFLECT(PasswordRow, username, hash, password)
+      PSIO_REFLECT(PasswordRow, username, hash, password)
    };
    using PasswordTable = psibase::Table<PasswordRow, &PasswordRow::username>;
    PSIO1_REFLECT_TYPENAME(PasswordTable)

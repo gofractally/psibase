@@ -41,7 +41,7 @@ namespace psibase
       BlockNum    num() const { return _num; }
       friend bool operator==(const ExtendedBlockId&, const ExtendedBlockId&) = default;
    };
-   PSIO1_REFLECT(ExtendedBlockId, _id, _num)
+   PSIO_REFLECT(ExtendedBlockId, _id, _num)
 
    enum class ConsensusAlgorithm : std::uint8_t
    {
@@ -634,7 +634,7 @@ namespace psibase
    {
       std::vector<char> key;
       std::vector<char> value;
-      PSIO1_REFLECT(SnapshotItem, key, value)
+      PSIO_REFLECT(SnapshotItem, key, value)
    };
 
    struct SnapshotLoader

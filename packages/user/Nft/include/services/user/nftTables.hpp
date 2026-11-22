@@ -12,7 +12,7 @@ namespace UserService
    {
       NID next_id;
    };
-   PSIO1_REFLECT(NftConfigRow, next_id)
+   PSIO_REFLECT(NftConfigRow, next_id)
    using NftConfigTable = psibase::Table<NftConfigRow, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(NftConfigTable)
 
@@ -23,7 +23,7 @@ namespace UserService
 
       auto operator<=>(const NftHolderRecord&) const = default;
    };
-   PSIO1_REFLECT(NftHolderRecord, account, autodebit);
+   PSIO_REFLECT(NftHolderRecord, account, autodebit);
    using NftHolderTable = psibase::Table<NftHolderRecord, &NftHolderRecord::account>;
    PSIO1_REFLECT_TYPENAME(NftHolderTable)
 
@@ -40,7 +40,7 @@ namespace UserService
 
       auto operator<=>(const NftRecord&) const = default;
    };
-   PSIO1_REFLECT(NftRecord, id, issuer, owner);
+   PSIO_REFLECT(NftRecord, id, issuer, owner);
    using NftTable =
        psibase::Table<NftRecord, &NftRecord::id, NftRecord::ByOwner{}, NftRecord::ByIssuer{}>;
    PSIO1_REFLECT_TYPENAME(NftTable)
@@ -56,7 +56,7 @@ namespace UserService
 
       auto operator<=>(const CreditRecord&) const = default;
    };
-   PSIO1_REFLECT(CreditRecord, nftId, creditor, debitor);
+   PSIO_REFLECT(CreditRecord, nftId, creditor, debitor);
    using CreditTable = psibase::Table<CreditRecord,
                                       &CreditRecord::nftId,
                                       CreditRecord::ByCreditor{},
@@ -70,7 +70,7 @@ namespace UserService
 
       auto operator<=>(const UserPendingRecord&) const = default;
    };
-   PSIO1_REFLECT(UserPendingRecord, user, nft_id);
+   PSIO_REFLECT(UserPendingRecord, user, nft_id);
    using UserPendingTable =
        psibase::Table<UserPendingRecord,
                       psibase::CompositeKey<&UserPendingRecord::user, &UserPendingRecord::nft_id>{}>;
@@ -82,7 +82,7 @@ namespace UserService
 
       auto operator<=>(const BurnedRecord&) const = default;
    };
-   PSIO1_REFLECT(BurnedRecord, id);
+   PSIO_REFLECT(BurnedRecord, id);
    using BurnedTable = psibase::Table<BurnedRecord, &BurnedRecord::id>;
    PSIO1_REFLECT_TYPENAME(BurnedTable)
 

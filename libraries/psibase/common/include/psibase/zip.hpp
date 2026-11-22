@@ -35,7 +35,7 @@ namespace psibase::zip
 
       Zip64ExtendedInfo zip64() const;
    };
-   PSIO1_REFLECT(LocalFileHeader,
+   PSIO_REFLECT(LocalFileHeader,
                 signature,
                 version,
                 flags,
@@ -74,7 +74,7 @@ namespace psibase::zip
       bool              isFile() const;
       Zip64ExtendedInfo zip64() const;
    };
-   PSIO1_REFLECT(FileHeader,
+   PSIO_REFLECT(FileHeader,
                 signature,
                 versionMadeBy,
                 versionNeededToExtract,

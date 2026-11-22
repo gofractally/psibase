@@ -32,7 +32,7 @@ struct message1
    std::string               to_string() const { return std::to_string(value); }
    friend auto               operator<=>(const message1&, const message1&) = default;
 };
-PSIO1_REFLECT(message1, value)
+PSIO_REFLECT(message1, value)
 
 std::ostream& operator<<(std::ostream& os, const message1& msg)
 {
@@ -233,13 +233,13 @@ struct ConsoleLog
    std::string filter = "Severity > critical";
    std::string format = "[{Severity}] [{Host}]{?:-[{RemoteEndpoint}]}: {Message}";
 };
-PSIO1_REFLECT(ConsoleLog, type, filter, format);
+PSIO_REFLECT(ConsoleLog, type, filter, format);
 
 struct Loggers
 {
    ConsoleLog stderr;
 };
-PSIO1_REFLECT(Loggers, stderr);
+PSIO_REFLECT(Loggers, stderr);
 
 int main(int argc, const char* const* argv)
 {

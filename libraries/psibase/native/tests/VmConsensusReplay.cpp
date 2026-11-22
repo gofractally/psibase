@@ -40,7 +40,7 @@ namespace
       std::vector<std::string> verifiedTransactionIds;
       std::vector<replay::NamespaceCount> namespaces;
    };
-   PSIO1_REFLECT(Result, passed, profile, inputBlockSha256, inputBeforeSha256,
+   PSIO_REFLECT(Result, passed, profile, inputBlockSha256, inputBeforeSha256,
                 expectedAfterSha256, actualAfterSha256, blockHeaderSha256,
                 transactionTraceSha256, proofTraceSha256, traceScope,
                 transactions, proofClaims, proofTimeoutMs, verifiedTransactionIds, namespaces)

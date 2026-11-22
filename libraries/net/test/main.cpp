@@ -16,13 +16,13 @@ struct ConsoleLog
        "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {TransactionId}}{?: {BlockId}: "
        "{BlockHeader}}{Indent:4:{TraceConsole}}";
 };
-PSIO1_REFLECT(ConsoleLog, type, filter, format);
+PSIO_REFLECT(ConsoleLog, type, filter, format);
 
 struct Loggers
 {
    ConsoleLog stderr;
 };
-PSIO1_REFLECT(Loggers, stderr);
+PSIO_REFLECT(Loggers, stderr);
 
 std::optional<std::size_t> dataIndex;
 

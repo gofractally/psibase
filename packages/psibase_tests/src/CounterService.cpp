@@ -14,7 +14,7 @@ struct CounterRow
    std::uint32_t value;
 };
 
-PSIO1_REFLECT(CounterRow, key, value)
+PSIO_REFLECT(CounterRow, key, value)
 
 using CounterTable = psibase::Table<CounterRow, &CounterRow::key>;
 PSIO1_REFLECT_TYPENAME(CounterTable)

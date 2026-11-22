@@ -629,7 +629,7 @@ namespace
       psibase::RunMode     mode;
       psibase::Action      action;
       psibase::Checksum256 context;
-      PSIO1_REFLECT(PreverifiedToken, success, mode, action, context)
+      PSIO_REFLECT(PreverifiedToken, success, mode, action, context)
    };
 }  // namespace
 

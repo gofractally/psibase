@@ -12,7 +12,7 @@ namespace TestService
       int         value;
       friend auto operator<=>(const SingleKeyRow&, const SingleKeyRow&) = default;
    };
-   PSIO1_REFLECT(SingleKeyRow, key, value)
+   PSIO_REFLECT(SingleKeyRow, key, value)
    using SingleKeyTable = psibase::Table<SingleKeyRow, &SingleKeyRow::key>;
    PSIO1_REFLECT_TYPENAME(SingleKeyTable)
 
@@ -23,7 +23,7 @@ namespace TestService
       int         value;
       friend auto operator<=>(const MultiKeyRow&, const MultiKeyRow&) = default;
    };
-   PSIO1_REFLECT(MultiKeyRow, key1, key2, value);
+   PSIO_REFLECT(MultiKeyRow, key1, key2, value);
    using MultiKeyTable = psibase::Table<MultiKeyRow, &MultiKeyRow::key1, &MultiKeyRow::key2>;
    PSIO1_REFLECT_TYPENAME(MultiKeyTable)
 
@@ -35,7 +35,7 @@ namespace TestService
       using CompoundKey = psibase::CompositeKey<&CompoundKeyRow::key2, &CompoundKeyRow::key1>;
       friend auto operator<=>(const CompoundKeyRow&, const CompoundKeyRow&) = default;
    };
-   PSIO1_REFLECT(CompoundKeyRow, key1, key2, value);
+   PSIO_REFLECT(CompoundKeyRow, key1, key2, value);
    using CompoundKeyTable =
        psibase::Table<CompoundKeyRow, &CompoundKeyRow::key1, CompoundKeyRow::CompoundKey{}>;
    PSIO1_REFLECT_TYPENAME(CompoundKeyTable)

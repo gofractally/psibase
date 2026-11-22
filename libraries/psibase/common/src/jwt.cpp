@@ -23,7 +23,7 @@ namespace psibase
       std::string alg{"HS256"};
       friend bool operator==(const token_header&, const token_header&) = default;
    };
-   PSIO1_REFLECT(token_header, typ, alg);
+   PSIO_REFLECT(token_header, typ, alg);
    std::optional<std::string> decodeJWT(const JWTKey& key, std::string_view token)
    {
       auto end_header = token.find('.');

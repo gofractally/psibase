@@ -10,7 +10,7 @@ struct DelayRow
 {
    std::uint64_t id;
    std::int32_t  socket;
-   PSIO1_REFLECT(DelayRow, id, socket)
+   PSIO_REFLECT(DelayRow, id, socket)
 };
 using DelayTable = psibase::Table<DelayRow, &DelayRow::id>;
 PSIO1_REFLECT_TYPENAME(DelayTable)
@@ -34,7 +34,7 @@ struct WaitArgs
 {
    std::string seconds;
 };
-PSIO1_REFLECT(WaitArgs, seconds)
+PSIO_REFLECT(WaitArgs, seconds)
 
 std::optional<psibase::HttpReply> XDelay::serveSys(psibase::HttpRequest        request,
                                                    std::optional<std::int32_t> socket)

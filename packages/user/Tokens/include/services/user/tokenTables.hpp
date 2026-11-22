@@ -17,7 +17,7 @@ namespace UserService
       std::uint64_t last_used_shared_bal_id;
       std::uint64_t last_used_subaccount_id;
    };
-   PSIO1_REFLECT(TokensInitRecord, last_used_id, last_used_shared_bal_id, last_used_subaccount_id)
+   PSIO_REFLECT(TokensInitRecord, last_used_id, last_used_shared_bal_id, last_used_subaccount_id)
    using TokensInitTable = psibase::Table<TokensInitRecord, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(TokensInitTable)
 
@@ -33,7 +33,7 @@ namespace UserService
 
       auto operator<=>(const TokenRecord&) const = default;
    };
-   PSIO1_REFLECT(TokenRecord,
+   PSIO_REFLECT(TokenRecord,
                 id,
                 nft_id,
                 settings_value,

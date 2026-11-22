@@ -18,7 +18,7 @@ namespace LocalService
       std::optional<psibase::TLSInfo>         tls;
       std::optional<psibase::SocketEndpoint>  endpoint;
       std::optional<std::vector<std::string>> bypassPrefixes;
-      PSIO1_REFLECT(OriginServerRow, subdomain, host, tls, endpoint, bypassPrefixes)
+      PSIO_REFLECT(OriginServerRow, subdomain, host, tls, endpoint, bypassPrefixes)
    };
    using OriginServerTable = psibase::Table<OriginServerRow, &OriginServerRow::subdomain>;
    PSIO1_REFLECT_TYPENAME(OriginServerTable)
@@ -27,7 +27,7 @@ namespace LocalService
    {
       std::int32_t socket1;
       std::int32_t socket2;
-      PSIO1_REFLECT(ProxyRow, socket1, socket2)
+      PSIO_REFLECT(ProxyRow, socket1, socket2)
    };
    using ProxyTable = psibase::Table<ProxyRow, &ProxyRow::socket1>;
    PSIO1_REFLECT_TYPENAME(ProxyTable)
@@ -36,7 +36,7 @@ namespace LocalService
    {
       std::int32_t from;
       std::int32_t to;
-      PSIO1_REFLECT(WebSocketRow, from, to)
+      PSIO_REFLECT(WebSocketRow, from, to)
    };
    using WebSocketTable = psibase::Table<WebSocketRow, &WebSocketRow::from, &WebSocketRow::to>;
    PSIO1_REFLECT_TYPENAME(WebSocketTable)

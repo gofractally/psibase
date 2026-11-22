@@ -61,7 +61,7 @@ namespace LocalService
       {
          AccountNumber account;
          bool          admin = true;
-         PSIO1_REFLECT(AdminAccountOp, account, admin)
+         PSIO_REFLECT(AdminAccountOp, account, admin)
       };
 
       struct LoginReply
@@ -69,7 +69,7 @@ namespace LocalService
          std::string access_token;
          std::string token_type = "bearer";
       };
-      PSIO1_REFLECT(LoginReply, access_token, token_type)
+      PSIO_REFLECT(LoginReply, access_token, token_type)
 
       struct ShutdownRequest
       {
@@ -77,7 +77,7 @@ namespace LocalService
          bool force   = false;
          bool soft    = false;
       };
-      PSIO1_REFLECT(ShutdownRequest, restart, force, soft);
+      PSIO_REFLECT(ShutdownRequest, restart, force, soft);
 
       struct PsinodeShutdownArgs
       {
@@ -85,7 +85,7 @@ namespace LocalService
          bool                                    soft = false;
          std::optional<MicroSeconds>             deadline;
       };
-      PSIO1_REFLECT(PsinodeShutdownArgs, restart, soft, deadline)
+      PSIO_REFLECT(PsinodeShutdownArgs, restart, soft, deadline)
 
       void initRefCounts()
       {
@@ -490,7 +490,7 @@ namespace LocalService
             }
             return {};
          }
-         PSIO1_REFLECT(PsinodeConfig, host, service)
+         PSIO_REFLECT(PsinodeConfig, host, service)
       };
 
       // The result of /config merges the host psinode config with the AdminOptions row
@@ -652,7 +652,7 @@ namespace LocalService
       {
          std::string isPrivileged  = "0";
          std::string isReplacement = "0";
-         PSIO1_REFLECT(ServiceFlags, isPrivileged, isReplacement)
+         PSIO_REFLECT(ServiceFlags, isPrivileged, isReplacement)
       };
    }  // namespace
 

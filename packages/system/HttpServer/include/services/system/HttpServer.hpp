@@ -11,7 +11,7 @@ namespace SystemService
       std::int32_t           socket;
       psibase::AccountNumber owner;
    };
-   PSIO1_REFLECT(PendingRequestRow, socket, owner)
+   PSIO_REFLECT(PendingRequestRow, socket, owner)
    using PendingRequestTable = psibase::Table<PendingRequestRow, &PendingRequestRow::socket>;
    PSIO1_REFLECT_TYPENAME(PendingRequestTable)
 
@@ -20,7 +20,7 @@ namespace SystemService
       psibase::AccountNumber service;
       psibase::AccountNumber server;
    };
-   PSIO1_REFLECT(RegisteredServiceRow, service, server)
+   PSIO_REFLECT(RegisteredServiceRow, service, server)
    using RegServTable = psibase::Table<RegisteredServiceRow, &RegisteredServiceRow::service>;
    PSIO1_REFLECT_TYPENAME(RegServTable)
 
@@ -29,7 +29,7 @@ namespace SystemService
       psibase::AccountNumber account;
       psibase::AccountNumber destination;
    };
-   PSIO1_REFLECT(RedirectRow, account, destination)
+   PSIO_REFLECT(RedirectRow, account, destination)
    using RedirectTable = psibase::Table<RedirectRow, &RedirectRow::account>;
    PSIO1_REFLECT_TYPENAME(RedirectTable)
 

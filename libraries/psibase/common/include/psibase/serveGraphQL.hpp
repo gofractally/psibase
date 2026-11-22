@@ -13,7 +13,7 @@ namespace psibase
    struct GraphQLQuery
    {
       std::string query;
-      PSIO1_REFLECT(GraphQLQuery, query);
+      PSIO_REFLECT(GraphQLQuery, query);
    };
 
    /// Handle `/graphql` request
@@ -87,7 +87,7 @@ namespace psibase
       bool        hasNextPage     = false;
       std::string startCursor;
       std::string endCursor;
-      PSIO1_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
+      PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
    };
 
    /// GraphQL support for paging
@@ -99,7 +99,7 @@ namespace psibase
    {
       Node        node;
       std::string cursor;
-      PSIO1_REFLECT(Edge, node, cursor)
+      PSIO_REFLECT(Edge, node, cursor)
    };
 
    template <typename Node, psio1::FixedString EdgeName>
@@ -120,7 +120,7 @@ namespace psibase
 
       std::vector<Edge> edges;
       PageInfo          pageInfo;
-      PSIO1_REFLECT(Connection, edges, pageInfo)
+      PSIO_REFLECT(Connection, edges, pageInfo)
    };
 
    template <typename Node, psio1::FixedString ConnectionName, psio1::FixedString EdgeName>
@@ -134,7 +134,7 @@ namespace psibase
    {
       std::optional<psibase::BlockNum>  blockNum;
       std::optional<psibase::BlockTime> blockTime;
-      PSIO1_REFLECT(EventBlockInfo, blockNum, blockTime)
+      PSIO_REFLECT(EventBlockInfo, blockNum, blockTime)
    };
 
    namespace detail
@@ -157,7 +157,7 @@ namespace psibase
                     "WithBlockContext<T>: T already has a 'block' field");
       EventBlockInfo block;
       T              data;
-      PSIO1_REFLECT(WithBlockContext, block, data)
+      PSIO_REFLECT(WithBlockContext, block, data)
    };
 
    template <typename T>
@@ -719,7 +719,7 @@ namespace psibase
    {
       uint64_t rowid;
       T        data;
-      PSIO1_REFLECT(SqlRow, rowid, data)
+      PSIO_REFLECT(SqlRow, rowid, data)
    };
 
    struct RowBlockStart
@@ -727,7 +727,7 @@ namespace psibase
       uint64_t  rowIndex;
       BlockNum  blockNum;
       BlockTime blockTime;
-      PSIO1_REFLECT(RowBlockStart, rowIndex, blockNum, blockTime)
+      PSIO_REFLECT(RowBlockStart, rowIndex, blockNum, blockTime)
    };
 
    namespace detail

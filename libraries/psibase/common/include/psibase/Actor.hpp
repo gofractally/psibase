@@ -450,7 +450,7 @@ namespace psibase
 
    struct EmptyService
    {
-      PSIO1_REFLECT(EmptyService)
+      PSIO_REFLECT(EmptyService)
    };
 
    /// Call a service

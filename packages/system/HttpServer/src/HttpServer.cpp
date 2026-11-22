@@ -130,7 +130,7 @@ namespace SystemService
          std::int32_t                              socket;
          psibase::AccountNumber                    owner;
          std::optional<std::vector<AccountNumber>> prevOwners;
-         PSIO1_REFLECT(TempPendingRequestRow, socket, owner, prevOwners)
+         PSIO_REFLECT(TempPendingRequestRow, socket, owner, prevOwners)
       };
       using TempPendingRequestTable =
           psibase::Table<TempPendingRequestRow, &TempPendingRequestRow::socket>;

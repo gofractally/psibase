@@ -11,7 +11,7 @@ namespace TestService
       int                  id;
       int                  count;
    };
-   PSIO1_REFLECT(CallCounterRow, id, count)
+   PSIO_REFLECT(CallCounterRow, id, count)
    using CallCounterTable = psibase::Table<CallCounterRow, &CallCounterRow::id>;
    PSIO1_REFLECT_TYPENAME(CallCounterTable)
 

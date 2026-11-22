@@ -11,7 +11,7 @@ namespace LocalService
    struct NodeIdRow
    {
       std::uint64_t nodeId;
-      PSIO1_REFLECT(NodeIdRow, nodeId);
+      PSIO_REFLECT(NodeIdRow, nodeId);
    };
    using NodeIdTable = psibase::Table<NodeIdRow, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(NodeIdTable)
@@ -21,7 +21,7 @@ namespace LocalService
       std::int32_t                     peerSocket;
       std::int32_t                     requestSocket;
       std::vector<psibase::HttpHeader> replyHeaders;
-      PSIO1_REFLECT(ConnectionRequestRow, peerSocket, requestSocket, replyHeaders)
+      PSIO_REFLECT(ConnectionRequestRow, peerSocket, requestSocket, replyHeaders)
    };
    using ConnectionRequestTable =
        psibase::Table<ConnectionRequestRow, &ConnectionRequestRow::peerSocket>;
@@ -42,7 +42,7 @@ namespace LocalService
       // and unchangable, false if the hosts are loaded from a
       // hostnamesMessage
       bool fixedHosts() const { return outgoing && !local; }
-      PSIO1_REFLECT(PeerConnection, socket, peerSocket, nodeId, urls, hosts, secure, local, outgoing)
+      PSIO_REFLECT(PeerConnection, socket, peerSocket, nodeId, urls, hosts, secure, local, outgoing)
    };
    using PeerConnectionTable =
        psibase::Table<PeerConnection,
@@ -54,7 +54,7 @@ namespace LocalService
    struct PeerUsernameRow
    {
       psibase::AccountNumber name;
-      PSIO1_REFLECT(PeerUsernameRow, name)
+      PSIO_REFLECT(PeerUsernameRow, name)
    };
    using PeerUsernameTable = psibase::Table<PeerUsernameRow, &PeerUsernameRow::name>;
    PSIO1_REFLECT_TYPENAME(PeerUsernameTable)
@@ -63,7 +63,7 @@ namespace LocalService
    {
       std::string url;
       std::string token;
-      PSIO1_REFLECT(UrlAuthRow, url, token)
+      PSIO_REFLECT(UrlAuthRow, url, token)
    };
    using UrlAuthTable = psibase::Table<UrlAuthRow, &UrlAuthRow::url>;
    PSIO1_REFLECT_TYPENAME(UrlAuthTable)
@@ -89,7 +89,7 @@ namespace LocalService
    {
       std::uint64_t timerId;
       std::string   url;
-      PSIO1_REFLECT(UrlTimerRow, timerId, url)
+      PSIO_REFLECT(UrlTimerRow, timerId, url)
    };
    using UrlTimerTable = psibase::Table<UrlTimerRow, &UrlTimerRow::timerId>;
    PSIO1_REFLECT_TYPENAME(UrlTimerTable)
@@ -100,7 +100,7 @@ namespace LocalService
       std::string   host;
       std::uint64_t nodeId;
       std::int32_t  socket;
-      PSIO1_REFLECT(HostIdRow, outgoing, host, nodeId, socket)
+      PSIO_REFLECT(HostIdRow, outgoing, host, nodeId, socket)
    };
    using HostIdTable = psibase::Table<HostIdRow,
                                       psibase::CompositeKey<&HostIdRow::outgoing,

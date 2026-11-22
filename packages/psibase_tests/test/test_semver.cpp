@@ -10,7 +10,7 @@ struct SemverTest
    std::string version;
    bool        matches;
 };
-PSIO1_REFLECT(SemverTest, pattern, version, matches)
+PSIO_REFLECT(SemverTest, pattern, version, matches)
 
 TEST_CASE("semver")
 {

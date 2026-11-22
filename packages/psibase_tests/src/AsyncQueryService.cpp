@@ -16,7 +16,7 @@ struct AsyncResponseRow
    HttpReply                  reply;
    std::optional<std::string> error;
 };
-PSIO1_REFLECT(AsyncResponseRow, socket, reply, error)
+PSIO_REFLECT(AsyncResponseRow, socket, reply, error)
 
 using AsyncResponseTable = psibase::Table<AsyncResponseRow, &AsyncResponseRow::socket>;
 PSIO1_REFLECT_TYPENAME(AsyncResponseTable)
@@ -26,7 +26,7 @@ struct CounterRow
    std::uint32_t value;
 };
 
-PSIO1_REFLECT(CounterRow, value)
+PSIO_REFLECT(CounterRow, value)
 
 using CounterTable = psibase::Table<CounterRow, SingletonKey{}>;
 PSIO1_REFLECT_TYPENAME(CounterTable)

@@ -131,7 +131,7 @@ struct ServiceActionCount
 {
    AccountNumber service;
    std::uint32_t count;
-   PSIO1_REFLECT(ServiceActionCount, service, count)
+   PSIO_REFLECT(ServiceActionCount, service, count)
 };
 
 struct BlockQuery

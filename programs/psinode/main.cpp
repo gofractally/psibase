@@ -399,7 +399,7 @@ struct ShutdownArgs
    bool                                    soft = false;
    std::optional<std::int64_t>             deadline;
 };
-PSIO1_REFLECT(ShutdownArgs, restart, soft, deadline)
+PSIO_REFLECT(ShutdownArgs, restart, soft, deadline)
 
 // connect,disconnect
 
@@ -407,13 +407,13 @@ struct ConnectRequest
 {
    std::string url;
 };
-PSIO1_REFLECT(ConnectRequest, url);
+PSIO_REFLECT(ConnectRequest, url);
 
 struct DisconnectRequest
 {
    peer_id id;
 };
-PSIO1_REFLECT(DisconnectRequest, id);
+PSIO_REFLECT(DisconnectRequest, id);
 
 struct NewKeyRequest
 {
@@ -421,20 +421,20 @@ struct NewKeyRequest
    std::optional<std::vector<char>> rawData;
    std::string                      device;
 };
-PSIO1_REFLECT(NewKeyRequest, service, rawData, device);
+PSIO_REFLECT(NewKeyRequest, service, rawData, device);
 
 struct UnlockKeyringRequest
 {
    std::string pin;
    std::string device;
 };
-PSIO1_REFLECT(UnlockKeyringRequest, pin, device);
+PSIO_REFLECT(UnlockKeyringRequest, pin, device);
 
 struct LockKeyringRequest
 {
    std::string device;
 };
-PSIO1_REFLECT(LockKeyringRequest, device);
+PSIO_REFLECT(LockKeyringRequest, device);
 
 std::vector<char> pkcs11TokenKey(const std::string& uri)
 {
@@ -451,7 +451,7 @@ struct UnlockKeyringRow
    std::string device;
    std::string pin;
 };
-PSIO1_REFLECT(UnlockKeyringRow, device, pin);
+PSIO_REFLECT(UnlockKeyringRow, device, pin);
 
 struct PKCS11TokenInfo
 {
@@ -459,7 +459,7 @@ struct PKCS11TokenInfo
    std::string id;
    bool        unlocked;
 };
-PSIO1_REFLECT(PKCS11TokenInfo, name, id, unlocked);
+PSIO_REFLECT(PKCS11TokenInfo, name, id, unlocked);
 
 struct RestartInfo
 {
@@ -470,7 +470,7 @@ struct RestartInfo
    bool keysChanged   = false;
    bool configChanged = false;
 };
-PSIO1_REFLECT(RestartInfo, shouldRestart);
+PSIO_REFLECT(RestartInfo, shouldRestart);
 
 struct ThreadInfo
 {
@@ -482,7 +482,7 @@ struct ThreadInfo
    uint64_t    read;
    uint64_t    written;
 };
-PSIO1_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
+PSIO_REFLECT(ThreadInfo, id, group, user, system, pageFaults, read, written)
 
 struct MemStats
 {
@@ -494,7 +494,7 @@ struct MemStats
    uint64_t                wasmCode;
    uint64_t                unclassified;
 };
-PSIO1_REFLECT(MemStats,
+PSIO_REFLECT(MemStats,
              database,
              databaseAttribution,
              code,
@@ -509,7 +509,7 @@ struct Perf
    std::optional<MemStats>                memory;
    std::optional<std::vector<ThreadInfo>> tasks;
 };
-PSIO1_REFLECT(Perf, timestamp, memory, tasks)
+PSIO_REFLECT(Perf, timestamp, memory, tasks)
 
 void write_om_descriptor(std::string_view name,
                          std::string_view type,
@@ -969,7 +969,7 @@ struct TLSConfig
    std::string              key;
    std::vector<std::string> trustfiles;
 };
-PSIO1_REFLECT(TLSConfig, certificate, key, trustfiles)
+PSIO_REFLECT(TLSConfig, certificate, key, trustfiles)
 
 struct ExtraConfigField
 {
@@ -1069,7 +1069,7 @@ struct PsinodeConfig
              name.starts_with("service.");
    }
 };
-PSIO1_REFLECT(PsinodeConfig,
+PSIO_REFLECT(PsinodeConfig,
              producer,
              pkcs11_modules,
              listen,
@@ -1145,7 +1145,7 @@ struct PsinodeCombinedConfig
 {
    PsinodeConfig        host;
    PsinodeServiceConfig service;
-   PSIO1_REFLECT(PsinodeCombinedConfig, host, service)
+   PSIO_REFLECT(PsinodeCombinedConfig, host, service)
 };
 
 void to_config(const PsinodeCombinedConfig& config, ConfigFile& file)

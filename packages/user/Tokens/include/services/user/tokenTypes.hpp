@@ -135,7 +135,7 @@ namespace UserService
          return value == static_cast<Quantity_t>(otherValue);
       }
    };  // namespace UserService
-   PSIO1_REFLECT(Quantity, value);
+   PSIO_REFLECT(Quantity, value);
 
    struct Decimal
    {

@@ -79,7 +79,7 @@ namespace psibase
       Claim                     signer;
       // To save space, we're picking this apart and reconstituting it, while
       // assuming that the signature remains valid.
-      PSIO1_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, signer)
+      PSIO_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, signer)
    };
 
    Checksum256 makeSignatureHash(const CommitMessage& msg)
@@ -97,14 +97,14 @@ namespace psibase
       std::vector<char> signature;
       friend bool       operator==(const ProducerConfirm&, const ProducerConfirm&) = default;
    };
-   PSIO1_REFLECT(ProducerConfirm, producer, signature)
+   PSIO_REFLECT(ProducerConfirm, producer, signature)
 
    struct BlockConfirm
    {
       BlockNum                                    blockNum;
       std::vector<ProducerConfirm>                commits;
       std::optional<std::vector<ProducerConfirm>> nextCommits;
-      PSIO1_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
+      PSIO_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
    };
 
    inline std::size_t strongThreshold(const BftConsensus& c)

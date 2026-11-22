@@ -18,25 +18,25 @@ struct HistoryEvent
    std::string s;
    int         i;
 };
-PSIO1_REFLECT(HistoryEvent, s, i);
+PSIO_REFLECT(HistoryEvent, s, i);
 
 struct Events
 {
    std::vector<HistoryEvent> history;
 };
-PSIO1_REFLECT(Events, history);
+PSIO_REFLECT(Events, history);
 
 struct EventsData
 {
    Events events;
 };
-PSIO1_REFLECT(EventsData, events);
+PSIO_REFLECT(EventsData, events);
 
 struct EventsRoot
 {
    EventsData data;
 };
-PSIO1_REFLECT(EventsRoot, data);
+PSIO_REFLECT(EventsRoot, data);
 
 ///////////////////////////////////
 
@@ -45,32 +45,32 @@ struct FooEventRecord
    std::string s;
    int         i;
 };
-PSIO1_REFLECT(FooEventRecord, s, i);
+PSIO_REFLECT(FooEventRecord, s, i);
 
 struct FooEventRecordEdge
 {
    FooEventRecord node;
    std::string    cursor;
 };
-PSIO1_REFLECT(FooEventRecordEdge, node, cursor);
+PSIO_REFLECT(FooEventRecordEdge, node, cursor);
 
 struct FooEventRecordConnection
 {
    std::vector<FooEventRecordEdge> edges;
 };
-PSIO1_REFLECT(FooEventRecordConnection, edges);
+PSIO_REFLECT(FooEventRecordConnection, edges);
 
 struct Foo2Events
 {
    FooEventRecordConnection foo2Events;
 };
-PSIO1_REFLECT(Foo2Events, foo2Events);
+PSIO_REFLECT(Foo2Events, foo2Events);
 
 struct Foo2EventsRoot
 {
    Foo2Events data;
 };
-PSIO1_REFLECT(Foo2EventsRoot, data);
+PSIO_REFLECT(Foo2EventsRoot, data);
 
 ///////////////////////////////////
 
@@ -78,32 +78,32 @@ struct ExampleRecordQuery
 {
    ExampleRecord r;
 };
-PSIO1_REFLECT(ExampleRecordQuery, r);
+PSIO_REFLECT(ExampleRecordQuery, r);
 
 struct ExampleRecordQueryEdge
 {
    ExampleRecordQuery node;
    std::string        cursor;
 };
-PSIO1_REFLECT(ExampleRecordQueryEdge, node, cursor);
+PSIO_REFLECT(ExampleRecordQueryEdge, node, cursor);
 
 struct ExampleRecordQueryConnection
 {
    std::vector<ExampleRecordQueryEdge> edges;
 };
-PSIO1_REFLECT(ExampleRecordQueryConnection, edges);
+PSIO_REFLECT(ExampleRecordQueryConnection, edges);
 
 struct ExampleRecordData
 {
    ExampleRecordQueryConnection exampleRecords;
 };
-PSIO1_REFLECT(ExampleRecordData, exampleRecords);
+PSIO_REFLECT(ExampleRecordData, exampleRecords);
 
 struct ExampleRecordQueryRoot
 {
    ExampleRecordData data;
 };
-PSIO1_REFLECT(ExampleRecordQueryRoot, data);
+PSIO_REFLECT(ExampleRecordQueryRoot, data);
 
 ///////////////////////////////////
 

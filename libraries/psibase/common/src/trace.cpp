@@ -126,7 +126,7 @@ namespace psibase
       {
          AccountNumber service;
          std::string   method;
-         PSIO1_REFLECT(PrettyServiceMethod, service, method)
+         PSIO_REFLECT(PrettyServiceMethod, service, method)
       };
 
       struct ServiceMethodFormatter

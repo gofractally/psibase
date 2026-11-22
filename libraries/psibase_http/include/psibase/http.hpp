@@ -140,7 +140,7 @@ namespace psibase::http
       std::optional<std::string>    address;
       std::optional<unsigned short> port;
    };
-   PSIO1_REFLECT(any_listen_spec, protocol, path, address, port)
+   PSIO_REFLECT(any_listen_spec, protocol, path, address, port)
 
    template <bool Secure, typename S>
    void to_json(const tcp_listen_spec<Secure>& obj, S& stream)

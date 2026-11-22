@@ -44,7 +44,7 @@ namespace psibase::net
          return "prepare: id=" + loggers::to_string(block_id) + " producer=" + producer.str();
       }
    };
-   PSIO1_REFLECT(PrepareMessage, block_id, producer, signer)
+   PSIO_REFLECT(PrepareMessage, block_id, producer, signer)
 
    struct CommitMessage
    {
@@ -60,7 +60,7 @@ namespace psibase::net
    };
    // To save space, we're picking this apart and reconstituting it, while
    // assuming that the signature remains valid.
-   PSIO1_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, signer)
+   PSIO_REFLECT(CommitMessage, definitionWillNotChange(), block_id, producer, signer)
 
    struct ProducerConfirm
    {
@@ -68,7 +68,7 @@ namespace psibase::net
       std::vector<char> signature;
       friend bool       operator==(const ProducerConfirm&, const ProducerConfirm&) = default;
    };
-   PSIO1_REFLECT(ProducerConfirm, producer, signature)
+   PSIO_REFLECT(ProducerConfirm, producer, signature)
 
    struct ViewChangeMessage
    {
@@ -95,7 +95,7 @@ namespace psibase::net
                 " prepared=" + loggers::to_string(best_prepared);
       }
    };
-   PSIO1_REFLECT(ViewChangeMessage,
+   PSIO_REFLECT(ViewChangeMessage,
                 term,
                 producer,
                 signer,
@@ -114,7 +114,7 @@ namespace psibase::net
 
       std::string to_string() const { return "request view"; }
    };
-   PSIO1_REFLECT(RequestViewMessage);
+   PSIO_REFLECT(RequestViewMessage);
 
    // TODO: consider using a multiparty signature scheme to save space
    struct BlockConfirm
@@ -123,7 +123,7 @@ namespace psibase::net
       std::vector<ProducerConfirm>                commits;
       std::optional<std::vector<ProducerConfirm>> nextCommits;
    };
-   PSIO1_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
+   PSIO_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
 
    template <typename Base, typename Timer>
    struct basic_bft_consensus : Base

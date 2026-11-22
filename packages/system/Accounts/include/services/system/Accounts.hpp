@@ -18,7 +18,7 @@ namespace SystemService
    {
       uint32_t totalAccounts = 0;
    };
-   PSIO1_REFLECT(AccountsStatus, totalAccounts)
+   PSIO_REFLECT(AccountsStatus, totalAccounts)
    using AccountsStatusTable = psibase::Table<AccountsStatus, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(AccountsStatusTable)
 
@@ -39,7 +39,7 @@ namespace SystemService
       /// infeasible.
       std::uint64_t authSequence;
    };
-   PSIO1_REFLECT(Account, accountNum, authService, authSequence)
+   PSIO_REFLECT(Account, accountNum, authService, authSequence)
    using AccountTable = psibase::Table<Account, &Account::accountNum>;
    PSIO1_REFLECT_TYPENAME(AccountTable)
 
@@ -50,7 +50,7 @@ namespace SystemService
       psibase::AccountNumber account;
       psibase::AccountNumber authService;
    };
-   PSIO1_REFLECT(FrozenAccount, account, authService)
+   PSIO_REFLECT(FrozenAccount, account, authService)
    using FrozenTable = psibase::Table<FrozenAccount, &FrozenAccount::account>;
    PSIO1_REFLECT_TYPENAME(FrozenTable)
 

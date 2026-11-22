@@ -16,7 +16,7 @@ namespace SystemService
                                         &CodeRefCountRow::vmType,
                                         &CodeRefCountRow::vmVersion>;
       auto key() const { return Key{}(*this); }
-      PSIO1_REFLECT(CodeRefCountRow, codeHash, vmType, vmVersion)
+      PSIO_REFLECT(CodeRefCountRow, codeHash, vmType, vmVersion)
    };
    using CodeRefCountTable = psibase::Table<CodeRefCountRow, CodeRefCountRow::Key{}>;
    PSIO1_REFLECT_TYPENAME(CodeRefCountTable)
@@ -33,7 +33,7 @@ namespace SystemService
       using Key =
           psibase::CompositeKey<&StagedCodeRow::from, &StagedCodeRow::id, &StagedCodeRow::service>;
       auto key() const { return Key{}(*this); }
-      PSIO1_REFLECT(StagedCodeRow, from, service, id, codeHash, vmType, vmVersion)
+      PSIO_REFLECT(StagedCodeRow, from, service, id, codeHash, vmType, vmVersion)
    };
    using StagedCodeTable = psibase::Table<StagedCodeRow, StagedCodeRow::Key{}>;
    PSIO1_REFLECT_TYPENAME(StagedCodeTable)
@@ -41,7 +41,7 @@ namespace SystemService
    struct VerifySequenceRow
    {
       std::uint64_t seq;
-      PSIO1_REFLECT(VerifySequenceRow, seq)
+      PSIO_REFLECT(VerifySequenceRow, seq)
    };
    using VerifySequenceTable = psibase::Table<VerifySequenceRow, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(VerifySequenceTable)
@@ -52,7 +52,7 @@ namespace SystemService
    struct DefaultVmVersionRow
    {
       std::uint8_t vmVersion = psibase::defaultVmVersion;
-      PSIO1_REFLECT(DefaultVmVersionRow, vmVersion)
+      PSIO_REFLECT(DefaultVmVersionRow, vmVersion)
    };
    using DefaultVmVersionTable = psibase::Table<DefaultVmVersionRow, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(DefaultVmVersionTable)

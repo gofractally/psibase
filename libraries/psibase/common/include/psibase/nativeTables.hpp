@@ -43,7 +43,7 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::native;
       static auto           key() -> KeyPrefixType;
-      PSIO1_REFLECT(StatusRow, chainId, current, head, consensus)
+      PSIO_REFLECT(StatusRow, chainId, current, head, consensus)
    };
    using StatusTable = Table<StatusRow, SingletonKey{}>;
 
@@ -62,7 +62,7 @@ namespace psibase
       static constexpr auto db = psibase::DbId::native;
 
       static auto key() -> KeyPrefixType;
-      PSIO1_REFLECT(ConfigRow, maxKeySize, maxValueSize, maxBlockSize)
+      PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize, maxBlockSize)
    };
    using ConfigTable = Table<ConfigRow, SingletonKey{}>;
 
@@ -75,7 +75,7 @@ namespace psibase
       static constexpr auto db = psibase::DbId::native;
 
       static auto key(NativeTableNum TableNum) -> KeyPrefixType;
-      PSIO1_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
+      PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
    };
    using WasmConfigTable = Table<WasmConfigRow, SingletonKey{}>;
 
@@ -115,7 +115,7 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> CodeKeyType;
-      PSIO1_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
+      PSIO_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
    };
    using CodeTable = Table<CodeRow, &CodeRow::codeNum>;
 
@@ -139,7 +139,7 @@ namespace psibase
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> CodeByHashKeyType;
-      PSIO1_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, code)
+      PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, code)
    };
    using CodeByHashTable = Table<
        CodeByHashRow,
@@ -179,7 +179,7 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> NotifyKeyType;
-      PSIO1_REFLECT(NotifyRow, type, actions)
+      PSIO_REFLECT(NotifyRow, type, actions)
    };
    using NotifyTable = Table<NotifyRow, &NotifyRow::type>;
 
@@ -194,7 +194,7 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::nativeSubjective;
       auto                  key() const -> BlockDataKeyType;
-      PSIO1_REFLECT(BlockDataRow, blockId, auxConsensusData);
+      PSIO_REFLECT(BlockDataRow, blockId, auxConsensusData);
    };
    using BlockDataTable = Table<BlockDataRow, &BlockDataRow::blockId>;
 
@@ -210,7 +210,7 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::nativeSubjective;
       auto                  key() const -> ConsensusChangeKeyType;
-      PSIO1_REFLECT(ConsensusChangeRow, start, commit, end);
+      PSIO_REFLECT(ConsensusChangeRow, start, commit, end);
    };
    using ConsensusChangeTable = Table<ConsensusChangeRow, &ConsensusChangeRow::start>;
 
@@ -218,7 +218,7 @@ namespace psibase
    {
       snapshot::StateChecksum               state;
       std::vector<snapshot::StateSignature> signatures;
-      PSIO1_REFLECT(SnapshotStateItem, state, signatures)
+      PSIO_REFLECT(SnapshotStateItem, state, signatures)
    };
 
    using SnapshotKeyType = std::tuple<std::uint16_t, std::uint8_t, Checksum256>;
@@ -233,7 +233,7 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::nativeSubjective;
       auto                  key() const -> SnapshotKeyType;
-      PSIO1_REFLECT(SnapshotRow, id, state, other)
+      PSIO_REFLECT(SnapshotRow, id, state, other)
    };
    using SnapshotTable = Table<SnapshotRow, &SnapshotRow::id>;
 
@@ -245,7 +245,7 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> ScheduledSnapshotKeyType;
-      PSIO1_REFLECT(ScheduledSnapshotRow, blockNum)
+      PSIO_REFLECT(ScheduledSnapshotRow, blockNum)
    };
    using ScheduledSnapshotTable = Table<ScheduledSnapshotRow, &ScheduledSnapshotRow::blockNum>;
 
@@ -258,7 +258,7 @@ namespace psibase
 
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> LogTruncateKeyType;
-      PSIO1_REFLECT(LogTruncateRow, start)
+      PSIO_REFLECT(LogTruncateRow, start)
    };
    using LogTruncateTable = Table<LogTruncateRow, SingletonKey{}>;
 
@@ -276,7 +276,7 @@ namespace psibase
       std::string                  message;
       Severity                     severity = Severity::info;
       std::optional<AccountNumber> service;
-      PSIO1_REFLECT(LogMessage, severity, message, service)
+      PSIO_REFLECT(LogMessage, severity, message, service)
    };
 
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
@@ -294,7 +294,7 @@ namespace psibase
 
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> SocketKeyType;
-      PSIO1_REFLECT(SocketRow, fd, info)
+      PSIO_REFLECT(SocketRow, fd, info)
    };
    using SocketTable = Table<SocketRow, &SocketRow::fd>;
 
@@ -354,7 +354,7 @@ namespace psibase
    {
       AccountNumber service;
       MethodNumber  method;
-      PSIO1_REFLECT(ServiceMethod, service, method)
+      PSIO_REFLECT(ServiceMethod, service, method)
    };
    inline constexpr bool psio_custom_schema(ServiceMethod*)
    {
@@ -415,7 +415,7 @@ namespace psibase
 
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> RunKeyType;
-      PSIO1_REFLECT(RunRow, id, mode, maxTime, action, continuation)
+      PSIO_REFLECT(RunRow, id, mode, maxTime, action, continuation)
    };
    using RunTable = Table<RunRow, &RunRow::id>;
 
@@ -428,7 +428,7 @@ namespace psibase
       std::string       value;
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> EnvKeyType;
-      PSIO1_REFLECT(EnvRow, name, value);
+      PSIO_REFLECT(EnvRow, name, value);
    };
    using EnvTable = Table<EnvRow, &EnvRow::name>;
 
@@ -445,7 +445,7 @@ namespace psibase
       std::string       config;
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> HostConfigKeyType;
-      PSIO1_REFLECT(HostConfigRow, hostVersion, config)
+      PSIO_REFLECT(HostConfigRow, hostVersion, config)
    };
    using HostConfigTable = Table<HostConfigRow, SingletonKey{}>;
 
@@ -470,7 +470,7 @@ namespace psibase
 
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> KeyPrefixType;
-      PSIO1_REFLECT(PendingShutdownRow, args);
+      PSIO_REFLECT(PendingShutdownRow, args);
    };
    using PendingShutdownTable = Table<PendingShutdownRow, SingletonKey{}>;
 

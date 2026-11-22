@@ -19,7 +19,7 @@ namespace UserService
          std::vector<uint8_t> fingerprint;
          std::string          secret;
       };
-      PSIO1_REFLECT(InvPayload, fingerprint, secret);
+      PSIO_REFLECT(InvPayload, fingerprint, secret);
 
       /// This interface should be implemented by a service that wants to handle hooks from the invite service
       /// to be notified when an event occurs related to an invite.

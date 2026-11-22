@@ -67,7 +67,7 @@ namespace psibase
 
       static Checksum256 combine(const Checksum256& lhs, const Checksum256& rhs);
       void               push_impl(const Checksum256& hash);
-      PSIO1_REFLECT(Merkle, i, stack)
+      PSIO_REFLECT(Merkle, i, stack)
    };
 
 }  // namespace psibase

@@ -23,7 +23,7 @@ namespace psibase::snapshot
       Checksum256 serviceRoot                                            = {};
       Checksum256 nativeRoot                                             = {};
       friend bool operator==(const StateChecksum&, const StateChecksum&) = default;
-      PSIO1_REFLECT(StateChecksum, serviceRoot, nativeRoot);
+      PSIO_REFLECT(StateChecksum, serviceRoot, nativeRoot);
    };
 
    struct StateSignature
@@ -33,7 +33,7 @@ namespace psibase::snapshot
       Claim                          claim;
       std::vector<char>              rawData;
       auto key() const { return psio1::composite_key(table, primaryIndex, account); }
-      PSIO1_REFLECT(StateSignature, account, claim, rawData)
+      PSIO_REFLECT(StateSignature, account, claim, rawData)
    };
 
    struct StateSignatureInfo

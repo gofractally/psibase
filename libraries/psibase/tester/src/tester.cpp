@@ -520,7 +520,7 @@ namespace
       psibase::RunMode     mode;
       psibase::Action      action;
       psibase::Checksum256 context;
-      PSIO1_REFLECT(RunTokenData, success, mode, action, context)
+      PSIO_REFLECT(RunTokenData, success, mode, action, context)
    };
 
    psibase::Checksum256 makeRunContext(psibase::TestChain&                      chain,

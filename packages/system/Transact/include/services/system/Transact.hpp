@@ -144,7 +144,7 @@ namespace SystemService
    {
       psibase::AccountNumber                sender;
       std::optional<psibase::ServiceMethod> action;
-      PSIO1_REFLECT(AuthTarget, sender, action)
+      PSIO_REFLECT(AuthTarget, sender, action)
    };
 
    struct TransactStatus
@@ -153,7 +153,7 @@ namespace SystemService
 
       std::optional<std::vector<psibase::Checksum256>> bootTransactions;
    };
-   PSIO1_REFLECT(TransactStatus, enforceAuth, bootTransactions)
+   PSIO_REFLECT(TransactStatus, enforceAuth, bootTransactions)
    using TransactStatusTable = psibase::Table<TransactStatus, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(TransactStatusTable)
 
@@ -161,7 +161,7 @@ namespace SystemService
    {
       bool enabled = false;
    };
-   PSIO1_REFLECT(ResMonitoringConfig, enabled)
+   PSIO_REFLECT(ResMonitoringConfig, enabled)
    using ResMonitoringConfigTable = psibase::Table<ResMonitoringConfig, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(ResMonitoringConfigTable)
 
@@ -171,7 +171,7 @@ namespace SystemService
       std::array<uint32_t, 256> blockSuffixes;
       std::uint32_t             blockNum;
    };
-   PSIO1_REFLECT(BlockSummary, blockSuffixes, blockNum)
+   PSIO_REFLECT(BlockSummary, blockSuffixes, blockNum)
    using BlockSummaryTable = psibase::Table<BlockSummary, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(BlockSummaryTable)
 
@@ -183,7 +183,7 @@ namespace SystemService
 
       using Key = psibase::CompositeKey<&IncludedTrx::expiration, &IncludedTrx::id>;
    };
-   PSIO1_REFLECT(IncludedTrx, expiration, id)
+   PSIO_REFLECT(IncludedTrx, expiration, id)
    using IncludedTrxTable = psibase::Table<IncludedTrx, IncludedTrx::Key{}>;
    PSIO1_REFLECT_TYPENAME(IncludedTrxTable)
 
@@ -199,7 +199,7 @@ namespace SystemService
       CallbackType                 type;
       std::vector<psibase::Action> actions;
    };
-   PSIO1_REFLECT(Callbacks, type, actions)
+   PSIO_REFLECT(Callbacks, type, actions)
 
    using CallbacksTable = psibase::Table<Callbacks, &Callbacks::type>;
    PSIO1_REFLECT_TYPENAME(CallbacksTable)
@@ -208,7 +208,7 @@ namespace SystemService
    {
       psibase::AccountNumber service;
    };
-   PSIO1_REFLECT(EventIndexer, service)
+   PSIO_REFLECT(EventIndexer, service)
    using EventIndexerTable = psibase::Table<EventIndexer, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(EventIndexerTable)
 
@@ -217,7 +217,7 @@ namespace SystemService
       psibase::BlockTime lastSnapshot;
       psibase::Seconds   snapshotInterval;
    };
-   PSIO1_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
+   PSIO_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
    using SnapshotInfoTable = psibase::Table<SnapshotInfo, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(SnapshotInfoTable)
 

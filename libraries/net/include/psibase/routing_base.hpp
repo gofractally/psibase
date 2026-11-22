@@ -27,7 +27,7 @@ namespace psibase::net
 
       std::string to_string() const { return "init: version=" + std::to_string(version); }
    };
-   PSIO1_REFLECT(InitMessage, version);
+   PSIO_REFLECT(InitMessage, version);
 
    template <typename T>
    concept has_block_id = requires(T& t) { t.block_id; };

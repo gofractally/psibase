@@ -8,7 +8,7 @@ struct payload
    int         number;
    std::string memo;
 };
-PSIO1_REFLECT(payload, number, memo)
+PSIO_REFLECT(payload, number, memo)
 
 int ctors_called = 0;
 int start_called = 0;

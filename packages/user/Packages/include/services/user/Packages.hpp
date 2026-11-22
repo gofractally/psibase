@@ -10,14 +10,14 @@ namespace UserService
       std::string name;
       std::string version;
    };
-   PSIO1_REFLECT(PackageRef, name, version)
+   PSIO_REFLECT(PackageRef, name, version)
 
    struct PackageExport
    {
       std::string            name;
       psibase::AccountNumber service;
    };
-   PSIO1_REFLECT(PackageExport, name, service)
+   PSIO_REFLECT(PackageExport, name, service)
 
    struct PackageMeta
    {
@@ -30,7 +30,7 @@ namespace UserService
       std::vector<psibase::AccountNumber> services;
       std::vector<PackageExport>          exports;
    };
-   PSIO1_REFLECT(PackageMeta,
+   PSIO_REFLECT(PackageMeta,
                 name,
                 version,
                 scope,
@@ -58,7 +58,7 @@ namespace UserService
                                         &PublishedPackage::name,
                                         &PublishedPackage::version>;
    };
-   PSIO1_REFLECT(PublishedPackage,
+   PSIO_REFLECT(PublishedPackage,
                 owner,
                 name,
                 version,
@@ -76,21 +76,21 @@ namespace UserService
       std::optional<std::string>            url;
       std::optional<psibase::AccountNumber> account;
    };
-   PSIO1_REFLECT(PackageSource, url, account)
+   PSIO_REFLECT(PackageSource, url, account)
 
    struct PackageSources
    {
       psibase::AccountNumber     owner;
       std::vector<PackageSource> sources;
    };
-   PSIO1_REFLECT(PackageSources, owner, sources)
+   PSIO_REFLECT(PackageSources, owner, sources)
 
    struct PackageKey
    {
       std::string            name;
       psibase::AccountNumber owner;
    };
-   PSIO1_REFLECT(PackageKey, name, owner)
+   PSIO_REFLECT(PackageKey, name, owner)
 
    struct InstalledPackage
    {
@@ -105,7 +105,7 @@ namespace UserService
 
       using ByName = psibase::CompositeKey<&InstalledPackage::name, &InstalledPackage::owner>;
    };
-   PSIO1_REFLECT(InstalledPackage,
+   PSIO_REFLECT(InstalledPackage,
                 name,
                 version,
                 description,
@@ -121,7 +121,7 @@ namespace UserService
       psibase::AccountNumber service;
       std::string            filename;
    };
-   PSIO1_REFLECT(PackageDataFile, account, service, filename)
+   PSIO_REFLECT(PackageDataFile, account, service, filename)
 
    struct PackageManifest
    {
@@ -132,14 +132,14 @@ namespace UserService
 
       using ByName = psibase::CompositeKey<&PackageManifest::name, &PackageManifest::owner>;
    };
-   PSIO1_REFLECT(PackageManifest, name, owner, data)
+   PSIO_REFLECT(PackageManifest, name, owner, data)
 
    struct InstalledSchema
    {
       psibase::AccountNumber account;
       psibase::ServiceSchema schema;
    };
-   PSIO1_REFLECT(InstalledSchema, account, schema)
+   PSIO_REFLECT(InstalledSchema, account, schema)
 
    using InstalledSchemaTable = psibase::Table<InstalledSchema, &InstalledSchema::account>;
    PSIO1_REFLECT_TYPENAME(InstalledSchemaTable)
@@ -152,7 +152,7 @@ namespace UserService
 
       using Key = psibase::CompositeKey<&TransactionOrder::owner, &TransactionOrder::id>;
    };
-   PSIO1_REFLECT(TransactionOrder, owner, id, index)
+   PSIO_REFLECT(TransactionOrder, owner, id, index)
 
    using InstalledPackageTable = psibase::Table<InstalledPackage, InstalledPackage::ByName{}>;
    PSIO1_REFLECT_TYPENAME(InstalledPackageTable)

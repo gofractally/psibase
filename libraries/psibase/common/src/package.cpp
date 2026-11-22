@@ -63,7 +63,7 @@ namespace psibase
          MethodNumber                     method;
          std::optional<std::vector<char>> rawData;
          std::optional<psio1::json::any>   data;
-         PSIO1_REFLECT(PrettyAction, sender, service, method, rawData, data)
+         PSIO_REFLECT(PrettyAction, sender, service, method, rawData, data)
       };
 
       const ServiceSchema* getSchema(std::span<const PackagedService> packages,

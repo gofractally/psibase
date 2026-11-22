@@ -13,7 +13,7 @@ namespace TestService
    {
       psibase::AccountNumber account;
       std::uint32_t          id;
-      PSIO1_REFLECT(CredIdRow, account, id)
+      PSIO_REFLECT(CredIdRow, account, id)
    };
    using CredIdTable = psibase::Table<CredIdRow, &CredIdRow::account>;
    PSIO1_REFLECT_TYPENAME(CredIdTable)
@@ -22,7 +22,7 @@ namespace TestService
    {
       psibase::AccountNumber owner;
       std::vector<char>      data;
-      PSIO1_REFLECT(BigDataRow, owner, data)
+      PSIO_REFLECT(BigDataRow, owner, data)
    };
    using BigDataTable = psibase::Table<BigDataRow, &BigDataRow::owner>;
    PSIO1_REFLECT_TYPENAME(BigDataTable)

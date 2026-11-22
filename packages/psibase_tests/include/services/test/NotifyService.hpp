@@ -10,7 +10,7 @@ namespace TestService
    {
       std::uint32_t count;
    };
-   PSIO1_REFLECT(BlockCountRow, count)
+   PSIO_REFLECT(BlockCountRow, count)
    using BlockCountTable = psibase::Table<BlockCountRow, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(BlockCountTable)
 
@@ -18,14 +18,14 @@ namespace TestService
    {
       std::uint32_t count;
    };
-   PSIO1_REFLECT(TransactionCountRow, count)
+   PSIO_REFLECT(TransactionCountRow, count)
    using TransactionCountTable = psibase::Table<TransactionCountRow, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(TransactionCountTable)
 
    struct FailRow
    {
    };
-   PSIO1_REFLECT(FailRow);
+   PSIO_REFLECT(FailRow);
    using FailTable = psibase::Table<FailRow, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(FailTable)
 

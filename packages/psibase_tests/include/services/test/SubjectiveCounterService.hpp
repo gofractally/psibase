@@ -17,7 +17,7 @@ namespace TestService
       std::uint32_t value;
    };
 
-   PSIO1_REFLECT(SubjectiveCounterRow, key, value)
+   PSIO_REFLECT(SubjectiveCounterRow, key, value)
 
    using SubjectiveCounterTable = psibase::Table<SubjectiveCounterRow, &SubjectiveCounterRow::key>;
    PSIO1_REFLECT_TYPENAME(SubjectiveCounterTable)

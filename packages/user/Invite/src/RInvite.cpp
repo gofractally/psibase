@@ -19,7 +19,7 @@ namespace UserService
          AccountNumber actor;
          std::string   event;
       };
-      PSIO1_REFLECT(InviteEvent, inviteId, actor, event);
+      PSIO_REFLECT(InviteEvent, inviteId, actor, event);
 
       struct InviteDetails
       {

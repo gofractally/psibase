@@ -123,7 +123,7 @@ namespace UserService
    {
       std::string owner;
       std::string package;
-      PSIO1_REFLECT(ManifestQuery, owner, package)
+      PSIO_REFLECT(ManifestQuery, owner, package)
    };
 
    std::optional<psibase::HttpReply> servePackageManifest(psibase::HttpRequest& request)
@@ -153,7 +153,7 @@ namespace UserService
    struct SchemaQuery
    {
       std::string service;
-      PSIO1_REFLECT(SchemaQuery, service)
+      PSIO_REFLECT(SchemaQuery, service)
    };
 
    std::optional<psibase::HttpReply> serveSchema(psibase::HttpRequest& request)

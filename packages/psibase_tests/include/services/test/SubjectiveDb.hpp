@@ -15,7 +15,7 @@ namespace TestService
       std::string key;
       std::string value;
    };
-   PSIO1_REFLECT(SubjectiveRow, key, value)
+   PSIO_REFLECT(SubjectiveRow, key, value)
 
    using SubjectiveTable = psibase::Table<SubjectiveRow, &SubjectiveRow::key>;
 

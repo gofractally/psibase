@@ -87,7 +87,7 @@ namespace psibase::vm_consensus_replay
       uint64_t rows;
       uint64_t bytes;
    };
-   PSIO1_REFLECT(NamespaceCount, db, rows, bytes)
+   PSIO_REFLECT(NamespaceCount, db, rows, bytes)
 
    struct Manifest
    {
@@ -102,7 +102,7 @@ namespace psibase::vm_consensus_replay
       std::vector<NamespaceCount> beforeNamespaces;
       std::vector<NamespaceCount> afterNamespaces;
    };
-   PSIO1_REFLECT(Manifest, version, chainName, blockNum, transactions, proofClaims,
+   PSIO_REFLECT(Manifest, version, chainName, blockNum, transactions, proofClaims,
                 blockSha256, beforeSha256, afterSha256, beforeNamespaces, afterNamespaces)
 
    inline std::vector<DbId> namespaces(bool independent)

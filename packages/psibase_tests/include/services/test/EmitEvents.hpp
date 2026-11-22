@@ -13,7 +13,7 @@ namespace TestService
 
       auto operator<=>(const ExampleRecord& other) const = default;
    };
-   PSIO1_REFLECT(ExampleRecord, count, value, message);
+   PSIO_REFLECT(ExampleRecord, count, value, message);
 
    struct EmitEvents : psibase::Service
    {

@@ -18,34 +18,34 @@ namespace
    struct ConnectRequest
    {
       std::string url;
-      PSIO1_REFLECT(ConnectRequest, url)
+      PSIO_REFLECT(ConnectRequest, url)
    };
 
    struct ConnectReply
    {
       std::int32_t id;
       std::string  endpoint;
-      PSIO1_REFLECT(ConnectReply, id, endpoint)
+      PSIO_REFLECT(ConnectReply, id, endpoint)
    };
 
    struct DisconnectRequest
    {
       std::int32_t id;
-      PSIO1_REFLECT(DisconnectRequest, id)
+      PSIO_REFLECT(DisconnectRequest, id)
    };
 
    struct UserRequest
    {
       AccountNumber account;
       bool          accept = true;
-      PSIO1_REFLECT(UserRequest, account, accept)
+      PSIO_REFLECT(UserRequest, account, accept)
    };
 
    struct AuthorizationRequest
    {
       std::string                url;
       std::optional<std::string> token;
-      PSIO1_REFLECT(AuthorizationRequest, url, token)
+      PSIO_REFLECT(AuthorizationRequest, url, token)
    };
 
    std::vector<HttpHeader> allowCorsCredentials(const HttpRequest& req, AccountNumber account)
@@ -245,25 +245,25 @@ namespace
       static const std::uint8_t type = 64;
       std::uint64_t             nodeId;
       std::int32_t              connectionId;
-      PSIO1_REFLECT(IdMessage, nodeId, connectionId)
+      PSIO_REFLECT(IdMessage, nodeId, connectionId)
    };
    struct DuplicateConnectionMessage
    {
       static const std::uint8_t type = 65;
       std::int32_t              connectionId;
       bool                      secure;
-      PSIO1_REFLECT(DuplicateConnectionMessage, connectionId, secure)
+      PSIO_REFLECT(DuplicateConnectionMessage, connectionId, secure)
    };
    struct HostnamesMessage
    {
       static const std::uint8_t type = 66;
       std::vector<std::string>  hosts;
-      PSIO1_REFLECT(HostnamesMessage, hosts)
+      PSIO_REFLECT(HostnamesMessage, hosts)
    };
    struct CheckDuplicatesMessage
    {
       static const std::uint8_t type = 67;
-      PSIO1_REFLECT(CheckDuplicatesMessage)
+      PSIO_REFLECT(CheckDuplicatesMessage)
    };
 
    template <typename T>

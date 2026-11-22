@@ -20,7 +20,7 @@ namespace LocalService
 
       using Key = psibase::CompositeKey<&ContentRow::account, &ContentRow::path>;
 
-      PSIO1_REFLECT(ContentRow,
+      PSIO_REFLECT(ContentRow,
                    account,
                    path,
                    contentType,

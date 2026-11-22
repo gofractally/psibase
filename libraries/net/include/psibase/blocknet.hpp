@@ -56,7 +56,7 @@ namespace psibase::net
                 " blocknum=" + std::to_string(xid.num());
       }
    };
-   PSIO1_REFLECT(HelloRequest, xid, committed)
+   PSIO_REFLECT(HelloRequest, xid, committed)
 
    struct BlockMessage
    {
@@ -73,7 +73,7 @@ namespace psibase::net
                 (block->auxConsensusData() ? " auxConsensusData" : "");
       }
    };
-   PSIO1_REFLECT(BlockMessage, block)
+   PSIO_REFLECT(BlockMessage, block)
 
    struct StateChecksumMessage
    {
@@ -89,7 +89,7 @@ namespace psibase::net
                 " native=" + loggers::to_string(state.nativeRoot);
       }
    };
-   PSIO1_REFLECT(StateChecksumMessage, blockId, state, signature)
+   PSIO_REFLECT(StateChecksumMessage, blockId, state, signature)
 
    struct BlockHeaderMessage
    {
@@ -106,7 +106,7 @@ namespace psibase::net
                 (block->auxConsensusData() ? " auxConsensusData" : "");
       }
    };
-   PSIO1_REFLECT(BlockHeaderMessage, block)
+   PSIO_REFLECT(BlockHeaderMessage, block)
 
    // snapshot protocol
    //
@@ -130,7 +130,7 @@ namespace psibase::net
                 "," + psio1::to_hex(highKey) + ")";
       }
    };
-   PSIO1_REFLECT(SnapshotPartMessage, blockId, db, lowKey, highKey, rows)
+   PSIO_REFLECT(SnapshotPartMessage, blockId, db, lowKey, highKey, rows)
 
    struct SnapshotVerifyMessage
    {
@@ -144,7 +144,7 @@ namespace psibase::net
                 " nsig=" + std::to_string(signatures.size());
       }
    };
-   PSIO1_REFLECT(SnapshotVerifyMessage, blockId, hash, signatures)
+   PSIO_REFLECT(SnapshotVerifyMessage, blockId, hash, signatures)
 
    // A producer-to-producer message with contents completely defined by services.
    struct WasmProducerMessage
@@ -156,7 +156,7 @@ namespace psibase::net
 
       std::string to_string() const { return "wasm prod: producer=" + producer.str(); }
    };
-   PSIO1_REFLECT(WasmProducerMessage, data, producer, signer)
+   PSIO_REFLECT(WasmProducerMessage, data, producer, signer)
 
    struct ConnectionStateStart
    {

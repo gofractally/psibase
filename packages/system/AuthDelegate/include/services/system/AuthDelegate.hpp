@@ -21,7 +21,7 @@ namespace SystemService
       using Secondary =
           psibase::CompositeKey<&AuthDelegateRecord::owner, &AuthDelegateRecord::account>;
    };
-   PSIO1_REFLECT(AuthDelegateRecord, account, owner)
+   PSIO_REFLECT(AuthDelegateRecord, account, owner)
    using AuthDelegateTable = psibase::
        Table<AuthDelegateRecord, &AuthDelegateRecord::account, AuthDelegateRecord::Secondary{}>;
    PSIO1_REFLECT_TYPENAME(AuthDelegateTable)

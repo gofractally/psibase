@@ -20,7 +20,7 @@ namespace SystemService
       psibase::Checksum256       id;
       psibase::SignedTransaction trx;
    };
-   PSIO1_REFLECT(TransactionData, id, trx)
+   PSIO_REFLECT(TransactionData, id, trx)
 
    using TransactionDataTable = psibase::Table<TransactionData, &TransactionData::id>;
    PSIO1_REFLECT_TYPENAME(TransactionDataTable)
@@ -41,7 +41,7 @@ namespace SystemService
       using ExpirationKey = psibase::CompositeKey<&PendingTransactionRecord::expiration,
                                                   &PendingTransactionRecord::sequence>;
    };
-   PSIO1_REFLECT(PendingTransactionRecord, id, expiration, ctime, sequence, verifies, speculative);
+   PSIO_REFLECT(PendingTransactionRecord, id, expiration, ctime, sequence, verifies, speculative);
 
    using PendingTransactionTable = psibase::Table<PendingTransactionRecord,
                                                   &PendingTransactionRecord::id,
@@ -54,7 +54,7 @@ namespace SystemService
    {
       std::uint64_t nextSequence;
    };
-   PSIO1_REFLECT(AvailableSequenceRecord, nextSequence);
+   PSIO_REFLECT(AvailableSequenceRecord, nextSequence);
 
    using AvailableSequenceTable = psibase::Table<AvailableSequenceRecord, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(AvailableSequenceTable)
@@ -72,7 +72,7 @@ namespace SystemService
       bool verified;
       // If missing, speculative execution succeeded
       std::optional<std::uint64_t> speculative;
-      PSIO1_REFLECT(UnverifiedTransactionRecord,
+      PSIO_REFLECT(UnverifiedTransactionRecord,
                    id,
                    expiration,
                    verifies,
@@ -89,7 +89,7 @@ namespace SystemService
    {
       psibase::Checksum256 txid;
       std::uint64_t        runid;
-      PSIO1_REFLECT(PendingVerifyRecord, txid, runid)
+      PSIO_REFLECT(PendingVerifyRecord, txid, runid)
    };
 
    using PendingVerifyTable = psibase::Table<PendingVerifyRecord, &PendingVerifyRecord::runid>;
@@ -100,7 +100,7 @@ namespace SystemService
       std::uint64_t        endSequence;
       psibase::Checksum256 verifyId;
       bool                 running;
-      PSIO1_REFLECT(ReverifySignaturesRecord, endSequence, verifyId, running)
+      PSIO_REFLECT(ReverifySignaturesRecord, endSequence, verifyId, running)
    };
    using ReverifySignaturesTable =
        psibase::Table<ReverifySignaturesRecord, psibase::SingletonKey{}>;
@@ -110,7 +110,7 @@ namespace SystemService
    {
       psibase::Checksum256 txid;
       std::uint64_t        runid;
-      PSIO1_REFLECT(SpeculativeTransactionRecord, txid, runid)
+      PSIO_REFLECT(SpeculativeTransactionRecord, txid, runid)
    };
    using SpeculativeTransactionTable =
        psibase::Table<SpeculativeTransactionRecord, &SpeculativeTransactionRecord::runid>;
@@ -121,7 +121,7 @@ namespace SystemService
    {
       std::uint64_t nextSequence;
    };
-   PSIO1_REFLECT(UnappliedTransactionRecord, nextSequence)
+   PSIO_REFLECT(UnappliedTransactionRecord, nextSequence)
 
    using UnappliedTransactionTable =
        psibase::Table<UnappliedTransactionRecord, psibase::SingletonKey{}>;
@@ -131,7 +131,7 @@ namespace SystemService
    {
       std::uint64_t        verifyCodeSequence;
       psibase::Checksum256 verifyId;
-      PSIO1_REFLECT(VerifyIdRecord, verifyCodeSequence, verifyId)
+      PSIO_REFLECT(VerifyIdRecord, verifyCodeSequence, verifyId)
    };
    using VerifyIdTable = psibase::Table<VerifyIdRecord, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(VerifyIdTable)
@@ -141,7 +141,7 @@ namespace SystemService
       psibase::BlockNum  blockNum;
       psibase::BlockTime time;
    };
-   PSIO1_REFLECT(ReversibleBlocksRow, blockNum, time)
+   PSIO_REFLECT(ReversibleBlocksRow, blockNum, time)
 
    using ReversibleBlocksTable =
        psibase::Table<ReversibleBlocksRow, &ReversibleBlocksRow::blockNum>;
@@ -153,7 +153,7 @@ namespace SystemService
       bool         json = true;
       uint8_t      waitFor;
 
-      PSIO1_REFLECT(TraceClientInfo, socket, json, waitFor)
+      PSIO_REFLECT(TraceClientInfo, socket, json, waitFor)
    };
 
    struct TraceClientRow
@@ -162,7 +162,7 @@ namespace SystemService
       psibase::TimePointSec        expiration;
       std::vector<TraceClientInfo> clients;
    };
-   PSIO1_REFLECT(TraceClientRow, id, expiration, clients)
+   PSIO_REFLECT(TraceClientRow, id, expiration, clients)
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
    PSIO1_REFLECT_TYPENAME(TraceClientTable)
@@ -171,7 +171,7 @@ namespace SystemService
    {
       std::vector<char> key;
    };
-   PSIO1_REFLECT(JWTKeyRecord, key)
+   PSIO_REFLECT(JWTKeyRecord, key)
 
    using JWTKeyTable = psibase::Table<JWTKeyRecord, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(JWTKeyTable)
@@ -181,7 +181,7 @@ namespace SystemService
       std::string access_token;
       std::string token_type = "bearer";
    };
-   PSIO1_REFLECT(LoginReply, access_token, token_type)
+   PSIO_REFLECT(LoginReply, access_token, token_type)
 
    struct TxSuccessRecord
    {
@@ -192,7 +192,7 @@ namespace SystemService
       using ByBlockNum = psibase::CompositeKey<&TxSuccessRecord::blockNum, &TxSuccessRecord::id>;
       auto byBlockNum() const { return ByBlockNum{}(*this); }
    };
-   PSIO1_REFLECT(TxSuccessRecord, id, blockNum, trace)
+   PSIO_REFLECT(TxSuccessRecord, id, blockNum, trace)
    using TxSuccessTable =
        psibase::Table<TxSuccessRecord, &TxSuccessRecord::id, TxSuccessRecord::ByBlockNum{}>;
    PSIO1_REFLECT_TYPENAME(TxSuccessTable)
@@ -203,7 +203,7 @@ namespace SystemService
       psibase::BlockNum                           blockNum;
       psio1::view<const psibase::TransactionTrace> trace;
    };
-   PSIO1_REFLECT(TxSuccessView, id, blockNum, trace)
+   PSIO_REFLECT(TxSuccessView, id, blockNum, trace)
 
    struct TxFailedRecord
    {
@@ -213,7 +213,7 @@ namespace SystemService
 
       using ByExpiration = psibase::CompositeKey<&TxFailedRecord::expiration, &TxFailedRecord::id>;
    };
-   PSIO1_REFLECT(TxFailedRecord, id, expiration, trace)
+   PSIO_REFLECT(TxFailedRecord, id, expiration, trace)
    using TxFailedTable =
        psibase::Table<TxFailedRecord, &TxFailedRecord::id, TxFailedRecord::ByExpiration{}>;
    PSIO1_REFLECT_TYPENAME(TxFailedTable)
@@ -224,7 +224,7 @@ namespace SystemService
       psibase::TimePointSec                       expiration;
       psio1::view<const psibase::TransactionTrace> trace;
    };
-   PSIO1_REFLECT(TxFailedView, id, expiration, trace)
+   PSIO_REFLECT(TxFailedView, id, expiration, trace)
 
    struct TxStatsRecord
    {
@@ -234,7 +234,7 @@ namespace SystemService
       uint64_t succeeded;
       uint64_t expired;
    };
-   PSIO1_REFLECT(TxStatsRecord, unprocessed, total, failed, succeeded, expired)
+   PSIO_REFLECT(TxStatsRecord, unprocessed, total, failed, succeeded, expired)
 
    using TxStatsTable = psibase::Table<TxStatsRecord, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(TxStatsTable)
@@ -244,7 +244,7 @@ namespace SystemService
    {
       uint32_t currentBlockSize;
    };
-   PSIO1_REFLECT(BlockSizeRecord, currentBlockSize)
+   PSIO_REFLECT(BlockSizeRecord, currentBlockSize)
    using BlockSizeTable = psibase::Table<BlockSizeRecord, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(BlockSizeTable)
 

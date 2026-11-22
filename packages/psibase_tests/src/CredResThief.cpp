@@ -16,13 +16,13 @@ using SystemService::AuthSig::SubjectPublicKeyInfo;
 struct KeyData
 {
    std::optional<SystemService::AuthSig::AuthRecord> account;
-   PSIO1_REFLECT(KeyData, account)
+   PSIO_REFLECT(KeyData, account)
 };
 
 struct KeyReply
 {
    KeyData data;
-   PSIO1_REFLECT(KeyReply, data)
+   PSIO_REFLECT(KeyReply, data)
 };
 
 void CredResThief::create()

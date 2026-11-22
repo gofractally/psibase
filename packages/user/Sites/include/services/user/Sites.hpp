@@ -18,7 +18,7 @@ namespace SystemService
 
       using Key = psibase::CompositeKey<&SitesContentRow::account, &SitesContentRow::path>;
    };
-   PSIO1_REFLECT(SitesContentRow, account, path, contentType, contentHash, contentEncoding, csp)
+   PSIO_REFLECT(SitesContentRow, account, path, contentType, contentHash, contentEncoding, csp)
    using SitesContentTable = psibase::Table<SitesContentRow, SitesContentRow::Key{}>;
    PSIO1_REFLECT_TYPENAME(SitesContentTable)
 
@@ -27,7 +27,7 @@ namespace SystemService
       psibase::Checksum256 hash;
       std::vector<char>    data;
    };
-   PSIO1_REFLECT(SitesDataRow, hash, data)
+   PSIO_REFLECT(SitesDataRow, hash, data)
 
    using SitesDataTable = psibase::Table<SitesDataRow, &SitesDataRow::hash>;
    PSIO1_REFLECT_TYPENAME(SitesDataTable)
@@ -37,7 +37,7 @@ namespace SystemService
       psibase::Checksum256 hash;
       std::uint32_t        refs;
    };
-   PSIO1_REFLECT(SitesDataRefRow, hash, refs)
+   PSIO_REFLECT(SitesDataRefRow, hash, refs)
 
    using SitesDataRefTable = psibase::Table<SitesDataRefRow, &SitesDataRefRow::hash>;
    PSIO1_REFLECT_TYPENAME(SitesDataRefTable)
@@ -50,7 +50,7 @@ namespace SystemService
       std::optional<std::string>            globalCsp    = std::nullopt;
       std::optional<psibase::AccountNumber> proxyAccount = std::nullopt;
    };
-   PSIO1_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
+   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
    PSIO1_REFLECT_TYPENAME(SiteConfigTable)
 

@@ -15,7 +15,7 @@ namespace SystemService
       std::string            endpoint;
       psibase::Claim         claim;
    };
-   PSIO1_REFLECT(CandidateInfo, account, endpoint, claim)
+   PSIO_REFLECT(CandidateInfo, account, endpoint, claim)
    using CandidateInfoTable = psibase::Table<CandidateInfo, &CandidateInfo::account>;
    PSIO1_REFLECT_TYPENAME(CandidateInfoTable)
 
@@ -23,7 +23,7 @@ namespace SystemService
    {
       uint8_t maxProds;
    };
-   PSIO1_REFLECT(ProdsConfig, maxProds)
+   PSIO_REFLECT(ProdsConfig, maxProds)
    using ProdsConfigTable = psibase::Table<ProdsConfig, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(ProdsConfigTable)
 

@@ -28,7 +28,7 @@ namespace SystemService
              psibase::NestedKey<&AuthRecord::pubkey, &SubjectPublicKeyInfo::fingerprint>{},
              &AuthRecord::account>;
       };
-      PSIO1_REFLECT(AuthRecord, account, pubkey)
+      PSIO_REFLECT(AuthRecord, account, pubkey)
 
       /// The `auth-sig` service is an auth service that can be used to authenticate actions for accounts.
       ///

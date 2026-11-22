@@ -17,7 +17,7 @@ namespace LocalService
       SystemService::AuthSig::PrivateKeyInfo key;
 
       using ByOwner = psibase::CompositeKey<&KeyRow::owner, &KeyRow::id>;
-      PSIO1_REFLECT(KeyRow, id, owner, key)
+      PSIO_REFLECT(KeyRow, id, owner, key)
    };
    using KeyTable = psibase::Table<KeyRow, KeyRow::ByOwner{}>;
    PSIO1_REFLECT_TYPENAME(KeyTable)

@@ -263,7 +263,7 @@ namespace psibase
          RunMode     mode;
          Action      action;
          Checksum256 context;
-         PSIO1_REFLECT(VerifyTokenData, success, mode, action, context)
+         PSIO_REFLECT(VerifyTokenData, success, mode, action, context)
       };
    }  // namespace
    Checksum256 BlockContext::getVerifyContextId()

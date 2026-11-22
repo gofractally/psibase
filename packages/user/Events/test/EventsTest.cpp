@@ -44,7 +44,7 @@ struct ExplainQueryPlan
    std::int64_t parent;
    std::string  detail;
 };
-PSIO1_REFLECT(ExplainQueryPlan, id, parent, detail)
+PSIO_REFLECT(ExplainQueryPlan, id, parent, detail)
 
 void explain(TestChain& chain, std::string_view s)
 {

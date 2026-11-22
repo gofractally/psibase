@@ -14,7 +14,7 @@ struct ParallelSubjectiveRow
    std::string   key;
    std::uint32_t value;
 };
-PSIO1_REFLECT(ParallelSubjectiveRow, key, value)
+PSIO_REFLECT(ParallelSubjectiveRow, key, value)
 
 using ParallelSubjectiveTable = psibase::Table<ParallelSubjectiveRow, &ParallelSubjectiveRow::key>;
 PSIO1_REFLECT_TYPENAME(ParallelSubjectiveTable)
@@ -23,7 +23,7 @@ struct GeRow
 {
    std::uint32_t key;
 };
-PSIO1_REFLECT(GeRow, key)
+PSIO_REFLECT(GeRow, key)
 
 using GeTable = Table<GeRow, &GeRow::key>;
 PSIO1_REFLECT_TYPENAME(GeTable)
@@ -53,7 +53,7 @@ struct IncResponse
    std::uint32_t attempts = 0;
    std::uint32_t value    = 0;
 };
-PSIO1_REFLECT(IncResponse, attempts, value)
+PSIO_REFLECT(IncResponse, attempts, value)
 
 template <typename T>
 T convert_from_json(const std::vector<char>& data)

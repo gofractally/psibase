@@ -13,7 +13,7 @@ namespace psibase::net
       psio1::shared_view_ptr<Msg> data;
 
       std::vector<char> signature;
-      PSIO1_REFLECT(SignedMessage, definitionWillNotChange(), data, signature)
+      PSIO_REFLECT(SignedMessage, definitionWillNotChange(), data, signature)
       std::string to_string() const { return data->unpack().to_string(); }
    };
 

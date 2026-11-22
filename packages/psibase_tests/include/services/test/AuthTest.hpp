@@ -11,7 +11,7 @@ namespace TestService
       psibase::AccountNumber              account;
       std::vector<psibase::AccountNumber> deps;
       std::uint32_t                       threshold;
-      PSIO1_REFLECT(AuthRow, account, deps, threshold)
+      PSIO_REFLECT(AuthRow, account, deps, threshold)
    };
    using AuthTable = psibase::Table<AuthRow, &AuthRow::account>;
    PSIO1_REFLECT_TYPENAME(AuthTable)
@@ -23,7 +23,7 @@ namespace TestService
       using Key =
           psibase::CompositeKey<psibase::NestedKey<&AuthMethodRow::auth, &AuthRow::account>{},
                                 &AuthMethodRow::method>;
-      PSIO1_REFLECT(AuthMethodRow, auth, method)
+      PSIO_REFLECT(AuthMethodRow, auth, method)
    };
    using AuthMethodTable = psibase::Table<AuthMethodRow, AuthMethodRow::Key{}>;
    PSIO1_REFLECT_TYPENAME(AuthMethodTable)

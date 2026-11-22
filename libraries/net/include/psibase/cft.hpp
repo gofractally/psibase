@@ -34,7 +34,7 @@ namespace psibase::net
                 " blocknum=" + std::to_string(head_num);
       }
    };
-   PSIO1_REFLECT(ConfirmMessage, term, follower_id, head_num, signer);
+   PSIO_REFLECT(ConfirmMessage, term, follower_id, head_num, signer);
 
    struct RequestVoteRequest
    {
@@ -50,7 +50,7 @@ namespace psibase::net
          return "request vote: term=" + std::to_string(term) + " candidate=" + candidate_id.str();
       }
    };
-   PSIO1_REFLECT(RequestVoteRequest, term, candidate_id, last_log_index, last_log_term, signer)
+   PSIO_REFLECT(RequestVoteRequest, term, candidate_id, last_log_index, last_log_term, signer)
    struct RequestVoteResponse
    {
       static constexpr unsigned type = 37;
@@ -66,7 +66,7 @@ namespace psibase::net
                 " voter=" + voter_id.str() + " vote granted=" + std::to_string(vote_granted);
       }
    };
-   PSIO1_REFLECT(RequestVoteResponse, term, candidate_id, voter_id, vote_granted, signer)
+   PSIO_REFLECT(RequestVoteResponse, term, candidate_id, voter_id, vote_granted, signer)
 
    // This protocol is based on RAFT, with some simplifications.
    // i.e. the blockchain structure is sufficient to guarantee log matching.

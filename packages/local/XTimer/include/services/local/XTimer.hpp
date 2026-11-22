@@ -7,7 +7,7 @@ namespace LocalService
    struct TimerIdRow
    {
       std::uint64_t next;
-      PSIO1_REFLECT(TimerIdRow, next)
+      PSIO_REFLECT(TimerIdRow, next)
    };
    using TimerIdTable = psibase::Table<TimerIdRow, psibase::SingletonKey{}>;
    PSIO1_REFLECT_TYPENAME(TimerIdTable)

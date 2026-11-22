@@ -24,7 +24,7 @@ namespace SystemService
       int         maxAge   = 0;
       bool        httpOnly = false;
    };
-   PSIO1_REFLECT(CookieData, name, value, maxAge, httpOnly);
+   PSIO_REFLECT(CookieData, name, value, maxAge, httpOnly);
 
    namespace
    {

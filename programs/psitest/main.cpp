@@ -1877,13 +1877,13 @@ struct ConsoleLog
        "{BlockHeader}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: "
        "{ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}";
 };
-PSIO1_REFLECT(ConsoleLog, type, filter, format);
+PSIO_REFLECT(ConsoleLog, type, filter, format);
 
 struct Loggers
 {
    ConsoleLog stderr;
 };
-PSIO1_REFLECT(Loggers, stderr);
+PSIO_REFLECT(Loggers, stderr);
 
 const char usage[] = "USAGE: psitest [OPTIONS] file.wasm [args for wasm]...\n";
 const char help[]  = R"(
