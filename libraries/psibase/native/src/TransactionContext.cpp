@@ -25,6 +25,7 @@ namespace psibase
    {
       explicit TransactionContextImpl(SystemContext& context)
           : vmTimedOut(psizam::detail::timed_run_has_timed_out),
+            vmTimedOutBefore(vmTimedOut.load()),
             watchdog(std::in_place, *context.watchdogManager, [this] { asyncTimeout(); })
       {
       }
@@ -36,6 +37,14 @@ namespace psibase
          std::lock_guard guard{mutex};
          altExecContexts.clear();
          executionContexts.clear();
+         // The watchdog marks this thread's VM as timed out, and each entry point
+         // restores the mark when it returns. But a timeout can be reported
+         // synchronously (a storage call notices the spent budget) before the
+         // watchdog thread fires: the entry point has then already returned, and
+         // the late callback would leave the mark set for whatever runs next on
+         // this thread. No callback can arrive after the reset above.
+         if (timedOut)
+            vmTimedOut.store(vmTimedOutBefore);
       }
       void clearAltExecutionContexts()
       {
@@ -52,6 +61,7 @@ namespace psibase
       std::mutex                                mutex    = {};
       bool                                      timedOut = false;
       std::atomic<bool>&                        vmTimedOut;
+      const bool                                vmTimedOutBefore;
       psizam::detail::stack_manager             altStack;
       std::map<AccountNumber, ExecutionContext> executionContexts = {};
       // alt execution contexts are used when executing in a different
