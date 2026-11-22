@@ -35,7 +35,9 @@
 // TEMPORARY: removed when psio1 is deleted (see the end of this file).
 #include <psio/adapter.hpp>
 #include <psio/annotate.hpp>
+#include <psio/invariant.hpp>
 #include <psio/reflect.hpp>
+#include <psio/transparent.hpp>
 
 namespace psio1
 {
@@ -991,6 +993,8 @@ namespace psio1::reflection_impl
       static_assert(!::psio::has_adapter_v<T, ::psio::binary_category> &&
                         !::psio::has_adapter_v<T, ::psio::sortable_binary_category>,
                     "psio1 does not bridge binary or key adapters of a type reflected with PSIO");
+      static_assert(!::psio::has_invariant_v<T> || ::psio::is_transparent_v<T>,
+                    "psio1 bridges a PSIO invariant of a transparent() type only");
 
       static constexpr bool is_defined              = true;
       static constexpr bool is_struct               = true;

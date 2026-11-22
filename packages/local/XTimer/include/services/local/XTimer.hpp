@@ -18,7 +18,7 @@ namespace LocalService
       psibase::MonotonicTimePointUSec expiration;
       psibase::AccountNumber          service;
       psibase::MethodNumber           method;
-      PSIO1_REFLECT(TimerQueueRow, id, expiration, service, method)
+      PSIO_REFLECT(TimerQueueRow, id, expiration, service, method)
    };
    using TimerQueueTable =
        psibase::Table<TimerQueueRow,

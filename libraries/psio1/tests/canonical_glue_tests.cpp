@@ -22,7 +22,17 @@
 #include <psibase/block.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
+#include <psibase/Actor.hpp>
+#include <psibase/Memo.hpp>
+#include <psibase/schema.hpp>
+#include <services/local/XAdmin.hpp>
+#include <services/local/XPeers.hpp>
+#include <services/local/XTimer.hpp>
+#include <services/user/DynLd.hpp>
 #include <services/user/Nft.hpp>
+#include <services/user/tokenTables.hpp>
+#include <services/user/tokenTypes.hpp>
+
 
 #include <chrono>
 #include <optional>
@@ -647,6 +657,240 @@ TEST_CASE("psibase records: an event", "[canonical][records]")
    CHECK(std::vector<std::string_view>(names.begin(), names.end()) ==
          std::vector<std::string_view>{"ownerChange", "nftId", "action", "account",
                                        "counter_party", "memo"});
+}
+
+// ---------------------------------------------------------------------------
+// The records slice 2 deferred (doc/pssz-conversion.md, 1.9) and slice 2b
+// declared with PSIO: transparent wrappers with an invariant (Memo,
+// Precision), a record with a text form (Decimal), rows with a monotonic
+// time point, records with a std::map member, a class template with a nested
+// member, transparent variant alternatives. The expected values were produced
+// by the tree before slice 2b (commit 61d2e2b9f), where every one of them was
+// declared with PSIO1_REFLECT / PSIO1_REFLECT_TYPENAME and the legacy ADL
+// hooks (psio_unwrap_packable, psio_validate_packable, to_json, from_json,
+// use_json_string_for_gql).
+// ---------------------------------------------------------------------------
+static_assert(psio::is_transparent_v<psibase::Memo> && psio::has_invariant_v<psibase::Memo> &&
+              psio::is_transparent_v<UserService::Precision> &&
+              psio::has_invariant_v<UserService::Precision> &&
+              psio::has_adapter_v<UserService::Decimal, psio::text_category> &&
+              psio::Reflected<psibase::TimerRow> && psio::Reflected<LocalService::TimerQueueRow> &&
+              psio::Reflected<LocalService::UrlRow> && psio::Reflected<UserService::DynDepGroups> &&
+              psio::Reflected<psibase::ServiceSchema> &&
+              psio::Reflected<psibase::TypedAction<std::tuple<std::uint32_t, std::string>>> &&
+              psio::is_transparent_v<LocalService::Auth::Account> &&
+              psio::is_transparent_v<LocalService::Auth::LocalUsername>);
+
+TEST_CASE("psibase records: the types slice 2b declared with PSIO", "[canonical][records][deferred]")
+{
+   using namespace UserService;
+   using psibase::Memo;
+
+   // Memo
+   const Memo memo{"h\xc3\xa9llo"};
+   CHECK(frac(memo) ==
+         "0600000068c3a96c6c6f");
+   CHECK(json(memo) ==
+         R"("héllo")");
+   CHECK(key(memo) ==
+         "68c3a96c6c6f0000");
+   CHECK(schemaOf<Memo>("Memo") ==
+         R"({"Memo":{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}}})");
+   CHECK(frac(std::tuple{std::uint8_t{7}, memo, std::optional<Memo>{}}) ==
+         "050007040000000600000068c3a96c6c6f");
+   CHECK(frac(std::tuple{std::optional<Memo>{memo}, std::vector<Memo>{memo, Memo{""}}}) ==
+         "0800080000000e0000000600000068c3a96c6c6f0800000008000000000000000600000068c3a96c6c6f");
+
+   // Precision, Decimal, a token row
+   const Precision precision{4};
+   CHECK(frac(precision) ==
+         "04");
+   CHECK(json(precision) ==
+         "4");
+   CHECK(key(precision) ==
+         "04");
+   CHECK(schemaOf<Precision>("Precision") ==
+         R"({"Precision":{"Int":{"bits":8,"isSigned":false}}})");
+   const Decimal decimal{Quantity{std::uint64_t{1234567}}, Precision{4}};
+   CHECK(frac(decimal) ==
+         "05000500000004080087d6120000000000");
+   CHECK(json(decimal) ==
+         R"("123.4567")");
+   CHECK(key(decimal) ==
+         "000000000012d68704");
+   CHECK(schemaOf<Decimal>("Decimal") ==
+         R"({"Decimal":{"Object":{"quantity":{"Object":{"value":{"Int":{"bits":64,"isSigned":false}}}},"precision":{"Int":{"bits":8,"isSigned":false}}}}})");
+   const TokenRecord token{3, 9, 1, Precision{8}, Quantity{std::uint64_t{100}}, Quantity{std::uint64_t{5}}, Quantity{std::uint64_t{1000}}};
+   CHECK(frac(token) ==
+         "1600030000000900000001080c000000120000001800000008006400000000000000080005000000000000000800e803000000000000");
+   CHECK(json(token) ==
+         R"({"id":3,"nft_id":9,"settings_value":1,"precision":8,"issued_supply":{"value":"100"},"burned_supply":{"value":"5"},"max_issued_supply":{"value":"1000"}})");
+   CHECK(key(token) ==
+         "000000030000000901080000000000000064000000000000000500000000000003e8");
+   CHECK(fnv(schemaOf<TokenRecord>("TokenRecord")) == 0x38ef77c6be793b97ull);
+
+   // Rows with a monotonic time point
+   const psibase::MonotonicTimePointUSec mono{psibase::MicroSeconds{123456789}};
+   const psibase::TimerRow timer{mono, AccountNumber{"x-timer"}, MethodNumber{"fire"}};
+   CHECK(frac(timer) ==
+         "180015cd5b0700000000002d6aee1dbd2b0fd339f00000000000");
+   CHECK(json(timer) ==
+         R"({"expiration":"123456789","service":"x-timer","method":"fire"})");
+   CHECK(key(timer) ==
+         "80000000075bcd150f2bbd1dee6a2d000000000000f039d3");
+   CHECK(schemaOf<psibase::TimerRow>("TimerRow") ==
+         R"({"@5":{"Int":{"bits":64,"isSigned":false}},"TimerRow":{"Object":{"expiration":{"Int":{"bits":64,"isSigned":true}},"service":{"Custom":{"type":{"Struct":{"value":"@5"}},"id":"AccountNumber"}},"method":{"Custom":{"type":{"Struct":{"value":"@5"}},"id":"MethodNumber"}}}}})");
+   const LocalService::TimerQueueRow queued{11, mono, AccountNumber{"alice"}, MethodNumber{"tick"}};
+   CHECK(frac(queued) ==
+         "20000b0000000000000015cd5b070000000000b82a1b83aedf043f91180000000000");
+   CHECK(json(queued) ==
+         R"({"id":"11","expiration":"123456789","service":"alice","method":"tick"})");
+   CHECK(key(queued) ==
+         "000000000000000b80000000075bcd1504dfae831b2ab800000000000018913f");
+   CHECK(schemaOf<LocalService::TimerQueueRow>("TimerQueueRow") ==
+         R"({"@1":{"Int":{"bits":64,"isSigned":false}},"TimerQueueRow":{"Object":{"id":"@1","expiration":{"Int":{"bits":64,"isSigned":true}},"service":{"Custom":{"type":{"Struct":{"value":"@1"}},"id":"AccountNumber"}},"method":{"Custom":{"type":{"Struct":{"value":"@1"}},"id":"MethodNumber"}}}}})");
+   const LocalService::UrlRow url{"https://x.example/", 2, true, psibase::MicroSeconds{30000000}, mono,
+                                  std::uint64_t{17}};
+   CHECK(frac(url) ==
+         "1d001d000000020000000180c3c9010000000015cd5b07000000001a0000001200000068747470733a2f2f782e6578616d706c652f1100000000000000");
+   CHECK(json(url) ==
+         R"({"url":"https://x.example/","refcount":2,"autoconnect":true,"currentTimeout":"30000000","retryTime":"123456789","timerId":"17"})");
+   CHECK(schemaOf<LocalService::UrlRow>("UrlRow") ==
+         R"({"@5":{"Int":{"bits":64,"isSigned":true}},"UrlRow":{"Object":{"url":{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}},"refcount":{"Int":{"bits":32,"isSigned":false}},"autoconnect":{"Custom":{"type":{"Int":{"bits":1,"isSigned":false}},"id":"bool"}},"currentTimeout":"@5","retryTime":"@5","timerId":{"Option":{"Int":{"bits":64,"isSigned":false}}}}}})");
+
+   // A std::map member
+   const DynDepGroups groups{AccountNumber{"alice"},
+                             {{"a", {{"dep1", AccountNumber{"bob"}}}}, {"b", {}}}};
+   CHECK(frac(groups) ==
+         "0c0000b82a1b83aedf040400000008000000080000003100000008000800000009000000010000006104000000040000000c000c0000000029a41b0b345e050400000064657031080008000000000000000100000062");
+   CHECK(json(groups) ==
+         R"({"service":"alice","groups":{"a":[{"name":"dep1","service":"bob"}],"b":[]}})");
+   CHECK(schemaOf<DynDepGroups>("DynDepGroups") ==
+         R"({"@1":{"Custom":{"type":{"Struct":{"value":{"Int":{"bits":64,"isSigned":false}}}},"id":"AccountNumber"}},"@5":{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}},"DynDepGroups":{"Object":{"service":"@1","groups":{"Custom":{"type":{"List":{"Object":{"first":"@5","second":{"List":{"Object":{"name":"@5","service":"@1"}}}}}},"id":"map"}}}}})");
+
+   // A class template with a nested member
+   const psibase::TypedAction<std::tuple<std::uint32_t, std::string>> typed{
+       AccountNumber{"alice"}, AccountNumber{"tokens"}, MethodNumber{"credit"}, {{7u, "x"}}};
+   CHECK(frac(typed) ==
+         "1c0000b82a1b83aedf0400342d8afa07a40d7ac6160000000000040000000f000000080007000000040000000100000078");
+   CHECK(json(typed) ==
+         R"({"sender":"alice","service":"tokens","method":"credit","rawData":"080007000000040000000100000078"})");
+   CHECK(schemaOf<psibase::TypedAction<std::tuple<std::uint32_t, std::string>>>("TypedAction") ==
+         R"({"@1":{"Custom":{"type":{"Struct":{"value":"@2"}},"id":"AccountNumber"}},"@2":{"Int":{"bits":64,"isSigned":false}},"TypedAction":{"Object":{"sender":"@1","service":"@1","method":{"Custom":{"type":{"Struct":{"value":"@2"}},"id":"MethodNumber"}},"rawData":{"Custom":{"type":{"FracPack":{"Tuple":[{"Int":{"bits":32,"isSigned":false}},{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}}]}},"id":"hex"}}}}})");
+
+   // Variant alternatives that are transparent wrappers
+   using LocalService::Auth::AuthResult;
+   const AuthResult account{LocalService::Auth::Account{AccountNumber{"alice"}}};
+   const AuthResult local{LocalService::Auth::LocalUsername{"root"}};
+   CHECK(frac(account) ==
+         "000800000000b82a1b83aedf04");
+   CHECK(frac(local) ==
+         "010800000004000000726f6f74");
+   CHECK(schemaOf<AuthResult>("AuthResult") ==
+         R"({"@4":{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}},"AuthResult":{"Variant":{"Account":{"Custom":{"type":{"Struct":{"value":{"Int":{"bits":64,"isSigned":false}}}},"id":"AccountNumber"}},"LocalUsername":"@4","Unauthenticated":{"Object":{"challenges":{"List":"@4"}}}}}})");
+
+   // The service schema record
+   psibase::ServiceSchema schema;
+   schema.service = AccountNumber{"alice"};
+   CHECK(frac(schema) ==
+         "180000b82a1b83aedf0400000000000000000000000000000000");
+   CHECK(json(schema) ==
+         R"({"service":"alice","types":{},"actions":{},"history":{},"merkle":{},"database":null})");
+   CHECK(fnv(schemaOf<psibase::ServiceSchema>("ServiceSchema")) == 0xd44785d5866f6705ull);
+}
+
+namespace glue
+{
+   struct DeferredRoot
+   {
+      psibase::Memo          memo;
+      UserService::Precision precision;
+      UserService::Decimal   decimal;
+      psibase::TimerRow      timer;
+      PSIO1_REFLECT(DeferredRoot, memo, precision, decimal, timer)
+   };
+}  // namespace glue
+
+namespace
+{
+   // What a legacy reader says of input it rejects (it aborts: an exception
+   // natively).
+   template <typename F>
+   std::string rejection(F&& f)
+   {
+#ifndef COMPILING_WASM
+      try
+      {
+         f();
+      }
+      catch (std::exception& e)
+      {
+         return e.what();
+      }
+#endif
+      return "";
+   }
+}  // namespace
+
+TEST_CASE("psibase records: the types slice 2b declared with PSIO, read", "[canonical][records][deferred]")
+{
+   using namespace UserService;
+   using psibase::Memo;
+   const DeferredRoot root{Memo{"hi"}, Precision{4}, Decimal{Quantity{std::uint64_t{1234567}}, Precision{4}},
+                           psibase::TimerRow{psibase::MonotonicTimePointUSec{psibase::MicroSeconds{5}},
+                                             AccountNumber{"alice"}, MethodNumber{"tick"}}};
+   CHECK(psio1::gql_query(root, "{ memo { contents } precision { value } decimal timer { expiration service method } }", "") ==
+         R"({"data": {"memo":{"contents":"hi"},"precision":{"value":4},"decimal":"123.4567","timer":{"expiration":"5","service":"alice","method":"tick"}}})");
+   CHECK(psio1::gql_query(root, "{ memo precision }", "") ==
+         R"({"errors": [{"message": "expected {"}]})");
+
+   const auto longMemo = psio1::convert_to_frac(std::string(81, 'a'));
+   const auto badUtf8  = psio1::convert_to_frac(std::string{"\xff\xfe"});
+   const auto nine     = psio1::convert_to_frac(std::uint8_t{9});
+#ifndef COMPILING_WASM
+   // A value that is not a Memo or a Precision aborts with the type's own
+   // message, wherever it is read. (Precision: the message of the legacy
+   // hook named the value, "Value 9 outside allowed Precision range: 0 to
+   // 8"; a PSIO invariant reports a constant text.)
+   CHECK(rejection([&] { (void)psio1::from_frac<Memo>(longMemo); }) ==
+         "Memo exceeds 80 bytes");
+   CHECK(rejection([&] { (void)psio1::fracpack_validate<Memo>(longMemo); }) ==
+         "Memo exceeds 80 bytes");
+   CHECK(rejection([&] { (void)psio1::from_frac<Memo>(badUtf8); }) ==
+         "Memo must be valid UTF-8");
+   CHECK(rejection([&] { (void)psio1::convert_from_json<Memo>("\"" + std::string(81, 'a') + "\""); }) ==
+         "Memo exceeds 80 bytes");
+   CHECK(rejection([&] { (void)psio1::from_frac<Precision>(nine); }) ==
+         "Value outside allowed Precision range: 0 to 8");
+   CHECK(rejection([&] { (void)psio1::fracpack_validate<Precision>(nine); }) ==
+         "Value outside allowed Precision range: 0 to 8");
+   CHECK(rejection([&] { (void)psio1::convert_from_json<Precision>("9"); }) ==
+         "Value outside allowed Precision range: 0 to 8");
+   CHECK(rejection([&] { (void)psio1::convert_from_json<Decimal>("\"1.2.3\""); }) ==
+         "Invalid number: parse error");
+   CHECK(rejection([&] { (void)psio1::fracpack_validate<std::tuple<std::uint32_t, Memo>>(psio1::convert_to_frac(std::tuple{std::uint32_t{1}, std::string(81, 'a')})); }) ==
+         "Memo exceeds 80 bytes");
+#endif
+
+   // Reading what was written.
+   roundTrips(root.memo);
+   roundTrips(root.precision);
+   roundTrips(root.decimal);
+   roundTrips(root.timer);
+   CHECK(psio1::convert_from_json<Decimal>("\"0.50\"").quantity.value == 50);
+   CHECK(psio1::convert_from_json<Decimal>("\".5\"").precision.value == 1);
+   CHECK(psio1::convert_from_json<Memo>("\"x\"").contents == "x");
+
+   // Views: a wrapper's view reads its member.
+   const auto                bytes = psio1::convert_to_frac(root.memo);
+   psio1::view<const Memo>   memoView{psio1::prevalidated{bytes}};
+   CHECK(std::string_view{memoView.contents()} == "hi");
+   const auto                    rootBytes = psio1::convert_to_frac(root);
+   psio1::view<const DeferredRoot> rootView{psio1::prevalidated{rootBytes}};
+   CHECK(std::string_view{rootView.memo().contents()} == "hi");
+   CHECK(rootView.precision().value() == 4);
+   CHECK(rootView.precision().unpack().value == 4);
+   CHECK(rootView.decimal().quantity().value() == 1234567);
 }
 
 namespace glue

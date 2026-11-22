@@ -17,7 +17,7 @@ namespace UserService
    {
       psibase::AccountNumber                     service;
       std::map<std::string, std::vector<DynDep>> groups;
-      PSIO1_REFLECT(DynDepGroups, service, groups)
+      PSIO_REFLECT(DynDepGroups, service, groups)
    };
    using DynDepGroupsTable = psibase::Table<DynDepGroups, &DynDepGroups::service>;
    PSIO_REFLECT_TYPENAME(DynDepGroupsTable)

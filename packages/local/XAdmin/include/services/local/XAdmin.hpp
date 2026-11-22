@@ -3,6 +3,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/SocketInfo.hpp>
+#include <psio/transparent.hpp>
 #include <services/system/SetCode.hpp>
 
 namespace LocalService
@@ -33,30 +34,14 @@ namespace LocalService
       struct Account
       {
          psibase::AccountNumber value;
+         PSIO_REFLECT(Account, transparent(), value)
       };
-      PSIO1_REFLECT_TYPENAME(Account)
-      inline auto& psio_unwrap_packable(Account& obj)
-      {
-         return obj.value;
-      }
-      inline const auto& psio_unwrap_packable(const Account& obj)
-      {
-         return obj.value;
-      }
 
       struct LocalUsername
       {
          std::string value;
+         PSIO_REFLECT(LocalUsername, transparent(), value)
       };
-      PSIO1_REFLECT_TYPENAME(LocalUsername)
-      inline auto& psio_unwrap_packable(LocalUsername& obj)
-      {
-         return obj.value;
-      }
-      inline const auto& psio_unwrap_packable(const LocalUsername& obj)
-      {
-         return obj.value;
-      }
       struct Unauthenticated
       {
          std::vector<std::string> challenges;

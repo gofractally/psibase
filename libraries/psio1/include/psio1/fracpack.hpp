@@ -8,6 +8,26 @@
 
 namespace psio1
 {
+   // TEMPORARY: removed when psio1 is deleted.
+   // A type PSIO declares transparent() is packed as its member: what
+   // `psio_unwrap_packable` says of a legacy wrapper. Its PSIO invariant is
+   // what `psio_validate_packable` checks; a value that fails it aborts with
+   // the invariant's own message, as the legacy hooks of psibase's types did.
+   template <typename T>
+      requires ::psio::is_transparent_v<T>
+   constexpr auto& psio_unwrap_packable(T& value) noexcept
+   {
+      return ::psio::transparent_inner(value);
+   }
+   template <typename T>
+      requires(::psio::is_transparent_v<T> && ::psio::has_invariant_v<T>)
+   bool psio_validate_packable(const T& value)
+   {
+      if (auto status = ::psio::check_invariant(value); !status.ok())
+         abort_error(status.error().what);
+      return true;
+   }
+
    // If a type T supports the expressions `psio_unwrap_packable(T&)`,
    // which returns a `T2&`, and `psio_unwrap_packable(const T&)`, which
    // returns `const T2&`, then packing or unpacking T packs or unpacks
@@ -45,6 +65,22 @@ namespace psio1
    template <typename T>
       requires Packable<std::remove_cv_t<T>>
    class view;
+
+   // TEMPORARY: removed when psio1 is deleted.
+   // The PSIO invariant of a transparent() type, checked on packed data that
+   // is validated without being unpacked.
+   template <typename T>
+      requires(::psio::is_transparent_v<T> && ::psio::has_invariant_v<T>)
+   bool psio_validate_packable(const view<const T>& value)
+   {
+      return psio_validate_packable(value.unpack());
+   }
+
+   // The type a PackableWrapper is packed as. (Named here, where the
+   // overloads above are visible to every caller.)
+   template <typename T>
+   using packable_wrapped_t =
+       std::remove_cvref_t<decltype(psio_unwrap_packable(std::declval<T&>()))>;
 
    template <typename T>
    concept PackableValidatedView = requires(view<const T>& p) { psio_validate_packable(p); };

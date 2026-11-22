@@ -609,6 +609,22 @@ namespace psio1
           std::span<const char>{text.data(), text.size()});
    }
 
+   // TEMPORARY: removed when psio1 is deleted.
+   // A type PSIO declares transparent() is read as its member; its PSIO
+   // invariant is then checked, and a value that fails it aborts with the
+   // invariant's message.
+   template <typename T, typename S>
+      requires(::psio::is_transparent_v<T> && !::psio::has_adapter_v<T, ::psio::text_category>)
+   void from_json(T& obj, S& stream)
+   {
+      from_json(::psio::transparent_inner(obj), stream);
+      if constexpr (::psio::has_invariant_v<T>)
+      {
+         if (auto status = ::psio::check_invariant(obj); !status.ok())
+            abort_error(status.error().what);
+      }
+   }
+
    /// not implemented, so don't link
    template <typename First, typename Second, typename S>
    void from_json(std::pair<First, Second>& obj, S& stream);

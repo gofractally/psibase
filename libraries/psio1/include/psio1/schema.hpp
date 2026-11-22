@@ -1684,11 +1684,17 @@ namespace psio1
       }
 
       // TEMPORARY: removed when psio1 is deleted.
-      // A type that PSIO's schema presents as Custom{wire type, id} (a
-      // reflected record or enum with a text adapter) is the same custom type
-      // here, under the same id.
+      // A type whose PSIO text adapter names its schema id (AccountNumber,
+      // MethodNumber) is the custom type of that id here: the ids are the
+      // ones the legacy schemas already used. PSIO's Schema IR calls more
+      // types Custom (every type with a text adapter or an invariant, under
+      // its own name); the legacy schema never did, and does not start to.
       template <typename T>
-         requires ::psio::schema_custom_v<T>
+      concept CanonicalCustom = ::psio::schema_custom_v<T> && requires {
+         std::string_view{::psio::adapter<T, ::psio::text_category>::schema_id};
+      };
+      template <typename T>
+         requires CanonicalCustom<T>
       constexpr bool psio_custom_schema(T*)
       {
          return true;
@@ -1696,7 +1702,7 @@ namespace psio1
       template <typename T>
       std::string custom_schema_id()
       {
-         if constexpr (::psio::schema_custom_v<T>)
+         if constexpr (CanonicalCustom<T>)
             return std::string{::psio::schema_custom_id<T>()};
          else
             return psio1::get_type_name<T>();
@@ -1832,8 +1838,7 @@ namespace psio1
                }
                else if constexpr (PackableWrapper<T>)
                {
-                  schema.insert(name, insert<std::remove_cvref_t<decltype(psio_unwrap_packable(
-                                          std::declval<T&>()))>>());
+                  schema.insert(name, insert<packable_wrapped_t<T>>());
                }
                else if constexpr (is_nested_wrapper_v<T>)
                {

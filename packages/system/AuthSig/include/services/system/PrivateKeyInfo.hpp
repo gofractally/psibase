@@ -1,6 +1,7 @@
 #pragma once
 #include <psibase/Table.hpp>
 #include <psibase/crypto.hpp>
+#include <psio/transparent.hpp>
 #include <string>
 #include <vector>
 
@@ -23,20 +24,12 @@ namespace SystemService
          {
             return psibase::compare_wknd(lhs.data, rhs.data);
          };
+         PSIO_REFLECT(PrivateKeyInfo, transparent(), data)
       };
       // Takes a private key in PEM format encoded as a PKCS8 PrivateKeyInfo
       std::vector<unsigned char> parsePrivateKeyInfo(std::string_view s);
       std::string                to_string(const PrivateKeyInfo&);
       SubjectPublicKeyInfo       getSubjectPublicKeyInfo(const PrivateKeyInfo& private_key);
-
-      inline std::vector<unsigned char>& psio_unwrap_packable(PrivateKeyInfo& obj)
-      {
-         return obj.data;
-      }
-      inline const std::vector<unsigned char>& psio_unwrap_packable(const PrivateKeyInfo& obj)
-      {
-         return obj.data;
-      }
 
       std::vector<uint8_t> sign(const PrivateKeyInfo&       private_key,
                                 const psibase::Checksum256& checksum);

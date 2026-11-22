@@ -470,7 +470,6 @@ struct RestartInfo
    bool keysChanged   = false;
    bool configChanged = false;
 };
-PSIO_REFLECT(RestartInfo, shouldRestart);
 
 struct ThreadInfo
 {
@@ -1045,7 +1044,7 @@ struct PsinodeServiceConfig
 {
    std::vector<std::string> argv;
    ExtraConfigFields        config;
-   PSIO1_REFLECT(PsinodeServiceConfig, argv, config)
+   PSIO_REFLECT(PsinodeServiceConfig, argv, config)
 };
 
 struct PsinodeConfig

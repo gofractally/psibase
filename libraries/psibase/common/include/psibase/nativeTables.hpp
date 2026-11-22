@@ -346,7 +346,7 @@ namespace psibase
    //   std::uint64_t id;
    //   TransactionTrace trace;
    //   std::optional<RunToken> token;
-   //   PSIO1_REFLECT(ContinuationArgs, id, trace, token)
+   //   PSIO_REFLECT(ContinuationArgs, id, trace, token)
    //};
 
    /// Identifies a method on a particular service
@@ -483,7 +483,7 @@ namespace psibase
 
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> KeyPrefixType;
-      PSIO1_REFLECT(TimerRow, expiration, service, method)
+      PSIO_REFLECT(TimerRow, expiration, service, method)
    };
    using TimerTable = Table<TimerRow, SingletonKey{}>;
 

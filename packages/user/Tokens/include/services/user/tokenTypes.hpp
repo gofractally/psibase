@@ -4,18 +4,27 @@
 #include <charconv>
 #include <compare>
 #include <limits>
+#include <optional>
 #include <psibase/check.hpp>
-#include <psio1/fracpack.hpp>
-#include <psio1/from_json.hpp>
-#include <psio1/to_json.hpp>
-#include <psio1/view.hpp>
+#include <psio/adapter.hpp>
+#include <psio/annotate.hpp>
+#include <psio/invariant.hpp>
+#include <psio/reflect.hpp>
+#include <psio/transparent.hpp>
+#include <span>
 #include <string>
+#include <string_view>
 #include <tuple>
 
 namespace UserService
 {
    using TID = uint32_t;
 
+   /// The number of decimal places of a token: 0 to 8.
+   ///
+   /// A precision is its number wherever it is serialized (`transparent()`).
+   /// A reader that checks its input rejects a number above 8
+   /// (`invariant(inRange)`).
    struct Precision
    {
       static constexpr uint8_t precisionMin = 0;
@@ -36,40 +45,17 @@ namespace UserService
          }
          return true;
       }
+      static psio::codec_status inRange(const Precision& p) noexcept
+      {
+         if (precisionMin > p.value || p.value > precisionMax)
+            return psio::codec_fail("Value outside allowed Precision range: 0 to 8", 0,
+                                    "Precision");
+         return psio::codec_ok();
+      }
 
       friend std::strong_ordering operator<=>(const Precision&, const Precision&) = default;
-      PSIO1_REFLECT(Precision, value);
+      PSIO_REFLECT(Precision, transparent(), invariant(inRange), value)
    };
-
-   inline uint8_t& psio_unwrap_packable(Precision& s)
-   {
-      return s.value;
-   }
-   inline const uint8_t& psio_unwrap_packable(const Precision& s)
-   {
-      return s.value;
-   }
-
-   inline bool psio_validate_packable(const Precision& p)
-   {
-      return Precision::validate(p.value);
-   }
-
-   inline bool psio_validate_packable(psio1::view<const Precision> p)
-   {
-      return Precision::validate(p.value());
-   }
-
-   void from_json(Precision& p, auto& stream)
-   {
-      from_json(p.value, stream);
-      Precision::validate(p.value);
-   }
-
-   void to_json(const Precision& p, auto& stream)
-   {
-      to_json(p.value, stream);
-   }
 
    struct Quantity
    {
@@ -161,6 +147,50 @@ namespace UserService
          result += '.';
          result += format_fractional_part(fractional_part, precision.value);
          return result;
+      }
+
+      /// The value `s` spells, or nothing if `s` is not a decimal number:
+      /// digits with at most one '.', at least one digit, at most 8 digits
+      /// after the point, and a quantity that fits 64 bits. Never aborts.
+      static std::optional<Decimal> parse(std::string_view s) noexcept
+      {
+         const auto             dot      = s.find('.');
+         const std::string_view integer  = s.substr(0, dot);
+         const std::string_view fraction = dot == std::string_view::npos ? std::string_view{}
+                                                                         : s.substr(dot + 1);
+         constexpr uint64_t     max      = std::numeric_limits<uint64_t>::max();
+         if (integer.empty() && fraction.empty())
+            return std::nullopt;
+         if (fraction.size() > Precision::precisionMax)
+            return std::nullopt;
+         auto digits = [](std::string_view text, uint64_t& out)
+         {
+            out = 0;
+            for (char c : text)
+            {
+               if (c < '0' || c > '9')
+                  return false;
+               const uint64_t digit = static_cast<uint64_t>(c - '0');
+               if (out > (max - digit) / 10)
+                  return false;
+               out = out * 10 + digit;
+            }
+            return true;
+         };
+         uint64_t integerValue  = 0;
+         uint64_t fractionValue = 0;
+         if (!digits(integer, integerValue) || !digits(fraction, fractionValue))
+            return std::nullopt;
+         uint64_t scale = 1;
+         for (std::size_t i = 0; i < fraction.size(); ++i)
+            scale *= 10;
+         if (integerValue > max / scale)
+            return std::nullopt;
+         const uint64_t whole = integerValue * scale;
+         if (fractionValue > max - whole)
+            return std::nullopt;
+         return Decimal{Quantity{whole + fractionValue},
+                        Precision{static_cast<uint8_t>(fraction.size())}};
       }
 
       static Decimal fromStr(std::string_view s)
@@ -278,21 +308,39 @@ namespace UserService
          return fraction_value * multiplier;
       }
    };
-   PSIO1_REFLECT(Decimal, quantity, precision);
+   PSIO_REFLECT(Decimal, quantity, precision);
 
-   void from_json(Decimal& d, auto& stream)
+   /// The text form of a Decimal: the quantity written with the precision's
+   /// number of digits after the point ("12.50" is 1250 at precision 2; the
+   /// precision is part of the value, so "12.5" is another one).
+   ///
+   /// `validate` accepts every spelling `Decimal::parse` reads; a missing
+   /// integer part (".5"), a trailing point ("5.") and leading zeros
+   /// included. `validate_strict` accepts only the spelling `str()` writes.
+   struct DecimalText
    {
-      d = Decimal::fromStr(stream.get_string());
-   }
-
-   void to_json(const Decimal& d, auto& stream)
-   {
-      to_json(d.str(), stream);
-   }
-
-   inline constexpr bool use_json_string_for_gql(Decimal*)
-   {
-      return true;
-   }
+      static std::size_t packsize(const Decimal& d) { return d.str().size(); }
+      static void        encode(const Decimal& d, std::string& out) { out += d.str(); }
+      static Decimal     decode(std::span<const char> text)
+      {
+         return Decimal::fromStr(std::string_view{text.data(), text.size()});
+      }
+      static psio::codec_status validate(std::span<const char> text) noexcept
+      {
+         if (Decimal::parse(std::string_view{text.data(), text.size()}))
+            return psio::codec_ok();
+         return psio::codec_fail("Decimal: not a decimal number", 0, "Decimal");
+      }
+      static psio::codec_status validate_strict(std::span<const char> text) noexcept
+      {
+         const std::string_view spelled{text.data(), text.size()};
+         if (auto value = Decimal::parse(spelled); value && value->str() == spelled)
+            return psio::codec_ok();
+         return psio::codec_fail("Decimal: not the canonical spelling of a decimal number", 0,
+                                 "Decimal");
+      }
+   };
 
 }  // namespace UserService
+
+PSIO_ADAPTER(UserService::Decimal, psio::text_category, UserService::DecimalText)

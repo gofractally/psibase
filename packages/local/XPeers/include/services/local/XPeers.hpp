@@ -80,7 +80,7 @@ namespace LocalService
       // The earliest time that a connection will be retried
       psibase::MonotonicTimePointUSec retryTime;
       std::optional<std::uint64_t>    timerId;
-      PSIO1_REFLECT(UrlRow, url, refcount, autoconnect, currentTimeout, retryTime, timerId)
+      PSIO_REFLECT(UrlRow, url, refcount, autoconnect, currentTimeout, retryTime, timerId)
    };
    using UrlTable = psibase::Table<UrlRow, &UrlRow::url>;
    PSIO_REFLECT_TYPENAME(UrlTable)

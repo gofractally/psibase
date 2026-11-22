@@ -2539,14 +2539,14 @@ namespace dwarf
       uint32_t magic   = 0;
       uint32_t version = 0;
    };
-   PSIO1_REFLECT(wasm_header, magic, version)
+   PSIO_REFLECT(wasm_header, magic, version)
 
    struct wasm_section
    {
       uint8_t            id = 0;
       psio1::input_stream data;
    };
-   PSIO1_REFLECT(wasm_section, id, data)
+   PSIO_REFLECT(wasm_section, id, data)
 
    psio1::input_stream wasm_exclude_custom(psio1::input_stream stream)
    {

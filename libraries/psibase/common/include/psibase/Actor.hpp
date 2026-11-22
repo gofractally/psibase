@@ -120,7 +120,7 @@ namespace psibase
       AccountNumber   service;  ///< Service to execute the action
       MethodNumber    method;   ///< Service method to execute
       psio1::nested<T> rawData;  ///< Data for the method
-      PSIO1_REFLECT(TypedAction, sender, service, method, rawData)
+      PSIO_REFLECT(TypedAction, sender, service, method, rawData)
    };
 
    struct ActionViewProxy

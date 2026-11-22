@@ -420,7 +420,7 @@ namespace psibase
       }
       // checks that all names and indexes are valid
       void checkValid() const;
-      PSIO1_REFLECT(ServiceSchema, service, types, actions, history, merkle, database)
+      PSIO_REFLECT(ServiceSchema, service, types, actions, history, merkle, database)
    };
 
    psio1::schema_types::CustomTypes psibase_types();

@@ -341,6 +341,15 @@ template <typename S> void to_json(float value, S& stream)              { return
       to_json(text, stream);
    }
 
+   // TEMPORARY: removed when psio1 is deleted.
+   // A type PSIO declares transparent() is written as its member.
+   template <typename T, typename S>
+      requires(::psio::is_transparent_v<T> && !::psio::has_adapter_v<T, ::psio::text_category>)
+   void to_json(const T& t, S& stream)
+   {
+      to_json(::psio::transparent_inner(t), stream);
+   }
+
    template <typename S>
    void to_json_hex(const char* data, size_t size, S& stream)
    {
