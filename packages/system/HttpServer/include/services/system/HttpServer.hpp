@@ -13,7 +13,7 @@ namespace SystemService
    };
    PSIO_REFLECT(PendingRequestRow, socket, owner)
    using PendingRequestTable = psibase::Table<PendingRequestRow, &PendingRequestRow::socket>;
-   PSIO1_REFLECT_TYPENAME(PendingRequestTable)
+   PSIO_REFLECT_TYPENAME(PendingRequestTable)
 
    struct RegisteredServiceRow
    {
@@ -22,7 +22,7 @@ namespace SystemService
    };
    PSIO_REFLECT(RegisteredServiceRow, service, server)
    using RegServTable = psibase::Table<RegisteredServiceRow, &RegisteredServiceRow::service>;
-   PSIO1_REFLECT_TYPENAME(RegServTable)
+   PSIO_REFLECT_TYPENAME(RegServTable)
 
    struct RedirectRow
    {
@@ -31,7 +31,7 @@ namespace SystemService
    };
    PSIO_REFLECT(RedirectRow, account, destination)
    using RedirectTable = psibase::Table<RedirectRow, &RedirectRow::account>;
-   PSIO1_REFLECT_TYPENAME(RedirectTable)
+   PSIO_REFLECT_TYPENAME(RedirectTable)
 
    /// The `http-server` service routes HTTP requests to the appropriate service
    ///

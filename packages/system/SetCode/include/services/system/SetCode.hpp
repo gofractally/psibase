@@ -19,7 +19,7 @@ namespace SystemService
       PSIO_REFLECT(CodeRefCountRow, codeHash, vmType, vmVersion)
    };
    using CodeRefCountTable = psibase::Table<CodeRefCountRow, CodeRefCountRow::Key{}>;
-   PSIO1_REFLECT_TYPENAME(CodeRefCountTable)
+   PSIO_REFLECT_TYPENAME(CodeRefCountTable)
 
    struct StagedCodeRow
    {
@@ -36,7 +36,7 @@ namespace SystemService
       PSIO_REFLECT(StagedCodeRow, from, service, id, codeHash, vmType, vmVersion)
    };
    using StagedCodeTable = psibase::Table<StagedCodeRow, StagedCodeRow::Key{}>;
-   PSIO1_REFLECT_TYPENAME(StagedCodeTable)
+   PSIO_REFLECT_TYPENAME(StagedCodeTable)
 
    struct VerifySequenceRow
    {
@@ -44,7 +44,7 @@ namespace SystemService
       PSIO_REFLECT(VerifySequenceRow, seq)
    };
    using VerifySequenceTable = psibase::Table<VerifySequenceRow, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(VerifySequenceTable)
+   PSIO_REFLECT_TYPENAME(VerifySequenceTable)
 
    /// The execution policy version stamped on code that is deployed without
    /// asking for one. Absent until the chain sets it; then
@@ -55,7 +55,7 @@ namespace SystemService
       PSIO_REFLECT(DefaultVmVersionRow, vmVersion)
    };
    using DefaultVmVersionTable = psibase::Table<DefaultVmVersionRow, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(DefaultVmVersionTable)
+   PSIO_REFLECT_TYPENAME(DefaultVmVersionTable)
 
    /// All compiled code is uploaded to the chain through this service
    struct SetCode : psibase::Service

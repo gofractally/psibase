@@ -20,7 +20,7 @@ namespace SystemService
    };
    PSIO_REFLECT(AccountsStatus, totalAccounts)
    using AccountsStatusTable = psibase::Table<AccountsStatus, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(AccountsStatusTable)
+   PSIO_REFLECT_TYPENAME(AccountsStatusTable)
 
    /// Structure of an account
    ///
@@ -41,7 +41,7 @@ namespace SystemService
    };
    PSIO_REFLECT(Account, accountNum, authService, authSequence)
    using AccountTable = psibase::Table<Account, &Account::accountNum>;
-   PSIO1_REFLECT_TYPENAME(AccountTable)
+   PSIO_REFLECT_TYPENAME(AccountTable)
 
    /// An account that is currently frozen.
    /// `authService` is the auth service to restore on unfreeze.
@@ -52,7 +52,7 @@ namespace SystemService
    };
    PSIO_REFLECT(FrozenAccount, account, authService)
    using FrozenTable = psibase::Table<FrozenAccount, &FrozenAccount::account>;
-   PSIO1_REFLECT_TYPENAME(FrozenTable)
+   PSIO_REFLECT_TYPENAME(FrozenTable)
 
    /// Determines the behavior of `newAccount` when the
    /// requested account already exists

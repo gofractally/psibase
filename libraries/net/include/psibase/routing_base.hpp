@@ -6,6 +6,7 @@
 #include <psibase/log.hpp>
 #include <psibase/message_serializer.hpp>
 #include <psibase/net_base.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/fracpack.hpp>
 #include <psio1/reflect.hpp>
 #include <random>

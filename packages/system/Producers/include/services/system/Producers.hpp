@@ -17,7 +17,7 @@ namespace SystemService
    };
    PSIO_REFLECT(CandidateInfo, account, endpoint, claim)
    using CandidateInfoTable = psibase::Table<CandidateInfo, &CandidateInfo::account>;
-   PSIO1_REFLECT_TYPENAME(CandidateInfoTable)
+   PSIO_REFLECT_TYPENAME(CandidateInfoTable)
 
    struct ProdsConfig
    {
@@ -25,7 +25,7 @@ namespace SystemService
    };
    PSIO_REFLECT(ProdsConfig, maxProds)
    using ProdsConfigTable = psibase::Table<ProdsConfig, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(ProdsConfigTable)
+   PSIO_REFLECT_TYPENAME(ProdsConfigTable)
 
    // This service manages the active producers.
    // It must have native write permission

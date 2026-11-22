@@ -155,7 +155,7 @@ namespace SystemService
    };
    PSIO_REFLECT(TransactStatus, enforceAuth, bootTransactions)
    using TransactStatusTable = psibase::Table<TransactStatus, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(TransactStatusTable)
+   PSIO_REFLECT_TYPENAME(TransactStatusTable)
 
    struct ResMonitoringConfig
    {
@@ -163,7 +163,7 @@ namespace SystemService
    };
    PSIO_REFLECT(ResMonitoringConfig, enabled)
    using ResMonitoringConfigTable = psibase::Table<ResMonitoringConfig, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(ResMonitoringConfigTable)
+   PSIO_REFLECT_TYPENAME(ResMonitoringConfigTable)
 
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary
@@ -173,7 +173,7 @@ namespace SystemService
    };
    PSIO_REFLECT(BlockSummary, blockSuffixes, blockNum)
    using BlockSummaryTable = psibase::Table<BlockSummary, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(BlockSummaryTable)
+   PSIO_REFLECT_TYPENAME(BlockSummaryTable)
 
    // This table tracks transaction IDs to detect duplicates.
    struct IncludedTrx
@@ -185,7 +185,7 @@ namespace SystemService
    };
    PSIO_REFLECT(IncludedTrx, expiration, id)
    using IncludedTrxTable = psibase::Table<IncludedTrx, IncludedTrx::Key{}>;
-   PSIO1_REFLECT_TYPENAME(IncludedTrxTable)
+   PSIO_REFLECT_TYPENAME(IncludedTrxTable)
 
    enum class CallbackType : std::uint32_t
    {
@@ -202,7 +202,7 @@ namespace SystemService
    PSIO_REFLECT(Callbacks, type, actions)
 
    using CallbacksTable = psibase::Table<Callbacks, &Callbacks::type>;
-   PSIO1_REFLECT_TYPENAME(CallbacksTable)
+   PSIO_REFLECT_TYPENAME(CallbacksTable)
 
    struct EventIndexer
    {
@@ -210,7 +210,7 @@ namespace SystemService
    };
    PSIO_REFLECT(EventIndexer, service)
    using EventIndexerTable = psibase::Table<EventIndexer, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(EventIndexerTable)
+   PSIO_REFLECT_TYPENAME(EventIndexerTable)
 
    struct SnapshotInfo
    {
@@ -219,7 +219,7 @@ namespace SystemService
    };
    PSIO_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
    using SnapshotInfoTable = psibase::Table<SnapshotInfo, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(SnapshotInfoTable)
+   PSIO_REFLECT_TYPENAME(SnapshotInfoTable)
 
    /// All transactions enter the chain through this service
    ///

@@ -13,7 +13,7 @@ namespace TestService
    };
    PSIO_REFLECT(CallCounterRow, id, count)
    using CallCounterTable = psibase::Table<CallCounterRow, &CallCounterRow::id>;
-   PSIO1_REFLECT_TYPENAME(CallCounterTable)
+   PSIO_REFLECT_TYPENAME(CallCounterTable)
 
    struct TestServiceEntry : psibase::Service
    {

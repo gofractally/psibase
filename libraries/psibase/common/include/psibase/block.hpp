@@ -5,6 +5,7 @@
 #include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/time.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/from_json.hpp>
 #include <psio1/reflect.hpp>
 #include <psio1/shared_view_ptr.hpp>

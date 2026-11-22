@@ -20,7 +20,7 @@ namespace SystemService
    };
    PSIO_REFLECT(SitesContentRow, account, path, contentType, contentHash, contentEncoding, csp)
    using SitesContentTable = psibase::Table<SitesContentRow, SitesContentRow::Key{}>;
-   PSIO1_REFLECT_TYPENAME(SitesContentTable)
+   PSIO_REFLECT_TYPENAME(SitesContentTable)
 
    struct SitesDataRow
    {
@@ -30,7 +30,7 @@ namespace SystemService
    PSIO_REFLECT(SitesDataRow, hash, data)
 
    using SitesDataTable = psibase::Table<SitesDataRow, &SitesDataRow::hash>;
-   PSIO1_REFLECT_TYPENAME(SitesDataTable)
+   PSIO_REFLECT_TYPENAME(SitesDataTable)
 
    struct SitesDataRefRow
    {
@@ -40,7 +40,7 @@ namespace SystemService
    PSIO_REFLECT(SitesDataRefRow, hash, refs)
 
    using SitesDataRefTable = psibase::Table<SitesDataRefRow, &SitesDataRefRow::hash>;
-   PSIO1_REFLECT_TYPENAME(SitesDataRefTable)
+   PSIO_REFLECT_TYPENAME(SitesDataRefTable)
 
    struct SiteConfigRow
    {
@@ -52,7 +52,7 @@ namespace SystemService
    };
    PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
-   PSIO1_REFLECT_TYPENAME(SiteConfigTable)
+   PSIO_REFLECT_TYPENAME(SiteConfigTable)
 
    /// Decompress content
    ///

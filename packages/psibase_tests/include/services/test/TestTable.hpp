@@ -14,7 +14,7 @@ namespace TestService
    };
    PSIO_REFLECT(SingleKeyRow, key, value)
    using SingleKeyTable = psibase::Table<SingleKeyRow, &SingleKeyRow::key>;
-   PSIO1_REFLECT_TYPENAME(SingleKeyTable)
+   PSIO_REFLECT_TYPENAME(SingleKeyTable)
 
    struct MultiKeyRow
    {
@@ -25,7 +25,7 @@ namespace TestService
    };
    PSIO_REFLECT(MultiKeyRow, key1, key2, value);
    using MultiKeyTable = psibase::Table<MultiKeyRow, &MultiKeyRow::key1, &MultiKeyRow::key2>;
-   PSIO1_REFLECT_TYPENAME(MultiKeyTable)
+   PSIO_REFLECT_TYPENAME(MultiKeyTable)
 
    struct CompoundKeyRow
    {
@@ -38,7 +38,7 @@ namespace TestService
    PSIO_REFLECT(CompoundKeyRow, key1, key2, value);
    using CompoundKeyTable =
        psibase::Table<CompoundKeyRow, &CompoundKeyRow::key1, CompoundKeyRow::CompoundKey{}>;
-   PSIO1_REFLECT_TYPENAME(CompoundKeyTable)
+   PSIO_REFLECT_TYPENAME(CompoundKeyTable)
 
    struct TestTable : psibase::Service
    {

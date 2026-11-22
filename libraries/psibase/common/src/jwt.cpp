@@ -6,6 +6,7 @@
 #include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/jwt.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/reflect.hpp>
 #include <ranges>
 #include <string>

@@ -14,7 +14,7 @@ namespace TestService
       PSIO_REFLECT(AuthRow, account, deps, threshold)
    };
    using AuthTable = psibase::Table<AuthRow, &AuthRow::account>;
-   PSIO1_REFLECT_TYPENAME(AuthTable)
+   PSIO_REFLECT_TYPENAME(AuthTable)
 
    struct AuthMethodRow
    {
@@ -26,7 +26,7 @@ namespace TestService
       PSIO_REFLECT(AuthMethodRow, auth, method)
    };
    using AuthMethodTable = psibase::Table<AuthMethodRow, AuthMethodRow::Key{}>;
-   PSIO1_REFLECT_TYPENAME(AuthMethodTable)
+   PSIO_REFLECT_TYPENAME(AuthMethodTable)
 
    struct AuthTest : psibase::Service
    {

@@ -71,7 +71,7 @@ std::ostream& operator<<(std::ostream& os, const T& value)
 #define REFLECT_EVENT(name, ...)                               \
    using json_stream_operator                       = void;    \
    friend bool operator==(const name&, const name&) = default; \
-   PSIO1_REFLECT(name, __VA_ARGS__)
+   PSIO_REFLECT(name, __VA_ARGS__)
 
 struct TestEvent
 {

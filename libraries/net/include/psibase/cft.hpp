@@ -5,6 +5,7 @@
 #include <psibase/blocknet.hpp>
 #include <psibase/net_base.hpp>
 #include <psibase/random_timer.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/reflect.hpp>
 
 #include <algorithm>

@@ -16,7 +16,7 @@ namespace TestService
       PSIO_REFLECT(CredIdRow, account, id)
    };
    using CredIdTable = psibase::Table<CredIdRow, &CredIdRow::account>;
-   PSIO1_REFLECT_TYPENAME(CredIdTable)
+   PSIO_REFLECT_TYPENAME(CredIdTable)
 
    struct BigDataRow
    {
@@ -25,7 +25,7 @@ namespace TestService
       PSIO_REFLECT(BigDataRow, owner, data)
    };
    using BigDataTable = psibase::Table<BigDataRow, &BigDataRow::owner>;
-   PSIO1_REFLECT_TYPENAME(BigDataTable)
+   PSIO_REFLECT_TYPENAME(BigDataTable)
 
    /// This service exploits the fact that Credentials checkAuthSys
    /// calls bill_to_sub and can be called by any service, to bill

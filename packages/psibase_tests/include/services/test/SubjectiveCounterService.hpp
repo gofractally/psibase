@@ -20,7 +20,7 @@ namespace TestService
    PSIO_REFLECT(SubjectiveCounterRow, key, value)
 
    using SubjectiveCounterTable = psibase::Table<SubjectiveCounterRow, &SubjectiveCounterRow::key>;
-   PSIO1_REFLECT_TYPENAME(SubjectiveCounterTable)
+   PSIO_REFLECT_TYPENAME(SubjectiveCounterTable)
 
    struct SubjectiveCounterService : psibase::Service
    {

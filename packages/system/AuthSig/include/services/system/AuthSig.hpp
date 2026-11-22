@@ -111,6 +111,6 @@ namespace SystemService
                    //
       )
       PSIBASE_REFLECT_TABLES(AuthSig, AuthSig::Tables)
-      PSIO1_REFLECT_TYPENAME(AuthSig::AuthTable)
+      PSIO_REFLECT_TYPENAME(AuthSig::AuthTable)
    }  // namespace AuthSig
 }  // namespace SystemService

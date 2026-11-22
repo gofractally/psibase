@@ -6,6 +6,7 @@
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/db.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/reflect.hpp>
 #include <psio1/schema.hpp>
 #include <string>

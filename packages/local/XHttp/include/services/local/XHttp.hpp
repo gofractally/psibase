@@ -29,7 +29,7 @@ namespace LocalService
       PSIO_REFLECT(ResponseHandlerRow, socket, type, service, method, err)
    };
    using ResponseHandlerTable = psibase::Table<ResponseHandlerRow, &ResponseHandlerRow::socket>;
-   PSIO1_REFLECT_TYPENAME(ResponseHandlerTable)
+   PSIO_REFLECT_TYPENAME(ResponseHandlerTable)
 
    /// Entry point for sockets
    struct XHttp : psibase::Service

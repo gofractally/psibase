@@ -5,6 +5,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/block.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/reflect.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/Transact.hpp>
@@ -24,7 +25,7 @@ namespace SystemService
    PSIO_REFLECT(AuthDelegateRecord, account, owner)
    using AuthDelegateTable = psibase::
        Table<AuthDelegateRecord, &AuthDelegateRecord::account, AuthDelegateRecord::Secondary{}>;
-   PSIO1_REFLECT_TYPENAME(AuthDelegateTable)
+   PSIO_REFLECT_TYPENAME(AuthDelegateTable)
 
    /// The `auth-delegate` service is an auth service that can be used to authenticate actions for accounts.
    ///

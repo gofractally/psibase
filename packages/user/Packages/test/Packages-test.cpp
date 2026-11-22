@@ -32,7 +32,7 @@ namespace
    };
    PSIO_REFLECT(TableRowV1, k1, k2, k3);
    using TableV1 = Table<TableRowV1, &TableRowV1::k1, &TableRowV1::k2>;
-   PSIO1_REFLECT_TYPENAME(TableV1)
+   PSIO_REFLECT_TYPENAME(TableV1)
 
    struct ServiceV1 : Service
    {
@@ -52,7 +52,7 @@ namespace
    };
    PSIO_REFLECT(TableRowV2, k1, k2, k3, o);
    using TableV2 = Table<TableRowV2, &TableRowV2::k1, &TableRowV2::k2>;
-   PSIO1_REFLECT_TYPENAME(TableV2)
+   PSIO_REFLECT_TYPENAME(TableV2)
 
    struct ServiceV2 : Service
    {
@@ -72,7 +72,7 @@ namespace
    };
    PSIO_REFLECT(TableRowV3, k1, k2, k3, o);
    using TableV3 = Table<TableRowV3, &TableRowV3::k1, &TableRowV3::k2>;
-   PSIO1_REFLECT_TYPENAME(TableV3)
+   PSIO_REFLECT_TYPENAME(TableV3)
 
    struct ServiceV3 : Service
    {
@@ -85,7 +85,7 @@ namespace
    // Add index
    using TableRowV4 = TableRowV1;
    using TableV4    = Table<TableRowV4, &TableRowV4::k1, &TableRowV4::k2, &TableRowV4::k3>;
-   PSIO1_REFLECT_TYPENAME(TableV4)
+   PSIO_REFLECT_TYPENAME(TableV4)
 
    struct ServiceV4 : Service
    {
@@ -98,7 +98,7 @@ namespace
    // Remove index
    using TableRowV5 = TableRowV1;
    using TableV5    = Table<TableRowV5, &TableRowV5::k1>;
-   PSIO1_REFLECT_TYPENAME(TableV5)
+   PSIO_REFLECT_TYPENAME(TableV5)
 
    struct ServiceV5 : Service
    {
@@ -111,7 +111,7 @@ namespace
    // Change index
    using TableRowV6 = TableRowV1;
    using TableV6    = Table<TableRowV6, &TableRowV6::k1, &TableRowV6::k3>;
-   PSIO1_REFLECT_TYPENAME(TableV6)
+   PSIO_REFLECT_TYPENAME(TableV6)
 
    struct ServiceV6 : Service
    {
@@ -130,7 +130,7 @@ namespace
    };
    PSIO_REFLECT(TableRowV7, k1, k2, k3);
    using TableV7 = Table<TableRowV7, &TableRowV7::k1, &TableRowV7::k2>;
-   PSIO1_REFLECT_TYPENAME(TableV7)
+   PSIO_REFLECT_TYPENAME(TableV7)
 
    struct ServiceV7 : Service
    {
@@ -209,7 +209,7 @@ namespace
    PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXFormExtended::outer, "outer")
 
    using TableXFormIV1 = Table<TableRowXForm, &TableRowXForm::inner>;
-   PSIO1_REFLECT_TYPENAME(TableXFormIV1)
+   PSIO_REFLECT_TYPENAME(TableXFormIV1)
    struct ServiceXFormIV1
    {
       static constexpr AccountNumber service{"alice"};
@@ -220,7 +220,7 @@ namespace
 
    // Upgrade without affecting the key
    using TableXFormIV2 = Table<TableRowXFormExtended, &TableRowXFormExtended::inner>;
-   PSIO1_REFLECT_TYPENAME(TableXFormIV2)
+   PSIO_REFLECT_TYPENAME(TableXFormIV2)
    struct ServiceXFormIV2
    {
       static constexpr AccountNumber service{"alice"};
@@ -231,7 +231,7 @@ namespace
 
    // Change transform
    using TableXFormIV3 = Table<TableRowXForm, &TableRowXForm::rev>;
-   PSIO1_REFLECT_TYPENAME(TableXFormIV3)
+   PSIO_REFLECT_TYPENAME(TableXFormIV3)
    struct ServiceXFormIV3
    {
       static constexpr AccountNumber service{"alice"};
@@ -242,7 +242,7 @@ namespace
 
    // Upgrade that changes the key
    using TableXFormOV1 = Table<TableRowXForm, &TableRowXForm::outer>;
-   PSIO1_REFLECT_TYPENAME(TableXFormOV1)
+   PSIO_REFLECT_TYPENAME(TableXFormOV1)
    struct ServiceXFormOV1
    {
       static constexpr AccountNumber service{"alice"};
@@ -251,7 +251,7 @@ namespace
    PSIO_REFLECT(ServiceXFormOV1)
    PSIBASE_REFLECT_TABLES(ServiceXFormOV1, ServiceXFormOV1::Tables)
    using TableXFormOV2 = Table<TableRowXFormExtended, &TableRowXFormExtended::outer>;
-   PSIO1_REFLECT_TYPENAME(TableXFormOV2)
+   PSIO_REFLECT_TYPENAME(TableXFormOV2)
    struct ServiceXFormOV2
    {
       static constexpr AccountNumber service{"alice"};

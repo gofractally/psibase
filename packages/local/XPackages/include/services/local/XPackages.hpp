@@ -19,7 +19,7 @@ namespace LocalService
    };
    PSIO_REFLECT(LocalPackage, name, version, description, depends, accounts, services, exports, sha256)
    using LocalPackagesTable = psibase::Table<LocalPackage, &LocalPackage::name>;
-   PSIO1_REFLECT_TYPENAME(LocalPackagesTable)
+   PSIO_REFLECT_TYPENAME(LocalPackagesTable)
 
    struct PendingLocalPackage
    {
@@ -49,7 +49,7 @@ namespace LocalService
                 removing)
    using PendingLocalPackagesTable =
        psibase::Table<PendingLocalPackage, PendingLocalPackage::ByName{}>;
-   PSIO1_REFLECT_TYPENAME(PendingLocalPackagesTable)
+   PSIO_REFLECT_TYPENAME(PendingLocalPackagesTable)
 
    struct XPackages : psibase::Service
    {

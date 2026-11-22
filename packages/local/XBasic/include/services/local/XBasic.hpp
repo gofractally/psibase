@@ -16,7 +16,7 @@ namespace LocalService
       PSIO_REFLECT(PasswordRow, username, hash, password)
    };
    using PasswordTable = psibase::Table<PasswordRow, &PasswordRow::username>;
-   PSIO1_REFLECT_TYPENAME(PasswordTable)
+   PSIO_REFLECT_TYPENAME(PasswordTable)
 
    struct XBasic : psibase::Service
    {

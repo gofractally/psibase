@@ -43,7 +43,7 @@ namespace UserService
       PSIO_REFLECT(InviteRecord, id, cid, inviter, numAccounts, useHooks, secret);
       using InviteTable = psibase::
           Table<InviteRecord, &InviteRecord::id, InviteRecord::ByInviter{}, &InviteRecord::cid>;
-      PSIO1_REFLECT_TYPENAME(InviteTable)
+      PSIO_REFLECT_TYPENAME(InviteTable)
 
    }  // namespace InviteNs
 }  // namespace UserService

@@ -16,7 +16,7 @@ namespace LocalService
       PSIO_REFLECT(AdminAccountRow, account);
    };
    using AdminAccountTable = psibase::Table<AdminAccountRow, &AdminAccountRow::account>;
-   PSIO1_REFLECT_TYPENAME(AdminAccountTable)
+   PSIO_REFLECT_TYPENAME(AdminAccountTable)
 
    struct AdminOptionsRow
    {
@@ -26,7 +26,7 @@ namespace LocalService
       PSIO_REFLECT(AdminOptionsRow, p2p, hosts, peers)
    };
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(AdminOptionsTable)
+   PSIO_REFLECT_TYPENAME(AdminOptionsTable)
 
    namespace Auth
    {

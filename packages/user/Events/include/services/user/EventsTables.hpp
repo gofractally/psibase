@@ -7,7 +7,7 @@
 #include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
 #include <psibase/schema.hpp>
-#include <psio1/reflect.hpp>
+#include <psio/reflect.hpp>
 #include <span>
 #include <vector>
 
@@ -23,7 +23,7 @@ namespace UserService
       PSIO_REFLECT(EventNumberRecord, type, nextEventNumber)
    };
    using EventNumberTable = psibase::Table<EventNumberRecord, &EventNumberRecord::type>;
-   PSIO1_REFLECT_TYPENAME(EventNumberTable)
+   PSIO_REFLECT_TYPENAME(EventNumberTable)
 
    struct EventRecord
    {
@@ -34,7 +34,7 @@ namespace UserService
       PSIO_REFLECT(EventRecord, id, service, type, rawData);
    };
    using EventTable = psibase::Table<EventRecord, &EventRecord::id>;
-   PSIO1_REFLECT_TYPENAME(EventTable)
+   PSIO_REFLECT_TYPENAME(EventTable)
 
    struct EventMerkleRecord
    {
@@ -42,7 +42,7 @@ namespace UserService
       PSIO_REFLECT(EventMerkleRecord, merkle)
    };
    using EventMerkleTable = psibase::Table<EventMerkleRecord, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(EventMerkleTable)
+   PSIO_REFLECT_TYPENAME(EventMerkleTable)
 
    struct SecondaryIndexInfo
    {
@@ -125,15 +125,15 @@ namespace UserService
 
    using ServiceSchemaTable = psibase::Table<ServiceSchema, &ServiceSchema::service>;
    using DbIndexStatusTable = psibase::Table<DbIndexStatus, &DbIndexStatus::db>;
-   PSIO1_REFLECT_TYPENAME(DbIndexStatusTable)
+   PSIO_REFLECT_TYPENAME(DbIndexStatusTable)
    using SecondaryIndexTable =
        psibase::Table<SecondaryIndexRecord, SecondaryIndexRecord::PrimaryKey{}>;
-   PSIO1_REFLECT_TYPENAME(SecondaryIndexTable)
+   PSIO_REFLECT_TYPENAME(SecondaryIndexTable)
    using PendingIndexTable =
        psibase::Table<PendingIndexRecord, &PendingIndexRecord::seq, PendingIndexRecord::ByIndex{}>;
-   PSIO1_REFLECT_TYPENAME(PendingIndexTable)
+   PSIO_REFLECT_TYPENAME(PendingIndexTable)
    using IndexDirtyTable = psibase::Table<IndexDirtyRecord, IndexDirtyRecord::PrimaryKey{}>;
-   PSIO1_REFLECT_TYPENAME(IndexDirtyTable)
+   PSIO_REFLECT_TYPENAME(IndexDirtyTable)
 
    using EventsTables =
        psibase::WriteOnlyTables<DbIndexStatusTable,
@@ -158,5 +158,5 @@ namespace UserService
 
 namespace psibase
 {
-   PSIO1_REFLECT_TYPENAME(UserService::ServiceSchemaTable)
+   PSIO_REFLECT_TYPENAME(UserService::ServiceSchemaTable)
 }

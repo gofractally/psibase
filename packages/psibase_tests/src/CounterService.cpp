@@ -17,7 +17,7 @@ struct CounterRow
 PSIO_REFLECT(CounterRow, key, value)
 
 using CounterTable = psibase::Table<CounterRow, &CounterRow::key>;
-PSIO1_REFLECT_TYPENAME(CounterTable)
+PSIO_REFLECT_TYPENAME(CounterTable)
 
 struct CounterService : psibase::Service
 {

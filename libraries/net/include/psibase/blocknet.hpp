@@ -3,6 +3,7 @@
 #include <psibase/ForkDb.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/net_base.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/finally.hpp>
 #include <psio1/reflect.hpp>
 #include <psio1/to_hex.hpp>

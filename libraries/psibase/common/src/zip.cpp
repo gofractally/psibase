@@ -2,6 +2,7 @@
 #include <cstring>
 #include <iterator>
 #include <psibase/check.hpp>
+#include <psio/reflect.hpp>
 #include <psio1/reflect.hpp>
 #include <ranges>
 #include <span>

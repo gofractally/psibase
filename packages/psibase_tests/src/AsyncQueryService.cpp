@@ -19,7 +19,7 @@ struct AsyncResponseRow
 PSIO_REFLECT(AsyncResponseRow, socket, reply, error)
 
 using AsyncResponseTable = psibase::Table<AsyncResponseRow, &AsyncResponseRow::socket>;
-PSIO1_REFLECT_TYPENAME(AsyncResponseTable)
+PSIO_REFLECT_TYPENAME(AsyncResponseTable)
 
 struct CounterRow
 {
@@ -29,7 +29,7 @@ struct CounterRow
 PSIO_REFLECT(CounterRow, value)
 
 using CounterTable = psibase::Table<CounterRow, SingletonKey{}>;
-PSIO1_REFLECT_TYPENAME(CounterTable)
+PSIO_REFLECT_TYPENAME(CounterTable)
 
 struct AsyncQueryService : psibase::Service
 {

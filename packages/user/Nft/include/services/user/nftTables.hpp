@@ -14,7 +14,7 @@ namespace UserService
    };
    PSIO_REFLECT(NftConfigRow, next_id)
    using NftConfigTable = psibase::Table<NftConfigRow, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(NftConfigTable)
+   PSIO_REFLECT_TYPENAME(NftConfigTable)
 
    struct NftHolderRecord
    {
@@ -25,7 +25,7 @@ namespace UserService
    };
    PSIO_REFLECT(NftHolderRecord, account, autodebit);
    using NftHolderTable = psibase::Table<NftHolderRecord, &NftHolderRecord::account>;
-   PSIO1_REFLECT_TYPENAME(NftHolderTable)
+   PSIO_REFLECT_TYPENAME(NftHolderTable)
 
    struct NftRecord
    {
@@ -43,7 +43,7 @@ namespace UserService
    PSIO_REFLECT(NftRecord, id, issuer, owner);
    using NftTable =
        psibase::Table<NftRecord, &NftRecord::id, NftRecord::ByOwner{}, NftRecord::ByIssuer{}>;
-   PSIO1_REFLECT_TYPENAME(NftTable)
+   PSIO_REFLECT_TYPENAME(NftTable)
 
    struct CreditRecord
    {
@@ -61,7 +61,7 @@ namespace UserService
                                       &CreditRecord::nftId,
                                       CreditRecord::ByCreditor{},
                                       CreditRecord::ByDebitor{}>;
-   PSIO1_REFLECT_TYPENAME(CreditTable)
+   PSIO_REFLECT_TYPENAME(CreditTable)
 
    struct UserPendingRecord
    {
@@ -74,7 +74,7 @@ namespace UserService
    using UserPendingTable =
        psibase::Table<UserPendingRecord,
                       psibase::CompositeKey<&UserPendingRecord::user, &UserPendingRecord::nft_id>{}>;
-   PSIO1_REFLECT_TYPENAME(UserPendingTable)
+   PSIO_REFLECT_TYPENAME(UserPendingTable)
 
    struct BurnedRecord
    {
@@ -84,6 +84,6 @@ namespace UserService
    };
    PSIO_REFLECT(BurnedRecord, id);
    using BurnedTable = psibase::Table<BurnedRecord, &BurnedRecord::id>;
-   PSIO1_REFLECT_TYPENAME(BurnedTable)
+   PSIO_REFLECT_TYPENAME(BurnedTable)
 
 }  // namespace UserService

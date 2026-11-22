@@ -142,7 +142,7 @@ namespace UserService
    PSIO_REFLECT(InstalledSchema, account, schema)
 
    using InstalledSchemaTable = psibase::Table<InstalledSchema, &InstalledSchema::account>;
-   PSIO1_REFLECT_TYPENAME(InstalledSchemaTable)
+   PSIO_REFLECT_TYPENAME(InstalledSchemaTable)
 
    struct TransactionOrder
    {
@@ -155,15 +155,15 @@ namespace UserService
    PSIO_REFLECT(TransactionOrder, owner, id, index)
 
    using InstalledPackageTable = psibase::Table<InstalledPackage, InstalledPackage::ByName{}>;
-   PSIO1_REFLECT_TYPENAME(InstalledPackageTable)
+   PSIO_REFLECT_TYPENAME(InstalledPackageTable)
    using PackageManifestTable = psibase::Table<PackageManifest, PackageManifest::ByName{}>;
-   PSIO1_REFLECT_TYPENAME(PackageManifestTable)
+   PSIO_REFLECT_TYPENAME(PackageManifestTable)
    using TransactionOrderTable = psibase::Table<TransactionOrder, TransactionOrder::Key{}>;
-   PSIO1_REFLECT_TYPENAME(TransactionOrderTable)
+   PSIO_REFLECT_TYPENAME(TransactionOrderTable)
    using PublishedPackageTable = psibase::Table<PublishedPackage, PublishedPackage::Key{}>;
-   PSIO1_REFLECT_TYPENAME(PublishedPackageTable)
+   PSIO_REFLECT_TYPENAME(PublishedPackageTable)
    using PackageSourcesTable = psibase::Table<PackageSources, &PackageSources::owner>;
-   PSIO1_REFLECT_TYPENAME(PackageSourcesTable)
+   PSIO_REFLECT_TYPENAME(PackageSourcesTable)
 
    struct Packages : psibase::Service
    {

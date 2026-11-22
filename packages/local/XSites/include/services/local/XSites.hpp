@@ -30,7 +30,7 @@ namespace LocalService
                    csp)
    };
    using ContentTable = psibase::Table<ContentRow, ContentRow::Key{}>;
-   PSIO1_REFLECT_TYPENAME(ContentTable)
+   PSIO_REFLECT_TYPENAME(ContentTable)
 
    struct XSites : psibase::Service
    {

@@ -23,7 +23,7 @@ namespace SystemService
    PSIO_REFLECT(TransactionData, id, trx)
 
    using TransactionDataTable = psibase::Table<TransactionData, &TransactionData::id>;
-   PSIO1_REFLECT_TYPENAME(TransactionDataTable)
+   PSIO_REFLECT_TYPENAME(TransactionDataTable)
 
    struct PendingTransactionRecord
    {
@@ -48,7 +48,7 @@ namespace SystemService
                                                   &PendingTransactionRecord::sequence,
                                                   PendingTransactionRecord::CTimeKey{},
                                                   PendingTransactionRecord::ExpirationKey{}>;
-   PSIO1_REFLECT_TYPENAME(PendingTransactionTable)
+   PSIO_REFLECT_TYPENAME(PendingTransactionTable)
 
    struct AvailableSequenceRecord
    {
@@ -57,7 +57,7 @@ namespace SystemService
    PSIO_REFLECT(AvailableSequenceRecord, nextSequence);
 
    using AvailableSequenceTable = psibase::Table<AvailableSequenceRecord, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(AvailableSequenceTable)
+   PSIO_REFLECT_TYPENAME(AvailableSequenceTable)
 
    struct UnverifiedTransactionRecord
    {
@@ -83,7 +83,7 @@ namespace SystemService
 
    using UnverifiedTransactionTable =
        psibase::Table<UnverifiedTransactionRecord, &UnverifiedTransactionRecord::id>;
-   PSIO1_REFLECT_TYPENAME(UnverifiedTransactionTable)
+   PSIO_REFLECT_TYPENAME(UnverifiedTransactionTable)
 
    struct PendingVerifyRecord
    {
@@ -93,7 +93,7 @@ namespace SystemService
    };
 
    using PendingVerifyTable = psibase::Table<PendingVerifyRecord, &PendingVerifyRecord::runid>;
-   PSIO1_REFLECT_TYPENAME(PendingVerifyTable)
+   PSIO_REFLECT_TYPENAME(PendingVerifyTable)
 
    struct ReverifySignaturesRecord
    {
@@ -104,7 +104,7 @@ namespace SystemService
    };
    using ReverifySignaturesTable =
        psibase::Table<ReverifySignaturesRecord, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(ReverifySignaturesTable)
+   PSIO_REFLECT_TYPENAME(ReverifySignaturesTable)
 
    struct SpeculativeTransactionRecord
    {
@@ -114,7 +114,7 @@ namespace SystemService
    };
    using SpeculativeTransactionTable =
        psibase::Table<SpeculativeTransactionRecord, &SpeculativeTransactionRecord::runid>;
-   PSIO1_REFLECT_TYPENAME(SpeculativeTransactionTable)
+   PSIO_REFLECT_TYPENAME(SpeculativeTransactionTable)
 
    // Follows forks
    struct UnappliedTransactionRecord
@@ -125,7 +125,7 @@ namespace SystemService
 
    using UnappliedTransactionTable =
        psibase::Table<UnappliedTransactionRecord, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(UnappliedTransactionTable)
+   PSIO_REFLECT_TYPENAME(UnappliedTransactionTable)
 
    struct VerifyIdRecord
    {
@@ -134,7 +134,7 @@ namespace SystemService
       PSIO_REFLECT(VerifyIdRecord, verifyCodeSequence, verifyId)
    };
    using VerifyIdTable = psibase::Table<VerifyIdRecord, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(VerifyIdTable)
+   PSIO_REFLECT_TYPENAME(VerifyIdTable)
 
    struct ReversibleBlocksRow
    {
@@ -145,7 +145,7 @@ namespace SystemService
 
    using ReversibleBlocksTable =
        psibase::Table<ReversibleBlocksRow, &ReversibleBlocksRow::blockNum>;
-   PSIO1_REFLECT_TYPENAME(ReversibleBlocksTable)
+   PSIO_REFLECT_TYPENAME(ReversibleBlocksTable)
 
    struct TraceClientInfo
    {
@@ -165,7 +165,7 @@ namespace SystemService
    PSIO_REFLECT(TraceClientRow, id, expiration, clients)
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
-   PSIO1_REFLECT_TYPENAME(TraceClientTable)
+   PSIO_REFLECT_TYPENAME(TraceClientTable)
 
    struct JWTKeyRecord
    {
@@ -174,7 +174,7 @@ namespace SystemService
    PSIO_REFLECT(JWTKeyRecord, key)
 
    using JWTKeyTable = psibase::Table<JWTKeyRecord, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(JWTKeyTable)
+   PSIO_REFLECT_TYPENAME(JWTKeyTable)
 
    struct LoginReply
    {
@@ -195,7 +195,7 @@ namespace SystemService
    PSIO_REFLECT(TxSuccessRecord, id, blockNum, trace)
    using TxSuccessTable =
        psibase::Table<TxSuccessRecord, &TxSuccessRecord::id, TxSuccessRecord::ByBlockNum{}>;
-   PSIO1_REFLECT_TYPENAME(TxSuccessTable)
+   PSIO_REFLECT_TYPENAME(TxSuccessTable)
 
    struct TxSuccessView
    {
@@ -216,7 +216,7 @@ namespace SystemService
    PSIO_REFLECT(TxFailedRecord, id, expiration, trace)
    using TxFailedTable =
        psibase::Table<TxFailedRecord, &TxFailedRecord::id, TxFailedRecord::ByExpiration{}>;
-   PSIO1_REFLECT_TYPENAME(TxFailedTable)
+   PSIO_REFLECT_TYPENAME(TxFailedTable)
 
    struct TxFailedView
    {
@@ -237,7 +237,7 @@ namespace SystemService
    PSIO_REFLECT(TxStatsRecord, unprocessed, total, failed, succeeded, expired)
 
    using TxStatsTable = psibase::Table<TxStatsRecord, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(TxStatsTable)
+   PSIO_REFLECT_TYPENAME(TxStatsTable)
 
    // This is used to limit the size of blocks before the chain
    struct BlockSizeRecord
@@ -246,7 +246,7 @@ namespace SystemService
    };
    PSIO_REFLECT(BlockSizeRecord, currentBlockSize)
    using BlockSizeTable = psibase::Table<BlockSizeRecord, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(BlockSizeTable)
+   PSIO_REFLECT_TYPENAME(BlockSizeTable)
 
    // Transactions enter this service through the push_transaction endpoint
    // or over p2p (recv). Speculative execution and signature verification

@@ -13,7 +13,7 @@ struct DelayRow
    PSIO_REFLECT(DelayRow, id, socket)
 };
 using DelayTable = psibase::Table<DelayRow, &DelayRow::id>;
-PSIO1_REFLECT_TYPENAME(DelayTable)
+PSIO_REFLECT_TYPENAME(DelayTable)
 
 /// provides a single endpoint /wait?seconds=<int> for testing x-timer
 struct XDelay : psibase::Service

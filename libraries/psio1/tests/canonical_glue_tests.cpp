@@ -348,8 +348,18 @@ TEST_CASE("PSIO-declared types: leaf shapes are byte-identical in fracpack/PSSZ 
 // psibase's own records. The expected values below were produced by the tree
 // before these records were re-declared with PSIO_REFLECT (commit 071fff6eb,
 // every one of them declared with PSIO1_REFLECT). Declaring a record with
-// PSIO must not change one byte of what this library produces for it.
+// PSIO does not change one byte of what this library produces for it.
 // ---------------------------------------------------------------------------
+// They are declared with PSIO now (the records psibase defers are listed in
+// doc/pssz-conversion.md).
+static_assert(psio::Reflected<psibase::Action> && psio::Reflected<psibase::Tapos> &&
+              psio::Reflected<psibase::Transaction> && psio::Reflected<psibase::SignedTransaction> &&
+              psio::Reflected<psibase::BlockHeader> && psio::Reflected<psibase::Consensus> &&
+              psio::Reflected<psibase::BftConsensus> && psio::Reflected<psibase::ActionTrace> &&
+              psio::Reflected<psibase::StatusRow> && psio::Reflected<psibase::CodeRow> &&
+              psio::Reflected<psibase::KvResourceKey> && psio::Reflected<UserService::NftRecord>);
+static_assert(psio::is_dwnc_v<psibase::Tapos> && !psio::is_dwnc_v<psibase::Action>);
+
 namespace
 {
    std::string hex(const std::vector<char>& bytes)

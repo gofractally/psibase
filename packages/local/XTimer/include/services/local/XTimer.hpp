@@ -10,7 +10,7 @@ namespace LocalService
       PSIO_REFLECT(TimerIdRow, next)
    };
    using TimerIdTable = psibase::Table<TimerIdRow, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(TimerIdTable)
+   PSIO_REFLECT_TYPENAME(TimerIdTable)
 
    struct TimerQueueRow
    {
@@ -24,7 +24,7 @@ namespace LocalService
        psibase::Table<TimerQueueRow,
                       &TimerQueueRow::id,
                       psibase::CompositeKey<&TimerQueueRow::expiration, &TimerQueueRow::id>{}>;
-   PSIO1_REFLECT_TYPENAME(TimerQueueTable)
+   PSIO_REFLECT_TYPENAME(TimerQueueTable)
 
    struct XTimer : psibase::Service
    {

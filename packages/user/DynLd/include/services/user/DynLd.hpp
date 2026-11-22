@@ -20,7 +20,7 @@ namespace UserService
       PSIO1_REFLECT(DynDepGroups, service, groups)
    };
    using DynDepGroupsTable = psibase::Table<DynDepGroups, &DynDepGroups::service>;
-   PSIO1_REFLECT_TYPENAME(DynDepGroupsTable)
+   PSIO_REFLECT_TYPENAME(DynDepGroupsTable)
 
    struct DynDeps
    {
@@ -29,7 +29,7 @@ namespace UserService
       PSIO_REFLECT(DynDeps, service, deps)
    };
    using DynDepsTable = psibase::Table<DynDeps, &DynDeps::service>;
-   PSIO1_REFLECT_TYPENAME(DynDepsTable)
+   PSIO_REFLECT_TYPENAME(DynDepsTable)
 
    struct DynLd : psibase::Service
    {

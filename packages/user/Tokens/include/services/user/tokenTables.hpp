@@ -19,7 +19,7 @@ namespace UserService
    };
    PSIO_REFLECT(TokensInitRecord, last_used_id, last_used_shared_bal_id, last_used_subaccount_id)
    using TokensInitTable = psibase::Table<TokensInitRecord, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(TokensInitTable)
+   PSIO_REFLECT_TYPENAME(TokensInitTable)
 
    struct TokenRecord
    {
@@ -42,6 +42,6 @@ namespace UserService
                 burned_supply,
                 max_issued_supply);
    using TokenTable = psibase::Table<TokenRecord, &TokenRecord::id>;
-   PSIO1_REFLECT_TYPENAME(TokenTable)
+   PSIO_REFLECT_TYPENAME(TokenTable)
 
 }  // namespace UserService

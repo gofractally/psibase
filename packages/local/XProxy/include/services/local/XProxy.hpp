@@ -21,7 +21,7 @@ namespace LocalService
       PSIO_REFLECT(OriginServerRow, subdomain, host, tls, endpoint, bypassPrefixes)
    };
    using OriginServerTable = psibase::Table<OriginServerRow, &OriginServerRow::subdomain>;
-   PSIO1_REFLECT_TYPENAME(OriginServerTable)
+   PSIO_REFLECT_TYPENAME(OriginServerTable)
 
    struct ProxyRow
    {
@@ -30,7 +30,7 @@ namespace LocalService
       PSIO_REFLECT(ProxyRow, socket1, socket2)
    };
    using ProxyTable = psibase::Table<ProxyRow, &ProxyRow::socket1>;
-   PSIO1_REFLECT_TYPENAME(ProxyTable)
+   PSIO_REFLECT_TYPENAME(ProxyTable)
 
    struct WebSocketRow
    {
@@ -39,7 +39,7 @@ namespace LocalService
       PSIO_REFLECT(WebSocketRow, from, to)
    };
    using WebSocketTable = psibase::Table<WebSocketRow, &WebSocketRow::from, &WebSocketRow::to>;
-   PSIO1_REFLECT_TYPENAME(WebSocketTable)
+   PSIO_REFLECT_TYPENAME(WebSocketTable)
 
    struct XProxy : psibase::Service
    {

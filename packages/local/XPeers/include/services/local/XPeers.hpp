@@ -14,7 +14,7 @@ namespace LocalService
       PSIO_REFLECT(NodeIdRow, nodeId);
    };
    using NodeIdTable = psibase::Table<NodeIdRow, psibase::SingletonKey{}>;
-   PSIO1_REFLECT_TYPENAME(NodeIdTable)
+   PSIO_REFLECT_TYPENAME(NodeIdTable)
 
    struct ConnectionRequestRow
    {
@@ -25,7 +25,7 @@ namespace LocalService
    };
    using ConnectionRequestTable =
        psibase::Table<ConnectionRequestRow, &ConnectionRequestRow::peerSocket>;
-   PSIO1_REFLECT_TYPENAME(ConnectionRequestTable)
+   PSIO_REFLECT_TYPENAME(ConnectionRequestTable)
 
    struct PeerConnection
    {
@@ -48,7 +48,7 @@ namespace LocalService
        psibase::Table<PeerConnection,
                       &PeerConnection::socket,
                       psibase::CompositeKey<&PeerConnection::outgoing, &PeerConnection::socket>{}>;
-   PSIO1_REFLECT_TYPENAME(PeerConnectionTable)
+   PSIO_REFLECT_TYPENAME(PeerConnectionTable)
 
    // Accept p2p connections from these users
    struct PeerUsernameRow
@@ -57,7 +57,7 @@ namespace LocalService
       PSIO_REFLECT(PeerUsernameRow, name)
    };
    using PeerUsernameTable = psibase::Table<PeerUsernameRow, &PeerUsernameRow::name>;
-   PSIO1_REFLECT_TYPENAME(PeerUsernameTable)
+   PSIO_REFLECT_TYPENAME(PeerUsernameTable)
 
    struct UrlAuthRow
    {
@@ -66,7 +66,7 @@ namespace LocalService
       PSIO_REFLECT(UrlAuthRow, url, token)
    };
    using UrlAuthTable = psibase::Table<UrlAuthRow, &UrlAuthRow::url>;
-   PSIO1_REFLECT_TYPENAME(UrlAuthTable)
+   PSIO_REFLECT_TYPENAME(UrlAuthTable)
 
    struct UrlRow
    {
@@ -83,7 +83,7 @@ namespace LocalService
       PSIO1_REFLECT(UrlRow, url, refcount, autoconnect, currentTimeout, retryTime, timerId)
    };
    using UrlTable = psibase::Table<UrlRow, &UrlRow::url>;
-   PSIO1_REFLECT_TYPENAME(UrlTable)
+   PSIO_REFLECT_TYPENAME(UrlTable)
 
    struct UrlTimerRow
    {
@@ -92,7 +92,7 @@ namespace LocalService
       PSIO_REFLECT(UrlTimerRow, timerId, url)
    };
    using UrlTimerTable = psibase::Table<UrlTimerRow, &UrlTimerRow::timerId>;
-   PSIO1_REFLECT_TYPENAME(UrlTimerTable)
+   PSIO_REFLECT_TYPENAME(UrlTimerTable)
 
    struct HostIdRow
    {
@@ -107,7 +107,7 @@ namespace LocalService
                                                             &HostIdRow::host,
                                                             &HostIdRow::nodeId,
                                                             &HostIdRow::socket>{}>;
-   PSIO1_REFLECT_TYPENAME(HostIdTable)
+   PSIO_REFLECT_TYPENAME(HostIdTable)
 
    struct XPeers : psibase::Service
    {

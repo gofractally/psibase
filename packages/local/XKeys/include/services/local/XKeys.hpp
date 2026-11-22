@@ -20,7 +20,7 @@ namespace LocalService
       PSIO_REFLECT(KeyRow, id, owner, key)
    };
    using KeyTable = psibase::Table<KeyRow, KeyRow::ByOwner{}>;
-   PSIO1_REFLECT_TYPENAME(KeyTable)
+   PSIO_REFLECT_TYPENAME(KeyTable)
 
    struct XKeys : psibase::Service
    {

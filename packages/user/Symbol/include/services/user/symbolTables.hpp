@@ -22,9 +22,9 @@ namespace UserService
    };
    PSIO_REFLECT(Mapping, tokenId, symbolId);
    using MappingByTokenTable = psibase::Table<Mapping, &Mapping::tokenId>;
-   PSIO1_REFLECT_TYPENAME(MappingByTokenTable)
+   PSIO_REFLECT_TYPENAME(MappingByTokenTable)
    using MappingBySymbolTable = psibase::Table<Mapping, &Mapping::symbolId>;
-   PSIO1_REFLECT_TYPENAME(MappingBySymbolTable)
+   PSIO_REFLECT_TYPENAME(MappingBySymbolTable)
 
    struct SymbolLengthRecord
    {
@@ -33,7 +33,7 @@ namespace UserService
    };
    PSIO_REFLECT(SymbolLengthRecord, symbolLength, nftId);
    using SymbolLengthTable = psibase::Table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;
-   PSIO1_REFLECT_TYPENAME(SymbolLengthTable)
+   PSIO_REFLECT_TYPENAME(SymbolLengthTable)
 
    struct SymbolRecord
    {
@@ -50,5 +50,5 @@ namespace UserService
    };
    PSIO_REFLECT(SymbolRecord, symbolId, ownerNft);
    using SymbolTable = psibase::Table<SymbolRecord, &SymbolRecord::symbolId>;
-   PSIO1_REFLECT_TYPENAME(SymbolTable)
+   PSIO_REFLECT_TYPENAME(SymbolTable)
 }  // namespace UserService

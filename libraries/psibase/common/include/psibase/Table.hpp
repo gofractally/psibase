@@ -9,6 +9,7 @@
 #include <psibase/api.hpp>
 #include <psibase/blob.hpp>
 #include <psibase/serviceState.hpp>
+#include <psio/get_type_name.hpp>
 #include <psio1/to_key.hpp>
 #include <span>
 #include <string_view>
