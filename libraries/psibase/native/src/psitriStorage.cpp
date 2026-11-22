@@ -921,13 +921,6 @@ namespace psibase::storage
                 // reached the disk: checksum what each durable commit covers so a
                 // power-loss rebuild can tell a complete flush from a partial one.
                 cfg.checksum_on_commit = cfg.sync_mode != psitri::sync_mode::none;
-                // The engine reserves address space for the largest store it
-                // may become. A temporary store holds session state, megabytes
-                // of it, and a process may have one per database it opens:
-                // reserving for 32 TiB each ran a test with a dozen nodes out
-                // of address space.
-                if (state->temporary)
-                   cfg.max_database_size = std::int64_t(64) << 30;
                 cfg.enable_read_cache        = false;
                 cfg.max_pinned_cache_size_mb = 0;
                 if (!fresh && !unclean)

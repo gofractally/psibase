@@ -200,44 +200,6 @@ namespace psibase
           static_cast<std::uint32_t>(DbId::endPersistent) -
           static_cast<std::uint32_t>(DbId::beginIndependent);
 
-      // Session and temporary state never survives a restart, so it does not
-      // belong in the chain's store, where every write to it took that
-      // store's single writer away from block production. It has a store of
-      // its own: a temporary one, never flushed, deleted when it closes, with
-      // its own writer. It is opened on first use; a database that never
-      // writes such state never has one.
-      static bool isVolatile(DbId db)
-      {
-         return db == DbId::temporary ||
-                (isIndependent(db) && independentIndex(db) >= numPersistentDatabases);
-      }
-      // Clones of a database (see clone()) keep their own roots but share
-      // the one store: a store per clone would be an engine, with its
-      // threads and mappings, for every fork a node considers.
-      struct VolatileStore
-      {
-         storage::database_config           config;
-         std::mutex                         mutex;
-         std::shared_ptr<storage::database> trie;
-      };
-      std::shared_ptr<VolatileStore> volatileShared = std::make_shared<VolatileStore>();
-      // Used only by a subjective commit, under subjectiveMutex.
-      std::shared_ptr<storage::write_session> volatileCommitter;
-      storage::database& volatileStore()
-      {
-         std::lock_guard l{volatileShared->mutex};
-         if (!volatileShared->trie)
-            volatileShared->trie = std::make_shared<storage::database>(
-                std::filesystem::path{}, volatileShared->config, storage::open_mode::temporary);
-         return *volatileShared->trie;
-      }
-      storage::write_session& committer()
-      {
-         if (!volatileCommitter)
-            volatileCommitter = volatileStore().start_write_session();
-         return *volatileCommitter;
-      }
-
       SharedDatabaseImpl(const std::filesystem::path&    dir,
                          const storage::database_config& config,
                          storage::open_mode              targetMode)
@@ -263,8 +225,6 @@ namespace psibase
             nativeDirectory /= "state";
          }
          trie = std::make_shared<storage::database>(nativeDirectory, config, targetMode);
-         volatileShared->config      = config;
-         volatileShared->config.sync = storage::durability::none;
          auto s  = trie->start_write_session();
          topRoot = s->get_top_root();
          head    = loadRevision(*s, topRoot, revisionHeadKey);
@@ -289,9 +249,6 @@ namespace psibase
          topRoot    = other.topRoot;
          head       = other.head;
          subjective = other.subjective;
-         // A clone starts without session state (see clone()) in the same
-         // volatile store.
-         volatileShared = other.volatileShared;
       }
 
       auto getTopRoot()
@@ -478,8 +435,7 @@ namespace psibase
       check(impl->trie->owns(writer), "writer belongs to another database view");
       std::lock_guard l{impl->subjectiveMutex};
       auto            proposedSubjective = impl->subjective;
-      (SharedDatabaseImpl::isVolatile(db) ? impl->committer() : writer)
-          .upsert(proposedSubjective[independentIndex(db)], key, value);
+      writer.upsert(proposedSubjective[independentIndex(db)], key, value);
       accounting::Publication publication;
       impl->publishSubjective(writer, proposedSubjective);
       impl->setSubjective(std::move(proposedSubjective));
@@ -491,8 +447,7 @@ namespace psibase
       check(impl->trie->owns(writer), "writer belongs to another database view");
       std::lock_guard l{impl->subjectiveMutex};
       auto            proposedSubjective = impl->subjective;
-      (SharedDatabaseImpl::isVolatile(db) ? impl->committer() : writer)
-          .remove(proposedSubjective[independentIndex(db)], key);
+      writer.remove(proposedSubjective[independentIndex(db)], key);
       accounting::Publication publication;
       impl->publishSubjective(writer, proposedSubjective);
       impl->setSubjective(std::move(proposedSubjective));
@@ -505,10 +460,6 @@ namespace psibase
    {
       check(impl->trie->owns(reader), "writer belongs to another database view");
       auto root = impl->getNativeSubjective(db);
-      if (!root)
-         return {};
-      if (SharedDatabaseImpl::isVolatile(db))
-         return impl->volatileStore().start_read_session()->get(root, key);
       return reader.get(root, key);
    }
 
@@ -543,15 +494,8 @@ namespace psibase
          {
             for (const auto& r : changes[i].ranges)
             {
-               // Identical roots need no session; this also keeps a commit
-               // that never touched volatile state from opening that store.
-               if (original[i] == impl->subjective[i])
-                  continue;
-               auto& session = i >= SharedDatabaseImpl::numPersistentDatabases
-                                   ? impl->committer()
-                                   : writer;
-               if (!session.is_equal_weak(original[i], impl->subjective[i], dbKey(r.lower),
-                                          dbKey(r.upper)))
+               if (!writer.is_equal_weak(original[i], impl->subjective[i], dbKey(r.lower),
+                                         dbKey(r.upper)))
                {
                   original = impl->subjective;
                   return false;
@@ -563,9 +507,8 @@ namespace psibase
          {
             for (const auto& r : changes[i].ranges)
             {
-               if (r.write && proposedSubjective[i] != updated[i])
-                  (i >= SharedDatabaseImpl::numPersistentDatabases ? impl->committer() : writer)
-                      .splice(proposedSubjective[i], updated[i], dbKey(r.lower), dbKey(r.upper));
+               if (r.write)
+                  writer.splice(proposedSubjective[i], updated[i], dbKey(r.lower), dbKey(r.upper));
             }
          }
          // Only the irreversible effects are accepted/uncancellable. Large
@@ -639,26 +582,6 @@ namespace psibase
       std::vector<char>                       valueBuffer;
 
       DbPtr                           temporaryDb;
-      // This request's session on the volatile store, taken when it first
-      // touches session or temporary state.
-      std::shared_ptr<storage::write_session> volatileSession;
-      storage::write_session&                 volatileWriter()
-      {
-         if (!volatileSession)
-            volatileSession = shared.impl->volatileStore().start_write_session();
-         return *volatileSession;
-      }
-      // The session a database's roots belong to.
-      // An empty volatile database has no root and reads as empty through
-      // any session, so reading it does not open the volatile store.
-      storage::read_session& reader(DbId db, storage::read_session& chain, const DbPtr& root)
-      {
-         return SharedDatabaseImpl::isVolatile(db) && root ? volatileWriter() : chain;
-      }
-      storage::write_session& writer(DbId db, storage::write_session& chain)
-      {
-         return SharedDatabaseImpl::isVolatile(db) ? volatileWriter() : chain;
-      }
       IndependentChangeSet            subjectiveChanges;
       std::vector<SocketChange>       socketChanges;
       std::vector<SubjectiveRevision> subjectiveRevisions;
@@ -1079,8 +1002,7 @@ namespace psibase
              {
                 changes->onWrite(key.string_view());
              }
-             impl->writer(db, session)
-                 .upsert(impl->db(revision, db), key.string_view(), value.string_view());
+             session.upsert(impl->db(revision, db), key.string_view(), value.string_view());
           });
    }
 
@@ -1093,7 +1015,7 @@ namespace psibase
              {
                 changes->onWrite(key.string_view());
              }
-             impl->writer(db, session).remove(impl->db(revision, db), key.string_view());
+             session.remove(impl->db(revision, db), key.string_view());
           });
    }
 
@@ -1107,7 +1029,7 @@ namespace psibase
                 changes->onRead(key.string_view());
              }
 
-             if (!impl->reader(db, session, impl->db(revision, db)).get(impl->db(revision, db), key.string_view(), &impl->valueBuffer,
+             if (!session.get(impl->db(revision, db), key.string_view(), &impl->valueBuffer,
                               nullptr))
              {
                 return {};
@@ -1126,7 +1048,7 @@ namespace psibase
              {
                 changes->onRead(key.string_view());
              }
-             return impl->reader(db, session, impl->db(revision, db)).get(impl->db(revision, db), key.string_view(), nullptr, nullptr);
+             return session.get(impl->db(revision, db), key.string_view(), nullptr, nullptr);
           });
    }
 
@@ -1137,7 +1059,7 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = impl->reader(db, session, impl->db(revision, db)).get_greater_equal(impl->db(revision, db), key.string_view(),
+             auto found = session.get_greater_equal(impl->db(revision, db), key.string_view(),
                                                     &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
                            (matchKeySize && memcmp(impl->keyBuffer.data(), key.pos, matchKeySize))))
@@ -1164,7 +1086,7 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = impl->reader(db, session, impl->db(revision, db)).get_less_than(impl->db(revision, db), key.string_view(),
+             auto found = session.get_less_than(impl->db(revision, db), key.string_view(),
                                                 &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
                            (matchKeySize && memcmp(impl->keyBuffer.data(), key.pos, matchKeySize))))
@@ -1189,7 +1111,7 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = impl->reader(db, session, impl->db(revision, db)).get_max(impl->db(revision, db), key.string_view(),
+             auto found = session.get_max(impl->db(revision, db), key.string_view(),
                                           &impl->keyBuffer, &impl->valueBuffer, nullptr);
 
              if (auto* changes = impl->getChangeSet(db))
