@@ -22,6 +22,14 @@ target_include_directories(boost INTERFACE ${root}/include)
 
 find_package(Catch2 REQUIRED)
 
+# PSIO: header-only for guests (no exceptions, no simdjson).
+add_library(psio INTERFACE)
+add_library(psio::psio ALIAS psio)
+target_include_directories(psio INTERFACE ${root}/include ${root}/include/psio/external)
+target_compile_definitions(psio INTERFACE PSIO_EXCEPTIONS_ENABLED=0 PSIO_HAVE_SIMDJSON=0)
+target_compile_features(psio INTERFACE cxx_std_23)
+target_link_libraries(psio INTERFACE boost)
+
 function(add_libs suffix)
 
     if(suffix)
@@ -35,6 +43,7 @@ function(add_libs suffix)
     target_link_libraries(psio1${suffix} INTERFACE
         -L${root}/lib
         -lpsio1
+        psio::psio
         boost
         wasm-base${suffix}
     )
@@ -47,6 +56,7 @@ function(add_libs suffix)
         wasm-base${suffix}
         -lpsibase${lib-suffix}
         -lcrypto
+        psio::psio
         psio1${suffix}
         boost
     )

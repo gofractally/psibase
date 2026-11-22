@@ -1,14 +1,24 @@
 add_compile_options( -Wall -Wstrict-aliasing -fstrict-aliasing )
 
-    link_directories(psibase-common-tests ${ICU_LIBRARY_DIR} )
 if(DEFINED IS_NATIVE)
+    link_directories(${ICU_LIBRARY_DIR})
     find_package(Threads REQUIRED)
     add_executable(psibase-common-tests
         name.cpp
     )
     target_link_libraries(psibase-common-tests psibase Catch2::Catch2WithMain Threads::Threads )
+    set_target_properties(psibase-common-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+    native_test(psibase-common-tests)
+
+    add_executable(psibase-psio-tests psio.cpp)
+    target_link_libraries(psibase-psio-tests psibase Catch2::Catch2WithMain Threads::Threads )
 endif()
 
-set_target_properties(psibase-common-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+if(DEFINED IS_WASM)
+    add_executable(psibase-psio-tests psio.cpp)
+    target_link_libraries(psibase-psio-tests psibase catch2 boost psitestlib )
+endif()
 
-native_and_wasm_test(psibase-common-tests)
+# PSIO as psibase uses it, natively and in a WASM guest (under psitest).
+set_target_properties(psibase-psio-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+native_and_wasm_test(psibase-psio-tests)

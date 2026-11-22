@@ -1,5 +1,6 @@
 # Canonical dependency acquisition, following psiserve 28330232d7d1.
-# Deliberately dormant: including this file does not fetch or add any targets.
+# Including this file does not fetch or add any targets; a consumer calls
+# psibase_acquire_dependency(<name>). libraries/CMakeLists.txt acquires psio.
 # The application must declare dependencies before adding dependency consumers.
 include_guard(GLOBAL)
 include(FetchContent)
@@ -15,11 +16,23 @@ function(psibase_declare_dependencies)
     # FetchContent's first declaration wins, including a containing project's
     # declarations. Local development uses FETCHCONTENT_SOURCE_DIR_<NAME>.
     # Exact commits, rather than moving branches, are the release/CI defaults.
+    # A consumer that only links PSIO (the psibase build) sets
+    # PSIBASE_PSIO_EXCLUDE_FROM_ALL so that PSIO's own install rules (its
+    # native archive, package config and the simdjson it fetched) stay out of
+    # the consumer's install tree and packages.
+    set(psio_scope)
+    if(PSIBASE_PSIO_EXCLUDE_FROM_ALL)
+        if(CMAKE_VERSION VERSION_LESS 3.28)
+            message(FATAL_ERROR "PSIBASE_PSIO_EXCLUDE_FROM_ALL requires CMake 3.28 or newer")
+        endif()
+        set(psio_scope EXCLUDE_FROM_ALL)
+    endif()
     FetchContent_Declare(psio
         GIT_REPOSITORY https://github.com/gofractally/psio.git
-        GIT_TAG f6b10ec7d7bba4022cd1c9394f88ad1440b4b2b7
+        GIT_TAG e6901febbe226c93fa31e5aec06bd8f7c12b5ff5
         GIT_SHALLOW FALSE
-        SOURCE_DIR "${psibase_root}/external/psio")
+        SOURCE_DIR "${psibase_root}/external/psio"
+        ${psio_scope})
     FetchContent_Declare(psitri
         GIT_REPOSITORY git@github.com:gofractally/psitri.git
         GIT_TAG a7c6660de883c6190135e213e2206d006286a7ee

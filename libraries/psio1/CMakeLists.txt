@@ -2,6 +2,9 @@ enable_testing()
 
 add_library( psio1 src/chrono.cpp src/fpconv.c src/schema.cpp src/from_json.cpp)
 target_link_libraries( psio1 PUBLIC rapidjson boost )
+# TEMPORARY: removed when psio1 is deleted. psio1 handles types that are
+# reflected with PSIO, so its headers include PSIO's.
+target_link_libraries( psio1 PUBLIC psio::psio )
 target_include_directories( psio1 PUBLIC include )
 add_compile_options( -Wall -Wstrict-aliasing )
 

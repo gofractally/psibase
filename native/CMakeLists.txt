@@ -46,6 +46,11 @@ add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${Boost_INCLUDE_DIR})
 target_link_libraries(boost INTERFACE ${Boost_LIBRARIES})
 
+# psibase links PSIO (libraries/CMakeLists.txt) but does not install PSIO's
+# native package. The dependency declarations are made once, by whichever
+# directory acquires a dependency first, so this is set before all of them.
+set(PSIBASE_PSIO_EXCLUDE_FROM_ALL ON)
+
 add_subdirectory(../external external)
 add_subdirectory(../libraries libraries)
 

@@ -1,7 +1,13 @@
-This is a dormant dependency acquisition checkpoint. The main psibase build
-continues to use its existing PSIO and runtime/storage adapters. Including
-`cmake/PsibaseDependencies.cmake` alone fetches nothing and adds no targets.
-Activating canonical PSIO while the legacy `psio` target exists fails clearly.
+`cmake/PsibaseDependencies.cmake` declares psibase's pinned source
+dependencies. Including it alone fetches nothing and adds no targets.
+
+The psibase build acquires canonical PSIO through it: `libraries/CMakeLists.txt`
+calls `psibase_acquire_dependency(psio)` for the native build and links the
+maintained `psio::psio` target; the WASM guest build and the installed SDK use
+the headers of that same source tree with `PSIO_EXCEPTIONS_ENABLED=0` and
+`PSIO_HAVE_SIMDJSON=0`. The legacy in-tree library is `psio1` and no longer
+collides with it. A project that still defines its own `psio` target before
+acquisition fails clearly.
 
 The pattern follows [psiserve at 28330232d7d156d201161dba3485a737f2b28a07](https://github.com/gofractally/psiserve/blob/28330232d7d156d201161dba3485a737f2b28a07/CMakeLists.txt#L86):
 declare canonical names before adding dependent projects, let the first
@@ -15,14 +21,16 @@ The defaults are immutable Git revisions:
 
 | Name | Revision | Acquisition boundary |
 | --- | --- | --- |
-| psio | `f6b10ec7d7bba4022cd1c9394f88ad1440b4b2b7` | Maintained upstream CMake target |
+| psio | `e6901febbe226c93fa31e5aec06bd8f7c12b5ff5` | Maintained upstream CMake target |
 | psitri | `a7c6660de883c6190135e213e2206d006286a7ee` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
 | psizam | `98eec58c4bbaf1735a5e184b7b1ba3d1c379d52e` | Sources only |
 
-The PSIO pin is the published `codex/annotation-header-self-containment`
-checkpoint: main `ff114b6` plus direct standard includes and a first-header
-compile probe. It contains no codec prototype changes. The psizam pin is the
+The PSIO pin is `main` of gofractally/psio: PSSZ with record evolution by
+appended optionals, mandatory pruning, type-derived offset widths, the `key`
+format, I-JSON and time values. PSIO fetches its own simdjson at a pinned
+release and archive hash; psibase refuses to configure if another simdjson
+target exists first. The psizam pin is the
 published `checkpoint/native-runtime-2026-11-21` revision.
 UCC is the public standalone extraction with its two qualified header fixes;
 its checkpoint covers the existing container tests and header consumer, not
@@ -41,7 +49,7 @@ Their existing adapters/submodule are unchanged here. Remove the old psizam
 gitlink as part of a later adapter conversion before adopting FetchContent for
 the same path; never overlay a new fetch onto an initialized submodule.
 
-To use the future acquisition interface after the legacy target is retired:
+To use the acquisition interface:
 
 ```cmake
 include(cmake/PsibaseDependencies.cmake)
@@ -148,10 +156,8 @@ cmake --build build/deps-installed
 ctest --test-dir build/deps-installed --output-on-failure
 ```
 
-This establishes native standalone package behavior only. The existing SDK
-installs legacy PSIO as `COMPONENT libpsibase`; canonical PSIO's install rules
-have a different component boundary and propagate native feature definitions.
-Guest exception flags, transitive guest includes, SDK component packaging,
-Rust manifest paths/pins, all dynamic schema callers, and the actual wire/API
-cutover remain separate gates. The current psiserve Cargo manifest still uses
-an older local PSIO path; it is not a Rust acquisition template to copy.
+This establishes native standalone package behavior. In the psibase build the
+SDK (`COMPONENT libpsibase`) ships PSIO's headers for guests from the WASM
+project; PSIO's own native install rules are excluded from psibase's install
+tree (`PSIBASE_PSIO_EXCLUDE_FROM_ALL`). Rust manifest paths/pins and the wire
+and API cutover are tracked in `doc/pssz-conversion.md`.
