@@ -261,7 +261,7 @@ namespace psibase
    ///       return arg1 + secondaryKey + arg2 + moreData;
    ///    }
    /// };
-   /// PSIO1_REFLECT(MyType,
+   /// PSIO_REFLECT(MyType,
    ///    primaryKey, secondaryKey, moreData,
    ///    method(someFn, arg1, arg2))
    ///
@@ -280,7 +280,7 @@ namespace psibase
    ///       return MyTables{service}.open<MyTable>().getIndex<1>();
    ///    }
    /// };
-   /// PSIO1_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
+   /// PSIO_REFLECT(Query, method(rowsByPrimary), method(rowsBySecondary))
    ///
    /// struct ExampleService : psibase::Service
    /// {
@@ -293,7 +293,7 @@ namespace psibase
    ///       return std::nullopt;
    ///    }
    /// };
-   /// PSIO1_REFLECT(ExampleService, method(serveSys, request))
+   /// PSIO_REFLECT(ExampleService, method(serveSys, request))
    ///
    /// PSIBASE_DISPATCH(ExampleService)
    /// ```

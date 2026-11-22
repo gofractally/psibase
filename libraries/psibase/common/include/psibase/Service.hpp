@@ -3,6 +3,7 @@
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Actor.hpp>
 #include <psibase/Table.hpp>
+#include <psio/reflect.hpp>
 
 namespace psibase
 {
@@ -181,11 +182,11 @@ namespace psibase
 
 #define PSIBASE_REFLECT_HISTORY_EVENTS(SERVICE, ...)          \
    using SERVICE##_EventsHistory = SERVICE ::Events::History; \
-   PSIO1_REFLECT(SERVICE##_EventsHistory, __VA_ARGS__)
+   PSIO_REFLECT(SERVICE##_EventsHistory, __VA_ARGS__)
 
 #define PSIBASE_REFLECT_MERKLE_EVENTS(SERVICE, ...)         \
    using SERVICE##_EventsMerkle = SERVICE ::Events::Merkle; \
-   PSIO1_REFLECT(SERVICE##_EventsMerkle, __VA_ARGS__)
+   PSIO_REFLECT(SERVICE##_EventsMerkle, __VA_ARGS__)
 
 #define PSIBASE_REFLECT_TABLES(SERVICE, ...) \
    boost::mp11::mp_list<__VA_ARGS__> psibase_get_tables(SERVICE*);

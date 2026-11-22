@@ -5,7 +5,7 @@
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/db.hpp>
-#include <psio1/reflect.hpp>
+#include <psio/reflect.hpp>
 #include <services/user/EventsTables.hpp>
 
 namespace UserService

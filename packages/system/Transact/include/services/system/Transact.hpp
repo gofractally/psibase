@@ -403,8 +403,7 @@ namespace SystemService
          };
       };
    };
-   PSIO1_REFLECT(Transact,
-                allowHashedMethods(),
+   PSIO_REFLECT(Transact,
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),

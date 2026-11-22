@@ -108,8 +108,7 @@ namespace SystemService
    };
 
    // clang-format off
-   PSIO1_REFLECT(StagedTxService,
-      allowHashedMethods(),
+   PSIO_REFLECT(StagedTxService,
       method(init),
       method(propose, actions, auto_exec),
       method(remove, id, txid),

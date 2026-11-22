@@ -423,8 +423,7 @@ namespace SystemService
       };
    };
 
-   PSIO1_REFLECT(VirtualServer,
-                allowHashedMethods(),
+   PSIO_REFLECT(VirtualServer,
                 method(init),
                 method(init_billing, fee_receiver),
                 method(get_fee_receiver),
@@ -467,7 +466,6 @@ namespace SystemService
 
    PSIBASE_REFLECT_HISTORY_EVENTS(
        VirtualServer,
-       allowHashedMethods(),
        method(consumed, account, resource, amount, cost),
        method(subsidized, purchaser, recipient, amount, memo),
        method(block_summary, net_usage_ppm, cpu_usage_ppm, disk_usage_ppm));

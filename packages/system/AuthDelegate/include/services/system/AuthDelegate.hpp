@@ -6,7 +6,6 @@
 #include <psibase/Table.hpp>
 #include <psibase/block.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/reflect.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/Transact.hpp>
 #include <vector>

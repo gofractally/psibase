@@ -385,7 +385,7 @@ namespace psibase
    ///    void        doSomething(std::string_view str);
    ///    std::string doAnother(uint32_t x, psibase::AccountNumber y);
    /// };
-   /// PSIO1_REFLECT(SomeService,
+   /// PSIO_REFLECT(SomeService,
    ///              method(doSomething, str),
    ///              method(doAnother, x, y))
    /// ```

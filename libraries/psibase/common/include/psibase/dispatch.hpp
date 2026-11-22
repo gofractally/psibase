@@ -75,7 +75,7 @@ namespace psibase
    /**
     *  This method is called when a service receives a call and will
     *  and will call the proper method on Contact assuming Service has
-    *  used the PSIO1_REFLECT macro.
+    *  used the PSIO_REFLECT macro.
     */
    template <typename Service>
    void dispatch(AccountNumber sender, AccountNumber receiver)
