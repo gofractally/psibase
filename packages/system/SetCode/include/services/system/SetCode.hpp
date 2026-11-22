@@ -46,6 +46,17 @@ namespace SystemService
    using VerifySequenceTable = psibase::Table<VerifySequenceRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(VerifySequenceTable)
 
+   /// The execution policy version stamped on code that is deployed without
+   /// asking for one. Absent until the chain sets it; then
+   /// psibase::defaultVmVersion applies.
+   struct DefaultVmVersionRow
+   {
+      std::uint8_t vmVersion = psibase::defaultVmVersion;
+      PSIO_REFLECT(DefaultVmVersionRow, vmVersion)
+   };
+   using DefaultVmVersionTable = psibase::Table<DefaultVmVersionRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(DefaultVmVersionTable)
+
    /// All compiled code is uploaded to the chain through this service
    struct SetCode : psibase::Service
    {
@@ -55,8 +66,10 @@ namespace SystemService
       /// Flags this service must run with
       static constexpr uint64_t serviceFlags = psibase::CodeRow::isPrivileged;
 
-      using Tables =
-          psibase::ServiceTables<CodeRefCountTable, StagedCodeTable, VerifySequenceTable>;
+      using Tables = psibase::ServiceTables<CodeRefCountTable,
+                                            StagedCodeTable,
+                                            VerifySequenceTable,
+                                            DefaultVmVersionTable>;
 
       void init();
 
@@ -66,7 +79,9 @@ namespace SystemService
       ///
       /// * `service`   - Must match the sender account
       /// * `vmType`    - Specifies the type of the WebAssembly VM. Currently must be equal to 0.
-      /// * `vmVersion` - Specifies the version of the WebAssembly VM. Currently must be equal to 0.
+      /// * `vmVersion` - The execution policy version the code runs under until it is next
+      ///                 deployed. 0 asks for the chain's default (see `defaultVmVersion`),
+      ///                 which is what gets recorded. Otherwise a version this chain supports.
       /// * `code`      - A byte array containing the compiled code to upload
       void setCode(psibase::AccountNumber service,
                    uint8_t                vmType,
@@ -80,7 +95,8 @@ namespace SystemService
       /// * `service`   - The service account that the code is intended for. This account is not required to exists when stageCode is called.
       /// * `id`        - A unique id chosen by the sender.
       /// * `vmType`    - Specifies the type of the WebAssembly VM. Currently must be equal to 0.
-      /// * `vmVersion` - Specifies the version of the WebAssembly VM. Currently must be equal to 0.
+      /// * `vmVersion` - The execution policy version, as for `setCode`: 0 asks for the chain's
+      ///                 default, which is settled now and recorded with the staged code.
       /// * `code`      - A byte array containing the compiled code to upload
       void stageCode(psibase::AccountNumber service,
                      std::uint64_t          id,
@@ -96,13 +112,21 @@ namespace SystemService
       /// * `from`      - The account that staged the code
       /// * `id`        - The id that was passed to `stageCode`
       /// * `vmType`    - Specifies the type of the WebAssembly VM. Currently must be equal to 0.
-      /// * `vmVersion` - Specifies the version of the WebAssembly VM. Currently must be equal to 0.
+      /// * `vmVersion` - 0 to accept the version recorded when the code was staged, or that
+      ///                 version.
       /// * `codeHash`  - SHA256 of the compiled code
       void setCodeStaged(psibase::AccountNumber from,
                          std::uint64_t          id,
                          std::uint8_t           vmType,
                          std::uint8_t           vmVersion,
                          psibase::Checksum256   codeHash);
+
+      /// The execution policy version recorded for code deployed with `vmVersion` 0.
+      std::uint8_t defaultVmVersion();
+
+      /// Sets the version recorded for code deployed with `vmVersion` 0. Code already
+      /// deployed keeps the version it has. Only this service's own account may call it.
+      void setDefaultVmVersion(std::uint8_t vmVersion);
 
       /// Sets the flags that a particular service must be run with
       void setFlags(psibase::AccountNumber service, uint64_t flags);
@@ -118,7 +142,9 @@ namespace SystemService
                 method(unstageCode, service, id),
                 method(setCodeStaged, from, id, vmType, vmVersion, codeHash),
                 method(setFlags, service, flags),
-                method(verifySeq))
+                method(verifySeq),
+                method(defaultVmVersion),
+                method(setDefaultVmVersion, vmVersion))
 
    PSIBASE_REFLECT_TABLES(SetCode, SetCode::Tables)
 }  // namespace SystemService

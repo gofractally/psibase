@@ -17,6 +17,7 @@ import psinode
 
 ENGINES = {}
 CLI = None
+EXPECT_VERSION = None
 
 def scenario(producer, validator, extra_blocks, root):
     label = '%s produces, %s validates' % (producer, validator)
@@ -29,6 +30,19 @@ def scenario(producer, validator, extra_blocks, root):
         t0 = time.time()
         a.boot()
         boot_seconds = time.time() - t0
+        # Which execution policy the chain's services were deployed under: a
+        # genesis service, and two installed through SetCode.
+        versions = {}
+        for account in ('transact', 'tokens', 'explorer'):
+            try:
+                code = a.graphql('setcode', 'query { code(account:"%s") { vmVersion } }' % account)
+                versions[account] = code['code']['vmVersion']
+            except Exception:
+                versions[account] = None
+        print('%s: code versions %s' % (label, versions), flush=True)
+        if EXPECT_VERSION is not None and any(v != EXPECT_VERSION for v in versions.values()):
+            print('  expected every service at version %d' % EXPECT_VERSION, flush=True)
+            return False
         # Give the producer a signing key and turn on periodic state
         # checkpoints: every few seconds the producer signs a checksum of the
         # whole chain state. A node only has a verified checkpoint if its own
@@ -146,6 +160,8 @@ if __name__ == '__main__':
                         help='a psinode binary built with one execution engine; give two or more')
     parser.add_argument('--psibase', required=True, help='the psibase command-line tool')
     parser.add_argument('--dir', help='directory for node databases (default: temporary)')
+    parser.add_argument('--expect-vm-version', type=int, metavar='N',
+                        help='fail unless services are deployed under this execution policy version')
     parser.add_argument('--pair', action='append', metavar='PRODUCER:VALIDATOR',
                         help='run only this pairing (may be repeated); default: every pairing')
     args = parser.parse_args()
@@ -153,6 +169,7 @@ if __name__ == '__main__':
         name, path = spec.split('=', 1)
         ENGINES[name] = os.path.abspath(path)
     CLI = os.path.abspath(args.psibase)
+    EXPECT_VERSION = args.expect_vm_version
     root = args.dir or tempfile.mkdtemp(prefix='cross-engine-')
     ok = True
     pairs = [tuple(p.split(':', 1)) for p in args.pair] if args.pair else [

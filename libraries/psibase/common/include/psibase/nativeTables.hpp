@@ -72,6 +72,19 @@ namespace psibase
    };
    using WasmConfigTable = Table<WasmConfigRow, SingletonKey{}>;
 
+   // Execution policy versions: CodeRow::vmVersion. A service keeps the
+   // version it was deployed under until it is next deployed, so a chain can
+   // adopt a new policy without changing what existing code computes.
+   //
+   // The two differ only in relaxed SIMD multiply-add: strict rounds the
+   // product and the sum separately (the WebAssembly deterministic profile);
+   // performance rounds once (fused). Both are deterministic on every engine.
+   inline constexpr std::uint8_t vmVersionStrict      = 0;
+   inline constexpr std::uint8_t vmVersionPerformance = 1;
+   // What genesis services get, and what SetCode stamps on a deployment that
+   // does not ask for a version, unless the chain has chosen otherwise.
+   inline constexpr std::uint8_t defaultVmVersion = vmVersionPerformance;
+
    using CodeKeyType = std::tuple<std::uint16_t, std::uint8_t, AccountNumber>;
    auto codePrefix() -> KeyPrefixType;
    auto codeKey(AccountNumber codeNum) -> CodeKeyType;

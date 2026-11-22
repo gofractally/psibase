@@ -567,7 +567,7 @@ namespace psibase
              .service   = account,
              .flags     = info.parseFlags(),
              .vmType    = 0,
-             .vmVersion = 0,
+             .vmVersion = defaultVmVersion,
              .code      = archive.getEntry(index).read(),
          });
       }
