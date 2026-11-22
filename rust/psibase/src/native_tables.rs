@@ -10,6 +10,16 @@ use serde::{Deserialize, Serialize};
 pub type NativeTable = u16;
 pub type NativeIndex = u8;
 
+/// Execution policy versions (`CodeRow::vmVersion`). A service keeps the
+/// version it was deployed under until it is next deployed. Strict is the
+/// WebAssembly deterministic profile; performance fuses relaxed SIMD
+/// multiply-add. Both are deterministic on every engine.
+pub const VM_VERSION_STRICT: u8 = 0;
+pub const VM_VERSION_PERFORMANCE: u8 = 1;
+/// What genesis services get. SetCode stamps its own default on later
+/// deployments that do not ask for a version.
+pub const DEFAULT_VM_VERSION: u8 = VM_VERSION_PERFORMANCE;
+
 pub const STATUS_TABLE: NativeTable = 1;
 pub const CODE_TABLE: NativeTable = 2;
 pub const CODE_BY_HASH_TABLE: NativeTable = 3;

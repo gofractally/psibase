@@ -729,7 +729,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 service: *account,
                 flags: translate_flags(&info.flags)?,
                 vmType: 0,
-                vmVersion: 0,
+                vmVersion: crate::native_tables::DEFAULT_VM_VERSION,
                 code: read(&mut self.archive.by_index(*index)?)?.into(),
             })
         }

@@ -62,7 +62,12 @@ int main(int argc, char** argv)
             auto code = package.archive.getEntry(header).read();
             auto hash = psibase::sha256(code.data(), code.size());
             if (seen.insert(hash).second)
+               {
+               // A chain deploys under its default version; a node loads its
+               // own local services under version 0. Either may run this code.
                cache.compileAhead(hash, code, configuration.vmOptions, 0);
+               cache.compileAhead(hash, code, configuration.vmOptions, psibase::defaultVmVersion);
+            }
          }
       }
       catch (const std::exception& e)
