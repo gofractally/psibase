@@ -51,11 +51,18 @@ namespace psibase
    {
       uint32_t maxKeySize   = 128;
       uint32_t maxValueSize = 8 << 20;
+      // The most bytes of transactions a block may hold: each transaction's
+      // packed size plus its proofs. A block with a single transaction is
+      // exempt, so one large transaction can always be included; the genesis
+      // block is exempt too. Without this, how much a block holds would depend
+      // on how fast its producer executes, and a block too large to send to
+      // peers could be produced.
+      uint32_t maxBlockSize = 4 << 20;
 
       static constexpr auto db = psibase::DbId::native;
 
       static auto key() -> KeyPrefixType;
-      PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
+      PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize, maxBlockSize)
    };
    using ConfigTable = Table<ConfigRow, SingletonKey{}>;
 

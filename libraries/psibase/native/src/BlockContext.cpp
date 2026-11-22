@@ -109,8 +109,12 @@ namespace psibase
       status->current = current.header;
       if (!isReadOnly)
          db.kvPut(StatusRow::db, status->key(), *status);
-      started = true;
-      active  = true;
+      // A change to the limit takes effect with the block after the one that
+      // makes it.
+      maxBlockSize = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key()).maxBlockSize;
+      transactionBytes = 0;
+      started          = true;
+      active           = true;
 
       return *status;
    }
@@ -124,6 +128,9 @@ namespace psibase
             "block previous does not match expected");
       check(src.header.blockNum == current.header.blockNum, "block num does not match expected");
       current.transactions = std::move(src.transactions);
+      for (const auto& trx : current.transactions)
+         transactionBytes += blockBytes(trx);
+      checkBlockSize();
       db.kvPut(StatusRow::db, status.key(), status);
       active = true;
    }
@@ -824,7 +831,28 @@ namespace psibase
    {
       check(!trx.subjectiveData, "Subjective data should be set by the block producer");
       trx.subjectiveData = exec(trx, trace, initialWatchdogLimit, enableUndo, commit);
+      transactionBytes += blockBytes(trx);
       current.transactions.push_back(std::move(trx));
+   }
+
+   std::uint64_t BlockContext::blockBytes(const SignedTransaction& trx)
+   {
+      std::uint64_t result = trx.transaction.size();
+      for (const auto& proof : trx.proofs)
+         result += proof.size();
+      return result;
+   }
+
+   void BlockContext::checkBlockSize() const
+   {
+      check(isGenesisBlock || current.transactions.size() <= 1 ||
+                transactionBytes <= maxBlockSize,
+            "block exceeds maxBlockSize");
+   }
+
+   bool BlockContext::fits(const SignedTransaction& trx) const
+   {
+      return current.transactions.empty() || transactionBytes + blockBytes(trx) <= maxBlockSize;
    }
 
    void BlockContext::replayTransaction(SignedTransaction&& trx, TransactionTrace& trace)

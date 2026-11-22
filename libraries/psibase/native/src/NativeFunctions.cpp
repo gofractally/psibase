@@ -192,6 +192,11 @@ namespace psibase
          // max values are odd.
          check(row.maxKeySize <= 128, "maxKeySize too big for the storage engine");
          check(row.maxValueSize <= (15 << 20), "maxValueSize too big for the storage engine");
+         // A block is sent to peers as one message, which they refuse above
+         // 16 MiB; a block may run over maxBlockSize by its subjective data
+         // and header.
+         check(row.maxBlockSize >= 1024, "maxBlockSize too small to make progress");
+         check(row.maxBlockSize <= (8 << 20), "maxBlockSize too big to send to peers");
       }
 
       void verifyWasmConfigRow(NativeTableNum     table,

@@ -193,6 +193,17 @@ namespace SystemService
       }
    }
 
+   void Transact::setMaxBlockSize(uint32_t bytes)
+   {
+      check(getSender() == getReceiver(), "Wrong sender");
+      auto _              = recurse();
+      auto table          = Native::tables(KvMode::readWrite).open<ConfigTable>();
+      auto config         = table.get({}).value_or(ConfigRow{});
+      config.maxBlockSize = bytes;
+      // The node checks the range when the row is written.
+      table.put(config);
+   }
+
    void Transact::setSnapTime(uint32_t seconds)
    {
       check(getSender() == getReceiver(), "Wrong sender");

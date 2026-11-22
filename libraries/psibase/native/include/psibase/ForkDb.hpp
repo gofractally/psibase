@@ -1949,6 +1949,10 @@ namespace psibase
          }
       }
 
+      // Whether the block being produced may take this transaction as well
+      // (ConfigRow::maxBlockSize). False means it belongs in the next block.
+      bool fitsInBlock(const SignedTransaction& trx) { return getBlockContext()->fits(trx); }
+
       void pushTransaction(SignedTransaction&& trx)
       {
          auto bc = getBlockContext();

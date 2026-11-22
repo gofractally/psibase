@@ -283,15 +283,10 @@ namespace psibase::net
 
       bool _trx_loop_running = false;
 
-      // A block is sent to peers as one message, and peers refuse a message
-      // above their size limit (16 MiB by default). The block timer alone
-      // does not bound a block's size: the faster transactions execute, the
-      // more of them fit in one interval. So once the open block holds this
-      // many bytes of transactions, the rest wait for the next block. One
-      // transaction can take the block past the budget, never more than one,
-      // and a transaction cannot exceed the 8 MiB maximum value size.
-      static constexpr std::size_t block_bytes_budget = 4 * 1024 * 1024;
-      std::size_t                  _block_bytes        = 0;
+      // A transaction taken from the queue that did not fit in the block
+      // that was open (ConfigRow::maxBlockSize). It goes first in the next
+      // block this node produces.
+      std::optional<SignedTransaction> _held_transaction;
 
       std::vector<std::unique_ptr<peer_connection>> _peers;
 
@@ -728,7 +723,6 @@ namespace psibase::net
          auto commit_index = chain().commit_index();
          chain().start_block(TimePointSec{duration_cast<Seconds>(block_start.time_since_epoch())},
                              self, current_term, commit_index);
-         _block_bytes = 0;
          _block_timer.async_wait(
              [this, saved_leader_cancel = _leader_cancel](const std::error_code& ec)
              {
@@ -877,23 +871,25 @@ namespace psibase::net
       {
          if (_state == producer_state::leader)
          {
-            if (_block_bytes >= block_bytes_budget)
+            auto trx = std::move(_held_transaction);
+            _held_transaction.reset();
+            if (!trx)
+               trx = chain().nextTransaction();
+            if (!trx)
+            {
+               _trx_loop_running = false;
+            }
+            else if (!chain().fitsInBlock(*trx))
             {
                // The block is full. start_leader resumes this loop when the
                // next block opens.
+               _held_transaction = std::move(trx);
                _trx_loop_running = false;
-            }
-            else if (auto trx = chain().nextTransaction())
-            {
-               _block_bytes += trx->transaction.size();
-               for (const auto& proof : trx->proofs)
-                  _block_bytes += proof.size();
-               chain().pushTransaction(std::move(*trx));
-               boost::asio::post(_ioctx, [this] { process_transactions(); });
             }
             else
             {
-               _trx_loop_running = false;
+               chain().pushTransaction(std::move(*trx));
+               boost::asio::post(_ioctx, [this] { process_transactions(); });
             }
          }
          else
@@ -901,7 +897,6 @@ namespace psibase::net
             _trx_loop_running = false;
          }
       }
-
       void schedule_process_transactions()
       {
          if (!_trx_loop_running && _state == producer_state::leader)

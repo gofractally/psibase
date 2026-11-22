@@ -21,6 +21,22 @@ namespace psibase
       bool              needGenesisAction = false;
       bool              started           = false;
       bool              active            = false;
+      // The chain's limit on the transaction bytes in one block (ConfigRow),
+      // as of the start of this block, and how many this block holds so far.
+      std::uint32_t maxBlockSize     = 0;
+      std::uint64_t transactionBytes = 0;
+
+      // What a transaction counts for against maxBlockSize: its packed size
+      // plus its proofs. Subjective data is left out; the producer adds it
+      // while executing, after it has decided the transaction fits.
+      static std::uint64_t blockBytes(const SignedTransaction& trx);
+      // Whether the block being produced may take this transaction too. The
+      // first transaction always fits.
+      bool fits(const SignedTransaction& trx) const;
+      // The rule a received block must satisfy: its transactions total at
+      // most maxBlockSize, unless it holds a single transaction or is the
+      // genesis block. Throws otherwise.
+      void checkBlockSize() const;
       // Both of these are supersets of the actual values,
       // as they are not reverted when a transaction fails.
       std::set<AccountNumber>     modifiedAuthAccounts;
