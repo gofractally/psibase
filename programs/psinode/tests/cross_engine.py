@@ -77,6 +77,15 @@ def scenario(producer, validator, extra_blocks, root):
         ia = header(a, common) if common else None
         ib = header(b, common) if common else None
         same = ia is not None and ia == ib
+        if hb['blockNum'] < target:
+            # Not an engine result: a block too large for one peer-to-peer
+            # message cannot be fetched at all. Booting packs many
+            # transactions into few blocks, more so on a faster engine.
+            with open(b.logpath) as f:
+                if 'The WebSocket message exceeded the locally configured limit' in f.read():
+                    print('%s: a boot block exceeded the peer message size limit; retrying'
+                          % label, flush=True)
+                    return None
         print('%s: boot %.1fs, producer head %d, validator head %d, header at %d identical: %s'
               % (label, boot_seconds, ha['blockNum'], hb['blockNum'], common, same), flush=True)
         if not same or hb['blockNum'] < target:
@@ -137,6 +146,8 @@ if __name__ == '__main__':
                         help='a psinode binary built with one execution engine; give two or more')
     parser.add_argument('--psibase', required=True, help='the psibase command-line tool')
     parser.add_argument('--dir', help='directory for node databases (default: temporary)')
+    parser.add_argument('--pair', action='append', metavar='PRODUCER:VALIDATOR',
+                        help='run only this pairing (may be repeated); default: every pairing')
     args = parser.parse_args()
     for spec in args.engine:
         name, path = spec.split('=', 1)
@@ -144,8 +155,17 @@ if __name__ == '__main__':
     CLI = os.path.abspath(args.psibase)
     root = args.dir or tempfile.mkdtemp(prefix='cross-engine-')
     ok = True
-    for producer in ENGINES:
-        for validator in ENGINES:
-            if producer != validator:
-                ok = scenario(producer, validator, 15, root) and ok
+    pairs = [tuple(p.split(':', 1)) for p in args.pair] if args.pair else [
+        (producer, validator) for producer in ENGINES for validator in ENGINES
+        if producer != validator]
+    for producer, validator in pairs:
+        result = None
+        for attempt in range(4):
+            result = scenario(producer, validator, 15, root)
+            if result is not None:
+                break
+        if result is None:
+            print('%s produces, %s validates: gave up after oversized boot blocks'
+                  % (producer, validator), flush=True)
+        ok = bool(result) and ok
     sys.exit(0 if ok else 1)
