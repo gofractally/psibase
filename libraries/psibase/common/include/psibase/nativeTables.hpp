@@ -358,18 +358,10 @@ namespace psibase
    {
       AccountNumber service;
       MethodNumber  method;
-      PSIO_REFLECT(ServiceMethod, service, method)
+      // A schema names the type (the custom type "ServiceMethod",
+      // presented as {service, method}).
+      PSIO_REFLECT(ServiceMethod, schemaId("ServiceMethod"), service, method)
    };
-   // No invariant: declared so that a schema names the type (the custom
-   // type "ServiceMethod", presented as {service, method}).
-   inline psio::codec_status serviceMethodSchemaIdentity(const ServiceMethod&) noexcept
-   {
-      return psio::codec_ok();
-   }
-}  // namespace psibase
-PSIO_INVARIANT(psibase::ServiceMethod, psibase::serviceMethodSchemaIdentity, "ServiceMethod")
-namespace psibase
-{
 
    using RunKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint64_t>;
    auto runPrefix() -> KeyPrefixType;

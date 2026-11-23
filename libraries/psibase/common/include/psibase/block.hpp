@@ -35,25 +35,10 @@ namespace psibase
       std::vector<char> rawData;  ///< Data for the method
       //
       friend bool operator==(const Action&, const Action&) = default;
-      PSIO_REFLECT(Action, sender, service, method, rawData)
+      // A schema names the type (the custom type "Action"): psibase's
+      // schema handlers present it as {sender, service, method, data}.
+      PSIO_REFLECT(Action, schemaId("Action"), sender, service, method, rawData)
    };
-   // An action has no invariant of its own. It is declared with one so that
-   // a schema names it (the custom type "Action") and psibase's schema
-   // handlers can present it as {sender, service, method, data}.
-   inline psio::codec_status actionSchemaIdentity(const Action&) noexcept
-   {
-      return psio::codec_ok();
-   }
-}  // namespace psibase
-PSIO_INVARIANT(psibase::Action, psibase::actionSchemaIdentity, "Action")
-// PSIO refuses a mutable view of a type with an invariant (a write beneath
-// it would not run the check). This one accepts every value, and services
-// overwrite sender / service / method of a packed action in place
-// (psio::as_mutable_view): its extension point says so.
-template <>
-inline constexpr bool psio::detail::mutation_blocked_v<psibase::Action> = false;
-namespace psibase
-{
 
    struct GenesisService
    {

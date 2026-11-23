@@ -211,9 +211,11 @@ static TableIndex<Block, std::uint32_t> blockLog()
 static constexpr std::uint32_t blocksPageBytes = 6 * 1024 * 1024;
 
 // A page of blocks is bounded by its stored size, not by the number of rows
-// asked for: the complexity of `blocks(first: 720) { ... transactions ... }`
-// (counted with `first` as the page size) is above the engine's default limit.
-static constexpr psio::graphql::limits queryLimits{.max_complexity = 10'000'000};
+// asked for. The Explorer UI keeps a window of 720 blocks and asks for
+// `blocks(last: 720) { ... transactions { ... actions { ... } } }`: the
+// two lists inside a block count 10 elements each, about 500 per row and
+// 360 000 for the page, above the engine's default of 100 000.
+static constexpr psio::graphql::limits queryLimits{.max_complexity = 1'000'000};
 
 static std::optional<Checksum256> parseChecksum(const std::string& hex)
 {
