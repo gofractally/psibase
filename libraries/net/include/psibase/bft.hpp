@@ -103,9 +103,9 @@ namespace psibase::net
                 best_prepared_term,
                 prepares,
                 nextPrepares)
-   inline auto by_best_prepared(psio1::view<const ViewChangeMessage> message)
+   inline auto by_best_prepared(psio::pssz_view<ViewChangeMessage> message)
    {
-      return std::tuple(message.best_prepared_term().unpack(), message.best_prepared().unpack());
+      return std::tuple(message.best_prepared_term(), message.best_prepared().unpack());
    }
 
    struct RequestViewMessage
@@ -159,7 +159,7 @@ namespace psibase::net
          if (confirms.size() < prods.threshold())
             check(false, "Not enough confirmations: " + std::to_string(confirms.size()) + "/" +
                              std::to_string(prods.threshold()) + " (" + prods.to_string() + ")");
-         for (const ProducerConfirm& confirm : confirms)
+         for (const ProducerConfirm& confirm : psio::value_of(confirms))
          {
             const auto& [prod, sig] = confirm;
             // mostly to guarantee that the producers are unique
@@ -347,8 +347,8 @@ namespace psibase::net
          {
             return true;
          }
-         auto idx0 = p0->getIndex(producer, msg.data->signer());
-         auto idx1 = p1 ? p1->getIndex(producer, msg.data->signer()) : std::optional<std::size_t>();
+         auto idx0 = p0->getIndex(producer, msg.data->signer().unpack());
+         auto idx1 = p1 ? p1->getIndex(producer, msg.data->signer().unpack()) : std::optional<std::size_t>();
          if (idx0 || idx1)
          {
             auto [iter, inserted] =
@@ -552,7 +552,7 @@ namespace psibase::net
                    if (!ec && old_term == current_term)
                    {
                       auto committed = chain().get_block_by_num(chain().commit_index());
-                      if (!committed || committed->block().header().term() < current_term)
+                      if (!committed || (*committed)->block().header().term() < current_term)
                       {
                          // If we have not committed a block in the current term, increase the block timer
                          //_timeout += _timeout_delta;
@@ -714,7 +714,7 @@ namespace psibase::net
          {
             return nullptr;
          }
-         if (info.best_message->data->best_prepared().unpack() == Checksum256{})
+         if (info.best_message->data->best_prepared() == Checksum256{})
          {
             return chain().get_state(chain().get_block_id(chain().commit_index()));
          }
@@ -778,9 +778,9 @@ namespace psibase::net
 
       void load_prepares(const BlockHeaderState*                        state,
                          const ProducerSet&                             prods,
-                         psio1::view<const std::vector<ProducerConfirm>> prepares)
+                         psio::pssz_view<std::vector<ProducerConfirm>> prepares)
       {
-         for (const ProducerConfirm& confirm : prepares)
+         for (const ProducerConfirm& confirm : prepares.unpack())
          {
             const auto& [prod, sig] = confirm;
             auto claim              = prods.getClaim(prod);
@@ -1017,8 +1017,8 @@ namespace psibase::net
       }
 
       bool compare_view_change(const ProducerSet&                  producers,
-                               psio1::view<const ViewChangeMessage> lhs,
-                               psio1::view<const ViewChangeMessage> rhs)
+                               psio::pssz_view<ViewChangeMessage> lhs,
+                               psio::pssz_view<ViewChangeMessage> rhs)
       {
          assert(lhs.producer() == rhs.producer());
          if (lhs.term() < rhs.term())
@@ -1079,7 +1079,8 @@ namespace psibase::net
 
       bool set_producer_view(int group, const SignedMessage<ViewChangeMessage>& msg)
       {
-         return set_producer_view(group, msg.data->term(), msg.data->producer(), msg.data->signer(),
+         return set_producer_view(group, msg.data->term(), msg.data->producer(),
+                                  msg.data->signer().unpack(),
                                   &msg);
       }
 
@@ -1329,7 +1330,7 @@ namespace psibase::net
          {
             std::sort(result.nextCommits->begin(), result.nextCommits->end(), compareProducer);
          }
-         chain().setBlockData(state->blockId(), psio1::convert_to_frac(result));
+         chain().setBlockData(state->blockId(), psio::to_pssz(result));
       }
       void verify_commit(const BlockHeaderState* state)
       {
@@ -1463,9 +1464,9 @@ namespace psibase::net
       }
 
       void validate_aux_consensus_data(const BlockHeaderState*             state,
-                                       psio1::view<const std::vector<char>> aux)
+                                       psio::pssz_view<std::vector<char>> aux)
       {
-         auto        data   = psio1::from_frac<BlockConfirm>(aux);
+         auto        data   = psio::from_pssz<BlockConfirm>(aux);
          const auto& header = state->info.header;
          check(data.blockNum >= header.commitNum && data.blockNum <= header.blockNum,
                "blockNum out of range");
@@ -1485,7 +1486,7 @@ namespace psibase::net
          addBlockConfirm(data, committed);
          if (committed->producers->algorithm == ConsensusAlgorithm::bft)
          {
-            chain().setBlockData(committed->blockId(), aux);
+            chain().setBlockData(committed->blockId(), aux.unpack());
          }
          // Ensure that the committed block is a candidate for the best block
          set_view(committed->info.header.term);
@@ -1517,7 +1518,7 @@ namespace psibase::net
             check(
                 is_leader(*state->producers, state->info.header.term, state->info.header.producer),
                 "Wrong producer");
-            auto block = chain().get(state->blockId());
+            auto block = *chain().get(state->blockId());
             if (auto aux = block->auxConsensusData())
             {
                validate_aux_consensus_data(state, *aux);
@@ -1554,8 +1555,8 @@ namespace psibase::net
          {
             return;
          }
-         validate_producer(state, msg.data->producer(), msg.data->signer());
-         do_view_change(msg.data->producer(), msg.data->signer(), state->info.header.term);
+         validate_producer(state, msg.data->producer(), msg.data->signer().unpack());
+         do_view_change(msg.data->producer(), msg.data->signer().unpack(), state->info.header.term);
          on_prepare(state, msg.data->producer(), msg);
          //Base::switch_fork();
       }
@@ -1570,8 +1571,8 @@ namespace psibase::net
          {
             return;
          }
-         validate_producer(state, msg.data->producer(), msg.data->signer());
-         do_view_change(msg.data->producer(), msg.data->signer(), state->info.header.term);
+         validate_producer(state, msg.data->producer(), msg.data->signer().unpack());
+         do_view_change(msg.data->producer(), msg.data->signer().unpack(), state->info.header.term);
          on_commit(state, msg.data->producer(), msg);
          Base::switch_fork();
       }
@@ -1632,13 +1633,13 @@ namespace psibase::net
       }
       BlockNum light_verify(const LightHeaderState&                   state,
                             const BlockInfo&                          info,
-                            const psio1::shared_view_ptr<SignedBlock>& block)
+                            const psio::shared_pssz<SignedBlock>& block)
       {
          if (state.producers->algorithm == ConsensusAlgorithm::bft)
          {
             if (!block->auxConsensusData())
                throw std::runtime_error("Consensus data missing for producer change");
-            auto commits = psio1::from_frac<BlockConfirm>(*block->auxConsensusData());
+            auto commits = psio::from_pssz<BlockConfirm>(*block->auxConsensusData());
 
             const ExtendedBlockId* committed = nullptr;
             for (auto& xid : state.pendingBlocks)

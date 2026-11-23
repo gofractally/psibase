@@ -181,7 +181,7 @@ namespace SystemService
       std::string access_token;
       std::string token_type = "bearer";
    };
-   PSIO_REFLECT(LoginReply, access_token, token_type)
+   PSIO_REFLECT(LoginReply, attr(access_token, utf8), attr(token_type, utf8))
 
    struct TxSuccessRecord
    {
@@ -201,7 +201,7 @@ namespace SystemService
    {
       psibase::Checksum256                        id;
       psibase::BlockNum                           blockNum;
-      psio1::view<const psibase::TransactionTrace> trace;
+      psio::pssz_view<psibase::TransactionTrace> trace;
    };
    PSIO_REFLECT(TxSuccessView, id, blockNum, trace)
 
@@ -222,7 +222,7 @@ namespace SystemService
    {
       psibase::Checksum256                        id;
       psibase::TimePointSec                       expiration;
-      psio1::view<const psibase::TransactionTrace> trace;
+      psio::pssz_view<psibase::TransactionTrace> trace;
    };
    PSIO_REFLECT(TxFailedView, id, expiration, trace)
 
@@ -275,19 +275,19 @@ namespace SystemService
 
       std::optional<psibase::SignedTransaction>                    next();
       std::optional<std::vector<std::optional<psibase::RunToken>>> preverify(
-          psio1::view<const psibase::SignedTransaction> transaction);
+          psio::pssz_view<psibase::SignedTransaction> transaction);
       // Handles transactions coming over P2P
       void recv(const psibase::SignedTransaction& transaction);
       // Callbacks used to track successful/expired transactions
-      void onTrx(const psibase::Checksum256& id, psio1::view<const psibase::TransactionTrace> trace);
+      void onTrx(const psibase::Checksum256& id, psio::pssz_view<psibase::TransactionTrace> trace);
       // Callback run when after signature verification
       void onVerify(std::uint64_t                               id,
-                    psio1::view<const psibase::TransactionTrace> trace,
+                    psio::pssz_view<psibase::TransactionTrace> trace,
                     std::optional<psibase::RunToken>            token);
       // Callback run after speculative transaction
-      void onSpecTrx(std::uint64_t id, psio1::view<const psibase::TransactionTrace> trace);
+      void onSpecTrx(std::uint64_t id, psio::pssz_view<psibase::TransactionTrace> trace);
       void requeue();
-      void onRequeue(std::uint64_t id, psio1::view<const psibase::TransactionTrace> trace);
+      void onRequeue(std::uint64_t id, psio::pssz_view<psibase::TransactionTrace> trace);
       void onBlock();
       auto serveSys(const psibase::HttpRequest&           request,
                     std::optional<std::int32_t>           socket,

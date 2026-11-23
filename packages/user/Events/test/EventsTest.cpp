@@ -14,7 +14,6 @@
 using namespace psibase;
 using namespace SystemService;
 using namespace UserService;
-using namespace psio1::schema_types;
 
 HttpRequest makeQuery(std::string_view s)
 {
@@ -33,9 +32,7 @@ std::vector<R> query(TestChain& chain, std::string_view s)
         << " " << std::string(response.body.begin(), response.body.end()));
    CHECK(response.status == HttpStatus::ok);
    CHECK(response.contentType == "application/json");
-   response.body.push_back('\0');
-   psio1::json_token_stream stream(response.body.data());
-   return psio1::from_json<std::vector<R>>(stream);
+   return psio::from_ijson<std::vector<R>>(response.body);
 }
 
 struct ExplainQueryPlan
@@ -64,7 +61,7 @@ template <typename T>
    requires requires { typename T::json_stream_operator; }
 std::ostream& operator<<(std::ostream& os, const T& value)
 {
-   os << psio1::convert_to_json(value) << std::endl;
+   os << psio::to_ijson(value) << std::endl;
    return os;
 }
 
@@ -113,7 +110,7 @@ TEST_CASE("events")
    auto mallory     = chain.from(chain.addAccount("mallory"));
 
    auto schema = ServiceSchema::make<TestService>();
-   std::cout << psio1::format_json(schema) << std::endl;
+   std::cout << psio::format_json(psio::to_ijson(schema)) << std::endl;
    expect(testService.to<Packages>().setSchema(schema).trace());
    expect(testService.to<TestService>().send(42, 1.414, std::vector{1}, "a").trace());
    expect(testService.to<TestService>().send(72, 3.14159, std::vector{2}, "b").trace());

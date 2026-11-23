@@ -393,8 +393,7 @@ namespace psibase
          else
          {
             tmpKey.clear();
-            psio1::vector_stream stream{tmpKey};
-            psio1::to_key(snapshotKey(id), stream);
+            psio::to_key(snapshotKey(id), tmpKey);
             if (!writer.get(nativeSubjective, tmpKey))
                writer.remove(proposed, key);
          }
@@ -407,7 +406,7 @@ namespace psibase
          // no longer present.
          std::vector<storage::shared_root> roots;
          std::vector<char>                 statusBytes;
-         auto                              sk = psio1::convert_to_key(statusKey());
+         auto                              sk = psio::to_key(statusKey());
          while (writer.get_greater_equal(proposed, key, &key, nullptr, &roots))
          {
             if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)
@@ -415,7 +414,7 @@ namespace psibase
             check(roots.size() == numChainDatabases, "wrong number of roots in fork");
             if (!writer.get(roots[(int)StatusRow::db], sk, &statusBytes, nullptr))
                throw std::runtime_error("Status row missing in fork");
-            auto status = psio1::from_frac<StatusRow>(psio1::prevalidated{statusBytes});
+            auto status = psio::from_pssz<StatusRow>(psio::trusted{statusBytes});
             if (!status.head)
                throw std::runtime_error("Status row is missing head information in fork");
             if (!writer.get(proposed, revisionById(status.head->header.previous), nullptr, nullptr))
@@ -1054,7 +1053,7 @@ namespace psibase
       std::fprintf(stderr, "\n");
       return total;
    }
-   void Database::kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value)
+   void Database::kvPutRaw(DbId db, std::span<const char> key, std::span<const char> value)
    {
       if (countWrites)
          ++writeCounts[writeSlot(db)];
@@ -1063,13 +1062,13 @@ namespace psibase
           {
              if (auto* changes = impl->getChangeSet(db))
              {
-                changes->onWrite(key.string_view());
+                changes->onWrite(std::string_view{key.data(), key.size()});
              }
-             session.upsert(impl->db(revision, db), key.string_view(), value.string_view());
+             session.upsert(impl->db(revision, db), std::string_view{key.data(), key.size()}, std::string_view{value.data(), value.size()});
           });
    }
 
-   void Database::kvRemoveRaw(DbId db, psio1::input_stream key)
+   void Database::kvRemoveRaw(DbId db, std::span<const char> key)
    {
       if (countWrites)
          ++writeCounts[writeSlot(db)];
@@ -1078,23 +1077,23 @@ namespace psibase
           {
              if (auto* changes = impl->getChangeSet(db))
              {
-                changes->onWrite(key.string_view());
+                changes->onWrite(std::string_view{key.data(), key.size()});
              }
-             session.remove(impl->db(revision, db), key.string_view());
+             session.remove(impl->db(revision, db), std::string_view{key.data(), key.size()});
           });
    }
 
-   std::optional<psio1::input_stream> Database::kvGetRaw(DbId db, psio1::input_stream key)
+   std::optional<std::span<const char>> Database::kvGetRaw(DbId db, std::span<const char> key)
    {
       return impl->read(
-          [&](auto& session, auto& revision) -> std::optional<psio1::input_stream>
+          [&](auto& session, auto& revision) -> std::optional<std::span<const char>>
           {
              if (auto* changes = impl->getChangeSet(db))
              {
-                changes->onRead(key.string_view());
+                changes->onRead(std::string_view{key.data(), key.size()});
              }
 
-             if (!session.get(impl->db(revision, db), key.string_view(), &impl->valueBuffer,
+             if (!session.get(impl->db(revision, db), std::string_view{key.data(), key.size()}, &impl->valueBuffer,
                               nullptr))
              {
                 return {};
@@ -1104,35 +1103,35 @@ namespace psibase
           });
    }  // Database::kvGetRaw
 
-   bool Database::kvContains(DbId db, psio1::input_stream key)
+   bool Database::kvContains(DbId db, std::span<const char> key)
    {
       return impl->read(
           [&](auto& session, auto& revision) -> bool
           {
              if (auto* changes = impl->getChangeSet(db))
              {
-                changes->onRead(key.string_view());
+                changes->onRead(std::string_view{key.data(), key.size()});
              }
-             return session.get(impl->db(revision, db), key.string_view(), nullptr, nullptr);
+             return session.get(impl->db(revision, db), std::string_view{key.data(), key.size()}, nullptr, nullptr);
           });
    }
 
    std::optional<Database::KVResult> Database::kvGreaterEqualRaw(DbId               db,
-                                                                 psio1::input_stream key,
+                                                                 std::span<const char> key,
                                                                  size_t             matchKeySize)
    {
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_greater_equal(impl->db(revision, db), key.string_view(),
+             auto found = session.get_greater_equal(impl->db(revision, db), std::string_view{key.data(), key.size()},
                                                     &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
-                           (matchKeySize && memcmp(impl->keyBuffer.data(), key.pos, matchKeySize))))
+                           (matchKeySize && memcmp(impl->keyBuffer.data(), key.data(), matchKeySize))))
                 found = false;
 
              if (auto* changes = impl->getChangeSet(db))
              {
-                changes->onGreaterEqual(key.string_view(), matchKeySize, found, impl->keyBuffer);
+                changes->onGreaterEqual(std::string_view{key.data(), key.size()}, matchKeySize, found, impl->keyBuffer);
              }
 
              if (!found)
@@ -1145,21 +1144,21 @@ namespace psibase
    }  // Database::kvGreaterEqualRaw
 
    std::optional<Database::KVResult> Database::kvLessThanRaw(DbId               db,
-                                                             psio1::input_stream key,
+                                                             std::span<const char> key,
                                                              size_t             matchKeySize)
    {
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_less_than(impl->db(revision, db), key.string_view(),
+             auto found = session.get_less_than(impl->db(revision, db), std::string_view{key.data(), key.size()},
                                                 &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
-                           (matchKeySize && memcmp(impl->keyBuffer.data(), key.pos, matchKeySize))))
+                           (matchKeySize && memcmp(impl->keyBuffer.data(), key.data(), matchKeySize))))
                 found = false;
 
              if (auto* changes = impl->getChangeSet(db))
              {
-                changes->onLessThan(key.string_view(), matchKeySize, found, impl->keyBuffer);
+                changes->onLessThan(std::string_view{key.data(), key.size()}, matchKeySize, found, impl->keyBuffer);
              }
 
              if (!found)
@@ -1171,17 +1170,17 @@ namespace psibase
           });
    }  // Database::kvLessThanRaw
 
-   std::optional<Database::KVResult> Database::kvMaxRaw(DbId db, psio1::input_stream key)
+   std::optional<Database::KVResult> Database::kvMaxRaw(DbId db, std::span<const char> key)
    {
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_max(impl->db(revision, db), key.string_view(),
+             auto found = session.get_max(impl->db(revision, db), std::string_view{key.data(), key.size()},
                                           &impl->keyBuffer, &impl->valueBuffer, nullptr);
 
              if (auto* changes = impl->getChangeSet(db))
              {
-                changes->onMax(key.string_view(), found, impl->keyBuffer);
+                changes->onMax(std::string_view{key.data(), key.size()}, found, impl->keyBuffer);
              }
 
              if (!found)

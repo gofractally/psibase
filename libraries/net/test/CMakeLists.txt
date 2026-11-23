@@ -70,8 +70,8 @@ endif()
 
 #add_executable(test_direct_routing test_direct_routing.cpp mock_timer.cpp)
 #target_include_directories(test_direct_routing PUBLIC ../include)
-#target_link_libraries(test_direct_routing PUBLIC psio1 Catch2::Catch2WithMain)
+#target_link_libraries(test_direct_routing PUBLIC Catch2::Catch2WithMain)
 
 #add_executable(test_integrated test_integrated.cpp mock_timer.cpp)
 #target_include_directories(test_integrated PUBLIC ../include)
-#target_link_libraries(test_integrated PUBLIC psio1 Catch2::Catch2WithMain psibase)
+#target_link_libraries(test_integrated PUBLIC Catch2::Catch2WithMain psibase)

@@ -31,15 +31,28 @@ namespace psibase
    Action getCurrentAction()
    {
       auto data = getResult(raw::getCurrentAction());
-      return psio1::from_frac<Action>(psio1::prevalidated{data});
+      return psio::from_pssz<Action>(psio::trusted{data});
    }
 
-   psio1::shared_view_ptr<Action> getCurrentActionView()
+   // A packed Action: valid, canonical, and with no members this build
+   // does not know.
+   static void checkActionFormat(std::span<const char> data)
    {
-      psio1::shared_view_ptr<Action> ptr(psio1::size_tag{raw::getCurrentAction()});
-      raw::getResult(ptr.data(), ptr.size(), 0);
-      check(ptr.validate_strict(), "invalid action format");
-      return ptr;
+      check(psio::validate_strict<Action>(psio::pssz{}, data).ok(), "invalid action format");
+   }
+
+   psio::shared_pssz<Action> getCurrentActionView()
+   {
+      auto data = getResult(raw::getCurrentAction());
+      checkActionFormat(data);
+      return psio::shared_pssz<Action>::unchecked(std::move(data));
+   }
+
+   psio::pssz_buffer<Action> getCurrentActionPacked()
+   {
+      auto data = getResult(raw::getCurrentAction());
+      checkActionFormat(data);
+      return psio::pssz_buffer<Action>::unchecked(std::move(data));
    }
 
    std::vector<char> call(const char* action, uint32_t len, CallFlags flags)
@@ -47,13 +60,13 @@ namespace psibase
       return getResult(raw::call(action, len, flags));
    }
 
-   std::vector<char> call(psio1::input_stream action, CallFlags flags)
+   std::vector<char> call(std::span<const char> action, CallFlags flags)
    {
-      return getResult(raw::call(action.pos, action.remaining(), flags));
+      return getResult(raw::call(action.data(), action.size(), flags));
    }
 
    std::vector<char> call(const Action& action, CallFlags flags)
    {
-      return call(psio1::convert_to_frac(action), flags);
+      return call(psio::to_pssz(action), flags);
    }
 }  // namespace psibase

@@ -7,17 +7,18 @@
 #include <psibase/headerValidation.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/testerApi.hpp>
-#include <psio1/fracpack.hpp>
-#include <psio1/stream.hpp>
+#include <psio/shapes.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <vector>
 
 namespace psibase
 {
    struct ChainHandle
    {
-      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio1::input_stream key)
+      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, std::span<const char> key)
       {
-         auto size = tester::raw::kvGet(id, db, key.pos, key.remaining());
+         auto size = tester::raw::kvGet(id, db, key.data(), key.size());
          if (size == -1)
             return std::nullopt;
          return psibase::getResult(size);
@@ -26,32 +27,32 @@ namespace psibase
       template <typename V, typename K>
       std::optional<V> kvGet(psibase::DbId db, const K& key)
       {
-         auto v = kvGetRaw(db, psio1::convert_to_key(key));
+         auto v = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!v)
             return std::nullopt;
          // TODO: validate (allow opt-in or opt-out)
-         return psio1::from_frac<V>(psio1::prevalidated{*v});
+         return psio::from_pssz<V>(psio::trusted{*v});
       }
 
-      void kvPutRaw(psibase::DbId db, psio1::input_stream key, psio1::input_stream value)
+      void kvPutRaw(psibase::DbId db, std::span<const char> key, std::span<const char> value)
       {
-         tester::raw::kvPut(id, db, key.pos, key.remaining(), value.pos, value.remaining());
+         tester::raw::kvPut(id, db, key.data(), key.size(), value.data(), value.size());
       }
       template <typename K, typename V>
-         requires(!psio1::is_std_optional<V>::value)
+         requires(!psio::is_optional<V>::value)
       void kvPut(DbId db, const K& key, const V& value)
       {
-         kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
       }
 
-      void kvRemoveRaw(psibase::DbId db, psio1::input_stream key)
+      void kvRemoveRaw(psibase::DbId db, std::span<const char> key)
       {
-         tester::raw::kvRemove(id, db, key.pos, key.remaining());
+         tester::raw::kvRemove(id, db, key.data(), key.size());
       }
       template <typename K>
       void kvRemove(DbId db, const K& key)
       {
-         kvRemoveRaw(db, psio1::convert_to_key(key));
+         kvRemoveRaw(db, psio::encode(psio::key{}, key));
       }
 
       std::uint32_t id;
@@ -84,10 +85,8 @@ namespace psibase
 
    Checksum256 makeSignatureHash(const CommitMessage& msg)
    {
-      std::vector<char>   result;
-      psio1::vector_stream stream{result};
-      stream.write(static_cast<char>(CommitMessage::type));
-      psio1::to_frac(msg, stream);
+      std::vector<char> result{static_cast<char>(CommitMessage::type)};
+      psio::to_pssz(msg, result);
       return sha256(result.data(), result.size());
    }
 
@@ -227,7 +226,7 @@ namespace psibase
                                   const SignedBlock&    block)
       {
          check(!!block.auxConsensusData, "BFT requires auxConsensusData to prove irreversibility");
-         auto confirms = psio1::from_frac<BlockConfirm>(*block.auxConsensusData);
+         auto confirms = psio::from_pssz<BlockConfirm>(*block.auxConsensusData);
          auto blockId  = getBlockId(confirms.blockNum);
 
          check(confirms.commits.size() >= strongThreshold(consensus), "Not enough confirmations");
@@ -292,7 +291,7 @@ namespace psibase
          psibase::VerifyArgs args{hash, claim, signature};
          psibase::Action     act{.service = claim.service,
                                  .method  = MethodNumber{"verifySys"},
-                                 .rawData = psio1::to_frac(args)};
+                                 .rawData = psio::to_pssz(args)};
          auto trace = tester::runAction(authServices.id, RunMode::verify, false, act);
 
          if (trace.error && !trace.error->empty())

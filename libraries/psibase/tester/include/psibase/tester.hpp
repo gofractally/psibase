@@ -6,7 +6,7 @@
 #include <psibase/fileUtil.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
-#include <psio1/to_hex.hpp>
+#include <psio/to_hex.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
@@ -100,7 +100,7 @@ namespace psibase
             auto actionTrace = getTopAction(t, 0);
             if (actionTrace.rawRetval.size() != 0)
             {
-               _return = psio1::from_frac<ReturnType>(actionTrace.rawRetval);
+               _return = psio::from_pssz<ReturnType>(actionTrace.rawRetval);
             }
          }
       }
@@ -165,8 +165,8 @@ namespace psibase
    struct FracPackBody
    {
       static std::string  contentType() { return "application/octet-stream"; }
-      std::vector<char>   body() const { return psio1::to_frac(value); }
-      static FracPackBody unpack(std::vector<char> data) { return {psio1::from_frac<T>(data)}; }
+      std::vector<char>   body() const { return psio::to_pssz(value); }
+      static FracPackBody unpack(std::vector<char> data) { return {psio::from_pssz<T>(data)}; }
       T                   value;
    };
 
@@ -176,16 +176,13 @@ namespace psibase
       static std::string contentType() { return "application/json"; }
       std::vector<char>  body() const
       {
-         std::vector<char>   result;
-         psio1::vector_stream stream{result};
-         to_json(value, stream);
+         std::vector<char> result;
+         psio::to_ijson(value, result);
          return result;
       }
       static JsonBody unpack(std::vector<char> data)
       {
-         data.push_back('\0');
-         psio1::json_token_stream stream(data.data());
-         return {psio1::from_json<T>(stream)};
+         return {psio::from_ijson<T>(std::span<const char>{data})};
       }
       T value;
    };
@@ -724,17 +721,17 @@ namespace psibase
       std::uint32_t nativeHandle() const { return id; }
 
       /// Get a key-value pair, if any
-      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio1::input_stream key);
+      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, std::span<const char> key);
 
       /// Get a key-value pair, if any
       template <typename V, typename K>
       std::optional<V> kvGet(psibase::DbId db, const K& key)
       {
-         auto v = kvGetRaw(db, psio1::convert_to_key(key));
+         auto v = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!v)
             return std::nullopt;
          // TODO: validate (allow opt-in or opt-out)
-         return psio1::from_frac<V>(psio1::prevalidated{*v});
+         return psio::from_pssz<V>(psio::trusted{*v});
       }
 
       /// Get a key-value pair, if any
@@ -745,24 +742,24 @@ namespace psibase
       }
 
       std::optional<std::vector<char>> kvGreaterEqualRaw(DbId               db,
-                                                         psio1::input_stream key,
+                                                         std::span<const char> key,
                                                          uint32_t           matchKeySize);
 
       template <typename V, typename K>
       inline std::optional<V> kvGreaterEqual(DbId db, const K& key, uint32_t matchKeySize)
       {
-         auto v = kvGreaterEqualRaw(db, psio1::convert_to_key(key), matchKeySize);
+         auto v = kvGreaterEqualRaw(db, psio::encode(psio::key{}, key), matchKeySize);
          if (!v)
             return std::nullopt;
-         return psio1::from_frac<V>(*v);
+         return psio::from_pssz<V>(*v);
       }
 
-      void kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value);
+      void kvPutRaw(DbId db, std::span<const char> key, std::span<const char> value);
 
       template <typename K, typename V>
       void kvPut(DbId db, const K& key, const V& value)
       {
-         kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
       }
    };  // TestChain
 
@@ -801,6 +798,6 @@ struct Catch::StringMaker<psibase::Checksum256>
 {
    static std::string convert(const psibase::Checksum256& obj)
    {
-      return psio1::hex(obj.begin(), obj.end());
+      return psio::to_hex(obj.begin(), obj.end());
    }
 };

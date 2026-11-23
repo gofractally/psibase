@@ -62,7 +62,7 @@ std::vector<char> readWholeFile(const std::filesystem::path& name)
 
 void pushTransaction(BlockContext* ctx, Transaction trx)
 {
-   SignedTransaction strx{.transaction = trx};
+   SignedTransaction strx{.transaction = psio::shared_pssz<Transaction>{trx}};
    TransactionTrace  trace;
    ctx->pushTransaction(std::move(strx), trace, std::nullopt);
 }
@@ -92,18 +92,18 @@ auto makeBoot(const ConsensusData& producers, bool ec) -> std::vector<SignedTran
           .code    = readWholeFile("VerifySig.wasm"),
       });
    }
-   result.push_back({Transaction{
+   result.push_back({psio::shared_pssz<Transaction>{Transaction{
        //
        .actions = {
            //
            Action{.sender  = AccountNumber{"psibase"},  // ignored
                   .service = AccountNumber{"psibase"},  // ignored
                   .method  = MethodNumber{"boot"},
-                  .rawData = psio1::convert_to_frac(GenesisActionData{.services = services})}}}});
-   result.push_back(
-       {Transaction{.tapos   = {.expiration = TimePointSec{Seconds(2)}},
-                    .actions = {transactor<Producers>(Producers::service, Producers::service)
-                                    .setConsensus(producers)}}});
+                  .rawData = psio::to_pssz(GenesisActionData{.services = services})}}}}});
+   result.push_back({psio::shared_pssz<Transaction>{
+       Transaction{.tapos   = {.expiration = TimePointSec{Seconds(2)}},
+                   .actions = {transactor<Producers>(Producers::service, Producers::service)
+                                   .setConsensus(producers)}}}});
 
    return result;
 }
@@ -149,9 +149,9 @@ void setProducers(psibase::BlockContext* ctx, const psibase::ConsensusData& prod
 
 SignedTransaction signTransaction(const BlockInfo& prevBlock, const Transaction& trx)
 {
-   SignedTransaction result{trx};
-   result.transaction->tapos() = getTapos(prevBlock);
-   return result;
+   Transaction withTapos = trx;
+   withTapos.tapos       = getTapos(prevBlock);
+   return SignedTransaction{psio::shared_pssz<Transaction>{withTapos}};
 }
 
 std::vector<SignedTransaction> signTransactions(const BlockInfo&                prevBlock,
@@ -193,10 +193,15 @@ TestBlock makeBlock(const BlockInfo&                   info,
       {
          if (act.service() == Producers::service && act.method() == MethodNumber{"setConsensus"})
          {
-            using param_tuple = MethodArgs<decltype(&Producers::setConsensus)>;
-            auto params = psio1::view<const param_tuple>(act.rawData());
+            constexpr auto setConsensus =
+                *psio::reflect<Producers>::index_of_method("setConsensus");
+            std::span<const char> args = act.rawData();
+            check(psio::validate_method_args<Producers, setConsensus>(args).ok(),
+                  "invalid arguments of setConsensus");
+            auto params = psio::method_args_view<Producers, setConsensus>(args);
             newBlock.block.header.newConsensus =
-                Consensus{get<0>(params), newState.current.services, newState.current.wasmConfig};
+                Consensus{params.template get<0>().unpack(), newState.current.services,
+                          newState.current.wasmConfig};
             check(!newState.next, "Joint consensus is already running");
             newState.next = {*newBlock.block.header.newConsensus, newBlock.block.header.blockNum};
          }
@@ -214,7 +219,7 @@ TestBlock makeBlock(const BlockInfo&                   info,
    newBlock.block.header.eventMerkleRoot = Checksum256{};
    if (auxData)
    {
-      newBlock.auxConsensusData = psio1::to_frac(*auxData);
+      newBlock.auxConsensusData = psio::to_pssz(*auxData);
    }
    return {BlockMessage{newBlock}, newState};
 }
@@ -276,13 +281,13 @@ auto sign(T&& message)
 
 SignedMessage<PrepareMessage> makePrepare(const BlockMessage& block, std::string_view producer)
 {
-   BlockInfo info{block.block->block()};
+   BlockInfo info{block.block->block().header().unpack()};
    return sign(PrepareMessage{info.blockId, AccountNumber{producer}});
 }
 
 SignedMessage<CommitMessage> makeCommit(const BlockMessage& block, std::string_view producer)
 {
-   BlockInfo info{block.block->block()};
+   BlockInfo info{block.block->block().header().unpack()};
    return sign(CommitMessage{info.blockId, AccountNumber{producer}});
 }
 

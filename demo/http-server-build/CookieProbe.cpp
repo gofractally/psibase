@@ -1,7 +1,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/dispatch.hpp>
-#include <psio1/to_json.hpp>
+#include <psio/json.hpp>
 
 struct CookieProbe : psibase::Service
 {
@@ -42,7 +42,7 @@ std::optional<psibase::HttpReply> CookieProbe::serveSys(
          for (auto value : single.getCookie("session")) result.appSession.emplace_back(value);
       }
    }
-   auto json = psio1::convert_to_json(result);
+   auto json = psio::to_ijson(result);
    return psibase::HttpReply{.contentType = "application/json", .body = {json.begin(), json.end()}};
 }
 PSIBASE_DISPATCH(CookieProbe)

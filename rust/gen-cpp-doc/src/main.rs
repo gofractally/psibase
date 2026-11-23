@@ -850,8 +850,6 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/common/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/service/include"),
-        &("-I".to_owned() + repo_path + "/libraries/psio1/consthash/include"),
-        &("-I".to_owned() + repo_path + "/libraries/psio1/include"),
         &("-I".to_owned() + repo_path + "/external/psio/cpp/include"),
         "-DPSIO_EXCEPTIONS_ENABLED=0",
         "-DPSIO_HAVE_SIMDJSON=0",

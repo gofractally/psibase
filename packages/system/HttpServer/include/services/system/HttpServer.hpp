@@ -100,13 +100,13 @@ namespace SystemService
       std::optional<psibase::AccountNumber> getServer(psibase::AccountNumber service);
 
       // Entry point for messages
-      void recv(std::int32_t socket, psio1::view<const std::vector<char>> data, std::uint32_t flags);
+      void recv(std::int32_t socket, psio::pssz_view<std::vector<char>> data, std::uint32_t flags);
 
       // Entry point for HTTP requests
       void serve(std::int32_t socket, psibase::HttpRequest req);
 
       /// Returns the root host for a given host
-      std::string rootHost(psio1::view<const std::string> host);
+      std::string rootHost(psio::pssz_view<std::string> host);
 
       /// Constructs a URL for a sibling subdomain under the same root host.
       /// If `keepTarget` is true, the original path and query are preserved;
@@ -142,7 +142,7 @@ namespace SystemService
                 method(getServer, service),
                 method(recv, socket, data, flags),
                 method(serve, socket, req),
-                method(rootHost, host),
+                method(rootHost, attr(host, utf8)),
                 method(getSiblingUrl, req, socket, destination, keepTarget),
                 method(setRedirect, destination),
                 method(clearRedirect))

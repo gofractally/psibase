@@ -130,7 +130,7 @@ namespace LocalService
       void onP2P(std::int32_t socket, psibase::HttpReply reply);
       void errP2P(std::int32_t socket, std::optional<psibase::HttpReply> reply);
       void recvP2P(std::int32_t                        socket,
-                   psio1::view<const std::vector<char>> data,
+                   psio::pssz_view<std::vector<char>> data,
                    std::uint32_t                       flags);
       void closeP2P(std::int32_t socket);
       void onTimer(std::uint64_t timerId);
@@ -139,7 +139,9 @@ namespace LocalService
                 method(serveSys, request, socket),
                 method(onConfig),
                 method(onP2P, socket, reply),
-                method(errP2P, socket, reply),
+                // An HTTP reply has no size limit: the 4-byte class, at its top. With the cap
+                // stated, (socket) under the same cap is this call without a reply.
+                method(errP2P, socket, reply, maxDynamicData(0xffffffff)),
                 method(recvP2P, socket, data, flags),
                 method(closeP2P, socket),
                 method(onTimer, timerId))

@@ -1,7 +1,7 @@
 #include <catch2/catch_all.hpp>
 #include <psibase/semver.hpp>
 #include <psibase/tester.hpp>
-#include <psio1/from_json.hpp>
+#include <psio/json.hpp>
 #include <string>
 
 struct SemverTest
@@ -17,9 +17,7 @@ TEST_CASE("semver")
    std::vector<SemverTest> tests;
    {
       auto contents = psibase::readWholeFile("semver.json");
-      contents.push_back('\0');
-      psio1::json_token_stream stream(contents.data());
-      psio1::from_json(tests, stream);
+      tests         = psio::from_ijson<std::vector<SemverTest>>(contents);
    }
    for (const auto& [pattern, version, matches] : tests)
    {

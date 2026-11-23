@@ -1,13 +1,14 @@
-#include <psibase/PsizamPolicy.hpp>
 #include <psibase/ConfigFile.hpp>
 #include <psibase/LogSocket.hpp>
 #include <psibase/Mount.hpp>
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
+#include <psibase/PsizamPolicy.hpp>
 #include <psibase/RunQueue.hpp>
 #include <psibase/Secrets.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/fileUtil.hpp>
+#include <psibase/finally.hpp>
 #include <psibase/http.hpp>
 #include <psibase/log.hpp>
 #include <psibase/node.hpp>
@@ -15,10 +16,9 @@
 #include <psibase/serviceEntry.hpp>
 #include <psibase/storageDiagnostics.hpp>
 #include <psibase/version.hpp>
-#include <psio1/finally.hpp>
-#include <psio1/from_json/map.hpp>
-#include <psio1/to_json.hpp>
-#include <psio1/to_json/map.hpp>
+#include <psio/json.hpp>
+#include <psio/json_value.hpp>
+#include <psio/untagged.hpp>
 
 #include "psinode.hpp"
 
@@ -221,31 +221,20 @@ std::string to_string(const Timeout& timeout)
    }
 }
 
-void to_json(const Timeout& obj, auto& stream)
+// In JSON a Timeout is its number of microseconds; no timeout is null (or
+// the member left out).
+std::optional<std::chrono::microseconds> toJson(const Timeout& obj)
 {
-   if (obj != Timeout::none())
-   {
-      std::int64_t us = std::chrono::duration_cast<std::chrono::microseconds>(obj.duration).count();
-      to_json(us, stream);
-   }
-   else
-   {
-      stream.write("null", 4);
-   }
+   if (obj == Timeout::none())
+      return std::nullopt;
+   return obj.duration;
 }
 
-void from_json(Timeout& obj, auto& stream)
+Timeout timeoutFromJson(const std::optional<std::chrono::microseconds>& us)
 {
-   std::optional<std::int64_t> us;
-   from_json(us, stream);
    if (us)
-   {
-      obj.duration = std::chrono::microseconds{*us};
-   }
-   else
-   {
-      obj = Timeout::none();
-   }
+      return Timeout{*us};
+   return Timeout::none();
 }
 
 std::filesystem::path option_path;
@@ -318,7 +307,7 @@ namespace psibase
       const auto& s = boost::program_options::validators::get_single_string(values);
       if (s.starts_with('{'))
       {
-         auto                    key = psio1::convert_from_json<ClaimKey>(s);
+         auto                    key = psio::from_ijson<ClaimKey>(s);
          std::shared_ptr<Prover> result;
 
          if (key.service.str() == "verify-sig")
@@ -419,14 +408,16 @@ struct NewKeyRequest
 {
    AccountNumber                    service;
    std::optional<std::vector<char>> rawData;
-   std::string                      device;
+   // The PKCS #11 token that holds the key; absent or empty: a key file
+   std::optional<std::string> device;
 };
 PSIO_REFLECT(NewKeyRequest, service, rawData, device);
 
 struct UnlockKeyringRequest
 {
-   std::string pin;
-   std::string device;
+   // Absent: the empty PIN
+   std::optional<std::string> pin;
+   std::string                device;
 };
 PSIO_REFLECT(UnlockKeyringRequest, pin, device);
 
@@ -438,7 +429,7 @@ PSIO_REFLECT(LockKeyringRequest, device);
 
 std::vector<char> pkcs11TokenKey(const std::string& uri)
 {
-   return psio1::composite_key(std::uint16_t{0}, std::uint8_t{0}, uri);
+   return psio::to_key(std::tuple{std::uint16_t{0}, std::uint8_t{0}, uri});
 }
 
 std::vector<char> pkcs11TokenKey(const pkcs11::token_info& token)
@@ -510,6 +501,26 @@ struct Perf
 };
 PSIO_REFLECT(Perf, timestamp, memory, tasks)
 
+// The I-JSON of a reply body. It is written on an HTTP thread, where
+// nothing catches: a value without a JSON text (a string that is not UTF-8,
+// such as the label of a PKCS #11 token may be) is answered as null.
+template <typename T>
+std::vector<char> jsonBody(const T& value)
+{
+   std::vector<char> json;
+   if (!psio::encode_json_checked(psio::ijson{}, value, json).ok())
+      json = {'n', 'u', 'l', 'l'};
+   return json;
+}
+
+// Appends text to a buffer
+struct TextWriter
+{
+   std::vector<char>& out;
+   void               write(char ch) { out.push_back(ch); }
+   void write(const char* data, std::size_t size) { out.insert(out.end(), data, data + size); }
+};
+
 void write_om_descriptor(std::string_view name,
                          std::string_view type,
                          std::string_view unit,
@@ -538,11 +549,18 @@ void write_om_descriptor(std::string_view name,
    stream.write('\n');
 }
 
+// A label value: a quoted string, escaped as a JSON string
+void write_om_label(std::string_view value, auto& stream)
+{
+   auto text = psio::to_ijson(value);
+   stream.write(text.data(), text.size());
+}
+
 void write_om_mem(std::string_view name, std::int64_t v, auto& stream)
 {
    std::string_view prefix = "psinode_memory_bytes{category=";
    stream.write(prefix.data(), prefix.size());
-   to_json(name, stream);
+   write_om_label(name, stream);
    stream.write("} ", 2);
    auto value = std::to_string(v);
    stream.write(value.data(), value.size());
@@ -584,9 +602,9 @@ void write_om_task_sample(std::string_view  name,
 {
    stream.write(name.data(), name.size());
    stream.write("{group=", 7);
-   to_json(task.group, stream);
+   write_om_label(task.group, stream);
    stream.write(",task=", 6);
-   to_json(std::to_string(task.id), stream);
+   write_om_label(std::to_string(task.id), stream);
    stream.write("} ", 2);
    stream.write(value.data(), value.size());
    stream.write('\n');
@@ -970,52 +988,17 @@ struct TLSConfig
 };
 PSIO_REFLECT(TLSConfig, certificate, key, trustfiles)
 
-struct ExtraConfigField
+// The value of a service-defined option: a string, or a list of strings for
+// an option that was given more than once. Its JSON is the bare string or
+// the bare array (an untagged variant).
+using ExtraConfigField = std::variant<std::string, std::vector<std::string>>;
+namespace psio
 {
-   std::variant<std::string, std::vector<std::string>> value;
-};
-
-void to_json(const ExtraConfigField& field, auto& stream)
-{
-   std::visit([&](auto& v) { to_json(v, stream); }, field.value);
-}
-
-void from_json(ExtraConfigField& field, auto& stream)
-{
-   auto t = stream.peek_token();
-   switch (t.get().type)
+   constexpr bool psio_is_untagged(const ::ExtraConfigField*)
    {
-      case psio1::json_token_type::type_bool:
-         field.value = stream.get_bool() ? "true" : "false";
-         break;
-      case psio1::json_token_type::type_string:
-         field.value = std::string(stream.get_string());
-         break;
-      case psio1::json_token_type::type_start_array:
-      {
-         std::vector<std::string> values;
-         stream.eat_token();
-         while (!stream.get_end_array_pred())
-         {
-            // bool or string
-            auto t = stream.peek_token();
-            if (t.get().type == psio1::json_token_type::type_bool)
-            {
-               values.push_back(stream.get_bool() ? "true" : "false");
-            }
-            else
-            {
-               values.push_back(std::string(stream.get_string()));
-            }
-         }
-         field.value = std::move(values);
-         break;
-      }
-      default:
-         throw std::runtime_error("Expected string or array");
-         break;
+      return true;
    }
-}
+}  // namespace psio
 
 using ExtraConfigFields = std::map<std::string, ExtraConfigField>;
 
@@ -1033,7 +1016,7 @@ ExtraConfigFields extraConfig(const std::vector<boost::program_options::option>&
       auto [pos, inserted] = result.try_emplace(std::string(key), option.value);
       if (!inserted)
       {
-         auto& value = std::get<std::vector<std::string>>(pos->second.value);
+         auto& value = std::get<std::vector<std::string>>(pos->second);
          value.insert(value.end(), option.value.begin(), option.value.end());
       }
    }
@@ -1042,8 +1025,10 @@ ExtraConfigFields extraConfig(const std::vector<boost::program_options::option>&
 
 struct PsinodeServiceConfig
 {
-   std::vector<std::string> argv;
-   ExtraConfigFields        config;
+   // The command line arguments that psinode did not recognize. A
+   // configuration written through x-admin does not carry them.
+   std::optional<std::vector<std::string>> argv;
+   ExtraConfigFields                       config;
    PSIO_REFLECT(PsinodeServiceConfig, argv, config)
 };
 
@@ -1068,7 +1053,19 @@ struct PsinodeConfig
              name.starts_with("service.");
    }
 };
-PSIO_REFLECT(PsinodeConfig,
+// The JSON of a PsinodeConfig: the "host" member of the configuration
+// document in HostConfigRow::config.
+struct PsinodeConfigJson
+{
+   AccountNumber                            producer;
+   std::vector<std::string>                 pkcs11_modules;
+   std::vector<http::any_listen_spec>       listen;
+   TLSConfig                                tls;
+   std::optional<std::chrono::microseconds> http_timeout;
+   std::uint64_t                            service_threads;
+   psio::json_value                         loggers;
+};
+PSIO_REFLECT(PsinodeConfigJson,
              producer,
              pkcs11_modules,
              listen,
@@ -1078,6 +1075,38 @@ PSIO_REFLECT(PsinodeConfig,
              http_timeout,
              service_threads,
              loggers);
+
+PsinodeConfigJson toJson(const PsinodeConfig& config)
+{
+   PsinodeConfigJson result{
+       .producer        = config.producer,
+       .pkcs11_modules  = config.pkcs11_modules,
+       .tls             = config.tls,
+       .http_timeout    = toJson(config.http_timeout),
+       .service_threads = config.service_threads,
+       .loggers         = config.loggers.toJson(),
+   };
+   for (const auto& l : config.listen)
+      result.listen.push_back(http::to_any_listen_spec(l));
+   return result;
+}
+
+// Throws std::runtime_error for a listen entry or a logger configuration
+// that is not valid.
+PsinodeConfig fromJson(PsinodeConfigJson&& config)
+{
+   PsinodeConfig result{
+       .producer        = config.producer,
+       .pkcs11_modules  = std::move(config.pkcs11_modules),
+       .tls             = std::move(config.tls),
+       .http_timeout    = timeoutFromJson(config.http_timeout),
+       .service_threads = config.service_threads,
+       .loggers         = psibase::loggers::Config::fromJson(config.loggers),
+   };
+   for (const auto& l : config.listen)
+      result.listen.push_back(http::from_any_listen_spec(l));
+   return result;
+}
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
 {
@@ -1144,8 +1173,28 @@ struct PsinodeCombinedConfig
 {
    PsinodeConfig        host;
    PsinodeServiceConfig service;
-   PSIO_REFLECT(PsinodeCombinedConfig, host, service)
 };
+
+// The configuration document in HostConfigRow::config:
+// {"host": PsinodeConfigJson, "service": PsinodeServiceConfig}
+struct PsinodeCombinedConfigJson
+{
+   PsinodeConfigJson    host;
+   PsinodeServiceConfig service;
+   PSIO_REFLECT(PsinodeCombinedConfigJson, host, service)
+};
+
+// Reads the configuration document. Throws std::runtime_error with the
+// reason when `text` is not one.
+PsinodeCombinedConfig parseCombinedConfig(std::string_view text)
+{
+   PsinodeCombinedConfigJson json;
+   if (auto status = psio::decode_json_checked(
+           psio::ijson{}, std::span<const char>{text.data(), text.size()}, json);
+       !status.ok())
+      throw std::runtime_error("host config: " + std::string(status.error().what));
+   return {.host = fromJson(std::move(json.host)), .service = std::move(json.service)};
+}
 
 void to_config(const PsinodeCombinedConfig& config, ConfigFile& file)
 {
@@ -1153,9 +1202,9 @@ void to_config(const PsinodeCombinedConfig& config, ConfigFile& file)
    for (const auto& [key, value] : config.service.config)
    {
       std::string_view section = PsinodeConfig::isNative(key) ? "service" : "";
-      if (auto* s = std::get_if<std::string>(&value.value))
+      if (auto* s = std::get_if<std::string>(&value))
          file.set(section, key, *s, "Service defined option");
-      else if (auto* v = std::get_if<std::vector<std::string>>(&value.value))
+      else if (auto* v = std::get_if<std::vector<std::string>>(&value))
          file.set(
              section, key, *v, [](std::string_view text) { return std::string(text); },
              "Service defined option");
@@ -1167,10 +1216,7 @@ HostConfigRow toHostConfig(const PsinodeConfig& config, const PsinodeServiceConf
    HostConfigRow result{
        .hostVersion = "psinode-" PSIBASE_VERSION_STRING,
    };
-   std::vector<char>   configText;
-   psio1::vector_stream stream(configText);
-   psio1::to_json(PsinodeCombinedConfig{config, extra}, stream);
-   result.config = std::string(configText.begin(), configText.end());
+   result.config = psio::to_ijson(PsinodeCombinedConfigJson{toJson(config), extra});
    return result;
 }
 
@@ -1455,7 +1501,9 @@ void run(const std::string&              db_path,
          auto key = pkcs11TokenKey(lib->GetTokenInfo(slot));
          if (auto row = secrets.get(key))
          {
-            auto pin = psio1::view<const UnlockKeyringRow>(*row).pin();
+            psibase::check(psio::validate_pssz<UnlockKeyringRow>(*row).ok(),
+                           "UnlockKeyringRow has invalid format");
+            auto pin = psio::pssz_view<UnlockKeyringRow>(*row).pin();
 
             auto pos = sessions.try_emplace(slot, lib, slot).first;
             pos->second->Login(std::string_view{pin.data(), pin.size()});
@@ -1471,7 +1519,7 @@ void run(const std::string&              db_path,
    RunQueue                runQueue{sharedState, std::chrono::milliseconds(proof_timeout_ms)};
    boost::asio::io_context chainContext;
 
-   auto shutdown_sockets = psio1::finally{[&system] { system->sockets->shutdown(); }};
+   auto shutdown_sockets = psibase::finally{[&system] { system->sockets->shutdown(); }};
 
    auto server_work = boost::asio::make_work_guard(chainContext);
 
@@ -1519,8 +1567,12 @@ void run(const std::string&              db_path,
    node.chain().onValidateHostConfig(
        [](std::span<const char> value)
        {
-          auto view   = psio1::view<const HostConfigRow>(value);
-          auto config = psio1::convert_from_json<PsinodeConfig>(view.config().unpack());
+          psibase::check(psio::validate_pssz<HostConfigRow>(value).ok(),
+                         "HostConfigRow has invalid format");
+          auto view = psio::pssz_view<HostConfigRow>(value);
+          // The document the change handler reads: the write is refused
+          // (the exception reaches the writer) when it is not one.
+          parseCombinedConfig(view.config().unpack());
        });
    node.chain().onChangeHostConfig(
        [&chainContext, &node, &db_path, &runResult, &http_config, &http_timeout, &service_threads,
@@ -1533,11 +1585,10 @@ void run(const std::string&              db_path,
                setPKCS11Libs]
               {
                  auto writer = system->sharedDatabase.createWriter();
-                 auto row    = system->sharedDatabase.kvGetSubjective(
-                     *writer, HostConfigRow::db, psio1::convert_to_key(hostConfigKey()));
-                 auto hostConfig = psio1::from_frac<HostConfigRow>(row.value());
-                 auto combinedConfig =
-                     psio1::convert_from_json<PsinodeCombinedConfig>(hostConfig.config);
+                 auto row = system->sharedDatabase.kvGetSubjective(*writer, HostConfigRow::db,
+                                                                   psio::to_key(hostConfigKey()));
+                 auto hostConfig = psio::from_pssz<HostConfigRow>(row.value());
+                 auto  combinedConfig = parseCombinedConfig(hostConfig.config);
                  auto& config = combinedConfig.host;
 
                  setPKCS11Libs(config.pkcs11_modules);
@@ -1584,11 +1635,21 @@ void run(const std::string&              db_path,
               {
                  auto writer = system->sharedDatabase.createWriter();
                  auto row    = system->sharedDatabase.kvGetSubjective(
-                     *writer, PendingShutdownRow::db, psio1::convert_to_key(pendingShutdownKey()));
+                     *writer, PendingShutdownRow::db, psio::to_key(pendingShutdownKey()));
                  if (!row)
                     return;
-                 auto shutdown  = psio1::from_frac<PendingShutdownRow>(row.value());
-                 runResult.args = psio1::convert_from_json<ShutdownArgs>(shutdown.args);
+                 auto         shutdown = psio::from_pssz<PendingShutdownRow>(row.value());
+                 ShutdownArgs args;
+                 if (auto status = psio::decode_json_checked(
+                         psio::ijson{}, std::span<const char>{shutdown.args}, args);
+                     !status.ok())
+                 {
+                    PSIBASE_LOG(psibase::loggers::generic::get(), error)
+                        << "Ignoring shutdown request with invalid arguments: "
+                        << status.error().what;
+                    return;
+                 }
+                 runResult.args = std::move(args);
 
                  shutdownTimer.setDeadline(chainContext, runResult.args->deadline);
 
@@ -1607,7 +1668,7 @@ void run(const std::string&              db_path,
        });
 
    auto stop_threads =
-       psio1::finally{[&chainContext, &tpool]
+       psibase::finally{[&chainContext, &tpool]
                      {
                         tpool.setNumThreads(0);
                         auto& ectx = static_cast<boost::asio::execution_context&>(chainContext);
@@ -1631,7 +1692,7 @@ void run(const std::string&              db_path,
       {
          boost::asio::post(chainContext,
                            [&node, callback = std::move(callback),
-                            transactions = psio1::from_frac<std::vector<SignedTransaction>>(
+                            transactions = psio::from_pssz<std::vector<SignedTransaction>>(
                                 packed_signed_transactions)] mutable
                            {
                               TransactionTrace trace;
@@ -1650,24 +1711,15 @@ void run(const std::string&              db_path,
       };
 
       http_config->get_perf = [sharedState](auto callback)
-      {
-         callback(
-             [result = get_perf(*sharedState)]() mutable
-             {
-                std::vector<char>   json;
-                psio1::vector_stream stream(json);
-                to_json(result, stream);
-                return json;
-             });
-      };
+      { callback([result = get_perf(*sharedState)]() mutable { return jsonBody(result); }); };
 
       http_config->get_metrics = [sharedState](auto callback)
       {
          callback(
              [result = get_perf(*sharedState)]() mutable
              {
-                std::vector<char>   data;
-                psio1::vector_stream stream(data);
+                std::vector<char> data;
+                TextWriter        stream{data};
                 to_openmetrics_text(result, stream);
                 return data;
              });
@@ -1680,27 +1732,19 @@ void run(const std::string&              db_path,
                            {
                               std::vector<Claim> result;
                               prover->get(result);
-                              callback(
-                                  [result = std::move(result)]() mutable
-                                  {
-                                     std::vector<char>   json;
-                                     psio1::vector_stream stream(json);
-                                     to_json(result, stream);
-                                     return json;
-                                  });
+                              callback([result = std::move(result)]() mutable
+                                       { return jsonBody(result); });
                            });
       };
 
       http_config->new_key = [&chainContext, &node, &prover, &db_path, &runResult, getPKCS11Slot](
                                  std::vector<char> json, auto callback)
       {
-         json.push_back('\0');
-         psio1::json_token_stream stream(json.data());
-         auto                    key = psio1::from_json<NewKeyRequest>(stream);
+         NewKeyRequest key;
+         if (auto status = psio::decode_json_checked(psio::ijson{}, json, key); !status.ok())
+            return callback(std::string(status.error().what));
          if (key.service.str() != "verify-sig")
-         {
-            throw std::runtime_error("Not implemented for native signing: " + key.service.str());
-         }
+            return callback("Not implemented for native signing: " + key.service.str());
          boost::asio::post(
              chainContext,
              [&node, &prover, &db_path, &runResult, getPKCS11Slot, callback = std::move(callback),
@@ -1710,9 +1754,9 @@ void run(const std::string&              db_path,
                 {
                    std::shared_ptr<Prover> result;
                    bool                    storeConfig = true;
-                   if (!key.device.empty())
+                   if (key.device && !key.device->empty())
                    {
-                      auto [lib, slot, sessions] = getPKCS11Slot(key.device);
+                      auto [lib, slot, sessions] = getPKCS11Slot(*key.device);
                       auto pos                   = sessions->find(slot);
                       check(pos != sessions->end(), "Device locked");
                       if (key.rawData)
@@ -1772,7 +1816,7 @@ void run(const std::string&              db_path,
                       std::vector<std::string> stringKeys;
                       for (const auto& k : allKeys)
                       {
-                         stringKeys.push_back(psio1::convert_to_json(k));
+                         stringKeys.push_back(psio::to_ijson(k));
                       }
                       file.set(
                           "", "key", stringKeys, [](std::string_view s) { return std::string(s); },
@@ -1784,14 +1828,7 @@ void run(const std::string&              db_path,
                       node.on_key_update();
                       runResult.keysChanged = true;
                    }
-                   callback(
-                       [result = std::move(claim)]() mutable
-                       {
-                          std::vector<char>   json;
-                          psio1::vector_stream stream(json);
-                          to_json(result, stream);
-                          return json;
-                       });
+                   callback([result = std::move(claim)]() mutable { return jsonBody(result); });
                 }
                 catch (std::exception& e)
                 {
@@ -1803,9 +1840,9 @@ void run(const std::string&              db_path,
       http_config->unlock_keyring = [&chainContext, &node, loadSessionKeys, getPKCS11Slot,
                                      &secrets](std::vector<char> json, auto callback)
       {
-         json.push_back('\0');
-         psio1::json_token_stream stream(json.data());
-         auto                    pin = psio1::from_json<UnlockKeyringRequest>(stream);
+         UnlockKeyringRequest pin;
+         if (auto status = psio::decode_json_checked(psio::ijson{}, json, pin); !status.ok())
+            return callback(std::string(status.error().what));
          boost::asio::post(chainContext,
                            [&node, getPKCS11Slot, &secrets, loadSessionKeys,
                             callback = std::move(callback), pin = std::move(pin)]() mutable
@@ -1814,13 +1851,14 @@ void run(const std::string&              db_path,
                               {
                                  auto [lib, slot, sessions] = getPKCS11Slot(pin.device);
                                  auto pos = sessions->try_emplace(slot, lib, slot).first;
-                                 pos->second->Login(pin.pin);
+                                 auto userPin = std::move(pin.pin).value_or(std::string());
+                                 pos->second->Login(userPin);
                                  loadSessionKeys(pos->second);
                                  node.on_key_update();
                                  UnlockKeyringRow row{
                                      .device = pkcs11::makeURI(lib->GetTokenInfo(slot)),
-                                     .pin    = std::move(pin.pin)};
-                                 secrets.put(pkcs11TokenKey(row.device), psio1::to_frac(row));
+                                     .pin    = std::move(userPin)};
+                                 secrets.put(pkcs11TokenKey(row.device), psio::to_pssz(row));
                                  callback(std::nullopt);
                               }
                               catch (std::exception& e)
@@ -1833,9 +1871,9 @@ void run(const std::string&              db_path,
       http_config->lock_keyring =
           [&chainContext, getPKCS11Slot, &secrets](std::vector<char> json, auto callback)
       {
-         json.push_back('\0');
-         psio1::json_token_stream stream(json.data());
-         auto                    id = psio1::from_json<LockKeyringRequest>(stream);
+         LockKeyringRequest id;
+         if (auto status = psio::decode_json_checked(psio::ijson{}, json, id); !status.ok())
+            return callback(std::string(status.error().what));
          boost::asio::post(
              chainContext,
              [getPKCS11Slot, &secrets, callback = std::move(callback), id = std::move(id)]() mutable
@@ -1887,14 +1925,8 @@ void run(const std::string&              db_path,
                                                          .unlocked = unlocked});
                                     }
                                  }
-                                 callback(
-                                     [result = std::move(result)]() mutable
-                                     {
-                                        std::vector<char>   json;
-                                        psio1::vector_stream stream(json);
-                                        to_json(result, stream);
-                                        return json;
-                                     });
+                                 callback([result = std::move(result)]() mutable
+                                          { return jsonBody(result); });
                               }
                               catch (std::exception& e)
                               {
@@ -1917,7 +1949,7 @@ void run(const std::string&              db_path,
       {
          Action act{.service = proxyServiceNum,
                     .method  = MethodNumber{"startSession"},
-                    .rawData = psio1::to_frac(std::tuple())};
+                    .rawData = psio::to_pssz(std::tuple())};
 
          BlockContext bc{*system, system->sharedDatabase.getHead(),
                          system->sharedDatabase.createWriter(), true};

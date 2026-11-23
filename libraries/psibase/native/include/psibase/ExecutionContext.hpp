@@ -14,7 +14,7 @@ namespace psibase
                 AccountNumber      service,
                 uint8_t            vmType,
                 uint8_t            vmVersion,
-                psio1::input_stream code);
+                std::span<const char> code);
 
    struct WasmCacheImpl;
    struct WasmCache

@@ -44,7 +44,7 @@ std::optional<psibase::HttpReply> XDelay::serveSys(psibase::HttpRequest        r
    {
       auto args       = request.query<WaitArgs>();
       auto expiration = std::chrono::time_point_cast<MicroSeconds>(
-          std::chrono::steady_clock::now() + psio1::convert_from_json<Seconds>(args.seconds));
+          std::chrono::steady_clock::now() + psio::from_ijson<Seconds>(args.seconds));
       auto table = open<DelayTable>();
       PSIBASE_SUBJECTIVE_TX
       {

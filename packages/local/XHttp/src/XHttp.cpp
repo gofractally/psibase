@@ -80,7 +80,7 @@ namespace
           info);
    }
 
-   std::string getUrl(const HttpRequestRef&        req,
+   std::string getUrl(const HttpRequestRef&       req,
                       std::int32_t                 socket,
                       std::string_view             rootHost,
                       std::optional<AccountNumber> subdomain = {})
@@ -159,7 +159,7 @@ namespace
    void sendNotFound(std::int32_t sock, const HttpRequestRef& req)
    {
       auto reply = error(HttpStatus::notFound, "The resource '" + req.target + "' was not found");
-      psibase::socketSend(sock, psio1::to_frac(std::move(reply)));
+      psibase::socketSend(sock, psio::to_pssz(std::move(reply)));
    }
 
    bool chainIsBooted()
@@ -177,17 +177,28 @@ namespace
 extern "C" [[clang::export_name("recv")]] void recv()
 {
    psibase::internal::receiver = XHttp::service;
-   auto act                    = getCurrentActionView();
+   auto act                    = getCurrentActionPacked();
 
-   auto [socket, data, flags] =
-       psio1::view<const std::tuple<std::int32_t, std::vector<char>, std::uint32_t>>(act->rawData());
+   using Args = std::tuple<std::int32_t, std::vector<char>, std::uint32_t>;
+   std::span<const char> args = act->rawData();
+   check(psio::validate_pssz<Args>(args).ok(), "invalid arguments of recv");
+   auto [socket, data, flags] = psio::pssz_view<Args>(args);
+   // Forwards the action as it is, to another service
+   auto forward = [&act](AccountNumber service, MethodNumber method)
+   {
+      auto action      = psio::as_mutable_view(act);
+      action.sender()  = XHttp::service;
+      action.service() = service;
+      action.method()  = method;
+      psibase::call(act.data(), act.size());
+   };
    // if this is a response to an HTTP request, send it to the owner
    auto                              requests = XHttp{}.open<ResponseHandlerTable>();
    std::optional<ResponseHandlerRow> row;
    bool                              accepted;
    PSIBASE_SUBJECTIVE_TX
    {
-      row = requests.get(socket.unpack());
+      row = requests.get(socket);
       if (row)
       {
          if (row->type == SocketType::http)
@@ -200,8 +211,8 @@ extern "C" [[clang::export_name("recv")]] void recv()
          else if (row->type == SocketType::handshake)
          {
             auto sockets = Native::session(KvMode::read).open<SocketTable>();
-            auto info    = sockets.get(socket.unpack());
-            check(info.has_value(), "Missing SocketInfo for " + std::to_string(socket.unpack()));
+            auto info    = sockets.get(socket);
+            check(info.has_value(), "Missing SocketInfo for " + std::to_string(socket));
             accepted = std::holds_alternative<WebSocketInfo>(info->info);
             if (accepted)
             {
@@ -220,6 +231,14 @@ extern "C" [[clang::export_name("recv")]] void recv()
       }
    }
 
+   // The data of an HTTP socket is a packed HttpReply
+   auto replyView = [&]
+   {
+      std::span<const char> reply = data;
+      check(psio::validate_pssz<psibase::HttpReply>(reply).ok(), "invalid HttpReply");
+      return psio::pssz_view<psibase::HttpReply>(reply);
+   };
+
    if (row)
    {
       if (row->type == SocketType::http)
@@ -227,23 +246,18 @@ extern "C" [[clang::export_name("recv")]] void recv()
          call(Action{.sender  = XHttp::service,
                      .service = row->service,
                      .method  = row->method,
-                     .rawData = psio1::to_frac(
-                         std::tuple(socket, psio1::view<const psibase::HttpReply>(data)))});
+                     .rawData = psio::to_pssz(std::tuple(socket, replyView()))});
       }
       else if (row->type == SocketType::handshake)
       {
          call(Action{.sender  = XHttp::service,
                      .service = row->service,
                      .method  = accepted ? row->method : row->err,
-                     .rawData = psio1::to_frac(std::tuple(
-                         socket, std::optional(psio1::view<const psibase::HttpReply>(data))))});
+                     .rawData = psio::to_pssz(std::tuple(socket, std::optional(replyView())))});
       }
       else
       {
-         act->sender()  = XHttp::service;
-         act->service() = row->service;
-         act->method()  = row->method;
-         psibase::call(act.data(), act.size());
+         forward(row->service, row->method);
 
          // It's safe to access this, because we still hold a closeLock
          check(socketSetFlags(socket, SocketFlags::recv, SocketFlags::recv) == 0,
@@ -252,32 +266,39 @@ extern "C" [[clang::export_name("recv")]] void recv()
       return;
    }
 
-   act->sender()  = XHttp::service;
-   act->service() = HttpServer::service;
-   act->method()  = MethodNumber{"recv"};
-   psibase::call(act.data(), act.size());
+   forward(HttpServer::service, MethodNumber{"recv"});
 }
 
 extern "C" [[clang::export_name("close")]] void closeSocket()
 {
    psibase::internal::receiver = XHttp::service;
-   auto act                    = getCurrentActionView();
+   auto act                    = getCurrentActionPacked();
 
-   auto [socket] = psio1::view<const std::tuple<std::int32_t>>(act->rawData());
+   std::span<const char> args = act->rawData();
+   check(psio::validate_pssz<std::tuple<std::int32_t>>(args).ok(), "invalid arguments of close");
+   auto [socket] = psio::pssz_view<std::tuple<std::int32_t>>(args);
    // if this is a response to an HTTP request, send it to the owner
    auto                              requests = XHttp{}.open<ResponseHandlerTable>();
    std::optional<ResponseHandlerRow> row;
    PSIBASE_SUBJECTIVE_TX
    {
-      row = requests.get(socket.unpack());
+      row = requests.get(socket);
    }
 
    if (row)
    {
+      // The error callback of a request or handshake takes the reply, if
+      // there is one, and declares maxDynamicData(0xffffffff): 4-byte
+      // offsets, which (socket, no reply) has here. The close callback of
+      // a websocket takes the socket alone, without a cap: 1-byte offsets.
+      // The two argument lists are different encodings.
       call(Action{.sender  = XHttp::service,
                   .service = row->service,
                   .method  = row->err,
-                  .rawData = psio1::to_frac(std::tuple(socket))});
+                  .rawData = row->type == SocketType::websocket
+                                 ? psio::to_pssz(std::tuple(socket))
+                                 : psio::to_pssz(std::tuple(
+                                       socket, std::optional<psibase::HttpReply>{}))});
 
       PSIBASE_SUBJECTIVE_TX
       {
@@ -286,15 +307,16 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
       return;
    }
 
-   act->sender()  = XHttp::service;
-   act->service() = HttpServer::service;
-   act->method()  = MethodNumber{"close"};
+   auto action      = psio::as_mutable_view(act);
+   action.sender()  = XHttp::service;
+   action.service() = HttpServer::service;
+   action.method()  = MethodNumber{"close"};
    psibase::call(act.data(), act.size());
 }
 
 #endif
 
-void XHttp::send(std::int32_t socket, psio1::view<const std::vector<char>> data, std::uint32_t flags)
+void XHttp::send(std::int32_t socket, psio::pssz_view<std::vector<char>> data, std::uint32_t flags)
 {
    if (socket == producer_multicast)
    {
@@ -377,25 +399,37 @@ void XHttp::autoClose(std::int32_t socket, bool value)
    auto sender = getSender();
    PSIBASE_SUBJECTIVE_TX
    {
-      // PendingRequestTable is compatible with TempPendingRequestTable,
-      // and we want to remove prevOwners if it is present
-      using AltTemporary = TemporaryTables<PendingRequestTable>;
-      auto requests      = Session{}.open<PendingRequestTable>();
-      auto owned         = AltTemporary{}.open<PendingRequestTable>();
-
-      auto from = value ? &requests : &owned;
-      auto to   = value ? &owned : &requests;
-      auto row  = from->get(socket);
-      if (row && row->owner == sender)
+      // A request that closes automatically is in the temporary table, any
+      // other in the session table. The temporary row may also hold
+      // prevOwners, which is dropped when the request moves. (The two row
+      // types are read as themselves: a row with known members of fixed
+      // size only cannot be read from the bytes of the wider one.)
+      auto requests = Session{}.open<PendingRequestTable>();
+      auto owned    = Temporary{}.open<TempPendingRequestTable>();
+      auto denied   = [&]
       {
-         from->remove(*row);
-         to->put(*row);
+         abortMessage(sender.str() + " cannot send a response on socket " +
+                      std::to_string(socket));
+      };
+      if (value)
+      {
+         if (auto row = requests.get(socket); row && row->owner == sender)
+         {
+            requests.remove(*row);
+            owned.put({.socket = row->socket, .owner = row->owner});
+         }
+         else if (auto row = owned.get(socket); !row || row->owner != sender)
+            denied();
       }
       else
       {
-         if (auto row = to->get(socket); !row || row->owner != sender)
-            abortMessage(sender.str() + " cannot send a response on socket " +
-                         std::to_string(socket));
+         if (auto row = owned.get(socket); row && row->owner == sender)
+         {
+            owned.remove(*row);
+            requests.put({.socket = row->socket, .owner = row->owner});
+         }
+         else if (auto row = requests.get(socket); !row || row->owner != sender)
+            denied();
       }
       auto mask = SocketFlags::autoClose | SocketFlags::lockClose;
       check(socketSetFlags(socket, mask, value ? mask : SocketFlags{}) == 0,
@@ -435,7 +469,7 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
    {
       abortMessage("Must set autoClose before sending a response");
    }
-   check(socketSend(socket, psio1::to_frac(result)) == 0, "socketSend failed");
+   check(socketSend(socket, psio::to_pssz(result)) == 0, "socketSend failed");
    PSIBASE_SUBJECTIVE_TX
    {
       check(socketSetFlags(socket, SocketFlags::lockClose, SocketFlags{}) == 0,
@@ -523,7 +557,7 @@ void XHttp::accept(std::int32_t socket, const psibase::HttpReply& reply)
    {
       handlers.put({.socket = socket, .type = SocketType::websocket, .service = sender});
    }
-   socketSend(socket, psio1::to_frac(reply));
+   socketSend(socket, psio::to_pssz(reply));
 }
 
 void XHttp::setCallback(std::int32_t          socket,
@@ -565,11 +599,11 @@ void XHttp::setCallback(std::int32_t          socket,
 void XHttp::log(LogMessage::Severity severity, std::string msg)
 {
    socketSend(SocketRow::log,
-              psio1::to_frac(LogMessage{
+              psio::to_pssz(LogMessage{
                   .message = std::move(msg), .severity = severity, .service = getSender()}));
 }
 
-std::string XHttp::rootHost(psio1::view<const std::string> host)
+std::string XHttp::rootHost(psio::pssz_view<std::string> host)
 {
    return std::string(getRootHost(host));
 }
@@ -629,8 +663,7 @@ auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
       if (request.contentType != "application/json")
          return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
 
-      auto body = psio1::convert_from_json<RegisteredServiceRow>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<RegisteredServiceRow>(request.body);
       PSIBASE_SUBJECTIVE_TX
       {
          open<RegServTable>().put(body);
@@ -646,8 +679,7 @@ auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
       if (request.contentType != "application/json")
          return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
 
-      auto service =
-          psio1::convert_from_json<AccountNumber>(std::string(request.body.begin(), request.body.end()));
+      auto service = psio::from_ijson<AccountNumber>(request.body);
       PSIBASE_SUBJECTIVE_TX
       {
          auto serverTable = open<RegServTable>();
@@ -668,7 +700,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
    auto act                    = getCurrentActionView();
    psibase::internal::receiver = act->service();
 
-   auto [sock, req] = psio1::from_frac<std::tuple<std::int32_t, HttpRequestRef>>(act->rawData());
+   auto [sock, req] = psio::from_pssz<std::tuple<std::int32_t, HttpRequestRef>>(act->rawData());
 
    auto owned    = Temporary{getReceiver(), KvMode::readWrite}.open<TempPendingRequestTable>();
    auto rootHost = getRootHost(req.host);
@@ -736,7 +768,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
       }
       if (reply)
       {
-         psibase::socketSend(sock, psio1::to_frac(std::move(*reply)));
+         psibase::socketSend(sock, psio::to_pssz(std::move(*reply)));
          return;
       }
    }
@@ -748,7 +780,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          auto reply = redirect(HttpStatus::found,
                                R"(<html><body>This psibase server is hosted at {}.</body></html>)",
                                location);
-         psibase::socketSend(sock, psio1::to_frac(std::move(reply)));
+         psibase::socketSend(sock, psio::to_pssz(std::move(reply)));
       }
       else
       {
@@ -772,14 +804,14 @@ extern "C" [[clang::export_name("serve")]] void serve()
              HttpStatus::found,
              R"(<html><body>Node is not connected to any psibase network.  Visit {} for node setup.</body></html>)",
              location);
-         psibase::socketSend(sock, psio1::to_frac(std::move(reply)));
+         psibase::socketSend(sock, psio::to_pssz(std::move(reply)));
       }
       else
       {
          auto reply =
              error(HttpStatus::serviceUnavailable,
                    "<html><body>Node is not connected to any psibase network.</body></html>");
-         psibase::socketSend(sock, psio1::to_frac(std::move(reply)));
+         psibase::socketSend(sock, psio::to_pssz(std::move(reply)));
       }
       return;
    }

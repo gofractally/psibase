@@ -45,7 +45,10 @@ if(DEFINED IS_WASM)
     add_library(psio::psio ALIAS psio)
     target_include_directories(psio INTERFACE
         "${psio_cpp}/include" "${psio_cpp}/external/xxhash")
-    target_compile_definitions(psio INTERFACE PSIO_EXCEPTIONS_ENABLED=0 PSIO_HAVE_SIMDJSON=0)
+    # A failed checked decode reports through psibase::abortMessage: PSIO calls
+    # psibase_psio_codec_abort (libpsibase, common/src/codecAbort.cpp).
+    target_compile_definitions(psio INTERFACE PSIO_EXCEPTIONS_ENABLED=0 PSIO_HAVE_SIMDJSON=0
+        PSIO_CODEC_ABORT_HANDLER=psibase_psio_codec_abort)
     target_compile_features(psio INTERFACE cxx_std_23)
     target_link_libraries(psio INTERFACE boost)
     # The SDK ships the same headers, laid out as PSIO's own install does.
@@ -54,7 +57,6 @@ if(DEFINED IS_WASM)
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psio/external COMPONENT libpsibase)
 endif()
 
-add_subdirectory(psio1)
 add_subdirectory(psibase)
 
 if(DEFINED IS_NATIVE)

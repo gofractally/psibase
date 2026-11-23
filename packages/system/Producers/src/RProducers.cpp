@@ -85,6 +85,7 @@ PSIO_REFLECT(ProducerQuery,
              method(nextConsensus),
              method(jointStart),
              method(maxProds))
+PSIO_TYPE_ATTRS(ProducerQuery, psio::graphql::name_as{"Query"})
 
 std::optional<HttpReply> RProducers::serveSys(HttpRequest request)
 {

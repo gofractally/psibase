@@ -1,5 +1,4 @@
 #pragma once
-#include <psibase/MethodArgs.hpp>
 #include <psibase/api.hpp>
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
@@ -7,8 +6,12 @@
 #include <psibase/export.hpp>
 #include <psibase/serviceState.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/fracpack.hpp>
-#include <psio1/nested.hpp>
+#include <psio/buffer.hpp>
+#include <psio/mutable_view.hpp>
+#include <psio/nested.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
+#include <psio/wire_type.hpp>
 
 namespace psibase
 {
@@ -24,6 +27,18 @@ namespace psibase
    template <std::size_t I, auto MemberPtr>
    inline constexpr MethodNumber methodNumber{psio::reflect<
        typename psio::method_traits<decltype(MemberPtr)>::class_type>::template method_name<I>};
+
+   /// The class whose reflection lists the method `MemberPtr` points to
+   template <auto MemberPtr>
+   using MethodClass = typename psio::method_traits<decltype(MemberPtr)>::class_type;
+
+   /// The value method `I` of `T` returns, as it is packed
+   ///
+   /// A method that returns a view of `X` returns a packed `X`; `void` for a
+   /// method that returns nothing.
+   template <typename T, std::size_t I>
+   using MethodResult =
+       psio::wire_type_t<typename psio::reflect<T>::template method_result<I>>;
 
    /**
     *  When an action is called it returns
@@ -46,62 +61,54 @@ namespace psibase
       template <std::size_t I, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
-         using param_tuple = MethodArgs<decltype(MemberPtr)>;
-
-         static_assert(std::tuple_size<param_tuple>() <= sizeof...(Args),
-                       "too few arguments passed to method");
-         static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
-                       "too many arguments passed to method");
-
          return psibase::Action{sender, receiver, methodNumber<I, MemberPtr>,
-                                psio1::convert_to_frac(param_tuple(std::forward<Args>(args)...))};
+                                psio::method_args_to_pssz<MethodClass<MemberPtr>, I>(
+                                    std::forward<Args>(args)...)};
       }
    };
 
    template <typename T>
    struct ImportView
    {
-      psio1::shared_view_ptr<exportType<T>>         raw;
-      psio1::shared_view_ptr<std::vector<KvHandle>> handles;
-      T unpack() const { return psibaseImport((T*)nullptr, *raw, *handles); }
+      psio::shared_pssz<exportType<T>>         raw;
+      psio::shared_pssz<std::vector<KvHandle>> handles;
+      T unpack() const { return psibaseImport((T*)nullptr, raw.unpack(), handles.unpack()); }
    };
 
+   /// Calls a service with a packed [Action] and returns its packed result
+   ///
+   /// `R` is the type of the result as it is packed. The bytes the callee
+   /// returned are validated as an `R`.
    template <typename R>
    auto fraccall(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
    {
       auto result_size = raw::call(packed_action.data(), packed_action.size(), flags);
       if constexpr (not std::is_same_v<void, R>)
       {
-         if constexpr (hasExport<R>)
+         auto getPacked = [&]<typename U>(std::uint32_t size)
          {
-            psio1::shared_view_ptr<exportType<R>> result(psio1::size_tag{result_size});
-            raw::getResult(result.data(), result_size, 0);
-            if (!result.validate())
+            auto bytes = getResult(size);
+            if (!psio::validate_pssz<U>(bytes).ok())
             {
-               psio1::view<const Action> action(
-                   psio1::prevalidated<std::span<const char>>{packed_action});
-               auto method_name = action.method().unpack().str();
+               psio::pssz_view<Action> action{packed_action};
+               auto                    method_name = action.method().unpack().str();
                check(false, std::string("value returned from ") + method_name +
                                 " was not serialized as expected");
             }
-            auto                                         handles_size = raw::importHandles();
-            psio1::shared_view_ptr<std::vector<KvHandle>> handles(psio1::size_tag{handles_size});
-            raw::getResult(handles.data(), handles_size, 0);
+            return psio::shared_pssz<U>::unchecked(std::move(bytes));
+         };
+         if constexpr (hasExport<R>)
+         {
+            auto result       = getPacked.template operator()<exportType<R>>(result_size);
+            auto handles_size = raw::importHandles();
+            // The host wrote the handles
+            auto handles =
+                psio::shared_pssz<std::vector<KvHandle>>::unchecked(getResult(handles_size));
             return ImportView<R>{std::move(result), std::move(handles)};
          }
          else
          {
-            psio1::shared_view_ptr<R> result(psio1::size_tag{result_size});
-            raw::getResult(result.data(), result_size, 0);
-            if (!result.validate())
-            {
-               psio1::view<const Action> action(
-                   psio1::prevalidated<std::span<const char>>{packed_action});
-               auto method_name = action.method().unpack().str();
-               check(false, std::string("value returned from ") + method_name +
-                                " was not serialized as expected");
-            }
-            return result;
+            return getPacked.template operator()<R>(result_size);
          }
       }
    }
@@ -109,8 +116,7 @@ namespace psibase
    template <typename T>
    auto fraccall(const Action& a, CallFlags flags = CallFlags::none)
    {
-      auto packed_action = psio1::convert_to_frac(a);
-      return fraccall<T>(psio1::convert_to_frac(a), flags);
+      return fraccall<T>(psio::to_pssz(a), flags);
    }
 
    template <typename T>
@@ -119,10 +125,14 @@ namespace psibase
       AccountNumber   sender;   ///< Account sending the action
       AccountNumber   service;  ///< Service to execute the action
       MethodNumber    method;   ///< Service method to execute
-      psio1::nested<T> rawData;  ///< Data for the method
+      psio::nested<T> rawData;  ///< Data for the method
       PSIO_REFLECT(TypedAction, sender, service, method, rawData)
    };
 
+   /// Packs an action: the result is a packed [Action] whose `rawData`
+   /// is typed as the method's argument tuple. The caller owns the bytes
+   /// and may overwrite a fixed-size argument in place
+   /// (`psio::as_mutable_view`) to send the action again.
    struct ActionViewProxy
    {
       ActionViewProxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
@@ -130,39 +140,15 @@ namespace psibase
       AccountNumber sender;
       AccountNumber receiver;
 
-      template <typename... T, typename... U>
-      auto packImpl(std::tuple<T...>*,
-                    std::tuple<U...>*,
-                    MethodNumber method,
-                    const std::conditional_t<psio1::PackableAs<U, T>, U, T>&... args) const
-      {
-         using Args = std::tuple<decltype(args)...>;
-         TypedAction<Args> action{sender, receiver, method, {Args(args...)}};
-         psio1::size_stream ss;
-         psio1::to_frac(action, ss);
-         check(ss.size <= std::numeric_limits<uint32_t>::max(), "packImpl: size overflow");
-         psio1::shared_view_ptr<TypedAction<std::tuple<T...>>> result(
-             psio1::size_tag{static_cast<uint32_t>(ss.size)});
-         psio1::fast_buf_stream stream(result.data(), result.size());
-         psio1::to_frac(action, stream);
-         return result;
-      }
-
-      // An argument is packed as its own (decayed) type when that has the
-      // packed form of the parameter, and is converted to the parameter's
-      // type otherwise.
       template <std::size_t I, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
-         using param_tuple = MethodArgs<decltype(MemberPtr)>;
-
-         static_assert(std::tuple_size<param_tuple>() <= sizeof...(Args),
-                       "too few arguments passed to method");
-         static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
-                       "too many arguments passed to method");
-
-         return packImpl((param_tuple*)nullptr, (std::tuple<std::decay_t<Args>...>*)nullptr,
-                         methodNumber<I, MemberPtr>, std::forward<Args>(args)...);
+         using Class = MethodClass<MemberPtr>;
+         using Tuple = typename psio::reflect<Class>::template method_arg_tuple<I>;
+         return psio::pssz_buffer<TypedAction<Tuple>>::unchecked(
+             psio::to_pssz(Action{sender, receiver, methodNumber<I, MemberPtr>,
+                                  psio::method_args_to_pssz<Class, I>(
+                                      std::forward<Args>(args)...)}));
       }
    };
 
@@ -185,8 +171,7 @@ namespace psibase
       {
          auto act = ActionViewProxy(sender, receiver)
                         .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
-         return psibase::fraccall<MethodResult<decltype(MemberPtr)>>(act.data_without_size_prefix(),
-                                                                     flags);
+         return psibase::fraccall<MethodResult<MethodClass<MemberPtr>, I>>(act.bytes(), flags);
       }
    };
 
@@ -206,11 +191,11 @@ namespace psibase
       {
          auto act          = ActionViewProxy(sender, receiver)
                                  .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
-         using result_type = MethodResult<decltype(MemberPtr)>;
+         using result_type = MethodResult<MethodClass<MemberPtr>, I>;
          if constexpr (not std::is_void_v<result_type>)
-            return psibase::fraccall<result_type>(act.data_without_size_prefix(), flags).unpack();
+            return psibase::fraccall<result_type>(act.bytes(), flags).unpack();
          else
-            psibase::fraccall<void>(act.data_without_size_prefix(), flags);
+            psibase::fraccall<void>(act.bytes(), flags);
       }
    };
 
@@ -227,22 +212,20 @@ namespace psibase
       AccountNumber sender;
       EventDb       event_log;
 
+      // The payload of an event is the packed argument tuple of its method
       template <std::size_t I, auto MemberPtr, typename... Args>
       EventNumber call(Args&&... args) const
       {
-         using param_tuple = MethodArgs<decltype(MemberPtr)>;
-         static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
-                       "insufficient arguments passed to method");
-
-         auto type   = methodNumber<I, MemberPtr>;
-         auto action = TypedAction{
+         auto   type = methodNumber<I, MemberPtr>;
+         Action action{
              .sender  = sender,
              .service = AccountNumber{"events"},
              .method  = MethodNumber{"event"},
-             .rawData =
-                 psio1::nested{std::tuple(event_log, type, psio1::nested{param_tuple(args...)})},
+             .rawData = psio::to_pssz(std::tuple(
+                 event_log, type,
+                 psio::method_args_to_pssz<MethodClass<MemberPtr>, I>(std::forward<Args>(args)...))),
          };
-         return fraccall<EventNumber>(psio1::to_frac(action)).unpack();
+         return fraccall<EventNumber>(action).unpack();
       }
    };
 

@@ -22,7 +22,7 @@ const zAccountPage = z.object({
         ),
         pageInfo: z.object({
             hasNextPage: z.boolean(),
-            endCursor: z.string(),
+            endCursor: z.string().nullable(),
         }),
     }),
 });

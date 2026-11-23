@@ -1,7 +1,8 @@
 #pragma once
 
-namespace psio1
+namespace psibase
 {
+   /// Runs `f` when the object goes out of scope
    template <typename F>
    struct finally
    {
@@ -11,4 +12,4 @@ namespace psio1
 
    template <typename F>
    finally(F) -> finally<F>;
-}  // namespace psio1
+}  // namespace psibase

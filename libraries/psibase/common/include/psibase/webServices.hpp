@@ -34,7 +34,7 @@ namespace psibase
       ///
       /// Services that rely on socket or user must verify that the sender is HttpServer.
       //
-      // Note: intentionally doesn't use psio1::const_view, since that complicates documentation.
+      // Note: intentionally a plain span rather than a view type, which would complicate documentation.
       //       implementations of this interface may, of course, use it.
       std::optional<HttpReply> serveSys(HttpRequest                  request,
                                         std::optional<std::int32_t>  socket,

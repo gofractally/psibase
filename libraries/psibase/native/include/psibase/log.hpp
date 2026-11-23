@@ -11,6 +11,7 @@
 #include <boost/program_options/variables_map.hpp>
 
 #include <psibase/block.hpp>
+#include <psio/json_value.hpp>
 
 #include <cstdint>
 #include <span>
@@ -67,17 +68,21 @@ namespace psibase
 
       class Config;
       void configure(const Config&);
-      void from_json(Config&, psio1::json_token_stream&);
-      void to_json(const Config&, psio1::vector_stream&);
       void to_config(const Config& obj, ConfigFile& file);
       class Config
       {
         public:
+         /// The configuration of the running loggers
          static Config get();
+         /// Reads `{"<logger>": {"type", "filter", "format", <options of
+         /// the sink type>}, ...}`. Throws `std::runtime_error` when `json`
+         /// is not such a document, or a filter, a format or an option
+         /// does not parse.
+         static Config fromJson(const psio::json_value& json);
+         /// The same document, for the configuration this holds
+         psio::json_value toJson() const;
 
         private:
-         friend void from_json(Config&, psio1::json_token_stream&);
-         friend void to_json(const Config&, psio1::vector_stream&);
          friend void configure(const Config&);
          friend void to_config(const Config& obj, ConfigFile& file);
 

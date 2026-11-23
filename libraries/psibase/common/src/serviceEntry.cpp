@@ -1,5 +1,7 @@
 #include <psibase/serviceEntry.hpp>
 
+#include <cassert>
+
 namespace psibase
 {
    Action makeVerify(const Checksum256&    transactionHash,
@@ -8,7 +10,7 @@ namespace psibase
    {
       return {.service = claim.service,
               .method  = MethodNumber{"verifySys"},
-              .rawData = psio1::to_frac(std::tie(transactionHash, claim, proof))};
+              .rawData = psio::to_pssz(std::tie(transactionHash, claim, proof))};
    }
 
    Action makeVerify(const SignedTransaction& trx,
@@ -18,6 +20,6 @@ namespace psibase
       auto claims = trx.transaction->claims();
       assert(trx.proofs.size() == claims.size());
       assert(i < trx.proofs.size());
-      return makeVerify(transactionHash, claims[i], trx.proofs[i]);
+      return makeVerify(transactionHash, claims[i].unpack(), trx.proofs[i]);
    }
 }  // namespace psibase

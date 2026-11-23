@@ -8,6 +8,7 @@ import datetime
 from services import XAdmin
 from http.server import *
 import ssl
+import socket
 
 expected = "Lorem ipsum dolor sit amet"
 
@@ -19,6 +20,33 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+class NotUtf8Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = expected.encode('utf-8')
+        self.send_response(200)
+        # http.server writes header values as latin-1: the bytes FF FE
+        self.send_header('Content-Type', '\xff\xfe')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+def raw_request(socketpath, request):
+    """Sends bytes to the node and returns the status code of the reply, or None if
+    the node closed the connection without one."""
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.settimeout(10)
+        sock.connect(socketpath)
+        sock.sendall(request)
+        data = b''
+        while b'\r\n' not in data:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+    if not data.startswith(b'HTTP/1.1 '):
+        return None
+    return int(data[9:12])
 
 class HTTPSServer(HTTPServer):
     def __init__(self, certfile):
@@ -144,6 +172,64 @@ class TestFetch(unittest.TestCase):
             server.shutdown()
             t.join()
             server.server_close()
+
+    # host, method and contentType of HttpRequest, contentType of HttpReply and the
+    # name of an HttpHeader are declared UTF-8. Bytes from the network that are not
+    # UTF-8 must be answered with an error and must not stop the node.
+    @testutil.psinode_test
+    def test_request_not_utf8(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1))
+        host = ('x-admin.%s' % a.hostname).encode()
+
+        okay = b'GET /config HTTP/1.1\r\nHost: ' + host + b'\r\nConnection: close\r\n\r\n'
+        self.assertEqual(raw_request(a.socketpath, okay), 200)
+
+        bad_host = b'GET /config HTTP/1.1\r\nHost: \xff\xfe.' + host + b'\r\nConnection: close\r\n\r\n'
+        self.assertEqual(raw_request(a.socketpath, bad_host), 400)
+
+        bad_content_type = (b'POST /config HTTP/1.1\r\nHost: ' + host +
+                            b'\r\nContent-Type: text/\xff\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}')
+        self.assertEqual(raw_request(a.socketpath, bad_content_type), 400)
+
+        # A header name and a method are tokens (ASCII): the HTTP parser refuses the
+        # request before it becomes an HttpRequest. Today the node closes the
+        # connection without a reply, as for any request it cannot parse.
+        bad_name = b'GET /config HTTP/1.1\r\nHost: ' + host + b'\r\nX-\xff: 1\r\nConnection: close\r\n\r\n'
+        self.assertIn(raw_request(a.socketpath, bad_name), (400, None))
+
+        bad_method = b'G\xffT /config HTTP/1.1\r\nHost: ' + host + b'\r\nConnection: close\r\n\r\n'
+        self.assertIn(raw_request(a.socketpath, bad_method), (400, None))
+
+        # The node still answers
+        self.assertEqual(raw_request(a.socketpath, okay), 200)
+        XAdmin(a).get_config()
+
+    @testutil.psinode_test
+    def test_reply_not_utf8(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1))
+
+        a.install_local(['XProxy'])
+
+        server = HTTPServer(('', 0), NotUtf8Handler)
+
+        t = threading.Thread(target=server.serve_forever)
+        t.start()
+        try:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.server_address[1]}) as reply:
+                reply.raise_for_status()
+
+            with a.get('/', service='x-proxy', timeout=10) as reply:
+                status = reply.status_code
+
+            # The response is treated as a failed read
+            self.assertEqual(status, 502)
+        finally:
+            server.shutdown()
+            t.join()
+            server.server_close()
+
+        # The node still answers
+        XAdmin(a).get_config()
 
 if __name__ == '__main__':
     testutil.main()

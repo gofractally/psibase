@@ -5,8 +5,7 @@ The psibase build acquires canonical PSIO through it: `libraries/CMakeLists.txt`
 calls `psibase_acquire_dependency(psio)` for the native build and links the
 maintained `psio::psio` target; the WASM guest build and the installed SDK use
 the headers of that same source tree with `PSIO_EXCEPTIONS_ENABLED=0` and
-`PSIO_HAVE_SIMDJSON=0`. The legacy in-tree library is `psio1` and no longer
-collides with it. A project that still defines its own `psio` target before
+`PSIO_HAVE_SIMDJSON=0`. The legacy in-tree library is deleted. A project that still defines its own `psio` target before
 acquisition fails clearly.
 
 The pattern follows [psiserve at 28330232d7d156d201161dba3485a737f2b28a07](https://github.com/gofractally/psiserve/blob/28330232d7d156d201161dba3485a737f2b28a07/CMakeLists.txt#L86):

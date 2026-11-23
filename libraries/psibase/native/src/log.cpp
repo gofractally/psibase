@@ -3,8 +3,10 @@
 #include <psibase/log.hpp>
 #include <psibase/trace.hpp>
 
-#include <psio1/json/any.hpp>
-#include <psio1/to_json.hpp>
+#include <psio/json.hpp>
+#include <psio/json_value.hpp>
+#include <psio/stream.hpp>
+#include <psio/to_hex.hpp>
 
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/local/datagram_protocol.hpp>
@@ -43,6 +45,32 @@ namespace psibase::loggers
 
    namespace
    {
+      // The I-JSON of an attribute of a log record. A logger must not fail
+      // on what it is asked to log: a string with no JSON text (bytes that
+      // are not UTF-8, a Unicode noncharacter) is written with every byte
+      // outside ASCII replaced by U+FFFD, and any other value without a
+      // text as null.
+      template <typename T>
+      std::string logJson(const T& value)
+      {
+         std::string out;
+         if (psio::encode_json_checked(psio::ijson{}, value, out).ok())
+            return out;
+         if constexpr (std::is_same_v<T, std::string>)
+         {
+            std::string ascii;
+            for (char ch : value)
+            {
+               if (static_cast<unsigned char>(ch) < 0x80)
+                  ascii.push_back(ch);
+               else
+                  ascii += "\xEF\xBF\xBD";
+            }
+            if (psio::encode_json_checked(psio::ijson{}, ascii, out).ok())
+               return out;
+         }
+         return "null";
+      }
 
       template <typename S, typename T>
       void format_timestamp(S& os, const T& timestamp)
@@ -155,12 +183,12 @@ namespace psibase::loggers
 
          if (auto attr = boost::log::extract<std::string>("Host", rec))
          {
-            os << ",\"host\":" << psio1::convert_to_json(*attr);
+            os << ",\"host\":" << logJson(*attr);
          }
 
          if (auto attr = rec[boost::log::expressions::smessage])
          {
-            os << ",\"short_message\":" << psio1::convert_to_json(*attr);
+            os << ",\"short_message\":" << logJson(*attr);
          }
 
          if (auto timestamp =
@@ -184,22 +212,22 @@ namespace psibase::loggers
 
          if (auto attr = boost::log::extract<std::string>("RemoteEndpoint", rec))
          {
-            os << ",\"_remote_endpoint\":" << psio1::convert_to_json(*attr);
+            os << ",\"_remote_endpoint\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<Checksum256>("BlockId", rec))
          {
-            os << ",\"_block_id\":" << psio1::convert_to_json(*attr);
+            os << ",\"_block_id\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<BlockHeader>("BlockHeader", rec))
          {
-            os << ",\"_block_header\":" << psio1::convert_to_json(*attr);
+            os << ",\"_block_header\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<Checksum256>("TransactionId", rec))
          {
-            os << ",\"_transaction_id\":" << psio1::convert_to_json(*attr);
+            os << ",\"_transaction_id\":" << logJson(*attr);
          }
 
          os << '}';
@@ -212,17 +240,17 @@ namespace psibase::loggers
 
          if (auto attr = rec[boost::log::expressions::smessage])
          {
-            os << "\"Message\":" << psio1::convert_to_json(*attr);
+            os << "\"Message\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<std::string>("Host", rec))
          {
-            os << ",\"Host\":" << psio1::convert_to_json(*attr);
+            os << ",\"Host\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<std::string>("Process", rec))
          {
-            os << ",\"Process\":" << psio1::convert_to_json(*attr);
+            os << ",\"Process\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<boost::log::process_id>("ProcessId", rec))
@@ -270,34 +298,34 @@ namespace psibase::loggers
 
          if (auto attr = boost::log::extract<std::string>("RemoteEndpoint", rec))
          {
-            os << ",\"RemoteEndpoint\":" << psio1::convert_to_json(*attr);
+            os << ",\"RemoteEndpoint\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<Checksum256>("BlockId", rec))
          {
-            os << ",\"BlockId\":" << psio1::convert_to_json(*attr);
+            os << ",\"BlockId\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<BlockHeader>("BlockHeader", rec))
          {
-            os << ",\"BlockHeader\":" << psio1::convert_to_json(*attr);
+            os << ",\"BlockHeader\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<Checksum256>("TransactionId", rec))
          {
-            os << ",\"TransactionId\":" << psio1::convert_to_json(*attr);
+            os << ",\"TransactionId\":" << logJson(*attr);
          }
 
          if (auto attr = boost::log::extract<std::string>("RequestMethod", rec))
          {
-            os << ",\"Request\":{\"Method\":" << psio1::convert_to_json(*attr);
+            os << ",\"Request\":{\"Method\":" << logJson(*attr);
             if (auto target = boost::log::extract<std::string>("RequestTarget", rec))
             {
-               os << ",\"Target\":" << psio1::convert_to_json(*target);
+               os << ",\"Target\":" << logJson(*target);
             }
             if (auto host = boost::log::extract<std::string>("RequestHost", rec))
             {
-               os << ",\"Host\":" << psio1::convert_to_json(*host);
+               os << ",\"Host\":" << logJson(*host);
             }
             os << "}";
          }
@@ -645,28 +673,42 @@ namespace psibase::loggers
          boost::log::formatter format = json_formatter;
       };
 
-      void from_json(LogReaderConfig& obj, auto& stream)
+      // The text of a LogReaderConfig: {"filter": <text>, "format": <text>},
+      // both optional; other members are skipped.
+      struct LogReaderConfigText
       {
-         psio1::from_json_object(stream,
-                                [&](std::string_view key)
-                                {
-                                   if (key == "format")
-                                   {
-                                      obj.format = parse_formatter(stream.get_string());
-                                   }
-                                   else if (key == "filter")
-                                   {
-                                      obj.filter = parse_filter(stream.get_string());
-                                   }
-                                   else
-                                   {
-                                      psio1::from_json_skip_value(stream);
-                                   }
-                                });
+         std::optional<std::string> filter;
+         std::optional<std::string> format;
+         PSIO_REFLECT(LogReaderConfigText, filter, format)
+      };
+
+      // Throws std::runtime_error when `json` is not such a document or a
+      // filter / format does not parse.
+      LogReaderConfig parseLogReaderConfig(std::string_view json)
+      {
+         LogReaderConfigText text;
+         if (auto status = psio::decode_json_checked(
+                 psio::ijson{}, std::span<const char>{json.data(), json.size()}, text);
+             !status.ok())
+            throw std::runtime_error(std::string(status.error().what));
+         LogReaderConfig obj;
+         if (text.format)
+            obj.format = parse_formatter(*text.format);
+         if (text.filter)
+            obj.filter = parse_filter(*text.filter);
+         return obj;
       }
 
       // searchable with string_view
-      using sink_args_type = std::map<std::string, psio1::json::any, std::less<>>;
+      using sink_args_type = std::map<std::string, psio::json_value, std::less<>>;
+
+      // A sink option that must be a string
+      const std::string& as_string(const psio::json_value& value)
+      {
+         if (auto* result = value.as_string())
+            return *result;
+         throw std::runtime_error("Expected string");
+      }
 
       struct ConsoleSinkConfig
       {
@@ -957,7 +999,7 @@ namespace psibase::loggers
                throw std::runtime_error("Invalid repeating interval");
             }
             repeating_interval result;
-            psio1::input_stream stream(s.substr(2));
+            psio::input_stream stream(s.substr(2));
             if (!parse_timestamp(result.base, stream))
             {
                throw std::runtime_error("Invalid time point");
@@ -966,7 +1008,7 @@ namespace psibase::loggers
             {
                throw std::runtime_error("Expected /");
             }
-            result.d = parse_duration({stream.pos, stream.end});
+            result.d = parse_duration(std::string_view{stream.rest().data(), stream.remaining()});
             return result;
          };
          if (s.empty())
@@ -1019,17 +1061,6 @@ namespace psibase::loggers
                   p = std::filesystem::weakly_canonical(p.parent_path()) / p.filename();
                }
             };
-            auto as_string = [](const auto& value) -> const std::string&
-            {
-               if (auto* result = std::get_if<std::string>(&value.value()))
-               {
-                  return *result;
-               }
-               else
-               {
-                  throw std::runtime_error("Expected string");
-               }
-            };
             if (auto iter = args.find("target"); iter != args.end())
             {
                target = log_file_path / as_string(iter->second);
@@ -1054,6 +1085,14 @@ namespace psibase::loggers
                auto iter = args.find(key);
                if (iter != args.end())
                {
+                  // A number, or (64-bit integers beyond 2^53 - 1, and the
+                  // values read from the config file) its decimal string
+                  if (auto* n = iter->second.as_number())
+                  {
+                     if (auto v = n->as_uint64())
+                        return *v;
+                     throw std::runtime_error("Expected an integer");
+                  }
                   std::uint64_t result;
                   const auto&   s   = as_string(iter->second);
                   auto          err = std::from_chars(s.data(), s.data() + s.size(), result);
@@ -1078,7 +1117,7 @@ namespace psibase::loggers
             }
             if (auto iter = args.find("flush"); iter != args.end())
             {
-               if (auto* ptr = std::get_if<bool>(&iter->second.value()))
+               if (auto* ptr = iter->second.as_bool())
                {
                   flush = *ptr;
                }
@@ -1153,54 +1192,31 @@ namespace psibase::loggers
          bool                           needsScan      = true;
          bool                           updateCounter  = true;
       };
-      void to_json(const FileSinkConfig& obj, auto& stream)
+      // A 64-bit integer as I-JSON has it: a number up to 2^53 - 1, a decimal
+      // string beyond
+      psio::json_value ijsonInteger(std::uint64_t value)
       {
+         if (value <= ((std::uint64_t{1} << 53) - 1))
+            return psio::json_value{value};
+         return psio::json_value{std::to_string(value)};
+      }
+
+      void to_json(const FileSinkConfig& obj, psio::json_value& out)
+      {
+         constexpr auto unset = std::numeric_limits<std::uint64_t>::max();
          if (!obj.filename.empty())
-         {
-            stream.write(',');
-            psio1::to_json("filename", stream);
-            stream.write(':');
-            psio1::to_json(obj.filename.native(), stream);
-         }
+            out.set("filename", obj.filename.native());
          if (!obj.target.empty())
-         {
-            stream.write(',');
-            psio1::to_json("target", stream);
-            stream.write(':');
-            psio1::to_json(obj.target.native(), stream);
-         }
-         if (obj.rotationSize != std::numeric_limits<std::uint64_t>::max())
-         {
-            stream.write(',');
-            psio1::to_json("rotationSize", stream);
-            stream.write(':');
-            psio1::to_json(obj.rotationSize, stream);
-         }
+            out.set("target", obj.target.native());
+         if (obj.rotationSize != unset)
+            out.set("rotationSize", ijsonInteger(obj.rotationSize));
          if (!obj.rotationTime.empty())
-         {
-            stream.write(',');
-            psio1::to_json("rotationTime", stream);
-            stream.write(':');
-            psio1::to_json(obj.rotationTime, stream);
-         }
-         if (obj.maxFiles != std::numeric_limits<std::uint64_t>::max())
-         {
-            stream.write(',');
-            psio1::to_json("maxFiles", stream);
-            stream.write(':');
-            psio1::to_json(obj.maxFiles, stream);
-         }
-         if (obj.maxSize != std::numeric_limits<std::uint64_t>::max())
-         {
-            stream.write(',');
-            psio1::to_json("maxSize", stream);
-            stream.write(':');
-            psio1::to_json(obj.maxSize, stream);
-         }
-         stream.write(',');
-         psio1::to_json("flush", stream);
-         stream.write(':');
-         psio1::to_json(obj.flush, stream);
+            out.set("rotationTime", obj.rotationTime);
+         if (obj.maxFiles != unset)
+            out.set("maxFiles", ijsonInteger(obj.maxFiles));
+         if (obj.maxSize != unset)
+            out.set("maxSize", ijsonInteger(obj.maxSize));
+         out.set("flush", obj.flush);
       }
 
       struct LocalSocketBackend
@@ -1249,17 +1265,6 @@ namespace psibase::loggers
          using backend_type = LocalSocketBackend;
          explicit LocalSocketSinkConfig(const sink_args_type& args)
          {
-            auto as_string = [](const auto& value) -> const std::string&
-            {
-               if (auto* result = std::get_if<std::string>(&value.value()))
-               {
-                  return *result;
-               }
-               else
-               {
-                  throw std::runtime_error("Expected string");
-               }
-            };
             auto iter = args.find("path");
             if (iter == args.end())
             {
@@ -1280,12 +1285,9 @@ namespace psibase::loggers
          std::filesystem::path path;
          bool                  newPath = true;
       };
-      void to_json(const LocalSocketSinkConfig& obj, auto& stream)
+      void to_json(const LocalSocketSinkConfig& obj, psio::json_value& out)
       {
-         stream.write(',');
-         psio1::to_json("path", stream);
-         stream.write(':');
-         psio1::to_json(obj.path.native(), stream);
+         out.set("path", obj.path.native());
       }
 
       struct PipeBackend
@@ -1307,17 +1309,6 @@ namespace psibase::loggers
          using backend_type = PipeBackend;
          explicit PipeSinkConfig(const sink_args_type& args)
          {
-            auto as_string = [](const auto& value) -> const std::string&
-            {
-               if (auto* result = std::get_if<std::string>(&value.value()))
-               {
-                  return *result;
-               }
-               else
-               {
-                  throw std::runtime_error("Expected string");
-               }
-            };
             auto iter = args.find("command");
             if (iter == args.end())
             {
@@ -1349,14 +1340,6 @@ namespace psibase::loggers
          bool        newCommand = true;
       };
 
-      void to_json(const PipeSinkConfig& obj, auto& stream)
-      {
-         stream.write(',');
-         to_json("command", stream);
-         stream.write(':');
-         to_json(obj.command, stream);
-      }
-
       struct sink_config
       {
          boost::log::formatter format;
@@ -1369,35 +1352,37 @@ namespace psibase::loggers
              backend;
       };
 
-      void from_json(sink_config& obj, auto& stream)
+      // {"type": <text>, "filter": <text>, "format": <text>, <backend options>}.
+      // Throws std::runtime_error for a value of the wrong kind and for a
+      // filter, format or backend option that does not parse.
+      sink_config parse_sink_config(const psio::json_value& json)
       {
+         auto* members = json.as_object();
+         if (!members)
+            throw std::runtime_error("Expected a logger configuration object");
+         sink_config    obj;
          sink_args_type args;
-         psio1::from_json_object(stream,
-                                [&](std::string_view key)
-                                {
-                                   if (key == "format")
-                                   {
-                                      auto s         = stream.get_string();
-                                      obj.format_str = s;
-                                      obj.format     = parse_formatter(s);
-                                   }
-                                   else if (key == "filter")
-                                   {
-                                      auto s         = stream.get_string();
-                                      obj.filter_str = s;
-                                      obj.filter     = parse_filter(s);
-                                   }
-                                   else if (key == "type")
-                                   {
-                                      obj.type = stream.get_string();
-                                   }
-                                   else
-                                   {
-                                      psio1::json::any val;
-                                      psio1::json::from_json(val, stream);
-                                      args.try_emplace(std::string(key), std::move(val));
-                                   }
-                                });
+         for (const auto& [key, value] : *members)
+         {
+            if (key == "format")
+            {
+               obj.format_str = as_string(value);
+               obj.format     = parse_formatter(obj.format_str);
+            }
+            else if (key == "filter")
+            {
+               obj.filter_str = as_string(value);
+               obj.filter     = parse_filter(obj.filter_str);
+            }
+            else if (key == "type")
+            {
+               obj.type = as_string(value);
+            }
+            else
+            {
+               args.insert_or_assign(key, value);
+            }
+         }
          if (obj.type == "console")
          {
             obj.backend.emplace<ConsoleSinkConfig>(args);
@@ -1414,34 +1399,25 @@ namespace psibase::loggers
          {
             obj.backend.emplace<PipeSinkConfig>(args);
          }
+         return obj;
       }
 
-      void to_json(const sink_config& obj, auto& stream)
+      psio::json_value to_json(const sink_config& obj)
       {
-         stream.write('{');
-         psio1::to_json("type", stream);
-         stream.write(':');
-         psio1::to_json(obj.type, stream);
+         psio::json_value out{psio::json_value::object{}};
+         out.set("type", obj.type);
          if (!obj.filter_str.empty())
-         {
-            stream.write(',');
-            psio1::to_json("filter", stream);
-            stream.write(':');
-            psio1::to_json(obj.filter_str, stream);
-         }
-         stream.write(',');
-         psio1::to_json("format", stream);
-         stream.write(':');
-         psio1::to_json(obj.format_str, stream);
+            out.set("filter", obj.filter_str);
+         out.set("format", obj.format_str);
          if (auto* backend = std::get_if<FileSinkConfig>(&obj.backend))
          {
-            to_json(*backend, stream);
+            to_json(*backend, out);
          }
          else if (auto* backend = std::get_if<LocalSocketSinkConfig>(&obj.backend))
          {
-            to_json(*backend, stream);
+            to_json(*backend, out);
          }
-         stream.write('}');
+         return out;
       }
 
       template <typename Config>
@@ -2293,7 +2269,7 @@ namespace psibase::loggers
       {
          return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
          {
-            psio1::input_stream                    stream(value);
+            psio::input_stream                     stream(value);
             std::chrono::system_clock::time_point v;
             // TODO: allow optional subseconds
             if (!parse_timestamp(v, stream) || stream.remaining())
@@ -2313,7 +2289,7 @@ namespace psibase::loggers
          return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
          {
             Checksum256 v;
-            if (value.size() != v.size() * 2 || !psio1::unhex(v.begin(), value.begin(), value.end()))
+            if (value.size() != v.size() * 2 || !psio::from_hex(value, v))
             {
                throw std::runtime_error("Invalid value for " + name.string());
             }
@@ -2486,7 +2462,7 @@ namespace psibase::loggers
             {
                if (auto attr = boost::log::extract<BlockHeader>(name, rec))
                {
-                  stream << psio1::convert_to_json(*attr);
+                  stream << logJson(*attr);
                }
             };
          };
@@ -2505,7 +2481,7 @@ namespace psibase::loggers
             {
                if (auto attr = boost::log::extract<TransactionTrace>(name, rec))
                {
-                  stream << psio1::convert_to_json(*attr);
+                  stream << logJson(*attr);
                }
             };
          };
@@ -2935,25 +2911,12 @@ namespace psibase::loggers
          }
       };
 
-      void to_json(const log_config& obj, auto& stream)
+      psio::json_value to_json(const log_config& obj)
       {
-         bool first = true;
-         stream.write('{');
+         psio::json_value out{psio::json_value::object{}};
          for (const auto& [name, sink] : obj.sinks)
-         {
-            if (!first)
-            {
-               stream.write(',');
-            }
-            else
-            {
-               first = false;
-            }
-            psio1::to_json(name, stream);
-            stream.write(':');
-            to_json(sink.first, stream);
-         }
-         stream.write('}');
+            out.set(name, to_json(sink.first));
+         return out;
       }
 
       void check_logger_name(std::string_view name)
@@ -2979,10 +2942,7 @@ namespace psibase::loggers
    }
    std::string get_config()
    {
-      std::string         result;
-      psio1::string_stream stream{result};
-      to_json(log_config::instance(), stream);
-      return result;
+      return psio::to_ijson(to_json(log_config::instance()));
    }
 
    struct Config::Impl
@@ -3014,55 +2974,30 @@ namespace psibase::loggers
       }
    }
 
-   void from_json(Config& obj, psio1::json_token_stream& stream)
+   Config Config::fromJson(const psio::json_value& json)
    {
-      if (!obj.impl)
-      {
-         obj.impl.reset(new Config::Impl);
-      }
+      auto* members = json.as_object();
+      if (!members)
+         throw std::runtime_error("Expected an object of logger configurations");
+      Config obj;
+      obj.impl.reset(new Config::Impl);
       // Ensure that the format and filter parsers are initialized
       log_config::instance();
-      from_json_object(stream,
-                       [&](std::string_view key)
-                       {
-                          check_logger_name(key);
-                          sink_config cfg;
-                          from_json(cfg, stream);
-                          auto [iter, inserted] =
-                              obj.impl->sinks.try_emplace(std::string(key), std::move(cfg));
-                          if (!inserted)
-                          {
-                             iter->second = std::move(cfg);
-                          }
-                       });
+      for (const auto& [key, value] : *members)
+      {
+         check_logger_name(key);
+         obj.impl->sinks.insert_or_assign(key, parse_sink_config(value));
+      }
+      return obj;
    }
 
-   void to_json(const Config& obj, psio1::vector_stream& stream)
+   psio::json_value Config::toJson() const
    {
-      if (!obj.impl)
-      {
-         stream.write("{}", 2);
-      }
-      else
-      {
-         bool first = true;
-         stream.write('{');
-         for (const auto& [key, value] : obj.impl->sinks)
-         {
-            if (first)
-            {
-               first = false;
-            }
-            else
-            {
-               stream.write(',');
-            }
-            to_json(key, stream);
-            stream.write(':');
-            to_json(value, stream);
-         }
-         stream.write('}');
-      }
+      psio::json_value out{psio::json_value::object{}};
+      if (impl)
+         for (const auto& [key, value] : impl->sinks)
+            out.set(key, to_json(value));
+      return out;
    }
 
    void to_config_impl(const std::string& section, const ConsoleSinkConfig, ConfigFile& file) {}
@@ -3235,7 +3170,7 @@ namespace psibase::loggers
 
    void LogReader::config(std::string_view json)
    {
-      auto cfg = psio1::convert_from_json<LogReaderConfig>(std::string(json));
+      auto cfg = parseLogReaderConfig(json);
       impl->sink->set_filter(cfg.filter);
       impl->sink->set_formatter(cfg.format);
       if (!impl->registered)

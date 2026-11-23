@@ -46,5 +46,5 @@ namespace SystemService
    };
    PSIO_REFLECT(WsAuth,
                 method(serveSys, request, socket, user),
-                method(consume, ticket))
+                method(consume, attr(ticket, utf8)))
 }  // namespace SystemService

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <psibase/psibase.hpp>
-#include <psio1/view.hpp>
+#include <psio/pssz_view.hpp>
 #include <vector>
 
 namespace UserService

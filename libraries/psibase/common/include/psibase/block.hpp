@@ -5,10 +5,13 @@
 #include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/time.hpp>
+#include <psio/buffer.hpp>
+#include <psio/invariant.hpp>
+#include <psio/json.hpp>
+#include <psio/mutable_view.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/from_json.hpp>
-#include <psio1/shared_view_ptr.hpp>
-#include <psio1/to_json.hpp>
 
 namespace psibase
 {
@@ -34,10 +37,23 @@ namespace psibase
       friend bool operator==(const Action&, const Action&) = default;
       PSIO_REFLECT(Action, sender, service, method, rawData)
    };
-   inline constexpr bool psio_custom_schema(Action*)
+   // An action has no invariant of its own. It is declared with one so that
+   // a schema names it (the custom type "Action") and psibase's schema
+   // handlers can present it as {sender, service, method, data}.
+   inline psio::codec_status actionSchemaIdentity(const Action&) noexcept
    {
-      return true;
+      return psio::codec_ok();
    }
+}  // namespace psibase
+PSIO_INVARIANT(psibase::Action, psibase::actionSchemaIdentity, "Action")
+// PSIO refuses a mutable view of a type with an invariant (a write beneath
+// it would not run the check). This one accepts every value, and services
+// overwrite sender / service / method of a packed action in place
+// (psio::as_mutable_view): its extension point says so.
+template <>
+inline constexpr bool psio::detail::mutation_blocked_v<psibase::Action> = false;
+namespace psibase
+{
 
    struct GenesisService
    {
@@ -56,7 +72,7 @@ namespace psibase
    {
       std::string                 memo;
       std::vector<GenesisService> services;
-      PSIO_REFLECT(GenesisActionData, memo, services)
+      PSIO_REFLECT(GenesisActionData, attr(memo, utf8), services)
    };
 
    struct Claim
@@ -127,7 +143,7 @@ namespace psibase
    //       e.g. complication: there are at least 2 different header formats for gzip.
    struct SignedTransaction
    {
-      psio1::shared_view_ptr<Transaction> transaction;
+      psio::shared_pssz<Transaction> transaction;
 
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;
@@ -211,11 +227,6 @@ namespace psibase
    };
 
    using ConsensusData = std::variant<CftConsensus, BftConsensus>;
-
-   inline auto get_gql_name(ConsensusData*)
-   {
-      return "ConsensusData";
-   }
 
    struct Consensus
    {
@@ -372,3 +383,15 @@ namespace psibase
    };
 
 }  // namespace psibase
+
+// The GraphQL name of the union
+namespace psio::graphql
+{
+   template <typename T>
+   struct type_name;
+   template <>
+   struct type_name<psibase::ConsensusData>
+   {
+      static constexpr std::string_view value = "ConsensusData";
+   };
+}  // namespace psio::graphql

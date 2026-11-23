@@ -49,7 +49,7 @@ std::uint64_t XRun::verify(Checksum256       transactionHash,
    Action     act{.sender  = AccountNumber{},
                   .service = args.claim.service,
                   .method  = MethodNumber("verifySys"),
-                  .rawData = psio1::to_frac(args)};
+                  .rawData = psio::to_pssz(args)};
    auto       table = Native::subjective().open<RunTable>();
    RunRow     row{
            .id           = 0,

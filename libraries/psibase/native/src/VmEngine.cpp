@@ -99,10 +99,10 @@ namespace psibase
                 AccountNumber      service,
                 uint8_t            vmType,
                 uint8_t            vmVersion,
-                psio1::input_stream code)
+                std::span<const char> code)
    {
-      check(code.remaining(), "native setCode can't clear code");
-      auto codeHash = sha256(code.pos, code.remaining());
+      check(code.size(), "native setCode can't clear code");
+      auto codeHash = sha256(code.data(), code.size());
 
       auto account = database.kvGet<CodeRow>(CodeRow::db, codeKey(service));
       check(account.has_value(), "setCode: unknown service account");
@@ -120,7 +120,7 @@ namespace psibase
          codeObj->codeHash  = codeHash;
          codeObj->vmType    = vmType;
          codeObj->vmVersion = vmVersion;
-         codeObj->code.assign(code.pos, code.end);
+         codeObj->code.assign(code.begin(), code.end());
       }
       database.kvPut(CodeByHashRow::db, codeObj->key(), *codeObj);
    }  // setCode

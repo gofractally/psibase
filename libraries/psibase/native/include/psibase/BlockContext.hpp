@@ -70,9 +70,9 @@ namespace psibase
       // transaction. Entries that cannot be filled (including due to
       // errors) will be set to zero.
       std::vector<Checksum256>                 callPreverify(const SignedTransaction& trx);
-      void callRun(psio1::view<const RunRow> row,
+      void callRun(psio::pssz_view<RunRow> row,
                    std::optional<std::chrono::microseconds> proofTimeout = std::nullopt);
-      void                                     callTimer(psio1::view<const TimerRow> row);
+      void                                     callTimer(psio::pssz_view<TimerRow> row);
       Checksum256                              makeEventMerkleRoot();
       Checksum256                              makeTransactionMerkle();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision(

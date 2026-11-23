@@ -3,7 +3,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/name.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio1/chrono.hpp>
+#include <chrono>
 
 #include <optional>
 #include <string>
@@ -69,19 +69,22 @@ namespace SystemService
       requireNew,
    };
 
-   void from_json(NewAccountMode& obj, auto& stream)
-   {
-      std::uint32_t value;
-      from_json(value, stream);
-      psibase::check(value <= 2, "mode out of range");
-      obj = static_cast<NewAccountMode>(value);
-   }
+   PSIO_REFLECT_ENUM(NewAccountMode, keepExisting, matchExisting, requireNew)
 
-   void to_json(const NewAccountMode& obj, auto& stream)
+   /// A `NewAccountMode` is one of its three enumerators: any other value
+   /// is refused wherever one is read or written.
+   inline psio::codec_status newAccountModeInRange(const NewAccountMode& mode) noexcept
    {
-      to_json(static_cast<std::uint32_t>(obj), stream);
+      if (static_cast<std::uint8_t>(mode) <= static_cast<std::uint8_t>(NewAccountMode::requireNew))
+         return psio::codec_ok();
+      return psio::codec_fail("mode out of range", 0, "NewAccountMode");
    }
+}  // namespace SystemService
 
+PSIO_INVARIANT(SystemService::NewAccountMode, SystemService::newAccountModeInRange)
+
+namespace SystemService
+{
    /// This service facilitates the creation of new accounts
    ///
    /// Only the Accounts service itself and the `inviteService` may create new accounts.
@@ -174,13 +177,13 @@ namespace SystemService
                 method(getAuthOf, account),
                 method(exists, name),
                 method(incAuthSeq, name),
-                method(freeze, accounts, memo),
-                method(unfreeze, accounts, memo),
+                method(freeze, accounts, attr(memo, utf8)),
+                method(unfreeze, accounts, attr(memo, utf8)),
                 //
    )
 
    PSIBASE_REFLECT_TABLES(Accounts, Accounts::Tables)
    PSIBASE_REFLECT_HISTORY_EVENTS(Accounts,  //
-                                  method(froze, account, memo),
-                                  method(unfroze, account, memo))
+                                  method(froze, account, attr(memo, utf8)),
+                                  method(unfroze, account, attr(memo, utf8)))
 }  // namespace SystemService

@@ -12,7 +12,6 @@
 // Native only (it reads and writes a file of the source tree).
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Memo.hpp>
-#include <psibase/MethodArgs.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/SnapshotHeader.hpp>
@@ -56,12 +55,6 @@
 #include <psio/key.hpp>
 #include <psio/pssz.hpp>
 #include <psio/schema_builder.hpp>
-
-// TEMPORARY: removed when psio1 is deleted. The fixture also carries each
-// value as the legacy library packs it, so that the Rust test can require
-// the legacy Rust declaration -- what Rust writes until the wire flip -- to
-// pack the same bytes.
-#include <psio1/fracpack.hpp>
 
 #include <catch2/catch_all.hpp>
 
@@ -112,6 +105,11 @@ namespace
       return out + "\"";
    }
 
+   // The arguments of a method as they are packed: each parameter as the
+   // type it is on the wire.
+   template <typename... P>
+   std::tuple<psio::wire_type_t<P>...> wireTuple(std::tuple<P...>*);
+
    struct Fixture
    {
       psio::SchemaBuilder builder;
@@ -154,7 +152,8 @@ namespace
       template <auto Method, typename... Args>
       void call(std::string_view interface, std::string_view method, Args&&... args)
       {
-         psibase::MethodArgs<decltype(Method)> tuple{std::forward<Args>(args)...};
+         decltype(wireTuple((typename psio::method_traits<decltype(Method)>::params*)nullptr))
+             tuple{std::forward<Args>(args)...};
          if (!calls.empty())
             calls += ",\n";
          calls += "{\"interface\":" + jsonString(interface) + ",\"method\":" + jsonString(method) +
@@ -172,8 +171,7 @@ namespace
             vectors += "{\"type\":" + jsonString(name) +
                        ",\"pssz\":" + jsonString(hex(psio::to_pssz(value))) +
                        ",\"key\":" + jsonString(hex(psio::to_key(value))) +
-                       ",\"ijson\":" + jsonString(psio::to_ijson(value)) +
-                       ",\"frac\":" + jsonString(hex(psio1::convert_to_frac(value))) + "}";
+                       ",\"ijson\":" + jsonString(psio::to_ijson(value)) + "}";
          }
       }
 

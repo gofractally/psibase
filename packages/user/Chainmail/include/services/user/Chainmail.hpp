@@ -11,7 +11,7 @@ namespace UserService
      public:
       static constexpr auto service = psibase::AccountNumber("chainmail");
 
-      Chainmail(psio1::shared_view_ptr<psibase::Action> action);
+      Chainmail(psio::shared_pssz<psibase::Action> action);
 
       void init();
 
@@ -51,15 +51,15 @@ namespace UserService
    // clang-format off
    PSIO_REFLECT(Chainmail,
       method(init),
-      method(send, receiver, subject, body),
+      method(send, receiver, attr(subject, utf8), attr(body, utf8)),
       method(archive, msg_id),
-      method(save, msg_id, receiver, sender, subject, body, datetime),
-      method(unsave, msg_id, sender, subject, body, datetime),
+      method(save, msg_id, receiver, sender, attr(subject, utf8), attr(body, utf8), datetime),
+      method(unsave, msg_id, sender, attr(subject, utf8), attr(body, utf8), datetime),
       method(serveSys, request)
    );
    PSIBASE_REFLECT_HISTORY_EVENTS(Chainmail,
-      method(sent, sender, receiver, subject, body, datetime),
-      method(archive, msg_id),
+      method(sent, sender, receiver, attr(subject, utf8), attr(body, utf8), datetime),
+      method(archive, attr(msg_id, utf8)),
    );
    // clang-format on
 

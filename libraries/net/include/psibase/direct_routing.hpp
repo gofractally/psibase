@@ -11,7 +11,8 @@
 #include <psibase/log.hpp>
 #include <psibase/net_base.hpp>
 #include <psibase/routing_base.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <queue>
 #include <random>
 #include <vector>

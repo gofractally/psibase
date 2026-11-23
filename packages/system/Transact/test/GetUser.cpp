@@ -3,7 +3,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/dispatch.hpp>
-#include <psio1/to_json.hpp>
+#include <psio/json.hpp>
 #include <services/system/HttpServer.hpp>
 
 using namespace psibase;
@@ -17,8 +17,7 @@ struct GetUser : psibase::Service
    {
       check(getSender() == HttpServer::service, "Wrong sender");
       HttpReply           result{.contentType = "application/json"};
-      psio1::vector_stream stream{result.body};
-      psio1::to_json(user, stream);
+      psio::to_ijson(user, result.body);
       return result;
    }
 };

@@ -9,6 +9,7 @@
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
 #include <psibase/serveSimpleUI.hpp>
+#include <psio/to_hex.hpp>
 #include <regex>
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
@@ -503,7 +504,7 @@ namespace SystemService
          {
             std::string cspHeader =
                 getCspHeader(content, content->account, cspRootDomain(rootHost, request));
-            auto etag = psio1::hex(content->contentHash.data(), content->contentHash.data() + 8);
+            auto etag = psio::to_hex(content->contentHash.data(), content->contentHash.data() + 8);
 
             if (!notFound && useCache(content->account) && shouldCache(request, etag))
             {
@@ -854,19 +855,24 @@ namespace SystemService
          }
 
          /// Gets all file properties for a given site
-         auto getContent(AccountNumber account) const
+         auto getContent(AccountNumber                         account,
+                         psio::graphql::key_range<std::string> range,
+                         psio::graphql::page_args              page) const
          {
             auto tables = Sites::Tables{service, KvMode::read};
 
             auto idx =
                 tables.open<SitesContentTable>().getIndex<0>().subindex<std::string>(account);
 
-            return TransformedConnection(std::move(idx),
-                                         [](auto&& row)
+            return psio::graphql::paginate(
+                psio::graphql::transform(IndexView{std::move(idx)},
+                                         [](psio::shared_pssz<SitesContentRow> packed)
                                          {
-                                            row.csp = row.csp.value_or("");
+                                            auto row = packed.unpack();
+                                            row.csp  = row.csp.value_or("");
                                             return row;
-                                         });
+                                         }),
+                range, page, allRows);
          }
 
          /// Gets the file properties for a given site and path
@@ -883,9 +889,10 @@ namespace SystemService
             return result;
          }
       };
-      PSIO_REFLECT(Query,                                //
-                   method(getConfig, account),           //
-                   method(getContent, account),          //
+      PSIO_REFLECT(Query,                                  //
+                   attr(service, psio::graphql::hidden),   //
+                   method(getConfig, account),             //
+                   method(getContent, account, range, page),  //
                    method(getContentAt, account, path),  //
                    method(getDefaultCsp)                 //
       );

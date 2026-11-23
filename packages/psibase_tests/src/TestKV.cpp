@@ -1,8 +1,6 @@
 #include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
-#include <psio1/from_bin.hpp>
-#include <psio1/to_bin.hpp>
-#include <psio1/to_key.hpp>
+#include <psio/key.hpp>
 #include <services/test/TestKV.hpp>
 
 using namespace psibase;
@@ -57,11 +55,11 @@ void TestKV::test()
    if (enable_print)
       printf("kvPut\n");
 
-   auto handle = kvOpen(DbId::service, psio1::convert_to_key(thisService), KvMode::readWrite);
+   auto handle = kvOpen(DbId::service, psio::encode(psio::key{}, thisService), KvMode::readWrite);
 
    for (const auto& item : items)
       if (item.add)
-         kvPutRaw(handle, item.getKey(), psio1::convert_to_bin(item.value));
+         kvPutRaw(handle, item.getKey(), psio::to_pssz(item.value));
 
    if (enable_print)
       printf("kvRemove\n");
@@ -87,7 +85,7 @@ void TestKV::test()
       }
       check(!!result, "missing result");
       check(!!expected, "result exists");
-      auto val = psio1::convert_from_bin<uint8_t>(*result);
+      auto val = psio::from_pssz<uint8_t>(*result);
       if (val != *expected)
       {
          if (enable_print)
@@ -152,7 +150,7 @@ void TestKV::test()
          fflush(stdout);
       }
       run(0, item.max, key,
-          [](KvHandle db, psio1::input_stream key, size_t) { return kvMaxRaw(db, key); });
+          [](KvHandle db, std::span<const char> key, size_t) { return kvMaxRaw(db, key); });
       if (enable_print)
          printf("\n");
    }  // kvMax

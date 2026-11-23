@@ -1,89 +1,19 @@
 #pragma once
 #include <psibase/AccountNumber.hpp>
-#include <psibase/MethodArgs.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/api.hpp>
 #include <psibase/export.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/shapes.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 
 #include <array>
 #include <optional>
 
 namespace psibase
 {
-
-   template <typename T>
-   std::span<const char> find_view_span(psio1::view<T> v)
-   {
-      const char*   start       = psio1::get_view_data(v);
-      bool          has_unknown = false;
-      bool          known_end;
-      std::uint32_t pos = 0;
-      if (!psio1::is_packable<std::remove_cv_t<T>>::template unpack<false, true>(
-              nullptr, has_unknown, known_end, start, pos, 0xffffffffu))
-      {
-         static_assert(!psio1::is_std_optional_v<std::remove_cv_t<T>>,
-                       "Optional members are not stored in contiguous memory");
-         assert(!"View must be valid");
-         __builtin_unreachable();
-      }
-      if (known_end)
-         return {start, pos};
-      else
-         return {};
-   }
-
-   template <typename T>
-   constexpr bool is_view_v = false;
-   template <typename T>
-   constexpr bool is_view_v<psio1::view<T>> = true;
-
-   /// Calls `f` and sets its result as the return value of the current action
-   ///
-   /// `R` is the declared return type of the method `f` calls.
-   template <typename R, typename F>
-   void callMethod(F&& f)
-   {
-      if constexpr (std::is_void_v<R>)
-      {
-         f();
-      }
-      else if constexpr (is_view_v<R>)
-      {
-         R    v(f());
-         auto s = find_view_span(v);
-         check(s.data() != nullptr, "Cannot handle extensions in returned view");
-         raw::setRetval(s.data(), s.size());
-      }
-      else if constexpr (hasExport<R>)
-      {
-         std::vector<KvHandle>                 handles;
-         auto                                  result = f();
-         psio1::shared_view_ptr<exportType<R>> p(psibaseExport(result, handles));
-         raw::setRetval(p.data(), p.size());
-         exportHandles(handles);
-      }
-      else
-      {
-         psio1::shared_view_ptr<R> p(f());
-         raw::setRetval(p.data(), p.size());
-      }
-   }
-
-   template <typename F, typename T, std::size_t... I>
-   decltype(auto) tuple_call(F&& f, T&& t, std::index_sequence<I...>)
-   {
-      return f(psio1::get<I>(t)...);
-   }
-
-   template <typename F, typename T>
-   decltype(auto) tuple_call(F&& f, T&& t)
-   {
-      return tuple_call(f, t,
-                        std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<T>>>());
-   }
 
    /// Maps a method's name to its [MethodNumber]
    ///
@@ -110,34 +40,40 @@ namespace psibase
 
    /// Calls method `I` of `service` with the arguments of `act`
    ///
-   /// The arguments are validated, then read through a view. The method's
-   /// result is set as the return value of the current action.
+   /// `Action::rawData` is the packed argument tuple of the method
+   /// (`psio::reflect<Service>::method_arg_tuple<I>`). It is validated; the
+   /// method then receives each parameter as it declares it: a view, a
+   /// `std::string_view` or a span into the bytes, anything else unpacked.
+   /// The method's result is set as the return value of the current action.
    template <typename Service, std::size_t I>
-   void callAction(Service& service, const psio1::shared_view_ptr<Action>& act)
+   void callAction(Service& service, const psio::shared_pssz<Action>& act)
    {
       using reflect     = psio::reflect<Service>;
-      using method_type = typename reflect::template method_type<I>;
-      using result_type = typename reflect::template method_result<I>;
-      using param_tuple = MethodArgs<method_type>;
+      using result_type = std::remove_cvref_t<typename reflect::template method_result<I>>;
 
-      auto param_data = std::span<const char>{act->rawData().data(), act->rawData().size()};
-      psibase::check(psio1::fracpack_validate<param_tuple>(param_data),
-                     "invalid argument encoding for " + act->method().unpack().str());
+      std::span<const char> args = act->rawData();
+      if (auto status = psio::validate_method_args<Service, I>(args); !status.ok())
+         abortMessage("invalid argument encoding for " + act->method().unpack().str() + ": " +
+                      std::string(status.error().what));
 
-      psio1::view<const param_tuple> param_view(
-          psio1::prevalidated<std::span<const char>>{param_data});
-
-      tuple_call(
-          [&](auto... args)
-          {
-             callMethod<result_type>(
-                 [&]() -> decltype(auto)
-                 {
-                    return reflect::template invoke_method<I>(
-                        service, std::forward_as_tuple(std::move(args)...));
-                 });
-          },
-          param_view);
+      if constexpr (hasExport<result_type>)
+      {
+         std::vector<KvHandle> handles;
+         auto result = psio::invoke_method_pssz<Service, I>(service, psio::trusted{args});
+         auto packed = psio::to_pssz(psibaseExport(result, handles));
+         raw::setRetval(packed.data(), packed.size());
+         exportHandles(handles);
+      }
+      else
+      {
+         std::vector<char> result;
+         if (auto status = psio::call_method_pssz<Service, I>(service, psio::trusted{args}, result);
+             !status.ok())
+            abortMessage("cannot encode the value returned from " +
+                         act->method().unpack().str() + ": " + std::string(status.error().what));
+         if constexpr (!std::is_void_v<result_type>)
+            raw::setRetval(result.data(), result.size());
+      }
    }
 
    namespace detail
@@ -148,7 +84,7 @@ namespace psibase
       template <typename Service, std::size_t... I>
       struct ActionTable<Service, std::index_sequence<I...>>
       {
-         using Call = void (*)(Service&, const psio1::shared_view_ptr<Action>&);
+         using Call = void (*)(Service&, const psio::shared_pssz<Action>&);
          static constexpr std::array<Call, sizeof...(I)> calls = {&callAction<Service, I>...};
       };
    }  // namespace detail
@@ -170,7 +106,7 @@ namespace psibase
 
       auto makeService = [&]()
       {
-         if constexpr (std::is_constructible<Service, psio1::shared_view_ptr<psibase::Action>>{})
+         if constexpr (std::is_constructible<Service, psio::shared_pssz<psibase::Action>>{})
          {
             return Service{act};
          }
@@ -181,7 +117,7 @@ namespace psibase
       };
       auto service{makeService()};
 
-      if (auto index = findAction<Service>(act->method().unpack()))
+      if (auto index = findAction<Service>(act->method()))
          detail::ActionTable<Service>::calls[*index](service, act);
       else
          abortMessage("unknown service action: " + act->method().unpack().str());
@@ -234,7 +170,25 @@ namespace psibase
          {
             service = Service::service;
          }
-         std::cout << psio1::convert_to_json(ServiceSchema::make<Service>(service));
+         std::vector<ServiceSchema::Collision> collisions;
+         auto schema = ServiceSchema::make<Service>(service, &collisions);
+         if (!collisions.empty())
+         {
+            // Two different types of the service have one unqualified
+            // name: the schema would name each by its qualified C++
+            // spelling. Refused: give one of them another name.
+            for (const auto& collision : collisions)
+            {
+               std::cerr << "schema of " << service.str() << ": the name " << collision.name
+                         << " is used by more than one type:";
+               for (const auto& type : collision.types)
+                  std::cerr << " " << type;
+               std::cerr << std::endl;
+            }
+            return 1;
+         }
+         schema.checkValid();
+         std::cout << psio::to_ijson(schema);
       }
       else
       {

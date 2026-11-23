@@ -255,6 +255,7 @@ int main(int argc, const char* const* argv)
    if (int res = session.applyCommandLine(argc, argv))
       return res;
 
-   loggers::configure(psio1::convert_from_json<loggers::Config>(psio1::convert_to_json(logConfig)));
+   loggers::configure(
+       loggers::Config::fromJson(psio::from_ijson<psio::json_value>(psio::to_ijson(logConfig))));
    return session.run();
 }

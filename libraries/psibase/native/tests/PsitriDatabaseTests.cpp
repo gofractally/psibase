@@ -9,7 +9,7 @@
 #include <psibase/api.hpp>
 #include <psibase/db.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio1/to_key.hpp>
+#include <psio/key.hpp>
 #include <thread>
 using namespace psibase;
 namespace
@@ -32,7 +32,7 @@ namespace
    std::string value(Database& db, DbId id, std::string_view key = "contract")
    {
       auto v = db.kvGetRaw(id, span(key));
-      return v ? std::string(v->pos, v->end) : "<missing>";
+      return v ? std::string(v->begin(), v->end()) : "<missing>";
    }
    void put(Database& db, DbId id, std::string_view v, std::string_view key = "contract")
    {

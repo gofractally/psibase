@@ -44,7 +44,7 @@ namespace
    }
 }  // namespace
 
-Invite::Invite(psio1::shared_view_ptr<Action> action)
+Invite::Invite(psio::shared_pssz<Action> action)
 {
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
@@ -135,7 +135,7 @@ uint32_t Invite::createInvite(uint32_t             inviteId,
                               Quantity             resources)
 {
    std::vector<char> payloadChars(payload.begin(), payload.end());
-   auto              invPayload  = psio1::from_frac<InvPayload>(payloadChars);
+   auto              invPayload  = psio::from_pssz<InvPayload>(payloadChars);
    auto              fingerprint = invPayload.fingerprint;
 
    auto sender    = getSender();

@@ -65,7 +65,7 @@ namespace
              .rawData = {key.first.data.begin(), key.first.data.end()},
          });
       SignedTransaction signedTrx;
-      signedTrx.transaction = trx;
+      signedTrx.transaction = psio::shared_pssz<Transaction>{trx};
       auto hash             = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
       for (auto& [account, key] : keys)
       {
@@ -112,7 +112,7 @@ TEST_CASE("Test login")
 
    // User with no key
    {
-      SignedTransaction strx{trx};
+      SignedTransaction strx{psio::shared_pssz<Transaction>{trx}};
 
       auto token = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
                        .access_token;
@@ -123,7 +123,7 @@ TEST_CASE("Test login")
 
    // The same as JSON
    {
-      SignedTransaction strx{trx};
+      SignedTransaction strx{psio::shared_pssz<Transaction>{trx}};
 
       auto token = t.post<LoginReply>(Transact::service, "/login", JsonBody{std::move(strx)})
                        .access_token;
@@ -146,7 +146,7 @@ TEST_CASE("Test login")
             return true;
          }
       };
-      auto packed = psio1::to_frac(SignedTransaction{trx});
+      auto packed = psio::to_pssz(SignedTransaction{psio::shared_pssz<Transaction>{trx}});
       CHECK(refused(RawBody{"application/octet-stream", {}}));
       CHECK(refused(RawBody{"application/octet-stream", {'\x01', '\x02', '\x03'}}));
       CHECK(refused(RawBody{"application/octet-stream",
@@ -161,7 +161,7 @@ TEST_CASE("Test login")
    t.setAuth<AuthSig::AuthSig>(alice, aliceKeys.first);
    // Missing signature
    {
-      SignedTransaction strx{trx};
+      SignedTransaction strx{psio::shared_pssz<Transaction>{trx}};
       auto              reply = t.post(Transact::service, "/login", FracPackBody{std::move(strx)});
       CHECK(static_cast<int>(reply.status) >= 400);
    }
@@ -338,7 +338,7 @@ TEST_CASE("Test push_transaction")
 
       // Count items in queue
       std::size_t                       queueSize = 0;
-      TableIndex<RunRow, std::uint64_t> runIndex{RunRow::db, psio1::convert_to_key(runPrefix()),
+      TableIndex<RunRow, std::uint64_t> runIndex{RunRow::db, psio::encode(psio::key{}, runPrefix()),
                                                  false};
       for (auto _ : runIndex)
       {
@@ -429,7 +429,7 @@ TEST_CASE("Test push_transaction")
       auto   trx = t.makeTransaction({nop}, 5);
       trx.claims.push_back({.service = verifyFlags});
       auto strx =
-          SignedTransaction{psio1::shared_view_ptr<Transaction>{trx}, {psio1::to_frac(flags)}};
+          SignedTransaction{psio::shared_pssz<Transaction>{trx}, {psio::to_pssz(flags)}};
 
       SECTION("run in transact mode")
       {

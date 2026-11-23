@@ -2,12 +2,11 @@
 
 // Opt-in capture of an existing test's real block. This is verification
 // instrumentation, not a new workload or part of the chain wire format.
-#include <psibase/crypto.hpp>
-#include <psibase/check.hpp>
-#include <psibase/db.hpp>
-#include <psio1/from_json.hpp>
-#include <psio1/to_json.hpp>
 #include <openssl/evp.h>
+#include <psibase/check.hpp>
+#include <psibase/crypto.hpp>
+#include <psibase/db.hpp>
+#include <psio/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -138,8 +137,8 @@ namespace psibase::vm_consensus_replay
          std::vector<char> key;
          while (auto row = database.kvGreaterEqualRaw(id, key, 0))
          {
-            auto k = row->key.string_view();
-            auto v = row->value.string_view();
+            auto k = std::string_view{row->key.data(), row->key.size()};
+            auto v = std::string_view{row->value.data(), row->value.size()};
             check(k.size() <= (256ull << 20) && v.size() <= (256ull << 20),
                   "replay snapshot row exceeds explicit 256 MiB limit");
             writeUint(out, k.size(), 8);
@@ -284,7 +283,7 @@ namespace psibase::vm_consensus_replay
          manifest.proofClaims = claims;
          manifest.afterNamespaces = snapshot(shared, after, directory / "after.rows", false);
          manifest.afterSha256 = fileHash(directory / "after.rows");
-         auto bytes = psio1::to_frac(block);
+         auto bytes = psio::to_pssz(block);
          std::ofstream out(directory / "block.frac", std::ios::binary);
          out.exceptions(std::ios::badbit | std::ios::failbit);
          out.write(bytes.data(), bytes.size());
@@ -292,7 +291,7 @@ namespace psibase::vm_consensus_replay
          manifest.blockSha256 = fileHash(directory / "block.frac");
          std::ofstream json(directory / "manifest.json");
          json.exceptions(std::ios::badbit | std::ios::failbit);
-         json << psio1::convert_to_json(manifest) << '\n';
+         json << psio::to_ijson(manifest) << '\n';
          json.close();
          complete = true;
       }

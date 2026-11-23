@@ -155,7 +155,7 @@ SCENARIO("Producers")
          return Action{.sender  = acc,
                        .service = Nft::service,
                        .method  = "mint"_m,
-                       .rawData = psio1::to_frac(std::tuple())
+                       .rawData = psio::to_pssz(std::tuple())
 
          };
       };
@@ -175,7 +175,7 @@ SCENARIO("Producers")
 
          auto body = std::string(res.body.begin(), res.body.end());
          //psibase::writeConsole(body + "\n");
-         auto response_root = psio1::convert_from_json<QueryRoot>(body);
+         auto response_root = psio::from_ijson<QueryRoot>(body);
 
          return response_root.data.nfts.edges.size();
       };

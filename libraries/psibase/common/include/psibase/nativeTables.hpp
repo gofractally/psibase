@@ -280,7 +280,7 @@ namespace psibase
       std::string                  message;
       Severity                     severity = Severity::info;
       std::optional<AccountNumber> service;
-      PSIO_REFLECT(LogMessage, severity, message, service)
+      PSIO_REFLECT(LogMessage, severity, attr(message, utf8), service)
    };
 
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
@@ -360,10 +360,16 @@ namespace psibase
       MethodNumber  method;
       PSIO_REFLECT(ServiceMethod, service, method)
    };
-   inline constexpr bool psio_custom_schema(ServiceMethod*)
+   // No invariant: declared so that a schema names the type (the custom
+   // type "ServiceMethod", presented as {service, method}).
+   inline psio::codec_status serviceMethodSchemaIdentity(const ServiceMethod&) noexcept
    {
-      return true;
+      return psio::codec_ok();
    }
+}  // namespace psibase
+PSIO_INVARIANT(psibase::ServiceMethod, psibase::serviceMethodSchemaIdentity, "ServiceMethod")
+namespace psibase
+{
 
    using RunKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint64_t>;
    auto runPrefix() -> KeyPrefixType;
@@ -449,7 +455,7 @@ namespace psibase
       std::string       config;
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> HostConfigKeyType;
-      PSIO_REFLECT(HostConfigRow, hostVersion, config)
+      PSIO_REFLECT(HostConfigRow, attr(hostVersion, utf8), attr(config, utf8))
    };
    using HostConfigTable = Table<HostConfigRow, SingletonKey{}>;
 
@@ -474,7 +480,7 @@ namespace psibase
 
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> KeyPrefixType;
-      PSIO_REFLECT(PendingShutdownRow, args);
+      PSIO_REFLECT(PendingShutdownRow, attr(args, utf8));
    };
    using PendingShutdownTable = Table<PendingShutdownRow, SingletonKey{}>;
 

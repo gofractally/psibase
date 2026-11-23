@@ -23,7 +23,7 @@ namespace LocalService
       bool                     p2p = false;
       std::vector<std::string> hosts;
       std::vector<std::string> peers;
-      PSIO_REFLECT(AdminOptionsRow, p2p, hosts, peers)
+      PSIO_REFLECT(AdminOptionsRow, p2p, attr(hosts, element(utf8)), attr(peers, element(utf8)))
    };
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(AdminOptionsTable)
@@ -77,7 +77,7 @@ namespace LocalService
       AdminOptionsRow options();
    };
    PSIO_REFLECT(XAdmin,
-                method(isAdmin, account, socket),
+                method(isAdmin, account, socket, forwardedFor),
                 method(checkAuth, req, socket),
                 method(serveSys, req, socket),
                 method(startSession),

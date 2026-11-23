@@ -2,7 +2,7 @@
 
 #include <psibase/dispatch.hpp>
 #include <psibase/serveGraphQL.hpp>
-#include <psio1/to_hex.hpp>
+#include <psio/to_hex.hpp>
 #include <services/system/CommonApi.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
@@ -12,7 +12,7 @@
 using namespace psibase;
 using namespace SystemService;
 
-using SharedBlock = psio1::shared_view_ptr<Block>;
+using SharedBlock = psio::shared_pssz<Block>;
 
 struct TransactionAuthChecker
 {
@@ -36,11 +36,11 @@ struct TransactionAuthChecker
       }
       return pos->second;
    }
-   bool operator()(psio1::view<const Action> action) const
+   bool operator()(psio::pssz_view<Action> action) const
    {
       return (*this)(action.sender()) || (*this)(action.service());
    }
-   bool operator()(psio1::view<const Transaction> transaction) const
+   bool operator()(psio::pssz_view<Transaction> transaction) const
    {
       for (auto action : transaction.actions())
       {
@@ -49,7 +49,7 @@ struct TransactionAuthChecker
       }
       return false;
    }
-   bool operator()(psio1::view<const SignedTransaction> transaction) const
+   bool operator()(psio::pssz_view<SignedTransaction> transaction) const
    {
       return (*this)(*transaction.transaction());
    }
@@ -57,21 +57,21 @@ struct TransactionAuthChecker
 
 struct ActionQuery
 {
-   psio1::view<const Action> action;
+   psio::pssz_view<Action> action;
    AccountNumber            sender() const { return action.sender(); }
    AccountNumber            service() const { return action.service(); }
    MethodNumber             method() const { return action.method(); }
    std::string              rawData() const
    {
       std::span<const char> result = action.rawData();
-      return psio1::to_hex(result);
+      return psio::to_hex(result);
    }
    PSIO_REFLECT(ActionQuery, method(sender), method(service), method(method), method(rawData))
 };
 
 struct TransactionQuery
 {
-   psio1::view<const Transaction> transaction;
+   psio::pssz_view<Transaction> transaction;
    std::vector<ActionQuery>      actions() const
    {
       std::vector<ActionQuery> result;
@@ -87,9 +87,9 @@ struct TransactionQuery
 
 struct SignedTransactionQuery
 {
-   psio1::view<const SignedTransaction> value;
+   psio::pssz_view<SignedTransaction> value;
    const TransactionAuthChecker*       censor;
-   Checksum256 id() const { return sha256(value.transaction().data(), value.transaction().size()); }
+   Checksum256 id() const { return sha256(value.transaction().bytes().data(), value.transaction().bytes().size()); }
    // Available even when the transaction is censored
    std::uint32_t numActions() const { return value.transaction()->actions().size(); }
    std::optional<TransactionQuery> transaction() const
@@ -111,7 +111,7 @@ struct SignedTransactionQuery
          result.reserve(value.proofs().size());
          for (std::span<const char> proof : value.proofs())
          {
-            result.push_back(psio1::to_hex(proof));
+            result.push_back(psio::to_hex(proof));
          }
          return result;
       }
@@ -139,7 +139,7 @@ struct BlockQuery
    SharedBlock                         block;
    const TransactionAuthChecker*       transactionCensor;
    Checksum256                         id() const { return BlockInfo{header()}.blockId; }
-   BlockHeader                         header() const { return block->header(); }
+   BlockHeader                         header() const { return block->header().unpack(); }
    std::vector<SignedTransactionQuery> transactions() const
    {
       std::vector<SignedTransactionQuery> result;
@@ -182,7 +182,7 @@ struct TransactionLocation
    SharedBlock                         block;
    BlockHeader                         blockHeader;
    std::uint32_t                       txIndex;
-   psio1::view<const SignedTransaction> value;
+   psio::pssz_view<SignedTransaction> value;
    const TransactionAuthChecker*       censor;
 
    BlockNum               blockNum() const { return blockHeader.blockNum; }
@@ -210,10 +210,15 @@ static TableIndex<Block, std::uint32_t> blockLog()
 // this much, which must fit in a query's 32 MiB of memory.
 static constexpr std::uint32_t blocksPageBytes = 6 * 1024 * 1024;
 
+// A page of blocks is bounded by its stored size, not by the number of rows
+// asked for: the complexity of `blocks(first: 720) { ... transactions ... }`
+// (counted with `first` as the page size) is above the engine's default limit.
+static constexpr psio::graphql::limits queryLimits{.max_complexity = 10'000'000};
+
 static std::optional<Checksum256> parseChecksum(const std::string& hex)
 {
    std::vector<char> bytes;
-   if (!psio1::from_hex(hex, bytes) || bytes.size() != Checksum256{}.size())
+   if (!psio::from_hex(hex, bytes) || bytes.size() != Checksum256{}.size())
       return std::nullopt;
    Checksum256 result;
    std::memcpy(result.data(), bytes.data(), result.size());
@@ -225,11 +230,15 @@ struct Query
    TransactionAuthChecker transactionCensor;
    /// A page may hold fewer blocks than requested, but never none if any match;
    /// use `pageInfo` to continue.
-   auto blocks() const
+   auto blocks(psio::graphql::key_range<std::uint32_t> range, psio::graphql::page_args page) const
    {
-      return psibase::TransformedConnectionView{
-          blockLog(), [this](SharedBlock&& block)
-          { return BlockQuery{std::move(block), &transactionCensor}; }, blocksPageBytes};
+      return psio::graphql::paginate(
+          psio::graphql::transform(IndexView{blockLog()},
+                                   [this](SharedBlock&& block)
+                                   { return BlockQuery{std::move(block), &transactionCensor}; }),
+          range, page,
+          psio::graphql::page_budget{.max_bytes     = blocksPageBytes,
+                                     .max_page_size = allRows.max_page_size});
    }
 
    std::optional<BlockQuery> block(std::uint32_t blockNum) const
@@ -237,7 +246,7 @@ struct Query
       auto block = blockLog().getView(blockNum);
       if (!block)
          return std::nullopt;
-      return BlockQuery{std::move(block), &transactionCensor};
+      return BlockQuery{std::move(*block), &transactionCensor};
    }
 
    std::optional<BlockHeader> head() const
@@ -247,7 +256,7 @@ struct Query
       --it;
       if (it == index.end())
          return std::nullopt;
-      BlockHeader header = it.view()->header();
+      BlockHeader header = it.view()->header().unpack();
       return header;
    }
 
@@ -271,9 +280,9 @@ struct Query
          std::uint32_t i     = 0;
          for (auto trx : block->transactions())
          {
-            if (sha256(trx.transaction().data(), trx.transaction().size()) == *target)
+            if (sha256(trx.transaction().bytes().data(), trx.transaction().bytes().size()) == *target)
             {
-               BlockHeader header = block->header();
+               BlockHeader header = block->header().unpack();
                return TransactionLocation{std::move(block), std::move(header), i, trx,
                                           &transactionCensor};
             }
@@ -285,7 +294,8 @@ struct Query
 };
 PSIO_REFLECT(  //
     Query,
-    method(blocks),
+    attr(transactionCensor, psio::graphql::hidden),
+    method(blocks, range, page),
     method(block, blockNum),
     method(head),
     method(transaction, id, maxBlocks))
@@ -297,7 +307,7 @@ namespace SystemService
                                                         std::optional<psibase::AccountNumber> user)
    {
       psibase::check(psibase::getSender() == HttpServer::service, "Wrong sender");
-      if (auto result = psibase::serveGraphQL(request, Query{user}))
+      if (auto result = psibase::serveGraphQL(request, Query{user}, queryLimits))
          return result;
       return std::nullopt;
    }

@@ -18,7 +18,13 @@ namespace SystemService
 
       using Key = psibase::CompositeKey<&SitesContentRow::account, &SitesContentRow::path>;
    };
-   PSIO_REFLECT(SitesContentRow, account, path, contentType, contentHash, contentEncoding, csp)
+   PSIO_REFLECT(SitesContentRow,
+                account,
+                path,
+                attr(contentType, utf8),
+                contentHash,
+                attr(contentEncoding, utf8),
+                attr(csp, utf8))
    using SitesContentTable = psibase::Table<SitesContentRow, SitesContentRow::Key{}>;
    PSIO_REFLECT_TYPENAME(SitesContentTable)
 
@@ -50,7 +56,7 @@ namespace SystemService
       std::optional<std::string>            globalCsp    = std::nullopt;
       std::optional<psibase::AccountNumber> proxyAccount = std::nullopt;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
+   PSIO_REFLECT(SiteConfigRow, account, spa, cache, attr(globalCsp, utf8), proxyAccount)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
    PSIO_REFLECT_TYPENAME(SiteConfigTable)
 
@@ -184,20 +190,21 @@ namespace SystemService
                                                      std::string_view rootDomain);
    };
 
-   PSIO_REFLECT(Sites,
-                method(serveSys, request, socket),
-                method(storeSys, path, contentType, contentEncoding, content),
-                method(hardlink, path, contentType, contentEncoding, contentHash),
-                method(remove, path),
-                method(isValidPath, site, path),
-                method(getProps, site, path),
-                method(getData, site, path, decompress),
-                method(enableSpa, enable),
-                method(setCsp, path, csp),
-                method(deleteCsp, path),
-                method(enableCache, enable),
-                method(setProxy, proxy),
-                method(clearProxy))
+   PSIO_REFLECT(
+       Sites,
+       method(serveSys, request, socket),
+       method(storeSys, path, attr(contentType, utf8), attr(contentEncoding, utf8), content),
+       method(hardlink, path, attr(contentType, utf8), attr(contentEncoding, utf8), contentHash),
+       method(remove, path),
+       method(isValidPath, site, path),
+       method(getProps, site, path),
+       method(getData, site, path, decompress),
+       method(enableSpa, enable),
+       method(setCsp, path, attr(csp, utf8)),
+       method(deleteCsp, path),
+       method(enableCache, enable),
+       method(setProxy, proxy),
+       method(clearProxy))
 
    PSIBASE_REFLECT_TABLES(Sites, Sites::Tables)
 }  // namespace SystemService

@@ -38,9 +38,9 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
   "tapos": {                // See [tapos](#tapos)
     "refBlockIndex": ...,   // Identifies block
     "refBlockSuffix": ...,  // Identifies block
-    "expiration": "..."     // When transaction expires (UTC)
+    "expiration": "...",    // When transaction expires (UTC), in whole seconds
                             // Example value: "2022-05-31T21:32:23Z"
-                            // Use `new Date(...)` to generate the correct format.
+    "flags": 0              // Required
   },
   "actions": [],            // See Action
   "claims": []              // See Claim
@@ -50,9 +50,7 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 `SignedTransaction` has these fields:
 ```json
 {
-  "transaction": {},    // This may be the Transaction object (above),
-                        // or it may be a hex string containing the packed
-                        // transaction.
+  "transaction": {},    // The Transaction object (above)
   "proofs": []          // See Proof
 }
 ```

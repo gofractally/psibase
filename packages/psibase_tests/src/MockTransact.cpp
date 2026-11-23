@@ -52,7 +52,10 @@ void MockTransact::setConsensus(ConsensusData consensus)
 extern "C" [[clang::export_name("processTransaction")]] void processTransaction()
 {
    auto top_act                = getCurrentActionView();
-   auto args                   = psio1::view<const ProcessTransactionArgs>(top_act->rawData());
+   std::span<const char> packedArgs = top_act->rawData();
+   check(psio::validate_pssz<ProcessTransactionArgs>(packedArgs).ok(),
+         "invalid arguments of processTransaction");
+   auto args                   = psio::pssz_view<ProcessTransactionArgs>(packedArgs);
    psibase::internal::receiver = Transact::service;
 
    for (auto act : args.transaction()->actions())
@@ -61,7 +64,7 @@ extern "C" [[clang::export_name("processTransaction")]] void processTransaction(
          continue;
       check(act.service() == Producers::service, "wrong service");
       check(act.method() == MethodNumber{"setConsensus"}, "wrong method");
-      auto [consensus] = psio1::from_frac<std::tuple<ConsensusData>>(act.rawData());
+      auto [consensus] = psio::from_pssz<std::tuple<ConsensusData>>(act.rawData());
       MockTransact{}.setConsensus(std::move(consensus));
    }
 }

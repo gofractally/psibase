@@ -79,13 +79,13 @@ namespace SystemService
       }
    }  // namespace
 
-   void Transact::startBoot(psio1::view<const std::vector<Checksum256>> bootTransactions)
+   void Transact::startBoot(psio::pssz_view<std::vector<Checksum256>> bootTransactions)
    {
       auto _           = recurse();
       auto statusTable = open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
-      statusTable.put({.enforceAuth = false, .bootTransactions = bootTransactions});
+      statusTable.put({.enforceAuth = false, .bootTransactions = bootTransactions.unpack()});
    }
 
    void Transact::finishBoot()
@@ -657,10 +657,10 @@ namespace SystemService
    }
 
    static std::span<const char>  trxData;
-   psio1::view<const Transaction> Transact::getTransaction() const
+   psio::pssz_view<Transaction> Transact::getTransaction() const
    {
       check(trxData.data() != nullptr, "No transaction");
-      return psio1::view<const Transaction>(psio1::prevalidated{trxData});
+      return psio::pssz_view<Transaction>(trxData);
    }
 
    bool Transact::isTransaction() const
@@ -748,15 +748,15 @@ namespace SystemService
             if (!speculative)
             {
                check(id == bootTransactions.front(),
-                     "Wrong transaction during boot " + psio1::convert_to_json(id) +
-                         " != " + psio1::convert_to_json(bootTransactions.front()));
+                     "Wrong transaction during boot " + psio::to_ijson(id) +
+                         " != " + psio::to_ijson(bootTransactions.front()));
                bootTransactions.erase(bootTransactions.begin());
                statusTable.put(*transactStatus);
             }
             else
             {
                check(std::ranges::contains(bootTransactions, id),
-                     "Wrong transaction during boot " + psio1::convert_to_json(id));
+                     "Wrong transaction during boot " + psio::to_ijson(id));
             }
          }
          else if (summary)
@@ -782,12 +782,12 @@ namespace SystemService
          return transactStatus && transactStatus->enforceAuth;
       }
 
-      void checkAuth(psio1::view<const Action>  act,
+      void checkAuth(psio::pssz_view<Action>  act,
                      const std::vector<Claim>& claims,
                      bool                      first,
                      bool                      readOnly)
       {
-         auto authService = to<Accounts>().getAuthOf(act.sender().unpack());
+         auto authService = to<Accounts>().getAuthOf(act.sender());
 
          if constexpr (enable_print)
             std::printf("call checkAuthSys on %s for sender account %s\n",
@@ -834,13 +834,13 @@ namespace SystemService
       }  // namespace
 
    }  // namespace
-   bool Transact::checkFirstAuth(Checksum256 id, psio1::view<const psibase::Transaction> trx)
+   bool Transact::checkFirstAuth(Checksum256 id, psio::pssz_view<psibase::Transaction> trx)
    {
       check(trx.actions().size() > 0, "transaction has no actions");
       auto _           = recurse();
       bool enforceAuth = checkTapos(id, trx.tapos(), true, false);
       if (enforceAuth)
-         checkAuth(trx.actions().front(), trx.claims(), true, true);
+         checkAuth(trx.actions().front(), trx.claims().unpack(), true, true);
       return enforceAuth;
    }
 
@@ -903,13 +903,16 @@ namespace SystemService
    }
 
    static void processTransactionImpl(
-       psio1::view<const psio1::shared_view_ptr<psibase::Transaction>> arg,
+       psio::pssz_view<psio::shared_pssz<psibase::Transaction>> arg,
        bool                                                          speculative)
    {
-      auto t = arg.data_without_size_prefix();
-      check(psio1::fracpack_validate_strict<Transaction>(t), "transaction has invalid format");
+      auto t = arg.bytes();
+      // Canonical, and no members this build does not know: they would be
+      // part of the transaction's id and ignored by its execution.
+      check(psio::validate_strict<Transaction>(psio::pssz{}, t).ok(),
+            "transaction has invalid format");
       trxData  = t;
-      auto trx = psio1::view<const Transaction>(psio1::prevalidated{t});
+      auto trx = psio::pssz_view<Transaction>(t);
       auto id  = sha256(t.data(), t.size());
 
       check(trx.actions().size() > 0, "transaction has no actions");
@@ -940,7 +943,7 @@ namespace SystemService
       {
          if (enforceAuth)
          {
-            auto first = get_view_data(act) == get_view_data(trx.actions()[0]);
+            auto first = psio::bytes(act).data() == psio::bytes(trx.actions()[0]).data();
             checkAuth(act, claims, first, false);
 
             if (first)
@@ -959,15 +962,12 @@ namespace SystemService
          if constexpr (enable_print)
             std::printf("call action\n");
 
-         auto data = find_view_span(act);
-         if (data.data() != nullptr)
-         {
-            psibase::raw::call(data.data(), data.size(), CallFlags::none);
-         }
-         else
-         {
-            psibase::call(act.unpack(), CallFlags::none);
-         }
+         // An element of the transaction's action list: its bytes are a
+         // packed Action as they are (the transaction was validated).
+         static_assert(
+             std::is_same_v<typename std::remove_cvref_t<decltype(act)>::format_type, psio::pssz>);
+         auto data = psio::bytes(act);
+         psibase::raw::call(data.data(), data.size(), CallFlags::none);
       }
 
       includedTable.put({tapos.expiration, id});
@@ -1015,7 +1015,7 @@ namespace SystemService
          abortMessage(std::format("Work not completed: {}", remainingWork[0].str()));
    }
 
-   void Transact::execTrx(psio1::view<const psio1::shared_view_ptr<psibase::Transaction>> transaction,
+   void Transact::execTrx(psio::pssz_view<psio::shared_pssz<psibase::Transaction>> transaction,
                           bool                                                          speculative)
    {
       check(trxData.data() == nullptr, "Cannot reenter execTrx");
@@ -1096,7 +1096,10 @@ namespace SystemService
       // TODO: subjective mitigation hooks
       // TODO: limit charged CPU & NET which can go into a block
       auto top_act                = getCurrentActionView();
-      auto args                   = psio1::view<const ProcessTransactionArgs>(top_act->rawData());
+      std::span<const char> packedArgs = top_act->rawData();
+      check(psio::validate_pssz<ProcessTransactionArgs>(packedArgs).ok(),
+            "invalid arguments of processTransaction");
+      auto args                   = psio::pssz_view<ProcessTransactionArgs>(packedArgs);
       psibase::internal::receiver = Transact::service;
       processTransactionImpl(args.transaction(), false);
    }
@@ -1104,11 +1107,12 @@ namespace SystemService
    extern "C" [[clang::export_name("nextTransaction")]] void nextTransaction()
    {
       // forward to r-transact
-      auto act       = getCurrentActionView();
-      act->sender()  = act->service().unpack();
-      act->service() = RTransact::service;
-      act->method()  = MethodNumber{"next"};
-      setRetvalBytes(call(act.data_without_size_prefix()));
+      auto act         = getCurrentActionPacked();
+      auto action      = psio::as_mutable_view(act);
+      action.sender()  = act->service();
+      action.service() = RTransact::service;
+      action.method()  = MethodNumber{"next"};
+      setRetvalBytes(call(act.bytes()));
    }
 
 #endif
