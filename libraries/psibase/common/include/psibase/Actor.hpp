@@ -40,6 +40,11 @@ namespace psibase
    using MethodResult =
        psio::wire_type_t<typename psio::reflect<T>::template method_result<I>>;
 
+   // PSIO gap G46: methodArg and packMethodArgs exist only because
+   // psio::method_args_to_pssz converts an argument with static_cast and
+   // takes it by const reference (doc/pssz-conversion.md, section 5.2).
+   // When PSIO closes the gap, callers use psio::method_args_to_pssz
+   // directly and both go.
    namespace detail
    {
       // An argument as it is handed to the packer: itself when it already

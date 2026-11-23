@@ -1166,6 +1166,140 @@ which stopped `test_consensus`.
 * The SDK's `psibase-config.cmake` (installed form) was edited like the
   build-tree form and not exercised.
 
+### 1.20 Pin e12e4f6d, parameter names, string kinds
+
+Five commits on the flip branch after S1. The legacy library still
+produces JSON, schemas and GraphQL; nothing here changes that.
+
+**Pin** (`a0f41408e`, `55401a596`). `0e6a1b72` → `3bf2b94b` → `e12e4f6d`
+(PSIO `main`) in `cmake/PsibaseDependencies.cmake` and the two files under
+`tests/cmake/dependencies`. `3bf2b94b` closes G34–G45 (5.1); `e12e4f6d`
+differs from it only outside C++ (`git diff 3bf2b94b e12e4f6d -- cpp cmake
+CMakeLists.txt` is empty: Rust, JavaScript, Python and docs). No psibase
+source needed a change for either move, and `rust-twins.json` did not
+change. psibase uses none of what G34–G45 add yet (stages S2, S4, S5).
+
+**Parameter names** (`6e3137253`). A reflection may list fewer names than
+the method has parameters (it may not list more); three did. The
+reflected name is the public JSON name, so they now agree with the
+declarations: `Packages::getSchema(service)` (listed none),
+`XAdmin::isAdmin(account, socket, forwardedFor)` (listed two),
+`XPackages::serveSys(request, socket)` (listed one, as `XSites` and
+`XAdmin` already listed both). `Packages::setSchema(schema)` was right
+since S1. No C++ caller, test or JSON file used a name that changed. The
+Rust mirror `rust/psibase/src/services/x_admin.rs` calls the third
+parameter of `isAdmin` `forwarded`; that is the Rust side's to align.
+
+**String kinds** (`45e2318d2`). The Rust side's list of C++ strings whose
+Rust twin is a `String` (`~/psibase-pssz-build.cpp-utf8-members.tsv`, 84
+rows; applied by `~/psibase-flip-cpp-scratch/utf8/apply.py`, whose output
+is `applied.txt` beside it) was applied as `attr(m, utf8)`: for a list of
+strings `attr(m, element(utf8))` (`AdminOptionsRow::hosts`, `::peers`,
+`VirtualServer::reg_res_provider` `accepted`), for an optional string the
+plain `attr(m, utf8)` (PSIO looks through the optional), for a parameter
+`method(name, …, attr(param, utf8))` (also where the parameter is a
+`psio::pssz_view<std::string>` or a `std::string_view`). String kind only:
+no bound, no cap. Everything not in the list stays raw.
+
+| | Rows |
+|---|---|
+| Applied: record members | 39 (13 files) |
+| Applied: action and event parameters | 44 (14 files), of which 6 under another spelling (below) |
+| Skipped | 1: `Memo::contents` (already `utf8 \| max<80>`) |
+
+* Six rows name a `Tokens` parameter `subAccount` (`toSub`, `fromSub`,
+  `createSub`, `deleteSub`, `recall`, `getSubBal`); the mirror header
+  spells it `sub_account`. It is the same parameter (the only string of
+  each method), so the annotation was applied to `sub_account`; the name
+  was not touched (mirror headers of Rust services are renamed by the
+  Rust side).
+* `Chainmail::archive` is both an action (`msg_id` a `uint64`) and a
+  history event (`msg_id` a string): the row applies to the event.
+* `LoginReply` is declared twice (`RTransact.hpp` and `RTransact.cpp`);
+  both rows were applied.
+
+With an annotated parameter `method_arg_tuple<I>` is a
+`psio::annotated_tuple`; nothing in psibase needed a change for that
+(`packMethodArgs` and the schema code already use its `tuple_type`), and
+the bytes are those of the plain tuple (pinned in the new test).
+
+*(a) What refuses bytes now.* A string declared UTF-8 is refused when it
+is not UTF-8 by `validate_pssz`, `validate_strict`, a checked decode and
+the packer (`to_pssz` throws `psio::codec_exception` natively and aborts
+the action in a guest). Where the node fills such a member from bytes it
+does not control:
+
+| Member | Filled from | What happens to bytes that are not UTF-8 |
+|---|---|---|
+| `HttpRequest::host`, `::contentType` | `libraries/psibase_http/handle_request.cpp`, the `Host` and `Content-Type` header values of an incoming request (a header value may hold any byte above 0x7F) | **Changed:** checked with `psio::utf8_spec::validate` before the socket is created; the request is answered `400` ("The Host header is not valid UTF-8" / "The Content-Type header is not valid UTF-8"). Without the check the packer threw inside the `try` around `execServe`: no abort, but the error surfaced as a failed `serve` rather than a 400 |
+| `HttpRequest::method` | the same function | one of six literals (`GET`, `POST`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`); any other method is answered 405 before. Nothing to do |
+| `HttpHeader::name` (request and response headers) | Beast's parser | a header name is an HTTP token, which the parser limits to ASCII; a request with another byte in a name (or in the method) does not parse. The node then closes the connection **without a reply**, as for every request it cannot parse (observed; not changed here) |
+| `HttpReply::contentType` of the response to an **outgoing** request | `libraries/psibase_http/send_request.cpp` `do_recv`, the remote server's `Content-Type` | **Changed, and this one mattered:** the reply was packed outside any `try`, in a completion handler, so the exception would have left the handler. `do_read` now checks the value before taking the receive lock and treats such a response as a failed read (warning "Failed to read HTTP response: Content-Type is not valid UTF-8", socket closed; `x-proxy` answers 502) |
+| `HttpReply` sent by a service (`HttpSocket::send`, `TempSocket::send` in `init.cpp`, psitest) | guest bytes, decoded with `psio::from_pssz<HttpReply>` | the decode throws inside the service's `socketSend` host call: the action fails, as for any malformed reply before. Not changed |
+| `socketOpen` arguments (`HttpRequest` from a service) | guest bytes | `validate_pssz` + `check`: "Malformed arguments to socketOpen". Not changed |
+| `LogMessage::message` | `libraries/psibase/native/src/LogSocket.cpp`: **arbitrary bytes from a guest** — whatever a privileged local service writes to the log socket; in the tree only `XHttp::log(severity, msg)` does, on behalf of other local services | the decode throws inside `socketSend`: the calling action fails and nothing is logged (before, the bytes were logged as they were). `XHttp::log`'s `msg` is declared UTF-8 too, so a caller is refused at dispatch. The node cannot be stopped by it. No sanitizing was added: whether a non-UTF-8 log line should be dropped with an error (now) or logged escaped is a policy question left open |
+| `HostConfigRow::hostVersion`, `::config` | `programs/psinode/main.cpp` `toHostConfig`: the node's own configuration as JSON text (operator input: host names, paths) | a configuration holding a string that is not UTF-8 would fail the node at start-up when the row is packed. Not network input; not changed, not tested |
+| `HostConfigRow`, `PendingShutdownRow` written by a service | `NativeFunctions.cpp` `verifyHostConfigRow` / `verifyPendingShutdownRow` | `validate_pssz` + `check`. The node's later decodes read rows that passed it |
+| `GenesisActionData::memo` | the boot transaction | `validate_strict` + `check` in `TransactionContext.cpp` |
+| psitest `HttpRequest` / `HttpReply` | the test's bytes | `validate_pssz` + `check` ("HttpRequest has invalid format") |
+
+*(b) `rust-twins.json`* was regenerated with
+`PSIBASE_WRITE_RUST_TWINS=1 psibase-psio-tests`. One line changed,
+`schema_ir`: 13 members of 9 of its 53 named types say `Custom{…,"utf8"}`
+where they said `"string"` — `HttpHeader.name`, `BasicHttpRequest.host`,
+`.method`, `.contentType`, `BasicHttpReply.contentType`,
+`GenesisActionData.memo`, `LogMessage.message`, `HostConfigRow.hostVersion`,
+`.config`, `PendingShutdownRow.args`, `PackageRef.name`, `.version`,
+`PackageExport.name` (compared by decoding both documents:
+`~/psibase-flip-cpp-scratch/utf8/ir2json.cpp`). The two interfaces
+(`setcode`, `auth-delg`) are unchanged, and `vectors` and `calls` — every
+value's `pssz`, `key`, `ijson` and `frac` — are byte-identical. The Rust
+test `psio_twins.rs` has to be brought to this fixture by the Rust side.
+
+*(c) Nothing else changed.* No tracked `*-schema.json` or test expectation
+changed: the generated service schemas and the pinned schema hashes of
+`canonical_glue_tests.cpp` come from the legacy library, which does not
+see the annotation. The schemas will say `utf8` when they are built from
+the Schema IR (S2).
+
+**Checked.**
+
+* Full build exit 0 after each commit (`build-c1.log`, `build-c2.log`,
+  `build-c1b.log`, `build-c3.log`, `build-c4.log`).
+* The 36 tests of the regression set (the tests that pass in
+  `ctest-s1-full.log`) pass after each (`ctest-c1.log`, `ctest-c2.log`,
+  `ctest-c1b.log`, `ctest-c3.log`, `ctest-c4.log`).
+* New, `libraries/psibase/common/tests/methods.cpp`, "methods: a string
+  declared UTF-8 refuses other bytes" (native and guest; the parts that
+  need exceptions are native only): `validate_pssz` refuses, with a
+  `utf8…` reason, an `HttpRequest` whose `host`, `method`, `contentType`
+  or a header's name was overwritten with `FF FE`, and accepts such bytes
+  in `target`, a header's value and the body; the same for
+  `HttpReply::contentType`, a reply header's name and
+  `LogMessage::message`; natively `from_pssz` and `to_pssz` throw
+  `psio::codec_exception` for each (also for the tuple the node packs for
+  `x-http::serve`); for a parameter annotated `utf8` the argument bytes
+  equal those of the plain tuple, `validate_method_args` refuses bytes
+  that are not UTF-8 and accepts them for an unannotated parameter, and
+  `method_args_to_pssz` throws.
+* New, `programs/psinode/tests/test_fetch.py` (in the regression set, no
+  chain booted): `test_request_not_utf8` sends raw requests to a running
+  psinode — a `Host` and a `Content-Type` that are not UTF-8 are answered
+  400, a header name and a method with such a byte get 400 or a closed
+  connection (today: closed), and the node answers a normal request
+  afterwards; `test_reply_not_utf8` lets `x-proxy` fetch from a server
+  whose response has such a `Content-Type`: the client gets 502 and the
+  node keeps answering.
+
+**Not verified.** That the two psinode tests fail without the two checks
+(they were written with the checks in place); the HTTPS and WebSocket
+variants of the two paths (same code, not exercised with such bytes); a
+log message that is not UTF-8 against a running node; a node
+configuration that is not UTF-8; and, as in 1.19, anything that needs a
+booted chain — in particular a service receiving an annotated parameter
+through real dispatch (covered only by `validate_method_args` in the
+unit test).
+
 ## 2. Inventory of what remains
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,
@@ -1610,6 +1744,12 @@ and 6.12.
 
 ### 5.1 Found by the survey for the flip, at PSIO `b5cea0d4` (G24–G45)
 
+**Status.** G24–G45 are closed in PSIO at the current pin, `e12e4f6d`
+(G24–G33 at `0e6a1b72`, G34–G41 at `1b4766bf`, G42–G45 at `3bf2b94b`;
+`e12e4f6d` is PSIO `main`, whose C++ is identical to `3bf2b94b`). The
+table below is kept as the record of what was found and is not updated.
+What S1 found after it is in 5.2.
+
 Found before any flip commit (section 1.17), by compiling probes against
 the pinned headers. Every reproduction below was compiled (and, where it
 has output, run) with
@@ -1676,6 +1816,23 @@ PSIO_REFLECT(Act, sender, name)
 
 Not serialization, and not asked of PSIO: `psio1::finally` (33 uses) and
 `psio1::check` (36, all in `dwarf.cpp`) need a psibase home (D9).
+
+### 5.2 Found during S1 (G46–G51)
+
+The six things section 1.19 lists as A–F, numbered. Each reproduction is in
+`~/psibase-flip-cpp-scratch/wire/` and was compiled again (and run, where
+it has output) against the pin `e12e4f6d` — C++ identical to `3bf2b94b` —
+with the command of 5.1 (`s1_gaps.sh` in the same directory runs all six).
+**All six still reproduce.**
+
+| # | Missing | Reproduction → first error / output at `3bf2b94b` | What psibase does meanwhile |
+|---|---|---|---|
+| G46 (A) | `psio::method_args_to_pssz<T, I>(args…)` converts an argument that is not already a source of the parameter with `static_cast` (explicit conversion) and takes `const Args&`. So an `int` for a type with an implicit `uint64` and an explicit `double` constructor (`Quantity`) is ambiguous, and a type whose conversion operator is not `const` (the tester's `UserContext`) cannot be passed. | `s1_gap_arg_convert.cpp` → `pssz.hpp:4404:21: error: ambiguous conversion for static_cast from 'const int' to 'detail::pssz_impl::arg_source_t<std::tuple_element_t<0UL, Tuple>, int>' (aka 'Q')`. Reproduces. | **A psibase-side workaround, to be removed when PSIO closes the gap:** `psibase::packMethodArgs<T, I>(args…)` in `libraries/psibase/common/include/psibase/Actor.hpp` (marked `// PSIO gap G46`; 3 uses, all in that header: `action_builder_proxy` — through which `Actor`, `transactor` and the tester pack —, `ActionViewBuilder`, `EventEmitter`). It checks the argument count against `method_arg_tuple<I>::tuple_type` (two static assertions, "too few" / "too many arguments passed to method"), passes each argument through `detail::methodArg<P>(arg)` and hands the results to `psio::method_args_to_pssz<T, I>`. `methodArg<P>`, for the parameter's wire type `P`: the argument itself, forwarded, when `psio::wire_type_t<A>` is `P` (the value, a view of it, a `std::string_view`, a span); otherwise `P(std::forward<A>(arg))` when `P` is constructible from the argument (direct initialization, which prefers the implicit `uint64` constructor for an `int` as overload resolution does, and may use a non-const conversion operator because the argument is forwarded, not taken as `const&`); otherwise copy-initialization `P converted = std::forward<A>(arg)`. Without the gap every use is `psio::method_args_to_pssz<T, I>(std::forward<Args>(args)…)`. |
+| G47 (B) | No decode into a record that borrows from the input (`BasicHttpRequest<std::span<const char>>`, a `std::string_view` member), and such a record is not accepted by `method_args_to_pssz` as an argument for the owning record type. | `s1_gap_decode_borrow.cpp` → `pssz.hpp:2287:51: error: static assertion failed due to requirement 'plain_members_v<Req<std::span<const char, …>>>': psio::pssz: a type that only refers to a value (…) cannot be decoded into: decode psio::wire_type_t<T>, or read the bytes through a view`; second statement: `pssz.hpp:4404:21: error: no matching conversion for static_cast from 'const Req<std::span<const char>>' to … (aka 'Req<std::vector<char>>')`. Reproduces. | `XHttp::serve` decodes an owning `HttpRequest`: the body is copied once per request. |
+| G48 (C) | Without exceptions `psio::validate_strict<T>(psio::pssz{}, bytes)` answers "guest strict semantic validation unsupported" for every value of a record that holds a type with an adapter — every psibase record with an `AccountNumber`. A guest cannot ask "valid, canonical, and nothing I do not know". | `s1_gap_guest_strict.cpp` (compiled `-fno-exceptions -DPSIO_EXCEPTIONS_ENABLED=0`) → prints `pssz: guest strict semantic validation unsupported`. Reproduces. | The guest strict sites (`intrinsic.cpp`, the check behind `getCurrentActionView` / `getCurrentActionPacked`; `Transact.cpp`, the transaction check; `TestServiceEntry.cpp`) use `psio::validate_pssz_compatible(…, unknown)` and `!unknown`. **This drops the canonical-encoding requirement** that strict adds. |
+| G49 (D) | A record or tuple whose known members are all fixed-size is not readable from a wider or a narrower declaration. With a variable-size known member the wider bytes are accepted. | `s1_gap_unknown_after_fixed.cpp` → prints `(int32) read as (int32, optional): pssz: record fixed region truncated`, `(int32, nullopt) read as (int32): pssz: fixed record has trailing payload`, `fixed known members, unknown absent : pssz: fixed record has trailing payload`, `fixed known members, unknown present: pssz: invalid record payload offset`, `variable known member, unknown present: ok`. Reproduces. | `XHttp::autoClose` reads `TempPendingRequestRow` and `PendingRequestRow` as themselves; `XHttp`'s close hook packs the error callback's arguments as the callback declares them. Whether another site relies on this was not searched exhaustively (1.19, "Not verified"). |
+| G50 (E) | A view does not convert to what it designates where the legacy view did: a view of `std::vector<unsigned char>` to `std::span<const unsigned char>`; a view of `std::array<std::uint8_t, N>` (`Checksum256`) to the array; a view of a `definitionWillNotChange` one-member record with a text adapter (`AccountNumber`, `MethodNumber`) to the record. Each compares with its value and has `.unpack()`. | `s1_gap_view_convert.cpp` (new; a stand-in `Name` for `AccountNumber`), `-DCASE=1` → `error: no matching function for call to 'takesSpan'`; `-DCASE=2` → `… 'takesDigest'`; `-DCASE=3` → `… 'takesName'`; without `CASE` it compiles and prints `ok: owner==value 1`. Reproduces. | About 100 `.unpack()` at call sites. |
+| G51 (F) | No compile-time relation "a `U` packs as a `T`" (the legacy `PackableAs<U, T>`): a concept that is true exactly when `psio::to_pssz(const U&)` yields the bytes of a `T`, for example a record of references, views or `std::string_view`s standing for the owning record (`TxSuccessView` for `TxSuccessRecord`). | `s1_gap_packs_as.cpp` (new), `-DCASE=1` → `error: no member named 'packs_as' in namespace 'psio'` (the name is psibase's wish, PSIO has none under any name); without `CASE` it runs: `RecView packs as Rec: bytes equal 1, run-time check 1`, `Wrong packs as Rec: run-time check 0 (compiled without complaint)`. Reproduces. | `Table::put` of such a record packs it and checks `psio::validate_pssz<T>` of the bytes at run time (3 call sites); a wrong record is found when the action runs, not when it is compiled. |
 
 ## 6. Rust, JavaScript and Python
 

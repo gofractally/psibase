@@ -7,15 +7,22 @@ the C++ file that defines it). The Rust side (`cargo-psibase`, the `psibase`
 CLI, Rust services and plugins) must produce and accept exactly the "after"
 column.
 
-Status of this file: sections 0 and 1 are **definitive** (keys flipped in
-section 1.18, the binary wire in section 1.19 of `doc/pssz-conversion.md`).
-In sections 2–6, rows marked *(proposed)* state the intended format; they
-become definitive when the corresponding C++ stage (S2–S5) lands. Line
-numbers in those sections are from the survey at `bc71f6bb0` and were read,
-not re-checked one by one.
+Status of this file: sections 0, 0.1, 1, 2 and 2.1 are **definitive**:
+keys flipped in section 1.18 and the binary wire in section 1.19 of
+`doc/pssz-conversion.md`; string kinds were applied in its section 1.20;
+the `ServiceSchema` record of section 2 and `DbId` in 2.1 are settled.
+Two rows of section 1 (events, `setSchema`) and the "Status in C++" note
+of section 2 say what still runs on the legacy schema code until stage S2
+lands. Sections 3–6 state the intended formats and are still to be
+confirmed by the C++ stages: section 3 (package files) and section 4
+(endpoints that pack) by S2 (schemas) and S4 (JSON), section 5 (JSON
+conventions) by S4, section 6 (GraphQL) by S5. Line numbers in those
+sections are from the survey at `bc71f6bb0` and were read, not re-checked
+one by one.
 
-PSIO pin for both languages: `0e6a1b7216a47620b9eafc69c2556b124f3796b0`
-(`cmake/PsibaseDependencies.cmake`).
+PSIO pin for both languages: `e12e4f6df7a2422f893d609848ab06194b75e082`
+(`cmake/PsibaseDependencies.cmake`; PSIO `main`, its C++ identical to
+`3bf2b94b`, where gaps G42–G45 closed).
 
 ## 0. Already in force with the pin (before any flip commit)
 
@@ -71,7 +78,20 @@ half of `rust/psibase_names` is gone.
 * **Strings.** Twins must agree on UTF-8 or raw: a Rust `String` is UTF-8,
   a C++ `std::string` is raw unless the member says `attr(m, utf8)`. The
   Rust side sends the list of C++ members that must gain `attr(m, utf8)`;
-  the C++ side applies it (string kind only, no size caps).
+  the C++ side applies it (string kind only, no size caps). **Applied** in
+  commit `45e2318d25fd9ad02d3850f3a3148d0df5da0721` ("String kinds: the
+  listed members and parameters are UTF-8"): the list is
+  `~/psibase-pssz-build.cpp-utf8-members.tsv` (84 rows: 40 record members,
+  44 action / event parameters); 83 were applied and one was already
+  annotated (`Memo::contents`); the per-row result is
+  `~/psibase-flip-cpp-scratch/utf8/applied.txt`, and
+  `doc/pssz-conversion.md` section 1.20 has the counts and consequences.
+  Six rows spell a `Tokens` parameter `subAccount` where the mirror header
+  says `sub_account`: annotated, not renamed. A value of such a member
+  that is not UTF-8 is refused by every validating reader and by the
+  packer, in both languages. `libraries/psibase/common/tests/rust-twins.json`
+  was regenerated in that commit (13 members of 9 types say `utf8` in
+  `schema_ir`; no value's bytes changed): the Rust test has to follow it.
 * **`Memo`** is UTF-8, at most 80 bytes: `transparent()` over `std::string`
   with `attr(contents, utf8 | max<80>)`
   (`libraries/psibase/common/include/psibase/Memo.hpp`). It is the one
@@ -86,6 +106,16 @@ half of `rust/psibase_names` is gone.
   UTC) and extra *zero* fraction digits, and rejects a finer fraction, a
   missing offset and a number. A duration is its tick count everywhere (in
   JSON a number, a decimal string beyond 2^53 − 1).
+
+**Rust status, as relayed by the coordinator** (not checked from this
+worktree):
+
+* Rust is pinned to the same PSIO commit as C++.
+* Time in Rust is `psio::time`: JSON `…Z`, durations as tick counts, and
+  the GraphQL scalars `DateTimeSeconds` / `DateTimeMicroseconds`.
+* 20 Rust actions lost the leading underscore of a parameter: the JSON
+  name of those arguments changes (the parameter-name rule above).
+* The consensus variants use the C++ names.
 
 ## 1. Binary values
 
@@ -277,9 +307,10 @@ at the pin):
 * a packed member is `Nested{T}` (legacy `FracPack`);
 * an unnamed action parameter was `c0`, `c1` in an object; it is positional now and its JSON is an array.
 
-Two schemas of one service built by C++ and by Rust must be *equivalent*;
-PSIO C++ has no runtime schema comparison (gap G33), so this cannot be
-checked from C++ yet.
+Two schemas of one service built by C++ and by Rust must be *equivalent*
+(`psio::pssz_ir::equivalent` with `compare::wire`, section 0.1; gap G33 is
+closed). C++ does not check this yet: its schemas are still the legacy
+ones until stage S2.
 
 | Artifact | Path / endpoint | Producer | Consumers | Today | After |
 |---|---|---|---|---|---|
