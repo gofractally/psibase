@@ -344,6 +344,7 @@ mod service {
         Tokens::call().debit(sys, buyer, amount, "".into());
         Tokens::call().toSub(sys, for_user.to_string(), amount);
         balance_cache::update_balance(for_user, None, amount.value as i128);
+        refresh_cpu_limit(for_user, None);
 
         if buyer != for_user {
             // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
@@ -378,7 +379,8 @@ mod service {
             UserSettings::to_sub_account_key(buyer, Some(sub_account.clone())),
             amount,
         );
-        balance_cache::update_balance(buyer, Some(sub_account), amount.value as i128);
+        balance_cache::update_balance(buyer, Some(sub_account.clone()), amount.value as i128);
+        refresh_cpu_limit(buyer, Some(sub_account));
     }
 
     /// Deletes the resource subaccount, returning the resources back to the caller's primary
@@ -411,6 +413,7 @@ mod service {
             Tokens::call().toSub(sys, sender.to_string(), balance);
             balance_cache::update_balance(sender, Some(sub_account), -(balance.value as i128));
             balance_cache::update_balance(sender, None, balance.value as i128);
+            refresh_cpu_limit(sender, None);
         }
     }
 
@@ -833,6 +836,19 @@ mod service {
     // Gets the CPU limit (in ns) for the specified account
     //
     // Returns None if there is no limit for the specified account
+    /// A transaction's CPU limit is what the balance it is billed to can
+    /// afford. The limit is set when the transaction starts; when that balance
+    /// changes while the transaction runs, the limit has to follow, or a
+    /// transaction that funds itself part-way is still stopped at what it
+    /// could afford before. Does nothing unless `account`/`sub_account` is the
+    /// balance the running transaction is billed to.
+    fn refresh_cpu_limit(account: AccountNumber, sub_account: Option<String>) {
+        if !tx_cache::billable::is_billed(account, &sub_account) {
+            return;
+        }
+        CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, sub_account));
+    }
+
     fn get_cpu_limit(account: AccountNumber, sub_account: Option<String>) -> Option<u64> {
         if !is_billing_enabled() {
             return None;
