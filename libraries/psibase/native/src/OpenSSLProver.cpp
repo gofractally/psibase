@@ -119,7 +119,9 @@ std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::parsePrivateKey(std::span<con
 
 psibase::OpenSSLProver::OpenSSLProver(AccountNumber service) : service(service)
 {
-   auto pkey = generateKey(NID_X9_62_prime256v1);
+   // A key generated here lives in this process, so it uses the curve that is
+   // fastest to verify. Hardware keys (PKCS #11) are P-256.
+   auto pkey = generateKey(NID_secp256k1);
    if (!pkey)
    {
       handleOpenSSLError();
