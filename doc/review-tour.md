@@ -148,6 +148,7 @@ The first commits (a4e5c0a0e through 0a93ef490) add Exchange, Favor, Signing and
 ### 8. Build and toolchain
 
 - binaryen 133 or newer must be first on `PATH`; older versions cannot read wide-arithmetic code and the configure step now says so.
+- Rust services get wide arithmetic only with rustc 1.100 or newer (on `claude/canonical-next`). rustc 1.98 miscompiles 128-bit arithmetic when the feature is on, giving wrong multiply and add/subtract results on every engine, so `cargo-psibase` adds the flag only for 1.100 and later and builds without it otherwise, with a message.
 - psizam, psitri and ucc are fetched at configure time and pinned; the eos-vm submodule is no longer what the node runs on.
 - Building the web UIs refuses an unsupported Node version and says why (8747dc889).
 - The tree builds and its suites run on macOS (Apple silicon) as well as Linux x86-64.
