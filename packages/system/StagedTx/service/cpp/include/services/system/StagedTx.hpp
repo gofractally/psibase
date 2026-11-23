@@ -118,7 +118,7 @@ namespace SystemService
       method(get_staged_tx, id),
    );
    PSIBASE_REFLECT_HISTORY_EVENTS(StagedTxService,
-      method(updated, txid, actor, datetime, event_type),
+      method(updated, txid, actor, datetime, attr(event_type, utf8)),
    );
    // clang-format on
 

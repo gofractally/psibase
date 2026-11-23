@@ -30,7 +30,7 @@ namespace psibase
       std::optional<std::string>                 transform;
       std::optional<psio1::schema_types::AnyType> type;
    };
-   PSIO_REFLECT(FieldId, path, transform, type)
+   PSIO_REFLECT(FieldId, path, attr(transform, utf8), type)
 
    using IndexInfo = std::vector<FieldId>;
 
@@ -49,7 +49,7 @@ namespace psibase
             return std::to_string(table);
       }
    };
-   PSIO_REFLECT(TableInfo, name, table, type, indexes)
+   PSIO_REFLECT(TableInfo, attr(name, utf8), table, type, indexes)
 
    using ServiceDatabaseSchema = std::vector<TableInfo>;
 
@@ -63,7 +63,7 @@ namespace psibase
    {
       psio1::schema_types::AnyType type;
       std::string                 access = "public";
-      PSIO_REFLECT(EventType, type, access)
+      PSIO_REFLECT(EventType, type, attr(access, utf8))
    };
 
    template <auto T>

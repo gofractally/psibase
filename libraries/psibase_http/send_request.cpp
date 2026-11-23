@@ -158,6 +158,16 @@ namespace
                        << "Failed to read HTTP response: " << ec.message();
                    self->do_error(ec);
                 }
+                else if (!psio::utf8_spec::validate(
+                              std::string_view{self->parser.get()[bhttp::field::content_type]})
+                              .ok())
+                {
+                   // HttpReply::contentType is declared UTF-8: packing this response
+                   // for the service would throw. Treat it as a failed read.
+                   PSIBASE_LOG(self->logger, warning)
+                       << "Failed to read HTTP response: Content-Type is not valid UTF-8";
+                   self->do_error(std::make_error_code(std::errc::illegal_byte_sequence));
+                }
                 else
                 {
                    if (auto l = self->server.sharedState->sockets()->lockRecv(self))

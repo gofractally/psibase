@@ -13,7 +13,7 @@ namespace psibase
    {
       std::string name;
       std::string value;
-      PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
+      PSIO_REFLECT(HttpHeader, definitionWillNotChange(), attr(name, utf8), value)
 
       bool matches(std::string_view h) const;
 
@@ -68,7 +68,13 @@ namespace psibase
       std::string             contentType;  ///< "application/json", "text/html", ...
       std::vector<HttpHeader> headers;      ///< HTTP Headers
       Body                    body;         ///< Request body, e.g. POST data
-      PSIO_REFLECT(BasicHttpRequest, host, method, target, contentType, headers, body)
+      PSIO_REFLECT(BasicHttpRequest,
+                   attr(host, utf8),
+                   attr(method, utf8),
+                   target,
+                   attr(contentType, utf8),
+                   headers,
+                   body)
 
       /// Parses the query component
       ///
@@ -243,7 +249,7 @@ namespace psibase
 
       static BasicHttpReply methodNotAllowed(const HttpRequest& req);
 
-      PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
+      PSIO_REFLECT(BasicHttpReply, status, attr(contentType, utf8), body, headers)
    };
 
    std::vector<HttpHeader> allowCors(std::string_view origin = "*");

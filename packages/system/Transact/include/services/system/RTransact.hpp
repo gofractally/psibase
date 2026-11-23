@@ -181,7 +181,7 @@ namespace SystemService
       std::string access_token;
       std::string token_type = "bearer";
    };
-   PSIO_REFLECT(LoginReply, access_token, token_type)
+   PSIO_REFLECT(LoginReply, attr(access_token, utf8), attr(token_type, utf8))
 
    struct TxSuccessRecord
    {

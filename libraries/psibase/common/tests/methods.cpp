@@ -10,6 +10,7 @@
 #include <psibase/Actor.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/nativeTables.hpp>
 #include <psibase/schema.hpp>
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/servePackAction.hpp>
@@ -492,4 +493,117 @@ TEST_CASE("methods: actions and events of the service schema", "[methods]")
    REQUIRE(schema.merkle.size() == 1);
    CHECK(params(schema.merkle.at("sealed").type) == "n ");
    CHECK(schema.merkle.at("sealed").access == "private");
+}
+
+// Strings declared UTF-8 (`attr(m, utf8)`): the bytes of a valid value are
+// those of a raw string; a value that is not UTF-8 is refused when it is
+// validated, decoded and packed.
+namespace utf8_test
+{
+   struct Notes
+   {
+      void note(std::int32_t id, std::string text) {}
+      void raw(std::string bytes) {}
+   };
+   PSIO_REFLECT(Notes, method(note, id, attr(text, utf8)), method(raw, bytes))
+
+   // The packed form of `value` with the one occurrence of `marker` in it
+   // overwritten by bytes that are not UTF-8.
+   template <typename T>
+   std::vector<char> spoiled(const T& value, std::string_view marker)
+   {
+      auto bytes = psio::to_pssz(value);
+      auto pos   = std::string_view{bytes.data(), bytes.size()}.find(marker);
+      REQUIRE(pos != std::string_view::npos);
+      bytes[pos]     = '\xff';
+      bytes[pos + 1] = '\xfe';
+      return bytes;
+   }
+}  // namespace utf8_test
+
+TEST_CASE("methods: a string declared UTF-8 refuses other bytes", "[methods][utf8]")
+{
+   using namespace utf8_test;
+   const std::string notUtf8 = "\xff\xfe";
+
+   HttpRequest request{.host        = "QQhost",
+                       .method      = "GET",
+                       .target      = "/t",
+                       .contentType = "text/plain",
+                       .headers     = {HttpHeader{"X-Name", "v"}},
+                       .body        = {'b'}};
+   REQUIRE(psio::validate_pssz<HttpRequest>(psio::to_pssz(request)).ok());
+   // Text beyond ASCII is accepted.
+   {
+      HttpRequest text = request;
+      text.host        = "h\xc3\xa9.example";
+      CHECK(psio::validate_pssz<HttpRequest>(psio::to_pssz(text)).ok());
+   }
+   // host, method, contentType and a header's name are UTF-8 ...
+   for (std::string_view marker : {"QQhost", "GET", "text/plain", "X-Name"})
+   {
+      INFO(marker);
+      auto bad    = spoiled(request, marker);
+      auto status = psio::validate_pssz<HttpRequest>(bad);
+      REQUIRE(!status.ok());
+      CHECK(std::string_view{status.error().what}.starts_with("utf8"));
+#ifndef COMPILING_WASM
+      CHECK_THROWS_AS(psio::from_pssz<HttpRequest>(bad), psio::codec_exception);
+#endif
+   }
+   // ... the target, a header's value and the body are not.
+   {
+      HttpRequest raw      = request;
+      raw.target           = notUtf8;
+      raw.headers[0].value = notUtf8;
+      raw.body             = {'\xff'};
+      auto bytes           = psio::to_pssz(raw);
+      CHECK(psio::validate_pssz<HttpRequest>(bytes).ok());
+   }
+
+   HttpReply reply{.contentType = "text/html", .body = {'x'}, .headers = {HttpHeader{"ETag", "1"}}};
+   CHECK(psio::validate_pssz<HttpReply>(psio::to_pssz(reply)).ok());
+   CHECK(!psio::validate_pssz<HttpReply>(spoiled(reply, "text/html")).ok());
+   CHECK(!psio::validate_pssz<HttpReply>(spoiled(reply, "ETag")).ok());
+
+   LogMessage message{.message = "started", .severity = LogMessage::Severity::info};
+   CHECK(psio::validate_pssz<LogMessage>(psio::to_pssz(message)).ok());
+   CHECK(!psio::validate_pssz<LogMessage>(spoiled(message, "started")).ok());
+
+#ifndef COMPILING_WASM
+   // Packing refuses too (in a guest it aborts the action).
+   {
+      HttpRequest bad = request;
+      bad.host        = notUtf8;
+      CHECK_THROWS_AS(psio::to_pssz(bad), psio::codec_exception);
+      bad             = request;
+      bad.contentType = notUtf8;
+      CHECK_THROWS_AS(psio::to_pssz(bad), psio::codec_exception);
+      bad                 = request;
+      bad.headers[0].name = notUtf8;
+      CHECK_THROWS_AS(psio::to_pssz(bad), psio::codec_exception);
+      // What the node packs for x-http::serve.
+      bad      = request;
+      bad.host = notUtf8;
+      CHECK_THROWS_AS(psio::to_pssz(std::tuple(std::int32_t{1}, bad)), psio::codec_exception);
+      HttpReply badReply   = reply;
+      badReply.contentType = notUtf8;
+      CHECK_THROWS_AS(psio::to_pssz(badReply), psio::codec_exception);
+      LogMessage badMessage = message;
+      badMessage.message    = notUtf8;
+      CHECK_THROWS_AS(psio::to_pssz(badMessage), psio::codec_exception);
+   }
+#endif
+
+   // A parameter: the argument bytes are those of the plain tuple, and the
+   // dispatcher's validation refuses text that is not UTF-8.
+   const auto good = psio::method_args_to_pssz<Notes, 0>(7, "caf\xc3\xa9");
+   CHECK(good == psio::to_pssz(std::tuple{std::int32_t{7}, std::string{"caf\xc3\xa9"}}));
+   CHECK(psio::validate_method_args<Notes, 0>(good).ok());
+   const auto badArgs = psio::to_pssz(std::tuple{std::int32_t{7}, notUtf8});
+   CHECK(!psio::validate_method_args<Notes, 0>(badArgs).ok());
+   CHECK(psio::validate_method_args<Notes, 1>(psio::to_pssz(std::tuple{notUtf8})).ok());
+#ifndef COMPILING_WASM
+   CHECK_THROWS_AS((psio::method_args_to_pssz<Notes, 0>(7, notUtf8)), psio::codec_exception);
+#endif
 }

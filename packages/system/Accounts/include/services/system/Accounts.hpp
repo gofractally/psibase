@@ -174,13 +174,13 @@ namespace SystemService
                 method(getAuthOf, account),
                 method(exists, name),
                 method(incAuthSeq, name),
-                method(freeze, accounts, memo),
-                method(unfreeze, accounts, memo),
+                method(freeze, accounts, attr(memo, utf8)),
+                method(unfreeze, accounts, attr(memo, utf8)),
                 //
    )
 
    PSIBASE_REFLECT_TABLES(Accounts, Accounts::Tables)
    PSIBASE_REFLECT_HISTORY_EVENTS(Accounts,  //
-                                  method(froze, account, memo),
-                                  method(unfroze, account, memo))
+                                  method(froze, account, attr(memo, utf8)),
+                                  method(unfroze, account, attr(memo, utf8)))
 }  // namespace SystemService

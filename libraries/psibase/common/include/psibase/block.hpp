@@ -58,7 +58,7 @@ namespace psibase
    {
       std::string                 memo;
       std::vector<GenesisService> services;
-      PSIO_REFLECT(GenesisActionData, memo, services)
+      PSIO_REFLECT(GenesisActionData, attr(memo, utf8), services)
    };
 
    struct Claim

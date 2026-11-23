@@ -280,7 +280,7 @@ namespace psibase
       std::string                  message;
       Severity                     severity = Severity::info;
       std::optional<AccountNumber> service;
-      PSIO_REFLECT(LogMessage, severity, message, service)
+      PSIO_REFLECT(LogMessage, severity, attr(message, utf8), service)
    };
 
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
@@ -449,7 +449,7 @@ namespace psibase
       std::string       config;
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> HostConfigKeyType;
-      PSIO_REFLECT(HostConfigRow, hostVersion, config)
+      PSIO_REFLECT(HostConfigRow, attr(hostVersion, utf8), attr(config, utf8))
    };
    using HostConfigTable = Table<HostConfigRow, SingletonKey{}>;
 
@@ -474,7 +474,7 @@ namespace psibase
 
       static const auto db = psibase::DbId::nativeSession;
       auto              key() const -> KeyPrefixType;
-      PSIO_REFLECT(PendingShutdownRow, args);
+      PSIO_REFLECT(PendingShutdownRow, attr(args, utf8));
    };
    using PendingShutdownTable = Table<PendingShutdownRow, SingletonKey{}>;
 

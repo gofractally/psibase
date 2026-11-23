@@ -810,6 +810,14 @@ namespace psibase::http
             data.host        = {host.begin(), host.size()};
             data.target      = std::string(req_target);
             data.contentType = (std::string)req[bhttp::field::content_type];
+            // host and contentType are declared UTF-8 (HttpRequest in Rpc.hpp), and a
+            // header value may hold any byte above 0x7F. Refuse such a request here:
+            // packing it would throw. (The method is one of the literals above, and a
+            // header name is a token, which the parser has already limited to ASCII.)
+            if (!psio::utf8_spec::validate(data.host).ok())
+               return send(builder.badRequest("The Host header is not valid UTF-8"));
+            if (!psio::utf8_spec::validate(data.contentType).ok())
+               return send(builder.badRequest("The Content-Type header is not valid UTF-8"));
             data.body        = req.body();
 
             // Do not use any reconfigurable members of server.http_config after this point

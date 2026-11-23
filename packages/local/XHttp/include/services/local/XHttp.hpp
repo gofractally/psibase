@@ -166,8 +166,8 @@ namespace LocalService
                 method(accept, socket, reply),
                 method(setCallback, socket, callback, err),
                 method(asyncClose, socket),
-                method(log, severity, msg),
-                method(rootHost, host),
+                method(log, severity, attr(msg, utf8)),
+                method(rootHost, attr(host, utf8)),
                 method(serveSys, request, socket),
                 method(startSession),
                 method(isSecure, socket))

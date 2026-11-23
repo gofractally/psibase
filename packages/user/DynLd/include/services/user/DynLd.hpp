@@ -10,7 +10,7 @@ namespace UserService
    {
       std::string            name;
       psibase::AccountNumber service;
-      PSIO_REFLECT(DynDep, name, service)
+      PSIO_REFLECT(DynDep, attr(name, utf8), service)
    };
 
    struct DynDepGroups
@@ -40,6 +40,6 @@ namespace UserService
       void link(std::string group, std::vector<DynDep> deps);
       void unlink(std::string group);
    };
-   PSIO_REFLECT(DynLd, method(link, group, deps), method(unlink, group))
+   PSIO_REFLECT(DynLd, method(link, attr(group, utf8), deps), method(unlink, attr(group, utf8)))
    PSIBASE_REFLECT_TABLES(DynLd, DynLd::Tables)
 }  // namespace UserService

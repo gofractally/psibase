@@ -142,7 +142,7 @@ namespace SystemService
                 method(getServer, service),
                 method(recv, socket, data, flags),
                 method(serve, socket, req),
-                method(rootHost, host),
+                method(rootHost, attr(host, utf8)),
                 method(getSiblingUrl, req, socket, destination, keepTarget),
                 method(setRedirect, destination),
                 method(clearRedirect))
