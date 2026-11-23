@@ -40,7 +40,7 @@
 #[crate::service(name = "diff-adj", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
-    use crate::{AccountNumber, Pack, TimePointSec, ToSchema, Unpack};
+    use crate::{AccountNumber, TimePointSec};
 
     use async_graphql::SimpleObject;
     use serde::{Deserialize, Serialize};
@@ -48,9 +48,6 @@ pub mod Service {
     #[table(name = "RateLimitTable", index = 0)]
     #[derive(
         Default,
-        Pack,
-        Unpack,
-        ToSchema,
         SimpleObject,
         Serialize,
         Deserialize,
@@ -61,7 +58,6 @@ pub mod Service {
         psio::ToPsszSchema,
         psio::JsonText,
     )]
-    #[fracpack(fracpack_mod = "fracpack")]
     pub struct RateLimit {
         #[primary_key]
         pub nft_id: u32,

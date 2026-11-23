@@ -3,7 +3,6 @@
 //! is not a value. The vectors are the ones the C++ tests pin for the same types
 //! (`libraries/psibase/common/tests/wrappers.cpp`).
 
-use psibase::fracpack::{Pack, Unpack};
 use psibase::services::tokens::{Decimal, Precision, Quantity};
 use psibase::Memo;
 
@@ -193,13 +192,7 @@ fn a_decimal_whose_quantity_does_not_fit_64_bits_is_rejected_not_wrapped() {
 // ── The forms in use are untouched ──────────────────────────────────────────
 
 #[test]
-fn the_packed_and_json_forms_in_use_are_unchanged() {
-    // fracpack still writes every byte psibase stores and sends.
-    assert_eq!(hex(&Memo::from("hi").packed()), "020000006869");
-    assert!(Memo::unpacked(&"a".repeat(81).packed()).is_err());
-    assert_eq!(hex(&Precision::new(4).unwrap().packed()), "04");
-    assert!(Precision::unpacked(&[9]).is_err());
-    assert_eq!(hex(&Quantity::new(5).packed()), "08000500000000000000");
+fn the_json_forms_in_use_are_unchanged() {
     // serde, which the services and the CLI use.
     assert_eq!(serde_json::to_string(&Memo::from("hi")).unwrap(), "\"hi\"");
     assert_eq!(
@@ -284,18 +277,13 @@ fn hex_is_the_byte_sequence_it_wraps() {
     );
 }
 
-/// What psibase writes today is untouched: fracpack bytes, the legacy key
-/// and the hex text serde gives.
+/// The hex text serde gives.
 #[test]
-fn the_forms_of_hex_in_use_are_unchanged() {
-    use psibase::{Checksum256, Hex, ToKey};
+fn the_serde_text_of_hex() {
+    use psibase::{Checksum256, Hex};
     let wrapped = Hex(vec![0x00u8, 0x01, 0xff]);
-    assert_eq!(hex(&wrapped.packed()), "030000000001ff");
-    assert_eq!(hex(&wrapped.to_key()), "0001" .to_string() + "01ff0000");
     assert_eq!(serde_json::to_string(&wrapped).unwrap(), "\"0001FF\"");
     assert_eq!(serde_json::from_str::<Hex<Vec<u8>>>("\"0001ff\"").unwrap(), wrapped);
     let checksum: Checksum256 = Hex([0xab; 32]);
-    assert_eq!(checksum.packed(), vec![0xab; 32]);
     assert_eq!(serde_json::to_string(&checksum).unwrap(), format!("\"{}\"", "AB".repeat(32)));
-    assert_eq!(Checksum256::unpacked(&[0xab; 32]).unwrap(), checksum);
 }

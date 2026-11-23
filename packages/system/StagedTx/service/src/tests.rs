@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use crate::Wrapper;
-    use psibase::fracpack::Pack;
+
     use psibase::services::accounts::Wrapper as Accounts;
     use psibase::services::auth_delegate::Wrapper as AuthDelegate;
     use psibase::services::nft as Nft;
@@ -75,7 +75,7 @@ mod tests {
                     sender: bob,
                     service: Nft::SERVICE,
                     method: MethodNumber::from("mint"),
-                    rawData: Nft::action_structs::mint { nftId: None }.packed().into(),
+                    rawData: psio::to_pssz(&Nft::action_structs::mint { nftId: None }).into(),
                 }],
                 true,
             )

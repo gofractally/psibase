@@ -2,7 +2,7 @@
 #[allow(non_snake_case, unused_variables)]
 pub mod service {
     use crate::{self as psibase, AccountNumber};
-    use fracpack::{Pack, ToSchema, Unpack};
+
     use serde::{Deserialize, Serialize};
 
     #[derive(
@@ -10,9 +10,6 @@ pub mod service {
         Clone,
         Serialize,
         Deserialize,
-        Pack,
-        Unpack,
-        ToSchema,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,

@@ -1,10 +1,10 @@
 #[psibase::service_tables]
 mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{Pack, ToSchema, Unpack};
+
     use serde::{Deserialize, Serialize};
     #[table(name = "NetworkNameTable")]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct NetworkName {
         pub name: String,
     }

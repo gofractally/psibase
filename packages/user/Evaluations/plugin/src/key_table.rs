@@ -3,7 +3,6 @@ use crate::bindings::host::types::types::Error;
 use crate::errors::ErrorType;
 use ecies::{utils::generate_keypair, PublicKey};
 use psibase::{
-    fracpack::{Pack, Unpack},
     AccountNumber,
 };
 use rand::Rng;
@@ -19,7 +18,7 @@ fn keys_table() -> Bucket {
     )
 }
 
-#[derive(Pack, Unpack, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct AsymKey {
     pub created_at: u32,
     pub private_key: Vec<u8>,
@@ -30,7 +29,7 @@ const KEY: &str = "asym_keys";
 pub fn get() -> Result<Vec<AsymKey>, Error> {
     let keys = keys_table().get(KEY);
     keys.map(|c| {
-        <Vec<AsymKey>>::unpacked(&c).map_err(|_| ErrorType::KeyDeserializationFailed.into())
+        psio::from_pssz::<Vec<AsymKey>>(&c).map_err(|_| ErrorType::KeyDeserializationFailed.into())
     })
     .unwrap_or(Ok(Vec::new()))
 }
@@ -40,7 +39,7 @@ pub fn get_latest() -> Option<AsymKey> {
 }
 
 pub fn save(keys: Vec<AsymKey>) {
-    keys_table().set(KEY, &keys.packed());
+    keys_table().set(KEY, &psio::to_pssz(&keys));
 }
 
 pub fn add(new_key: AsymKey) -> Result<(), Error> {
@@ -81,7 +80,7 @@ impl AsymKey {
     }
 }
 
-#[derive(Pack, Unpack, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct SymmetricKey {
     pub key: Vec<u8>,
     salt: Vec<u8>,
@@ -107,7 +106,7 @@ impl SymmetricKey {
         let key_value = keys_table().get(&key);
         Ok(match key_value {
             Some(value) => Some(
-                SymmetricKey::unpacked(&value).map_err(|_| ErrorType::KeyDeserializationFailed)?,
+                psio::from_pssz::<SymmetricKey>(&value).map_err(|_| ErrorType::KeyDeserializationFailed)?,
             ),
             None => None,
         })
@@ -134,7 +133,7 @@ impl SymmetricKey {
 
     pub fn save(&self, owner: AccountNumber, evaluation_id: u32, group_number: u32) {
         let key = Self::storage_key(owner, evaluation_id, group_number);
-        let packed_key = self.packed();
+        let packed_key = psio::to_pssz(&self);
         keys_table().set(&key, &packed_key);
     }
 }

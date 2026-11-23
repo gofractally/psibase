@@ -1,6 +1,6 @@
 use crate::errors::ErrorTypes::*;
 
-use psibase::fracpack::{Pack, Unpack};
+
 use psibase_plugin::types::*;
 use serde::Deserialize;
 
@@ -21,19 +21,19 @@ pub struct FixedDetailsResponse {
     pub expiryDate: String,
 }
 
-#[derive(Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct FixedDetails {
     pub expiry_date: String,
     pub private_key: String,
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct CurrentDetailsResponse {
     pub numAccounts: u16,
 }
 
-#[derive(Default, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct DeviceDetails {
     // Whether this device created an account with this invite
     pub account_created: bool,

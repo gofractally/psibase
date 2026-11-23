@@ -10,7 +10,7 @@ mod tests {
     use std::str::FromStr;
 
     fn assert_error(result: ChainEmptyResult, message: &str) {
-        let err = result.trace.error.unwrap();
+        let err = result.trace.error_text().unwrap();
         let contains_error = err.contains(message);
         assert!(
             contains_error,

@@ -3,7 +3,7 @@ use chrono::{Duration, Utc};
 use clap::{Args, FromArgMatches, Parser, Subcommand};
 use dialoguer::{console::Term, Confirm};
 use flate2::write::GzEncoder;
-use fracpack::Pack;
+
 use futures::{
     future::{join_all, pending, try_join_all, LocalBoxFuture, Shared},
     stream::FuturesUnordered,
@@ -556,7 +556,7 @@ fn store_sys(
     let (content, content_encoding) = compress_content(content, content_type, compression_level);
 
     sites::Wrapper::pack_from_to(sender, sites::SERVICE).storeSys(
-        path.to_string(),
+        path.to_string().into(),
         content_type.to_string(),
         content_encoding,
         content.into(),
@@ -786,7 +786,7 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -845,7 +845,7 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -909,7 +909,7 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -925,7 +925,7 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     let client = build_client(&args.node_args.proxy).await?;
     let wasm = std::fs::read(args.filename.clone())
         .with_context(|| format!("Can not read {}", args.filename))?;
-    let schema: psibase::Schema = serde_json::from_slice(
+    let schema: psibase::ServiceSchema = serde_json::from_slice(
         &std::fs::read(&args.schema)
             .with_context(|| format!("Can not read {}", args.schema.display()))?,
     )?;
@@ -968,7 +968,7 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -1032,7 +1032,7 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client.clone(),
-        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        psio::to_pssz(&sign_transaction(trx, &args.sig_args.sign)?),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -1108,7 +1108,7 @@ async fn monitor_trx<F: SchemaFetcher>(
     let result = push_transaction(
         &args.node_args.api,
         client.clone(),
-        trx.packed(),
+        psio::to_pssz(&trx),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
@@ -1256,7 +1256,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     push_boot(
         args,
         &client,
-        boot_transactions.packed(),
+        psio::to_pssz(&boot_transactions),
         &progress,
         &mut afmt,
     )
@@ -1268,7 +1268,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
             push_transaction_optimistic(
                 &args.node_args.api,
                 client.clone(),
-                trx.packed(),
+                psio::to_pssz(&trx),
                 args.tx_args.trace,
                 args.tx_args.console,
                 Some(&progress),
@@ -1441,7 +1441,7 @@ async fn push_transactions_parallel<'a, F: SchemaFetcher + 'a>(
                     push_transaction(
                         base_url,
                         client.clone(),
-                        trx.packed(),
+                        psio::to_pssz(&trx),
                         fmt,
                         console,
                         Some(progress),
@@ -1540,7 +1540,7 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
             builder.set_label(format!("Publishing {}-{}", &meta.name, &meta.version));
             builder.push(vec![
                 sites::Wrapper::pack_from(args.sender.into()).storeSys(
-                    dest.clone(),
+                    dest.clone().into(),
                     "application/zip".to_string(),
                     None,
                     content.into(),
@@ -1799,7 +1799,7 @@ async fn do_install<T: Read + Seek>(
                     push_transaction(
                         &node_args.api,
                         client.clone(),
-                        trx.packed(),
+                        psio::to_pssz(trx),
                         tx_args.trace,
                         tx_args.console,
                         Some(&progress),
@@ -1938,6 +1938,8 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// What `x-packages` is told about a package (C++ `LocalPackage`): every
+/// member is sent.
 #[derive(Debug, Clone, Serialize)]
 pub struct LocalPackage<'a> {
     pub name: &'a String,
@@ -1946,6 +1948,7 @@ pub struct LocalPackage<'a> {
     pub depends: &'a Vec<PackageRef>,
     pub accounts: &'a Vec<AccountNumber>,
     pub services: &'a Vec<AccountNumber>,
+    pub exports: &'a Vec<psibase::PackageExport>,
     pub sha256: &'a Checksum256,
 }
 
@@ -1958,6 +1961,7 @@ impl<'a> From<&'a PackageInfo> for LocalPackage<'a> {
             depends: &other.depends,
             accounts: &other.accounts,
             services: &other.services,
+            exports: &other.exports,
             sha256: &other.sha256,
         }
     }
@@ -1973,6 +1977,7 @@ impl<'a, R: Read + Seek> From<&'a PackagedService<R>> for LocalPackage<'a> {
             depends: &meta.depends,
             accounts: &meta.accounts,
             services: &meta.services,
+            exports: &meta.exports,
             sha256: other.hash(),
         }
     }
@@ -1990,6 +1995,7 @@ impl<'a> From<&'a (Meta, PackageOrigin)> for LocalPackage<'a> {
             depends: &other.0.depends,
             accounts: &other.0.accounts,
             services: &other.0.services,
+            exports: &other.0.exports,
             sha256: sha256,
         }
     }
@@ -2585,7 +2591,7 @@ async fn handle_login(args: &LoginArgs) -> Result<(), anyhow::Error> {
             .post(transact::SERVICE.url(&args.node_args.api)?.join("/login")?)
             .header("Content-Type", "application/octet-stream")
             .header("Accept", "application/json")
-            .body(sign_transaction(trx, &args.sign)?.packed()),
+            .body(psio::to_pssz(&sign_transaction(trx, &args.sign)?)),
     )
     .await?;
     println!("{} {}", reply.token_type, reply.access_token);

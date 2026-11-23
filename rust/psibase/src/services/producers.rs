@@ -10,7 +10,7 @@ pub const PRODUCER_ACCOUNT_STRONG: AccountNumber = account!("producers+3");
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{services::transact::ServiceMethod, AccountNumber, Claim, ConsensusData, Producer};
-    use crate::{Pack, ToSchema, Unpack};
+
     use serde::{Deserialize, Serialize};
 
     #[derive(
@@ -18,16 +18,12 @@ mod service {
         Clone,
         Serialize,
         Deserialize,
-        Pack,
-        Unpack,
-        ToSchema,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
     )]
-    #[fracpack(fracpack_mod = "fracpack")]
     pub struct CandidateInfo {
         pub account: AccountNumber,
         pub endpoint: String,

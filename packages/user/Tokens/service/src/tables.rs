@@ -9,11 +9,11 @@ pub mod tables {
         abort_message, get_sender, AccountNumber, Checksum256, Memo, ServiceWrapper, TableRecord,
     };
     use psibase::{define_flags, Flags};
-    use psibase::{Pack, Table, ToSchema, Unpack};
+    use psibase::{Table};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct InitRow {
         pub last_used_id: TID,
         pub last_used_shared_bal_id: u64,
@@ -89,7 +89,7 @@ pub mod tables {
     }
 
     #[table(name = "TokenTable", index = 1)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct Token {
         #[primary_key]
@@ -294,7 +294,7 @@ pub mod tables {
     }
 
     #[table(name = "BalanceTable", index = 2)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct Balance {
         pub account: AccountNumber,
@@ -414,7 +414,7 @@ pub mod tables {
     }
 
     #[table(name = "SharedBalanceTable", index = 3)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Serialize, Deserialize, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct SharedBalance {
         #[primary_key]
@@ -661,7 +661,7 @@ pub mod tables {
     });
 
     #[table(name = "BalanceConfigTable", index = 4)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct BalanceConfig {
         pub account: AccountNumber,
         pub token_id: TID,
@@ -727,7 +727,7 @@ pub mod tables {
     }
 
     #[table(name = "UserConfigTable", index = 5)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Serialize, Deserialize, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct UserConfig {
         #[primary_key]
@@ -782,7 +782,7 @@ pub mod tables {
     }
 
     #[table(name = "ConfigTable", index = 6)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct ConfigRow {
         pub sys_tid: TID,
@@ -801,7 +801,7 @@ pub mod tables {
     }
 
     #[table(name = "UserPendingTable", index = 7)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Serialize, Deserialize, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct UserPendingRecord {
         #[graphql(skip)]
@@ -854,7 +854,7 @@ pub mod tables {
     }
 
     #[table(name = "SubAccountTable", index = 8)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct SubAccount {
         pub account: AccountNumber,
         pub sub_account: String,
@@ -982,7 +982,7 @@ pub mod tables {
     }
 
     #[table(name = "SubAccountBalanceTable", index = 9)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct SubAccountBalance {
         #[graphql(skip)]

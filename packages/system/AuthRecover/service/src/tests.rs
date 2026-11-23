@@ -7,7 +7,7 @@ mod tests {
         ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey},
         pkcs8::EncodePublicKey,
     };
-    use psibase::fracpack::Pack;
+
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
     use psibase::*;
 
@@ -85,7 +85,7 @@ mod tests {
             claims,
         };
         chain.fill_tapos(&mut tx, 2);
-        let transaction = tx.packed();
+        let transaction = psio::to_pssz(&tx);
         let digest = psibase::sha256(&transaction);
         let proofs = keys
             .iter()
@@ -99,7 +99,7 @@ mod tests {
             .collect::<Result<_, Error>>()?;
         let res = ChainEmptyResult {
             trace: chain.push(&SignedTransaction {
-                transaction: transaction.into(),
+                transaction: psio::pssz::Nested::unchecked(transaction),
                 proofs,
                 ..Default::default()
             }),

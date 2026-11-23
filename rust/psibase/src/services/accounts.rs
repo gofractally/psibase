@@ -1,14 +1,13 @@
 #![allow(non_snake_case)]
 
 use crate::AccountNumber;
-use crate::{Pack, ToSchema, Unpack};
+
 use serde::{Deserialize, Serialize};
 use serde_aux::field_attributes::deserialize_number_from_string;
 
 pub const MIN_ALLOWED_ACCOUNT_LENGTH: u8 = 8;
 // TODO: tables
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct Account {
     pub accountNum: AccountNumber,
     pub authService: AccountNumber,
@@ -23,16 +22,12 @@ pub struct Account {
     Copy,
     Serialize,
     Deserialize,
-    Pack,
-    Unpack,
-    ToSchema,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[psio(transparent)]
 pub struct NewAccountMode(u8);
 

@@ -2,11 +2,11 @@
 pub mod tables {
     use async_graphql::SimpleObject;
 
-    use psibase::{AccountNumber, Pack, ToSchema, Unpack};
+    use psibase::{AccountNumber};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct ConfigRow {
         pub owner: AccountNumber,
         pub last_used_id: u32,
@@ -20,7 +20,7 @@ pub mod tables {
     }
 
     #[table(name = "EvaluationTable", index = 1)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Evaluation {
         pub id: u32,
         pub created_at: u32,
@@ -36,13 +36,18 @@ pub mod tables {
 
     #[table(name = "UserTable", index = 2)]
     #[derive(
-        Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
-    psio::PsszPack,
-    psio::PsszUnpack,
-    psio::PsszView,
-    psio::ToPsszSchema,
+        Default,
+        SimpleObject,
+        Serialize,
+        Deserialize,
+        Debug,
+        Clone,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
         psio::JsonText,
-)]
+    )]
     pub struct User {
         pub owner: AccountNumber,
         pub evaluation_id: u32,
@@ -55,13 +60,18 @@ pub mod tables {
 
     #[table(name = "GroupTable", index = 3)]
     #[derive(
-        Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
-    psio::PsszPack,
-    psio::PsszUnpack,
-    psio::PsszView,
-    psio::ToPsszSchema,
+        Default,
+        SimpleObject,
+        Serialize,
+        Deserialize,
+        Debug,
+        Clone,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
         psio::JsonText,
-)]
+    )]
     pub struct Group {
         pub owner: AccountNumber,
         pub evaluation_id: u32,
@@ -71,13 +81,18 @@ pub mod tables {
 
     #[table(name = "UserSettingsTable", index = 4)]
     #[derive(
-        Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
-    psio::PsszPack,
-    psio::PsszUnpack,
-    psio::PsszView,
-    psio::ToPsszSchema,
+        Default,
+        SimpleObject,
+        Serialize,
+        Deserialize,
+        Debug,
+        Clone,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
         psio::JsonText,
-)]
+    )]
     pub struct UserSettings {
         #[primary_key]
         pub user: AccountNumber,

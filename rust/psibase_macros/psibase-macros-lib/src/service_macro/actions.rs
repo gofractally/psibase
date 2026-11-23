@@ -48,27 +48,20 @@ impl Default for Options {
     }
 }
 
+/// The parameter names of an action or event, as the members of its
+/// argument record (`a, b,`) and as read from a decoded record
+/// (`args.a, args.b,`).
 pub fn process_action_args(
-    options: &Options,
-    gql: bool,
-    event_db: Option<&proc_macro2::TokenStream>,
-    psibase_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
-    new_items: &mut proc_macro2::TokenStream,
     invoke_args: &mut proc_macro2::TokenStream,
     invoke_struct_args: &mut proc_macro2::TokenStream,
 ) {
-    let mut struct_members = proc_macro2::TokenStream::new();
     for input in f.sig.inputs.iter() {
         match input {
             FnArg::Receiver(_) => (), // Compiler generates errors on self args
             FnArg::Typed(pat_type) => match &*pat_type.pat {
                 Pat::Ident(name) => {
-                    let ty = &*pat_type.ty;
-                    struct_members = quote! {
-                        #struct_members
-                        pub #name: #ty,
-                    };
+                    let name = &name.ident;
                     *invoke_args = quote! {
                         #invoke_args
                         #name,
@@ -82,48 +75,27 @@ pub fn process_action_args(
             },
         };
     }
-    let fn_name = &f.sig.ident;
-    let psibase_mod_str = psibase_mod.to_string();
-    let fracpack_mod = psibase_mod_str.clone() + "::fracpack";
+}
 
-    let doc = format!(
-        "This structure has the same JSON and Fracpack format as the arguments to [{actions}::{fn_name}]({actions}::{fn_name}).",
-        actions=options.actions, fn_name=fn_name.to_string());
-
-    let gql_object_attr = if gql && !f.sig.inputs.is_empty() {
-        quote! { , async_graphql::SimpleObject }
-    } else {
-        quote! {}
-    };
-
-    *new_items = quote! {
-        #new_items
-        #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::fracpack::ToSchema, serde::Deserialize, serde::Serialize #gql_object_attr)]
-        #[fracpack(fracpack_mod = #fracpack_mod)]
-        #[doc = #doc]
-        pub struct #fn_name {
-            #struct_members
-        }
-
-        impl #fn_name {
-            pub const ACTION_NAME: &'static str = stringify!(#fn_name);
-        }
-    };
-
-    if let Some(db) = event_db {
-        *new_items = quote! {
-            #new_items
-            impl #psibase_mod::GetEventDb for #fn_name {
-                fn db() -> #psibase_mod::EventDb {
-                    #psibase_mod::EventDb::#db
-                }
+/// The parameters of an action as its caller declares them: without `mut`.
+fn caller_inputs(f: &ItemFn) -> proc_macro2::TokenStream {
+    let params = f.sig.inputs.iter().filter_map(|input| match input {
+        FnArg::Receiver(_) => None,
+        FnArg::Typed(pat_type) => match &*pat_type.pat {
+            Pat::Ident(param) => {
+                let ident = &param.ident;
+                let ty = &pat_type.ty;
+                Some(quote! { #ident: #ty })
             }
-        }
-    }
+            _ => abort!(*pat_type.pat, "expected identifier"),
+        },
+    });
+    quote! { #(#params),* }
 }
 
 pub fn process_action_callers(
     psibase_mod: &proc_macro2::TokenStream,
+    args_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     action_callers: &mut proc_macro2::TokenStream,
     invoke_args: &proc_macro2::TokenStream,
@@ -132,7 +104,7 @@ pub fn process_action_callers(
     let name_str = name.to_string();
     let method_number =
         quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
-    let inputs = &f.sig.inputs;
+    let inputs = caller_inputs(f);
 
     let inner_doc = f
         .attrs
@@ -163,36 +135,30 @@ pub fn process_action_callers(
         call = quote! {call::<#fn_ret, _>};
     }
 
+    // The arguments of a call are the action's argument record.
     *action_callers = quote! {
         #action_callers
 
         #outer_doc
         pub fn #name(&self, #inputs) -> #caller_ret {
             #inner_doc
-            self.caller.#call(#method_number, (#invoke_args))
+            self.caller.#call(#method_number, #args_mod::#name { #invoke_args })
         }
     };
 }
 
 pub fn process_action_schema(
     psibase_mod: &proc_macro2::TokenStream,
-    action_mod: &proc_macro2::TokenStream,
+    args_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     insertions: &mut proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
     let name_str = name.to_string();
 
-    let ret = match &f.sig.output {
-        ReturnType::Default => quote! { None },
-        ReturnType::Type(_, ty) => {
-            quote! { Some(builder.insert::<#ty>() ) }
-        }
-    };
-
     *insertions = quote! {
         #insertions
-        actions.insert(#psibase_mod::MethodString(#name_str.to_string()), #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
+        actions.insert(#name_str.to_string(), #psibase_mod::function_type::<#args_mod::#name>(builder));
     }
 }
 

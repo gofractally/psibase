@@ -40,7 +40,7 @@ pub fn serve_simple_ui<Wrapper: WithActionStruct + ToServiceSchema>(
 /// </html>
 /// ```
 pub fn serve_simple_index(request: &HttpRequest) -> Option<HttpReply> {
-    if request.method == "GET" && (request.target == "/" || request.target == "/index.html") {
+    if request.method == "GET" && (request.target.to_str().unwrap_or_default() == "/" || request.target.to_str().unwrap_or_default() == "/index.html") {
         Some(HttpReply {
             status: 200,
             contentType: "text/html".into(),
@@ -65,7 +65,7 @@ pub fn serve_simple_index(request: &HttpRequest) -> Option<HttpReply> {
 pub fn serve_action_templates<Wrapper: ToServiceSchema>(
     request: &HttpRequest,
 ) -> Option<HttpReply> {
-    if request.method == "GET" && request.target == "/action_templates" {
+    if request.method == "GET" && request.target.to_str().unwrap_or_default() == "/action_templates" {
         Some(HttpReply {
             status: 200,
             contentType: "text/html".into(),
@@ -95,24 +95,30 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
         type Output = HttpReply;
 
         fn process<
-            Return: serde::Serialize + serde::de::DeserializeOwned,
-            ArgStruct: fracpack::Pack + serde::Serialize + serde::de::DeserializeOwned,
+            Return: psio::json::JsonText,
+            ArgStruct: psio::interface::Method
+                + psio::json::JsonText
+                + serde::Serialize
+                + serde::de::DeserializeOwned,
         >(
             self,
         ) -> Self::Output {
-            let arg_struct = serde_json::from_slice::<ArgStruct>(self.0)
+            // The arguments by name (or the positional array), as I-JSON.
+            let text = std::str::from_utf8(self.0)
+                .unwrap_or_else(|err| panic!("err parsing action args json: {err}"));
+            let arg_struct = psio::from_ijson::<ArgStruct>(text)
                 .unwrap_or_else(|err| panic!("err parsing action args json: {err}"));
             HttpReply {
                 status: 200,
                 contentType: "application/octet-stream".into(),
-                body: arg_struct.packed().into(),
+                body: psio::to_pssz(&arg_struct).into(),
                 headers: allow_cors_with_origin("*"),
             }
         }
     }
 
-    if request.method == "POST" && request.target.starts_with("/pack_action/") {
-        Wrapper::with_action_struct(&request.target[13..], PackAction(&request.body))
+    if request.method == "POST" && request.target.to_str().unwrap_or_default().starts_with("/pack_action/") {
+        Wrapper::with_action_struct(&request.target.to_str().unwrap_or_default()[13..], PackAction(&request.body))
     } else {
         None
     }
@@ -131,10 +137,10 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
     request: &HttpRequest,
     query: Query,
 ) -> Option<HttpReply> {
-    let (base, args) = if let Some((b, q)) = request.target.split_once('?') {
+    let (base, args) = if let Some((b, q)) = request.target.to_str().unwrap_or_default().split_once('?') {
         (b, q)
     } else {
-        (request.target.as_ref(), "")
+        (request.target.to_str().unwrap_or_default(), "")
     };
     if base != "/graphql" || request.method != "GET" && request.method != "POST" {
         return None;
@@ -194,7 +200,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
 /// This wraps [graphiql_source].
 pub fn serve_graphiql(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET"
-        && (request.target == "/graphiql.html" || request.target == "/graphiql")
+        && (request.target.to_str().unwrap_or_default() == "/graphiql.html" || request.target.to_str().unwrap_or_default() == "/graphiql")
     {
         Some(HttpReply {
             status: 200,

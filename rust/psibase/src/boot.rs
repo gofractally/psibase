@@ -5,7 +5,7 @@ use crate::{
     PackageList, PackageOrigin, PackagedService, Producer, SchemaMap, ServiceWrapper,
     SignedTransaction, Tapos, TimePointSec, Transaction, TransactionBuilder,
 };
-use fracpack::Pack;
+
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::io::{Read, Seek};
@@ -69,11 +69,11 @@ fn genesis_transaction<R: Read + Seek>(
         sender: AccountNumber { value: 0 },
         service: AccountNumber { value: 0 },
         method: method!("boot"),
-        rawData: genesis_action_data.packed().into(),
+        rawData: psio::to_pssz(&genesis_action_data).into(),
     }];
 
     Ok(SignedTransaction {
-        transaction: without_tapos(actions, expiration).packed().into(),
+        transaction: psio::pssz::Nested::new(&without_tapos(actions, expiration)).unwrap(),
         proofs: vec![],
         subjectiveData: None,
     })
@@ -286,7 +286,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     const TARGET_SIZE: usize = 1024 * 1024;
     let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| {
         Ok(SignedTransaction {
-            transaction: without_tapos(actions, expiration).packed().into(),
+            transaction: psio::pssz::Nested::new(&without_tapos(actions, expiration)).unwrap(),
             proofs: vec![],
             subjectiveData: None,
         })
@@ -305,7 +305,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     let transaction_groups = builder.finish()?;
 
     boot_transactions.push(SignedTransaction {
-        transaction: without_tapos(
+        transaction: psio::pssz::Nested::new(&without_tapos(
             genesis_block_actions(
                 block_signing_key,
                 initial_producer,
@@ -313,9 +313,8 @@ pub fn create_boot_transactions<R: Read + Seek>(
                 &schemas,
             )?,
             expiration,
-        )
-        .packed()
-        .into(),
+        ))
+        .unwrap(),
         proofs: vec![],
         subjectiveData: None,
     });
@@ -324,17 +323,16 @@ pub fn create_boot_transactions<R: Read + Seek>(
     for (_, transactions, _) in &transaction_groups {
         for trx in transactions {
             transaction_ids.push(crate::Checksum256::from(<[u8; 32]>::from(Sha256::digest(
-                &trx.transaction,
+                trx.transaction.bytes(),
             ))))
         }
     }
     boot_transactions.push(SignedTransaction {
-        transaction: without_tapos(
+        transaction: psio::pssz::Nested::new(&without_tapos(
             vec![transact::Wrapper::pack().startBoot(transaction_ids)],
             expiration,
-        )
-        .packed()
-        .into(),
+        ))
+        .unwrap(),
         proofs: vec![],
         subjectiveData: None,
     });

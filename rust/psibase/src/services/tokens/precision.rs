@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
+
 use serde::{Deserialize, Serialize};
 
 use crate::services::tokens::TokensError;
@@ -15,8 +15,6 @@ use async_graphql::scalar;
     Debug,
     Copy,
     Clone,
-    Pack,
-    ToSchema,
     Serialize,
     psio::PsszPack,
     psio::PsszUnpack,
@@ -24,7 +22,6 @@ use async_graphql::scalar;
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[psio(transparent, invariant = "Precision::in_range")]
 pub struct Precision(u8);
 
@@ -76,23 +73,6 @@ impl FromStr for Precision {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::new(s.parse::<u8>().map_err(|_| TokensError::InvalidNumber)?)
-    }
-}
-
-impl<'a> Unpack<'a> for Precision {
-    const FIXED_SIZE: u32 = 1;
-
-    const VARIABLE_SIZE: bool = false;
-
-    fn unpack(src: &mut FracInputStream<'a>) -> fracpack::Result<Self> {
-        u8::unpack(src)?
-            .try_into()
-            .map_err(|_| fracpack::Error::BadScalar)
-    }
-
-    fn verify(src: &mut FracInputStream) -> fracpack::Result<()> {
-        Self::unpack(src)?;
-        Ok(())
     }
 }
 

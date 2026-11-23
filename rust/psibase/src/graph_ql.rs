@@ -1,8 +1,9 @@
 use crate::{
     get_key_bytes, kv_get, kv_greater_equal_bytes, kv_less_than_bytes, kv_max_bytes, BlockNum,
-    BlockTime, EventDb, MethodNumber, RawKey, ServiceWrapper, TableIndex, TableRecord, ToKey,
+    BlockTime, EventDb, MethodNumber, RawKey, ServiceWrapper, TableIndex, TableRecord,
 };
 use async_graphql::connection::{query_with, Connection, Edge, EmptyFields};
+use psio::key::KeyPack;
 use async_graphql::{ContainerType, OutputType, SimpleObject, TypeName};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
@@ -31,7 +32,7 @@ use std::ops::RangeBounds;
 /// and [after](Self::after) page through the range. They conform to
 /// the Pagination Spec, except [query](Self::query) produces an
 /// error if both `first` and `last` are Some.
-pub struct TableQuery<Key: ToKey, Record: TableRecord> {
+pub struct TableQuery<Key: KeyPack, Record: TableRecord> {
     index: TableIndex<Key, Record>,
     first: Option<i32>,
     last: Option<i32>,
@@ -41,7 +42,7 @@ pub struct TableQuery<Key: ToKey, Record: TableRecord> {
     end: Option<RawKey>,
 }
 
-impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
+impl<Key: KeyPack, Record: TableRecord + OutputType> TableQuery<Key, Record> {
     /// Query a table's index
     pub fn new(table_index: TableIndex<Key, Record>) -> Self {
         Self {
@@ -66,12 +67,12 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
     /// - `table_index`: The table index to query.
     /// - `subkey`: Provides the key fields that remain constant. If there's more
     /// than 1 field, then use a tuple.
-    pub fn subindex<RemainingKey: ToKey>(
+    pub fn subindex<RemainingKey: KeyPack>(
         table_index: TableIndex<Key, Record>,
-        subkey: &impl ToKey,
+        subkey: &impl KeyPack,
     ) -> TableQuery<RemainingKey, Record> {
         let mut prefix = table_index.prefix;
-        subkey.append_key(&mut prefix);
+        prefix.extend_from_slice(&psio::to_key(&subkey));
         TableQuery {
             index: TableIndex::new(&table_index.db, prefix, table_index.is_secondary),
             first: None,
@@ -124,7 +125,7 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
     fn with_key<F: FnOnce(Self, RawKey) -> Self>(self, key: Option<&Key>, f: F) -> Self {
         if let Some(key) = key {
             let mut raw = self.index.prefix.clone();
-            key.append_key(&mut raw);
+            raw.extend_from_slice(&psio::to_key(key));
             f(self, RawKey::new(raw))
         } else {
             self
@@ -227,7 +228,7 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
         if self.index.is_secondary {
             kv_get(&self.index.db, &RawKey::new(bytes)).unwrap()
         } else {
-            Some(Record::unpacked(&bytes[..]).unwrap())
+            Some(psio::from_pssz::<Record>(&bytes[..]).unwrap())
         }
     }
 
@@ -675,7 +676,8 @@ impl<T: DeserializeOwned + OutputType + ContainerType> EventQuery<T> {
             println!("[EventQuery] SQL params: {:?}", params);
         }
 
-        let json_str = crate::services::r_events::Wrapper::call().sqlQuery(query, params);
+        let json_str = crate::services::r_events::Wrapper::call()
+            .sqlQuery(query, params.into_iter().map(Into::into).collect());
 
         if self.debug {
             println!("[EventQuery] Raw JSON response: {}", json_str);

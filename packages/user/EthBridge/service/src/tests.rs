@@ -1,5 +1,5 @@
 use super::*;
-use psibase::fracpack::Pack;
+
 use serde_json::{json, Value};
 fn fixture() -> Value {
     serde_json::from_str(include_str!(
@@ -36,7 +36,7 @@ fn push(chain: &Chain, actions: Vec<Action>, proofs: &[Value]) -> TransactionTra
         n
     }));
     let trace = chain.push(&SignedTransaction {
-        transaction: trx.packed().into(),
+        transaction: psio::pssz::Nested::new(&trx).unwrap(),
         proofs: witnesses,
         subjectiveData: None,
     });
@@ -44,13 +44,13 @@ fn push(chain: &Chain, actions: Vec<Action>, proofs: &[Value]) -> TransactionTra
         .action_traces
         .iter()
         .filter(|a| a.action.service == account!("verify-eth"))
-        .map(|a| a.total_time)
+        .map(|a| a.total_time.ticks())
         .sum();
     let objective_ns: i64 = trace
         .action_traces
         .iter()
         .filter(|a| a.action.service != account!("verify-eth"))
-        .map(|a| a.total_time)
+        .map(|a| a.total_time.ticks())
         .sum();
     println!(
         "ETH_BRIDGE_METRIC {}",
@@ -123,7 +123,7 @@ fn proof_rejection_and_objective_commitment_binding(chain: Chain) -> Result<(), 
         vec![untrusted],
         &[f["proofs"]["rotation"].clone()]
     )
-    .error
+    .error_text()
     .unwrap()
     .contains("Unauthenticated signing committee"));
     assert_eq!(
@@ -261,7 +261,7 @@ fn backed_deposit_deterministic_signing_and_finalized_withdrawal(
     .ok()?;
     assert!(
         push(&chain, vec![deposit], &[f["proofs"]["deposit"].clone()])
-            .error
+            .error_text()
             .unwrap()
             .contains("ETH deposit already credited")
     );
@@ -294,7 +294,7 @@ fn backed_deposit_deterministic_signing_and_finalized_withdrawal(
     let committed = Wrapper::push_from(&chain, publisher).makeBatch();
     println!(
         "ETH_BRIDGE_DIRECT_METRIC {}",
-        json!({"operation":"makeBatch","objective_ns":committed.trace.action_traces.iter().map(|a|a.total_time).sum::<i64>()})
+        json!({"operation":"makeBatch","objective_ns":committed.trace.action_traces.iter().map(|a|a.total_time.ticks()).sum::<i64>()})
     );
     let batch = committed.get()?;
     assert_eq!(batch, 0);
@@ -325,7 +325,7 @@ fn backed_deposit_deterministic_signing_and_finalized_withdrawal(
         let gathered = Wrapper::push_from(&chain, publisher).gather(0, i as u8);
         println!(
             "ETH_BRIDGE_DIRECT_METRIC {}",
-            json!({"operation":"gather","objective_ns":gathered.trace.action_traces.iter().map(|a|a.total_time).sum::<i64>()})
+            json!({"operation":"gather","objective_ns":gathered.trace.action_traces.iter().map(|a|a.total_time.ticks()).sum::<i64>()})
         );
         gathered.get()?;
     }
@@ -359,7 +359,7 @@ fn backed_deposit_deterministic_signing_and_finalized_withdrawal(
     .ok()?;
     assert!(
         push(&chain, vec![complete], &[f["proofs"]["completed"].clone()])
-            .error
+            .error_text()
             .unwrap()
             .contains("ETH batch already completed")
     );

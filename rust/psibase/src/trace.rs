@@ -1,47 +1,52 @@
 use std::fmt;
 
 use crate::{
-    field_names, field_types, method, schema_types,
+    method, nested_calls,
     services::{db, transact, virtual_server},
-    AccountNumber, Action, CustomPrettyAction, Hex, MethodNumber, MethodString, Schema, SchemaMap,
-    ServiceMethod, SharedAction, TypeMatchExt,
+    AccountNumber, Action, ActionDecoder, Hex, SchemaMap, ServiceSchema,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use fracpack::{CompiledSchema, CompiledType, CustomHandler, FracInputStream, Pack, Unpack};
+
 use futures::future::{FutureExt, LocalBoxFuture, Shared};
 use serde::{
     ser::{SerializeSeq, SerializeStruct},
     Deserialize, Serialize, Serializer,
 };
-use serde_aux::prelude::deserialize_number_from_string;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::rc::Rc;
+use std::sync::Arc;
 
-#[derive(Debug, Clone, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 #[serde(rename_all = "camelCase")]
 pub struct ActionTrace {
     pub action: Action,
     pub raw_retval: Hex<Vec<u8>>,
     pub inner_traces: Vec<InnerTrace>,
-    pub total_time: i64,
-    pub error: Option<String>,
+    pub total_time: psio::time::Duration<psio::time::Nanos>,
+    pub error: Option<psio::pssz::RawString>,
+}
+
+impl ActionTrace {
+    /// The error as text; bytes that are not UTF-8 are replaced.
+    pub fn error_text(&self) -> Option<String> {
+        self.error
+            .as_ref()
+            .map(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+    }
 }
 
 impl fmt::Display for ActionTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_action_trace(&SchemaMap::new(), self, 0, f)
+        format_action_trace(&ActionDecoder::empty(), self, 0, f)
     }
 }
 
 #[derive(
     Debug,
     Clone,
-    Pack,
-    Unpack,
     Serialize,
     Deserialize,
     psio::PsszPack,
@@ -50,38 +55,42 @@ impl fmt::Display for ActionTrace {
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleTrace {
-    pub console: String,
+    pub console: psio::pssz::RawString,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 pub enum InnerTraceEnum {
     ConsoleTrace(ConsoleTrace),
     ActionTrace(ActionTrace),
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 #[serde(rename_all = "camelCase")]
 pub struct InnerTrace {
     pub inner: InnerTraceEnum,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionTrace {
     pub action_traces: Vec<ActionTrace>,
-    pub error: Option<String>,
+    pub error: Option<psio::pssz::RawString>,
 }
 
 impl TransactionTrace {
+    /// The error as text. It is whatever the failing service passed to
+    /// abort: bytes that are not UTF-8 are replaced.
+    pub fn error_text(&self) -> Option<String> {
+        self.error
+            .as_ref()
+            .map(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+    }
+
     #[track_caller]
     pub fn ok(self) -> Result<TransactionTrace, anyhow::Error> {
-        if let Some(e) = self.error {
+        if let Some(e) = self.error_text() {
             let loc = std::panic::Location::caller();
             Err(anyhow::anyhow!("{} (at {}:{})", e, loc.file(), loc.line()))
         } else {
@@ -92,7 +101,7 @@ impl TransactionTrace {
     #[track_caller]
     pub fn match_error(self, msg: &str) -> Result<TransactionTrace, anyhow::Error> {
         let loc = std::panic::Location::caller();
-        if let Some(e) = &self.error {
+        if let Some(e) = self.error_text() {
             if e.contains(msg) {
                 Ok(self)
             } else {
@@ -125,7 +134,7 @@ impl TransactionTrace {
             writer,
             &UnpackedTrace {
                 value: self,
-                schemas: &afmt.storage.schemas.borrow(),
+                schemas: &afmt.decoder(),
             },
         )
     }
@@ -138,7 +147,7 @@ impl TransactionTrace {
             writer,
             &UnpackedTrace {
                 value: self,
-                schemas: &afmt.storage.schemas.borrow(),
+                schemas: &afmt.decoder(),
             },
         )
     }
@@ -146,7 +155,7 @@ impl TransactionTrace {
 
 impl fmt::Display for TransactionTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_transaction_trace(&SchemaMap::new(), self, 0, f)
+        format_transaction_trace(&ActionDecoder::empty(), self, 0, f)
     }
 }
 
@@ -166,7 +175,9 @@ impl fmt::Display for TraceConsole<'_> {
 fn write_action_console(atrace: &ActionTrace, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     for inner in &atrace.inner_traces {
         match &inner.inner {
-            InnerTraceEnum::ConsoleTrace(c) => write!(f, "{}", &c.console)?,
+            InnerTraceEnum::ConsoleTrace(c) => {
+                write!(f, "{}", String::from_utf8_lossy(c.console.as_bytes()))?
+            }
             InnerTraceEnum::ActionTrace(a) => write_action_console(a, f)?,
         }
     }
@@ -186,7 +197,7 @@ fn format_string(mut s: &str, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt:
 
 fn format_console(c: &ConsoleTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{:indent$}console:    ", "")?;
-    format_string(&c.console, indent + 12, f)?;
+    format_string(&String::from_utf8_lossy(c.console.as_bytes()), indent + 12, f)?;
     writeln!(f)
 }
 
@@ -197,7 +208,7 @@ fn hide_action(action: &Action) -> bool {
 }
 
 fn format_action_trace(
-    schemas: &SchemaMap,
+    schemas: &ActionDecoder,
     atrace: &ActionTrace,
     indent: usize,
     f: &mut fmt::Formatter<'_>,
@@ -205,13 +216,7 @@ fn format_action_trace(
     if hide_action(&atrace.action) {
         return Ok(());
     }
-    let schema = schemas.get(&atrace.action.service);
-    let action_name = MethodString(atrace.action.method.to_string());
-    let (action_name, action_type) = schema
-        .and_then(|schema| schema.actions.get_key_value(&action_name))
-        .map_or((&action_name, None), |(name, action_type)| {
-            (name, Some(action_type))
-        });
+    let action_name = schemas.method_name(atrace.action.service, atrace.action.method);
 
     writeln!(f, "{:indent$}action:", "")?;
     writeln!(
@@ -219,37 +224,33 @@ fn format_action_trace(
         "{:indent$}    {} => {}::{}",
         "", atrace.action.sender, atrace.action.service, action_name
     )?;
-    if let Some(action_type) = action_type {
-        let mut custom = schema_types();
-        let service_method = CustomResolvedServiceMethod::new(schemas, std::mem::drop);
-        custom.insert("ServiceMethod".to_string(), &service_method);
-        let custom_action = CustomPrettyAction::new(&*schemas);
-        custom.insert("Action".to_string(), &custom_action);
-        let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
+    if schemas.describes(atrace.action.service, atrace.action.method) {
         if !atrace.action.rawData.is_empty() {
-            cschema.extend(&action_type.params);
-            if let Ok(args) = cschema.to_value(&action_type.params, &atrace.action.rawData) {
-                if let serde_json::Value::Object(args) = args {
+            match schemas.args(&atrace.action) {
+                Some(Ok(serde_json::Value::Object(args))) => {
                     for (name, value) in args {
                         write!(f, "{:indent$}    {}: ", "", name)?;
                         format_pruned_json(f, &value)?;
                         writeln!(f, "")?;
                     }
-                } else {
+                }
+                Some(Ok(args)) => {
                     write!(f, "{:indent$}    args: ", "")?;
                     format_pruned_json(f, &args)?;
                     writeln!(f, "")?;
                 }
-            } else {
-                writeln!(f, "{:indent$}    args: <deserialization failed>", "")?;
+                _ => writeln!(f, "{:indent$}    args: <deserialization failed>", "")?,
             }
         }
         if !atrace.raw_retval.is_empty() {
-            if let Some(result_type) = &action_type.result {
-                cschema.extend(result_type);
+            if let Some(result) = schemas.retval(
+                atrace.action.service,
+                atrace.action.method,
+                &atrace.raw_retval,
+            ) {
                 write!(f, "{:indent$}    retval: ", "",)?;
-                if let Ok(result) = &cschema.to_value(result_type, &atrace.raw_retval) {
-                    format_pruned_json(f, &result)?
+                if let Ok(result) = &result {
+                    format_pruned_json(f, result)?
                 } else {
                     write!(f, "<deserialization failed>")?
                 }
@@ -274,7 +275,7 @@ fn format_action_trace(
 }
 
 fn format_transaction_trace(
-    schemas: &SchemaMap,
+    schemas: &ActionDecoder,
     ttrace: &TransactionTrace,
     indent: usize,
     f: &mut fmt::Formatter<'_>,
@@ -282,9 +283,9 @@ fn format_transaction_trace(
     for a in &ttrace.action_traces {
         format_action_trace(schemas, a, indent, f)?;
     }
-    if let Some(e) = &ttrace.error {
+    if let Some(e) = ttrace.error_text() {
         write!(f, "{:indent$}error:     ", "")?;
-        format_string(e, indent + 11, f)?;
+        format_string(&e, indent + 11, f)?;
     }
     Ok(())
 }
@@ -292,7 +293,7 @@ fn format_transaction_trace(
 fn use_disk_sys_amount(action: &Action) -> Option<i64> {
     use crate as psibase;
     if action.service == virtual_server::SERVICE && action.method == method!("useDiskSys") {
-        let args = virtual_server::action_structs::useDiskSys::unpacked(&action.rawData).ok()?;
+        let args = psio::from_pssz::<virtual_server::action_structs::useDiskSys>(&action.rawData).ok()?;
         Some(args.amount_bytes)
     } else {
         None
@@ -355,21 +356,16 @@ const COL_WIDTH: usize = 8;
 const COLS_TOTAL: usize = COL_WIDTH * 2 + 4;
 
 fn format_disk_usage_action(
-    schemas: &SchemaMap,
+    schemas: &ActionDecoder,
     atrace: &ActionTrace,
     indent: usize,
     show_all_ops: bool,
     f: &mut fmt::Formatter<'_>,
 ) -> fmt::Result {
-    let schema = schemas.get(&atrace.action.service);
-    let entry_placeholder = MethodString("<entry>".to_string());
-    let action_name = MethodString(atrace.action.method.to_string());
     let action_name = if atrace.action.method.value == 0 {
-        &entry_placeholder
+        "<entry>".to_string()
     } else {
-        schema
-            .and_then(|schema| schema.actions.get_key_value(&action_name))
-            .map_or(&action_name, |(name, _)| name)
+        schemas.method_name(atrace.action.service, atrace.action.method)
     };
 
     let mut deltas = Vec::new();
@@ -418,7 +414,7 @@ fn format_disk_usage_action(
 }
 
 fn format_transaction_disk_usage_trace(
-    schemas: &SchemaMap,
+    schemas: &ActionDecoder,
     ttrace: &TransactionTrace,
     show_all_ops: bool,
     f: &mut fmt::Formatter<'_>,
@@ -442,7 +438,7 @@ fn format_transaction_disk_usage_trace(
 }
 
 pub struct DisplayDiskUsageTrace<'a> {
-    schemas: &'a RefCell<HashMap<AccountNumber, Schema>>,
+    schemas: &'a RefCell<Arc<SchemaMap>>,
     trace: &'a TransactionTrace,
     show_all_ops: bool,
 }
@@ -450,7 +446,7 @@ pub struct DisplayDiskUsageTrace<'a> {
 impl fmt::Display for DisplayDiskUsageTrace<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         format_transaction_disk_usage_trace(
-            &self.schemas.borrow(),
+            &ActionDecoder::new(self.schemas.borrow().clone()),
             self.trace,
             self.show_all_ops,
             f,
@@ -459,16 +455,12 @@ impl fmt::Display for DisplayDiskUsageTrace<'_> {
 }
 
 fn format_error_stack<T: std::fmt::Write>(
-    schemas: &SchemaMap,
+    schemas: &ActionDecoder,
     atrace: &ActionTrace,
     f: &mut T,
 ) -> fmt::Result {
     if atrace.error.is_some() {
-        let schema = schemas.get(&atrace.action.service);
-        let action_name = MethodString(atrace.action.method.to_string());
-        let action_name = schema
-            .and_then(|schema| schema.actions.get_key_value(&action_name))
-            .map_or(&action_name, |(name, _action_type)| name);
+        let action_name = schemas.method_name(atrace.action.service, atrace.action.method);
         writeln!(
             f,
             "{} => {}::{}",
@@ -485,7 +477,7 @@ fn format_error_stack<T: std::fmt::Write>(
 }
 
 fn format_transaction_error_stack<T: std::fmt::Write>(
-    schemas: &SchemaMap,
+    schemas: &ActionDecoder,
     ttrace: &TransactionTrace,
     f: &mut T,
 ) -> fmt::Result {
@@ -493,7 +485,7 @@ fn format_transaction_error_stack<T: std::fmt::Write>(
         format_error_stack(schemas, a, f)?;
         break;
     }
-    if let Some(message) = &ttrace.error {
+    if let Some(message) = ttrace.error_text() {
         writeln!(f, "{}", message)?;
     }
     Ok(())
@@ -502,40 +494,45 @@ fn format_transaction_error_stack<T: std::fmt::Write>(
 impl TransactionTrace {
     pub fn fmt_stack<'a, F: SchemaFetcher + 'a>(&self, afmt: &ActionFormatter<'a, F>) -> String {
         let mut result = String::new();
-        format_transaction_error_stack(&afmt.storage.schemas.borrow(), self, &mut result).unwrap();
+        format_transaction_error_stack(&afmt.decoder(), self, &mut result).unwrap();
         result
     }
 }
 
 #[async_trait(?Send)]
 pub trait SchemaFetcher {
-    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error>;
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<ServiceSchema, anyhow::Error>;
 }
 
 pub struct NullSchemaFetcher;
 
 #[async_trait(?Send)]
 impl SchemaFetcher for NullSchemaFetcher {
-    async fn fetch_schema(&self, _service: AccountNumber) -> Result<Schema, anyhow::Error> {
+    async fn fetch_schema(&self, _service: AccountNumber) -> Result<ServiceSchema, anyhow::Error> {
         Err(anyhow::anyhow!("Schema fetching disabled"))
     }
 }
 
 pub struct DisplayTransactionTrace<'a> {
-    schemas: &'a RefCell<HashMap<AccountNumber, Schema>>,
+    schemas: &'a RefCell<Arc<SchemaMap>>,
     trace: &'a TransactionTrace,
 }
 
 impl fmt::Display for DisplayTransactionTrace<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_transaction_trace(&self.schemas.borrow(), self.trace, 0, f)
+        format_transaction_trace(
+            &ActionDecoder::new(self.schemas.borrow().clone()),
+            self.trace,
+            0,
+            f,
+        )
     }
 }
 
 type PinType<'a> = LocalBoxFuture<'a, Result<(), Rc<Cell<anyhow::Error>>>>;
 
 struct ActionFormatterImpl<'a, F: SchemaFetcher + 'a> {
-    schemas: RefCell<HashMap<AccountNumber, Schema>>,
+    schemas: RefCell<Arc<SchemaMap>>,
     fetcher: F,
     pending: RefCell<HashMap<AccountNumber, Shared<PinType<'a>>>>,
 }
@@ -567,7 +564,7 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
     pub fn with_schemas(schemas: SchemaMap, fetcher: F) -> Self {
         ActionFormatter {
             storage: Rc::new(ActionFormatterImpl {
-                schemas: schemas.into(),
+                schemas: RefCell::new(Arc::new(schemas)),
                 fetcher,
                 pending: RefCell::new(HashMap::new()),
             }),
@@ -591,7 +588,7 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
                             .fetch_schema(service)
                             .await
                             .map_err(|e| Rc::new(Cell::new(e)))?;
-                        storage.schemas.borrow_mut().insert(service, schema);
+                        Arc::make_mut(&mut *storage.schemas.borrow_mut()).insert(service, Arc::new(schema));
                         Ok(())
                     });
                     fut.shared()
@@ -603,50 +600,23 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         }
         Ok(())
     }
-    pub async fn prepare_action_impl<'b>(
-        &self,
-        act: SharedAction<'b>,
-        nested_actions: &mut Vec<SharedAction<'b>>,
-        services: &mut HashSet<AccountNumber>,
-    ) {
-        let schemas = self.storage.schemas.borrow();
-        if let Some(schema) = schemas.get(&act.service) {
-            let mut custom = schema_types();
-            let services = RefCell::new(services);
-            let service_method =
-                CustomResolvedServiceMethod::new(&*schemas, |service_method: ServiceMethod| {
-                    if !schemas.contains_key(&service_method.service) {
-                        services.borrow_mut().insert(service_method.service);
-                    }
-                });
-            custom.insert("ServiceMethod".to_string(), &service_method);
-            let nested_actions = RefCell::new(nested_actions);
-            let custom_action = CustomActionCollector::new(|inner: SharedAction| {
-                if let Some(raw_data) = restore_lifetime(act.rawData.0, inner.rawData.0) {
-                    nested_actions.borrow_mut().push(SharedAction {
-                        sender: inner.sender,
-                        service: inner.service,
-                        method: inner.method,
-                        rawData: raw_data.into(),
-                    });
-                }
-            });
-            custom.insert("Action".to_string(), &custom_action);
-            let mut cschema = CompiledSchema::new(&schema.types, &custom);
-            let action_name = MethodString(act.method.to_string());
-            if let Some(action_type) = schema.actions.get(&action_name) {
-                cschema.extend(&action_type.params);
-                let _ = cschema.verify(&action_type.params, act.rawData.0);
-            }
-        }
+    /// The schemas loaded so far, as a decoder of actions.
+    pub fn decoder(&self) -> ActionDecoder {
+        ActionDecoder::new(self.storage.schemas.borrow().clone())
     }
-    pub async fn prepare_action<'b>(&self, act: SharedAction<'b>) {
-        let mut actions = vec![act];
+    /// Loads the schemas needed to present `act`: its service's, and those
+    /// of the actions and service methods its arguments name, to any depth.
+    pub async fn prepare_action(&self, act: &Action) {
+        let mut actions = vec![act.clone()];
         let mut services = HashSet::new();
         while let Some(act) = actions.pop() {
             let _ = self.add_service(act.service).await;
-            self.prepare_action_impl(act, &mut actions, &mut services)
-                .await;
+            let found = {
+                let schemas = self.storage.schemas.borrow();
+                nested_calls(&schemas, act.service, act.method, &act.rawData.0)
+            };
+            actions.extend(found.actions);
+            services.extend(found.methods.into_iter().map(|m| m.service));
         }
         for service in services {
             let _ = self.add_service(service).await;
@@ -656,28 +626,16 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
     /// the schemas loaded by [Self::prepare_action]. When the service's schema describes
     /// the method, `method` has its original spelling and `data`, which replaces
     /// `rawData`, holds the arguments, with any actions nested in them also decoded.
-    pub fn action_to_json(&self, act: SharedAction) -> serde_json::Value {
-        let schemas = self.storage.schemas.borrow();
-        let mut method = MethodString(act.method.to_string());
-        let mut data = None;
-        if let Some(schema) = schemas.get(&act.service) {
-            if let Some((name, action_type)) = schema.actions.get_key_value(&method) {
-                method = name.clone();
-                let mut custom = schema_types();
-                let service_method = CustomResolvedServiceMethod::new(&*schemas, std::mem::drop);
-                custom.insert("ServiceMethod".to_string(), &service_method);
-                let custom_action = CustomPrettyAction::new(&*schemas);
-                custom.insert("Action".to_string(), &custom_action);
-                let mut cschema = CompiledSchema::new(&schema.types, &custom);
-                cschema.extend(&action_type.params);
-                data = cschema.to_value(&action_type.params, act.rawData.0).ok();
-            }
-        }
+    pub fn action_to_json(&self, act: &Action) -> serde_json::Value {
+        let decoder = self.decoder();
         let mut result = serde_json::Map::with_capacity(4);
         result.insert("sender".to_string(), act.sender.to_string().into());
         result.insert("service".to_string(), act.service.to_string().into());
-        result.insert("method".to_string(), method.0.into());
-        if let Some(data) = data {
+        result.insert(
+            "method".to_string(),
+            decoder.method_name(act.service, act.method).into(),
+        );
+        if let Some(Ok(data)) = decoder.args(act) {
             result.insert("data".to_string(), data);
         } else {
             result.insert("rawData".to_string(), act.rawData.to_string().into());
@@ -688,13 +646,7 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         let mut res = self.add_service(atrace.action.service).await;
         if res.is_ok() {
             if !atrace.action.rawData.is_empty() {
-                self.prepare_action(SharedAction {
-                    sender: atrace.action.sender,
-                    service: atrace.action.service,
-                    method: atrace.action.method,
-                    rawData: (&atrace.action.rawData.0[..]).into(),
-                })
-                .await;
+                self.prepare_action(&atrace.action).await;
             }
         }
         for inner in &atrace.inner_traces {
@@ -828,7 +780,7 @@ fn format_pruned_json(
 
 struct UnpackedAction<'a> {
     value: &'a Action,
-    method: &'a MethodString,
+    method: &'a str,
     data: Option<serde_json::Value>,
 }
 
@@ -849,7 +801,7 @@ impl<'a> Serialize for UnpackedAction<'a> {
 
 struct UnpackedTrace<'a, T> {
     value: T,
-    schemas: &'a SchemaMap,
+    schemas: &'a ActionDecoder,
 }
 
 impl<'a, 'b, T> Serialize for UnpackedTrace<'a, &'b Vec<T>>
@@ -886,36 +838,25 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b TransactionTrace> {
 impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let atrace = &self.value;
-        let schema = self.schemas.get(&atrace.action.service);
-        let action_name = MethodString(atrace.action.method.to_string());
-        let (action_name, action_type) = schema
-            .and_then(|schema| schema.actions.get_key_value(&action_name))
-            .map_or((&action_name, None), |(name, action_type)| {
-                (name, Some(action_type))
-            });
+        let action_name = self
+            .schemas
+            .method_name(atrace.action.service, atrace.action.method);
 
         let mut unpacked_args = None;
         let mut unpacked_retval = None;
 
-        if let Some(action_type) = action_type {
-            let mut custom = schema_types();
-            let service_method = CustomResolvedServiceMethod::new(self.schemas, std::mem::drop);
-            custom.insert("ServiceMethod".to_string(), &service_method);
-            let custom_action = CustomPrettyAction::new(&self.schemas);
-            custom.insert("Action".to_string(), &custom_action);
-            let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
-            if !atrace.action.rawData.is_empty() {
-                cschema.extend(&action_type.params);
-                unpacked_args = cschema
-                    .to_value(&action_type.params, &atrace.action.rawData)
-                    .ok()
-            }
-            if !atrace.raw_retval.is_empty() {
-                if let Some(result_type) = &action_type.result {
-                    cschema.extend(result_type);
-                    unpacked_retval = cschema.to_value(result_type, &atrace.raw_retval).ok()
-                }
-            }
+        if !atrace.action.rawData.is_empty() {
+            unpacked_args = self.schemas.args(&atrace.action).and_then(Result::ok);
+        }
+        if !atrace.raw_retval.is_empty() {
+            unpacked_retval = self
+                .schemas
+                .retval(
+                    atrace.action.service,
+                    atrace.action.method,
+                    &atrace.raw_retval,
+                )
+                .and_then(Result::ok);
         }
 
         let mut s = serializer.serialize_struct("ActionTrace", 5)?;
@@ -924,7 +865,7 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
             "action",
             &UnpackedAction {
                 value: &self.value.action,
-                method: action_name,
+                method: &action_name,
                 data: unpacked_args,
             },
         )?;
@@ -978,133 +919,5 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b InnerTraceEnum> {
                 },
             ),
         }
-    }
-}
-
-// Uses on-chain schemas to resolve the original
-// spelling of methods.
-struct CustomResolvedServiceMethod<'a, F> {
-    schemas: &'a HashMap<AccountNumber, Schema>,
-    f: F,
-}
-
-impl<'a, F> CustomResolvedServiceMethod<'a, F> {
-    fn new(schemas: &'a SchemaMap, f: F) -> Self {
-        CustomResolvedServiceMethod { schemas, f }
-    }
-}
-
-impl<'b, F: Fn(ServiceMethod) -> ()> CustomHandler for CustomResolvedServiceMethod<'b, F> {
-    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
-        if let Some([service, method]) = field_types::<2>(ty) {
-            schema.matches_u64(service) && schema.matches_u64(method)
-        } else {
-            false
-        }
-    }
-    fn frac2json(
-        &self,
-        _schema: &CompiledSchema,
-        ty: &CompiledType,
-        src: &mut FracInputStream,
-        _allow_empty_container: bool,
-    ) -> Result<serde_json::Value, fracpack::Error> {
-        let [sname, mname] = field_names::<2>(ty).unwrap();
-        let value = ServiceMethod::unpack(src)?;
-        let mut method = MethodString(value.method.to_string());
-        if let Some(schema) = self.schemas.get(&value.service) {
-            if let Some((key, _)) = schema.actions.get_key_value(&method) {
-                method = key.clone();
-            }
-        }
-        let mut result = serde_json::Map::with_capacity(2);
-        result.insert(sname.to_owned(), value.service.to_string().into());
-        result.insert(mname.to_owned(), method.0.into());
-        Ok(result.into())
-    }
-    fn json2frac(
-        &self,
-        _schema: &CompiledSchema,
-        ty: &CompiledType,
-        val: &serde_json::Value,
-        dest: &mut Vec<u8>,
-    ) -> Result<(), serde_json::Error> {
-        use serde::de::Error;
-        let [sname, mname] = field_names::<2>(ty).unwrap();
-        let Some(object) = val.as_object() else {
-            Err(serde_json::Error::custom("expected object"))?
-        };
-        let value =
-            ServiceMethod {
-                service: AccountNumber::deserialize(object.get(sname).ok_or_else(|| {
-                    serde_json::Error::custom(format!("missing field {}", sname))
-                })?)?,
-                method: MethodNumber::deserialize(object.get(mname).ok_or_else(|| {
-                    serde_json::Error::custom(format!("missing field {}", mname))
-                })?)?,
-            };
-        Ok(value.pack(dest))
-    }
-    fn fracpack_verify(
-        &self,
-        _schema: &CompiledSchema,
-        _ty: &CompiledType,
-        src: &mut FracInputStream,
-        _allow_empty_container: bool,
-    ) -> Result<(), fracpack::Error> {
-        let value = ServiceMethod::unpack(src)?;
-        (self.f)(value);
-        Ok(())
-    }
-    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
-        false
-    }
-}
-
-struct CustomActionCollector<F> {
-    f: F,
-}
-
-impl<F> CustomActionCollector<F> {
-    fn new(f: F) -> Self {
-        Self { f }
-    }
-}
-
-impl<F: Fn(SharedAction) -> ()> CustomHandler for CustomActionCollector<F> {
-    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
-        schema.matches_action(ty)
-    }
-    fn frac2json(
-        &self,
-        _schema: &CompiledSchema,
-        _ty: &CompiledType,
-        _src: &mut FracInputStream,
-        _allow_empty_container: bool,
-    ) -> Result<serde_json::Value, fracpack::Error> {
-        unimplemented!()
-    }
-    fn json2frac(
-        &self,
-        _schema: &CompiledSchema,
-        _ty: &CompiledType,
-        _val: &serde_json::Value,
-        _dest: &mut Vec<u8>,
-    ) -> Result<(), serde_json::Error> {
-        unimplemented!()
-    }
-    fn fracpack_verify(
-        &self,
-        _schema: &CompiledSchema,
-        _ty: &CompiledType,
-        src: &mut FracInputStream,
-        _allow_empty_container: bool,
-    ) -> Result<(), fracpack::Error> {
-        let value = SharedAction::unpack(src)?;
-        (self.f)(value);
-        Ok(())
-    }
-    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
-        false
     }
 }

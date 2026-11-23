@@ -1,16 +1,16 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Action, Checksum256, Pack, TimePointUSec, ToSchema, Unpack};
+    use psibase::{AccountNumber, Action, Checksum256, TimePointUSec};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct ActionList {
         pub actions: Vec<Action>,
     }
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -19,7 +19,7 @@ pub mod tables {
 
     /// A table that contains all of the transactions currently staged.
     #[table(name = "StagedTxTable", index = 1)]
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct StagedTx {
         /// Unique ID for a staged transaction
         pub id: u32,
@@ -58,7 +58,7 @@ pub mod tables {
     }
 
     #[table(name = "LastUsedTable", index = 2)]
-    #[derive(Default, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct LastUsed {
         pub id: u32,
     }
@@ -69,7 +69,7 @@ pub mod tables {
 
     /// A table that contains all of the responses to staged transactions.
     #[table(name = "ResponseTable", index = 3)]
-    #[derive(Debug, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Response {
         /// The ID of the staged transaction
         pub id: u32,
@@ -102,7 +102,7 @@ pub mod tables {
     /// Table can be used to search for all parties in a staged transaction, or all
     /// staged transactions related to a given party.
     #[table(name = "StagedTxPartyTable", index = 4)]
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct StagedTxParty {
         /// The ID of the staged transaction
         pub id: u32,
@@ -127,7 +127,7 @@ pub mod impls {
     use std::collections::HashSet;
 
     use super::tables::*;
-    use psibase::fracpack::Pack;
+
     use psibase::services::transact::ServiceMethod;
     use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
     use psibase::{get_sender, AccountNumber, Action, Checksum256, ServiceWrapper, Table};
@@ -148,7 +148,7 @@ pub mod impls {
 
             let monotonic_id = LastUsed::get_next_id();
             let current_block = Transact::call().currentBlock();
-            let packed = (monotonic_id, current_block.blockNum, &actions).packed();
+            let packed = psio::to_pssz(&(monotonic_id, current_block.blockNum, &actions));
             let txid = crate::sha256(&packed);
 
             for action in &actions {

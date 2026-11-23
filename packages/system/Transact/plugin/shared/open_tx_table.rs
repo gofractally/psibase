@@ -1,5 +1,5 @@
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
-use psibase::fracpack::{Pack, UnpackOwned};
+
 use psibase::{Action, Claim, Hex, MethodNumber};
 #[path = "transaction_policy.rs"]
 mod policy;
@@ -26,14 +26,14 @@ pub(crate) fn open_tx_table() -> Bucket {
     )
 }
 
-fn load<T: UnpackOwned>(key: &str) -> Option<T> {
+fn load<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>>(key: &str) -> Option<T> {
     open_tx_table()
         .get(key)
-        .map(|bytes| T::unpacked(&bytes).unwrap())
+        .map(|bytes| psio::from_pssz::<T>(&bytes).unwrap())
 }
 
-fn store<T: Pack>(key: &str, value: &T) {
-    open_tx_table().set(key, &value.packed());
+fn store<T: psio::pssz::PsszPack<psio::Pssz>>(key: &str, value: &T) {
+    open_tx_table().set(key, &psio::to_pssz(value));
 }
 
 fn connection() -> Option<ConnectionPin> {
@@ -177,16 +177,15 @@ impl OpenTx {
             return Err(());
         };
 
-        let packed = psibase::services::staged_tx::action_structs::propose {
+        let packed = psio::to_pssz(&psibase::services::staged_tx::action_structs::propose {
             actions,
             auto_exec: true,
-        }
-        .packed();
+        });
         Self::add_action(Action {
             sender: proposer.parse().unwrap(),
             service: psibase::services::staged_tx::SERVICE,
             method: MethodNumber::from(
-                psibase::services::staged_tx::action_structs::propose::ACTION_NAME,
+                <psibase::services::staged_tx::action_structs::propose as psio::interface::Method>::NAME,
             ),
             rawData: Hex::from(packed),
         });

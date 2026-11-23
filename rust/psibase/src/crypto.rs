@@ -688,13 +688,13 @@ pub fn sign_transaction(
     keys: &[AnyPrivateKey],
 ) -> Result<crate::SignedTransaction, K1Error> {
     trx.claims = keys.iter().map(|k| k.key.get_claim()).collect();
-    let transaction = fracpack::Pack::packed(&trx);
+    let transaction = psio::to_pssz(&trx);
     let proofs = keys
         .iter()
         .map(|k| k.key.sign(&transaction).into())
         .collect();
     Ok(crate::SignedTransaction {
-        transaction: transaction.into(),
+        transaction: psio::pssz::Nested::unchecked(transaction),
         proofs,
         subjectiveData: None,
     })

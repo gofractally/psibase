@@ -84,7 +84,6 @@ pub use web_services::*;
 
 use internal_macros::*;
 
-pub use fracpack;
 // For what the service macro generates into crates that do not name `psio`
 // in their manifest (`#[psio::interface(crate = "psibase::psio")]`).
 pub use psio;

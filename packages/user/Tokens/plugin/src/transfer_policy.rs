@@ -3,13 +3,13 @@
 //! Host's authenticated call stack and the user from Host Accounts.
 
 #[cfg(not(test))]
-use psibase::fracpack::{Pack, Unpack};
+
 
 pub const APPROVAL_TTL_SECONDS: u64 = 300;
 pub const MAX_PENDING: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(not(test), derive(Pack, Unpack))]
+#[cfg_attr(not(test), derive(psio::PsszPack, psio::PsszUnpack))]
 pub struct Intent {
     pub user: String,
     pub caller: String,
@@ -22,7 +22,7 @@ pub struct Intent {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(not(test), derive(Pack, Unpack))]
+#[cfg_attr(not(test), derive(psio::PsszPack, psio::PsszUnpack))]
 pub struct Request {
     pub id: u64,
     pub intent: Intent,

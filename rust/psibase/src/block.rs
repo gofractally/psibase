@@ -1,8 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    AccountNumber, Hex, MethodNumber, Pack, TimePointSec, TimePointUSec, ToKey, ToSchema, Unpack,
-    WasmConfigRow,
+    AccountNumber, Hex, MethodNumber, TimePointSec, TimePointUSec, WasmConfigRow,
 };
 use async_graphql::{InputObject, SimpleObject, Union};
 use serde::{Deserialize, Serialize};
@@ -25,10 +24,6 @@ pub type BlockTime = TimePointUSec;
     Debug,
     Clone,
     Default,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -42,8 +37,7 @@ pub type BlockTime = TimePointUSec;
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack", custom = "Action")]
-#[to_key(psibase_mod = "crate")]
+#[psio(custom = "Action")]
 #[graphql(input_name = "ActionInput")]
 pub struct Action {
     /// Account sending the action
@@ -59,39 +53,16 @@ pub struct Action {
     pub rawData: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, psio::PsszPack)]
-#[fracpack(fracpack_mod = "fracpack", custom = "Action")]
-#[to_key(psibase_mod = "crate")]
-pub struct SharedAction<'a> {
-    pub sender: AccountNumber,
-    pub service: AccountNumber,
-    pub method: MethodNumber,
-    pub rawData: Hex<&'a [u8]>,
-}
-
 /// The genesis action is the first action of the first transaction of
 /// the first block. The action struct's fields are ignored, except
 /// rawData, which contains this struct.
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key, psio::JsonText)]
 pub struct GenesisActionData {
     pub memo: String,
     pub services: Vec<GenesisService>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, psio::PsszPack)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
-pub struct SharedGenesisActionData<'a> {
-    pub memo: String,
-    #[serde(borrow)]
-    pub services: Vec<SharedGenesisService<'a>>,
-}
-
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key, psio::JsonText)]
 pub struct GenesisService {
     pub service: AccountNumber,
     pub flags: u64,
@@ -100,25 +71,10 @@ pub struct GenesisService {
     pub code: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, psio::PsszPack)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
-pub struct SharedGenesisService<'a> {
-    pub service: AccountNumber,
-    pub flags: u64,
-    pub vmType: u8,
-    pub vmVersion: u8,
-    pub code: Hex<&'a [u8]>,
-}
-
 #[derive(
     Debug,
     Clone,
     Default,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -132,8 +88,6 @@ pub struct SharedGenesisService<'a> {
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "ClaimInput")]
 pub struct Claim {
     pub service: AccountNumber,
@@ -166,10 +120,6 @@ pub struct Claim {
     Debug,
     Clone,
     Default,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -183,8 +133,6 @@ pub struct Claim {
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "TaposInput")]
 #[psio(definition_will_not_change)]
 pub struct Tapos {
@@ -203,10 +151,6 @@ impl Tapos {
     Debug,
     Clone,
     Default,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -220,8 +164,6 @@ impl Tapos {
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "TransactionInput")]
 pub struct Transaction {
     pub tapos: Tapos,
@@ -233,14 +175,8 @@ pub struct Transaction {
     Debug,
     Clone,
     Default,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
-    SimpleObject,
-    InputObject,
     PartialEq,
     Eq,
     psio::PsszPack,
@@ -250,12 +186,10 @@ pub struct Transaction {
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
-#[graphql(input_name = "SignedTransactionInput")]
 pub struct SignedTransaction {
-    // Contains a packed `Transaction`. TODO: shared_view_ptr
-    pub transaction: Hex<Vec<u8>>,
+    /// The packed transaction: a byte list holding the PSSZ of a
+    /// `Transaction` (C++ `psio::nested<Transaction>`).
+    pub transaction: psio::pssz::Nested<Transaction>,
     pub proofs: Vec<Hex<Vec<u8>>>,
     pub subjectiveData: Option<Vec<Hex<Vec<u8>>>>,
 }
@@ -266,10 +200,6 @@ type TermNum = u32;
     Debug,
     Clone,
     Default,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -281,8 +211,6 @@ type TermNum = u32;
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "ProducerInput")]
 pub struct Producer {
     pub name: AccountNumber,
@@ -290,33 +218,42 @@ pub struct Producer {
 }
 
 #[derive(
-    Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Clone,
+    Default,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct CftConsensus {
     pub producers: Vec<Producer>,
 }
 
 #[derive(
-    Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug,
+    Clone,
+    Default,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct BftConsensus {
     pub producers: Vec<Producer>,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, Union, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Serialize, Deserialize, Union, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 pub enum ConsensusData {
     CftConsensus(CftConsensus),
     BftConsensus(BftConsensus),
@@ -335,10 +272,6 @@ impl ConsensusData {
     Debug,
     Clone,
     Default,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -351,9 +284,6 @@ impl ConsensusData {
     psio::JsonText,
 )]
 #[psio(definition_will_not_change)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[fracpack(definition_will_not_change)]
-#[to_key(psibase_mod = "crate")]
 pub struct ConsensusBytes {
     pub consensusVariantIdx: u8,
     pub consensusData: Vec<u8>,
@@ -363,10 +293,6 @@ pub struct ConsensusBytes {
     Debug,
     Clone,
     Default,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -378,8 +304,6 @@ pub struct ConsensusBytes {
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 pub struct BlockHeaderAuthAccount {
     pub codeNum: AccountNumber,
     pub codeHash: Checksum256,
@@ -387,23 +311,20 @@ pub struct BlockHeaderAuthAccount {
     pub vmVersion: u8,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct Consensus {
     pub data: ConsensusData,
     pub services: Vec<BlockHeaderAuthAccount>,
     pub wasmConfig: WasmConfigRow,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct PendingConsensus {
     pub consensus: Consensus,
     pub blockNum: BlockNum,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct JointConsensus {
     pub current: Consensus,
     pub next: Option<PendingConsensus>,
@@ -413,10 +334,6 @@ pub struct JointConsensus {
     Debug,
     Clone,
     Default,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -428,16 +345,13 @@ pub struct JointConsensus {
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 pub struct BlockHeaderCode {
     pub vmType: u8,
     pub vmVersion: u8,
     pub code: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
@@ -473,15 +387,13 @@ pub struct BlockHeader {
     authCode: Option<Vec<BlockHeaderCode>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct SignedBlock {
     pub block: Block,
     pub signature: Hex<Vec<u8>>,
@@ -489,8 +401,7 @@ pub struct SignedBlock {
     pub auxConsensusData: Option<Hex<Vec<u8>>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct BlockInfo {
     pub header: BlockHeader,
     pub blockId: Checksum256,

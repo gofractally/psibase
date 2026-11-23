@@ -405,18 +405,10 @@ fn method_numbers_are_psios() {
     }
 }
 
-// ── The legacy forms are untouched ──────────────────────────────────────────
+// ── The serde forms ─────────────────────────────────────────────────────────
 
 #[test]
-fn the_packed_and_key_forms_in_use_are_unchanged() {
-    use psibase::fracpack::Pack;
-    use psibase::ToKey;
-    // fracpack still produces every byte psibase writes; for these two types
-    // its bytes and keys happen to equal the PSIO forms.
-    assert_eq!(hex(&account("alice").packed()), "00b82a1b83aedf04");
-    assert_eq!(hex(&account("alice").to_key()), "04dfae831b2ab800");
-    assert_eq!(hex(&method("transfer").packed()), "41b6aa42ce000000");
-    assert_eq!(hex(&method("transfer").to_key()), "000000ce42aab641");
+fn the_serde_forms_in_use_are_unchanged() {
     // serde, which the services and the CLI use, still reads leniently.
     assert_eq!(
         serde_json::from_str::<AccountNumber>(r#""Alice""#).unwrap(),

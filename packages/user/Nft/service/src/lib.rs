@@ -3,9 +3,7 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
-        abort_message, get_sender, AccountNumber, Memo, Pack, ServiceWrapper, Table, ToSchema,
-        Unpack,
-    };
+        abort_message, get_sender, AccountNumber, Memo, ServiceWrapper, Table, };
     use serde::{Deserialize, Serialize};
 
     use async_graphql::ComplexObject;
@@ -19,7 +17,7 @@ pub mod tables {
     pub const UNCREDITED: u8 = 4;
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct ConfigRow {
         pub next_id: NID,
     }
@@ -55,7 +53,7 @@ pub mod tables {
     }
 
     #[table(name = "NftTable", index = 1)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, PartialEq, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Nft {
         #[primary_key]
         pub id: NID,
@@ -190,7 +188,7 @@ pub mod tables {
     }
 
     #[table(name = "NftHolderTable", index = 2)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, SimpleObject, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct NftHolder {
         #[primary_key]
         pub account: AccountNumber,
@@ -198,7 +196,7 @@ pub mod tables {
     }
 
     #[table(name = "CreditTable", index = 3)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[allow(non_snake_case)]
     pub struct CreditRecord {
         #[primary_key]
@@ -307,7 +305,7 @@ pub mod tables {
     }
 
     #[table(name = "UserPendingTable", index = 4)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[allow(non_snake_case)]
     #[graphql(complex)]
     pub struct UserPending {
@@ -352,7 +350,7 @@ pub mod tables {
     }
 
     #[table(name = "BurnedTable", index = 5)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Burned {
         #[primary_key]
         pub id: NID,

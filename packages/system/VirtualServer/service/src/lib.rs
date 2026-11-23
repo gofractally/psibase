@@ -173,7 +173,7 @@ mod service {
 
     fn status_row_bytes() -> u64 {
         let native = KvHandle::open_direct(DbId::Native, &[], KvMode::Read);
-        let key = status_key().to_key();
+        let key = psio::to_key(&status_key());
         kv_get_bytes(&native, &key)
             .map(|value| key.len() as u64 + value.len() as u64)
             .unwrap_or(0)
@@ -188,9 +188,9 @@ mod service {
 
     /// Exact on-disk footprint (`key + value`) of a single fixed-width table row.
     fn row_size<R: TableRecord, T: Table<R>>(table: &T, sample: &R) -> u64 {
-        let prefix = (T::SERVICE, T::TABLE_INDEX).to_key();
+        let prefix = psio::to_key(&(T::SERVICE, T::TABLE_INDEX));
         let key = table.serialize_key(0, &sample.get_primary_key());
-        (prefix.len() + key.data.len() + sample.packed().len()) as u64
+        (prefix.len() + key.data.len() + psio::to_pssz(&sample).len()) as u64
     }
 
     #[action]
@@ -789,7 +789,6 @@ mod service {
                 return
             }
 
-            DbId::NumChainDatabases => abort_message("NumChainDatabases is not a valid database"),
         };
 
         // Avoiding a flood of events for writing individual records. Accumulate in the tx_cache and emit

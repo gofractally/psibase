@@ -2,7 +2,7 @@
 //! completed nonempty bars live only in native prunable history. Recording is
 //! constant work per aggregate execution, independent of resting owners/history.
 use crate::{math::Wide, tables::tables::*};
-use psibase::{KvHandle, KvMode, ServiceWrapper, Table, TableRecord, ToKey};
+use psibase::{KvHandle, KvMode, ServiceWrapper, Table, TableRecord};
 use serde_json::{json, Value};
 async_graphql::scalar!(Wide);
 pub const INTERVALS: [u32; 5] = [5, 15, 60, 3600, 86400];
@@ -190,11 +190,10 @@ pub fn read(market: u64, interval: u32, limit: u32, before: Option<u64>) -> Resu
         .ok_or("Unknown market")?;
     // This is used only by the privileged read-only query service. Native
     // recording never invokes token queries or mutating token getters.
-    let prefix = (
+    let prefix = psio::to_key(&(
         tokens::SERVICE,
         tokens::tables::tables::TokenTable::TABLE_INDEX,
-    )
-        .to_key();
+    ));
     let token_table = tokens::tables::tables::TokenTable::from_handle(KvHandle::open_direct(
         <tokens::tables::tables::Token as TableRecord>::DB,
         &prefix,

@@ -1,6 +1,6 @@
 //! Build/sign a transaction containing independent Ethereum evidence claims.
 //! Custody secrets are never used: --key is the relayer's Psibase auth key.
-use psibase::fracpack::Pack;
+
 use psibase::*;
 use serde::Deserialize;
 use std::path::Path;
@@ -104,11 +104,11 @@ async fn main() -> anyhow::Result<()> {
         actions,
         claims,
     };
-    let packed = trx.packed();
+    let packed = psio::to_pssz(&trx);
     let mut proofs: Vec<Hex<Vec<u8>>> = keys.iter().map(|k| k.sign(&packed).into()).collect();
     proofs.extend(extra);
     let signed = SignedTransaction {
-        transaction: packed.into(),
+        transaction: psio::pssz::Nested::unchecked(packed),
         proofs,
         subjectiveData: None,
     };
@@ -120,7 +120,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .header("Content-Type", "application/octet-stream")
         .header("Accept", "application/json")
-        .body(signed.packed())
+        .body(psio::to_pssz(&signed))
         .send()
         .await?;
     let status = response.status();

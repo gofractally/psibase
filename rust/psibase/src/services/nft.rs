@@ -1,5 +1,5 @@
 use async_graphql::{InputObject, SimpleObject};
-use fracpack::{Pack, ToSchema, Unpack};
+
 use serde::{Deserialize, Serialize};
 
 use crate::AccountNumber;
@@ -10,20 +10,16 @@ pub type NID = u32;
     Debug,
     Copy,
     Clone,
-    Pack,
-    Unpack,
     Serialize,
     Deserialize,
     SimpleObject,
     InputObject,
-    ToSchema,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftRecordInput")]
 pub struct Nft {
     pub id: NID,
@@ -35,20 +31,16 @@ pub struct Nft {
     Debug,
     Copy,
     Clone,
-    Pack,
-    Unpack,
     Serialize,
     Deserialize,
     SimpleObject,
     InputObject,
-    ToSchema,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftHolderRecordInput")]
 pub struct NftHolderRecord {
     account: AccountNumber,
@@ -59,20 +51,16 @@ pub struct NftHolderRecord {
     Debug,
     Copy,
     Clone,
-    Pack,
-    Unpack,
     Serialize,
     Deserialize,
     SimpleObject,
     InputObject,
-    ToSchema,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "CreditRecordInput")]
 pub struct CreditRecord {
     nftId: NID,

@@ -8,8 +8,6 @@ use bindings::host::http::api as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
-use psibase::fracpack::Pack;
-
 pub mod consensus;
 mod errors;
 mod graphql;
@@ -37,7 +35,7 @@ impl Admin for EvaluationsPlugin {
         num_options: u8,
         use_hooks: bool,
     ) -> Result<(), Error> {
-        let packed_args = Actions::create {
+        let packed_args = psio::to_pssz(&Actions::create {
             registration,
             deliberation,
             submission,
@@ -45,59 +43,54 @@ impl Admin for EvaluationsPlugin {
             allowed_group_sizes,
             num_options,
             use_hooks,
-        }
-        .packed();
-        add_action_to_transaction(Actions::create::ACTION_NAME, &packed_args)
+        });
+        add_action_to_transaction(<Actions::create as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn start(evaluation_id: u32) -> Result<(), Error> {
-        let packed_args = Actions::start { evaluation_id }.packed();
-        add_action_to_transaction(Actions::start::ACTION_NAME, &packed_args)
+        let packed_args = psio::to_pssz(&Actions::start { evaluation_id });
+        add_action_to_transaction(<Actions::start as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
         let evaluation_owner = parse_account_number(&evaluation_owner)?;
 
-        let packed_args = Actions::close {
+        let packed_args = psio::to_pssz(&Actions::close {
             evaluation_id,
             owner: evaluation_owner,
-        }
-        .packed();
-        add_action_to_transaction(Actions::close::ACTION_NAME, &packed_args)
+        });
+        add_action_to_transaction(<Actions::close as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn delete(evaluation_id: u32, force: bool) -> Result<(), Error> {
-        let packed_args = Actions::delete {
+        let packed_args = psio::to_pssz(&Actions::delete {
             evaluation_id,
             force,
-        }
-        .packed();
+        });
 
-        add_action_to_transaction(Actions::delete::ACTION_NAME, &packed_args)
+        add_action_to_transaction(<Actions::delete as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn register_other(evaluation_id: u32, registrant: String) -> Result<(), Error> {
         let registrant = parse_account_number(&registrant)?;
 
-        let packed_args = Actions::register {
+        let packed_args = psio::to_pssz(&Actions::register {
             owner: current_user()?,
             evaluation_id,
             registrant,
-        }
-        .packed();
-        add_action_to_transaction(Actions::register::ACTION_NAME, &packed_args)
+        });
+        add_action_to_transaction(<Actions::register as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn unregister_other(evaluation_id: u32, registrant: String) -> Result<(), Error> {
         let registrant = parse_account_number(&registrant)?;
 
-        let packed_args = Actions::unregister {
+        let packed_args = psio::to_pssz(&Actions::unregister {
             owner: current_user()?,
             evaluation_id,
             registrant,
-        }
-        .packed();
-        add_action_to_transaction(Actions::unregister::ACTION_NAME, &packed_args)
+        });
+        add_action_to_transaction(<Actions::unregister as psio::interface::Method>::NAME, &packed_args)
     }
 }
 
@@ -110,23 +103,21 @@ impl User for EvaluationsPlugin {
         let key = key_table::AsymKey::new();
         let public_key_vectored = key.public_key()?.serialize().to_vec();
 
-        let packed_args = Actions::set_key {
+        let packed_args = psio::to_pssz(&Actions::set_key {
             key: public_key_vectored,
-        }
-        .packed();
-        add_action_to_transaction(Actions::set_key::ACTION_NAME, &packed_args)
+        });
+        add_action_to_transaction(<Actions::set_key as psio::interface::Method>::NAME, &packed_args)
             .map_err(|e| ErrorType::TransactionFailed(e.to_string()))?;
         key.save()?;
 
         let registrant = current_user().expect("not authenticated");
 
-        let packed_args = Actions::register {
+        let packed_args = psio::to_pssz(&Actions::register {
             owner: evaluation_owner,
             evaluation_id,
             registrant,
-        }
-        .packed();
-        add_action_to_transaction(Actions::register::ACTION_NAME, &packed_args)
+        });
+        add_action_to_transaction(<Actions::register as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn unregister(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
@@ -135,13 +126,12 @@ impl User for EvaluationsPlugin {
 
         let registrant = current_user().expect("not authenticated");
 
-        let packed_args = Actions::unregister {
+        let packed_args = psio::to_pssz(&Actions::unregister {
             owner: evaluation_owner,
             evaluation_id,
             registrant,
-        }
-        .packed();
-        add_action_to_transaction(Actions::unregister::ACTION_NAME, &packed_args)
+        });
+        add_action_to_transaction(<Actions::unregister as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn propose(
@@ -172,14 +162,13 @@ impl User for EvaluationsPlugin {
             symmetric_key.salt_base_64().as_str(),
         );
 
-        let packed_args = Actions::propose {
+        let packed_args = psio::to_pssz(&Actions::propose {
             owner: evaluation_owner,
             evaluation_id,
             proposal: encrypted_proposal,
-        }
-        .packed();
+        });
 
-        add_action_to_transaction(Actions::propose::ACTION_NAME, &packed_args)
+        add_action_to_transaction(<Actions::propose as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn attest(
@@ -225,13 +214,12 @@ impl User for EvaluationsPlugin {
 
         let consensus = consensus::alignment_merge(&mut proposals).expect("Alignment merge failed");
 
-        let packed_args = Actions::attest {
+        let packed_args = psio::to_pssz(&Actions::attest {
             owner: evaluation_owner,
             evaluation_id,
             attestation: consensus,
-        }
-        .packed();
-        add_action_to_transaction(Actions::attest::ACTION_NAME, &packed_args)
+        });
+        add_action_to_transaction(<Actions::attest as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn get_proposal(

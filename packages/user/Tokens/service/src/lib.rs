@@ -246,7 +246,7 @@ pub mod service {
             .filter(|_| is_icon_content_type(contentType))
             .expect("Icon content type not allowed");
 
-        Sites::call().storeSys(icon_path(token_id), mime.to_string(), None, image);
+        Sites::call().storeSys(icon_path(token_id).into(), mime.to_string(), None, image);
 
         Wrapper::emit().history().configured(
             token_id,
@@ -265,12 +265,12 @@ pub mod service {
         let path = icon_path(token_id);
         assert!(
             Sites::call()
-                .getProps(Wrapper::SERVICE, path.clone())
+                .getProps(Wrapper::SERVICE, path.clone().into())
                 .is_some(),
             "Token has no icon"
         );
 
-        Sites::call().remove(path);
+        Sites::call().remove(path.into());
 
         Wrapper::emit().history().configured(
             token_id,

@@ -502,23 +502,23 @@ pub mod service {
             let banned_service_methods: Vec<ServiceMethod> = vec![
                 ServiceMethod::new(
                     Accounts::SERVICE,
-                    Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
+                    <Accounts::action_structs::setAuthServ as psio::interface::Method>::NAME.into(),
                 ),
                 ServiceMethod::new(
                     SetCode::SERVICE,
-                    SetCode::action_structs::setCode::ACTION_NAME.into(),
+                    <SetCode::action_structs::setCode as psio::interface::Method>::NAME.into(),
                 ),
                 ServiceMethod::new(
                     SetCode::SERVICE,
-                    SetCode::action_structs::setCodeStaged::ACTION_NAME.into(),
+                    <SetCode::action_structs::setCodeStaged as psio::interface::Method>::NAME.into(),
                 ),
                 ServiceMethod::new(
                     StagedTx::SERVICE,
-                    StagedTx::action_structs::propose::ACTION_NAME.into(),
+                    <StagedTx::action_structs::propose as psio::interface::Method>::NAME.into(),
                 ),
                 ServiceMethod::new(
                     StagedTx::SERVICE,
-                    StagedTx::action_structs::accept::ACTION_NAME.into(),
+                    <StagedTx::action_structs::accept as psio::interface::Method>::NAME.into(),
                 ),
             ];
 

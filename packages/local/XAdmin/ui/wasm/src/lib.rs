@@ -8,7 +8,7 @@ use exports::psibase::x_admin::boot::{Guest as Boot, *};
 use exports::psibase::x_admin::crypto::Guest as Crypto;
 use exports::psibase::x_admin::packages::Guest as Packages;
 use exports::psibase::x_admin::util::Guest as Util;
-use psibase::fracpack::{Pack, Unpack};
+
 use psibase::*;
 
 const DEBUG_PRINT: bool = false;
@@ -93,13 +93,13 @@ impl Boot for XAdminPlugin {
             let mut tx_sizes: Vec<String> = Vec::new();
             for (_, transactions, _) in &groups {
                 for tx in transactions {
-                    tx_sizes.push(format!("{:?} kb", tx.packed().len() / 1024));
+                    tx_sizes.push(format!("{:?} kb", psio::to_pssz(&tx).len() / 1024));
                 }
             }
             println!("{:?}", tx_sizes);
         }
 
-        let boot_transactions = boot_transactions.packed();
+        let boot_transactions = psio::to_pssz(&boot_transactions);
 
         let mut labels = Vec::new();
         let mut transactions = Vec::new();
@@ -111,7 +111,7 @@ impl Boot for XAdminPlugin {
                 completed = idx;
             }
             for tx in group {
-                transactions.push((Tx::from(tx.packed()), completed, idx + 1));
+                transactions.push((Tx::from(psio::to_pssz(&tx)), completed, idx + 1));
                 completed = idx;
             }
             idx += 1;
@@ -130,7 +130,7 @@ impl Crypto for XAdminPlugin {
 
 impl Util for XAdminPlugin {
     fn deserialize_trace(buffer: Vec<u8>) -> Result<String, String> {
-        let trace = TransactionTrace::unpacked(&buffer).map_err(|e| e.to_string())?;
+        let trace = psio::from_pssz::<TransactionTrace>(&buffer).map_err(|e| e.to_string())?;
         Ok(serde_json::to_string(&trace).map_err(|e| e.to_string())?)
     }
 }

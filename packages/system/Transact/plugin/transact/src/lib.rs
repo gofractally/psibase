@@ -23,7 +23,7 @@ use exports::transact::plugin::{
 };
 
 use crate::trust::*;
-use psibase::fracpack::Pack;
+
 use psibase::services::transact::action_structs::setSnapTime;
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction};
 use serde::Deserialize;
@@ -131,12 +131,11 @@ fn pack_staged_propose(actions: Vec<ImportAction>, auto_exec: bool) -> (String, 
     let inner: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
     (
         psibase::services::staged_tx::SERVICE.to_string(),
-        psibase::services::staged_tx::action_structs::propose::ACTION_NAME.to_string(),
-        psibase::services::staged_tx::action_structs::propose {
+        <psibase::services::staged_tx::action_structs::propose as psio::interface::Method>::NAME.to_string(),
+        psio::to_pssz(&psibase::services::staged_tx::action_structs::propose {
             actions: inner,
             auto_exec,
-        }
-        .packed(),
+        }),
     )
 }
 
@@ -285,10 +284,10 @@ impl Network for TransactPlugin {
     fn set_snapshot_time(seconds: u32) -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::set_snapshot_time, vec!["config".into()])?;
 
-        let packed_args = setSnapTime { seconds }.packed();
+        let packed_args = psio::to_pssz(&setSnapTime { seconds });
         schedule_action(
             psibase::services::transact::SERVICE.to_string(),
-            setSnapTime::ACTION_NAME.to_string(),
+            <setSnapTime as psio::interface::Method>::NAME.to_string(),
             packed_args,
         )
     }
@@ -311,7 +310,7 @@ impl Auth for TransactPlugin {
             sender: user.clone(),
             service: app,
             method: "loginSys".to_string(),
-            raw_data: (root_host,).packed(),
+            raw_data: psio::to_pssz(&(root_host,)),
         }];
 
         let claims: Vec<ImportClaim> = user_auth_claim(&user)?.into_iter().collect();
@@ -333,12 +332,12 @@ impl Auth for TransactPlugin {
             claims,
         };
         let proofs: Vec<Hex<Vec<u8>>> =
-            user_auth_proof(&user, &Sha256::digest(&tx.packed()).into())?
+            user_auth_proof(&user, &Sha256::digest(&psio::to_pssz(&tx)).into())?
                 .into_iter()
                 .map(|proof| Hex::from(proof.signature))
                 .collect();
         let signed_tx = SignedTransaction {
-            transaction: Hex::from(tx.packed()),
+            transaction: psio::pssz::Nested::new(&tx).unwrap(),
             proofs,
             subjectiveData: None,
         };
@@ -348,7 +347,7 @@ impl Auth for TransactPlugin {
 
         let response = Server::post(&HostTypes::PostRequest {
             endpoint: "/login".to_string(),
-            body: HostTypes::BodyTypes::Bytes(signed_tx.packed()),
+            body: HostTypes::BodyTypes::Bytes(psio::to_pssz(&signed_tx)),
         })?;
 
         let reply = match response {

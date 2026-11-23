@@ -1,7 +1,7 @@
 use crate::bindings::host::auth::api as HostAuth;
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use crate::bindings::host::types::types::Error;
-use psibase::fracpack::{Pack, Unpack};
+
 
 // User logged into each app; persistent so the login survives page loads
 pub(crate) fn logged_in_user_table() -> Bucket {
@@ -25,7 +25,7 @@ pub(crate) fn connected_accounts_table() -> Bucket {
     )
 }
 
-#[derive(Pack, Unpack, Default, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Default, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct ConnectedAccounts {
     accounts: Vec<String>,
 }
@@ -77,17 +77,17 @@ impl AppsTable {
     pub(crate) fn connect(&self, user: &str) {
         let connected_accounts = connected_accounts_table().get(&self.app);
         let mut connected_accounts = connected_accounts
-            .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
+            .map(|c| psio::from_pssz::<ConnectedAccounts>(&c).unwrap())
             .unwrap_or_default();
         connected_accounts.add(user);
 
-        connected_accounts_table().set(&self.app, &connected_accounts.packed());
+        connected_accounts_table().set(&self.app, &psio::to_pssz(&connected_accounts));
     }
 
     pub(crate) fn disconnect(&self, user: &str) {
         let connected_accounts = connected_accounts_table().get(&self.app);
         let mut connected_accounts = connected_accounts
-            .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
+            .map(|c| psio::from_pssz::<ConnectedAccounts>(&c).unwrap())
             .unwrap_or_default();
         connected_accounts.remove(user);
 
@@ -98,7 +98,7 @@ impl AppsTable {
             self.logout();
         }
 
-        connected_accounts_table().set(&self.app, &connected_accounts.packed());
+        connected_accounts_table().set(&self.app, &psio::to_pssz(&connected_accounts));
     }
 
     pub(crate) fn logout(&self) {
@@ -111,7 +111,7 @@ impl AppsTable {
     pub(crate) fn get_connected_accounts(&self) -> Vec<String> {
         let connected_accounts = connected_accounts_table().get(&self.app);
         connected_accounts
-            .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
+            .map(|c| psio::from_pssz::<ConnectedAccounts>(&c).unwrap())
             .unwrap_or_default()
             .accounts
     }

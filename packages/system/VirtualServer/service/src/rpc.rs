@@ -165,7 +165,7 @@ fn auth_users_err(u1: AccountNumber, u2: AccountNumber) -> async_graphql::Result
 fn serve_sys() -> ServiceMethod {
     ServiceMethod {
         service: crate::Wrapper::SERVICE,
-        method: MethodNumber::from(crate::action_structs::serveSys::ACTION_NAME),
+        method: MethodNumber::from(<crate::action_structs::serveSys as psio::interface::Method>::NAME),
     }
 }
 

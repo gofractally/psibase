@@ -1,4 +1,4 @@
-use crate::{serialize_as_str, Pack, ToKey, ToSchema, Unpack};
+use crate::{serialize_as_str};
 use custom_error::custom_error;
 use psio::compress_name::{method_to_number, number_to_method};
 use std::{num::ParseIntError, str::FromStr};
@@ -31,22 +31,12 @@ custom_error! { pub MethodNumberError
     Copy,
     Clone,
     Hash,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::Key,
 )]
-#[fracpack(
-    definition_will_not_change,
-    fracpack_mod = "fracpack",
-    custom = "MethodNumber"
-)]
-#[to_key(psibase_mod = "crate")]
 #[psio(definition_will_not_change, custom = "MethodNumber")]
 pub struct MethodNumber {
     pub value: u64,

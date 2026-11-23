@@ -8,7 +8,7 @@ use exports::staged_tx::plugin::{
 };
 use host::http::api as Server;
 use host::types::types::Error;
-use psibase::fracpack::Pack;
+
 use psibase::Checksum256;
 use staged_tx::action_structs::*;
 use transact::plugin::api::add_action_to_transaction;
@@ -102,12 +102,11 @@ impl Proposer for StagedTxPlugin {
     fn remove(id: u32) -> Result<(), Error> {
         assert_authorized(FunctionName::remove)?;
         add_action_to_transaction(
-            remove::ACTION_NAME,
-            &remove {
+            <remove as psio::interface::Method>::NAME,
+            &psio::to_pssz(&remove {
                 id,
                 txid: get_staged_txid(id)?,
-            }
-            .packed(),
+            }),
         )
     }
 }
@@ -120,12 +119,11 @@ impl Respondent for StagedTxPlugin {
         )?;
 
         add_action_to_transaction(
-            accept::ACTION_NAME,
-            &accept {
+            <accept as psio::interface::Method>::NAME,
+            &psio::to_pssz(&accept {
                 id,
                 txid: get_staged_txid(id)?,
-            }
-            .packed(),
+            }),
         )
     }
 
@@ -136,24 +134,22 @@ impl Respondent for StagedTxPlugin {
         )?;
 
         add_action_to_transaction(
-            reject::ACTION_NAME,
-            &reject {
+            <reject as psio::interface::Method>::NAME,
+            &psio::to_pssz(&reject {
                 id,
                 txid: get_staged_txid(id)?,
-            }
-            .packed(),
+            }),
         )
     }
 
     fn execute(id: u32) -> Result<(), Error> {
         assert_authorized(FunctionName::execute)?;
         add_action_to_transaction(
-            execute::ACTION_NAME,
-            &execute {
+            <execute as psio::interface::Method>::NAME,
+            &psio::to_pssz(&execute {
                 id,
                 txid: get_staged_txid(id)?,
-            }
-            .packed(),
+            }),
         )
     }
 }

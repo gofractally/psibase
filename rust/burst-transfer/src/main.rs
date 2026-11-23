@@ -2,7 +2,7 @@
 use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 use anyhow::{anyhow, Context};
-use psibase::fracpack::Pack;
+
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::{
     new_account_action, preapprove_action, ActionFormatter, AnyPrivateKey, HttpSchemaFetcher,
@@ -173,7 +173,7 @@ async fn push_setup(
     psibase::push_transaction(
         &args.api,
         client.clone(),
-        psibase::sign_transaction(trx, &args.sign)?.packed(),
+        psio::to_pssz(&psibase::sign_transaction(trx, &args.sign)?),
         args.trace,
         args.console,
         None,
@@ -214,7 +214,7 @@ async fn transfer_impl(
     psibase::push_transaction_optimistic(
         &args.api,
         client.clone(),
-        psibase::sign_transaction(trx, &args.sign)?.packed(),
+        psio::to_pssz(&psibase::sign_transaction(trx, &args.sign)?),
         args.trace,
         args.console,
         None,

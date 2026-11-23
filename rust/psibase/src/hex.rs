@@ -1,13 +1,11 @@
-use crate::ToKey;
 use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType};
-use fracpack::{AnyType, FracInputStream, SchemaBuilder, ToSchema};
 use std::convert::AsRef;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 
-trait ToHex: Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + ToKey {
+trait ToHex: Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord {
     fn to_hex(&self) -> String;
 }
 
@@ -72,15 +70,6 @@ where
     }
 }
 
-impl<T: ToSchema + 'static> ToSchema for Hex<T> {
-    fn schema(builder: &mut SchemaBuilder) -> AnyType {
-        AnyType::Custom {
-            type_: builder.insert::<T>().into(),
-            id: "hex".to_string(),
-        }
-    }
-}
-
 impl<T> Display for Hex<T>
 where
     T: ToHex,
@@ -122,90 +111,6 @@ where
 {
     fn as_ref(&self) -> &[u8] {
         self.deref().as_ref()
-    }
-}
-
-impl<T> ToKey for Hex<T>
-where
-    T: ToHex + crate::fracpack::Pack,
-{
-    fn append_key(&self, key: &mut Vec<u8>) {
-        self.0.append_key(key)
-    }
-}
-
-// TODO: Fracpack macro support for <T>
-impl<T> crate::fracpack::Pack for Hex<T>
-where
-    T: ToHex + crate::fracpack::Pack,
-{
-    const FIXED_SIZE: u32 = <T as crate::fracpack::Pack>::FIXED_SIZE;
-    const VARIABLE_SIZE: bool = <T as crate::fracpack::Pack>::VARIABLE_SIZE;
-    const IS_OPTIONAL: bool = <T as crate::fracpack::Pack>::IS_OPTIONAL;
-    fn pack(&self, dest: &mut Vec<u8>) {
-        let value = &self.0;
-        <&T as crate::fracpack::Pack>::pack(&value, dest)
-    }
-    fn is_empty_container(&self) -> bool {
-        self.0.is_empty_container()
-    }
-    fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
-        let value = &self.0;
-        <&T as crate::fracpack::Pack>::embedded_fixed_pack(&value, dest)
-    }
-    fn embedded_fixed_repack(&self, fixed_pos: u32, heap_pos: u32, dest: &mut Vec<u8>) {
-        let value = &self.0;
-        <&T as crate::fracpack::Pack>::embedded_fixed_repack(&value, fixed_pos, heap_pos, dest)
-    }
-    fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
-        let value = &self.0;
-        <&T as crate::fracpack::Pack>::embedded_variable_pack(&value, dest)
-    }
-}
-
-// TODO: Fracpack macro support for <T>
-impl<'a, T> crate::fracpack::Unpack<'a> for Hex<T>
-where
-    T: ToHex + crate::fracpack::Unpack<'a>,
-{
-    const FIXED_SIZE: u32 = <T as crate::fracpack::Unpack>::FIXED_SIZE;
-    const VARIABLE_SIZE: bool = <T as crate::fracpack::Unpack>::VARIABLE_SIZE;
-    const IS_OPTIONAL: bool = <T as crate::fracpack::Unpack>::IS_OPTIONAL;
-    fn unpack(src: &mut FracInputStream<'a>) -> crate::fracpack::Result<Self> {
-        let value = <T as crate::fracpack::Unpack>::unpack(src)?;
-        Ok(Self(value))
-    }
-    fn verify(src: &mut FracInputStream) -> crate::fracpack::Result<()> {
-        <T as crate::fracpack::Unpack>::verify(src)
-    }
-    fn new_empty_container() -> crate::fracpack::Result<Self> {
-        Ok(Self(<T as crate::fracpack::Unpack>::new_empty_container()?))
-    }
-    fn embedded_variable_unpack(
-        src: &mut FracInputStream<'a>,
-        fixed_pos: &mut u32,
-    ) -> crate::fracpack::Result<Self> {
-        let value = <T as crate::fracpack::Unpack>::embedded_variable_unpack(src, fixed_pos)?;
-        Ok(Self(value))
-    }
-    fn embedded_unpack(
-        src: &mut FracInputStream<'a>,
-        fixed_pos: &mut u32,
-    ) -> crate::fracpack::Result<Self> {
-        let value = <T as crate::fracpack::Unpack>::embedded_unpack(src, fixed_pos)?;
-        Ok(Self(value))
-    }
-    fn embedded_variable_verify(
-        src: &mut FracInputStream,
-        fixed_pos: &mut u32,
-    ) -> crate::fracpack::Result<()> {
-        <T as crate::fracpack::Unpack>::embedded_variable_verify(src, fixed_pos)
-    }
-    fn embedded_verify(
-        src: &mut FracInputStream,
-        fixed_pos: &mut u32,
-    ) -> crate::fracpack::Result<()> {
-        <T as crate::fracpack::Unpack>::embedded_verify(src, fixed_pos)
     }
 }
 

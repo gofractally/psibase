@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
-use psibase::fracpack::{Pack, Unpack};
+
 use psibase::AccountNumber;
 
 use crate::bindings::profiles::plugin::types::Contact;
@@ -21,7 +21,7 @@ fn contacts_table() -> Bucket {
     )
 }
 
-#[derive(Pack, Unpack, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct ContactEntry {
     pub account: AccountNumber,
     pub nickname: Option<String>,
@@ -57,7 +57,7 @@ impl ContactTable {
     }
 
     fn save_contacts(&self, contacts: Vec<ContactEntry>) {
-        contacts_table().set(&self.key(), &contacts.packed());
+        contacts_table().set(&self.key(), &psio::to_pssz(&contacts));
     }
 
     pub fn set(&self, contact: Contact, overwrite: bool) -> Result<(), Error> {
@@ -82,7 +82,7 @@ impl ContactTable {
         let contacts = contacts_table().get(&self.key());
 
         contacts
-            .map(|c| <Vec<ContactEntry>>::unpacked(&c).unwrap())
+            .map(|c| psio::from_pssz::<Vec<ContactEntry>>(&c).unwrap())
             .unwrap_or_default()
     }
 

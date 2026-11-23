@@ -1,6 +1,6 @@
 //! Native recording, rollback, sparse long intervals and bounded objective state.
 use super::*;
-use psibase::fracpack::Pack as _;
+
 fn candles(chain: &Chain) -> Vec<CurrentCandle> {
     chain
         .open::<_, CurrentCandleTable>()
@@ -41,7 +41,7 @@ fn native_candles_hour_day_events_and_five_current_rows_survive_many_days(
     };
     chain.fill_tapos(&mut tx, 2);
     let trace = chain.push(&SignedTransaction {
-        transaction: tx.packed().into(),
+        transaction: psio::pssz::Nested::new(&tx).unwrap(),
         proofs: vec![],
         subjectiveData: None,
     });

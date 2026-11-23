@@ -1,3 +1,4 @@
+use psio::interface::Method;
 use crate::services::{
     accounts,
     transact::{auth_interface::auth_action_structs, ServiceMethod},
@@ -24,7 +25,7 @@ pub fn is_auth(
         flags: 0,
     }
     .call(
-        MethodNumber::from(auth_action_structs::isAuthSys::ACTION_NAME),
+        MethodNumber::from(auth_action_structs::isAuthSys::NAME),
         auth_action_structs::isAuthSys {
             sender,
             authorizers,

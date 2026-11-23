@@ -2766,7 +2766,223 @@ GraphQL changes of the time types are covered by unit tests in
 
 Stages R-A … R-F as the coordinator defined them. Scratch tools:
 `~/psibase-pssz-scripts/rflip/` (`add_jsontext.py`, `add_psio_all.py`,
-`flip.py`); logs `~/psibase-pssz-build.*rflip*.log`.
+`flip.py`, `clean_imports.py`); logs `~/psibase-pssz-build.*rflip*.log`.
+
+**HANDOVER: the state after the sweep R-B + R-C + R-D (+ the Rust part
+of R-F).** Branch `claude/pssz`, not pushed, PSIO pin `e12e4f6d`. Every
+byte Rust writes or reads is PSIO's: there is no `rust/fracpack`, no
+legacy derive, no `ToKey`. The C++ of this tree is still on the legacy
+wire, so the two halves of this tree do not talk to each other until the
+C++ flip branch (`claude/pssz-flip-cpp`) is merged. Not started: R-E.
+
+*What the sweep did.*
+
+* **Wire.** `x.packed()` → `psio::to_pssz(&x)` (202 sites), `T::unpacked(b)`
+  → `psio::from_pssz::<T>(b)` (62), legacy derive names, `#[fracpack]` and
+  `#[to_key]` removed from every derive list; generic bounds are
+  `PsszPack<Pssz> + PsszUnpack<Pssz>` (`psio::from_pssz` asks both).
+  `SignedTransaction::transaction` is `psio::pssz::Nested<Transaction>`
+  (built with `Nested::new(&trx)`, read with `.decode()`, `.bytes()` for
+  the digest); `transact::execTrx` takes the same. The borrowing records
+  `SharedAction`, `SharedGenesisActionData`, `SharedGenesisService` are
+  gone: a writer packs the owned record, the dispatcher reads a view.
+* **Service macro.** Callers pack the action's argument record
+  (`psio_actions::args::<action>`; the bytes of the tuple of the
+  parameters) and `Caller::call` takes `Args: psio::interface::Method`.
+  Dispatch gets `psio::PsszView<Action>` (validated), compares the method
+  number and decodes the arguments with `psio::from_pssz` (validated).
+  Events pack their argument record. What `#[psio::interface]` expands
+  to is named after the service (`psio_actions__<service>`, trait
+  `PsioActions__<service>`) and re-exported as real modules
+  `psio_actions`, `psio_history_events`, `psio_merkle_events` and
+  `action_structs` (`= psio_actions::args`, the name service code always
+  used): a service module that glob-imports another service's module
+  would otherwise have two macro-expanded items of one name (E0659).
+  `X::ACTION_NAME` is `<X as psio::interface::Method>::NAME`.
+* **Trust: one switch.** `rust/psibase/src/table.rs` `decode_row` is the
+  only place a table row is decoded (tables, secondary indexes, the
+  GraphQL table queries go through it); it validates, as every read did
+  before. To trust a service's own rows, change that function. Nothing
+  else in the tree calls a `trusted` entry point.
+* **Keys (R-D).** `psio::to_key`, `psio::key::KeyPack` bounds; `to_key.rs`
+  holds only `RawKey` and `KeyView`, which implement `KeyPack` (their
+  bytes as they stand); `SingletonKey` likewise. `key_prefix` is not used
+  yet: prefixes are still built by concatenating `psio::to_key` of the
+  parts (same bytes).
+* **Schemas (R-C).** `psibase::ServiceSchema`, `TableInfo`, `FieldId`,
+  `EventType` (`rust/psibase/src/schema.rs`) are the records of the
+  settled specification (`~/psibase-flip-cpp/doc/flip-interop.md` 2,
+  commits `4ccdfae3a` / `300521555`): Schema IR members,
+  `BTreeMap<String, _>`, `String` everywhere. `SchemaMap` is
+  `HashMap<AccountNumber, Arc<ServiceSchema>>`. Lookup by method number:
+  `ServiceSchema::action(method)`. Schema-driven JSON is
+  `psio::pssz::dynamic`: `schema_handlers()` (AccountNumber,
+  MethodNumber), `action_handlers(schemas)` (an `Action` as
+  `{sender, service, method, data}` through `CustomHandlers::add_json`,
+  a `ServiceMethod` with the declared spelling), `ActionDecoder`
+  (traces), `nested_calls` (what the legacy collecting handlers did),
+  `action_data_from_json` (postinstall `data`). `Action` and
+  `ServiceMethod` are `#[psio(custom = "Action" / "ServiceMethod")]`.
+  Schema files are written with `psio::to_ijson`.
+* **Raw strings.** `psio::pssz::RawString`: `HttpHeader::value`,
+  `HttpRequest::target`, `LocalEndpoint::path`, `EnvRow::name` / `value`,
+  `ActionTrace::error`, `TransactionTrace::error`, `ConsoleTrace::console`,
+  `WsTicketInfo::path`, `SitesContentRow::path`, the `path` parameter of
+  the `sites` actions, `r-events::sqlQuery` `params`. Text is read with
+  `.to_str()`; the traces have `error_text()`.
+* **Other.** `DbId` has no `NumChainDatabases` and writes camelCase names
+  (`service`, `writeOnly`, …: the C++ names). `ActionTrace::total_time`
+  is `psio::time::Duration<Nanos>`. The Permissions plugin stores
+  `StoredTrustLevel` (a plain `#[repr(u8)]` PSIO enum mirroring the
+  wit-bindgen `TrustLevel`). The CLI's `LocalPackage` sends `exports`.
+  `SignedTransaction` lost `SimpleObject` / `InputObject` (`Nested<T>` is
+  not an async-graphql type; nothing used it as one) — for the team
+  review log.
+* **Deleted (R-F, Rust workspace).** `rust/fracpack`, `rust/test_fracpack`,
+  `rust/test_fracpack_macros`, the derives `Pack`, `Unpack`, `View`,
+  `ToKey`, `ToSchema` of `psibase-macros-derive` (four files), the
+  legacy halves of the `psio_*` tests; `rs-tests` no longer runs
+  `test_fracpack`.
+
+*Temporary items that MUST be removed at the merge with the C++ flip.*
+
+| Where | What | Remove when |
+|---|---|---|
+| `rust/psibase/tests/psio_twins.rs`, `resolved()` | the custom ids `Action` and `ServiceMethod` are read through on both sides | the C++ of the tree declares them (the flip branch does: `PSIO_INVARIANT` in `block.hpp`, `nativeTables.hpp`); then regenerate the fixture |
+| `libraries/psibase/common/tests/rust-twins.json` | still carries a `"frac"` member per value (written by C++, no longer read by Rust) | the C++ side stops writing it |
+
+No `#[action(legacy)]` marker is left, and the macro no longer knows it.
+
+*What the C++ side must provide for the combined tree.*
+
+1. `service/<acct>.json` and `<Target>-schema.json` in the new I-JSON, and
+   a reader of it: today a Rust tool refuses every C++-built package
+   (`json: missing required member "package" of Schema`) and the C++
+   tester refuses every Rust-built one (`Invalid type for variant`).
+   This alone accounts for all 64 failing tests below.
+2. The custom ids `Action` and `ServiceMethod` (above).
+3. `DbId` reflected as an enum with the names `service`, `writeOnly`,
+   `native`, `blockLog`, `blockProof`, `prevAuthServices`, `subjective`,
+   `nativeSubjective`, `session`, `nativeSession`, `temporary`; then add
+   `DbId` to the twin fixture (not done: this tree's C++ has no such
+   reflection).
+4. `meta.json` with every member (the node tests' writer has `services`
+   since R-A).
+5. `SignedTransaction.transaction` as `psio::nested<Transaction>`;
+   `ActionTrace.totalTime` nanoseconds; traces' `error` / `console` raw.
+
+*For `flip-interop.md` (not yet said there).* Rust reads an `Action`
+from JSON as `{sender, service, method, data}` or
+`{sender, service, method, rawData}` and writes `data` when the called
+service's schema describes the method, else `rawData` (hex); a
+`ServiceMethod` is `{service, method}` with the declared spelling. The
+interface names of events are provisional (`<service>.history`,
+`<service>.merkle`); they only name the argument records in the Schema
+IR. A Rust-built schema names an argument list `<interface>.<method>`
+where C++ writes `@N` (RG18, fixed on the PSIO line: switch to
+`SchemaBuilder::insert_argument_lists` at the next repin; compare with
+`equivalent`, not text).
+
+*PSIO gaps recorded in this round.*
+
+| # | Gap | Reproduction |
+|---|---|---|
+| RG16 | closed at `e12e4f6d`; not yet used: 13 `to_unit().unwrap()` sites become `.into()` | — |
+| RG17 | closed at `e12e4f6d` (`CustomHandlers::add_json`); used by `action_handlers` | — |
+| RG18 | a `#[psio::interface]` argument record is a named type in the Schema IR (`"<interface>.<method>"`), C++ writes an anonymous `@N`; fixed on the PSIO line, not on the pin | `SchemaBuilder::new().insert::<token::args::transfer>()` → `Type{"token.transfer"}` |
+| RG19 | **convenience:** `psio::pssz::RawString` has no text helpers: no `Display`, no `PartialEq<str>` / `PartialEq<&str>`, no `as_str` or lossy access, no `Deref<[u8]>`. psibase writes `x.to_str().unwrap_or_default()` (about 40 sites) and `String::from_utf8_lossy(x.as_bytes())` | `let t = RawString::from("/a"); t == "/a"` and `format!("{t}")` do not compile |
+
+*Verification at this tip (tag `rflip-rb`).*
+
+| Check | Command | Result |
+|---|---|---|
+| Rust workspace | `cd rust && cargo check --workspace` | clean |
+| core tests compile | `cargo check -p psibase -p cargo-psibase -p psibase-macros-lib -p psibase_plugin --all-targets` | clean |
+| system packages | `cd packages/system && cargo check --workspace --target wasm32-wasip1 --tests --keep-going` | clean |
+| user packages (the six unbuilt included) | `cd packages/user && CC_wasm32_wasip1=/Users/dlarimer/psibase/build/wasi-sdk-prefix/src/wasi-sdk/bin/clang cargo check --workspace --target wasm32-wasip1 --tests --keep-going` | clean except the known ones below |
+| plugins | `cd packages && cargo check --workspace --target wasm32-wasip1 --keep-going` | clean |
+| wasm test crates | `cd rust && cargo check --target wasm32-wasip1 --tests -p test-contract -p example -p subjective -p test-panic -p psimacrotest -p tpack -p r-tpack -p tpack-admin` | clean |
+| XAdmin wasm helper | `cd packages/local/XAdmin/ui/wasm && cargo check --target wasm32-unknown-unknown` | clean |
+| EthBridge relayer | `cd packages/user/EthBridge/relayer && cargo check --target aarch64-apple-darwin` | clean (its manifest was broken since the derive pass: `psio.workspace = true` without a workspace) |
+| Rust unit tests | `cd rust && cargo test -r --no-fail-fast -p psibase -p cargo-psibase -p psibase-macros-lib -p psibase-macros-derive -p psibase_plugin` | `service_schema` 4 / 4, `psio_twins` 3 / 3, `psio_leaf_types` 13 / 13, `psio_wrappers` 8 / 8, macro-lib 6 / 6, cargo-psibase 8 / 8, psibase lib 60 pass and the 42 `verify_schema` fail (they read the build directory's packages: legacy schema JSON, and need `PSIBASE_DATADIR`) |
+| full build | `~/psibase-pssz-scripts/build.sh rflip-rb` | exit 1 at the last step only, `share/psibase/packages/index.json`: the Rust `reserved-names` tool reads the C++-built `AccountsService.psi` and refuses its legacy schema JSON. Everything else built: all Rust services to wasm, all packages, the CLI, the UIs |
+| full suite | `~/psibase-pssz-scripts/ctest.sh rflip-rb` | 29 / 93 |
+
+`service_schema.rs` is the test of the specification's sample
+(`tests/service-schema-sample.json`, the text of the interop document):
+Rust reads it, writes the identical I-JSON and packs it to the same 1336
+bytes; the schema the service macro builds for the same declaration is
+`equivalent` (`Compare::Contract`; `Compare::Wire` for `getRow`, whose
+parameter C++ leaves unnamed); the argument bytes of the typed record,
+of the tuple and of the schema-driven codec over the C++ schema are
+equal; an `Action` view gives the method and the argument bytes the
+dispatcher uses.
+
+*The 64 failing tests, classified.* None is known to be a Rust bug; all
+fail before any PSSZ byte crosses between the languages, so the wire
+itself is **not exercised** in this tree (that is what the merge will
+test first).
+
+| Tests | Count | Message | Class |
+|---|---|---|---|
+| `rs-test-*`, `rs-subjective-test` (`cargo-psibase test`: the Rust tester loads the default packages) | 28 | `json: missing required member "package" of Schema` (`tester.rs:283`) | needs the C++ flip: schema I-JSON in C++-built packages |
+| `psinode_test_*` except `config`, `timer` | 13 | the same, from `psibase boot` / `psibase install` | needs the C++ flip: the same |
+| `t-*-test`, `t-psibase-tests` (C++ tester) | 22 | `tester wasm asserted: Invalid type for variant` | needs the C++ flip: the C++ reader of the schema JSON in Rust-built packages |
+| `rs-tests` | 1 | 42 × `verify_schema` | needs the C++ flip: schemas of the built packages |
+
+Passing: the native C++ tests, `n-` / `t-psibase-psio-tests`,
+`psinode_test_config`, `psinode_test_timer`, the consensus and routing
+tests, the Python unit tests (29).
+
+*Not compile-verifiable, and why.* `btcbridge-plugin`, `btcrelay-plugin`,
+`ethbridge-plugin`, `exchange-plugin`, `favor-plugin-legacy`: their
+`bindings.rs` is generated by the component build, absent under
+`cargo check` (before and after; the flip script rewrote their
+`.packed()` calls and they have the `psio` dependency, but no compiler
+has seen the result). `tokens-plugin` under `--tests`: its two records
+derive the codec only with `cfg(not(test))` (as before). The Favor
+contract tests need `FAVOR_TEST_SERVICE` / `FAVOR_TEST_QUERY_SERVICE` at
+compile time. `package-templates/` (converted by hand) and `demo/` are
+not built.
+
+*What is left.*
+
+**R-E, the JSON flip (not started).** 263 types in 63 files derive both
+`psio::JsonText` and `serde::Serialize` / `Deserialize`: the serde
+derives become `psio::Serde` (the bridge; six types have it already:
+`ServiceSchema` and its three records, `ActionTrace`, `accounts::Account`,
+and every generated argument record). 159 `#[serde(...)]` attributes to
+review (PSIO refuses `default` on a non-optional member,
+`deserialize_with`, `deny_unknown_fields`, `tag` / `content`, `flatten`;
+`untagged` is honoured at this pin). `Hex<T>` (92 lines in 30 files;
+`Checksum256` is `Hex<[u8; 32]>`, 113 lines in 31 files) is deleted and
+its uses become `Vec<u8>` / `[u8; N]`; `serialize_as_str!` (5 uses:
+`AccountNumber`, `MethodNumber`, `Memo`, `ExactAccountNumber`, …) becomes
+`TextForm` + `psio::json_text_form!` + `psio::Serde`; `ExactAccountNumber`
+(44 lines) is deleted; `serde_json::to_string(&wire)` /
+`from_str::<Wire>` → `psio::to_ijson` / `from_ijson`; the GraphQL scalars
+of the replaced wrappers come from `psio`'s `async-graphql` feature
+(check that it does not change `serde_json` for dependents). `PrettyAction`
+and the package records (`PackageInfo`, `ServiceInfo`, `PackageManifest`)
+are serde-only today. `DbId`'s serde derive still writes the Rust names
+only because it is serde's (`rename_all = "camelCase"` is in place).
+
+**R-F, the rest.** 13 `to_unit().unwrap()` → `.into()` (RG16);
+`from_bin.rs` / `to_bin.rs` (comment says they disappear; 13 uses) — check
+for consumers; comments and documentation that still say "fracpack"
+(`rust/psibase_macros/**/README.md` and `psibase-macros-derive/src/lib.rs`
+docs, `native_raw.rs`, `tester_raw.rs`, `serve_http.rs`,
+`rust/.config/hakari.toml`, `StagedTx/service/src/db.rs`,
+`Exchange/service/src/math.rs`, two `.wit` files); `rust/psibase_names`
+keeps the account coder; `doc/src` Rust documentation. `git grep -i
+fracpack -- 'rust' 'packages'` still lists those plus C++, TypeScript and
+Python files that belong to the other sides.
+
+**After the merge.** Regenerate the twin fixture and remove the
+pass-through; add `DbId`, action argument records of services in both
+languages, a boot transaction and a package's schema file to the fixture
+(not done here: the C++ of this tree cannot produce their PSIO forms
+yet); rerun the full suite; then the trust refinement (`decode_row`).
 
 **Pin moved to PSIO `e12e4f6df7a2422f893d609848ab06194b75e082`** (the
 pin both flip branches converge on). No psibase source changed; the

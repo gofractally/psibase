@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 favor = { path = "../service" }
 psibase.workspace = true
+psio.workspace = true
 wit-bindgen-rt.workspace = true
 
 [package.metadata.component]

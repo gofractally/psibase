@@ -1,4 +1,4 @@
-use crate::{self as psibase, AccountNumber, Pack, ToSchema, Unpack};
+use crate::{self as psibase, AccountNumber};
 use serde::{Deserialize, Serialize};
 
 /// Identify a service and method
@@ -8,7 +8,7 @@ pub use crate::ServiceMethod;
 
 type CallbackType = u32;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 pub struct AuthTarget {
     sender: AccountNumber,
     action: Option<ServiceMethod>,
@@ -160,7 +160,7 @@ pub mod auth_interface {
 mod service {
     use super::{AuthTarget, CallbackType};
     use crate::{AccountNumber, Action, Checksum256, Hex, Transaction};
-    use fracpack::Nested;
+
 
     /// Only called once, immediately after the boot transaction.
     ///
@@ -192,8 +192,8 @@ mod service {
     }
 
     /// Called by RTransact to execute a transaction speculatively
-    #[action(legacy)]
-    fn execTrx(transaction: Nested<Transaction>, speculative: bool) {
+    #[action]
+    fn execTrx(transaction: psio::pssz::Nested<Transaction>, speculative: bool) {
         unimplemented!()
     }
 

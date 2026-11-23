@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "burst-transfer",
     "cargo-psibase",
-    "fracpack",
     "gen-cpp-doc",
     "md2man",
     "psibase",
@@ -15,8 +14,6 @@ members = [
     "rust-workspace-hack",
     "test_contract",
     "test_contract_2",
-    "test_fracpack",
-    "test_fracpack_macros",
     "test_package/admin",
     "test_package/plugin",
     "test_package/query",
@@ -29,15 +26,12 @@ members = [
 default-members = [
     "burst-transfer",
     "cargo-psibase",
-    "fracpack",
     "gen-cpp-doc",
     "md2man",
     "psibase_macros",
     "psibase",
     "psibase_plugin",
     "reserved-names",
-    "test_fracpack",
-    "test_fracpack_macros",
 ]
 
 [workspace.package]
@@ -53,7 +47,6 @@ publish = false
 anyhow = "1.0"
 async-graphql = "=7.0.17"
 clap = { version = "4.5", features = ["derive"] }
-fracpack = { path = "./fracpack", version = "0.29.0" }
 # The official PSIO crate, from the checkout of gofractally/psio that the CMake
 # build fetches at the commit pinned in cmake/PsibaseDependencies.cmake.
 psio = { path = "../external/psio/rust/psio" }

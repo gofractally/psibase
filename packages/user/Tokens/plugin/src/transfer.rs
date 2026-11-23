@@ -14,7 +14,6 @@ use bindings::{
     transact::plugin::{hooks as TransactHooks, types::ActionScope},
 };
 use psibase::{
-    fracpack::{Pack, Unpack},
     services::tokens::{Decimal, Quantity},
     AccountNumber,
 };
@@ -87,11 +86,11 @@ fn scope() -> Result<(String, String, String), Error> {
 fn requests(key: &str) -> Vec<Request> {
     session()
         .get(key)
-        .map(|b| Vec::<Request>::unpacked(&b).expect("invalid transfer review store"))
+        .map(|b| psio::from_pssz::<Vec<Request>>(&b).expect("invalid transfer review store"))
         .unwrap_or_default()
 }
 fn save(key: &str, requests: &[Request]) {
-    session().set(key, &requests.to_vec().packed());
+    session().set(key, &psio::to_pssz(&requests.to_vec()));
 }
 fn consumed_key(key: &str, id: u64) -> String {
     format!("{key}:{id}")
@@ -100,7 +99,7 @@ fn was_consumed(key: &str, id: u64) -> bool {
     let global = global_approvals();
     let revoked_through = global
         .get(&format!("{key}:revoked-through"))
-        .map(|b| u64::unpacked(&b).unwrap())
+        .map(|b| psio::from_pssz::<u64>(&b).unwrap())
         .unwrap_or(0);
     consumed().exists(&consumed_key(key, id))
         || !grant_available(
@@ -110,19 +109,19 @@ fn was_consumed(key: &str, id: u64) -> bool {
         )
 }
 
-#[derive(Clone, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct PromptRef {
     key: String,
     id: u64,
 }
 
-#[derive(Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct TransferScope {
     user: String,
     caller: String,
 }
 
-#[derive(Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct SpentApproval {
     id: u64,
     expires: u64,
@@ -138,12 +137,12 @@ fn seal_global_approvals(
     let index_key = format!("{key}:spent-index");
     let mut spent = table
         .get(&index_key)
-        .map(|bytes| Vec::<SpentApproval>::unpacked(&bytes).unwrap())
+        .map(|bytes| psio::from_pssz::<Vec<SpentApproval>>(&bytes).unwrap())
         .unwrap_or_default();
     let floor_key = format!("{key}:revoked-through");
     let previous_floor = table
         .get(&floor_key)
-        .map(|bytes| u64::unpacked(&bytes).unwrap())
+        .map(|bytes| psio::from_pssz::<u64>(&bytes).unwrap())
         .unwrap_or(0);
     let floor = advance_revocation_floor(
         previous_floor,
@@ -155,7 +154,7 @@ fn seal_global_approvals(
     // A deleted spent flag must never resurrect a copied grant if the device
     // clock subsequently rolls back. Persist the floor BEFORE deleting flags.
     if floor != previous_floor {
-        table.set(&floor_key, &floor.packed());
+        table.set(&floor_key, &psio::to_pssz(&floor));
     }
     spent.retain(|record| {
         if record.expires > time {
@@ -190,7 +189,7 @@ fn seal_global_approvals(
     // Persist the bounded GC index before individual flags. If interrupted here
     // no RPC has started. Once every flag is saved, even copied session storage
     // in another tab cannot revive this consent after an unknown RPC outcome.
-    table.set(&index_key, &spent.packed());
+    table.set(&index_key, &psio::to_pssz(&spent));
     for index in indices {
         table.set(&format!("{key}:spent:{}", requests[*index].id), &[1]);
     }
@@ -200,7 +199,7 @@ fn seal_global_approvals(
 fn guard_submission(user: &str, caller: &str) -> Result<(), Error> {
     let table = staged();
     if let Some(bytes) = table.get("scope") {
-        let previous = TransferScope::unpacked(&bytes).unwrap();
+        let previous = psio::from_pssz::<TransferScope>(&bytes).unwrap();
         if previous.user != user || previous.caller != caller {
             return Err(error(
                 "wallet account or requesting app changed during composition",
@@ -209,11 +208,10 @@ fn guard_submission(user: &str, caller: &str) -> Result<(), Error> {
     } else {
         table.set(
             "scope",
-            &TransferScope {
+            &psio::to_pssz(&TransferScope {
                 user: user.into(),
                 caller: caller.into(),
-            }
-            .packed(),
+            }),
         );
     }
     // No peer identity is accepted by this API; Transact records Tokens from
@@ -226,7 +224,7 @@ fn stage(reference: PromptRef) -> Result<(), Error> {
     let table = staged();
     let mut references = table
         .get("pending")
-        .map(|b| Vec::<PromptRef>::unpacked(&b).unwrap())
+        .map(|b| psio::from_pssz::<Vec<PromptRef>>(&b).unwrap())
         .unwrap_or_default();
     if references.len() >= MAX_PENDING {
         return Err(error("too many exact transfers in one transaction"));
@@ -238,7 +236,7 @@ fn stage(reference: PromptRef) -> Result<(), Error> {
         return Err(error("an exact transfer approval may only be staged once"));
     }
     references.push(reference);
-    table.set("pending", &references.packed());
+    table.set("pending", &psio::to_pssz(&references));
     Ok(())
 }
 
@@ -299,11 +297,11 @@ fn authorize(intent: Intent) -> Result<(), Error> {
         let global = global_approvals();
         let id = global
             .get(&nonce_key)
-            .map(|v| u64::unpacked(&v).unwrap())
+            .map(|v| psio::from_pssz::<u64>(&v).unwrap())
             .unwrap_or(0)
             .checked_add(1)
             .ok_or_else(|| error("transfer review nonce exhausted"))?;
-        global.set(&nonce_key, &id.packed());
+        global.set(&nonce_key, &psio::to_pssz(&id));
         pending.push(Request {
             id,
             intent,
@@ -413,9 +411,9 @@ impl Transfer for TokensPlugin {
         let global = global_approvals();
         let nonce = global
             .get(&format!("{key}:nonce"))
-            .map(|b| u64::unpacked(&b).unwrap())
+            .map(|b| psio::from_pssz::<u64>(&b).unwrap())
             .unwrap_or(0);
-        global.set(&format!("{key}:revoked-through"), &nonce.packed());
+        global.set(&format!("{key}:revoked-through"), &psio::to_pssz(&nonce));
         for request in requests(&key) {
             consumed().delete(&consumed_key(&key, request.id));
         }
@@ -513,7 +511,7 @@ impl PrePublishHook for TokensPlugin {
         let table = staged();
         let scope = table
             .get("scope")
-            .map(|b| TransferScope::unpacked(&b).unwrap())
+            .map(|b| psio::from_pssz::<TransferScope>(&b).unwrap())
             .ok_or_else(|| error("no active wallet transfer scope"))?;
         let user = Accounts::get_current_user()
             .ok_or_else(|| error("selected user changed before submission"))?;
@@ -538,7 +536,7 @@ impl PrePublishHook for TokensPlugin {
             .collect();
         let references = table
             .get("pending")
-            .map(|b| Vec::<PromptRef>::unpacked(&b).unwrap())
+            .map(|b| psio::from_pssz::<Vec<PromptRef>>(&b).unwrap())
             .unwrap_or_default();
         if references.is_empty() {
             return Ok(());

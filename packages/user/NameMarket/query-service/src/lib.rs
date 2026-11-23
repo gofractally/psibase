@@ -131,7 +131,7 @@ mod service {
     fn serve_sys() -> services::transact::ServiceMethod {
         services::transact::ServiceMethod {
             service: crate::Wrapper::SERVICE,
-            method: MethodNumber::from(crate::action_structs::serveSys::ACTION_NAME),
+            method: MethodNumber::from(<crate::action_structs::serveSys as psio::interface::Method>::NAME),
         }
     }
 

@@ -1,6 +1,6 @@
 use crate::serialize_as_str;
 use custom_error::custom_error;
-use fracpack::{FracInputStream, Pack, ToSchema, Unpack};
+
 use std::fmt;
 use std::str::FromStr;
 
@@ -18,15 +18,12 @@ custom_error! { pub MemoError
 #[derive(
     Debug,
     Clone,
-    ToSchema,
     Default,
-    Pack,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[psio(transparent)]
 pub struct Memo(#[psio(max = 80)] String);
 
@@ -70,29 +67,6 @@ impl FromStr for Memo {
 impl From<&str> for Memo {
     fn from(s: &str) -> Self {
         Memo::from_str(s).unwrap()
-    }
-}
-
-impl<'a> Unpack<'a> for Memo {
-    const FIXED_SIZE: u32 = 4;
-    const VARIABLE_SIZE: bool = true;
-
-    fn unpack(src: &mut FracInputStream) -> fracpack::Result<Self> {
-        Ok(Self::new(String::unpack(src)?).map_err(|_| fracpack::Error::ExtraData)?)
-    }
-
-    fn verify(src: &mut FracInputStream) -> fracpack::Result<()> {
-        let len = <&str>::unpack(src)?.len();
-
-        if len <= 80 {
-            Ok(())
-        } else {
-            Err(fracpack::Error::ExtraData)
-        }
-    }
-
-    fn new_empty_container() -> fracpack::Result<Self> {
-        Ok(Default::default())
     }
 }
 

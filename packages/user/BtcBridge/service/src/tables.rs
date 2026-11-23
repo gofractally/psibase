@@ -1,11 +1,11 @@
 use btcbridge_core as btc;
-use psibase::{AccountNumber, Pack, ToSchema, Unpack};
+use psibase::{AccountNumber};
 use serde::{Deserialize, Serialize};
 #[psibase::service_tables]
 pub mod tables {
     use super::*;
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Config {
         pub policy: String,
         pub token: u32,
@@ -24,7 +24,7 @@ pub mod tables {
         fn pk(&self) {}
     }
     #[table(name = "AddressTable", index = 1)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct DepositAddress {
         #[primary_key]
         pub index: u32,
@@ -39,7 +39,7 @@ pub mod tables {
         }
     }
     #[table(name = "ScriptTable", index = 2)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct CustodyScript {
         #[primary_key]
         pub script: String,
@@ -48,7 +48,7 @@ pub mod tables {
         pub owner: AccountNumber,
     }
     #[table(name = "UtxoTable", index = 3)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Utxo {
         #[primary_key]
         pub id: String,
@@ -79,7 +79,7 @@ pub mod tables {
         }
     }
     #[table(name = "RequestTable", index = 4)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Withdrawal {
         #[primary_key]
         pub id: u64,
@@ -114,7 +114,7 @@ pub mod tables {
         }
     }
     #[table(name = "BatchTable", index = 5)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Batch {
         #[primary_key]
         pub id: u32,
@@ -131,7 +131,7 @@ pub mod tables {
         }
     }
     #[table(name = "RevisionTable", index = 6)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Revision {
         pub batch: u32,
         pub revision: u32,
@@ -148,7 +148,7 @@ pub mod tables {
         }
     }
     #[table(name = "SignatureTable", index = 7)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct SignerResponse {
         pub batch: u32,
         pub revision: u32,
@@ -162,7 +162,7 @@ pub mod tables {
         }
     }
     #[table(name = "TxTable", index = 8)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct TxRecord {
         #[primary_key]
         pub txid: String,
@@ -170,7 +170,7 @@ pub mod tables {
         pub revision: u32,
     }
     #[table(name = "SigningLinkTable", index = 9)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct SigningLink {
         pub batch: u32,
         pub revision: u32,
@@ -185,20 +185,20 @@ pub mod tables {
         }
     }
     #[table(name = "CustodyKeyTable", index = 10)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct CustodyKey {
         #[primary_key]
         pub signer: u8,
         pub key: u32,
         pub provider: AccountNumber,
     }
-    #[derive(Clone, Debug, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct FeeTerms {
         pub fee_bps: u16,
         pub publisher_bps: u16,
     }
     #[table(name = "DepositFeesTable", index = 11)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct DepositFees {
         pub current: FeeTerms,
         pub pending: Option<FeeTerms>,
@@ -209,7 +209,7 @@ pub mod tables {
         fn pk(&self) {}
     }
     #[table(name = "DepositTable", index = 12)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Deposit {
         #[primary_key]
         pub id: String,

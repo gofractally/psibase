@@ -15,9 +15,9 @@ pub mod service {
             psibase::services::http_server::SERVICE,
             "Native HTTP server required"
         );
-        if request.method == "GET" && request.target.starts_with("/snapshot?provider=") {
+        if request.method == "GET" && request.target.to_str().unwrap_or_default().starts_with("/snapshot?provider=") {
             let provider: AccountNumber = request
-                .target
+                .target.to_str().unwrap_or_default()
                 .strip_prefix("/snapshot?provider=")?
                 .parse()
                 .ok()?;

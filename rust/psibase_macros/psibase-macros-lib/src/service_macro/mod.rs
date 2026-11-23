@@ -129,7 +129,14 @@ fn process_mod(
             }
         }
 
-        let mut action_structs = proc_macro2::TokenStream::new();
+        let (psio_attr, psio_crate) = if options.psibase_mod == "crate" {
+            (quote! { ::psio }, "::psio".to_string())
+        } else {
+            (
+                quote! { #psibase_mod::psio },
+                format!("{}::psio", options.psibase_mod),
+            )
+        };
         let mut action_schema_init = quote! {};
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
@@ -139,32 +146,23 @@ fn process_mod(
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 check_method_number(method_number, f, &mut method_numbers);
-                // Temporary: `#[action(legacy)]` keeps an action whose types are
-                // not PSIO values yet out of the PSIO interface.
-                let legacy_only = f.attrs.iter().any(|attr| {
-                    is_action_attr(attr) && matches!(&attr.meta, syn::Meta::List(list) if list.tokens.to_string() == "legacy")
-                });
-                if !legacy_only {
-                    psio_fns.push(psio_interface_fn(f));
-                }
+                psio_fns.push(psio_interface_fn(f));
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
                 if pre_action_info.has_pre_action() {
                     add_pre_action_call_if_not_excluded(&pre_action_info, f);
                 }
-                process_action_args(
-                    options,
-                    false,
-                    None,
-                    psibase_mod,
-                    f,
-                    &mut action_structs,
-                    &mut invoke_args,
-                    &mut invoke_struct_args,
-                );
+                process_action_args(f, &mut invoke_args, &mut invoke_struct_args);
                 process_action_schema(psibase_mod, &structs, f, &mut action_schema_init);
-                process_action_callers(psibase_mod, f, &mut action_callers, &invoke_args);
-                process_dispatch_body(psibase_mod, f, &mut dispatch_body, invoke_struct_args);
+                process_action_callers(psibase_mod, &structs, f, &mut action_callers, &invoke_args);
+                process_dispatch_body(
+                    psibase_mod,
+                    &psio_attr,
+                    &structs,
+                    f,
+                    &mut dispatch_body,
+                    invoke_struct_args,
+                );
                 let name = &f.sig.ident;
                 let name_str = name.to_string();
                 let output = match &f.sig.output {
@@ -187,14 +185,6 @@ fn process_mod(
         // The actions as PSIO declares an interface: `#[psio::interface]`
         // gives the argument records, the method metadata and the Schema
         // IR's Interface.
-        let (psio_attr, psio_crate) = if options.psibase_mod == "crate" {
-            (quote! { ::psio }, "::psio".to_string())
-        } else {
-            (
-                quote! { #psibase_mod::psio },
-                format!("{}::psio", options.psibase_mod),
-            )
-        };
         // A second interface declared in one module (`structs = "hooks_structs"`)
         // names its PSIO interface after the same prefix.
         let psio_prefix = options
@@ -221,12 +211,39 @@ fn process_mod(
                 ),
             ),
         };
+        // What `#[psio::interface]` expands to is named after the service, and
+        // the module holds it under the plain names (`psio_actions`,
+        // `PsioActions`): a service module that glob-imports another
+        // service's module then has no two macro-expanded items of one name.
+        let psio_unique: String = options
+            .name
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect();
+        let unique_ident = |name: &str| {
+            proc_macro2::Ident::new(
+                &format!("{name}__{psio_unique}"),
+                proc_macro2::Span::call_site(),
+            )
+        };
         psio_action_idents = Some((
             proc_macro2::Ident::new(&psio_module_name, proc_macro2::Span::call_site()),
             proc_macro2::Ident::new(&psio_trait_name, proc_macro2::Span::call_site()),
         ));
         {
-            let psio_trait_ident = &psio_action_idents.as_ref().unwrap().1;
+            let (psio_module_ident, psio_trait_ident) = psio_action_idents.as_ref().unwrap();
+            let unique_module = unique_ident(&psio_module_name);
+            let unique_trait = unique_ident(&psio_trait_name);
+            let psio_module_name = unique_module.to_string();
+            let _ = psio_trait_ident;
+            items.push(parse_quote! {
+                /// The service's actions as a PSIO interface: `Tag`, the
+                /// argument records (`args`), dispatch and the proxy.
+                pub mod #psio_module_ident {
+                    pub use super::#unique_module::*;
+                }
+            });
+            let psio_trait_ident = &unique_trait;
             let psio_doc = format!(
                 "The actions of \"{}\" as a PSIO interface: `psio_actions::Tag` is the \
                  interface, `psio_actions::args::<action>` the argument record of an action.",
@@ -234,7 +251,7 @@ fn process_mod(
             );
             items.push(parse_quote! {
                 #[doc = #psio_doc]
-                #[allow(non_snake_case)]
+                #[allow(non_snake_case, non_camel_case_types)]
                 #[#psio_attr::interface(name = #service_account, module = #psio_module_name, crate = #psio_crate, derive(Debug, Clone, #psio_attr::Serde))]
                 pub trait #psio_trait_ident {
                     #(#psio_fns)*
@@ -251,6 +268,9 @@ fn process_mod(
             };
             let trait_ident = proc_macro2::Ident::new(trait_name, proc_macro2::Span::call_site());
             let module_ident = proc_macro2::Ident::new(module_name, proc_macro2::Span::call_site());
+            let unique_module = unique_ident(module_name);
+            let unique_trait = unique_ident(trait_name);
+            let unique_module_name = unique_module.to_string();
             let interface_name = format!("{}.{}", options.name, suffix);
             let mut event_psio_fns = Vec::new();
             let mut all_have_params = true;
@@ -272,13 +292,20 @@ fn process_mod(
             );
             items.push(parse_quote! {
                 #[doc = #psio_doc]
-                #[allow(non_snake_case)]
-                #[#psio_attr::interface(name = #interface_name, module = #module_name, crate = #psio_crate, derive(Debug, Clone, #psio_attr::Serde #gql_derive))]
-                pub trait #trait_ident {
+                #[allow(non_snake_case, non_camel_case_types)]
+                #[#psio_attr::interface(name = #interface_name, module = #unique_module_name, crate = #psio_crate, derive(Debug, Clone, #psio_attr::Serde #gql_derive))]
+                pub trait #unique_trait {
                     #(#event_psio_fns)*
                 }
             });
-            psio_event_reexports.push(quote! { #module_ident, #trait_ident });
+            let _ = trait_ident;
+            items.push(parse_quote! {
+                /// The events of this kind as a PSIO interface.
+                pub mod #module_ident {
+                    pub use super::#unique_module::*;
+                }
+            });
+            psio_event_reexports.push(quote! { #module_ident });
         }
         let const_pub = if options.pub_constant {
             quote! {pub}
@@ -294,18 +321,20 @@ fn process_mod(
             #const_pub const #constant: #psibase_mod::AccountNumber =
                 #psibase_mod::AccountNumber::new(#psibase_mod::account_raw!(#service_account));
         });
-        items.push(parse_quote! {
-            #[automatically_derived]
-            #[allow(non_snake_case)]
-            #[allow(non_camel_case_types)]
-            #[allow(non_upper_case_globals)]
-            /// These structs produce the same JSON and fracpack formats
-            /// that the actions do.
-            pub mod #structs {
-                use super::*;
-                #action_structs
-            }
-        });
+        {
+            let psio_module_ident = &psio_action_idents.as_ref().unwrap().0;
+            let structs_doc = format!(
+                "The argument record of each action of \"{}\": its PSSZ is the action's \
+                 `rawData` and its JSON the object of the arguments by name.",
+                options.name
+            );
+            items.push(parse_quote! {
+                #[doc = #structs_doc]
+                pub mod #structs {
+                    pub use super::#psio_module_ident::args::*;
+                }
+            });
+        }
         let doc = impl_mod
             .attrs
             .iter()
@@ -341,8 +370,9 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             impl<T: #psibase_mod::Caller> #psibase_mod::ToActionsSchema for #actions<T> {
-                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::fracpack::FunctionType> {
-                    let mut actions = #psibase_mod::fracpack::indexmap::IndexMap::new();
+                #[allow(unused_variables, unused_mut)]
+                fn to_schema(builder: &mut #psio_attr::pssz::schema_ir::SchemaBuilder) -> #psibase_mod::ActionMap {
+                    let mut actions = #psibase_mod::ActionMap::new();
                     #action_schema_init
                     actions
                 }
@@ -440,7 +470,7 @@ fn process_mod(
             if !event_fns.contains_key(&id) {
                 items.push( parse_quote! {
                     impl #psibase_mod::ToEventsSchema for #event_name {
-                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::EventType> {
+                        fn to_schema(_builder: &mut #psio_attr::pssz::schema_ir::SchemaBuilder) -> #psibase_mod::EventMap {
                             Default::default()
                         }
                     }
@@ -474,6 +504,11 @@ fn process_mod(
                 EventType::History => quote!(history),
                 EventType::Merkle => quote!(merkle),
             };
+            let psio_event_module = match kind {
+                EventType::History => quote!(psio_history_events),
+                EventType::Merkle => quote!(psio_merkle_events),
+            };
+            let event_args = quote! { #psio_event_module::args };
             let mut event_callers = proc_macro2::TokenStream::new();
             let mut event_structs = quote! {};
             let mut event_schema_init = quote! {};
@@ -483,21 +518,19 @@ fn process_mod(
                 if let Item::Fn(f) = &items[fn_index] {
                     let mut invoke_args = quote! {};
                     let mut invoke_struct_args = quote! {};
-                    process_action_args(
-                        options,
-                        options.gql,
-                        Some(&db),
+                    process_action_args(f, &mut invoke_args, &mut invoke_struct_args);
+                    process_event_callers(
                         psibase_mod,
+                        &psio_attr,
+                        &event_args,
                         f,
-                        &mut event_structs,
-                        &mut invoke_args,
-                        &mut invoke_struct_args,
+                        &mut event_callers,
+                        &invoke_args,
                     );
-                    process_event_callers(psibase_mod, f, &mut event_callers, &invoke_args);
-                    process_event_name(psibase_mod, f, &mut event_structs);
+                    process_event_name(psibase_mod, &db, f, &mut event_structs);
                     process_event_schema(
                         psibase_mod,
-                        &quote! { #event_structs_mod::#event_module_name},
+                        &event_args,
                         f,
                         &event_opts,
                         &mut event_schema_init,
@@ -525,8 +558,8 @@ fn process_mod(
             items.push(parse_quote! {
                 #[automatically_derived]
                 impl #psibase_mod::ToEventsSchema for #event_name {
-                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodString, #psibase_mod::EventType> {
-                        let mut events = #psibase_mod::fracpack::indexmap::IndexMap::new();
+                    fn to_schema(builder: &mut #psio_attr::pssz::schema_ir::SchemaBuilder) -> #psibase_mod::EventMap {
+                        let mut events = #psibase_mod::EventMap::new();
                         #event_schema_init
                         events
                     }
@@ -545,6 +578,7 @@ fn process_mod(
             event_structs_decls.push(quote! {
                 pub mod #event_module_name {
                     use super::super::*;
+                    pub use super::super::#psio_event_module::args::*;
                     #event_structs
                 }
                 pub use #event_module_name::#event_name;
@@ -601,7 +635,12 @@ fn process_mod(
                     pub use #psibase_mod as psibase;
                     pub use psibase_service;
                     pub use super::#wrapper as Wrapper;
-                    fn dispatch(act: #psibase_mod::SharedAction) -> #psibase_mod::fracpack::Result<()> {
+                    #[allow(unused_variables)]
+                    fn dispatch(act: #psio_attr::PsszView<'_, #psibase_mod::Action>) -> #psio_attr::pssz::PsszResult<()> {
+                        use #psibase_mod::ActionPsszAccessors as _;
+                        use #psibase_mod::MethodNumberPsszAccessors as _;
+                        let method = #psibase_mod::MethodNumber::new(act.method().value().get());
+                        let raw_data: &[u8] = act.rawData().bytes();
                         #dispatch_body
                         Ok(())
                     }
@@ -653,10 +692,10 @@ fn process_mod(
     } else {
         quote! {}
     };
-    let (psio_module_ident, psio_trait_ident) = psio_action_idents.unwrap();
+    let (psio_module_ident, _) = psio_action_idents.unwrap();
     let reexport_psio = quote! {
         #[automatically_derived]
-        pub use #mod_name::{#psio_module_ident, #psio_trait_ident #(, #psio_event_reexports)*};
+        pub use #mod_name::{#psio_module_ident #(, #psio_event_reexports)*};
     };
     let silence = if options.dispatch.unwrap() {
         quote! {}

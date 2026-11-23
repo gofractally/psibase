@@ -3,8 +3,7 @@ pub mod tables {
     use psibase::services::nft::Wrapper as Nft;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        get_sender, AccountNumber, Pack, ServiceWrapper, Table, TimePointSec, ToSchema, Unpack,
-    };
+        get_sender, AccountNumber, ServiceWrapper, Table, TimePointSec, };
 
     use async_graphql::{ComplexObject, SimpleObject};
 
@@ -13,7 +12,7 @@ pub mod tables {
     const ONE_MILLION: u32 = 1_000_000;
 
     #[table(name = "RateLimitTable", index = 0)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct RateLimit {
         #[primary_key]
         pub nft_id: u32,

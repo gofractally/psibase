@@ -10,11 +10,11 @@ const MAX_EXPIRED_TICKET_ERASE_PER_MINT: usize = 32;
 
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::{AccountNumber, Pack, ToSchema, Unpack};
+    use psibase::{AccountNumber};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "WsTicketTable", index = 0, db = "Session")]
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct WsTicketRow {
         #[primary_key]
         pub ticket: String,
@@ -38,10 +38,10 @@ pub mod tables {
 mod service {
     use super::*;
     use crate::tables::WsTicketRow;
-    use psibase::{Pack, ServiceWrapper, ToSchema, Unpack};
+    use psibase::{ServiceWrapper};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct WsTicketInfo {
         pub user: AccountNumber,
         pub app: AccountNumber,

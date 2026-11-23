@@ -66,7 +66,7 @@ impl PermsAdmin for PermissionsPlugin {
             &context.user,
             &context.caller,
             &context.callee,
-            context.level,
+            context.level.into(),
             match duration {
                 ApprovalDuration::Session => StorageDuration::Session,
                 ApprovalDuration::Permanent => StorageDuration::Persistent,
@@ -185,7 +185,7 @@ impl Api for PermissionsPlugin {
                 user: user.to_string(),
                 caller: caller.clone(),
                 callee: callee.clone(),
-                level,
+                level: level.into(),
                 descriptions,
                 active_app: get_active_app(),
             }),

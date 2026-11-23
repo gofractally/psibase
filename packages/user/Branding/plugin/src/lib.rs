@@ -11,7 +11,7 @@ use sites::plugin::api::{remove, upload, File};
 use transact::plugin::api::add_action_to_transaction;
 
 use branding::action_structs as Actions;
-use psibase::fracpack::Pack;
+
 use psibase::image_content_type;
 use psibase::AccountNumber;
 
@@ -39,9 +39,9 @@ impl Api for BrandingPlugin {
 
         let _ = AccountNumber::from_exact(name.as_str()).expect("Network name invalid");
 
-        let packed_network_name_args = Actions::setNetworkName { name }.packed();
+        let packed_network_name_args = psio::to_pssz(&Actions::setNetworkName { name });
         add_action_to_transaction(
-            Actions::setNetworkName::ACTION_NAME,
+            <Actions::setNetworkName as psio::interface::Method>::NAME,
             &packed_network_name_args,
         )
         .unwrap();

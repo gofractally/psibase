@@ -19,7 +19,7 @@ use virtual_server::plugin::transact as VirtualServer;
 use exports::transact::admin::admin::Guest as Admin;
 
 use crate::trust::*;
-use psibase::fracpack::Pack;
+
 use psibase::{Hex, SignedTransaction, TransactionTrace};
 use serde_json::from_str;
 use sha2::{Digest, Sha256};
@@ -70,11 +70,11 @@ impl Admin for TransactAdmin {
             .map_err(ConnectionChanged)?;
 
         let (tx, extra_claims, evidence) = make_transaction(actions, 3);
-        let mut proofs = get_proofs(&Sha256::digest(&tx.packed()).into(), &extra_claims)?;
+        let mut proofs = get_proofs(&Sha256::digest(&psio::to_pssz(&tx)).into(), &extra_claims)?;
         proofs.extend(evidence);
 
         let signed_tx = SignedTransaction {
-            transaction: Hex::from(tx.packed()),
+            transaction: psio::pssz::Nested::new(&tx).unwrap(),
             proofs,
             subjectiveData: None,
         };
@@ -121,7 +121,7 @@ impl Admin for TransactAdmin {
         // TODO (idea): on_hook_post_publish(trace)
         // Could be for logging, or for other post-transaction client-side processing
 
-        match trace.error {
+        match trace.error_text() {
             Some(err) => Err(TransactionError(err).into()),
             None => {
                 println!("Transaction executed successfully");

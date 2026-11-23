@@ -1,6 +1,6 @@
 //! Fresh-chain contract tests. No running node, UI, plugins, or demo identities.
 use super::*;
-use psibase::fracpack::{Pack, Unpack};
+
 use psibase::*;
 use serde_json::{json, Value};
 
@@ -143,7 +143,7 @@ impl Fixture {
         };
         self.chain.fill_tapos(&mut tx, 10);
         SignedTransaction {
-            transaction: tx.packed().into(),
+            transaction: psio::pssz::Nested::new(&tx).unwrap(),
             proofs: vec![],
             subjectiveData: None,
         }
@@ -165,7 +165,7 @@ impl Fixture {
                     .open::<$record, $table>()
                     .get_index_pk()
                     .iter()
-                    .map(|r| r.packed())
+                    .map(|r| psio::to_pssz(&r))
                     .collect()
             };
         }
@@ -185,14 +185,14 @@ impl Fixture {
         let target = actions.last().unwrap().clone();
         let trace = self.push(actions);
         assert!(
-            trace.error.as_deref().is_some_and(|e| e.contains(expected)),
+            trace.error_text().as_deref().is_some_and(|e| e.contains(expected)),
             "expected {expected:?}; got {:?}",
             trace.error
         );
         fn failed_at(t: &ActionTrace, target: &Action, expected: &str) -> bool {
             (t.action.service == target.service
                 && t.action.method == target.method
-                && t.error.as_deref().is_some_and(|e| e.contains(expected)))
+                && t.error_text().as_deref().is_some_and(|e| e.contains(expected)))
                 || t.inner_traces.iter().any(|t| match &t.inner {
                     InnerTraceEnum::ActionTrace(t) => failed_at(t, target, expected),
                     _ => false,
@@ -1178,7 +1178,7 @@ fn authenticated_queries_restrict_identity_and_paginate_private_rows() {
     let r = f.query(Some(A), "{lines(user:\"carol\"){nodes{peer}}}");
     assert!(r.get("errors").is_some());
     // Pack the actual serveSys ABI; an ordinary sender cannot assert user=C.
-    #[derive(Pack)]
+    #[derive(psio::PsszPack)]
     struct Serve {
         request: HttpRequest,
         socket: Option<i32>,
@@ -1188,7 +1188,7 @@ fn authenticated_queries_restrict_identity_and_paginate_private_rows() {
         sender: A,
         service: Q,
         method: method!("serveSys"),
-        rawData: Serve {
+        rawData: psio::to_pssz(&Serve {
             request: HttpRequest {
                 host: "favor.psibase.io".into(),
                 method: "POST".into(),
@@ -1199,8 +1199,7 @@ fn authenticated_queries_restrict_identity_and_paginate_private_rows() {
             },
             socket: None,
             user: Some(C),
-        }
-        .packed()
+        })
         .into(),
     };
     f.reject(vec![action], "Only http-server may supply query identity");
@@ -1233,14 +1232,14 @@ fn signed_transactions_require_the_senders_key_and_valid_signature() {
     }
     let sign = |actions: Vec<Action>, claim: &SigningKey, signer: &SigningKey| {
         let mut signed = f.signed_transaction(actions);
-        let mut tx = Transaction::unpacked(&signed.transaction).unwrap();
+        let mut tx = signed.transaction.decode().unwrap();
         tx.claims = vec![Claim {
             service: services::verify_sig::SERVICE,
             rawData: public(claim).into(),
         }];
-        let bytes = tx.packed();
+        let bytes = psio::to_pssz(&tx);
         let sig: Signature = signer.sign(&bytes);
-        signed.transaction = bytes.into();
+        signed.transaction = psio::pssz::Nested::unchecked(bytes);
         signed.proofs = vec![sig.to_bytes().to_vec().into()];
         signed
     };
@@ -1249,7 +1248,7 @@ fn signed_transactions_require_the_senders_key_and_valid_signature() {
         let trace = f.chain.push(&signed);
         f.chain.start_block();
         assert!(
-            trace.error.as_deref().is_some_and(|e| e.contains(error)),
+            trace.error_text().as_deref().is_some_and(|e| e.contains(error)),
             "expected {error}; got {:?}",
             trace.error
         );

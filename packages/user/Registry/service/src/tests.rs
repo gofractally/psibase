@@ -105,7 +105,7 @@ mod tests {
 
         let error = push_set_metadata(&chain, default_metadata(), tags)
             .trace
-            .error
+            .error_text()
             .unwrap();
         assert!(error.contains("Max 3 tags per app"), "error = {}", error);
 
@@ -122,7 +122,7 @@ mod tests {
 
         let error = push_set_metadata(&chain, metadata, default_tags())
             .trace
-            .error
+            .error_text()
             .unwrap();
         assert!(
             error.contains(

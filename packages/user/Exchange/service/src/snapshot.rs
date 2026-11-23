@@ -1,11 +1,11 @@
 //! Read-only native tables. No token action getters, no ID allocation in RPC.
 use crate::tables::tables::*;
-use psibase::{AccountNumber, KvHandle, KvMode, Table, TableRecord, ToKey};
+use psibase::{AccountNumber, KvHandle, KvMode, Table, TableRecord};
 use serde_json::{json, Value};
 // Used only by the authenticated READ-ONLY query service, never the financial
 // action snapshot. Db.open intentionally forbids arbitrary foreign prefixes.
 pub(crate) fn foreign<R: TableRecord, T: Table<R>>(service: AccountNumber) -> T {
-    let prefix = (service, T::TABLE_INDEX).to_key();
+    let prefix = psio::to_key(&(service, T::TABLE_INDEX));
     T::from_handle(KvHandle::open_direct(R::DB, &prefix, KvMode::Read))
 }
 const MAX_JS_INTEGER: u128 = (1_u128 << 53) - 1;

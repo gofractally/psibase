@@ -6,7 +6,7 @@ use bindings::{
     exports::favor::plugin::{api::Guest as Api, authorized::Guest as Authorized},
     host::types::types::Error,
 };
-use psibase::{fracpack::Pack, AccountNumber};
+use psibase::{AccountNumber};
 
 psibase::define_trust! {
     descriptions {
@@ -46,15 +46,15 @@ impl Api for TrustPlugin {
             forwarding,
         };
         add_action_to_transaction(
-            ::favor::action_structs::set_line::ACTION_NAME,
-            &args.packed(),
+            <::favor::action_structs::set_line as psio::interface::Method>::NAME,
+            &psio::to_pssz(&args),
         )
     }
     fn set_receiving(request_only: bool) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::set_receiving)?;
         add_action_to_transaction(
-            ::favor::action_structs::set_receiving::ACTION_NAME,
-            &::favor::action_structs::set_receiving { request_only }.packed(),
+            <::favor::action_structs::set_receiving as psio::interface::Method>::NAME,
+            &psio::to_pssz(&::favor::action_structs::set_receiving { request_only }),
         )
     }
     fn create_request(
@@ -70,22 +70,21 @@ impl Api for TrustPlugin {
             .map_err(|_| ErrorType::InvalidInput("Invalid request expiry".into()))?;
         let payer = payer.map(|p| account(&p)).transpose()?;
         add_action_to_transaction(
-            ::favor::action_structs::create_request::ACTION_NAME,
-            &::favor::action_structs::create_request {
+            <::favor::action_structs::create_request as psio::interface::Method>::NAME,
+            &psio::to_pssz(&::favor::action_structs::create_request {
                 hash,
                 symbol,
                 amount,
                 expires_at,
                 payer,
-            }
-            .packed(),
+            }),
         )
     }
     fn revoke_request(hash: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::revoke_request)?;
         add_action_to_transaction(
-            ::favor::action_structs::revoke_request::ACTION_NAME,
-            &::favor::action_structs::revoke_request { hash }.packed(),
+            <::favor::action_structs::revoke_request as psio::interface::Method>::NAME,
+            &psio::to_pssz(&::favor::action_structs::revoke_request { hash }),
         )
     }
     fn pay(
@@ -107,7 +106,7 @@ impl Api for TrustPlugin {
             reference,
             memo,
         };
-        add_action_to_transaction(::favor::action_structs::pay::ACTION_NAME, &args.packed())
+        add_action_to_transaction(<::favor::action_structs::pay as psio::interface::Method>::NAME, &psio::to_pssz(&args))
     }
     fn settle(peer: String, symbol: String, amount: String, nonce: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::settle)?;
@@ -117,7 +116,7 @@ impl Api for TrustPlugin {
             amount,
             nonce,
         };
-        add_action_to_transaction(::favor::action_structs::settle::ACTION_NAME, &args.packed())
+        add_action_to_transaction(<::favor::action_structs::settle as psio::interface::Method>::NAME, &psio::to_pssz(&args))
     }
 }
 impl Authorized for TrustPlugin {

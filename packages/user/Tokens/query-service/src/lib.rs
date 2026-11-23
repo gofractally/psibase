@@ -173,7 +173,7 @@ mod service {
             let json = psibase::services::r_events::Wrapper::call().sqlQuery(
                 "SELECT DISTINCT token_id FROM \"history.tokens.balChanged\" WHERE account = ?"
                     .to_string(),
-                vec![user.to_string()],
+                vec![user.to_string().into()],
             );
             let rows: Vec<Row> = serde_json::from_str(&json).map_err(|e| {
                 async_graphql::Error::new(format!("Failed to read balance history: {e}"))

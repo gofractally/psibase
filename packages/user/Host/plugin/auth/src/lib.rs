@@ -7,8 +7,6 @@ use helpers::*;
 
 use exports::host::auth::api::Guest as Api;
 
-use psibase::fracpack::{Pack, Unpack};
-
 use crate::bindings::{
     host::{
         client::api as CallContext,
@@ -67,7 +65,7 @@ fn set_active_query_token(query_token: &str, app: &str, user: &str) {
     );
     Supervisor::send_request(&req, true).unwrap();
 
-    Bucket::new(DB, &bucket_id(user)).set(&app, &query_token.to_string().packed());
+    Bucket::new(DB, &bucket_id(user)).set(&app, &psio::to_pssz(&query_token.to_string()));
 }
 
 fn remove_active_query_token(app: &str, user: &str) {
@@ -87,7 +85,7 @@ impl Api for HostAuth {
 
         let query_token = Bucket::new(DB, &bucket_id(&user))
             .get(&app)
-            .map(|t| String::unpacked(&t).unwrap())
+            .map(|t| psio::from_pssz::<String>(&t).unwrap())
             .unwrap_or_else(|| Transact::get_query_token(&app, &user).unwrap());
 
         set_active_query_token(&query_token, &app, &user);
@@ -108,7 +106,7 @@ impl Api for HostAuth {
 
         Bucket::new(DB, &bucket_id(&user))
             .get(&app)
-            .map(|t| String::unpacked(&t).unwrap())
+            .map(|t| psio::from_pssz::<String>(&t).unwrap())
     }
 }
 

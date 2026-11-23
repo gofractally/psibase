@@ -2,7 +2,7 @@
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{AccountNumber, HttpReply, HttpRequest, IPAddress};
-    use fracpack::{Pack, ToSchema, Unpack};
+
     use serde::{Deserialize, Serialize};
 
     /// Returns true if the account or the remote end of socket is a node admin
@@ -35,8 +35,7 @@ mod service {
         unimplemented!()
     }
 
-    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
-    #[fracpack(fracpack_mod = "fracpack")]
+    #[derive(Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     pub struct AdminOptionsRow {
         p2p: bool,
         hosts: Vec<String>,

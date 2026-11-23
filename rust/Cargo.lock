@@ -536,6 +536,7 @@ dependencies = [
  "futures",
  "psibase",
  "psibase-rust-workspace-hack",
+ "psio",
  "rand 0.8.5",
  "reqwest",
  "serde",
@@ -1405,21 +1406,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fracpack"
-version = "0.29.0"
-dependencies = [
- "custom_error",
- "hex 0.3.2",
- "indexmap 2.2.6",
- "psibase-rust-workspace-hack",
- "psibase_macros",
- "psio",
- "serde",
- "serde-aux",
- "serde_json",
-]
-
-[[package]]
 name = "fs_extra"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1764,12 +1750,6 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
-
-[[package]]
-name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 
 [[package]]
 name = "hex"
@@ -2501,7 +2481,7 @@ dependencies = [
  "env_logger",
  "futures-util",
  "handlebars 6.4.0",
- "hex 0.4.3",
+ "hex",
  "ignore",
  "log",
  "memchr",
@@ -3214,7 +3194,6 @@ dependencies = [
  "dialoguer",
  "flate2",
  "form_urlencoded",
- "fracpack",
  "futures",
  "getrandom 0.2.15",
  "hmac",
@@ -3371,6 +3350,7 @@ dependencies = [
  "graphql_client",
  "psibase",
  "psibase-rust-workspace-hack",
+ "psio",
  "serde",
  "serde_json",
  "wit-bindgen 0.30.0",
@@ -4494,41 +4474,6 @@ dependencies = [
  "psibase_service",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "test_fracpack"
-version = "0.29.0"
-dependencies = [
- "cxx",
- "cxx-build",
- "fracpack",
- "hex 0.3.2",
- "indexmap 2.2.6",
- "psibase",
- "psibase-rust-workspace-hack",
- "psibase_macros",
- "serde",
- "serde-aux",
- "serde_json",
- "test_fracpack_macros",
-]
-
-[[package]]
-name = "test_fracpack_macros"
-version = "0.29.0"
-dependencies = [
- "anyhow",
- "fracpack",
- "hex 0.3.2",
- "proc-macro-error",
- "proc-macro2",
- "psibase-rust-workspace-hack",
- "quote",
- "regex",
- "serde",
- "serde_json",
- "syn 1.0.109",
 ]
 
 [[package]]

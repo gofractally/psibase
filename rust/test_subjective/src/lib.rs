@@ -1,10 +1,10 @@
 #[psibase::service_tables]
 mod tables {
-    use psibase::{Pack, ToSchema, Unpack};
+
     use serde::{Deserialize, Serialize};
 
     #[table(name = "SubjectiveTable", index = 0, db = "Subjective")]
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     pub struct SubjectiveRow {
         #[primary_key]
         pub id: i32,

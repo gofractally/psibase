@@ -6,15 +6,13 @@ pub mod tables {
     use psibase::services::token_swap::{swap, Wrapper as TokenSwap, PPM};
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
-        abort_message, get_sender, AccountNumber, Memo, Pack, ServiceWrapper, Table, ToSchema,
-        Unpack,
-    };
+        abort_message, get_sender, AccountNumber, Memo, ServiceWrapper, Table, };
 
     use crate::helpers::{mul_div, sqrt};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct InitRow {}
 
     impl InitRow {
@@ -40,7 +38,7 @@ pub mod tables {
     }
 
     #[table(name = "PoolTable", index = 1)]
-    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct Pool {
         #[primary_key]
@@ -49,7 +47,7 @@ pub mod tables {
     }
 
     #[table(name = "ReserveTable", index = 2)]
-    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct Reserve {
         pub pool_id: TID,

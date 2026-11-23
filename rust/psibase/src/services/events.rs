@@ -1,4 +1,4 @@
-use fracpack::{Pack, ToSchema, Unpack};
+
 use serde::{Deserialize, Serialize};
 
 use crate as psibase;
@@ -9,9 +9,6 @@ use crate as psibase;
     Copy,
     Serialize,
     Deserialize,
-    Pack,
-    Unpack,
-    ToSchema,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,

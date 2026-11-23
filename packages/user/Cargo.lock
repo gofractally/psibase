@@ -649,7 +649,7 @@ name = "btcbridge-core"
 version = "0.29.0"
 dependencies = [
  "bitcoin",
- "hex 0.4.3",
+ "hex",
  "rand 0.8.5",
  "secp256k1 0.29.100",
  "serde",
@@ -1370,7 +1370,7 @@ name = "ethbridge-core"
 version = "0.29.0"
 dependencies = [
  "ethrelay-core",
- "hex 0.4.3",
+ "hex",
  "secp256k1 0.29.100",
  "serde",
  "serde_json",
@@ -1418,7 +1418,7 @@ name = "ethrelay-core"
 version = "0.29.0"
 dependencies = [
  "blst",
- "hex 0.4.3",
+ "hex",
  "serde",
  "serde_json",
  "sha2",
@@ -1594,6 +1594,7 @@ version = "0.29.0"
 dependencies = [
  "favor",
  "psibase",
+ "psio",
  "wit-bindgen-rt",
 ]
 
@@ -1663,21 +1664,6 @@ version = "0.29.0"
 dependencies = [
  "frac-tester",
  "psibase-user-workspace-hack",
-]
-
-[[package]]
-name = "fracpack"
-version = "0.29.0"
-dependencies = [
- "custom_error",
- "hex 0.3.2",
- "indexmap",
- "psibase-rust-workspace-hack",
- "psibase_macros",
- "psio",
- "serde",
- "serde-aux",
- "serde_json",
 ]
 
 [[package]]
@@ -2051,12 +2037,6 @@ name = "hermit-abi"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
-
-[[package]]
-name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 
 [[package]]
 name = "hex"
@@ -3242,7 +3222,6 @@ dependencies = [
  "dialoguer",
  "flate2",
  "form_urlencoded",
- "fracpack",
  "futures",
  "getrandom 0.2.16",
  "hmac",
@@ -3367,6 +3346,7 @@ dependencies = [
  "graphql_client",
  "psibase",
  "psibase-rust-workspace-hack",
+ "psio",
  "serde",
  "serde_json",
  "wit-bindgen 0.30.0",
@@ -4342,7 +4322,7 @@ name = "signing-core"
 version = "0.29.0"
 dependencies = [
  "bip32",
- "hex 0.4.3",
+ "hex",
  "k256",
 ]
 

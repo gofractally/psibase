@@ -1,4 +1,4 @@
-use crate::{Pack, ToSchema, Unpack};
+
 use async_graphql::SimpleObject;
 use serde::{Deserialize, Serialize};
 
@@ -9,9 +9,6 @@ use serde::{Deserialize, Serialize};
     Clone,
     Serialize,
     Deserialize,
-    Pack,
-    Unpack,
-    ToSchema,
     SimpleObject,
     psio::PsszPack,
     psio::PsszUnpack,
@@ -19,7 +16,6 @@ use serde::{Deserialize, Serialize};
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct ServerSpecs {
     /// Amount of bandwidth capacity per second per server
     pub net_bps: u64,
@@ -33,9 +29,6 @@ pub struct ServerSpecs {
     Clone,
     Serialize,
     Deserialize,
-    Pack,
-    Unpack,
-    ToSchema,
     SimpleObject,
     psio::PsszPack,
     psio::PsszUnpack,
@@ -43,7 +36,6 @@ pub struct ServerSpecs {
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct NetworkVariables {
     /// How much faster a node replays blocks compared to the live network
     pub block_replay_factor: u8,
@@ -62,9 +54,6 @@ pub struct NetworkVariables {
     Clone,
     Serialize,
     Deserialize,
-    Pack,
-    Unpack,
-    ToSchema,
     SimpleObject,
     psio::PsszPack,
     psio::PsszUnpack,
@@ -72,7 +61,6 @@ pub struct NetworkVariables {
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct BufferConfig {
     /// A threshold (specified in integer percentage values) at or below which the client should
     /// attempt to automatically refill the account's resource buffer. A threshold of 0 means

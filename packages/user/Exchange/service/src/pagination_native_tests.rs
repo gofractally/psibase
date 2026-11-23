@@ -1,7 +1,7 @@
 //! Exercise the real native indexes above the old global 100/1,000 limits.
 //! Rows are created through financial actions; fixture setup is not timed.
 use super::*;
-use psibase::fracpack::Pack;
+
 use std::collections::BTreeSet;
 
 fn batch(chain: &Chain, actions: Vec<Action>) -> Result<(), Error> {
@@ -17,7 +17,7 @@ fn batch(chain: &Chain, actions: Vec<Action>) -> Result<(), Error> {
         chain.fill_tapos(&mut transaction, 30);
         ChainEmptyResult {
             trace: chain.push(&SignedTransaction {
-                transaction: transaction.packed().into(),
+                transaction: psio::pssz::Nested::new(&transaction).unwrap(),
                 proofs: vec![],
                 subjectiveData: None,
             }),

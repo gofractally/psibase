@@ -1,12 +1,12 @@
 use crate::{
     services::{packages, transact},
-    AccountNumber, ActionFormatter, Schema, SchemaFetcher, SignedTransaction, TransactionTrace,
+    AccountNumber, ActionFormatter, SchemaFetcher, ServiceSchema, SignedTransaction, TransactionTrace,
 };
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use async_trait::async_trait;
 use custom_error::custom_error;
-use fracpack::{Pack, UnpackOwned};
+
 use indicatif::ProgressBar;
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -43,7 +43,7 @@ pub async fn as_json<T: DeserializeOwned>(
     Ok(serde_json::de::from_str(&as_text(builder).await?)?)
 }
 
-async fn as_json_or_fracpack<T: UnpackOwned + DeserializeOwned>(
+async fn as_json_or_pssz<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz> + DeserializeOwned>(
     builder: reqwest::RequestBuilder,
 ) -> Result<T, anyhow::Error> {
     let mut response = builder.send().await?;
@@ -60,7 +60,7 @@ async fn as_json_or_fracpack<T: UnpackOwned + DeserializeOwned>(
             if ty == "application/json" {
                 Ok(serde_json::de::from_str(&response.text().await?)?)
             } else if ty == "application/octet-stream" {
-                Ok(T::unpacked(response.bytes().await?.as_ref())?)
+                Ok(psio::from_pssz::<T>(response.bytes().await?.as_ref())?)
             } else {
                 Err(Error::WrongContentType {
                     ty: ty.to_str()?.to_string(),
@@ -129,6 +129,7 @@ impl TraceFormat {
             _ => {}
         }
         if let Some(e) = &trace.error {
+            let e = String::from_utf8_lossy(e.as_bytes());
             if !e.is_empty() {
                 let message = match self {
                     TraceFormat::Error => e.to_string(),
@@ -166,7 +167,7 @@ pub struct HttpSchemaFetcher<'a> {
 
 #[async_trait(?Send)]
 impl<'a> SchemaFetcher for HttpSchemaFetcher<'a> {
-    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<ServiceSchema, anyhow::Error> {
         as_json(
             self.client.get(
                 packages::SERVICE
@@ -206,7 +207,7 @@ async fn push_transaction_impl<'a, F: SchemaFetcher>(
         .map(|wait| format!("?wait_for={}", wait))
         .unwrap_or_default();
 
-    let trace: TransactionTrace = as_json_or_fracpack(
+    let trace: TransactionTrace = as_json_or_pssz(
         client
             .post(
                 transact::SERVICE
@@ -296,7 +297,7 @@ pub async fn push_transactions<'a, F: SchemaFetcher + 'a>(
             let result = push_transaction(
                 base_url,
                 client.clone(),
-                trx.packed(),
+                psio::to_pssz(&trx),
                 fmt,
                 console,
                 Some(progress),

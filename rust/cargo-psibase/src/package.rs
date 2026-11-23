@@ -3,7 +3,7 @@ use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
     AccountNumber, Checksum256, Meta, PackageExport, PackageInfo, PackageRef, PackagedService,
-    PrettyAction, Schema, ServiceInfo,
+    PrettyAction, ServiceInfo, ServiceSchema,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -395,7 +395,7 @@ impl<'a> PackageBuilder<'a> {
 
     fn finish(
         self,
-        service_wasms: Vec<(AccountNumber, Schema, PathBuf)>,
+        service_wasms: Vec<(AccountNumber, ServiceSchema, PathBuf)>,
         args: &Args,
         metadata: &MetadataIndex<'_>,
         root: &PackageId,
@@ -661,7 +661,7 @@ pub async fn build_packages(
     for ((builder, paths), root) in builders.into_iter().zip(paths).zip(roots) {
         let mut service_wasms = Vec::new();
         for paths in paths {
-            let schema: Schema =
+            let schema: ServiceSchema =
                 serde_json::from_str(&std::io::read_to_string(File::open(paths.schema)?)?)?;
             let service = schema.service.clone();
             service_wasms.push((service, schema, paths.service));

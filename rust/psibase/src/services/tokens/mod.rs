@@ -8,7 +8,7 @@ pub use quantity::Quantity;
 
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
-use fracpack::{Pack, ToSchema, Unpack};
+
 
 use serde::{Deserialize, Serialize};
 
@@ -26,9 +26,6 @@ pub type TID = u32;
     Debug,
     Copy,
     Clone,
-    Pack,
-    Unpack,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -39,7 +36,6 @@ pub type TID = u32;
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct TokenRecord {
     pub id: TID,
     pub nft_id: u32,
@@ -59,9 +55,6 @@ crate::define_flags!(TokenFlags, u8, {
     Debug,
     Copy,
     Clone,
-    Pack,
-    Unpack,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -72,7 +65,6 @@ crate::define_flags!(TokenFlags, u8, {
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct Holder {
     pub account: AccountNumber,
     pub flags: u8,
@@ -82,9 +74,6 @@ pub struct Holder {
     Debug,
     Copy,
     Clone,
-    Pack,
-    Unpack,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -95,7 +84,6 @@ pub struct Holder {
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct SharedBalance {
     /// The row's id (the primary key of the tokens service's table).
     pub shared_bal_id: u64,
@@ -109,9 +97,6 @@ pub struct SharedBalance {
     Debug,
     Copy,
     Clone,
-    Pack,
-    Unpack,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -122,7 +107,6 @@ pub struct SharedBalance {
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct Balance {
     pub account: AccountNumber,
     pub token_id: TID,
@@ -152,7 +136,7 @@ pub fn icon_path(token_id: TID) -> String {
 pub fn icon_hash(token_id: TID) -> Option<crate::Checksum256> {
     use crate::ServiceWrapper;
     crate::services::sites::Wrapper::call()
-        .getProps(Wrapper::SERVICE, icon_path(token_id))
+        .getProps(Wrapper::SERVICE, icon_path(token_id).into())
         .map(|props| props.contentHash)
 }
 

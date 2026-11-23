@@ -7,26 +7,23 @@ pub use psibase::image_content_type::{
 #[psibase::service_tables]
 pub mod tables {
     use psibase::AccountNumber;
-    use psibase::{Pack, ToSchema, Unpack};
+
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ProfileTable", index = 0)]
     #[derive(
         Default,
-        Pack,
-        Unpack,
-        ToSchema,
         async_graphql::SimpleObject,
         Serialize,
         Deserialize,
         Debug,
         Clone,
-    psio::PsszPack,
-    psio::PsszUnpack,
-    psio::PsszView,
-    psio::ToPsszSchema,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
         psio::JsonText,
-)]
+    )]
     pub struct Profile {
         #[primary_key]
         pub account: AccountNumber,
@@ -77,7 +74,7 @@ pub mod service {
 
         let caller = get_sender();
         Sites::call().storeSys(
-            format!("/avatar/{caller}"),
+            format!("/avatar/{caller}").into(),
             content_type.to_string(),
             None,
             Hex(image),
@@ -88,7 +85,7 @@ pub mod service {
     #[allow(non_snake_case)]
     fn removeAvatar() {
         let caller = get_sender();
-        Sites::call().remove(format!("/avatar/{caller}"));
+        Sites::call().remove(format!("/avatar/{caller}").into());
     }
 }
 

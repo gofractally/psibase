@@ -25,7 +25,7 @@ fn get_delegations(
     method: Option<ServiceMethod>,
 ) -> Vec<AccountNumber> {
     caller.call(
-        MethodNumber::from(auth_action_structs::getDlgsSys::ACTION_NAME),
+        MethodNumber::from(<auth_action_structs::getDlgsSys as psio::interface::Method>::NAME),
         auth_action_structs::getDlgsSys { sender, method },
     )
 }
@@ -37,7 +37,7 @@ fn is_auth_sys(
     method: Option<ServiceMethod>,
 ) -> bool {
     caller.call(
-        MethodNumber::from(auth_action_structs::isAuthSys::ACTION_NAME),
+        MethodNumber::from(<auth_action_structs::isAuthSys as psio::interface::Method>::NAME),
         auth_action_structs::isAuthSys {
             sender,
             authorizers,
@@ -53,7 +53,7 @@ fn is_reject_sys(
     method: Option<ServiceMethod>,
 ) -> bool {
     caller.call(
-        MethodNumber::from(auth_action_structs::isRejectSys::ACTION_NAME),
+        MethodNumber::from(<auth_action_structs::isRejectSys as psio::interface::Method>::NAME),
         auth_action_structs::isRejectSys {
             sender,
             rejecters,

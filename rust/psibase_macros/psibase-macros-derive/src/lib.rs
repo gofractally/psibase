@@ -3,7 +3,6 @@
 
 use authorized_macro::authorized_attr_impl;
 use component_name_macro::component_name_macro_impl;
-use fracpack_macro::fracpack_macro_impl;
 use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
 use number_macro::{account_macro_impl, method_macro_impl};
 use plugin_error_macro::plugin_error_derive_impl;
@@ -11,46 +10,19 @@ use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use psibase_macros_lib::service_macro::service_macro_impl;
 use psibase_macros_lib::service_tables_macro::service_tables_macro_impl;
-use schema_macro::schema_derive_macro;
 use test_case_macro::test_case_macro_impl;
-use to_key_macro::to_key_macro_impl;
-use view_macro::view_macro_impl;
 
 mod authorized_macro;
 mod component_name_macro;
-mod fracpack_macro;
 mod graphql_macro;
 mod number_macro;
 mod plugin_error_macro;
-mod schema_macro;
 mod test_case_macro;
-mod to_key_macro;
-mod view_macro;
 
 #[proc_macro_error]
 #[proc_macro]
 pub fn component_name(_item: TokenStream) -> TokenStream {
     component_name_macro_impl()
-}
-
-#[proc_macro_derive(Pack, attributes(fracpack))]
-pub fn derive_pack(input: TokenStream) -> TokenStream {
-    fracpack_macro_impl(input, true, false)
-}
-
-#[proc_macro_derive(Unpack, attributes(fracpack))]
-pub fn derive_unpack(input: TokenStream) -> TokenStream {
-    fracpack_macro_impl(input, false, true)
-}
-
-#[proc_macro_derive(View, attributes(fracpack))]
-pub fn derive_view(input: TokenStream) -> TokenStream {
-    view_macro_impl(input)
-}
-
-#[proc_macro_derive(ToKey, attributes(to_key))]
-pub fn derive_to_key(input: TokenStream) -> TokenStream {
-    to_key_macro_impl(input)
 }
 
 /// # psibase_plugin::ErrorEnum
@@ -122,11 +94,6 @@ pub fn derive_plugin_error(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn authorized(attr: TokenStream, item: TokenStream) -> TokenStream {
     authorized_attr_impl(attr, item)
-}
-
-#[proc_macro_derive(ToSchema, attributes(schema, fracpack))]
-pub fn to_schema(input: TokenStream) -> TokenStream {
-    schema_derive_macro(input)
 }
 
 /// Define a [psibase](https://psibase.io) service interface.

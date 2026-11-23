@@ -15,7 +15,7 @@ use exports::producers::plugin::authorized::Guest as Authorized;
 use producers::plugin::types::*;
 
 use psibase::account;
-use psibase::fracpack::Pack;
+
 use psibase::services;
 use serde::Deserialize;
 use services::producers::action_structs as Actions;
@@ -114,7 +114,7 @@ impl ProducersPlugin {
             consensus: consensus_data,
         };
 
-        add_action_to_transaction(Actions::setConsensus::ACTION_NAME, &set_consensus.packed())
+        add_action_to_transaction(<Actions::setConsensus as psio::interface::Method>::NAME, &psio::to_pssz(&set_consensus))
     }
 }
 
@@ -136,11 +136,10 @@ impl Api for ProducersPlugin {
     fn set_producers(prods: Vec<String>) -> Result<(), Error> {
         assert!(Client::get_sender() == "config");
         add_action_to_transaction(
-            Actions::setProducers::ACTION_NAME,
-            &Actions::setProducers {
+            <Actions::setProducers as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Actions::setProducers {
                 producers: Self::lookup_candidates(&prods)?,
-            }
-            .packed(),
+            }),
         )
     }
 
@@ -164,16 +163,16 @@ impl Api for ProducersPlugin {
         };
 
         add_action_to_transaction(
-            Actions::regCandidate::ACTION_NAME,
-            &Actions::regCandidate { endpoint, claim }.packed(),
+            <Actions::regCandidate as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Actions::regCandidate { endpoint, claim }),
         )
     }
 
     fn unregister_candidate() {
         assert!(Client::get_sender() == "config");
         add_action_to_transaction(
-            Actions::unregCand::ACTION_NAME,
-            &Actions::unregCand {}.packed(),
+            <Actions::unregCand as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Actions::unregCand {}),
         )
         .unwrap();
     }
@@ -181,8 +180,8 @@ impl Api for ProducersPlugin {
     fn set_max_prods(max_prods: u8) -> Result<(), Error> {
         assert!(Client::get_sender() == "config");
         add_action_to_transaction(
-            Actions::setMaxProds::ACTION_NAME,
-            &Actions::setMaxProds { maxProds: max_prods }.packed(),
+            <Actions::setMaxProds as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Actions::setMaxProds { maxProds: max_prods }),
         )
     }
 }

@@ -1088,21 +1088,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fracpack"
-version = "0.29.0"
-dependencies = [
- "custom_error",
- "hex 0.3.2",
- "indexmap",
- "psibase-rust-workspace-hack",
- "psibase_macros",
- "psio",
- "serde",
- "serde-aux",
- "serde_json",
-]
-
-[[package]]
 name = "fractal-core"
 version = "0.29.0"
 dependencies = [
@@ -1368,12 +1353,6 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
-
-[[package]]
-name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
@@ -1457,7 +1436,7 @@ dependencies = [
 name = "host-db"
 version = "0.29.0"
 dependencies = [
- "hex 0.4.3",
+ "hex",
  "hkdf",
  "hmac",
  "psibase",
@@ -2431,7 +2410,7 @@ dependencies = [
 name = "producers"
 version = "0.29.0"
 dependencies = [
- "hex 0.4.3",
+ "hex",
  "psibase",
  "psibase-plugin-workspace-hack",
  "psio",
@@ -2458,7 +2437,6 @@ dependencies = [
  "dialoguer",
  "flate2",
  "form_urlencoded",
- "fracpack",
  "futures",
  "getrandom 0.2.16",
  "hmac",
@@ -2587,6 +2565,7 @@ dependencies = [
  "graphql_client",
  "psibase",
  "psibase-rust-workspace-hack",
+ "psio",
  "serde",
  "serde_json",
  "wit-bindgen 0.30.0",

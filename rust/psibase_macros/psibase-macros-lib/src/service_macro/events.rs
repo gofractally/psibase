@@ -74,6 +74,8 @@ impl RawEventOptions {
 
 pub fn process_event_callers(
     psibase_mod: &proc_macro2::TokenStream,
+    psio_mod: &proc_macro2::TokenStream,
+    args_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     event_callers: &mut proc_macro2::TokenStream,
     invoke_args: &proc_macro2::TokenStream,
@@ -97,19 +99,23 @@ pub fn process_event_callers(
         .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.meta.path().is_ident("doc"))
         .fold(quote! {}, |a, b| quote! {#a #b});
 
+    // The data of an event is the PSSZ of its argument record.
     *event_callers = quote! {
         #event_callers
 
         #outer_doc
         pub fn #name(&self, #inputs) -> u64 {
             #inner_doc
-            <#psibase_mod::services::events::Wrapper as #psibase_mod::ServiceWrapper>::call().event(self.event_log, #method_number, #psibase_mod::fracpack::Pack::packed(&(#invoke_args)))
+            <#psibase_mod::services::events::Wrapper as #psibase_mod::ServiceWrapper>::call().event(self.event_log, #method_number, #psio_mod::to_pssz(&#args_mod::#name { #invoke_args }).into())
         }
     };
 }
 
+/// What an event's argument record is to psibase: its name and its
+/// database.
 pub fn process_event_name(
     psibase_mod: &proc_macro2::TokenStream,
+    db: &proc_macro2::TokenStream,
     f: &ItemFn,
     structs: &mut proc_macro2::TokenStream,
 ) {
@@ -124,12 +130,18 @@ pub fn process_event_name(
         impl #psibase_mod::NamedEvent for #name {
             fn name() -> #psibase_mod::MethodNumber { #method_number }
         }
+
+        impl #psibase_mod::GetEventDb for #name {
+            fn db() -> #psibase_mod::EventDb {
+                #psibase_mod::EventDb::#db
+            }
+        }
     }
 }
 
 pub fn process_event_schema(
     psibase_mod: &proc_macro2::TokenStream,
-    event_mod: &proc_macro2::TokenStream,
+    args_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     options: &EventOptions,
     insertions: &mut proc_macro2::TokenStream,
@@ -140,7 +152,7 @@ pub fn process_event_schema(
 
     *insertions = quote! {
         #insertions
-        events.insert(#psibase_mod::MethodString(#name_str.to_string()), #psibase_mod::EventType{ type_: builder.insert::<#event_mod::#name>(), access: #access.to_string() });
+        events.insert(#name_str.to_string(), #psibase_mod::event_type::<#args_mod::#name>(builder, #access));
     }
 }
 

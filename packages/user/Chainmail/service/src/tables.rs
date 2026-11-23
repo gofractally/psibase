@@ -1,11 +1,11 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Pack, TimePointSec, ToSchema, Unpack};
+    use psibase::{AccountNumber, TimePointSec};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct InitRow {}
 
     impl InitRow {
@@ -14,7 +14,7 @@ pub mod tables {
     }
 
     #[table(name = "SavedMessageTable", index = 1)]
-    #[derive(Debug, Serialize, Deserialize, ToSchema, Pack, Unpack, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct SavedMessage {
         #[primary_key]
         pub msg_id: u64,

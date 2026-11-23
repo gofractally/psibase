@@ -1,5 +1,5 @@
 use async_graphql::{InputObject, SimpleObject};
-use fracpack::{Pack, ToSchema, Unpack};
+
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
@@ -18,9 +18,6 @@ fn parse_u64_part(s: &str) -> Result<u64, TokensError> {
     Copy,
     Default,
     Clone,
-    Pack,
-    Unpack,
-    ToSchema,
     Serialize,
     Deserialize,
     SimpleObject,
@@ -36,7 +33,6 @@ fn parse_u64_part(s: &str) -> Result<u64, TokensError> {
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "QuantityInput")]
 pub struct Quantity {
     pub value: u64,

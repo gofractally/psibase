@@ -1,12 +1,11 @@
 use anyhow::anyhow;
 use async_graphql::{scalar, InputObject, SimpleObject};
-use fracpack::{Pack, ToSchema, Unpack};
+
 use pem::{encode, parse, Pem};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Debug, Clone, ToSchema, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 #[psio(transparent)]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct SubjectPublicKeyInfo(pub Vec<u8>);
 scalar!(SubjectPublicKeyInfo);
 
@@ -53,14 +52,18 @@ impl From<Vec<u8>> for SubjectPublicKeyInfo {
 }
 
 #[derive(
-    Debug, Clone, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, InputObject,
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    SimpleObject,
+    InputObject,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "AuthRecord")]
 /// A record containing the authorization claims needed for an account using this auth service.
 pub struct AuthRecord {

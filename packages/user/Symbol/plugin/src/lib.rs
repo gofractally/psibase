@@ -8,7 +8,7 @@ use bindings::host::types::types::Error;
 use bindings::transact::plugin::api::add_action_to_transaction;
 
 use psibase::define_trust;
-use psibase::fracpack::Pack;
+
 use psibase::services::tokens;
 
 use crate::errors::ErrorType;
@@ -63,11 +63,10 @@ impl Api for SymbolPlugin {
             }
         })?;
 
-        let packed_args = symbol::action_structs::create {
+        let packed_args = psio::to_pssz(&symbol::action_structs::create {
             symbol: symbol.parse().unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(symbol::action_structs::create::ACTION_NAME, &packed_args)
+        });
+        add_action_to_transaction(<symbol::action_structs::create as psio::interface::Method>::NAME, &packed_args)
     }
 
     fn map_symbol(token_id: u32, symbol: String) -> Result<(), Error> {
@@ -80,12 +79,11 @@ impl Api for SymbolPlugin {
             "symbol mapping".into(),
         )?;
 
-        let map_args = symbol::action_structs::mapSymbol {
+        let map_args = psio::to_pssz(&symbol::action_structs::mapSymbol {
             token_id,
             symbol: symbol.parse().unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(symbol::action_structs::mapSymbol::ACTION_NAME, &map_args)
+        });
+        add_action_to_transaction(<symbol::action_structs::mapSymbol as psio::interface::Method>::NAME, &map_args)
     }
 }
 
@@ -96,13 +94,12 @@ impl Admin for SymbolPlugin {
             vec!["config".to_string()],
         )?;
 
-        let packed_args = symbol::action_structs::admin_create {
+        let packed_args = psio::to_pssz(&symbol::action_structs::admin_create {
             symbol: symbol.parse().unwrap(),
             recipient: recipient.parse().unwrap(),
-        }
-        .packed();
+        });
         add_action_to_transaction(
-            symbol::action_structs::admin_create::ACTION_NAME,
+            <symbol::action_structs::admin_create as psio::interface::Method>::NAME,
             &packed_args,
         )
     }
@@ -118,16 +115,15 @@ impl Admin for SymbolPlugin {
             vec!["config".to_string()],
         )?;
 
-        let packed_args = symbol::action_structs::sellLength {
+        let packed_args = psio::to_pssz(&symbol::action_structs::sellLength {
             length,
             initial_price: initial_price.into(),
             target,
             floor_price: floor_price.into(),
-        }
-        .packed();
+        });
 
         add_action_to_transaction(
-            symbol::action_structs::sellLength::ACTION_NAME,
+            <symbol::action_structs::sellLength as psio::interface::Method>::NAME,
             &packed_args,
         )
     }
@@ -138,9 +134,9 @@ impl Admin for SymbolPlugin {
             vec!["config".to_string()],
         )?;
 
-        let packed_args = symbol::action_structs::delLength { length }.packed();
+        let packed_args = psio::to_pssz(&symbol::action_structs::delLength { length });
 
-        add_action_to_transaction(symbol::action_structs::delLength::ACTION_NAME, &packed_args)
+        add_action_to_transaction(<symbol::action_structs::delLength as psio::interface::Method>::NAME, &packed_args)
     }
 }
 

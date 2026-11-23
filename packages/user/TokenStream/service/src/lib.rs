@@ -2,14 +2,14 @@
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::tokens::{Decimal, Precision, Quantity, TID};
-    use psibase::{AccountNumber, Pack, ServiceWrapper, Table, TimePointSec, ToSchema, Unpack};
+    use psibase::{AccountNumber, ServiceWrapper, Table, TimePointSec};
     use serde::{Deserialize, Serialize};
 
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::transact::Wrapper as TransactSvc;
 
     #[table(name = "StreamTable", index = 0)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct Stream {
         #[primary_key]

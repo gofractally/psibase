@@ -24,8 +24,6 @@ use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 // Services
 use psibase::services::auth_sig::action_structs as MyService;
 
-use psibase::fracpack::Pack;
-
 use crate::errors::ErrorType;
 
 psibase::define_trust! {
@@ -131,11 +129,10 @@ impl Actions for AuthSig {
         )?;
 
         Transact::add_action_to_transaction(
-            MyService::setKey::ACTION_NAME,
-            &MyService::setKey {
+            <MyService::setKey as psio::interface::Method>::NAME,
+            &psio::to_pssz(&MyService::setKey {
                 key: AuthSig::to_der(public_key)?.into(),
-            }
-            .packed(),
+            }),
         )?;
 
         Ok(())
@@ -151,12 +148,11 @@ impl Actions for AuthSig {
         let key = HostCrypto::to_der(&keypair.public_key)?;
 
         Transact::add_action_to_transaction(
-            MyService::newAccount::ACTION_NAME,
-            &MyService::newAccount {
+            <MyService::newAccount as psio::interface::Method>::NAME,
+            &psio::to_pssz(&MyService::newAccount {
                 name,
                 key: key.into(),
-            }
-            .packed(),
+            }),
         )?;
 
         Ok(keypair.private_key)

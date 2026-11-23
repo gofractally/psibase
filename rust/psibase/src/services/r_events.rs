@@ -4,7 +4,7 @@ mod service {
     use crate::{AccountNumber, HttpRequest};
 
     #[action]
-    fn sqlQuery(query: String, params: Vec<String>) -> String {
+    fn sqlQuery(query: String, params: Vec<psio::pssz::RawString>) -> String {
         unimplemented!()
     }
 

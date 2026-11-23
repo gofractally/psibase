@@ -2,17 +2,17 @@
 //! and no second mutable trade ledger. These are aggregate taker, liquidation,
 //! and stop-batch executions; amounts determine each record's realized VWAP.
 //! Event order is commit order, not the auction's simulated marginal-price path.
-use psibase::fracpack::Unpack as _;
-use psibase::{AccountNumber, DbId, KvHandle, KvMode, MethodNumber, ServiceWrapper, ToKey};
+
+use psibase::{AccountNumber, DbId, KvHandle, KvMode, MethodNumber, ServiceWrapper};
 use serde_json::{json, Value};
 
 pub const MAX_PAGE: u32 = 100;
 
-#[derive(psibase::Pack, psibase::Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct IndexInfo {
     index_num: u8,
 }
-#[derive(psibase::Pack, psibase::Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct ReadyIndex {
     db: u8,
     service: AccountNumber,
@@ -29,10 +29,10 @@ pub(crate) fn indexed_ids(
 ) -> Result<Vec<u64>, String> {
     let service = psibase::account!("events+2");
     let event = MethodNumber::from(method);
-    let ready = KvHandle::open_direct(DbId::WriteOnly, &(service, 7_u16).to_key(), KvMode::Read);
-    let key = (0_u8, 0_u8, crate::SERVICE, event).to_key();
+    let ready = KvHandle::open_direct(DbId::WriteOnly, &psio::to_key(&(service, 7_u16)), KvMode::Read);
+    let key = psio::to_key(&(0_u8, 0_u8, crate::SERVICE, event));
     let row =
-        psibase::kv_get_bytes(&ready, &key).and_then(|bytes| ReadyIndex::unpacked(&bytes).ok());
+        psibase::kv_get_bytes(&ready, &key).and_then(|bytes| psio::from_pssz::<ReadyIndex>(&bytes).ok());
     let is_ready = row
         .map(|row| {
             row.db == 0
@@ -44,8 +44,8 @@ pub(crate) fn indexed_ids(
     if !is_ready {
         return Err("Native trade history index is synchronizing".into());
     }
-    let handle = KvHandle::open_direct(DbId::WriteOnly, &(service, 1_u16).to_key(), KvMode::Read);
-    let prefix = (0_u8, crate::SERVICE, event, 0_u8, market).to_key();
+    let handle = KvHandle::open_direct(DbId::WriteOnly, &psio::to_key(&(service, 1_u16)), KvMode::Read);
+    let prefix = psio::to_key(&(0_u8, crate::SERVICE, event, 0_u8, market));
     let mut cursor = prefix.clone();
     let mut found = if let Some(id) = before {
         cursor.extend_from_slice(&id.to_be_bytes());

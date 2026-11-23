@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub mod tables {
     use super::*;
     #[table(name = "SigningConfigTable", index = 0)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct SigningConfig {
         pub deployment: String,
         pub providers: Vec<AccountNumber>,
@@ -16,7 +16,7 @@ pub mod tables {
         fn pk(&self) {}
     }
     #[table(name = "KeyTable", index = 1)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Key {
         #[primary_key]
         pub id: u32,
@@ -33,7 +33,7 @@ pub mod tables {
         }
     }
     #[table(name = "HashRequestTable", index = 2)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct HashRequest {
         #[primary_key]
         pub id: u64,
@@ -53,7 +53,7 @@ pub mod tables {
         }
     }
     #[table(name = "PendingKeyTable", index = 3)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct PendingKey {
         #[primary_key]
         pub id: u32,

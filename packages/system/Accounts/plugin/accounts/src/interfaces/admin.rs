@@ -8,7 +8,7 @@ use crate::bindings::exports::accounts::plugin::admin::{Error, Guest as Admin};
 use crate::bindings::host::accounts::admin as HostAccountsAdmin;
 use crate::bindings::transact::plugin::api as Transact;
 use crate::trust::*;
-use psibase::fracpack::Pack;
+
 use psibase::services::accounts as Accounts;
 use psibase::AccountNumber;
 use std::collections::HashSet;
@@ -95,11 +95,10 @@ impl Admin for AccountsPlugin {
             .unwrap();
 
         Transact::add_action_to_transaction(
-            Accounts::action_structs::preapproveAcc::ACTION_NAME,
-            &Accounts::action_structs::preapproveAcc {
+            <Accounts::action_structs::preapproveAcc as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Accounts::action_structs::preapproveAcc {
                 name: account.parse().unwrap(),
-            }
-            .packed(),
+            }),
         )
         .unwrap();
     }
@@ -108,8 +107,8 @@ impl Admin for AccountsPlugin {
         assert_authorized_with_whitelist(FunctionName::freeze, vec!["config".into()])?;
         let accounts = parse_accounts(accounts)?;
         Transact::add_action_to_transaction(
-            Accounts::action_structs::freeze::ACTION_NAME,
-            &Accounts::action_structs::freeze { accounts, memo }.packed(),
+            <Accounts::action_structs::freeze as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Accounts::action_structs::freeze { accounts, memo }),
         )?;
         Ok(())
     }
@@ -118,8 +117,8 @@ impl Admin for AccountsPlugin {
         assert_authorized_with_whitelist(FunctionName::unfreeze, vec!["config".into()])?;
         let accounts = parse_accounts(accounts)?;
         Transact::add_action_to_transaction(
-            Accounts::action_structs::unfreeze::ACTION_NAME,
-            &Accounts::action_structs::unfreeze { accounts, memo }.packed(),
+            <Accounts::action_structs::unfreeze as psio::interface::Method>::NAME,
+            &psio::to_pssz(&Accounts::action_structs::unfreeze { accounts, memo }),
         )?;
         Ok(())
     }

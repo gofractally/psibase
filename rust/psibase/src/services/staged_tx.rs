@@ -1,17 +1,14 @@
 #[crate::service(name = "staged-tx", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod service {
-    use crate::{AccountNumber, Action, Checksum256, Pack, TimePointUSec, Unpack};
+    use crate::{AccountNumber, Action, Checksum256, TimePointUSec};
     use async_graphql::SimpleObject;
-    use fracpack::ToSchema;
+
     use serde::{Deserialize, Serialize};
 
     #[derive(
-        Pack,
-        Unpack,
         Serialize,
         Deserialize,
-        ToSchema,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
@@ -19,17 +16,13 @@ pub mod service {
         psio::ToPsszSchema,
         psio::JsonText,
     )]
-    #[fracpack(fracpack_mod = "fracpack")]
     pub struct ActionList {
         pub actions: Vec<Action>,
     }
 
     #[derive(
-        Pack,
-        Unpack,
         Serialize,
         Deserialize,
-        ToSchema,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
@@ -37,7 +30,6 @@ pub mod service {
         psio::ToPsszSchema,
         psio::JsonText,
     )]
-    #[fracpack(fracpack_mod = "fracpack")]
     pub struct StagedTx {
         pub id: u32,
         pub txid: Checksum256,
@@ -52,11 +44,8 @@ pub mod service {
     /// `ResponseTable`.
     #[derive(
         Debug,
-        Pack,
-        Unpack,
         Serialize,
         Deserialize,
-        ToSchema,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
@@ -64,7 +53,6 @@ pub mod service {
         psio::ToPsszSchema,
         psio::JsonText,
     )]
-    #[fracpack(fracpack_mod = "fracpack")]
     pub struct Response {
         /// The ID of the staged transaction
         pub id: u32,

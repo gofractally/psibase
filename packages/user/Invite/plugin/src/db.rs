@@ -4,7 +4,7 @@ use psibase_plugin::host::store::*;
 
 use crate::bindings::base64::plugin as base64;
 use crate::types::CurrentDetailsResponse;
-use psibase::fracpack::Unpack;
+
 
 pub struct InviteTokensTable {}
 impl InviteTokensTable {
@@ -56,7 +56,7 @@ impl InviteTokensTable {
 
     fn get_current_details(invite_id: u32) -> Option<CurrentDetailsResponse> {
         if let Some(cached) = Self::current_details().get(&invite_id.to_string()) {
-            return Some(<CurrentDetailsResponse>::unpacked(&cached).unwrap());
+            return Some(psio::from_pssz::<CurrentDetailsResponse>(&cached).unwrap());
         }
 
         let query = format!(
@@ -74,13 +74,13 @@ impl InviteTokensTable {
         }
 
         let current_details = current_details.unwrap();
-        Self::current_details().set(&invite_id.to_string(), &current_details.packed());
+        Self::current_details().set(&invite_id.to_string(), &psio::to_pssz(&current_details));
         Some(current_details)
     }
 
     fn get_fixed_details(invite_id: u32, sym_key: Vec<u8>) -> Option<FixedDetails> {
         if let Some(cached) = Self::fixed_details().get(&invite_id.to_string()) {
-            return Some(<FixedDetails>::unpacked(&cached).unwrap());
+            return Some(psio::from_pssz::<FixedDetails>(&cached).unwrap());
         }
 
         let query = format!(
@@ -117,7 +117,7 @@ impl InviteTokensTable {
             expiry_date: response.expiryDate,
             private_key: String::from_utf8(cred_key).unwrap(),
         };
-        Self::fixed_details().set(&invite_id.to_string(), &fixed_details.packed());
+        Self::fixed_details().set(&invite_id.to_string(), &psio::to_pssz(&fixed_details));
         Some(fixed_details)
     }
 
@@ -127,7 +127,7 @@ impl InviteTokensTable {
 
     fn is_valid(invite_id: u32, sym_key: &Vec<u8>) -> bool {
         if let Some(invite_local) = Self::device_history().get(&invite_id.to_string()) {
-            let invite_local = <DeviceDetails>::unpacked(&invite_local).unwrap();
+            let invite_local = psio::from_pssz::<DeviceDetails>(&invite_local).unwrap();
             if invite_local.accepted || invite_local.rejected {
                 // Already accepted or rejected
                 return false;
@@ -198,7 +198,7 @@ impl InviteTokensTable {
         let invite_id = invite_id.unwrap();
 
         if let Some(device) = Self::device_history().get(&invite_id.to_string()) {
-            let device = <DeviceDetails>::unpacked(&device).unwrap();
+            let device = psio::from_pssz::<DeviceDetails>(&device).unwrap();
             if device.account_created {
                 return false;
             }
@@ -215,20 +215,20 @@ impl InviteTokensTable {
         let invite_id = Self::active_invite_id().expect("No active invite token");
         let mut device = Self::device_history()
             .get(&invite_id.to_string())
-            .map(|d| <DeviceDetails>::unpacked(&d).unwrap())
+            .map(|d| psio::from_pssz::<DeviceDetails>(&d).unwrap())
             .unwrap_or_default();
         device.account_created = true;
-        Self::device_history().set(&invite_id.to_string(), &device.packed());
+        Self::device_history().set(&invite_id.to_string(), &psio::to_pssz(&device));
     }
 
     pub fn accepted() {
         let invite_id = Self::active_invite_id().expect("No active invite token");
         let mut device = Self::device_history()
             .get(&invite_id.to_string())
-            .map(|d| <DeviceDetails>::unpacked(&d).unwrap())
+            .map(|d| psio::from_pssz::<DeviceDetails>(&d).unwrap())
             .unwrap_or_default();
         device.accepted = true;
-        Self::device_history().set(&invite_id.to_string(), &device.packed());
+        Self::device_history().set(&invite_id.to_string(), &psio::to_pssz(&device));
     }
 
     pub fn active_credential_key() -> Option<String> {
@@ -251,9 +251,9 @@ impl InviteTokensTable {
 
         let mut device = Self::device_history()
             .get(&invite_id.to_string())
-            .map(|d| <DeviceDetails>::unpacked(&d).unwrap())
+            .map(|d| psio::from_pssz::<DeviceDetails>(&d).unwrap())
             .unwrap_or_default();
         device.rejected = true;
-        Self::device_history().set(&invite_id.to_string(), &device.packed());
+        Self::device_history().set(&invite_id.to_string(), &psio::to_pssz(&device));
     }
 }

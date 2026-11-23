@@ -1,6 +1,6 @@
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::fracpack::{Pack, Unpack};
+
     use psibase::services::{
         nft::Wrapper as Nft,
         tokens::{BalanceFlags, Wrapper as Tokens},
@@ -10,7 +10,7 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -34,7 +34,7 @@ pub mod tables {
     }
 
     #[table(name = "CredentialIdTable", index = 1)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct CredentialId {
         pub id: u32,
     }
@@ -56,7 +56,7 @@ pub mod tables {
     }
 
     #[table(name = "CredentialTable", index = 2)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Credential {
         pub id: u32,
         pub pubkey_fingerprint: Checksum256,

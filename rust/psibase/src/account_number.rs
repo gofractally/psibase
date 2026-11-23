@@ -1,4 +1,4 @@
-use crate::{serialize_as_str, Pack, ToKey, ToSchema, Unpack};
+use crate::{serialize_as_str};
 use custom_error::custom_error;
 use psibase_names::{account_number_from_str, account_number_to_string};
 pub use psibase_names::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
@@ -30,22 +30,12 @@ custom_error! { pub AccountNumberError
     Copy,
     Clone,
     Hash,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::Key,
 )]
-#[fracpack(
-    definition_will_not_change,
-    fracpack_mod = "fracpack",
-    custom = "AccountNumber"
-)]
-#[to_key(psibase_mod = "crate")]
 #[psio(definition_will_not_change, custom = "AccountNumber")]
 pub struct AccountNumber {
     pub value: u64,
@@ -142,14 +132,8 @@ impl std::fmt::Display for AccountNumber {
 }
 
 /// Like AccountNumber, except FromStr and deserializing JSON require exact round-trip conversion
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Pack, Unpack, ToKey, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key)]
+#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key)]
 #[psio(definition_will_not_change)]
-#[fracpack(
-    definition_will_not_change,
-    fracpack_mod = "fracpack",
-    custom = "AccountNumber"
-)]
-#[to_key(psibase_mod = "crate")]
 pub struct ExactAccountNumber {
     pub value: u64,
 }

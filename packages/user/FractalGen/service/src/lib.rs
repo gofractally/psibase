@@ -3,11 +3,11 @@
 
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::{Pack, Table, ToSchema, Unpack};
+    use psibase::{Table};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct ConfigRow {}
     impl ConfigRow {
         #[primary_key]

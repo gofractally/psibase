@@ -4,7 +4,7 @@ mod bindings;
 use bindings::exports::btcbridge::plugin::api::Guest;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
-use psibase::fracpack::Pack;
+
 use serde::Deserialize;
 use serde_json::Value;
 psibase::define_trust! {
@@ -104,7 +104,7 @@ impl Guest for Plugin {
                 return Err(error("Unsupported service"));
             }
             macro_rules! pack { ($($name:ident),* $(,)?) => { match a.method.as_str() {
-                $(stringify!($name) => serde_json::from_value::<btcbridge::action_structs::$name>(a.data).map_err(error)?.packed(),)*
+                $(stringify!($name) => psio::to_pssz(&serde_json::from_value::<btcbridge::action_structs::$name>(a.data).map_err(error)?),)*
                 _ => return Err(error("Unsupported bridge action")),
             } }; }
             let packed = pack!(

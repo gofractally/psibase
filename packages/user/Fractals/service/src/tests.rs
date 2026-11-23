@@ -120,7 +120,7 @@ mod chain {
     const FRACTAL: AccountNumber = account!("testfrac");
 
     fn assert_error(result: ChainEmptyResult, message: &str) {
-        let err = result.trace.error.unwrap();
+        let err = result.trace.error_text().unwrap();
         assert!(
             err.contains(message),
             "Error \"{err}\" does not contain: \"{message}\"",

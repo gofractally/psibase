@@ -74,9 +74,9 @@ mod tests {
 
         let psio = service_macro_impl(quote! {}, before, &method_number).to_string();
         assert!(psio.contains("psibase :: psio :: interface"), "{psio}");
-        assert!(psio.contains("pub trait PsioActions"), "{psio}");
+        assert!(psio.contains("pub trait PsioActions__"), "{psio}");
         assert!(psio.contains("fn add (a : i32 , b : i32) -> i32 ;"), "{psio}");
-        assert!(psio.contains("module = \"psio_actions\""), "{psio}");
+        assert!(psio.contains("module = \"psio_actions__"), "{psio}");
     }
 
     #[test]

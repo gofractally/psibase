@@ -2,7 +2,6 @@ use p256::ecdsa::{Signature, SigningKey, signature::hazmat::PrehashSigner};
 use p256::pkcs8::DecodePrivateKey;
 use psibase::{
     account,
-    fracpack::Pack,
     services::{
         auth_sig::SubjectPublicKeyInfo,
         credentials,
@@ -464,7 +463,7 @@ fn settlement_exhausts_resource_buffer(chain: psibase::Chain) -> Result<(), psib
     // exactly its balance using the trusted CPU-usage notification, while the
     // funded producer pays the transaction's ordinary CPU/network/disk costs.
     // This avoids depending on a measured execution time to hit zero exactly.
-    let buffer_key = (Tokens::SERVICE, 8u16, 0u8, Wrapper::SERVICE, alice.to_string()).to_key();
+    let buffer_key = psio::to_key(&(Tokens::SERVICE, 8u16, 0u8, Wrapper::SERVICE, alice.to_string()));
     for _ in 0..2 {
         let cost = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .get_cpu_cost(1)
@@ -504,7 +503,7 @@ fn disk_consumed(chain: &psibase::Chain) -> u64 {
 }
 
 fn status_row_bytes(chain: &psibase::Chain) -> u64 {
-    let key = status_key().to_key();
+    let key = psio::to_key(&status_key());
     chain
         .kv_get_bytes(DbId::Native, &key)
         .map(|value| key.len() as u64 + value.len() as u64)
@@ -636,11 +635,10 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
         .into_contents();
 
     let fingerprint = psibase::sha256(&inv_pubkey_der);
-    let payload = InvPayload {
+    let payload = psio::to_pssz(&InvPayload {
         fingerprint: fingerprint.to_vec(),
         secret: "".to_string(),
-    }
-    .packed();
+    });
 
     invite::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
         .createInvite(invite_id, payload, 1, false, min_cost.into())
@@ -658,11 +656,10 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
             sender: credentials::CREDENTIAL_SENDER,
             service: invite,
             method: MethodNumber::new(method_raw!("createAccount")),
-            rawData: (
+            rawData: psio::to_pssz(&(
                 account!("alicealice"),
                 SubjectPublicKeyInfo(new_pub_key_der),
-            )
-                .packed()
+            ))
                 .into(),
         }],
         claims: vec![Claim {
@@ -671,20 +668,20 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
         }],
     };
     chain.fill_tapos(&mut trx, 2);
-    let tx_packed = trx.packed();
+    let tx_packed = psio::to_pssz(&trx);
     let signing_key =
         SigningKey::from_pkcs8_pem(&private_key).map_err(|e| psibase::Error::new(e))?;
     let signature: Signature = signing_key
         .sign_prehash(&psibase::sha256(&tx_packed).0)
         .map_err(|e| psibase::Error::new(e))?;
     let strx = SignedTransaction {
-        transaction: tx_packed.into(),
+        transaction: psio::pssz::Nested::unchecked(tx_packed),
         proofs: vec![signature.to_bytes().to_vec().into()],
         subjectiveData: None,
     };
     let trace = chain.push(&strx);
     if trace.error.is_some() {
-        println!("{}", trace.error.unwrap());
+        println!("{}", trace.error_text().unwrap());
         assert!(false, "Invite create acc fail");
     }
 
@@ -695,8 +692,8 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     );
 
     // Verify that the resource balance of cred_sys is untouched
-    use psibase::fracpack::Unpack;
-    let cred_resources = Quantity::unpacked(
+
+    let cred_resources = psio::from_pssz::<Quantity>(
         &chain
             .run_action(
                 RunMode::RPC,

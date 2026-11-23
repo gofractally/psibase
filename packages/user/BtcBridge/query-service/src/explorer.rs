@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 fn foreign<R: TableRecord, T: Table<R>>() -> T {
     T::from_handle(KvHandle::open_direct(
         R::DB,
-        &(T::SERVICE, T::TABLE_INDEX).to_key(),
+        &psio::to_key(&(T::SERVICE, T::TABLE_INDEX)),
         KvMode::Read,
     ))
 }

@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{AccountNumber, Hex, Pack, ToKey, ToSchema, Unpack};
+use crate::{AccountNumber, Hex};
 use anyhow::anyhow;
 use percent_encoding::percent_decode;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -17,10 +17,6 @@ use std::collections::HashMap;
     PartialEq,
     Eq,
     Clone,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
     Serialize,
     Deserialize,
     psio::PsszPack,
@@ -30,22 +26,20 @@ use std::collections::HashMap;
     psio::Key,
     psio::JsonText,
 )]
-#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 #[psio(definition_will_not_change)]
 pub struct HttpHeader {
     /// Name of header, e.g. "Content-Security-Policy"
     pub name: String,
 
     /// Value of header
-    pub value: String,
+    pub value: psio::pssz::RawString,
 }
 
 impl HttpHeader {
     pub fn new(name: &str, value: &str) -> Self {
         HttpHeader {
             name: name.to_string(),
-            value: value.to_string(),
+            value: value.into(),
         }
     }
     pub fn matches(&self, name: &str) -> bool {
@@ -77,15 +71,19 @@ pub enum HttpStatus {
 /// action. The `http-server` service receives it via its `serve` exported function.
 
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    Serialize,
+    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 pub struct HttpRequest {
     /// Fully-qualified domain name
     pub host: String,
@@ -94,7 +92,7 @@ pub struct HttpRequest {
     pub method: String,
 
     /// Absolute path, e.g. "/index.js"
-    pub target: String,
+    pub target: psio::pssz::RawString,
 
     /// "application/json", "text/html", ...
     pub contentType: String,
@@ -108,14 +106,13 @@ pub struct HttpRequest {
 
 impl HttpRequest {
     pub fn path<'a>(&'a self) -> Cow<'a, str> {
-        let encoded = self
-            .target
-            .split_once('?')
-            .map_or(self.target.as_str(), |s| s.0);
+        let target = self.target.to_str().unwrap_or_default();
+        let encoded = target.split_once('?').map_or(target, |s| s.0);
         return percent_decode(encoded.as_bytes()).decode_utf8_lossy();
     }
     pub fn query(&self) -> HashMap<String, String> {
-        let encoded = self.target.split_once('?').map_or("", |s| s.1);
+        let target = self.target.to_str().unwrap_or_default();
+        let encoded = target.split_once('?').map_or("", |s| s.1);
         return form_urlencoded::parse(encoded.as_bytes())
             .into_owned()
             .collect();
@@ -124,7 +121,7 @@ impl HttpRequest {
         self.headers
             .iter()
             .find(|h| h.matches(name))
-            .map(|h| h.value.as_str())
+            .and_then(|h| h.value.to_str().ok())
     }
 }
 
@@ -152,15 +149,19 @@ impl HttpBody {
 ///
 /// Services return this from their [serveSys](crate::server_interface::ServerActions::serveSys) action.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, ToSchema, ToKey, Serialize, Deserialize,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    Serialize,
+    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
 pub struct HttpReply {
     pub status: u16,
 

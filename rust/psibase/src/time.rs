@@ -5,8 +5,6 @@
 //! `Seconds` / `MicroSeconds` name the *durations* here; PSIO's units of the
 //! same meaning are `psio::time::Seconds` / `psio::time::Micros`.
 
-use crate::ToKey;
-
 /// Seconds since the Unix epoch.
 pub type TimePointSec = psio::time::TimePoint<psio::time::Seconds>;
 /// Microseconds since the Unix epoch.
@@ -16,41 +14,28 @@ pub type Seconds = psio::time::Duration<psio::time::Seconds>;
 /// A number of microseconds.
 pub type MicroSeconds = psio::time::Duration<psio::time::Micros>;
 
-// The key of the tick count, as the structs these values replaced had
-// (`{ seconds: i64 }`, `{ microseconds: i64 }`, `{ value: i64 }`).
-impl<U: psio::time::Unit> ToKey for psio::time::TimePoint<U> {
-    fn append_key(&self, key: &mut Vec<u8>) {
-        self.ticks().append_key(key)
-    }
-}
-
-impl<U: psio::time::Unit> ToKey for psio::time::Duration<U> {
-    fn append_key(&self, key: &mut Vec<u8>) {
-        self.ticks().append_key(key)
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fracpack::{Pack, Unpack};
+
 
     #[test]
-    fn legacy_bytes_and_keys_are_the_tick_count() {
+    fn bytes_and_keys_are_the_tick_count() {
         let t = TimePointSec::from_ticks(1795342530);
-        assert_eq!(t.packed(), 1795342530i64.to_le_bytes());
-        assert_eq!(TimePointSec::unpacked(&t.packed()).unwrap(), t);
-        assert_eq!(t.to_key(), 1795342530i64.to_key());
-        assert_eq!(t.to_key(), [0x80, 0, 0, 0, 0x6b, 0x02, 0xc0, 0xc2]);
+        assert_eq!(psio::to_pssz(&t), 1795342530i64.to_le_bytes());
+        assert_eq!(psio::from_pssz::<TimePointSec>(&psio::to_pssz(&t)).unwrap(), t);
+        assert_eq!(psio::to_key(&t), psio::to_key(&1795342530i64));
+        assert_eq!(psio::to_key(&t), [0x80, 0, 0, 0, 0x6b, 0x02, 0xc0, 0xc2]);
         let t = TimePointUSec::from_ticks(-1);
-        assert_eq!(t.packed(), (-1i64).to_le_bytes());
-        assert_eq!(t.to_key(), [0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-        assert_eq!(Seconds::from_ticks(5).packed(), 5i64.to_le_bytes());
-        assert_eq!(Seconds::from_ticks(5).to_key(), 5i64.to_key());
-        assert_eq!(MicroSeconds::from_ticks(5).packed(), 5i64.to_le_bytes());
-        assert_eq!(MicroSeconds::from_ticks(5).to_key(), 5i64.to_key());
+        assert_eq!(psio::to_pssz(&t), (-1i64).to_le_bytes());
+        assert_eq!(psio::to_key(&t), [0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+        assert_eq!(psio::to_pssz(&Seconds::from_ticks(5)), 5i64.to_le_bytes());
+        assert_eq!(psio::to_key(&Seconds::from_ticks(5)), psio::to_key(&5i64));
+        assert_eq!(psio::to_pssz(&MicroSeconds::from_ticks(5)), 5i64.to_le_bytes());
+        assert_eq!(psio::to_key(&MicroSeconds::from_ticks(5)), psio::to_key(&5i64));
         assert_eq!(
-            Some(t).to_key(),
+            psio::to_key(&Some(t)),
             [1, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
         );
     }

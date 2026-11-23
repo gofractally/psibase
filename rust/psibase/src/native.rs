@@ -7,9 +7,11 @@
 //!
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
-use crate::{native_raw, DbId, HttpRequest, MicroSeconds, SocketEndpoint, TLSInfo, ToKey};
+use crate::{native_raw, DbId, HttpRequest, MicroSeconds, SocketEndpoint, TLSInfo};
+use psio::key::KeyPack;
+use psio::pssz::{PsszPack, PsszResult, PsszUnpack};
+use psio::Pssz;
 use anyhow::anyhow;
-use fracpack::{Pack, Unpack, UnpackOwned};
 
 /// Write message to console
 ///
@@ -103,7 +105,7 @@ pub fn get_current_action_bytes() -> Vec<u8> {
 /// Note: The above only applies if the contract uses [crate::native_raw::call].
 pub fn get_current_action() -> crate::Action {
     let bytes = get_current_action_bytes();
-    <crate::Action>::unpacked(&bytes[..]).unwrap() // unwrap won't panic
+    psio::from_pssz::<crate::Action>(&bytes[..]).unwrap() // unwrap won't panic
 }
 
 /// Get the currently-executing action and pass it to `f`.
@@ -117,15 +119,15 @@ pub fn get_current_action() -> crate::Action {
 ///    * After B returns, [get_current_action] returns A.
 ///
 /// Note: The above only applies if the contract uses [crate::native_raw::call].
-pub fn with_current_action<R, F: Fn(crate::SharedAction) -> R>(f: F) -> R {
+pub fn with_current_action<R, F: Fn(psio::PsszView<'_, crate::Action>) -> R>(f: F) -> R {
     let bytes = get_current_action_bytes();
-    let act = <crate::SharedAction>::unpacked(&bytes[..]).unwrap(); // unwrap won't panic
+    let act = psio::PsszView::<crate::Action>::new(&bytes[..]).unwrap(); // unwrap won't panic
     f(act)
 }
 
 /// Set the currently-executing action's return value
-pub fn set_retval<T: Pack>(val: &T) {
-    let bytes = val.packed();
+pub fn set_retval<T: PsszPack<Pssz>>(val: &T) {
+    let bytes = psio::to_pssz(val);
     unsafe { native_raw::setRetval(bytes.as_ptr(), bytes.len() as u32) };
 }
 
@@ -177,7 +179,7 @@ impl KvHandle {
         })
     }
     pub unsafe fn import_raw(index: u32) -> native_raw::KvHandle {
-        let handles = Vec::<u32>::unpacked(&get_result_bytes(native_raw::importHandles())).unwrap();
+        let handles = psio::from_pssz::<Vec<u32>>(&get_result_bytes(native_raw::importHandles())).unwrap();
         native_raw::KvHandle(handles[index as usize])
     }
     pub fn import(index: u32) -> KvHandle {
@@ -209,8 +211,8 @@ pub fn kv_put_bytes(db: &KvHandle, key: &[u8], value: &[u8]) {
 /// Set a key-value pair
 ///
 /// If key already exists, then replace the existing value.
-pub fn kv_put<K: ToKey, V: Pack>(db: &KvHandle, key: &K, value: &V) {
-    kv_put_bytes(db, &key.to_key(), &value.packed())
+pub fn kv_put<K: KeyPack, V: PsszPack<Pssz>>(db: &KvHandle, key: &K, value: &V) {
+    kv_put_bytes(db, &psio::to_key(key), &psio::to_pssz(value))
 }
 
 /// Remove a key-value pair if it exists
@@ -219,8 +221,8 @@ pub fn kv_remove_bytes(db: &KvHandle, key: &[u8]) {
 }
 
 /// Remove a key-value pair if it exists
-pub fn kv_remove<K: ToKey>(db: &KvHandle, key: &K) {
-    kv_remove_bytes(db, &key.to_key())
+pub fn kv_remove<K: KeyPack>(db: &KvHandle, key: &K) {
+    kv_remove_bytes(db, &psio::to_key(key))
 }
 
 /// Get a key-value pair, if any
@@ -230,12 +232,12 @@ pub fn kv_get_bytes(db: &KvHandle, key: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// Get a key-value pair, if any
-pub fn kv_get<V: UnpackOwned, K: ToKey>(
+pub fn kv_get<V: PsszPack<Pssz> + PsszUnpack<Pssz>, K: KeyPack>(
     db: &KvHandle,
     key: &K,
-) -> Result<Option<V>, fracpack::Error> {
-    if let Some(v) = kv_get_bytes(db, &key.to_key()) {
-        Ok(Some(V::unpacked(&v)?))
+) -> PsszResult<Option<V>> {
+    if let Some(v) = kv_get_bytes(db, &psio::to_key(key)) {
+        Ok(Some(psio::from_pssz::<V>(&v)?))
     } else {
         Ok(None)
     }
@@ -268,13 +270,13 @@ pub fn kv_greater_equal_value_size(db: &KvHandle, key: &[u8], match_key_size: u3
 /// If one is found, and the first `match_key_size` bytes of the found key
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
-pub fn kv_greater_equal<K: ToKey, V: UnpackOwned>(
+pub fn kv_greater_equal<K: KeyPack, V: PsszPack<Pssz> + PsszUnpack<Pssz>>(
     db: &KvHandle,
     key: &K,
     match_key_size: u32,
 ) -> Option<V> {
-    let bytes = kv_greater_equal_bytes(db, &key.to_key(), match_key_size);
-    bytes.map(|v| V::unpacked(&v[..]).unwrap())
+    let bytes = kv_greater_equal_bytes(db, &psio::to_key(key), match_key_size);
+    bytes.map(|v| psio::from_pssz::<V>(&v[..]).unwrap())
 }
 
 /// Get the key-value pair immediately-before provided key
@@ -293,13 +295,13 @@ pub fn kv_less_than_bytes(db: &KvHandle, key: &[u8], match_key_size: u32) -> Opt
 /// If one is found, and the first `match_key_size` bytes of the found key
 /// matches the provided key, then returns the value. Use [get_key_bytes] to get
 /// the found key.
-pub fn kv_less_than<K: ToKey, V: UnpackOwned>(
+pub fn kv_less_than<K: KeyPack, V: PsszPack<Pssz> + PsszUnpack<Pssz>>(
     db: &KvHandle,
     key: &K,
     match_key_size: u32,
 ) -> Option<V> {
-    let bytes = kv_less_than_bytes(db, &key.to_key(), match_key_size);
-    bytes.map(|v| V::unpacked(&v[..]).unwrap())
+    let bytes = kv_less_than_bytes(db, &psio::to_key(key), match_key_size);
+    bytes.map(|v| psio::from_pssz::<V>(&v[..]).unwrap())
 }
 
 /// Get the maximum key-value pair which has key as a prefix
@@ -313,9 +315,9 @@ pub fn kv_max_bytes(db: &KvHandle, key: &[u8]) -> Option<Vec<u8>> {
 /// Get the maximum key-value pair which has key as a prefix
 ///
 /// If one is found, then returns the value. Use [get_key_bytes] to get the found key.
-pub fn kv_max<K: ToKey, V: UnpackOwned>(db: &KvHandle, key: &K) -> Option<V> {
-    let bytes = kv_max_bytes(db, &key.to_key());
-    bytes.map(|v| V::unpacked(&v[..]).unwrap())
+pub fn kv_max<K: KeyPack, V: PsszPack<Pssz> + PsszUnpack<Pssz>>(db: &KvHandle, key: &K) -> Option<V> {
+    let bytes = kv_max_bytes(db, &psio::to_key(key));
+    bytes.map(|v| psio::from_pssz::<V>(&v[..]).unwrap())
 }
 
 /// Sets the CPU timer to expire after the current transaction/query/callback
@@ -402,7 +404,7 @@ pub fn socket_open(
     tls: Option<TLSInfo>,
     endpoint: Option<SocketEndpoint>,
 ) -> Result<i32, anyhow::Error> {
-    let packed = (req, tls, endpoint).packed();
+    let packed = psio::to_pssz(&(req, tls, endpoint));
     let sock = unsafe { native_raw::socketOpen(packed.as_ptr(), packed.len()) };
     if sock >= 0 {
         Ok(sock)

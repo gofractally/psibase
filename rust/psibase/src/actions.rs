@@ -4,7 +4,7 @@ use crate::services::{
 use crate::{
     account_raw, method_raw, AccountNumber, Action, AnyPublicKey, MethodNumber, ServiceWrapper,
 };
-use fracpack::Pack;
+
 
 macro_rules! account {
     ($name:expr) => {
@@ -83,6 +83,6 @@ pub fn login_action(user: AccountNumber, app: AccountNumber, root_host: &str) ->
         sender: user,
         service: app,
         method: MethodNumber::new(method_raw!("loginSys")),
-        rawData: (root_host,).packed().into(),
+        rawData: psio::to_pssz(&(root_host,)).into(),
     }
 }

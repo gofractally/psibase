@@ -2,7 +2,7 @@
 #[allow(warnings)]
 mod bindings;
 use bindings::{exports::ethbridge::plugin::api::Guest, host::types::types::Error};
-use psibase::fracpack::Pack;
+
 use serde::Deserialize;
 use serde_json::Value;
 psibase::define_trust! {descriptions{Low=>"",Medium=>"",High=>"Publish Ethereum proofs, authorize ETH withdrawals, cancel queued withdrawals, and coordinate finalized ETH batches using your connected Psibase account",}functions{High=>[submit,prove],None=>[identity],}}
@@ -81,28 +81,26 @@ impl Guest for Plugin {
         let (method, args) = match s.fact {
             Fact::Update(_) | Fact::Header(_) => (
                 "relay",
-                ethbridge::action_structs::relay {
+                psio::to_pssz(&ethbridge::action_structs::relay {
                     fact_json,
                     child: s.child,
-                }
-                .packed(),
+                }),
             ),
             Fact::Receipt(_) => {
                 let block = s.block.ok_or_else(|| error("Receipt block required"))?;
                 if let Some(batch) = s.batch {
                     (
                         "complete",
-                        ethbridge::action_structs::complete {
+                        psio::to_pssz(&ethbridge::action_structs::complete {
                             batch,
                             block,
                             fact_json,
-                        }
-                        .packed(),
+                        }),
                     )
                 } else {
                     (
                         "deposit",
-                        ethbridge::action_structs::deposit { block, fact_json }.packed(),
+                        psio::to_pssz(&ethbridge::action_structs::deposit { block, fact_json }),
                     )
                 }
             }
@@ -181,7 +179,7 @@ impl Guest for Plugin {
                         serde_json::from_value(a.data).map_err(error)?;
                     bindings::transact::plugin::api::add_action_to_transaction(
                         stringify!($method),
-                        &args.packed(),
+                        &psio::to_pssz(&args),
                     )?;
                 }};
             }

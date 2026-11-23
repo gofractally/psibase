@@ -53,7 +53,7 @@ impl KeySchemaData {
             for idx in field {
                 path = quote! { #path #idx, }
             }
-            result = quote! { #result #psibase_mod::FieldId { path: vec![ #path ], transform: None, type_: None }, }
+            result = quote! { #result #psibase_mod::FieldId { path: vec![ #path ], transform: None, r#type: None }, }
         }
         quote! { vec![ #result ] }
     }
@@ -97,6 +97,15 @@ impl SkIdentData {
             ty,
             schema,
         }
+    }
+}
+
+/// The path of the psio crate as generated code names it.
+fn psio_path(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    if psibase_mod.to_string() == "crate" {
+        quote! { ::psio }
+    } else {
+        quote! { #psibase_mod::psio }
     }
 }
 
@@ -166,6 +175,7 @@ pub fn process_service_tables(
     }
 
     secondary_keys.sort_by_key(|sk| sk.idx);
+    let psio = psio_path(psibase_mod);
     let mut sks_fns = quote! {};
     let mut sks = quote! {};
     let sks_len = secondary_keys.len() as u8;
@@ -179,22 +189,9 @@ pub fn process_service_tables(
             emit_error!(sk_ident, format!("Missing expected secondary index {}; indexes may not have gaps and may not be removed or reordered", expected_idx));
         }
 
-        sks = quote! { #sks #psibase_mod::RawKey::new(self.#sk_ident().to_key()), };
+        sks = quote! { #sks #psibase_mod::RawKey::new(#psio::to_key(&self.#sk_ident())), };
 
         let sk_fn_name = Ident::new(&format!("get_index_{}", sk_ident), Span::call_site());
-
-        // The key of every index is a PSIO key.
-        let psio_path = if psibase_mod.to_string() == "crate" {
-            quote! { ::psio }
-        } else {
-            quote! { #psibase_mod::psio }
-        };
-        items.push(parse_quote! {
-            const _: fn() = || {
-                fn is_key<K: #psio_path::key::KeyPack>() {}
-                is_key::<#sk_ty>();
-            };
-        });
 
         sks_fns = quote! {
             #sks_fns
@@ -218,12 +215,10 @@ pub fn process_service_tables(
                 const DB: #psibase_mod::DbId = #psibase_mod::DbId::#db;
 
                 fn get_primary_key(&self) -> #psibase_mod::RawKey {
-                    use #psibase_mod::ToKey;
-                    #psibase_mod::RawKey::new(self.#pk_call_ident.to_key())
+                    #psibase_mod::RawKey::new(#psio::to_key(&self.#pk_call_ident))
                 }
 
                 fn get_secondary_keys(&self) -> Vec<#psibase_mod::RawKey> {
-                    use #psibase_mod::ToKey;
                     vec![#sks]
                 }
             }
@@ -241,7 +236,7 @@ pub fn process_service_tables(
 
         items.push(parse_quote! {
             impl #psibase_mod::ToIndexSchema for #table_record_struct_name {
-                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> Vec<#psibase_mod::IndexInfo> {
+                fn to_schema(builder: &mut #psio::pssz::schema_ir::SchemaBuilder) -> Vec<#psibase_mod::IndexInfo> {
                     vec![#index_schema]
                 }
             }
@@ -318,15 +313,16 @@ pub fn process_table_schema_root(
     items: &mut Vec<Item>,
     tables: Vec<(proc_macro2::TokenStream, proc_macro2::TokenStream)>,
 ) {
+    let psio = psio_path(psibase_mod);
     let mut schema_init = proc_macro2::TokenStream::new();
     for (table, record) in tables {
         let name = format!("{}", table);
         schema_init = quote! {
             #schema_init
             let table = <#table as #psibase_mod::Table<#record>>::TABLE_INDEX;
-            let type_ = <#record as #psibase_mod::fracpack::ToSchema>::schema(builder);
+            let r#type = builder.insert::<#record>().expect("a table row has a schema");
             let indexes = <#record as #psibase_mod::ToIndexSchema>::to_schema(builder);
-            let info = #psibase_mod::TableInfo{name: Some(#name.to_string()), table, type_, indexes };
+            let info = #psibase_mod::TableInfo{name: Some(#name.to_string()), table, r#type, indexes };
             result.entry(#psibase_mod::db_name(<#record as #psibase_mod::TableRecord>::DB)).or_insert(Vec::new()).push(info);
         }
     }
@@ -335,8 +331,8 @@ pub fn process_table_schema_root(
     });
     items.push(parse_quote! {
         impl #psibase_mod::ToDatabaseSchema for TablesWrapper {
-            fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> Option<#psibase_mod::fracpack::indexmap::IndexMap<String, Vec<#psibase_mod::TableInfo>>> {
-                let mut result = #psibase_mod::fracpack::indexmap::IndexMap::new();
+            fn to_schema(builder: &mut #psio::pssz::schema_ir::SchemaBuilder) -> Option<#psibase_mod::DatabaseMap> {
+                let mut result = #psibase_mod::DatabaseMap::new();
                 #schema_init
                 Some(result)
             }
@@ -550,7 +546,7 @@ fn process_table_impls(
                                         process_key_schema(&method.block, field_names),
                                     ));
                                 } else {
-                                    emit_error!(method, "Invalid secondary key return type, make sure it is a valid ToKey.");
+                                    emit_error!(method, "Invalid secondary key return type, make sure it is a psio key.");
                                     continue;
                                 }
                             } else {

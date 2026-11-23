@@ -29,7 +29,7 @@ fn cpu_time_ns(_id: u32) -> u64 {
 pub trait TraceRef {
     fn trace(&self) -> &TransactionTrace;
 }
-impl<T: psibase::fracpack::UnpackOwned> TraceRef for ChainResult<T> {
+impl<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> TraceRef for ChainResult<T> {
     fn trace(&self) -> &TransactionTrace {
         &self.trace
     }
@@ -60,7 +60,7 @@ pub fn measure<R: TraceRef>(scenario: &str, metadata: Value, f: impl FnOnce() ->
     let billable: i128 = trace
         .action_traces
         .iter()
-        .map(|a| a.total_time as i128)
+        .map(|a| a.total_time.ticks() as i128)
         .sum();
     assert!(billable >= 0, "negative native action time");
     fn counts(a: &psibase::ActionTrace) -> (u64, u64) {

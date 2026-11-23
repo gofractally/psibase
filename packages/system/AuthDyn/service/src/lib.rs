@@ -4,13 +4,12 @@ pub mod tables {
     use psibase::services::auth_dyn::int_wrapper;
     use psibase::services::transact::ServiceMethod;
     use psibase::{
-        services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Pack, ServiceWrapper, Table,
-        ToSchema, Unpack,
-    };
+        services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, ServiceWrapper, Table,
+        };
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ManagementTable", index = 0)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Management {
         #[primary_key]
         pub account: AccountNumber,

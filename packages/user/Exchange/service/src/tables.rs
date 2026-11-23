@@ -1,10 +1,10 @@
 #[psibase::service_tables]
 pub mod tables {
     use crate::math::Wide;
-    use psibase::{AccountNumber, Pack, ToSchema, Unpack};
+    use psibase::{AccountNumber};
     use serde::{Deserialize, Serialize};
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Config {
         pub next: u64,
     }
@@ -13,7 +13,7 @@ pub mod tables {
         fn pk(&self) {}
     }
     #[table(name = "MarketTable", index = 1)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Market {
         #[primary_key]
         pub id: u64,
@@ -42,7 +42,7 @@ pub mod tables {
         }
     }
     #[table(name = "PoolTable", index = 2)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Pool {
         #[primary_key]
         pub id: u64,
@@ -57,7 +57,7 @@ pub mod tables {
         pub active: bool,
     }
     #[table(name = "BookTable", index = 3)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Book {
         pub market: u64,
         pub bid: bool,
@@ -71,7 +71,7 @@ pub mod tables {
         }
     }
     #[table(name = "MakerTable", index = 4)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Maker {
         pub owner: AccountNumber,
         pub market: u64,
@@ -88,7 +88,7 @@ pub mod tables {
         }
     }
     #[table(name = "LoanTable", index = 5)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Loan {
         #[primary_key]
         pub generation: u64,
@@ -104,7 +104,7 @@ pub mod tables {
         pub surplus: u64,
     }
     #[table(name = "LoanBookTable", index = 6)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct LoanBook {
         pub market: u64,
         pub long: bool,
@@ -118,7 +118,7 @@ pub mod tables {
         }
     }
     #[table(name = "BorrowerTable", index = 7)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Borrower {
         pub owner: AccountNumber,
         pub market: u64,
@@ -134,7 +134,7 @@ pub mod tables {
         }
     }
     #[table(name = "LenderTable", index = 8)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Lender {
         pub owner: AccountNumber,
         pub market: u64,
@@ -148,7 +148,7 @@ pub mod tables {
         }
     }
     #[table(name = "LiquidityTable", index = 9)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Liquidity {
         pub owner: AccountNumber,
         pub market: u64,
@@ -161,7 +161,7 @@ pub mod tables {
         }
     }
     #[table(name = "EscrowTable", index = 10)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Escrow {
         pub market: u64,
         pub token: u32,
@@ -174,7 +174,7 @@ pub mod tables {
         }
     }
     #[table(name = "StopPoolTable", index = 11)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct StopPool {
         #[primary_key]
         pub id: u64,
@@ -187,7 +187,7 @@ pub mod tables {
         pub batch: Option<u64>,
     }
     #[table(name = "StopBookTable", index = 12)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct StopBook {
         pub market: u64,
         pub sell_base: bool,
@@ -201,7 +201,7 @@ pub mod tables {
         }
     }
     #[table(name = "StopPositionTable", index = 13)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct StopPosition {
         pub owner: AccountNumber,
         pub generation: u64,
@@ -214,7 +214,7 @@ pub mod tables {
         }
     }
     #[table(name = "StopBatchTable", index = 14)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct StopBatch {
         #[primary_key]
         pub id: u64,
@@ -232,13 +232,17 @@ pub mod tables {
     }
     /// Exact executed price: quote token atoms divided by base token atoms.
     #[derive(
-        Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, async_graphql::SimpleObject,
-    psio::PsszPack,
-    psio::PsszUnpack,
-    psio::PsszView,
-    psio::ToPsszSchema,
+        Clone,
+        Debug,
+        Serialize,
+        Deserialize,
+        async_graphql::SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
         psio::JsonText,
-)]
+    )]
     pub struct CandlePrice {
         pub base: u64,
         pub quote: u64,
@@ -247,13 +251,17 @@ pub mod tables {
     /// are emitted to the native prunable event log, never archived in tables.
     #[table(name = "CurrentCandleTable", index = 15)]
     #[derive(
-        Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, async_graphql::SimpleObject,
-    psio::PsszPack,
-    psio::PsszUnpack,
-    psio::PsszView,
-    psio::ToPsszSchema,
+        Clone,
+        Debug,
+        Serialize,
+        Deserialize,
+        async_graphql::SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
         psio::JsonText,
-)]
+    )]
     pub struct CurrentCandle {
         pub market: u64,
         pub interval: u32,

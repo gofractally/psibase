@@ -8,7 +8,7 @@ use crate::bindings::transact::plugin::types::{Claim, Proof};
 use crate::errors::ErrorType::*;
 use crate::open_tx_table::OpenTx;
 use crate::types::FromExpirationTime;
-use psibase::fracpack::Pack;
+
 use psibase::{Hex, SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
 
@@ -157,7 +157,7 @@ impl Publish for SignedTransaction {
     fn publish(self) -> Result<BodyTypes, HostTypes::Error> {
         Ok(Server::post(&HostTypes::PostRequest {
             endpoint: "/push_transaction".to_string(),
-            body: HostTypes::BodyTypes::Bytes(self.packed()),
+            body: HostTypes::BodyTypes::Bytes(psio::to_pssz(&self)),
         })?)
     }
 }

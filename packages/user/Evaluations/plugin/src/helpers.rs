@@ -7,7 +7,7 @@ use crate::key_table;
 use crate::types;
 use bindings::host::client::api as Client;
 use ecies::{decrypt, encrypt};
-use psibase::{fracpack::Pack, AccountNumber};
+use psibase::{AccountNumber};
 
 use crate::bindings::host::types::types::Error;
 use crate::graphql::{fetch_and_decode, fetch_key_history, fetch_user_settings};
@@ -82,15 +82,14 @@ pub fn create_new_symmetric_key(
 
     let hash = symmetric_key.hash();
 
-    let packed_args = evaluations::action_structs::group_key {
+    let packed_args = psio::to_pssz(&evaluations::action_structs::group_key {
         owner: evaluation_owner,
         evaluation_id,
         keys: payloads,
         hash,
-    }
-    .packed();
+    });
     add_action_to_transaction(
-        evaluations::action_structs::group_key::ACTION_NAME,
+        <evaluations::action_structs::group_key as psio::interface::Method>::NAME,
         &packed_args,
     )?;
     Ok(symmetric_key)

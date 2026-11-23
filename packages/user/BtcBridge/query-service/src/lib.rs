@@ -10,7 +10,7 @@ pub mod service {
     use serde_json::{json, Value};
     // Cross-service objective reads are confined to this privileged read-only RPC.
     fn foreign<R: TableRecord, T: Table<R>>() -> T {
-        let prefix = (T::SERVICE, T::TABLE_INDEX).to_key();
+        let prefix = psio::to_key(&(T::SERVICE, T::TABLE_INDEX));
         T::from_handle(KvHandle::open_direct(R::DB, &prefix, KvMode::Read))
     }
     fn parameter<'a>(query: &'a str, key: &str) -> Option<&'a str> {
@@ -42,10 +42,8 @@ pub mod service {
             psibase::services::http_server::SERVICE,
             "Native HTTP server required"
         );
-        let (path, query) = request
-            .target
-            .split_once('?')
-            .unwrap_or((&request.target, ""));
+        let target = request.target.to_str().unwrap_or_default();
+        let (path, query) = target.split_once('?').unwrap_or((target, ""));
         if request.method == "GET" {
             if let Some(reply) = crate::explorer::serve(path, query) {
                 return Some(reply);

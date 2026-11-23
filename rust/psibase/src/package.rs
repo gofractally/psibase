@@ -5,19 +5,17 @@ use crate::services::{
     x_sites,
 };
 use crate::{
-    deserialize_pretty_action, new_account_owned_action, preapprove_action, reg_server,
-    schema_types, set_code_action, solve_dependencies, version_match, AccountNumber, Action,
-    AnyPublicKey, Checksum256, CodeRow, CustomPrettyAction, ExactAccountNumber, GenesisService,
-    Hex, MethodNumber, MethodString, NullSchemaFetcher, PackageDisposition, PackageOp,
-    PackagePreference, Schema, SchemaFetcher, ServiceWrapper, ToSchema, TypeMatchExt, Version,
+    action_data_from_json, action_handlers_recording, nested_calls, new_account_owned_action,
+    preapprove_action, reg_server, set_code_action, solve_dependencies, version_match,
+    AccountNumber, Action, AnyPublicKey, Checksum256, CodeRow, ExactAccountNumber, GenesisService,
+    Hex, MethodNumber, NullSchemaFetcher, PackageDisposition, PackageOp, PackagePreference,
+    SchemaFetcher, ServiceSchema, ServiceWrapper, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
-use fracpack::{
-    CompiledSchema, CompiledType, CustomHandler, FracInputStream, Pack, Unpack, UnpackOwned,
-};
+
 use regex::Regex;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -106,9 +104,6 @@ pub fn compress_content(
     Deserialize,
     PartialEq,
     Eq,
-    Pack,
-    Unpack,
-    ToSchema,
     Hash,
     psio::PsszPack,
     psio::PsszUnpack,
@@ -116,7 +111,6 @@ pub fn compress_content(
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageRef {
     pub name: String,
     pub version: String,
@@ -130,9 +124,6 @@ pub struct PackageRef {
     Deserialize,
     PartialEq,
     Eq,
-    Pack,
-    Unpack,
-    ToSchema,
     Hash,
     psio::PsszPack,
     psio::PsszUnpack,
@@ -140,7 +131,6 @@ pub struct PackageRef {
     psio::ToPsszSchema,
     psio::JsonText,
 )]
-#[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageExport {
     pub name: String,
     pub service: AccountNumber,
@@ -150,8 +140,7 @@ fn network_scope() -> String {
     "network".to_string()
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 pub struct Meta {
     pub name: String,
     pub version: String,
@@ -280,11 +269,11 @@ pub struct PackageManifest {
     pub data: Vec<PackageDataFile>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct ServiceInfo {
     pub flags: Vec<String>,
     pub server: Option<AccountNumber>,
-    pub schema: Option<Schema>,
+    pub schema: Option<ServiceSchema>,
 }
 
 impl ServiceInfo {
@@ -302,7 +291,9 @@ pub struct PackagedService<R: Read + Seek> {
     hash: Checksum256,
 }
 
-pub type SchemaMap = HashMap<AccountNumber, Schema>;
+/// The schemas of services by account. A schema is shared (`Arc`): a map
+/// is cloned to hand it to the schema-driven codec's handlers.
+pub type SchemaMap = HashMap<AccountNumber, std::sync::Arc<ServiceSchema>>;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -322,31 +313,43 @@ pub struct PrettyAction {
 }
 
 impl PrettyAction {
+    /// The PSSZ of the arguments in `data` (an object keyed by parameter
+    /// name, or the positional array; no arguments when absent), by the
+    /// schema of `service`. An action nested in them is packed by the
+    /// schema of the service it calls.
     fn pack_data(
         service: AccountNumber,
         method: MethodNumber,
         data: &Option<serde_json::Value>,
         schemas: &SchemaMap,
     ) -> Result<Hex<Vec<u8>>, anyhow::Error> {
-        let schema = schemas.get(&service).unwrap();
-        let mut custom = schema_types();
-        let custom_action = CustomPrettyAction::new(schemas);
-        custom.insert("Action".to_string(), &custom_action);
-        let mut cschema = CompiledSchema::new(&schema.types, &custom);
-        let Some(act) = schema.actions.get(&MethodString(method.to_string())) else {
+        let missing = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        Self::pack_data_recording(service, method, data, schemas, &missing)
+    }
+    fn pack_data_recording(
+        service: AccountNumber,
+        method: MethodNumber,
+        data: &Option<serde_json::Value>,
+        schemas: &SchemaMap,
+        missing: &std::sync::Arc<std::sync::Mutex<Vec<AccountNumber>>>,
+    ) -> Result<Hex<Vec<u8>>, anyhow::Error> {
+        let Some(schema) = schemas.get(&service) else {
+            missing.lock().unwrap().push(service);
+            return Err(anyhow!("Missing schema for {}", service));
+        };
+        if schema.action(method).is_none() {
             Err(Error::UnknownAction {
                 service: service,
                 method: method,
             })?
         };
-        cschema.extend(&act.params);
-        if let Some(data) = data {
-            Ok(cschema.from_value(&act.params, data)?.into())
-        } else {
-            Ok(cschema
-                .from_value(&act.params, &serde_json::json!({}))?
-                .into())
-        }
+        let handlers =
+            action_handlers_recording(std::sync::Arc::new(schemas.clone()), missing.clone());
+        let text = match data {
+            Some(data) => data.to_string(),
+            None => "{}".to_string(),
+        };
+        Ok(action_data_from_json(schemas, &handlers, service, method, &text)?.into())
     }
     pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
         let service = self.service.into();
@@ -376,33 +379,45 @@ impl PrettyAction {
             rawData: raw_data,
         })
     }
-    pub fn parse_data_as<T: UnpackOwned + DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
+    pub fn parse_data_as<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz> + DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
         if let Some(raw_data) = &self.raw_data {
-            Ok(T::unpacked(&raw_data.0)?)
+            Ok(psio::from_pssz::<T>(&raw_data.0)?)
         } else if let Some(data) = &self.data {
             Ok(serde_json::from_value(data.clone())?)
         } else {
             Err(anyhow!("Missing action data"))
         }
     }
+    /// Loads the schemas needed to pack `data`: the service's own and those
+    /// of the services called by actions nested in the arguments, to any
+    /// depth.
     pub async fn load_schemas<F: SchemaFetcher>(
         &self,
         fetcher: &F,
         schemas: &mut SchemaMap,
     ) -> Result<(), anyhow::Error> {
-        if !self.raw_data.is_some() {
-            if let Some(data) = &self.data {
-                SharedPrettyAction {
-                    sender: self.sender.into(),
-                    service: self.service.into(),
-                    method: self.method,
-                    data: data,
+        if self.raw_data.is_some() || self.data.is_none() {
+            return Ok(());
+        }
+        loop {
+            let missing = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            let packed = PrettyAction::pack_data_recording(
+                self.service.into(),
+                self.method,
+                &self.data,
+                schemas,
+                &missing,
+            );
+            let missing = std::mem::take(&mut *missing.lock().unwrap());
+            if missing.is_empty() {
+                return packed.map(|_| ());
+            }
+            for service in missing {
+                if !schemas.contains_key(&service) {
+                    schemas.insert(service, fetcher.fetch_schema(service).await?.into());
                 }
-                .load_schemas(fetcher, schemas)
-                .await?;
             }
         }
-        Ok(())
     }
     pub fn get_required_accounts(
         &self,
@@ -413,211 +428,26 @@ impl PrettyAction {
         let service = self.service.into();
         accounts.push(self.sender.into());
         services.push(service);
-        if let Some(data) = &self.data {
-            let schema = schemas
-                .get(&service)
-                .ok_or_else(|| anyhow!("Missing schema for {}", self.service))?;
-            let mut custom = schema_types();
-            let out = RefCell::new((accounts, services));
-            let custom_action = CustomPrettyActionCollectAccounts::new(
-                |sender, service| {
-                    let mut out = out.borrow_mut();
-                    let (accounts, services) = &mut *out;
-                    // Native callbacks have "" as the sender
-                    if sender != AccountNumber::new(0) {
-                        accounts.push(sender);
-                    }
-                    services.push(service);
-                },
-                schemas,
-            );
-            custom.insert("Action".to_string(), &custom_action);
-            let action_type = schema
-                .actions
-                .get(&MethodString(self.method.to_string()))
-                .ok_or_else(|| anyhow!("Missing action {}::{}", self.service, self.method))?;
-            let mut cschema = CompiledSchema::new(&schema.types, &custom);
-            cschema.extend(&action_type.params);
-            cschema.from_value(&action_type.params, data)?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-struct SharedPrettyAction<'a> {
-    pub sender: AccountNumber,
-    pub service: AccountNumber,
-    pub method: MethodNumber,
-    pub data: &'a serde_json::Value,
-}
-
-impl<'a> SharedPrettyAction<'a> {
-    pub async fn load_schemas<F: SchemaFetcher>(
-        &self,
-        fetcher: &F,
-        schemas: &mut SchemaMap,
-    ) -> Result<(), anyhow::Error> {
-        let mut actions = vec![self.clone()];
-        while let Some(next) = actions.pop() {
-            if !schemas.contains_key(&next.service) {
-                schemas.insert(next.service, fetcher.fetch_schema(next.service).await?);
+        if self.data.is_some() {
+            if !schemas.contains_key(&service) {
+                return Err(anyhow!("Missing schema for {}", self.service));
             }
-            let schema = schemas.get(&next.service).unwrap();
-            let mut custom = schema_types();
-            let actions = std::cell::RefCell::new(&mut actions);
-            let custom_action = CustomPrettyActionCollectSchemas::new(|act: SharedPrettyAction| {
-                actions.borrow_mut().push(SharedPrettyAction {
-                    sender: act.sender,
-                    service: act.service,
-                    method: act.method,
-                    data: unsafe { &*(act.data as *const serde_json::Value) },
-                })
-            });
-            custom.insert("Action".to_string(), &custom_action);
-            let action_type = schema
-                .actions
-                .get(&MethodString(next.method.to_string()))
-                .ok_or_else(|| anyhow!("Missing action {}::{}", next.service, next.method))?;
-            let mut cschema = CompiledSchema::new(&schema.types, &custom);
-            cschema.extend(&action_type.params);
-            cschema.from_value(&action_type.params, next.data)?;
-        }
-        Ok(())
-    }
-}
-
-struct CustomPrettyActionCollectSchemas<F> {
-    f: F,
-}
-
-impl<F> CustomPrettyActionCollectSchemas<F> {
-    fn new(f: F) -> Self {
-        Self { f }
-    }
-}
-
-impl<F: Fn(SharedPrettyAction) -> ()> CustomHandler for CustomPrettyActionCollectSchemas<F> {
-    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
-        schema.matches_action(ty)
-    }
-    fn frac2json(
-        &self,
-        _schema: &CompiledSchema,
-        _ty: &CompiledType,
-        _src: &mut FracInputStream,
-        _allow_empty_container: bool,
-    ) -> Result<serde_json::Value, fracpack::Error> {
-        unimplemented!()
-    }
-    fn json2frac(
-        &self,
-        _schema: &CompiledSchema,
-        ty: &CompiledType,
-        val: &serde_json::Value,
-        dest: &mut Vec<u8>,
-    ) -> Result<(), serde_json::Error> {
-        let (sender, service, method, _raw_data_name) = deserialize_pretty_action(ty, val)?;
-
-        if let Some(data) = val.get("data") {
-            (self.f)(SharedPrettyAction {
-                sender,
-                service,
-                method,
-                data,
-            });
-        }
-
-        Action {
-            sender,
-            service,
-            method,
-            rawData: Vec::<u8>::new().into(),
-        }
-        .pack(dest);
-        Ok(())
-    }
-    fn fracpack_verify(
-        &self,
-        _schema: &CompiledSchema,
-        _ty: &CompiledType,
-        _src: &mut FracInputStream,
-        _allow_empty_container: bool,
-    ) -> Result<(), fracpack::Error> {
-        unimplemented!()
-    }
-    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
-        false
-    }
-}
-
-struct CustomPrettyActionCollectAccounts<'a, F> {
-    f: F,
-    schemas: &'a SchemaMap,
-}
-
-impl<'a, F> CustomPrettyActionCollectAccounts<'a, F> {
-    fn new(f: F, schemas: &'a SchemaMap) -> Self {
-        Self { f, schemas }
-    }
-}
-
-impl<'a, F: Fn(AccountNumber, AccountNumber) -> ()> CustomHandler
-    for CustomPrettyActionCollectAccounts<'a, F>
-{
-    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
-        schema.matches_action(ty)
-    }
-    fn frac2json(
-        &self,
-        _schema: &CompiledSchema,
-        _ty: &CompiledType,
-        _src: &mut FracInputStream,
-        _allow_empty_container: bool,
-    ) -> Result<serde_json::Value, fracpack::Error> {
-        unimplemented!()
-    }
-    fn json2frac(
-        &self,
-        parent_schema: &CompiledSchema,
-        ty: &CompiledType,
-        val: &serde_json::Value,
-        dest: &mut Vec<u8>,
-    ) -> Result<(), serde_json::Error> {
-        let (sender, service, method, _raw_data_name) = deserialize_pretty_action(ty, val)?;
-
-        (self.f)(sender, service);
-        if let Some(data) = val.get("data") {
-            if let Some(schema) = self.schemas.get(&service) {
-                if let Some(action_type) = schema.actions.get(&MethodString(method.to_string())) {
-                    let mut cschema =
-                        CompiledSchema::new(&schema.types, parent_schema.get_custom());
-                    cschema.extend(&action_type.params);
-                    cschema.from_value(&action_type.params, data)?;
+            // The senders and services of the actions nested in the
+            // arguments, to any depth.
+            let packed = PrettyAction::pack_data(service, self.method, &self.data, schemas)?;
+            let mut pending = vec![(service, self.method, packed.0)];
+            while let Some((service, method, raw_data)) = pending.pop() {
+                for act in nested_calls(schemas, service, method, &raw_data).actions {
+                    // Native callbacks have "" as the sender
+                    if act.sender != AccountNumber::new(0) {
+                        accounts.push(act.sender);
+                    }
+                    services.push(act.service);
+                    pending.push((act.service, act.method, act.rawData.0));
                 }
             }
         }
-
-        Action {
-            sender,
-            service,
-            method,
-            rawData: Vec::<u8>::new().into(),
-        }
-        .pack(dest);
         Ok(())
-    }
-    fn fracpack_verify(
-        &self,
-        _schema: &CompiledSchema,
-        _ty: &CompiledType,
-        _src: &mut FracInputStream,
-        _allow_empty_container: bool,
-    ) -> Result<(), fracpack::Error> {
-        unimplemented!()
-    }
-    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
-        false
     }
 }
 
@@ -822,7 +652,7 @@ impl<R: Read + Seek> PackagedService<R> {
 
                     uploader.actions.push(
                         sites::Wrapper::pack_from_to(tmp_sender, sites::SERVICE).storeSys(
-                            tmp_path.clone(),
+                            tmp_path.clone().into(),
                             t.essence_str().to_string(),
                             content_encoding.clone(),
                             content.into(),
@@ -830,7 +660,7 @@ impl<R: Read + Seek> PackagedService<R> {
                     );
                     actions.push(
                         sites::Wrapper::pack_from_to(*sender, sites::SERVICE).hardlink(
-                            path.to_string(),
+                            path.to_string().into(),
                             t.essence_str().to_string(),
                             content_encoding,
                             content_hash.into(),
@@ -838,12 +668,12 @@ impl<R: Read + Seek> PackagedService<R> {
                     );
                     actions.push(
                         sites::Wrapper::pack_from_to(tmp_sender, sites::SERVICE)
-                            .remove(tmp_path.to_string()),
+                            .remove(tmp_path.to_string().into()),
                     );
                 } else {
                     actions.push(
                         sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
-                            path.to_string(),
+                            path.to_string().into(),
                             t.essence_str().to_string(),
                             content_encoding,
                             content.into(),
@@ -1106,7 +936,8 @@ impl<R: Read + Seek> PackagedService<R> {
                     *account,
                     info.schema
                         .clone()
-                        .ok_or_else(|| Error::MissingSchema { service: *account })?,
+                        .ok_or_else(|| Error::MissingSchema { service: *account })?
+                        .into(),
                 );
             }
         }
@@ -1117,7 +948,7 @@ impl<R: Read + Seek> PackagedService<R> {
         for (account, _, info) in &self.services {
             if !schemas.contains_key(account) {
                 if let Some(schema) = info.schema.clone() {
-                    schemas.insert(*account, schema);
+                    schemas.insert(*account, schema.into());
                 }
             }
         }
@@ -1369,7 +1200,7 @@ impl PackageManifest {
         for file in &self.data {
             if !new_files.contains(file) {
                 out.push_action(
-                    sites::Wrapper::pack_from(file.account).remove(file.filename.clone()),
+                    sites::Wrapper::pack_from(file.account).remove(file.filename.clone().into()),
                 )?;
             }
         }
@@ -1396,7 +1227,7 @@ impl PackageManifest {
         out: &mut T,
     ) -> Result<(), anyhow::Error> {
         for file in &self.data {
-            out.push_action(sites::Wrapper::pack_from(file.account).remove(file.filename.clone()))?;
+            out.push_action(sites::Wrapper::pack_from(file.account).remove(file.filename.clone().into()))?;
         }
         for (service, info) in &self.services {
             if info.server.is_some() {
