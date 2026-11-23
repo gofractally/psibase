@@ -251,8 +251,5 @@ namespace psibase
 
    using HttpReply = BasicHttpReply<std::vector<char>>;
 
-   template <typename T>
-   using FracpackHttpReply = BasicHttpReply<psio::nested<T>>;
-
    using HttpReplyRef = BasicHttpReply<std::span<const char>>;
 }  // namespace psibase
