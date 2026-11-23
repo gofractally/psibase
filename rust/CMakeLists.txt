@@ -36,13 +36,27 @@ find_path(PSIBASE_BOOST_INCLUDE_DIR boost/core/demangle.hpp)
 if(NOT PSIBASE_BOOST_INCLUDE_DIR)
     set(PSIBASE_BOOST_INCLUDE_DIR "")
 endif()
+# The PKCS #11 signer test in the psibase crate needs a token; it uses SoftHSM
+# when that is installed and skips itself otherwise.
+find_library(RS_TESTS_LIBSOFTHSM2 libsofthsm2.so PATH_SUFFIXES softhsm)
+find_program(RS_TESTS_SOFTHSM2_UTIL softhsm2-util)
+set(rs_tests_softhsm)
+if(RS_TESTS_LIBSOFTHSM2 AND RS_TESTS_SOFTHSM2_UTIL)
+    set(rs_tests_softhsm PSIBASE_TEST_SOFTHSM2=${RS_TESTS_LIBSOFTHSM2} PSIBASE_TEST_SOFTHSM2_UTIL=${RS_TESTS_SOFTHSM2_UTIL})
+endif()
 add_test(
     NAME rs-tests
-    COMMAND env PSIBASE_DATADIR=${CMAKE_BINARY_DIR}/share/psibase PSIBASE_BOOST_INCLUDE_DIR=${PSIBASE_BOOST_INCLUDE_DIR} cargo test -r --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR} -p test_fracpack -p psibase -p cargo-psibase -p psibase-macros-lib -p psibase-macros-derive -p psibase_plugin
+    COMMAND env PSIBASE_DATADIR=${CMAKE_BINARY_DIR}/share/psibase PSIBASE_BOOST_INCLUDE_DIR=${PSIBASE_BOOST_INCLUDE_DIR} ${rs_tests_softhsm} cargo test -r --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR} -p test_fracpack -p psibase -p cargo-psibase -p psibase-macros-lib -p psibase-macros-derive -p psibase_plugin
+)
+
+# Unit tests of the browser signing plugin, run natively.
+add_test(
+    NAME plugin-web-crypto-tests
+    COMMAND cargo test -r --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/../packages/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/plugin-tests -p web-crypto
 )
 
 include(ProcessorCount)
 ProcessorCount(NPROC)
 if(NPROC)
-    set_tests_properties(rs-tests PROPERTIES PROCESSORS ${NPROC})
+    set_tests_properties(rs-tests plugin-web-crypto-tests PROPERTIES PROCESSORS ${NPROC})
 endif()
