@@ -400,6 +400,9 @@ void EventIndex::sync()
 
 void EventIndex::onBlock()
 {
+   // Index everything the block emitted. One pass per block: each emitting
+   // service's schema is fetched and compiled once, not once per transaction.
+   sync();
    queueIndexChanges();
    processQueue(1000);
 }
