@@ -61,7 +61,7 @@ impl InviteTokensTable {
 
         let query = format!(
             r#"query {{
-                inviteById(inviteId: "{id}") {{
+                inviteById(inviteId: {id}) {{
                     numAccounts,
                 }}
             }}"#,
@@ -85,7 +85,7 @@ impl InviteTokensTable {
 
         let query = format!(
             r#"query {{
-                inviteById(inviteId: "{id}") {{
+                inviteById(inviteId: {id}) {{
                     secret,
                     expiryDate,
                 }}

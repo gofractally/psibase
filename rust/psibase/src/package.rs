@@ -2014,7 +2014,7 @@ impl HTTPRegistry {
             if !data.packages.pageInfo.hasNextPage {
                 break;
             }
-            end_cursor = Some(data.packages.pageInfo.endCursor);
+            end_cursor = data.packages.pageInfo.endCursor;
         }
         Ok(HTTPRegistry {
             index_url: owner.url(url)?,
@@ -2179,7 +2179,8 @@ struct InstalledEdge {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct NextPageInfo {
     hasNextPage: bool,
-    endCursor: String,
+    /// Null on a page without edges.
+    endCursor: Option<String>,
 }
 
 #[allow(non_snake_case)]
@@ -2359,7 +2360,7 @@ impl PackageList {
             if !data.installed.pageInfo.hasNextPage {
                 break;
             }
-            end_cursor = Some(data.installed.pageInfo.endCursor);
+            end_cursor = data.installed.pageInfo.endCursor;
         }
         Ok(result)
     }
@@ -2380,7 +2381,7 @@ impl PackageList {
             if !data.installed.pageInfo.hasNextPage {
                 break;
             }
-            end_cursor = Some(data.installed.pageInfo.endCursor);
+            end_cursor = data.installed.pageInfo.endCursor;
         }
         Ok(result)
     }

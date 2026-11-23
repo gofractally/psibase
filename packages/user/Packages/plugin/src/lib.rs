@@ -228,7 +228,8 @@ struct InstalledEdge {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct NextPageInfo {
     hasNextPage: bool,
-    endCursor: String,
+    /// Null on a page without edges.
+    endCursor: Option<String>,
 }
 
 #[allow(non_snake_case)]
@@ -259,7 +260,7 @@ fn get_installed_packages() -> Result<Vec<psibase::InstalledPackageInfo>, HostTy
         if !root.data.installed.pageInfo.hasNextPage {
             break;
         }
-        end_cursor = Some(root.data.installed.pageInfo.endCursor);
+        end_cursor = root.data.installed.pageInfo.endCursor;
     }
     Ok(result)
 }

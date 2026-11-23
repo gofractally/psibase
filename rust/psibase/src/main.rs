@@ -1520,13 +1520,18 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
 
     query_existing += " }";
 
-    let existing = psibase::gql_query::<serde_json::Value>(
-        &args.node_args.api,
-        &mut client,
-        packages::SERVICE,
-        query_existing,
-    )
-    .await?;
+    // A query without a field is not a GraphQL document.
+    let existing = if all_meta.is_empty() {
+        serde_json::Value::Object(Default::default())
+    } else {
+        psibase::gql_query::<serde_json::Value>(
+            &args.node_args.api,
+            &mut client,
+            packages::SERVICE,
+            query_existing,
+        )
+        .await?
+    };
     let existing = existing.as_object().unwrap();
     let num_new = existing.values().filter(|p| p.is_null()).count();
 
