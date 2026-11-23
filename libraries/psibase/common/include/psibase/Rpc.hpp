@@ -210,18 +210,6 @@ namespace psibase
       httpVersionNotSupported     = 505
    };
 
-   void from_json(HttpStatus& status, auto& stream)
-   {
-      std::uint16_t value;
-      from_json(value, stream);
-      status = static_cast<HttpStatus>(value);
-   }
-
-   void to_json(const HttpStatus& status, auto& stream)
-   {
-      to_json(static_cast<std::uint16_t>(status), stream);
-   }
-
    /// An HTTP reply
    ///
    /// Services return this from their `serveSys` action.

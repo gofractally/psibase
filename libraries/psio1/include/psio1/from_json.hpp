@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <functional>
 #include <optional>
+#include <psio/adapter.hpp>
 #include <psio/detail/nested_fwd.hpp>
 #include <psio1/canonical_bounded.hpp>
 #include <psio1/check.hpp>
@@ -415,7 +416,11 @@ namespace psio1
    }
 
    /// \group from_json_explicit
+   // TEMPORARY: removed when psio1 is deleted.
+   // (the constraint) A variant with a PSIO text adapter is read from that
+   // text, by the overload for types with a text adapter below.
    template <typename... T, typename S>
+      requires(!::psio::has_adapter_v<std::variant<T...>, ::psio::text_category>)
    void from_json(std::variant<T...>& result, S& stream)
    {
       if (stream.peek_token().get().type == json_token_type::type_start_object)
@@ -596,20 +601,6 @@ namespace psio1
       {
          T::reflection_not_defined;
       }
-   }
-
-   // TEMPORARY: removed when psio1 is deleted.
-   // A PSIO packed value (psio::nested, psio::pssz_buffer, psio::shared_pssz)
-   // is read as this library read its own packed values: the hex of its
-   // bytes, which are validated.
-   template <typename T, typename S>
-      requires ::psio::detail::is_nested_v<T>
-   void from_json(T& obj, S& stream)
-   {
-      std::vector<char> bytes;
-      from_json(bytes, stream);
-      if (auto status = T::checked(std::span<const char>{bytes}, obj); !status.ok())
-         abort_error(status.error().what);
    }
 
    // TEMPORARY: removed when psio1 is deleted.

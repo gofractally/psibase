@@ -1,5 +1,7 @@
 #include <psibase/serviceEntry.hpp>
 
+#include <cassert>
+
 namespace psibase
 {
    Action makeVerify(const Checksum256&    transactionHash,

@@ -53,8 +53,7 @@ namespace
                               .method      = "POST",
                               .target      = "/register_server",
                               .contentType = "application/json"};
-      psio1::vector_stream stream{req.body};
-      to_json(server, stream);
+      psio::to_ijson(server, req.body);
       return req;
    }
 }  // namespace
@@ -132,8 +131,7 @@ void load_local_packages(TransactionContext&           tc,
           .target      = "/postinstall",
           .contentType = "application/json",
       };
-      psio1::vector_stream stream(postinstall.body);
-      to_json(
+      psio::to_ijson(
           LocalPackage{
               .name        = package.meta.name,
               .version     = package.meta.version,
@@ -143,7 +141,7 @@ void load_local_packages(TransactionContext&           tc,
               .services    = package.meta.services,
               .sha256      = package.sha256,
           },
-          stream);
+          postinstall.body);
       requests.push_back(std::move(postinstall));
    }
 

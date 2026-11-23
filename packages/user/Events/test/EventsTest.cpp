@@ -32,9 +32,7 @@ std::vector<R> query(TestChain& chain, std::string_view s)
         << " " << std::string(response.body.begin(), response.body.end()));
    CHECK(response.status == HttpStatus::ok);
    CHECK(response.contentType == "application/json");
-   response.body.push_back('\0');
-   psio1::json_token_stream stream(response.body.data());
-   return psio1::from_json<std::vector<R>>(stream);
+   return psio::from_ijson<std::vector<R>>(response.body);
 }
 
 struct ExplainQueryPlan
@@ -63,7 +61,7 @@ template <typename T>
    requires requires { typename T::json_stream_operator; }
 std::ostream& operator<<(std::ostream& os, const T& value)
 {
-   os << psio1::convert_to_json(value) << std::endl;
+   os << psio::to_ijson(value) << std::endl;
    return os;
 }
 

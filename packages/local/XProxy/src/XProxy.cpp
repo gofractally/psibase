@@ -96,8 +96,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest request, std::optional<std
             return makeError(HttpStatus::unsupportedMediaType, msg);
          }
          auto table = open<OriginServerTable>();
-         auto row   = psio1::convert_from_json<OriginServerRow>(
-             std::string(request.body.begin(), request.body.end()));
+         auto row   = psio::from_ijson<OriginServerRow>(request.body);
 
          if (row.host.empty())
          {
@@ -124,8 +123,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest request, std::optional<std
             std::string_view msg = "Content-Type must be application/json\n";
             return makeError(HttpStatus::unsupportedMediaType, msg);
          }
-         auto originSubdomain = psio1::convert_from_json<AccountNumber>(
-             std::string(request.body.begin(), request.body.end()));
+         auto originSubdomain = psio::from_ijson<AccountNumber>(request.body);
          auto table = open<OriginServerTable>();
          PSIBASE_SUBJECTIVE_TX
          {

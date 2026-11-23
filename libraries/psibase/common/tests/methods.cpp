@@ -417,17 +417,51 @@ TEST_CASE("methods: a signed transaction holds its transaction packed", "[method
 
 TEST_CASE("methods: packing an action from JSON", "[methods]")
 {
-   CHECK(fracpackActionFromJson<Ledger>("transfer", R"({"from":"bob","memo":"rent","amount":5})") ==
+   // An object keyed by parameter name ...
+   CHECK(packActionFromJson<Ledger>("transfer", R"({"from":"bob","memo":"rent","amount":5})") ==
          psio::to_pssz(TransferArgs{AccountNumber{"bob"}, "rent", std::int32_t{5}}));
-   // Arguments are matched by name, in any order; one that is absent keeps its default.
-   CHECK(fracpackActionFromJson<Ledger>("transfer", R"({"memo":"rent","from":"bob"})") ==
+   // ... in any order; an optional argument may be left out; a member that
+   // names no parameter is skipped.
+   CHECK(packActionFromJson<Ledger>("transfer", R"({"memo":"rent","from":"bob"})") ==
          psio::to_pssz(TransferArgs{AccountNumber{"bob"}, "rent", std::nullopt}));
-   CHECK(fracpackActionFromJson<Ledger>("locate", R"({"dx":3,"at":{"x":4,"label":"here"}})") ==
+   CHECK(
+       packActionFromJson<Ledger>("transfer", R"({"memo":"rent","note":{"x":[1]},"from":"bob"})") ==
+       psio::to_pssz(TransferArgs{AccountNumber{"bob"}, "rent", std::nullopt}));
+   CHECK(packActionFromJson<Ledger>("locate", R"({"dx":3,"at":{"x":4,"label":"here"}})") ==
          psio::to_pssz(std::tuple{Point{4, "here"}, std::int32_t{3}}));
-   CHECK(fracpackActionFromJson<Ledger>("init", "{}") == psio::to_pssz(std::tuple{}));
+   // Or the positional array, one element per parameter.
+   CHECK(packActionFromJson<Ledger>("transfer", R"(["bob","rent",5])") ==
+         psio::to_pssz(TransferArgs{AccountNumber{"bob"}, "rent", std::int32_t{5}}));
+   CHECK(packActionFromJson<Ledger>("locate", R"([{"x":4,"label":"here"},3])") ==
+         psio::to_pssz(std::tuple{Point{4, "here"}, std::int32_t{3}}));
+   // Parameters the reflection does not name: the array only.
+   CHECK(packActionFromJson<Ledger>("unnamed", "[6,7]") ==
+         psio::to_pssz(std::tuple{std::int32_t{6}, std::int32_t{7}}));
+   CHECK(packActionFromJson<Ledger>("init", "{}") == psio::to_pssz(std::tuple{}));
+   CHECK(packActionFromJson<Ledger>("init", "[]") == psio::to_pssz(std::tuple{}));
    // The action is named as it is written in the source.
-   CHECK(!fracpackActionFromJson<Ledger>("missing", "{}"));
-   CHECK(!fracpackActionFromJson<Ledger>("noted", "{}"));
+   CHECK(!packActionFromJson<Ledger>("missing", "{}"));
+   CHECK(!packActionFromJson<Ledger>("noted", "{}"));
+
+   // What the endpoint refuses (it aborts with the action's name and this
+   // message): the reader is PSIO's, over the argument list.
+   using Transfer = psio::reflect<Ledger>::method_arg_tuple<1>;
+   auto refusal   = [](std::string_view json)
+   {
+      Transfer args{};
+      auto     status = psio::decode_json_checked(
+          psio::ijson{}, std::span<const char>{json.data(), json.size()}, args);
+      return status.ok() ? std::string{} : std::string{status.error().what};
+   };
+   CHECK(refusal(R"({"from":"bob","memo":"rent"})") == "");
+   // A required argument that is missing is named.
+   CHECK(refusal(R"({"from":"bob"})") == R"(json: missing required member "memo")");
+   CHECK(refusal(R"({"memo":"rent","amount":5})") == R"(json: missing required member "from")");
+   CHECK(refusal(R"(["bob","rent"])") != "");
+   CHECK(refusal(R"(["bob","rent",5,6])") != "");
+   // A 32-bit number is a number, an account name is canonical.
+   CHECK(refusal(R"({"from":"bob","memo":"rent","amount":"5"})") != "");
+   CHECK(refusal(R"({"from":"Bob","memo":"rent"})") == "AccountNumber: not an account name");
 }
 
 TEST_CASE("methods: action templates", "[methods]")
@@ -438,7 +472,7 @@ TEST_CASE("methods: action templates", "[methods]")
          R"("transfer":{"from":"","memo":"","amount":null},)"
          R"("balance":{"who":""},)"
          R"("locate":{"at":{"x":0,"label":""},"dx":0},)"
-         R"("unnamed":{"error_missing_arg_name":0,"error_missing_arg_name":0},)"
+         R"("unnamed":[0,0],)"
          R"("get_staged_tx":{"id":0}})");
    const auto none = generateActionJsonTemplate<EmptyService>();
    CHECK(std::string(none.begin(), none.end()) == "{}");

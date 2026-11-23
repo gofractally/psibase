@@ -2,20 +2,21 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/LogSocket.hpp>
 #include <psibase/NativeFunctions.hpp>
+#include <psibase/NativeVM.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/api.hpp>
+#include <psibase/finally.hpp>
 #include <psibase/log.hpp>
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/version.hpp>
-#include <psibase/finally.hpp>
-#include <psio1/to_bin.hpp>
-#include <psio1/to_json.hpp>
+#include <psio/json.hpp>
+#include <psio/json_value.hpp>
 #include <psio/pssz_view.hpp>
-#include <psibase/NativeVM.hpp>
+#include <psio1/to_bin.hpp>
 #include <psizam/debug/debug.hpp>
 #include "VmConsensusReplay.hpp"
 
@@ -2015,8 +2016,8 @@ int main(int argc, char* argv[])
    }
    try
    {
-      psibase::loggers::configure(
-          psio1::convert_from_json<psibase::loggers::Config>(psio1::convert_to_json(logConfig)));
+      psibase::loggers::configure(psibase::loggers::Config::fromJson(
+          psio::from_ijson<psio::json_value>(psio::to_ijson(logConfig))));
       std::vector<std::string> args{argv + next_arg, argv + argc};
       psibase::ExecutionContext::registerHostFunctions();
       register_callbacks();

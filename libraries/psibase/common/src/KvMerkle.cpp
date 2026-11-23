@@ -2,6 +2,8 @@
 
 #include <psibase/api.hpp>
 
+#include <cassert>
+
 namespace
 {
    std::size_t common_prefix_bits(unsigned char lhs, unsigned char rhs)

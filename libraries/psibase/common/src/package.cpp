@@ -294,9 +294,10 @@ namespace psibase
       check(!!meta_index, "Service does not contain meta.json");
       {
          auto metaContents = archive.getEntry(*meta_index).read();
-         metaContents.push_back('\0');
-         psio1::json_token_stream stream(metaContents.data());
-         psio1::from_json(meta, stream);
+         if (auto status = psio::decode_json_checked(psio::ijson{},
+                                                     std::span<const char>{metaContents}, meta);
+             !status.ok())
+            abortMessage("meta.json: " + std::string(status.error().what));
       }
       for (const auto& [account, file] : service_files)
       {
@@ -469,36 +470,26 @@ namespace psibase
 
    std::vector<char> PackagedService::manifest()
    {
-      std::vector<char>   manifest;
-      psio1::vector_stream stream{manifest};
-      bool                first = true;
-      stream.write('{');
-      to_json("services", stream);
-      stream.write(':');
-      stream.write('{');
+      // {"services":{<account>:ServiceInfo},"data":[{"account","filename"}]}
+      std::vector<char> manifest;
+      auto              write = [&](std::string_view text)
+      { manifest.insert(manifest.end(), text.begin(), text.end()); };
+      bool first = true;
+      write(R"({"services":{)");
       for (const auto& [account, header, info] : services)
       {
          if (first)
             first = false;
          else
-            stream.write(',');
-         to_json(account, stream);
-         stream.write(':');
-         to_json(info, stream);
+            write(",");
+         psio::to_ijson(account, manifest);
+         write(":");
+         psio::to_ijson(info, manifest);
       }
-      stream.write('}');
-      stream.write(',');
-      to_json("data", stream);
-      stream.write(':');
-      stream.write('[');
+      write(R"(},"data":[)");
       first = true;
       for (const auto& [sender, index] : data)
       {
-         AccountNumber service = Sites::service;
-         if (hasService(sender))
-         {
-            service = sender;
-         }
          auto path = index.filename.substr(5);
          auto pos  = path.find('/');
          assert(pos != std::string::npos);
@@ -507,20 +498,14 @@ namespace psibase
          if (first)
             first = false;
          else
-            stream.write(',');
-         stream.write('{');
-         to_json("account", stream);
-         stream.write(':');
-         to_json(sender, stream);
-         stream.write(',');
-
-         to_json("filename", stream);
-         stream.write(':');
-         to_json(path, stream);
-         stream.write('}');
+            write(",");
+         write(R"({"account":)");
+         psio::to_ijson(sender, manifest);
+         write(R"(,"filename":)");
+         psio::to_ijson(path, manifest);
+         write("}");
       }
-      stream.write(']');
-      stream.write('}');
+      write("]}");
 
       return manifest;
    }
@@ -565,9 +550,10 @@ namespace psibase
       std::vector<PackageInfo> result;
       {
          auto index_json = readWholeFile(path + "/index.json");
-         index_json.push_back('\0');
-         psio1::json_token_stream stream(index_json.data());
-         from_json(result, stream);
+         if (auto status = psio::decode_json_checked(psio::ijson{},
+                                                     std::span<const char>{index_json}, result);
+             !status.ok())
+            abortMessage(path + "/index.json: " + std::string(status.error().what));
       }
       return result;
    }

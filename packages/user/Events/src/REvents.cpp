@@ -825,17 +825,28 @@ sqlite3_module eventModule = {
     .xRowid      = event_rowid,
 };
 
-void column_to_json(sqlite3_stmt* stmt, int i, auto& stream)
+// Appends `"<column name>":<value>` of column i of the current row.
+// INTEGER and REAL are numbers (a 64-bit integer beyond 2^53 - 1 is a
+// decimal string, as everywhere in I-JSON), TEXT a string (a JSON column
+// is its value), BLOB upper-case hex. A value with no JSON text (a
+// non-finite REAL, TEXT that is not UTF-8) is null.
+void column_to_json(sqlite3_stmt* stmt, int i, std::vector<char>& out)
 {
-   to_json(sqlite3_column_name(stmt, i), stream);
-   write_colon(stream);
+   auto write = [&](std::string_view text) { out.insert(out.end(), text.begin(), text.end()); };
+   auto value = [&](const auto& v)
+   {
+      if (!psio::encode_json_checked(psio::ijson{}, v, out).ok())
+         write("null");
+   };
+   value(std::string_view{sqlite3_column_name(stmt, i)});
+   write(":");
    switch (sqlite3_column_type(stmt, i))
    {
       case SQLITE_INTEGER:
-         to_json(sqlite3_column_int64(stmt, i), stream);
+         value(static_cast<std::int64_t>(sqlite3_column_int64(stmt, i)));
          break;
       case SQLITE_FLOAT:
-         to_json(sqlite3_column_double(stmt, i), stream);
+         value(sqlite3_column_double(stmt, i));
          break;
       case SQLITE_TEXT:
       {
@@ -844,18 +855,18 @@ void column_to_json(sqlite3_stmt* stmt, int i, auto& stream)
          if (result.starts_with(jsonPrefix))
          {
             result.remove_prefix(jsonPrefix.size());
-            stream.write(result.data(), result.size());
+            write(result);
          }
          else
-            to_json(result, stream);
+            value(result);
          break;
       }
       case SQLITE_BLOB:
-         to_json_hex(reinterpret_cast<const char*>(sqlite3_column_text(stmt, i)),
-                     static_cast<std::size_t>(sqlite3_column_bytes(stmt, i)), stream);
+         value(std::span<const char>{reinterpret_cast<const char*>(sqlite3_column_blob(stmt, i)),
+                                     static_cast<std::size_t>(sqlite3_column_bytes(stmt, i))});
          break;
       case SQLITE_NULL:
-         stream.write("null", 4);
+         write("null");
          break;
    }
 }
@@ -929,9 +940,8 @@ static std::vector<char> sqlQueryImpl(AccountNumber                   user,
       check(query.size() <= std::numeric_limits<int>::max(), "Query too large");
       const char*         ptr = query.data();
       const char*         end = query.data() + query.size();
-      psio1::vector_stream stream{result};
       bool                firstRow = true;
-      stream.write('[');
+      result.push_back('[');
       while (ptr != end)
       {
          sqlite3_stmt* stmt;
@@ -956,16 +966,16 @@ static std::vector<char> sqlQueryImpl(AccountNumber                   user,
                if (firstRow)
                   firstRow = false;
                else
-                  stream.write(',');
-               stream.write('{');
+                  result.push_back(',');
+               result.push_back('{');
                int nColumns = sqlite3_column_count(stmt);
                for (int i = 0; i < nColumns; ++i)
                {
                   if (i != 0)
-                     stream.write(',');
-                  column_to_json(stmt, i, stream);
+                     result.push_back(',');
+                  column_to_json(stmt, i, result);
                }
-               stream.write('}');
+               result.push_back('}');
             }
             else
             {
@@ -981,7 +991,7 @@ static std::vector<char> sqlQueryImpl(AccountNumber                   user,
             abortMessage(std::string("sqlite3_prepare_v2: ") + sqlite3_errmsg(db));
          }
       }
-      stream.write(']');
+      result.push_back(']');
    }
 
    return result;

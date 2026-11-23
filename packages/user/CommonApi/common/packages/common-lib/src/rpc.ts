@@ -249,21 +249,20 @@ export async function packSignedTransaction(
     baseUrl: string,
     signedTransaction: any,
 ) {
-    if (typeof signedTransaction.transaction !== "string")
-        signedTransaction = {
-            ...signedTransaction,
-            transaction: uint8ArrayToHex(
-                new Uint8Array(
-                    await packTransaction(
-                        baseUrl,
-                        signedTransaction.transaction,
-                    ),
-                ),
-            ),
-        };
+    // The `transaction` member is the transaction object itself (its
+    // actions packed), not the hex of its packed bytes.
     return await postJsonGetArrayBuffer(
         baseUrl.replace(/\/+$/, "") + "/common/pack/SignedTransaction",
-        signedTransaction,
+        {
+            ...signedTransaction,
+            transaction: {
+                ...signedTransaction.transaction,
+                actions: await packActions(
+                    baseUrl,
+                    signedTransaction.transaction.actions,
+                ),
+            },
+        },
     );
 }
 
@@ -302,10 +301,15 @@ export async function signTransaction(
         service: "verify-sig",
         rawData: uint8ArrayToHex(publicKeyPairToDER(k)),
     }));
-    transaction = new Uint8Array(
-        await packTransaction(baseUrl, { ...transaction, claims }),
-    );
-    const digest = new (hashJs as any).sha256().update(transaction).digest();
+    // The signed transaction holds the transaction object; what is signed
+    // is the digest of its packed bytes.
+    transaction = {
+        ...transaction,
+        actions: await packActions(baseUrl, transaction.actions),
+        claims,
+    };
+    const packed = new Uint8Array(await packTransaction(baseUrl, transaction));
+    const digest = new (hashJs as any).sha256().update(packed).digest();
     const proofs = keys.map((k) =>
         uint8ArrayToHex(
             signatureToBin({
@@ -314,8 +318,7 @@ export async function signTransaction(
             }),
         ),
     );
-    const signedTransaction = uint8ArrayToHex(transaction);
-    const result = { transaction: signedTransaction, proofs };
+    const result = { transaction, proofs };
     return result;
 }
 

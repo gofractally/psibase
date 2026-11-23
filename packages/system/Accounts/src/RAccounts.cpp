@@ -4,8 +4,6 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
-#include <psio1/from_json.hpp>
-#include <psio1/to_json.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 

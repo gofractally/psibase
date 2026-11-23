@@ -241,8 +241,7 @@ namespace
                                        .method      = "POST",
                                        .target      = "/register_server",
                                        .contentType = "application/json"};
-               psio1::vector_stream stream{req.body};
-               to_json(RegisteredServiceRow{account, *serviceInfo.server}, stream);
+               psio::to_ijson(RegisteredServiceRow{account, *serviceInfo.server}, req.body);
                if (account == XPackages::service)
                   early_requests.push_back(std::move(req));
                else
@@ -277,8 +276,7 @@ namespace
              .target      = "/postinstall",
              .contentType = "application/json",
          };
-         psio1::vector_stream stream(postinstall.body);
-         to_json(
+         psio::to_ijson(
              LocalPackage{
                  .name        = package.meta.name,
                  .version     = package.meta.version,
@@ -288,7 +286,7 @@ namespace
                  .services    = package.meta.services,
                  .sha256      = package.sha256,
              },
-             stream);
+             postinstall.body);
          requests.push_back(std::move(postinstall));
       }
       psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
@@ -429,11 +427,10 @@ void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 
 void psibase::TestChain::startBlock(std::string_view time)
 {
-   std::int64_t  sec;
-   std::uint32_t nsec;
-   if (!psio1::parse_system_time(time, sec, nsec))
+   auto tp = psio::from_rfc3339<TimePointUSec>(time);
+   if (!tp)
       abortMessage("bad time");
-   startBlock(TimePointUSec{Seconds{sec} + MicroSeconds{nsec / 1000}});
+   startBlock(*tp);
 }
 
 void psibase::TestChain::startBlock(BlockTime tp)
@@ -709,9 +706,8 @@ void psibase::TestChain::pushBlock(const SignedBlock& block)
    BlockInfo info{header};
    if (info.blockId != status->head->blockId)
    {
-      abortMessage(std::format("block header does not match: {} != {}",
-                               psio1::convert_to_json(info.header),
-                               psio1::convert_to_json(status->head->header)));
+      abortMessage(std::format("block header does not match: {} != {}", psio::to_ijson(info.header),
+                               psio::to_ijson(status->head->header)));
    }
 }
 

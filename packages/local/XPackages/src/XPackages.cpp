@@ -68,8 +68,7 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
          return error(request, HttpStatus::unsupportedMediaType,
                       "Content-Type must be application/json\n");
       }
-      auto package =
-          psio1::convert_from_json<LocalPackage>(std::string(request.body.begin(), request.body.end()));
+      auto package      = psio::from_ijson<LocalPackage>(request.body);
       auto pendingTable = open<PendingLocalPackagesTable>();
       PSIBASE_SUBJECTIVE_TX
       {
@@ -96,8 +95,7 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
          return error(request, HttpStatus::unsupportedMediaType,
                       "Content-Type must be application/json\n");
       }
-      auto package =
-          psio1::convert_from_json<LocalPackage>(std::string(request.body.begin(), request.body.end()));
+      auto package      = psio::from_ijson<LocalPackage>(request.body);
       auto table        = open<LocalPackagesTable>();
       auto pendingTable = open<PendingLocalPackagesTable>();
       PSIBASE_SUBJECTIVE_TX

@@ -65,9 +65,9 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
     tapos: {
         refBlockIndex: ...,   // Identifies block
         refBlockSuffix: ...,  // Identifies block
-        expiration: "..."     // When transaction expires (UTC)
+        expiration: "...",    // When transaction expires (UTC), in whole seconds
                               // Example value: "2022-05-31T21:32:23Z"
-                              // Use `new Date(...)` to generate the correct format.
+        flags: 0              // Required
     },
     actions: [],        // See below
 }

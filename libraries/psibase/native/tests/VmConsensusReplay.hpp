@@ -2,12 +2,11 @@
 
 // Opt-in capture of an existing test's real block. This is verification
 // instrumentation, not a new workload or part of the chain wire format.
-#include <psibase/crypto.hpp>
-#include <psibase/check.hpp>
-#include <psibase/db.hpp>
-#include <psio1/from_json.hpp>
-#include <psio1/to_json.hpp>
 #include <openssl/evp.h>
+#include <psibase/check.hpp>
+#include <psibase/crypto.hpp>
+#include <psibase/db.hpp>
+#include <psio/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -292,7 +291,7 @@ namespace psibase::vm_consensus_replay
          manifest.blockSha256 = fileHash(directory / "block.frac");
          std::ofstream json(directory / "manifest.json");
          json.exceptions(std::ios::badbit | std::ios::failbit);
-         json << psio1::convert_to_json(manifest) << '\n';
+         json << psio::to_ijson(manifest) << '\n';
          json.close();
          complete = true;
       }

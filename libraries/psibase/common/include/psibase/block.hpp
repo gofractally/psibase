@@ -5,14 +5,16 @@
 #include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/time.hpp>
-#include <psio/reflect.hpp>
-#include <psio1/from_json.hpp>
 #include <psio/buffer.hpp>
 #include <psio/invariant.hpp>
+#include <psio/json.hpp>
 #include <psio/mutable_view.hpp>
 #include <psio/pssz.hpp>
 #include <psio/pssz_view.hpp>
-#include <psio1/to_json.hpp>
+#include <psio/reflect.hpp>
+// Byte-range parameter types (psio1::input_stream, psio1::vector_stream):
+// moved off psio1 with the remaining stream uses.
+#include <psio1/stream.hpp>
 
 namespace psibase
 {

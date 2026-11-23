@@ -483,8 +483,16 @@ namespace
       if (!jsonClients.empty())
       {
          HttpReply reply{.contentType = "application/json", .headers = allowCors()};
-         psio1::vector_stream stream{reply.body};
-         to_json(pruned, stream);
+         // A trace may hold a string with no JSON text (an abort message that
+         // is not UTF-8): the clients are told so rather than left waiting.
+         if (!psio::encode_json_checked(psio::ijson{}, pruned, reply.body).ok())
+         {
+            std::string_view msg = "The transaction trace has no JSON text";
+            reply                = HttpReply{.status      = HttpStatus::internalServerError,
+                                             .contentType = "text/plain",
+                                             .body        = std::vector(msg.begin(), msg.end()),
+                                             .headers     = allowCors()};
+         }
          send(reply, jsonClients);
       }
 
@@ -1214,12 +1222,7 @@ namespace
       T result;
       if (request.contentType == "application/json")
       {
-         std::vector<char> body;
-         body.reserve(request.body.size() + 1);
-         body.insert(body.end(), request.body.begin(), request.body.end());
-         body.push_back('\0');
-         psio1::json_token_stream stream(body.data());
-         from_json(result, stream);
+         result = psio::from_ijson<T>(request.body);
       }
       else if (request.contentType == "application/octet-stream")
       {
@@ -1487,8 +1490,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
                                                             .exp = exp.time_since_epoch().count()});
          HttpReply           reply{.contentType = "application/json",
                                    .headers     = allowCors(request, AccountNumber{"supervisor"})};
-         psio1::vector_stream stream{reply.body};
-         to_json(LoginReply{token}, stream);
+         psio::to_ijson(LoginReply{token}, reply.body);
          return reply;
       }
       else
@@ -1524,13 +1526,12 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
           .contentType = "application/json",
           .headers     = allowCors(request, AccountNumber{"x-admin"}),
       };
-      psio1::vector_stream stream{reply.body};
-      TxStatsRecord       stats;
+      TxStatsRecord stats;
       PSIBASE_SUBJECTIVE_TX
       {
          stats = open<TxStatsTable>().get({}).value_or(TxStatsRecord{});
       }
-      to_json(stats, stream);
+      psio::to_ijson(stats, reply.body);
       return reply;
    }
    else if (auto result = serveGraphQL(request, TransactQuery{}))

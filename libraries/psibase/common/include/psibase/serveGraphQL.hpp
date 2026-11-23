@@ -6,9 +6,10 @@
 #include <psibase/Table.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/fixed_string.hpp>
+#include <psio/json.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/graphql.hpp>
 #include <psio/to_hex.hpp>
+#include <psio1/graphql.hpp>
 
 namespace psibase
 {
@@ -70,8 +71,7 @@ namespace psibase
          }
          else if (request.contentType == "application/json")
          {
-            auto q =
-                psio1::convert_from_json<GraphQLQuery>({request.body.data(), request.body.size()});
+            auto q = psio::from_ijson<GraphQLQuery>(request.body);
             return doit(q.query, {});
          }
       }
@@ -786,7 +786,57 @@ namespace psibase
              " )",
              values);
          auto json = sql_query(sql, {}, debug);
-         return psio1::convert_from_json<std::vector<RowBlockStart>>(json);
+         return psio::from_ijson<std::vector<RowBlockStart>>(json);
+      }
+   }  // namespace detail
+
+   namespace detail
+   {
+      // Reads the result of an SQL query over an event table,
+      // `[{"rowid":…, <the members of T, flattened>…}, …]`: each column is
+      // read into the member of T of that name; other columns are skipped.
+      // Aborts with the reader's message when `json` is not such a text.
+      template <typename T>
+      std::vector<SqlRow<T>> read_sql_rows(std::string_view json)
+      {
+         std::vector<SqlRow<T>> rows;
+         psio::json_text_cursor cursor{std::span<const char>{json.data(), json.size()}, true};
+         psio::json_reader      reader{psio::ijson{}, cursor};
+         auto                   read = [&]
+         {
+            bool             has = false, known = false;
+            std::string_view key;
+            if (!cursor.begin_array())
+               return false;
+            for (;;)
+            {
+               if (!cursor.next_element(has))
+                  return false;
+               if (!has)
+                  return cursor.finish();
+               SqlRow<T> row{};
+               if (!cursor.begin_object())
+                  return false;
+               for (;;)
+               {
+                  if (!cursor.next_field(has, key))
+                     return false;
+                  if (!has)
+                     break;
+                  if (key == "rowid")
+                  {
+                     if (!reader.read(row.rowid))
+                        return false;
+                  }
+                  else if (!reader.read_member(key, row.data, known) || (!known && !reader.skip()))
+                     return false;
+               }
+               rows.push_back(std::move(row));
+            }
+         };
+         if (!read())
+            abortMessage("SQL result: " + std::string(reader.status().error().what));
+         return rows;
       }
    }  // namespace detail
 
@@ -959,7 +1009,7 @@ namespace psibase
 
          auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
          auto json_str  = detail::sql_query(query_str, _params, _debug);
-         auto rows      = psio1::convert_from_json<std::vector<SqlRow<T>>>(json_str);
+         auto rows      = detail::read_sql_rows<T>(json_str);
 
          if (_debug)
          {
@@ -1065,31 +1115,5 @@ namespace psibase
       bool                       _debug = false;
 
    };  // EventQuery
-
-   template <typename T>
-   void from_json(SqlRow<T>& s, auto& stream)
-   {
-      from_json_object(stream,
-                       [&](std::string_view key)
-                       {
-                          if (key == "rowid")
-                          {
-                             std::string rowid_str;
-                             from_json(rowid_str, stream);
-                             auto [ptr, ec] = std::from_chars(
-                                 rowid_str.data(), rowid_str.data() + rowid_str.size(), s.rowid);
-                             check(ec == std::errc{}, "Invalid rowid");
-                          }
-                          else
-                          {
-                             bool found = psio::reflect<T>::visit_field_by_name(
-                                 s.data, key, [&](auto& member) { from_json(member, stream); });
-                             if (!found)
-                             {
-                                from_json_skip_value(stream);
-                             }
-                          }
-                       });
-   }
 
 }  // namespace psibase

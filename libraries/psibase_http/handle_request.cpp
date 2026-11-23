@@ -13,9 +13,9 @@
 #include <psibase/Socket.hpp>
 #include <psibase/TransactionContext.hpp>
 #include <psibase/WebSocket.hpp>
-#include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
-#include <psio1/to_json.hpp>
+#include <psibase/serviceEntry.hpp>
+#include <psio/json.hpp>
 #include <unordered_set>
 
 namespace beast     = boost::beast;
@@ -498,9 +498,11 @@ namespace psibase::http
                     {
                        if constexpr (!std::is_same_v<std::decay_t<decltype(body)>, std::string>)
                        {
-                          std::vector<char>   data;
-                          psio1::vector_stream stream{data};
-                          psio1::to_json(body, stream);
+                          std::vector<char> data;
+                          if (auto status = psio::encode_json_checked(psio::ijson{}, body, data);
+                              !status.ok())
+                             return builder.error(bhttp::status::internal_server_error,
+                                                  std::string(status.error().what));
                           return builder.ok(std::move(data), "application/json");
                        }
                        else
@@ -515,14 +517,17 @@ namespace psibase::http
       // Anything that can serialized as json
       void runNativeHandlerJsonNoFail(auto&& request_handler)
       {
-         runNativeHandler(request_handler,
-                          [builder = HttpReplyBuilder{session->server, req}](auto&& result)
-                          {
-                             std::vector<char>   data;
-                             psio1::vector_stream stream{data};
-                             psio1::to_json(result, stream);
-                             return builder.ok(std::move(data), "application/json");
-                          });
+         runNativeHandler(
+             request_handler,
+             [builder = HttpReplyBuilder{session->server, req}](auto&& result)
+             {
+                std::vector<char> data;
+                if (auto status = psio::encode_json_checked(psio::ijson{}, result, data);
+                    !status.ok())
+                   return builder.error(bhttp::status::internal_server_error,
+                                        std::string(status.error().what));
+                return builder.ok(std::move(data), "application/json");
+             });
       }
 
       // optional<string>
@@ -632,9 +637,8 @@ namespace psibase::http
                                                [](auto& tmp) { tmp.needgenesis = false; });
                   }
                }
-               std::vector<char>   body;
-               psio1::vector_stream stream{body};
-               to_json(status, stream);
+               std::vector<char> body;
+               psio::to_ijson(statusNames(status), body);
                send(builder.ok(std::move(body), "application/json"));
             }
             else

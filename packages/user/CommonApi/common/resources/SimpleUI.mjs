@@ -26,7 +26,9 @@ async function pushTransaction(transaction, keys, addMsg, clearMsg) {
             })
         );
         addMsg("getting tapos");
+        // Every member of the tapos must be sent
         transaction.tapos = {
+            flags: 0,
             ...(await getTaposForHeadBlock()),
             ...transaction.tapos,
         };
@@ -65,7 +67,12 @@ function ActionButtons({ setTrx }) {
                 JSON.stringify(
                     {
                         tapos: {
-                            expiration: new Date(Date.now() + 10 * 60 * 1000),
+                            // The expiration is in whole seconds
+                            expiration: new Date(
+                                Math.floor(Date.now() / 1000) * 1000 +
+                                    10 * 60 * 1000
+                            ),
+                            flags: 0,
                         },
                         actions: [
                             {

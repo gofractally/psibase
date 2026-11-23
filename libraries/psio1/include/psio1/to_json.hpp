@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <psio/adapter.hpp>
 #include <psio/detail/nested_fwd.hpp>
 #include <psio/view.hpp>
 #include <psio1/reflect.hpp>
@@ -231,7 +232,12 @@ template <typename S> void to_json(float value, S& stream)              { return
       }
    }
 
+   // TEMPORARY: removed when psio1 is deleted.
+   // (the constraint) A variant with a PSIO text adapter (psibase's
+   // IPAddress, SocketEndpoint) is written as that text, by the overload
+   // for types with a text adapter below, as GraphQL presents it.
    template <typename... T, typename S>
+      requires(!::psio::has_adapter_v<std::variant<T...>, ::psio::text_category>)
    void to_json(const std::variant<T...>& obj, S& stream)
    {
       std::visit(

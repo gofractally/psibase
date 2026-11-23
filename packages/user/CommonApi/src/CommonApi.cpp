@@ -3,7 +3,7 @@
 #include <psibase/check.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psio1/to_json.hpp>
+#include <psio/json.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/Transact.hpp>
 
@@ -31,11 +31,7 @@ namespace SystemService
       template <typename T>
       T extractData(HttpRequest& request)
       {
-         request.body.push_back(0);
-         psio1::json_token_stream jstream{request.body.data()};
-         auto                    result = psio1::from_json<T>(jstream);
-         request.body.pop_back();
-         return result;
+         return psio::from_ijson<T>(request.body);
       }
 
       bool isAllowedChar(char ch, std::string_view excluded)
@@ -126,7 +122,7 @@ namespace SystemService
    {
       auto to_json = [](const auto& obj)
       {
-         auto json = psio1::convert_to_json(obj);
+         auto json = psio::to_ijson(obj);
          return HttpReply{
              .contentType = "application/json",
              .body        = {json.begin(), json.end()},

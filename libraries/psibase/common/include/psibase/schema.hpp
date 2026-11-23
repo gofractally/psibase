@@ -388,22 +388,4 @@ namespace psibase
    Action toAction(PrettyAction&&                       action,
                    const GetSchemaFn&                   schemas,
                    const psio::pssz_ir::CustomHandlers& handlers);
-
-   // TEMPORARY: removed when psio1 is deleted. The legacy JSON library
-   // (psio1::to_json / from_json, still used by the HTTP endpoints until the
-   // JSON stage) writes a ServiceSchema as its I-JSON text. It cannot read
-   // one: its tokenizer hands numbers over as strings, which the Schema IR
-   // does not accept for its 32-bit members. Nothing reads a schema through
-   // it (package.cpp reads service files with PSIO); the overload exists
-   // because the argument tuples of Packages::setSchema are instantiated
-   // for the legacy /pack_action endpoint, which answers with this message.
-   void to_json(const ServiceSchema& schema, auto& stream)
-   {
-      auto text = psio::to_ijson(schema);
-      stream.write(text.data(), text.size());
-   }
-   void from_json(ServiceSchema&, auto&)
-   {
-      abortMessage("a service schema is read as I-JSON (psio::from_ijson), not by the legacy reader");
-   }
 }  // namespace psibase

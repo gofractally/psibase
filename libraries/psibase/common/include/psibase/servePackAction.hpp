@@ -1,38 +1,20 @@
 #pragma once
 
 #include <psibase/check.hpp>
-#include <psio/reflect.hpp>
+#include <psio/json.hpp>
 #include <psio/pssz.hpp>
-#include <psio1/from_json.hpp>
-#include <psio1/to_json.hpp>
+#include <psio/reflect.hpp>
 
 namespace psibase
 {
-   template <int i, typename... Ts>
-   bool fracpackActionFromJsonImpl(psio1::json_token_stream&         stream,
-                                   std::string_view                  name,
-                                   std::span<const std::string_view> meta,
-                                   std::tuple<Ts...>&                params)
-   {
-      if constexpr (i < std::tuple_size<std::tuple<Ts...>>())
-      {
-         if (i < meta.size() && name == meta[i])
-         {
-            from_json(std::get<i>(params), stream);
-            return true;
-         }
-         else
-         {
-            return fracpackActionFromJsonImpl<i + 1>(stream, name, meta, params);
-         }
-      }
-      return false;
-   }
-
-   // TODO: detect missing non-optional args
+   /// Packs (PSSZ) the arguments of the action `name` of `T` from their
+   /// I-JSON text: an object keyed by parameter name, or the positional
+   /// array. An argument that is not optional must be present; a member
+   /// that names no parameter is skipped. Aborts with the action's name
+   /// and the reader's message when `json` is not such a text. Returns
+   /// nothing when `T` has no action `name`.
    template <typename T>
-   std::optional<std::vector<char>> fracpackActionFromJson(std::string_view name,
-                                                           std::string_view json)
+   std::optional<std::vector<char>> packActionFromJson(std::string_view name, std::string_view json)
    {
       using reflect = psio::reflect<T>;
       std::optional<std::vector<char>> result;
@@ -41,20 +23,13 @@ namespace psibase
           {
              if (methodName == name)
              {
-                constexpr std::size_t                                 I = decltype(index)::value;
+                constexpr std::size_t                          I = decltype(index)::value;
                 typename reflect::template method_arg_tuple<I> params{};
-                std::vector<char>                                     j{json.begin(), json.end()};
-                j.push_back(0);
-                psio1::json_token_stream stream{j.data()};
-                from_json_object(  //
-                    stream,
-                    [&](std::string_view k)
-                    {
-                       if (!fracpackActionFromJsonImpl<0>(
-                               stream, k, reflect::template method_param_names<I>, params))
-                          abortMessage("action '" + std::string(name) +
-                                       "' does not have argument '" + std::string(k) + "'");
-                    });
+                if (auto status = psio::decode_json_checked(
+                        psio::ijson{}, std::span<const char>{json.data(), json.size()}, params);
+                    !status.ok())
+                   abortMessage("action '" + std::string(name) +
+                                "': " + std::string(status.error().what));
                 result = psio::to_pssz(params);
              }
           });
@@ -77,7 +52,7 @@ namespace psibase
       {
          if (request.target.starts_with("/pack_action/"))
          {
-            if (auto result = fracpackActionFromJson<Service>(  //
+            if (auto result = packActionFromJson<Service>(  //
                     std::string_view{request.target}.substr(13),
                     std::string_view{request.body.data(), request.body.size()}))
             {

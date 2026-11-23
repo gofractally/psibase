@@ -103,7 +103,7 @@ SCENARIO("AuthDelegate")
          auto res = t.post(Nft::service, "/graphql", query);
 
          auto body          = std::string(res.body.begin(), res.body.end());
-         auto response_root = psio1::convert_from_json<QueryRoot>(body);
+         auto response_root = psio::from_ijson<QueryRoot>(body);
 
          return response_root.data.nfts.edges.size();
       };

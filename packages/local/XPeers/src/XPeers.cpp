@@ -363,7 +363,7 @@ namespace
 
    void recvMessage(std::int32_t socket, IdMessage&& msg)
    {
-      printf("Id %s\n", psio1::convert_to_json(msg).c_str());
+      printf("Id %s\n", psio::to_ijson(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -390,7 +390,7 @@ namespace
 
    void recvMessage(std::int32_t socket, HostnamesMessage&& msg)
    {
-      printf("Hostnames %s\n", psio1::convert_to_json(msg).c_str());
+      printf("Hostnames %s\n", psio::to_ijson(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -419,7 +419,7 @@ namespace
    // on a different socket will work correctly.
    void recvMessage(std::int32_t socket, CheckDuplicatesMessage&& msg)
    {
-      printf("CheckDuplicates %s\n", psio1::convert_to_json(msg).c_str());
+      printf("CheckDuplicates %s\n", psio::to_ijson(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -435,7 +435,7 @@ namespace
    }
    void recvMessage(std::int32_t socket, DuplicateConnectionMessage&& msg)
    {
-      printf("DuplicateConnection %s\n", psio1::convert_to_json(msg).c_str());
+      printf("DuplicateConnection %s\n", psio::to_ijson(msg).c_str());
       auto table = XPeers{}.open<PeerConnectionTable>();
       PSIBASE_SUBJECTIVE_TX
       {
@@ -626,8 +626,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       }
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
-      auto body = psio1::convert_from_json<ConnectRequest>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<ConnectRequest>(request.body);
       connect(body.url, socket, &request);
 
       return {};
@@ -644,8 +643,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
 
-      auto body = psio1::convert_from_json<DisconnectRequest>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<DisconnectRequest>(request.body);
 
       auto                          table = XPeers{}.open<PeerConnectionTable>();
       std::optional<PeerConnection> row;
@@ -677,8 +675,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
 
-      auto body = psio1::convert_from_json<UserRequest>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<UserRequest>(request.body);
 
       auto table = open<PeerUsernameTable>();
       PSIBASE_SUBJECTIVE_TX
@@ -701,8 +698,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       if (request.method != "POST")
          return HttpReply::methodNotAllowed(request);
 
-      auto body = psio1::convert_from_json<AuthorizationRequest>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<AuthorizationRequest>(request.body);
 
       auto table = open<UrlAuthTable>();
       PSIBASE_SUBJECTIVE_TX
@@ -730,8 +726,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
          }
       }
       HttpReply           reply{.status = HttpStatus::ok, .contentType = "application/json"};
-      psio1::vector_stream stream{reply.body};
-      to_json(result, stream);
+      psio::to_ijson(result, reply.body);
       return reply;
    }
    else if (target == "/urls")
@@ -746,8 +741,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
          }
       }
       HttpReply           reply{.status = HttpStatus::ok, .contentType = "application/json"};
-      psio1::vector_stream stream{reply.body};
-      to_json(result, stream);
+      psio::to_ijson(result, reply.body);
       return reply;
    }
    else if (target == "/graphql")
@@ -857,8 +851,7 @@ void XPeers::onP2P(std::int32_t socket, HttpReply reply)
           .contentType = "application/json",
           .headers     = std::move(request->replyHeaders),
       };
-      psio1::vector_stream stream(reply.body);
-      to_json(*replyBody, stream);
+      psio::to_ijson(*replyBody, reply.body);
       to<XHttp>().sendReply(request->requestSocket, std::move(reply));
    }
    to<XHttp>().send(socket, serializeMessage(IdMessage{myNodeId(), socket}),

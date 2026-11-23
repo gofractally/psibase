@@ -90,7 +90,7 @@ std::string keyId(const psibase::Claim& claim)
       return psio::to_hex(fingerprint.data(), fingerprint.data() + 32, {':'});
    }
    else
-      return psio1::convert_to_json(claim);
+      return psio::to_ijson(claim);
 }
 
 std::size_t weakThreshold(const psibase::BftConsensus& c)

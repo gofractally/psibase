@@ -7,7 +7,6 @@
 
 using namespace psibase;
 using namespace TestService;
-using namespace psio1;
 
 TEST_CASE("memo")
 {
@@ -31,12 +30,12 @@ TEST_CASE("memo")
    CHECK(
        t.from(TestMemo::service).to<TestMemo>().testView(longData).failed("Memo exceeds 80 bytes"));
 
-   CHECK(convert_from_json<Memo>(convert_to_json(shortData)).contents == shortData);
-   CHECK(convert_to_json(Memo{shortData}) == convert_to_json(shortData));
+   CHECK(psio::from_ijson<Memo>(psio::to_ijson(shortData)).contents == shortData);
+   CHECK(psio::to_ijson(Memo{shortData}) == psio::to_ijson(shortData));
    CHECK(t.from(TestMemo::service)
              .to<TestMemo>()
-             .testJson(psio1::convert_to_json(longData))
-             .failed("Memo exceeds 80 bytes"));
+             .testJson(psio::to_ijson(longData))
+             .failed("json: member length_bound violated"));
 
    CHECK(t.from(TestMemo::service)
              .to<TestMemo>()

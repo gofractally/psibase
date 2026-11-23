@@ -69,19 +69,22 @@ namespace SystemService
       requireNew,
    };
 
-   void from_json(NewAccountMode& obj, auto& stream)
-   {
-      std::uint32_t value;
-      from_json(value, stream);
-      psibase::check(value <= 2, "mode out of range");
-      obj = static_cast<NewAccountMode>(value);
-   }
+   PSIO_REFLECT_ENUM(NewAccountMode, keepExisting, matchExisting, requireNew)
 
-   void to_json(const NewAccountMode& obj, auto& stream)
+   /// A `NewAccountMode` is one of its three enumerators: any other value
+   /// is refused wherever one is read or written.
+   inline psio::codec_status newAccountModeInRange(const NewAccountMode& mode) noexcept
    {
-      to_json(static_cast<std::uint32_t>(obj), stream);
+      if (static_cast<std::uint8_t>(mode) <= static_cast<std::uint8_t>(NewAccountMode::requireNew))
+         return psio::codec_ok();
+      return psio::codec_fail("mode out of range", 0, "NewAccountMode");
    }
+}  // namespace SystemService
 
+PSIO_INVARIANT(SystemService::NewAccountMode, SystemService::newAccountModeInRange)
+
+namespace SystemService
+{
    /// This service facilitates the creation of new accounts
    ///
    /// Only the Accounts service itself and the `inviteService` may create new accounts.

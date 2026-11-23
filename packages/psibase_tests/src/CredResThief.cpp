@@ -38,9 +38,7 @@ void CredResThief::create()
                         .body        = std::vector(query.begin(), query.end()),
                     })
                     .value();
-   auto ownerAccount =
-       psio1::convert_from_json<KeyReply>(std::string(reply.body.begin(), reply.body.end()))
-           .data.account;
+   auto ownerAccount = psio::from_ijson<KeyReply>(reply.body).data.account;
    check(ownerAccount.has_value(), "Could not find owner key");
    auto id = to<Credentials>().issue(keyFingerprint(ownerAccount->pubkey), std::nullopt,
                                      std::vector{MethodNumber{"bill"}});

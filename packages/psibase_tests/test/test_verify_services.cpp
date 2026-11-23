@@ -14,7 +14,7 @@ namespace psibase
 {
    std::ostream& operator<<(std::ostream& os, const BlockHeaderAuthAccount& a)
    {
-      return os << psio1::convert_to_json(a);
+      return os << psio::to_ijson(a);
    }
 }  // namespace psibase
 

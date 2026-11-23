@@ -748,15 +748,15 @@ namespace SystemService
             if (!speculative)
             {
                check(id == bootTransactions.front(),
-                     "Wrong transaction during boot " + psio1::convert_to_json(id) +
-                         " != " + psio1::convert_to_json(bootTransactions.front()));
+                     "Wrong transaction during boot " + psio::to_ijson(id) +
+                         " != " + psio::to_ijson(bootTransactions.front()));
                bootTransactions.erase(bootTransactions.begin());
                statusTable.put(*transactStatus);
             }
             else
             {
                check(std::ranges::contains(bootTransactions, id),
-                     "Wrong transaction during boot " + psio1::convert_to_json(id));
+                     "Wrong transaction during boot " + psio::to_ijson(id));
             }
          }
          else if (summary)

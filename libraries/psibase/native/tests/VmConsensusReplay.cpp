@@ -69,7 +69,7 @@ namespace
    {
       std::ofstream output(path);
       output.exceptions(std::ios::badbit | std::ios::failbit);
-      output << psio1::convert_to_json(result) << '\n';
+      output << psio::to_ijson(result) << '\n';
    }
 
    std::string profile()
@@ -88,8 +88,8 @@ namespace
    void run(const std::filesystem::path& input, const std::filesystem::path& output)
    {
       auto manifestBytes = readFile(input / "manifest.json");
-      auto manifest = psio1::convert_from_json<replay::Manifest>(
-          std::string(manifestBytes.data(), manifestBytes.size()));
+      auto manifest      = psio::from_ijson<replay::Manifest>(
+          std::span<const char>{manifestBytes.data(), manifestBytes.size()});
       check(manifest.version == 1, "unsupported replay capture version");
       check(manifest.proofClaims > 0 && manifest.transactions > 0,
             "replay gate requires an existing proof-bearing transaction block");
@@ -189,7 +189,7 @@ namespace
             "replay changed objective database bytes");
       result.passed = true;
       saveResult(output / "result.json", result);
-      std::cout << psio1::convert_to_json(result) << '\n';
+      std::cout << psio::to_ijson(result) << '\n';
    }
 }
 

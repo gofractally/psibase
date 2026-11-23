@@ -1759,9 +1759,9 @@ namespace psibase
             {
                PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
                PSIBASE_LOG(logger, error)
-                   << "The recorded state checksum (" << psio1::convert_to_json(row.state->state)
-                   << ") does not match the newly computed checksum ("
-                   << psio1::convert_to_json(checksum) << ")";
+                   << "The recorded state checksum (" << psio::to_ijson(row.state->state)
+                   << ") does not match the newly computed checksum (" << psio::to_ijson(checksum)
+                   << ")";
                row.state = {.state = checksum};
             }
          }

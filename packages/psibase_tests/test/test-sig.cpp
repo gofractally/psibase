@@ -5,7 +5,7 @@
 
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/to_json.hpp>
+#include <psio/json.hpp>
 
 using namespace psibase;
 

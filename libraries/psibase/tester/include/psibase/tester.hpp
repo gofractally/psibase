@@ -176,16 +176,13 @@ namespace psibase
       static std::string contentType() { return "application/json"; }
       std::vector<char>  body() const
       {
-         std::vector<char>   result;
-         psio1::vector_stream stream{result};
-         to_json(value, stream);
+         std::vector<char> result;
+         psio::to_ijson(value, result);
          return result;
       }
       static JsonBody unpack(std::vector<char> data)
       {
-         data.push_back('\0');
-         psio1::json_token_stream stream(data.data());
-         return {psio1::from_json<T>(stream)};
+         return {psio::from_ijson<T>(std::span<const char>{data})};
       }
       T value;
    };

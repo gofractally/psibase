@@ -662,8 +662,7 @@ auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
       if (request.contentType != "application/json")
          return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
 
-      auto body = psio1::convert_from_json<RegisteredServiceRow>(
-          std::string(request.body.begin(), request.body.end()));
+      auto body = psio::from_ijson<RegisteredServiceRow>(request.body);
       PSIBASE_SUBJECTIVE_TX
       {
          open<RegServTable>().put(body);
@@ -679,8 +678,7 @@ auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
       if (request.contentType != "application/json")
          return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
 
-      auto service =
-          psio1::convert_from_json<AccountNumber>(std::string(request.body.begin(), request.body.end()));
+      auto service = psio::from_ijson<AccountNumber>(request.body);
       PSIBASE_SUBJECTIVE_TX
       {
          auto serverTable = open<RegServTable>();

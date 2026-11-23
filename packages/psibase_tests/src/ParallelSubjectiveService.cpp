@@ -58,15 +58,14 @@ PSIO_REFLECT(IncResponse, attempts, value)
 template <typename T>
 T convert_from_json(const std::vector<char>& data)
 {
-   return psio1::convert_from_json<T>(std::string(data.data(), data.size()));
+   return psio::from_ijson<T>(data);
 }
 
 template <typename T>
 HttpReply json_reply(const T& body)
 {
    HttpReply           response{.contentType = "application/json", .headers = allowCors()};
-   psio1::vector_stream stream{response.body};
-   psio1::to_json(body, stream);
+   psio::to_ijson(body, response.body);
    return response;
 }
 

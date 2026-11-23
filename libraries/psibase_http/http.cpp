@@ -361,6 +361,51 @@ namespace psibase::http
    }
 
    template <bool Secure>
+   any_listen_spec to_any(const tcp_listen_spec<Secure>& spec)
+   {
+      return {.protocol = Secure ? "https" : "http",
+              .address  = spec.endpoint.address().to_string(),
+              .port     = spec.endpoint.port()};
+   }
+
+   any_listen_spec to_any(const local_listen_spec& spec)
+   {
+      return {.protocol = "local", .path = spec.path()};
+   }
+
+   any_listen_spec to_any_listen_spec(const listen_spec& spec)
+   {
+      return std::visit([](const auto& spec) { return to_any(spec); }, spec);
+   }
+
+   listen_spec from_any_listen_spec(const any_listen_spec& spec)
+   {
+      auto endpoint = [&]
+      {
+         if (!spec.address)
+            throw std::runtime_error("listen: address expected");
+         if (!spec.port)
+            throw std::runtime_error("listen: port expected");
+         boost::system::error_code ec;
+         auto                      address = boost::asio::ip::make_address(*spec.address, ec);
+         if (ec)
+            throw std::runtime_error("listen: invalid address: " + *spec.address);
+         return boost::asio::ip::tcp::endpoint{address, *spec.port};
+      };
+      if (spec.protocol == "http")
+         return tcp_listen_spec<false>{endpoint()};
+      else if (spec.protocol == "https")
+         return tcp_listen_spec<true>{endpoint()};
+      else if (spec.protocol == "local")
+      {
+         if (!spec.path)
+            throw std::runtime_error("listen: path expected");
+         return local_listen_spec{*spec.path};
+      }
+      throw std::runtime_error("listen: unknown protocol: " + spec.protocol);
+   }
+
+   template <bool Secure>
    bool make_listener(server_impl& server, const tcp_listen_spec<Secure>& spec)
    {
       auto l = std::make_shared<listener<net::ip::tcp::acceptor>>(server, spec.endpoint);
