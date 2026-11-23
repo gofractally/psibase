@@ -5483,6 +5483,8 @@ entry → `x-http` → `http-server` → `r-transact`; then the queued
 speculative run, the push above, and `r-transact::onTrx` for the reply).
 `r-transact` has a freeing allocator and the same 32 MiB.
 
+Before the change below (`53b6007b7`):
+
 | Arguments | Accepted | Applied by Transact | Reply to the client |
 |---|---|---|---|
 | 1 MiB | yes | ok | 200, the trace as JSON (4.2 MB), 43 ms |
@@ -5492,11 +5494,124 @@ speculative run, the push above, and `r-transact::onTrx` for the reply).
 | 4.75 MiB | yes | not reached | the continuation of the speculative run fails with `bad_alloc` in `r-transact` (the tester aborts) |
 | 5.5 MiB, 6 MiB | **no**: 500, `bad_alloc` in `r-transact::serveSys` | | |
 
-So over HTTP the transaction itself is applied up to 4.5 MiB, but the
-client is answered properly only up to about 1.5 MiB: an out-of-memory
-trap in `r-transact` bites first, the explicit limit (`maxValueSize` on
-the stored trace) second. None of this is PSIO's validation. Whether these
-thresholds were different before the flip was not measured.
+So over HTTP the transaction itself was applied up to 4.5 MiB, but the
+client was answered properly only up to about 1.5 MiB: an out-of-memory
+trap in `r-transact` bit first, the explicit limit (`maxValueSize` on
+the stored trace) second. None of this is PSIO's validation.
+
+**Now** (`f0e9648ca`, gofractally/psibase#2233; the same case, re-measured):
+
+| Arguments | Accepted | Applied by Transact | Reply to the client |
+|---|---|---|---|
+| 1 MiB | yes | ok | 200, the trace as JSON (4.2 MB), 49 ms |
+| 1.5 MiB | yes | ok | 200 (6.3 MB), 76 ms |
+| 1.6 MiB | yes | ok | 200 (6.7 MB), 78 ms |
+| 1.75 MiB, 2 MiB | yes | ok | 200, **the outcome** (354 bytes): the trace is above 3.25 MiB |
+| 4 MiB − 200 bytes, 4.5 MiB | yes | ok | 200, the outcome, 163 and 191 ms |
+| 5 MiB − 1 KiB | yes | ok | 200, the outcome, 211 ms |
+| 5 MiB, 6 MiB, 6.5 MiB, 7 MiB, 7.5 MiB | **no**: 413, `The transaction is 5242955 bytes. push_transaction accepts at most 5242880 bytes.` | | |
+| 8 MiB, 20 MiB | **no**: 500, `wasm trap: unreachable` in a service before `r-transact` (`x-http` or `http-server`; which was not determined) | | |
+
+Every size up to 7.5 MiB gets a correct reply or the limit by name. From
+8 MiB the request does not reach `r-transact`, and the client still gets a
+trap as a 500: that is the next service's memory, not looked at here.
+
+*The outcome*: a trace above `maxFullTraceSize` (3.25 MiB packed, in
+`RTransact.cpp`) is neither stored nor sent. In its place the client gets,
+with HTTP 200 and in the format it asked for, a `TransactionTrace` whose
+`error` is the transaction's (none if it was applied) and whose one action
+trace, sender and service `transact+1`, no method, has one console line:
+`The trace of this transaction is 9437411 bytes packed, more than the
+3407872 that transact+1 keeps and sends: its action traces are omitted.`
+The same record is what `TxSuccessTable` / `TxFailedTable` keep, so a
+client that waits for finality gets it too, and so does the client of a
+large transaction that fails. Why this and not something else:
+
+- a client reads the outcome as from any trace (the tester's
+  `Result<void>`, the CLI): an HTTP error for a transaction that was
+  applied would be read as a failed push;
+- the reason is in the body, where a person who prints the trace sees
+  it. A response header (`X-Trace-Omitted`) was tried first: `http-server`
+  refuses any header outside its list (`allowedHeaders` in
+  `HttpServer.cpp`), so that needs a change there. The option is open;
+- the action traces go as a whole, not only their arguments. A trace
+  without arguments would keep the return values and the console output,
+  but storing it needs a row built from references, and
+  `psio::packs_as<U, T>`, which `Table::put` asks for, does not compile
+  for a recursive record (PSIO gap 1 below).
+
+The two limits are constants of `r-transact`, sized for the 32 MiB of
+`WasmConfigRow` and the 8 MiB of `maxValueSize`: a chain configured
+smaller than that fails as before. `maxFullTraceSize` is 3.25 MiB because
+a whole trace of 3.46 MiB was answered and one of 3.56 MiB was not (the
+JSON text is twice the bytes and is held three times: the text, the
+arguments of `sendReply`, the action). `maxPushedTransactionSize` is 5 MiB
+because handing the transaction to the other producers
+(`onSpecTrx` → `sendProds(recv(trx))`) holds it five times, six in the
+tester, whose run token is the packed action and not its hash
+(`TestChain::runQueueItem`; psinode sends a SHA-256): 5 MiB − 1 KiB passes
+in the tester and 5.5 MiB does not.
+
+**Does this predate the migration?** Read, not measured (the old tree was
+not built): `git show 44c57f739:packages/system/Transact/src/RTransact.cpp`
+and the `Actor.hpp` beside it. The structure is the same line for line:
+an owning `HttpRequest`, `from_frac<SignedTransaction>(request.body)`,
+`checkFirstAuth(id, *trx.transaction)`, `execTrx` inside `x-run::post`, the
+`TransactionData` row, the trace stored and then sent. So the silence
+around 4 MiB (the row above `maxValueSize`) predates the migration. The
+number of buffers does not: the old library wrote a call in one pass
+(`ActionViewProxy::packImpl`: `TypedAction<Args>` with `psio::nested<T>`
+holding the *values*, a size pass, one buffer) and the JSON of a reply
+straight into the action (`JsonHttpReply<TransactionTraceRef&>`,
+`psio::nested_json<T>`). PSIO packs the arguments
+(`method_args_to_pssz`), then the action around them, and the JSON text
+first of all. Counted in copies of the transaction S at the peak:
+
+| Step | Before the migration | After it (`53b6007b7`) | Now |
+|---|---|---|---|
+| `serveSys` up to `x-run::post` | 5: action bytes, `HttpRequest`, `SignedTransaction`, the `execTrx` action, the `post` action | 6: one more, the arguments of `post` | 4: action bytes, the `execTrx` action, the arguments of `post`, the `post` action |
+| handing on (`onSpecTrx`) | 2 (the trace) + row + `TransactionData` + the `recv` action + the `sendProds` action = 6 | 7: one more, the arguments of `sendProds` | 5: the trace, the `recv` action, the arguments of `sendProds`, the action (the row is released first) |
+| the reply (`onTrx`), trace T = 2 S, JSON 2 T | T + one action holding the text: 3 T | T + the text in a growing buffer (up to 4 T) + arguments 2 T + action 2 T: 7 to 9 T | T + text 2 T (reserved) + arguments 2 T + action 2 T: 7 T, 9 T measured with what the allocator cannot reuse; nothing above 3.25 MiB |
+
+So, by this count, the 500 from 1.75 MiB is new with the migration (3 T
+fits up to the row limit), the refusal of a request came down from about
+32 MiB / 5 to 32 MiB / 6, and the change above brings the accept path
+below where it was. None of the old thresholds was measured.
+
+**What changed in `r-transact`.** `serveSys` takes
+`psio::pssz_view<HttpRequest>`; everything but the body is unpacked (it is
+small), the body of `push_transaction` is validated once
+(`psio::validated_view<SignedTransaction>(psio::pssz{}, body).value()`: the
+check `from_pssz` made) and read through the view by `validateTransaction`,
+`pushTransaction`, `scheduleSpeculative`, `scheduleVerify` and
+`forwardTransaction`. `recv` takes a view. The `TransactionData` row is
+written from the bytes (`TransactionDataView`, as `TxSuccessView` already
+was) and read back with `getView` in `onVerify`, `requeue` and when the
+transaction is handed on. The other endpoints get the `HttpRequest` they
+had. Wire formats, the HTTP API and the tables are unchanged; the schema of
+the service is the same (a view parameter is its value on the wire).
+`next` and `sendFailureTraces` still unpack a row and pack it again: both
+hold at most one transaction or one trace under the limit.
+
+**Where PSIO lacks something** (reproductions in
+`~/psibase-pssz-scratch-2233/`, each compiled against the pin; not worked
+around):
+
+1. `psio_gap_packs_as_recursive.cpp`: `psio::packs_as<NodeRef, Node>` for
+   a record that holds a list of itself does not compile (`undefined
+   function 'layout_evolves<NodeRef, Node>' cannot be used in a constant
+   expression`), though `to_pssz(NodeRef)` writes the bytes of a `Node`.
+   `ActionTrace` → `InnerTrace` → `variant<ConsoleTrace, ActionTrace>` is
+   such a record, so a table row cannot be put from a trace that refers to
+   parts of another.
+2. `psio_gap_nested_in_place.cpp`: a nested member can only be written
+   from bytes that exist (`psio::nested<T>` owns them, a span borrows
+   them). A message inside a message inside a message of 1 MiB peaks at
+   3.0 MiB beside the value. What the old library had: a nested member
+   that holds the value and is written in place after a size pass, and the
+   same for the JSON text of a value. With it `Actor` would pack a call in
+   one buffer, and the three rows of the table above become 2 S, 4 S and
+   3 T.
 
 Where something proportional to the transaction (S bytes) is still
 materialized, by reading the code; "in place" means no allocation:
@@ -5512,8 +5627,8 @@ materialized, by reading the code; "in place" means no allocation:
 | `NativeFunctions::call` | `validate_strict<Action>` in place; `from_pssz<Action>` ("don't unpack rawData" is a TODO there); `atrace.action = action` | 2 of the action, native |
 | the callee | `getCurrentActionView`: 1 of its action; the dispatcher validates the arguments in place (`validate_method_args`) and then builds the method's parameters: an owning parameter (`std::vector<char> code` of `SetCode::setCode`) is 1 more, a view parameter none. `nop` reads nothing | 1–2 of the action, in the callee's own 32 MiB |
 | the trace | holds `processTransaction`'s action and each called action with their arguments: 2 S; packed once for the tester, once more for each callback (`onTransaction`) | 2 S per copy, native |
-| `r-transact::serveSys` | the action bytes, the dispatcher's owning `HttpRequest`, `psio::from_pssz<SignedTransaction>(request.body)`, the argument of `Transact::checkFirstAuth`, the `execTrx` action for the speculative run and the `x-run::post` call around it, the `TransactionDataTable` row | about 6–7, guest (fails between 4.75 and 5.5 MiB) |
-| `r-transact::onTrx` | the trace (2 S) as action bytes, as the `TxSuccessTable` row, as JSON (hex: 4 S, in a growing buffer), as the `sendReply` action | fails between a 3.2 MB and a 3.7 MB trace |
+| `r-transact::serveSys` | at `53b6007b7`: the action bytes, the dispatcher's owning `HttpRequest`, `psio::from_pssz<SignedTransaction>(request.body)`, the argument of `Transact::checkFirstAuth`, the `execTrx` action for the speculative run and the `x-run::post` call around it, the `TransactionDataTable` row. Now: the action bytes, and one buffer per call layer while a call is made | was about 6–7, guest (failed between 4.75 and 5.5 MiB); now 4 at the peak, 1 between calls; a body above 5 MiB is refused with 413 |
+| `r-transact::onTrx` | the trace (2 S) as action bytes, as the `TxSuccessTable` row, as JSON (hex: 4 S; was in a growing buffer, now reserved), as the arguments of `sendReply`, as the action | a trace above 3.25 MiB is replaced by its outcome (it failed between a 3.2 MB and a 3.7 MB trace) |
 
 **The adaptation of M8 is undone.** `DefaultTestChain.cpp`
 `makeTransactions` is again what it was before `0ab430805` and
@@ -5528,20 +5643,50 @@ met; not measured again). The Rust builder
 (`transaction_builder.rs`) is the team's and was not touched.
 
 **The test**: `Transact-test.cpp` "Test transaction size" (in
-`t-Transact-test`, about 5 s with its four chain setups): 1, 4.5, 8 and
-16 MiB pushed and applied; 1 MiB posted and answered; 4.5 MiB posted,
-queued and applied (the reply is not asserted, see above); 32 MiB refused
-with the memory-limit message.
+`t-Transact-test`): 1, 4.5, 8 and 16 MiB pushed and applied; 32 MiB
+refused with the memory-limit message; posted: 1 and 1.6 MiB answered with
+the whole trace (the arguments counted in it); 2 MiB answered with the
+outcome; 4.5 MiB queued, applied and answered with the outcome; 4.5 MiB
+with `wait_for=final` answered with the outcome once the block is final;
+4.5 MiB to a service that does not exist answered with the outcome and
+its error; 5 MiB − 1 KiB answered; 5, 6 and 7.5 MiB refused with 413 and
+the limit in the text. 40 assertions.
 
 | Step | Result |
 |---|---|
 | full build | exit 0 (`build-txsize1.log`) |
 | `ctest -j4` | **88 / 88** (`ctest-txsize1.log`); the count is unchanged because the new case is inside `t-Transact-test` (6.0 s) |
 
-Open, for the team (not PSIO): `r-transact` should not need six copies of
-a transaction to accept it nor a JSON trace with the arguments twice to
-answer it; a client whose transaction was applied gets a 500 or no answer
-from 1.75 MiB on. `NativeFunctions::call` still unpacks the action.
+Open, for the team: a request of 8 MiB or more traps in a service before
+`r-transact` (500 to the client); `http-server` holds a reply about as
+many times as `r-transact` does; whether a client should be told through a
+header (the allow-list in `HttpServer.cpp`) rather than in the trace;
+whether the two limits should come from the chain's configuration instead
+of being constants; the tester's run token (the packed action where
+psinode sends a hash); `recv` from a peer has no size limit of its own.
+`NativeFunctions::call` still unpacks the action. For PSIO: the two gaps
+above.
+
+| Step (after the six commits, `0302e4a7f`) | Result |
+|---|---|
+| full build | exit 0 (`build-fin1.log`) |
+| `ctest -j4` | **88 / 88** (`ctest-fin1.log`; `t-Transact-test` 7.3 s) |
+| every Rust workspace | `check_all.sh b5`: as before (all exit 0 except `packages/user --tests`: `tokens-plugin` and Favor's tests, the same seven errors) |
+
+**Names (gofractally/psibase#2234, the mechanical part)**, each its own
+commit; this supersedes the first four rows of the table of names in 7.8:
+`psibase::fraccall` is `psibase::callPacked` (`0f57063d4`);
+`FracPackBody<T>` is `PsszBody<T>` (`9b0de956a`, five files);
+`FracpackHttpReply<T>` is deleted (`e70c422b7`);
+`publicKeyPairToFracpack` and `signatureToFracpack` are deleted from
+`common-lib` with their two rows of `js-libraries.md` (`3098673b5`;
+`git grep -i ToFracpack` over the tree finds the definitions and documents
+only; `common-lib` is rebuilt by the CMake flow, `CommonApiCommonLib_js`);
+`rust/psibase/src/from_bin.rs` and `to_bin.rs` are deleted with their four
+lines of `lib.rs` (`0302e4a7f`; no caller in any workspace; `psibase::Error` is
+`anyhow::Error`, re-exported by name, not the `Error` of `from_bin.rs`).
+Left as they are: `block.frac`, `doc/verify-sig/`, the `fracpack.md` and
+`schema.md` pages, `demo/`.
 
 **Linux, for the record** (not run here): x86-64 Linux, clang 20.1.8 +
 libstdc++ 15, wasmtime, rustc 1.100.0, on `a217d99bb` + zip `<limits>` fix
