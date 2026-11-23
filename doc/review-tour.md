@@ -4,7 +4,7 @@
 
 `bytemaster/head` is 158 commits ahead of `main` (merge base db601e572, 18 November). The raw diff is about 930 files and 200,000 added lines, but most of that is documentation, demos and application work. The platform changes are much smaller, and a large part of the execution engine is not in this repository at all. This tour says where to look.
 
-Status when this was written: head at 054a0c386.
+Status when this was last updated: head at 054a0c386.
 
 ## Read this first: what changes consensus or formats
 
@@ -13,32 +13,46 @@ These are the changes the team has to agree to, as opposed to review for quality
 | Change | Where | Effect |
 |---|---|---|
 | Storage engine | psitri replaces triedent (fae80b3b8 deletes triedent) | On-disk state format; no migration path from a triedent database |
-| Execution engine | psizam and wasmtime replace eos-vm; wasmtime is the default (d3aec135e) | Every node must produce identical results on the new engines |
-| Float policy per code version | 09e1f9075, 3a0ae5d56 | A service runs under the float profile its `vmVersion` names; new deployments default to the "deterministic performance" profile (fused multiply-add) |
+| Execution engine | psizam and wasmtime replace eos-vm; wasmtime is the default (d3aec135e) | Every node must produce identical results on the new engines. The wasmtime every node runs is a **fork** ([gofractally/wasmtime](https://github.com/gofractally/wasmtime): upstream 51.0.0 plus changes), pinned by revision; that revision is part of the identity of compiled code |
+| Stack depth | psizam's validator, and the wasmtime shim | A byte budget (`max_stack_bytes`) charged per call frame from costs the validator computes, so every engine overflows at the same call |
+| Float policy per code version | 09e1f9075, 3a0ae5d56 | A service runs under the float profile its `vmVersion` names: 0 is the strict WebAssembly deterministic profile, 1 is "deterministic performance" (fused multiply-add, as wasmtime behaves). SetCode stamps the chain default, 1, on new code. NaNs are canonical in both |
 | Wide-arithmetic instructions | 8b09a8776 | C++ services are compiled with `-mwide-arithmetic`; every engine must accept `i64.add128`, `i64.sub128`, `i64.mul_wide_s/u` |
 | Block size limit | 01c148342, bf02dd93c | A block stops filling at 4 MiB of transactions; the limit is an on-chain setting |
 | Signature service | b474c3e15 | `verify-sig` is a different implementation and is stricter about key encodings (details below) |
 | Default key curve | cb87219ff | New software-held keys are secp256k1; P-256 remains for hardware keys. Both verify as before |
 | Canonical signatures (**not yet in the head**) | branch `claude/canonical-signatures` | Only low-S signatures (`s <= n/2`) will verify, on both curves |
 
+Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time from the monotonic clock, not thread CPU time (c3397f9c7). Billing still reads the CPU clock.
+
 ## Tour by area
 
 ### 1. Execution engine (suggested reviewer: Steven)
 
-**What changed.** eos-vm is replaced by psizam (interpreter, JIT1, JIT2, LLVM AOT) with wasmtime added as an engine and made the default. A build can carry several engines and pick one at run time. Compiled services are cached on disk and compiled in the background ahead of first use. Service instances now come from a pool of warm slots. The CPU budget is enforced from a watchdog thread.
+**What changed.** eos-vm is replaced by psizam (interpreter, JIT1, JIT2, LLVM AOT), with wasmtime added as an engine and made the default. A build can carry several engines and pick one at run time.
+
+- **Compilation.** With wasmtime a service is compiled at first use, in tens of milliseconds, and the result is kept in a per-user cache on disk. Compiling stored services in the background ahead of first use applies to the LLVM AOT engine only.
+- **Instance pool** (ff905f61a, bc22a3953). wasmtime's pooling allocator with 256 slots per engine; a slot stays warm for the module that last used it. An instance the pool cannot serve (no free slot, a memory16 module, an oversized table) is created by a second engine without a pool running the same compiled code, and if the pool's address space cannot be reserved the node runs without one. `PSIBASE_WASMTIME_POOL=0` turns it off; the test `t-Tokens-test-one-pool-slot` forces the fallback. Resetting a slot is wasmtime's own mechanism: a copy-on-write image and in-place zeroing on Linux, a fresh mapping on macOS, where it gains almost nothing.
+- **CPU budget** (c3397f9c7). The executing thread no longer evaluates its own budget; only the watchdog thread cancels. The budget is paused only while a service is actually being loaded or compiled.
+- **Wide arithmetic** (8b09a8776). Accepted unconditionally by every engine, with no feature gate and no per-contract opt-in.
+- **memory16.** An optional one-page execution profile a module opts into with a custom section. No psibase service uses it. Tag `stable-20261122-memory16` on psibase, psizam and the wasmtime fork marks that checkpoint.
 
 **Where to look.**
-- Most of it is in the separate repository [gofractally/psizam](https://github.com/gofractally/psizam) (public, `main`): the engines, the wasmtime shim (`wasmtime/shim`, Rust, wasmtime pinned to an exact version), the wide-arithmetic support, and an optional one-page `memory16` execution profile (`docs/memory16.md`).
+- Most of it is in the separate repository [gofractally/psizam](https://github.com/gofractally/psizam) (public, `main`): the engines, the wasmtime shim (`wasmtime/shim`, Rust; its `Cargo.toml` pins the wasmtime fork by revision), the wide-arithmetic support, and the memory16 profile (`docs/memory16.md`).
 - In this repository: `libraries/psibase/native/src/ExecutionContext.cpp`, `ExecutionContextWasmtime.cpp`, `VmEngine.cpp`, `PsizamPolicy.cpp`, `NativeAotCache.cpp`, and `external/psizam-core.cmake` for the pin and the engine selection options.
 - Commits: f00d3507e (psizam for node and tests), 6199b528c (LLVM AOT and artifact cache), 09e1f9075 (float profile per code version), 9dea98a8d and 8768429ef (wasmtime, several engines), d3aec135e (wasmtime default), 5ccd89a8e and edfff6ed0 (shared and background compilation), 8b09a8776 (wide arithmetic), ff905f61a and bc22a3953 (instance pool), c3397f9c7 (watchdog-only CPU budget).
 
 **Questions for the reviewer.**
 - Is the wasm feature set each engine admits the right one, and is "psizam's validator admits, wasmtime only executes" a sound division?
+- The consensus engine is a fork of wasmtime. Is that acceptable, and is the way it is pinned enough?
 - Stack accounting under wasmtime is done by rewriting the module in the shim rather than by patching the compiler. Is that acceptable as a consensus rule?
 - Instance pooling and reuse: what state can survive between uses of a slot, and is that provably none?
 - The fused float profile as the default for new code.
+- Wide arithmetic is lowered in JIT2 and LLVM as 64-bit operations plus a carry compare, with two new high-multiply operations, and is tested against a 128-bit oracle on every engine. Is unconditional acceptance what the team wants?
 
-**Known limits.** Work on JIT2 and LLVM AOT is paused; c45c060cd marks the psizam-engine execution context as unverified after the CPU budget change. The suites are qualified on wasmtime only. Rust services are not yet compiled with wide arithmetic.
+**Known limits.**
+- Work on JIT2 and LLVM AOT is paused; c45c060cd marks the psizam-engine execution context as unverified after the CPU budget change. The suites are qualified on wasmtime only.
+- psizam tests a reviewer will see fail, all predating this work: the `memory_grow_2` spec cases on every engine, `psizam_host_tail_reentry_tests` (intentionally red), and on x86 "Test call depth dynamic - jit_llvm".
+- Rust services are not compiled with wide arithmetic in this head. Branch `claude/canonical-next` adds it and is next to land. It moves `cargo-psibase` to newer walrus, wasmparser and wasm-opt versions and passes `--enable-multivalue` beside `--enable-wide-arithmetic` to the optimizer. rustc calls the wide-arithmetic target feature unstable and warns that using it will become an error.
 
 ### 2. Storage: psitri replaces triedent
 
@@ -50,7 +64,15 @@ These are the changes the team has to agree to, as opposed to review for quality
 
 **Questions for the reviewer.** Crash and unclean-shutdown recovery; the reader/writer model; what "fold once per block" means for a transaction that is interrupted.
 
-**Known limits.** On 22 November an intermittent failure was seen in `psinode_test_crash`: a node aborted with "reference count exceeded limits" when reopening its database. It occurred in 2 of 3 full runs on a tree based on an older head (8fa03237f) under heavy machine load. It has not recurred in 8 full runs on a branch that includes head 44c57f739. It was diagnosed as a double release earlier in the node's life; the caller has not been identified, and an always-on check is being added.
+**Details worth knowing before reading the code.**
+- Speculative execution never takes the store's writer gate. A database's pending changes are folded early once they pass 256 MiB.
+- After an unclean shutdown the default open does not rebuild reference counts: counts may be stale and leaked space remains until a full scan. Stronger recovery modes exist but are not what the node selects.
+- Durability is chosen by sync level, and the suites run with `database-sync=none`. Performance by default with persistence opt-in is a deliberate policy.
+- The pinned psitri is b7b8647 on its `main`.
+
+**Known limits.**
+- On 22 November `psinode_test_crash` failed intermittently: a node aborted with "reference count exceeded limits" when reopening its database. It has not been reproduced in 21 loaded runs on the current line. The diagnosis is an earlier double release: in release builds psitri wrapped a reference count that was already zero, and the next retain threw. The root cause has not been found. The pinned psitri now aborts at the faulty release with a message instead of wrapping, so a recurrence will name the caller.
+- At the pinned commit four of psitri's own tests fail on the Mac and have not been triaged: "Block allocator truncate operations", `sal_hybrid-va-recycle-tests`, `psitrimdbx-tests` and `kv-compat-test`. They failed the same way at the previous pin.
 
 ### 3. Signature verification (suggested reviewer: Steven, who wrote the Botan-based service)
 
@@ -73,7 +95,7 @@ These are the changes the team has to agree to, as opposed to review for quality
 
 **In the head.** cb87219ff: keys generated by the C++ key helper, by psinode's software signer and by the psinode test harness are secp256k1. PKCS #11 keys stay P-256.
 
-**Not yet in the head.** Branch `claude/canonical-signatures` (55aabe977): `verify-sig` accepts only low-S signatures on both curves, and every signer normalizes: the C++ helper, psinode's software and PKCS #11 signers, the Rust library's P-256 and PKCS #11 signers, the browser signing plugin, and the test harness. It includes tests of the browser plugin's signing function and of the Rust PKCS #11 signer against a SoftHSM token.
+**Not yet in the head.** Branch `claude/canonical-signatures` (55aabe977), queued to land as part of `claude/canonical-next`: `verify-sig` accepts only low-S signatures on both curves, and every signer normalizes: the C++ helper, psinode's software and PKCS #11 signers, the Rust library's P-256 and PKCS #11 signers, the browser signing plugin, and the test harness. It includes tests of the browser plugin's signing function and of the Rust PKCS #11 signer against a SoftHSM token.
 
 **Not started.** The Rust library's key generation and the browser plugins still create P-256 keys.
 
@@ -102,30 +124,44 @@ The first commits (a4e5c0a0e through 0a93ef490) add Exchange, Favor, Signing and
 
 ## Throughput
 
-Token transfers per second, 16-core x86 cloud server, one block of 5,000 transfers in the tester.
+Token transfers per second on an idle 16-core x86 cloud server: one block of 5,000 transactions built in the tester on one thread. The three head commits were measured in one session, three runs each.
 
 | | Unsigned | Signed, P-256 | Signed, secp256k1 |
 |---|---|---|---|
 | `main` (eos-vm, triedent) | 157 | 109 | not measured |
-| Head before the signature change (44c57f739) | 301 | 198 | 192 |
-| Head with the new `verify-sig` (b474c3e15) | 309 | 274 | 308 |
+| 44c57f739 (wide arithmetic, Botan `verify-sig`) | 292–301 | 199–200 | 191–192 |
+| c45c060cd (adds new `verify-sig`, secp256k1 default keys, instance pool, watchdog-only CPU budget) | 353–366 | 313–314 | 351–366 |
+| 054a0c386 (adds psitri transaction stack, per-block event indexing, 1 ms psitri timer) | 895–900 | 628–633 | 811–816 |
 
-Over a network, where each signature is checked once and off the producing thread, the signature change is worth about 10% on signed transfers, and unsigned throughput (about 190 to 200 per second) is the ceiling. The tester verifies every signature twice, so it overstates signature cost; that is unfixed.
+So the head today against `main` is about 5.7 times faster unsigned and about 5.8 times faster signed with P-256. A transaction that does nothing runs at about 1,790 per second unsigned and 1,490 signed with secp256k1 at 054a0c386.
 
-The numbers above do not include the commits after b474c3e15 (instance pool, event indexing, the psitri transaction stack). The benchmark report is not in the repository yet.
+Where the gains came from, measured in isolation on the 44c57f739 base: the psitri transaction stack alone took unsigned from 300–308 to 346–351, and adding per-block event indexing took it to 646–654. The new `verify-sig` alone took one verification from about 896 µs to about 135 µs.
+
+What these numbers are not:
+- They are one block on one thread in the tester, not network throughput. Over a network at 44c57f739 a single node applied about 199 unsigned transfers per second; a network figure for 054a0c386 is not available yet.
+- Per-block event indexing means indexing time is no longer in a transaction's billed CPU, and objective pricing of events is not built.
+- The tester verified every signature twice when this was last checked, which overstates signature cost there. That has not been rechecked at 054a0c386.
+
+The benchmark report itself is not in the repository yet.
 
 ## Test results
 
-Suite results are recorded per commit under `tests/timing/runs/`. The latest head was reported green on wasmtime on both machines: Mac native 24/24, end-to-end 39/39, Rust 29/29; x86 native 20/20, end-to-end 39/39, Rust 29/29 (figures reported for c45c060cd).
+Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime:
+
+| Commit | Mac | x86 |
+|---|---|---|
+| c45c060cd | native 24/24, end-to-end 39/39, Rust 29/29 | native 20/20, end-to-end 39/39, Rust 29/29 |
+| 054a0c386 (head) | full ctest 92/92 | native 20/20, end-to-end 39/39, Rust 29/29 |
 
 ## Known gaps, in one place
 
-- JIT2 and LLVM AOT paused and marked unverified; wasmtime is the only qualified engine.
+- JIT2 and LLVM AOT paused and marked unverified; wasmtime (a pinned fork) is the only qualified engine.
 - psitri is a private repository.
-- The `psinode_test_crash` reopen failure: not reproduced on the current head, cause not pinned to a caller.
-- Rust services lack wide arithmetic.
+- The `psinode_test_crash` reopen failure: not reproduced on the current line, root cause not found.
+- Four of psitri's own tests fail on the Mac, untriaged.
+- Rust services lack wide arithmetic until `claude/canonical-next` lands.
 - P-256 verification speed.
-- The tester verifies each signature twice.
+- The tester verified each signature twice when last checked; not rechecked at 054a0c386.
 - Crypto library sources are fetched from their upstream sites, not mirrored.
 - Canonical signatures and the browser/Rust key default are not in the head.
 - The benchmark report and the verifier differential test are not in the tree.
@@ -145,8 +181,7 @@ Serialization is being moved from the in-tree fracpack library to the canonical 
 
 ### Also to come
 
-- Canonical low-S signatures.
-- Wide arithmetic for Rust services.
+- Canonical low-S signatures and wide arithmetic for Rust services, together on `claude/canonical-next`.
 - Updated throughput numbers and the benchmark report.
 
 ## A note on how this was written
