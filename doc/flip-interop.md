@@ -124,7 +124,7 @@ struct FieldId {                                   // one component of an index 
    std::optional<std::string>                   transform;  // name of a key transform, if any
    std::optional<psio::schema_types::AnyType>   type;       // the transform's result type, if any
 };
-PSIO_REFLECT(FieldId, path, transform, type)
+PSIO_REFLECT(FieldId, path, attr(transform, utf8), type)
 
 struct TableInfo {
    std::optional<std::string>          name;      // table type name ("AccountTable")
@@ -132,13 +132,13 @@ struct TableInfo {
    psio::schema_types::AnyType         type;      // row type
    std::vector<std::vector<FieldId>>   indexes;   // [0] is the primary key
 };
-PSIO_REFLECT(TableInfo, name, table, type, indexes)
+PSIO_REFLECT(TableInfo, attr(name, utf8), table, type, indexes)
 
 struct EventType {
    psio::schema_types::AnyType type;              // the event's argument list (see below)
    std::string                 access;            // "public" | "private"
 };
-PSIO_REFLECT(EventType, type, access)
+PSIO_REFLECT(EventType, type, attr(access, utf8))
 
 struct ServiceSchema {
    psibase::AccountNumber                                     service;   // the service's account
@@ -148,16 +148,24 @@ struct ServiceSchema {
    std::map<std::string, EventType>                           merkle;
    std::optional<std::map<std::string, std::vector<TableInfo>>> database; // "service" | "writeOnly" | "subjective" | "session"
 };
-PSIO_REFLECT(ServiceSchema, service, types, actions, history, merkle, database)
+PSIO_REFLECT(ServiceSchema, service, types, attr(actions, keys(utf8)), attr(history, keys(utf8)),
+             attr(merkle, keys(utf8)), attr(database, keys(utf8)))
 ```
 
 Rules:
 
 * Member order is as written; none of the four records is
-  `definitionWillNotChange`; no caps or bounds; every string is raw
-  (`std::string`). Rust: `BTreeMap<String, _>` for the maps (PSIO's map
-  order is the order of the keys' key encoding = byte order of the names),
-  `Option` where C++ says `std::optional`.
+  `definitionWillNotChange`; no caps or bounds. **Every string of these
+  records is UTF-8** (they are identifiers): the keys of the four maps
+  (`keys(utf8)`), `EventType.access`, `FieldId.transform`,
+  `TableInfo.name`; Rust declares them `String`. (The annotation changes
+  no byte of a valid value; it makes readers reject text that is not
+  UTF-8, and the schema of the record itself says `utf8` for them.) Rust:
+  `BTreeMap<String, _>` for the maps, `Option` where C++ says
+  `std::optional`.
+* **Order.** The maps are ordered by name (PSIO's map order: the byte
+  order of the names). Until the flip C++ ordered `actions`, `history` and
+  `merkle` by method number.
 * `actions[name]` is `FunctionType{ params, result }`. `params` is the
   Schema IR node of the action's **wire argument list**: what
   `SchemaBuilder::insert<psio::reflect<Service>::method_arg_tuple<I>>()`
@@ -235,7 +243,7 @@ added:
 ```
 
 The PSSZ of this example is 1336 bytes and validates as `ServiceSchema`;
-reading the JSON back and packing gives the same bytes. The `@N` names
+reading the JSON back and packing gives the same bytes. (Re-run with the UTF-8 annotations: same JSON, same 1336 bytes.) The `@N` names
 are the builder's and are not part of the contract: two schemas are
 compared with `pssz_ir::equivalent`, not by text.
 
@@ -267,6 +275,37 @@ checked from C++ yet.
 | Schema of the schema | `doc/src/specifications/data-formats/schema-schema.json` | hand-maintained | `packages/psibase_tests/test/test_schema.cpp` | legacy schema JSON | regenerated from the new record |
 | Schema endpoint | `GET <packages>/schema?service=<acct>` | `packages/user/Packages/src/RPackages.cpp` `serveSchema` | Rust CLI and `rpc.rs` `HttpSchemaFetcher`, Packages plugin, EthBridge relayer; Python `programs/psinode/tests/psinode.py` | JSON `ServiceSchema` | the new I-JSON |
 
+## 2.1 `DbId`
+
+`psibase::DbId` (`libraries/psibase/common/include/psibase/db.hpp`,
+`enum class DbId : uint32_t`; C++ is the authority) is its `u32` in PSSZ
+and in a key, unchanged. In JSON it becomes its **name** in both languages
+(PSIO's enum rule: the name is written, the name or the number is read);
+C++ wrote the number until the JSON flip. The named values, C++ spelling
+(Rust's identifiers differ by case convention only):
+
+| Value | C++ name | Rust |
+|---|---|---|
+| 0 | `service` | `Service` |
+| 1 | `writeOnly` | `WriteOnly` |
+| 2 | `native` | `Native` |
+| 3 | `blockLog` | `BlockLog` |
+| 4 | `blockProof` | `BlockProof` |
+| 5 | `prevAuthServices` | `PrevAuthServices` |
+| 64 | `subjective` | `Subjective` |
+| 65 | `nativeSubjective` | `NativeSubjective` |
+| 66 | `session` | `Session` |
+| 67 | `nativeSession` | `NativeSession` |
+| 68 | `temporary` | `Temporary` |
+
+Not named values: `numChainDatabases` (6) is the count of the chain
+databases, and `beginIndependent` (64), `endPersistent` (66),
+`endIndependent` (68) are range markers that alias `subjective`,
+`session` and `temporary`. They stay C++ constants and are not reflected;
+**Rust should drop `NumChainDatabases` from its enum** (keep it as a
+constant if it needs the count). No C++ database lacks a Rust name and no
+name differs in substance.
+
 ## 3. Package files
 
 Container and layout do not change.
@@ -274,7 +313,7 @@ Container and layout do not change.
 | Artifact | Path | Producer | Consumers | Format (today = after unless said) |
 |---|---|---|---|---|
 | Package archive | `<build>/share/psibase/packages/<Name>.psi` | `pack_service.cmake` `psibase_package`; Rust `cargo-psibase/src/package.rs`; `rust/reserved-names` | C++ `libraries/psibase/common/src/package.cpp` `PackagedService` (tester, `psinode` init / precompile); Rust `rust/psibase/src/package.rs` | zip: `meta.json`, `service/<acct>.wasm`, `service/<acct>.json`, `data/<acct>/<path>`, `script/postinstall.json`; sub-account `a+1` is `service/a/1.*` |
-| `meta.json` | in zip | `pack_service.cmake` `write_meta`; cargo-psibase; reserved-names | C++ `package.cpp` → `PackageMeta` (`Packages.hpp`); Rust `Meta`; `make_package_index.sh` (text) | JSON `{name, version, scope, description, depends:[{name,version}], accounts, services, exports:[{name,service}]}`. Read by C++ with PSIO's JSON reader: **every member must be present** (a missing required member is an error) |
+| `meta.json` | in zip | `pack_service.cmake` `write_meta`; cargo-psibase; reserved-names | C++ `package.cpp` → `PackageMeta` (`Packages.hpp`); Rust `Meta`; `make_package_index.sh` (text) | JSON `{name, version, scope, description, depends:[{name,version}], accounts, services, exports:[{name,service}]}`. **Every member must be present** in both languages: C++ reads it with PSIO's JSON reader and Rust's `package::Meta` requires every member too |
 | Service info | `service/<acct>.json` | `generate_service_info.cmake`; cargo-psibase | C++ `package.cpp` → `ServiceInfo` (`psibase/package.hpp`); Rust `ServiceInfo` | JSON `{flags:[string], server?: account, schema?: ServiceSchema}`; flags `isPrivileged`, `isVerify`, `isReplacement`. After: `schema` is the new I-JSON |
 | Postinstall script | `script/postinstall.json` | `pack_service.cmake` (generated for `INIT` services, or a hand-written file); cargo-psibase | C++ `package.cpp` (`readPostinstall`, `to_action`); Rust `package.rs` | JSON array of `{sender, service, method, rawData?: hex, data?: JSON}`. After: `data` is packed to PSSZ with the target service's schema (action arguments as an object keyed by parameter name, or an array). The CMake-generated `"rawData":"0000"` (fracpack of no arguments) is replaced by `"data":{}`; any hand-written `rawData` hex must be re-encoded |
 | Package index | `<dir>/index.json` | `make_package_index.sh`; Rust registries | C++ `package.cpp` `DirectoryRegistry` → `PackageInfo`; Rust registries | JSON array of `meta.json` objects plus `file`, `sha256` (every hash changes) |
