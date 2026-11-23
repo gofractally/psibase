@@ -12,13 +12,13 @@ Where the detail lives:
 - PSIO docs: `docs/annotations.md`, `docs/tutorial-annotations.md`, `docs/annotations-for-agents.md`,
   `docs/pssz-spec.md` in gofractally/psio
 
-Last updated: 2026-11-22
+Last updated: 2026-11-23
 
 ---
 
 ## 0. Hand-over plan (owner, 2026-11-22)
 
-Dan: "I want to rapidly get to a point where we have old psio1 removed, and everything working with
+Owner: "I want to rapidly get to a point where we have old psio1 removed, and everything working with
 the new psio... then I can hand it over to the team to refine." So the flip is being done now for
 speed, with these deliberate shortcuts that the team is expected to refine afterwards:
 
@@ -54,7 +54,7 @@ speed, with these deliberate shortcuts that the team is expected to refine after
 Owner's note: an omission can be intentional — a type is unpacked and then annotated with extra,
 unserialized fields (e.g. for optimisation), or a field is left out as a version migration with
 backward compatibility assumed; such fields do no harm. So these are **questions of intent, not
-presumed bugs**. Dan reviewed the readings below (2026-11-22: "your read on each case is accurate,
+presumed bugs**. The owner reviewed the readings below (2026-11-22: "your read on each case is accurate,
 apply it as you judge and the team can correct it if you are wrong"), so 2.3, 2.4 and 2.5 are being
 fixed on the branch and 2.1, 2.2 are left as they are — **team: please confirm or correct each**. Each was traced through the code and `git log`
 (by reading; none was confirmed by a test). All five predate the conversion.
@@ -153,7 +153,7 @@ construction and are not listed.
 
 ## 4. Trust model (validate vs trusted decode)
 
-Rule from Dan: a service's own table rows are trusted on read; action arguments, cross-service data
+Rule from the owner: a service's own table rows are trusted on read; action arguments, cross-service data
 and anything from outside are validated.
 
 | # | Item | Status |
@@ -247,7 +247,7 @@ Proposal in `~/psibase-pssz-audit/v2/`. Every cap carries a one-line reason comm
 | 10.6c | In-place size-changing mutation (`frac_ref`): the old implementation is unsound around optionals (invalid buffers; a crash when setting an absent trailing optional; its tests cover only the no-optional case). Retire for good, or redesign as "re-encode the smallest enclosing value"? | OPEN — do not port as is |
 | 10.6d | Work stranded in secondary psiserve checkouts: `psiserve-agent2` main (also remote branches `backup/main-pre-psio-rename`, 37 commits ahead of main, and `feature/runtime-migration`) has tuple views with structured bindings, `vec_view::as_span()`, a 3-argument `PSIO_PACKAGE`; `psi/service.hpp` on psiserve main depends on that and probably does not build; `psiserve-agent3` has a stash with pjson_typed work. | OPEN — someone should decide what to rescue |
 | 10.6e | Ports in the old lineage: Go, Zig and MoonBit disagree with the old C++ on the wire (nested fixed struct 26 bytes inline vs 30 behind an offset) and target fracpack. Drop them (recommended), or redo for PSSZ? | OPEN |
-| 10.6f | **Cap'n Proto and FlatBuffers must be first-class in the one psio (Dan, 2026-11-23: "psio needs first class FlatBuffer and Cap'n Proto so the library can claim a non-compromise").** The work exists in `psiserve/libraries/psio1`: `capnp_view.hpp` (3,989 lines: view/pack/unpack/validate/mutate, 74 tests), `flatbuf.hpp` (3,033 lines: builder, views, mutation, verify, unions), `.capnp`/`.fbs` parsers with computed wire layouts, `dynamic_view` (by-name navigation of foreign data), `psio-tool` CLI, and benchmarks behind the claims "reads Cap'n Proto 10–36× faster than the official library" and FlatBuffers pack at parity/1.3×. The standalone C++ has only minimal codecs for these two (its Rust still has the full views); it does have protobuf encode/decode and schema emitters/parsers for capnp/fbs/proto/WIT from the Schema IR. Planned as the first follow-on track after the flip: port the v1 work onto the current view frame, keep Rust at parity, re-measure the speed claims. Not started; must not be dropped. | DECIDED-BY-DAN — follow-on track |
+| 10.6f | **Cap'n Proto and FlatBuffers must be first-class in the one psio (owner, 2026-11-23: "psio needs first class FlatBuffer and Cap'n Proto so the library can claim a non-compromise").** The work exists in `psiserve/libraries/psio1`: `capnp_view.hpp` (3,989 lines: view/pack/unpack/validate/mutate, 74 tests), `flatbuf.hpp` (3,033 lines: builder, views, mutation, verify, unions), `.capnp`/`.fbs` parsers with computed wire layouts, `dynamic_view` (by-name navigation of foreign data), `psio-tool` CLI, and benchmarks behind the claims "reads Cap'n Proto 10–36× faster than the official library" and FlatBuffers pack at parity/1.3×. The standalone C++ has only minimal codecs for these two (its Rust still has the full views); it does have protobuf encode/decode and schema emitters/parsers for capnp/fbs/proto/WIT from the Schema IR. Planned as the first follow-on track after the flip: port the v1 work onto the current view frame, keep Rust at parity, re-measure the speed claims. Not started; must not be dropped. | DECIDED-BY-DAN — follow-on track |
 | 10.6g | Is "fastest" a release gate? PSIO's own comparison shows PSSZ behind ssz/borsh/bincode by 15–20% on some shapes and well behind fracpack on nested extensible decode. | OPEN |
 | 10.6h | Two contradictions inside the PSSZ spec: §4.1 says accept any non-zero bool but the code rejects; §7.1 gives appended non-optional fields defaults but §7.2/§7.5 forbid them. Being fixed to match the settled rules (bools are 0/1; new fields are optional). | INFO |
 | 10.6i | Design decisions recorded only in psiserve's `.issues/` (psio-v2-design.md, psio-language-principles.md) are not in the PSIO repo; `@final`/`@canonical` became reserved no-ops; WIT is emit-only (no WIT → Schema IR path); a missing `psio-tool` CLI; no typed zero-copy spans over an mmap'd file; no `dynamic_view` for PSSZ. | OPEN — which to bring over |
@@ -310,3 +310,25 @@ Sources: the C++ flip's final report (`doc/pssz-conversion.md` §1.17–1.25, `d
 **Not verified at the time of writing**: nothing had run on a booted chain with both halves; front ends (TypeScript, `SimpleUI.mjs`) compile but were not run in a browser; snapshot tools compile but were not run; `demo/` is not built; nine user-doc pages still describe the old formats; the Python test harness still had its legacy codec.
 
 **Open PSIO items from the flip**: G52 — the only way to give a record a schema id is an invariant, and an invariant blocks mutable views (psibase sets a PSIO `detail` trait for `Action` as a stop-gap); G53 above; RG20 (GraphQL bytes scalar in Rust).
+
+## 13. After both halves were merged and the integration head taken in (2026-11-23)
+
+State: `claude/pssz` contains `bytemaster/head` 7fe3cda05; suite baseline is **88** (the earlier 90, minus four `DarwinCpu*` tests the head deleted, plus `plugin-web-crypto-tests` and `t-Tokens-test-one-pool-slot`). Details: `doc/pssz-conversion.md` §7 and §7.8.
+
+| # | Item | Status |
+|---|---|---|
+| 13.1 | **Maximum transaction size fell to roughly 3.5–4.4 MB.** The guest's strict PSSZ check decodes and re-encodes the whole transaction; a 4.37 MB boot transaction exceeded Transact's 32 MiB memory. Fix belongs in PSIO (an in-place canonical check), in progress; psibase needs only a re-pin. | OPEN (PSIO) |
+| 13.2 | An empty optional result is zero bytes on the wire; callers that tested "result present" by length must not. | INFO |
+| 13.3 | `Actor.hpp` decodes a call result as the plain type rather than through PSIO's method-result declaration (`returns(...)`), and `returns(...)` does not reach the service schema (repro `psio_gap_result_node.cpp`). | OPEN (PSIO + psibase) |
+| 13.4 | Variant alternative labels are derived by different rules in C++ and Rust; both sides were made to agree by hand where a type is shared. One rule should live in PSIO. | OPEN (PSIO) |
+| 13.5 | Identifiers still named after the old format, not renamed: `psibase::fraccall` (`Actor.hpp`), `FracPackBody<T>` (tester, 18 uses; suggest `PsszBody`), `FracpackHttpReply<T>` (`Rpc.hpp`, unused; delete), `publicKeyPairToFracpack` / `signatureToFracpack` (`common-lib` exports, no users in tree, emit bytes nothing accepts; delete with their doc rows), `block.frac` (engine replay tests; engine owners' call). | OPEN — rename or delete |
+| 13.6 | Doc pages left describing the old formats: `specifications/data-formats/fracpack.md` (+ `SUMMARY.md` entry), `schema.md` (legacy schema JSON, `"FracPack"` type), `js-libraries.md`, last paragraph of `rust-service/tables.md`, `Favor/README.md` history note. Needs a writer who knows the intended audience. | OPEN |
+| 13.7 | `doc/verify-sig/` (the head's measurement record) uses `psio::to_frac`/`from_frac` and names `libraries/psio`; it describes the pre-migration tree and will not build against this one. Keep as a record or port. | OPEN |
+| 13.8 | Exchange stores `Wide` as two `u64` limbs because the old format had no `u128`. PSSZ has one; switching is a storage-format change for that package. | OPEN — package owner |
+| 13.9 | `psibase boot` exits 0 while the node is still applying ~100 boot transactions (~50 s); transactions pushed in that window are refused ("references non-existing block"). Not checked whether this predates the migration. | OPEN — confirm intended |
+| 13.10 | Transact's HTTP 415 text now reads "Expected PSSZ encoded signed transaction". | INFO |
+| 13.11 | `rust/psibase/src/from_bin.rs` / `to_bin.rs` are exported but have no callers; candidates for deletion. | OPEN |
+| 13.12 | `programs/psinode/tests/name.py` now holds only the account coder; method names use PSIO's Python package. The MIT header that covered the removed arithmetic coder went with it. | INFO — say if the header must stay |
+| 13.13 | Explorer raises the GraphQL complexity limit to 1,000,000 to work at all (PSIO G53 double-counts page size). | OPEN (PSIO) |
+| 13.14 | Shutdown: tests and scripts must use `-TERM`; `kill -INT` did not stop the node cleanly in the end-to-end check. | OPEN — confirm intended |
+| 13.15 | Not exercised by anyone: front ends and plugins in a browser, snapshot tools at run time, `demo/`, LLVM AOT backend with this tree, Linux x86-64, hidden `TransferBench` cases. | OPEN — test coverage |
