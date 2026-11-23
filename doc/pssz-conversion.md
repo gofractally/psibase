@@ -5688,11 +5688,23 @@ lines of `lib.rs` (`0302e4a7f`; no caller in any workspace; `psibase::Error` is
 Left as they are: `block.frac`, `doc/verify-sig/`, the `fracpack.md` and
 `schema.md` pages, `demo/`.
 
-**Linux, for the record** (not run here): x86-64 Linux, clang 20.1.8 +
-libstdc++ 15, wasmtime, rustc 1.100.0, on `a217d99bb` + zip `<limits>` fix
-+ PSIO bound fix: native 19/19, end-to-end 39/39, Rust 29/29, plugin
-signing 1/1 (source: engine session, 2026-11-23); LLVM AOT run pending on
-`b488a7fdd`.
+**Linux, for the record** (not run here; source: engine session,
+2026-11-23; x86-64 Linux, clang 20.1.8 + libstdc++ 15, rustc 1.100.0):
+
+- `a217d99bb` + zip `<limits>` fix + PSIO `b8a32ad` (old pin `fdb5de2` plus
+  the bound fix), wasmtime: native 19/19, end-to-end 39/39, Rust 29/29,
+  plugin signing 1/1.
+- `b488a7fdd` with PSIO `599943b`, LLVM AOT: builds; native 20/20 including
+  `VmConsensusTests`; end-to-end 38/39, the one failure being a psitri
+  crash (address-range reservation race in its block allocator, fixed in
+  psitri `d3bba0e`), not serialization.
+- There is NO valid wasmtime result for PSIO `599943b` at `b488a7fdd`: the
+  numbers first reported for it (native 19/19, end-to-end 38/39, Rust
+  29/29, plugin 1/1) came from a build directory that still pointed at PSIO
+  `b8a32ad` through a leftover CMake override, as the engine session found
+  when "Test transaction size" failed there at 8 and 16 MiB (the old strict
+  check's extra copy). A clean rebuild is the first real x86 wasmtime
+  evidence for this tree.
 
 ### 7.10 Pin moved to PSIO `66abb1b5`: method results, variant labels
 
