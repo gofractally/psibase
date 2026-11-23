@@ -129,6 +129,69 @@ TEST_CASE("json: an IP address is one string", "[json]")
    CHECK(psio::from_pssz<IPAddress>(psio::to_pssz(v6)) == v6);
 }
 
+TEST_CASE("json: every IPv6 text that is written is read back", "[json]")
+{
+   // (text, what to_string writes for the address it denotes)
+   const std::pair<std::string_view, std::string_view> cases[] = {
+       {"::", "::"},
+       {"::1", "::1"},
+       {"1::", "1::"},
+       {"fe80::", "fe80::"},
+       {"2001:db8::1", "2001:db8::1"},
+       {"2001:0DB8:0000:0000:0000:0000:0000:0001", "2001:db8::1"},
+       // The first longest run of zero groups is elided; one group is not.
+       {"1:0:0:2:0:0:0:3", "1:0:0:2::3"},
+       {"1:0:0:2:0:0:3:4", "1::2:0:0:3:4"},
+       {"1:0:2:3:4:5:6:7", "1:0:2:3:4:5:6:7"},
+       {"1:2:3:4:5:6:7::", "1:2:3:4:5:6:7:0"},
+       {"fe80::1%3", "fe80::1%3"},
+       {"fe80::%3", "fe80::%3"},
+       {"ff02::1:ff00:42", "ff02::1:ff00:42"},
+       // IPv4-mapped
+       {"::ffff:192.168.1.2", "::ffff:192.168.1.2"},
+       {"::ffff:c0a8:102", "::ffff:192.168.1.2"},
+       {"::ffff:1.2.3.4%7", "::ffff:1.2.3.4%7"},
+   };
+   for (const auto& [text, written] : cases)
+   {
+      INFO(text);
+      const auto address = parseIPV6Address(text);
+      REQUIRE(address.has_value());
+      CHECK(to_string(*address) == written);
+      CHECK(parseIPV6Address(written) == address);
+      // through the text adapters, as an address and in an endpoint
+      const std::string json = '"' + std::string(written) + '"';
+      CHECK(psio::to_ijson(IPAddress{*address}) == json);
+      CHECK(psio::from_ijson<IPAddress>(json) == IPAddress{*address});
+      const SocketEndpoint endpoint = IPV6Endpoint{*address, 80};
+      const std::string    endpointJson = "\"[" + std::string(written) + "]:80\"";
+      CHECK(psio::to_ijson(endpoint) == endpointJson);
+      CHECK(psio::from_ijson<SocketEndpoint>(endpointJson) == endpoint);
+   }
+   CHECK(parseIPV6Address("2001:db8::1")->bytes[1] == 0x01);
+   CHECK(parseIPV6Address("1::2")->bytes[1] == 1);
+   CHECK(parseIPV6Address("1::2")->bytes[15] == 2);
+   CHECK(psio::from_ijson<SocketEndpoint>(R"("[::]:80")") ==
+         SocketEndpoint{IPV6Endpoint{IPV6Address{{}, 0}, 80}});
+   CHECK(reread<SocketEndpoint>(R"("[fe80::1%2]:443")") == R"("[fe80::1%2]:443")");
+
+   for (std::string_view wrong :
+        {":", ":::", "1:2", "1:", "1:2:3:4:5:6:7", "1:2:3:4:5:6:7:8:9", "1:2:3:4:5:6:7:8::",
+         "1::2::3", "12345::", "g::", "1::x", "1:2:3:4:5:6:7:8%", "::1%x", "::1]", "[::1]",
+         "::ffff:1.2.3", "::ffff:1.2.3.4.5", "::ffff:1.2.3.4:5", "1:2:3:4:5:6:7:1.2.3.4",
+         "1.2.3", "1.2.3.4.5", "1.2.3.256", " 1.2.3.4", "1.2.3.4 ", "+1.2.3.4"})
+   {
+      INFO(wrong);
+      CHECK(!parseIPAddress(wrong));
+      CHECK(reread<IPAddress>('"' + std::string(wrong) + '"') ==
+            "error: IPAddress: not an IP address");
+   }
+   // Text that is not an IP endpoint is the path of a local socket
+   CHECK(psio::from_ijson<SocketEndpoint>(R"("[::1]")") == SocketEndpoint{LocalEndpoint{"[::1]"}});
+   CHECK(psio::from_ijson<SocketEndpoint>(R"("[:::]:80")") ==
+         SocketEndpoint{LocalEndpoint{"[:::]:80"}});
+}
+
 TEST_CASE("json: a socket endpoint is one string", "[json]")
 {
    const SocketEndpoint v4    = IPV4Endpoint{IPV4Address{{127, 0, 0, 1}}, 8080};
