@@ -366,6 +366,13 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                 backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
                 // Waiting for a compile in flight, or compiling here, is not
                 // billed to the transaction.
+                //
+                // NOT VERIFIED ON THESE ENGINES: this file serves the psizam
+                // engines (JIT2, LLVM AOT, JIT1). The watchdog-only CPU budget
+                // changed the order here (cache first, pause only on a miss)
+                // and the trace timing below, and was qualified on wasmtime
+                // only; work on the other engines is paused. Run their suites
+                // before relying on a build that selects one of them.
                 std::optional<TransactionContext::BillingPause> unbilled;
                 if (!backend.backend)
                 {
