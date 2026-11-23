@@ -542,7 +542,7 @@ mod tests {
     fn install_with_an_existing_missing_dependency_does_not_panic() -> Result<(), anyhow::Error> {
         let mut graph = DepGraph::new();
         let existing: Meta = serde_json::from_str(
-            r#"{"name":"Existing","description":"","version":"1.0.0","depends":[{"name":"Missing","version":"1.0.0"}],"accounts":[],"exports":[]}"#,
+            r#"{"name":"Existing","version":"1.0.0","scope":"network","description":"","depends":[{"name":"Missing","version":"1.0.0"}],"accounts":[],"services":[],"exports":[]}"#,
         )?;
         graph.add_existing(existing, PackageDisposition::pinned("1.0.0"));
         let new: PackageInfo = serde_json::from_str(

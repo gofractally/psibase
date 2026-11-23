@@ -21,6 +21,7 @@ pub type NID = u32;
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftRecordInput")]
@@ -45,6 +46,7 @@ pub struct Nft {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NftHolderRecordInput")]
@@ -68,6 +70,7 @@ pub struct NftHolderRecord {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "CreditRecordInput")]
@@ -124,17 +127,17 @@ mod service {
     }
 
     #[action]
-    fn getNft(nftId: crate::services::nft::NID) -> Option<super::Nft> {
+    fn getNft(nftId: crate::services::nft::NID) -> Option<crate::services::nft::Nft> {
         unimplemented!()
     }
 
     #[action]
-    fn getNftHolder(account: AccountNumber) -> super::NftHolderRecord {
+    fn getNftHolder(account: AccountNumber) -> crate::services::nft::NftHolderRecord {
         unimplemented!()
     }
 
     #[action]
-    fn getCredRecord(nftId: crate::services::nft::NID) -> Option<super::CreditRecord> {
+    fn getCredRecord(nftId: crate::services::nft::NID) -> Option<crate::services::nft::CreditRecord> {
         unimplemented!()
     }
 

@@ -2762,6 +2762,49 @@ named JSON arguments; `SiteConfig.proxy` has no test; the JSON and
 GraphQL changes of the time types are covered by unit tests in
 `rust/psibase/src/time.rs` only, no UI or plugin was exercised.
 
+### 6.26 The Rust flip, stage by stage (handover; newest state first)
+
+Stages R-A … R-F as the coordinator defined them. Scratch tools:
+`~/psibase-pssz-scripts/rflip/` (`add_jsontext.py`, `add_psio_all.py`,
+`flip.py`); logs `~/psibase-pssz-build.*rflip*.log`.
+
+**R-A (done): every service declares a PSIO interface.**
+
+* `#[psibase::service]` always generates `PsioActions` / `psio_actions`
+  (`#[psio::interface]`, argument records with `Debug, Clone, psio::Serde`);
+  the option `psio = true` is gone. A second interface in one module
+  (`structs = "hooks_structs"`) is `PsioHooks` / `psio_hooks`. Events are
+  interfaces too: `PsioHistoryEvents` / `psio_history_events` and
+  `PsioMerkleEvents` / `psio_merkle_events`, interface names
+  `<service>.history` / `<service>.merkle` (provisional; the schema of an
+  event is the argument record's node, not an `Interface`).
+* Tables: `TableRecord::PrimaryKey` and every secondary key type must be
+  `psio::key::KeyPack` (a compile-time assertion per index);
+  `RawKey`, `KeyView`, `SingletonKey` implement it (their bytes as they
+  stand).
+* Types: `psio::JsonText` on the 257 types that had the binary derives;
+  the full PSIO derives on 32 more (types declared inside service
+  modules, `DbId`, `AuthTarget`, `SymbolLength`, `AdminOptionsRow`, …).
+  `package::Meta` has no serde `default` any more (every member of
+  `meta.json` is required, as in C++; the node tests' package writer adds
+  `services`); `accounts::Account` and `ActionTrace` lost
+  `deserialize_with` and take their serde impls from `psio::Serde` (reads
+  a 64-bit number bare or quoted).
+* Result types are named absolutely where a view wrote `super::Record`.
+* **Temporary, must be gone after R-B / R-C:** `#[action(legacy)]` keeps
+  an action out of the PSIO interface: `packages::setSchema`,
+  `packages::getSchema` (legacy `Schema`), `transact::execTrx`
+  (`fracpack::Nested`). The legacy schema records and
+  `packages::InstalledSchema` have no PSIO derives. The Permissions
+  plugin's `PackablePromptContext`, `Permission`, `Permissions` have none
+  either (`TrustLevel` is mirrored as a plain enum when the legacy codec
+  goes). `ActionTrace::total_time` is still `i64` (C++: nanoseconds).
+* Checked (tag `rflip-ra`): full build exit 0; ctest 93 / 93 (81 in the
+  first run: `psibase boot` could not read `totalTime` written as a
+  string, and two tests fed a `meta.json` without `services`; the 12 were
+  rerun after the fixes and pass); 68 schemas identical to `snap-d`; the
+  six unbuilt packages check; plugins workspace checks.
+
 ### 6.21 What was checked after each of these steps
 
 Each row: full build exit 0, full `ctest -j4`, the generated

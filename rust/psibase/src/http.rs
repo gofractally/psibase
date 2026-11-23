@@ -28,6 +28,7 @@ use std::collections::HashMap;
     psio::PsszView,
     psio::ToPsszSchema,
     psio::Key,
+    psio::JsonText,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
@@ -81,6 +82,7 @@ pub enum HttpStatus {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
@@ -155,6 +157,7 @@ impl HttpBody {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]

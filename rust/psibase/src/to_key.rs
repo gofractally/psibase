@@ -67,6 +67,16 @@ impl ToKey for RawKey {
     }
 }
 
+/// Already-encoded key bytes: a `RawKey` is written as it stands.
+impl psio::key::KeyPack for RawKey {
+    fn key_size(&self) -> usize {
+        self.data.len()
+    }
+    fn key_pack(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.data);
+    }
+}
+
 impl CursorType for RawKey {
     type Error = &'static str;
     fn decode_cursor(s: &str) -> Result<Self, Self::Error> {
@@ -88,6 +98,16 @@ pub struct KeyView<'a> {
 impl<'a> KeyView<'a> {
     pub fn new(data: &'a [u8]) -> Self {
         KeyView { data }
+    }
+}
+
+/// Already-encoded key bytes: a `KeyView` is written as it stands.
+impl<'a> psio::key::KeyPack for KeyView<'a> {
+    fn key_size(&self) -> usize {
+        self.data.len()
+    }
+    fn key_pack(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(self.data);
     }
 }
 

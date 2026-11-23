@@ -16,7 +16,7 @@ mod service {
 
     use crate::events::OwnerChangeEvent;
 
-    #[derive(Pack, Unpack, ToSchema, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     struct UserDetail {
         account: AccountNumber,
         authService: AccountNumber,
@@ -31,7 +31,7 @@ mod service {
         }
     }
 
-    #[derive(Pack, Unpack, ToSchema, Debug, Clone, SimpleObject)]
+    #[derive(Pack, Unpack, ToSchema, Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     struct NftDetail {
         id: NID,
         owner: UserDetail,

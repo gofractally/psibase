@@ -100,6 +100,8 @@ fn process_mod(
 
     let mut pre_action_info: PreAction = PreAction::default();
 
+    let mut psio_event_reexports = Vec::new();
+    let mut psio_action_idents = None;
     if let Some((_, items)) = &mut impl_mod.content {
         let mut action_fns: Vec<usize> = Vec::new();
         let mut non_action_fns: Vec<usize> = Vec::new();
@@ -137,7 +139,12 @@ fn process_mod(
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 check_method_number(method_number, f, &mut method_numbers);
-                if options.psio {
+                // Temporary: `#[action(legacy)]` keeps an action whose types are
+                // not PSIO values yet out of the PSIO interface.
+                let legacy_only = f.attrs.iter().any(|attr| {
+                    is_action_attr(attr) && matches!(&attr.meta, syn::Meta::List(list) if list.tokens.to_string() == "legacy")
+                });
+                if !legacy_only {
                     psio_fns.push(psio_interface_fn(f));
                 }
                 let mut invoke_args = quote! {};
@@ -177,19 +184,49 @@ fn process_mod(
             }
         }
         add_unknown_action_check_to_dispatch_body(psibase_mod, &mut dispatch_body);
-        if options.psio {
-            // The actions as PSIO declares an interface: `#[psio::interface]`
-            // gives the argument records, the method metadata and the Schema
-            // IR's Interface. Nothing calls it yet; `Actions`, `action_structs`
-            // and the dispatcher above still carry every call.
-            let (psio_attr, psio_crate) = if options.psibase_mod == "crate" {
-                (quote! { ::psio }, "::psio".to_string())
-            } else {
-                (
-                    quote! { #psibase_mod::psio },
-                    format!("{}::psio", options.psibase_mod),
-                )
-            };
+        // The actions as PSIO declares an interface: `#[psio::interface]`
+        // gives the argument records, the method metadata and the Schema
+        // IR's Interface.
+        let (psio_attr, psio_crate) = if options.psibase_mod == "crate" {
+            (quote! { ::psio }, "::psio".to_string())
+        } else {
+            (
+                quote! { #psibase_mod::psio },
+                format!("{}::psio", options.psibase_mod),
+            )
+        };
+        // A second interface declared in one module (`structs = "hooks_structs"`)
+        // names its PSIO interface after the same prefix.
+        let psio_prefix = options
+            .structs
+            .strip_suffix("_structs")
+            .filter(|prefix| *prefix != "action")
+            .map(str::to_string);
+        let (psio_module_name, psio_trait_name) = match &psio_prefix {
+            None => ("psio_actions".to_string(), "PsioActions".to_string()),
+            Some(prefix) => (
+                format!("psio_{prefix}"),
+                format!(
+                    "Psio{}",
+                    prefix
+                        .split('_')
+                        .map(|part| {
+                            let mut chars = part.chars();
+                            chars
+                                .next()
+                                .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
+                                .unwrap_or_default()
+                        })
+                        .collect::<String>()
+                ),
+            ),
+        };
+        psio_action_idents = Some((
+            proc_macro2::Ident::new(&psio_module_name, proc_macro2::Span::call_site()),
+            proc_macro2::Ident::new(&psio_trait_name, proc_macro2::Span::call_site()),
+        ));
+        {
+            let psio_trait_ident = &psio_action_idents.as_ref().unwrap().1;
             let psio_doc = format!(
                 "The actions of \"{}\" as a PSIO interface: `psio_actions::Tag` is the \
                  interface, `psio_actions::args::<action>` the argument record of an action.",
@@ -198,11 +235,50 @@ fn process_mod(
             items.push(parse_quote! {
                 #[doc = #psio_doc]
                 #[allow(non_snake_case)]
-                #[#psio_attr::interface(name = #service_account, module = "psio_actions", crate = #psio_crate)]
-                pub trait PsioActions {
+                #[#psio_attr::interface(name = #service_account, module = #psio_module_name, crate = #psio_crate, derive(Debug, Clone, #psio_attr::Serde))]
+                pub trait #psio_trait_ident {
                     #(#psio_fns)*
                 }
             });
+        }
+        // The events of each kind as a PSIO interface: the argument record
+        // of an event is `psio_history_events::args::<event>` (or
+        // `psio_merkle_events`).
+        for (kind, fns) in &event_fns {
+            let (trait_name, module_name, suffix) = match kind {
+                EventType::History => ("PsioHistoryEvents", "psio_history_events", "history"),
+                EventType::Merkle => ("PsioMerkleEvents", "psio_merkle_events", "merkle"),
+            };
+            let trait_ident = proc_macro2::Ident::new(trait_name, proc_macro2::Span::call_site());
+            let module_ident = proc_macro2::Ident::new(module_name, proc_macro2::Span::call_site());
+            let interface_name = format!("{}.{}", options.name, suffix);
+            let mut event_psio_fns = Vec::new();
+            let mut all_have_params = true;
+            for (fn_index, _) in fns {
+                if let Item::Fn(f) = &items[*fn_index] {
+                    all_have_params &= !f.sig.inputs.is_empty();
+                    event_psio_fns.push(psio_interface_fn(f));
+                }
+            }
+            let gql_derive = if options.gql && all_have_params {
+                quote! { , async_graphql::SimpleObject }
+            } else {
+                quote! {}
+            };
+            let psio_doc = format!(
+                "The {} events of \"{}\" as a PSIO interface: `{}::args::<event>` is the \
+                 argument record of an event.",
+                suffix, options.name, module_name
+            );
+            items.push(parse_quote! {
+                #[doc = #psio_doc]
+                #[allow(non_snake_case)]
+                #[#psio_attr::interface(name = #interface_name, module = #module_name, crate = #psio_crate, derive(Debug, Clone, #psio_attr::Serde #gql_derive))]
+                pub trait #trait_ident {
+                    #(#event_psio_fns)*
+                }
+            });
+            psio_event_reexports.push(quote! { #module_ident, #trait_ident });
         }
         let const_pub = if options.pub_constant {
             quote! {pub}
@@ -577,13 +653,10 @@ fn process_mod(
     } else {
         quote! {}
     };
-    let reexport_psio = if options.psio {
-        quote! {
-            #[automatically_derived]
-            pub use #mod_name::{psio_actions, PsioActions};
-        }
-    } else {
-        quote! {}
+    let (psio_module_ident, psio_trait_ident) = psio_action_idents.unwrap();
+    let reexport_psio = quote! {
+        #[automatically_derived]
+        pub use #mod_name::{#psio_module_ident, #psio_trait_ident #(, #psio_event_reexports)*};
     };
     let silence = if options.dispatch.unwrap() {
         quote! {}

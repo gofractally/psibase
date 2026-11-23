@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub mod tables {
     use super::*;
     #[table(name = "RelayTable", index = 0)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Relay {
         pub network: String,
         pub checkpoint: String,
@@ -24,7 +24,7 @@ pub mod tables {
         fn pk(&self) {}
     }
     #[table(name = "HeaderTable", index = 1)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct HeaderRow {
         #[primary_key]
         pub id: String,
@@ -36,7 +36,7 @@ pub mod tables {
         pub epoch_start: u32,
     }
     #[table(name = "CanonicalTable", index = 2)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Canonical {
         #[primary_key]
         pub height: u32,

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub mod tables {
     use super::*;
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Config {
         pub chain_id: u64,
         pub deployment: String,
@@ -33,7 +33,7 @@ pub mod tables {
         fn pk(&self) {}
     }
     #[table(name = "CustodyTable", index = 1)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Custody {
         #[primary_key]
         pub index: u8,
@@ -43,7 +43,7 @@ pub mod tables {
         pub address: String,
     }
     #[table(name = "DepositTable", index = 2)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Deposit {
         #[primary_key]
         pub id: u64,
@@ -64,7 +64,7 @@ pub mod tables {
         }
     }
     #[table(name = "RequestTable", index = 3)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Request {
         #[primary_key]
         pub id: u64,
@@ -87,7 +87,7 @@ pub mod tables {
         }
     }
     #[table(name = "BatchTable", index = 4)]
-    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Clone, Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct Batch {
         #[primary_key]
         pub nonce: u64,

@@ -20,7 +20,7 @@ custom_error! {
 }
 
 pub trait TableRecord: Pack + UnpackOwned {
-    type PrimaryKey: ToKey;
+    type PrimaryKey: ToKey + psio::key::KeyPack;
     const SECONDARY_KEYS: u8;
     const DB: DbId = DbId::Service;
 
@@ -227,6 +227,13 @@ pub trait ServiceTablesWrapper {
 }
 
 pub struct SingletonKey {}
+
+impl psio::key::KeyPack for SingletonKey {
+    fn key_size(&self) -> usize {
+        0
+    }
+    fn key_pack(&self, _out: &mut Vec<u8>) {}
+}
 
 impl ToKey for SingletonKey {
     fn append_key(&self, _key: &mut Vec<u8>) {}

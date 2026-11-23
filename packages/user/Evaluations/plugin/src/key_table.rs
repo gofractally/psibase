@@ -19,7 +19,7 @@ fn keys_table() -> Bucket {
     )
 }
 
-#[derive(Pack, Unpack, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+#[derive(Pack, Unpack, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct AsymKey {
     pub created_at: u32,
     pub private_key: Vec<u8>,
@@ -81,7 +81,7 @@ impl AsymKey {
     }
 }
 
-#[derive(Pack, Unpack, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+#[derive(Pack, Unpack, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct SymmetricKey {
     pub key: Vec<u8>,
     salt: Vec<u8>,

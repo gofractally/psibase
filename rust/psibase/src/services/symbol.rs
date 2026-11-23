@@ -12,9 +12,13 @@ pub type SID = AccountNumber;
 
 #[derive(
     Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-struct SymbolLength {
+pub struct SymbolLength {
     symbolLength: u8,
     nftId: u32,
 }
@@ -34,6 +38,7 @@ struct SymbolLength {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SymbolRecord {
@@ -56,6 +61,7 @@ pub struct SymbolRecord {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Mapping {

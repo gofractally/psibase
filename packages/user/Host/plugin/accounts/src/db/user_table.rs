@@ -12,7 +12,7 @@ pub(crate) fn connected_apps_table() -> Bucket {
     )
 }
 
-#[derive(Pack, Unpack, Default)]
+#[derive(Pack, Unpack, Default, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct ConnectedApps {
     apps: Vec<String>,
 }

@@ -25,7 +25,7 @@ pub(crate) fn connected_accounts_table() -> Bucket {
     )
 }
 
-#[derive(Pack, Unpack, Default)]
+#[derive(Pack, Unpack, Default, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct ConnectedAccounts {
     accounts: Vec<String>,
 }

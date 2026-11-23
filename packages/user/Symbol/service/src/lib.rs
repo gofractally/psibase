@@ -14,7 +14,7 @@ pub mod tables {
     use crate::service::{CREATED, MAPPED};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -22,7 +22,7 @@ pub mod tables {
     }
 
     #[table(name = "SymbolLengthTable", index = 1)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct SymbolLength {
         #[primary_key]
@@ -131,7 +131,7 @@ pub mod tables {
     }
 
     #[table(name = "SymbolTable", index = 2)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct Symbol {
         #[primary_key]
@@ -228,7 +228,7 @@ pub mod tables {
     }
 
     #[table(name = "MappingTable", index = 3)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     #[graphql(complex)]
     pub struct Mapping {
         #[primary_key]

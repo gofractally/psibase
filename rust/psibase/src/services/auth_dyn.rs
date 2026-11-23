@@ -18,6 +18,7 @@ pub mod policy {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct WeightedAuthorizer {
@@ -44,6 +45,7 @@ pub mod policy {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct DynamicAuthPolicy {

@@ -13,7 +13,7 @@ pub mod tables {
     const ONE_MILLION: u32 = 1_000_000;
 
     #[table(name = "RateLimitTable", index = 0)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct RateLimit {
         #[primary_key]
         pub nft_id: u32,

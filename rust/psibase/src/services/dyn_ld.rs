@@ -17,6 +17,7 @@ pub mod service {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     pub struct DynDep {
         pub name: String,

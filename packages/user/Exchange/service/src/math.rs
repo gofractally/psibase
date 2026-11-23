@@ -17,6 +17,7 @@ pub const MAX_PRICE: u64 = (1 << 32) - 1;
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 pub struct Wide {
     pub lo: u64,

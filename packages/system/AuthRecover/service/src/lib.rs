@@ -9,14 +9,14 @@ pub mod service {
 
     const RECOVERY_TIME: Seconds = Seconds::from_ticks(15 * 60);
 
-    #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct RecoveryKey {
         key: SubjectPublicKeyInfo,
         expiration: TimePointSec,
     }
 
     #[table(name = "AuthTable", index = 0)]
-    #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct AuthRow {
         #[primary_key]
         pub account: AccountNumber,

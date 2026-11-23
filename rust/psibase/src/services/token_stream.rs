@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Stream {

@@ -22,6 +22,7 @@ dependencies = [
  "psibase_macros",
  "psibase_service",
  "psimacrotest",
+ "psio",
  "serde",
 ]
 
@@ -1334,6 +1335,7 @@ dependencies = [
  "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_service",
+ "psio",
  "serde",
  "serde-aux",
  "serde_json",
@@ -4334,6 +4336,7 @@ dependencies = [
  "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_service",
+ "psio",
  "serde",
 ]
 

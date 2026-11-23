@@ -4,7 +4,7 @@ use fracpack::{Pack, ToSchema, Unpack};
 use pem::{encode, parse, Pem};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Debug, Clone, ToSchema, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema)]
+#[derive(Debug, Clone, ToSchema, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 #[psio(transparent)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SubjectPublicKeyInfo(pub Vec<u8>);
@@ -58,6 +58,7 @@ impl From<Vec<u8>> for SubjectPublicKeyInfo {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "AuthRecord")]

@@ -110,19 +110,19 @@ fn was_consumed(key: &str, id: u64) -> bool {
         )
 }
 
-#[derive(Clone, Pack, Unpack)]
+#[derive(Clone, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct PromptRef {
     key: String,
     id: u64,
 }
 
-#[derive(Pack, Unpack)]
+#[derive(Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct TransferScope {
     user: String,
     caller: String,
 }
 
-#[derive(Pack, Unpack)]
+#[derive(Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct SpentApproval {
     id: u64,
     expires: u64,

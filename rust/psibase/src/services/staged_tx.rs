@@ -17,6 +17,7 @@ pub mod service {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct ActionList {
@@ -34,6 +35,7 @@ pub mod service {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct StagedTx {
@@ -60,6 +62,7 @@ pub mod service {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct Response {

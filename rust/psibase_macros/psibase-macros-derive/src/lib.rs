@@ -354,20 +354,18 @@ pub fn to_schema(input: TokenStream) -> TokenStream {
 ///     structs = "action_structs", // Name of generated module
 ///     dispatch = see_below,       // Create service_wasm_interface?
 ///     pub_constant = true,        // Make constant public and reexport it?
-///     psio = false,               // Also declare the actions as a PSIO interface?
 /// )]
 /// ```
 ///
 /// `name` defaults to the package name.
 ///
-/// With `psio = true` the module also holds `PsioActions`, a trait with one
-/// function per action, declared with `#[psio::interface]`, and
-/// `psio_actions`, the module that attribute generates: the interface
-/// (`psio_actions::Tag`), the argument record of each action
-/// (`psio_actions::args::<action>`) and the Schema IR of both. Every
-/// parameter and result type must then be a PSIO value, named as the service
-/// module sees it and not through `self::` or `super::`. Nothing calls
-/// these yet.
+/// The module also holds `PsioActions`, a trait with one function per
+/// action, declared with `#[psio::interface]`, and `psio_actions`, the
+/// module that attribute generates: the interface (`psio_actions::Tag`), the
+/// argument record of each action (`psio_actions::args::<action>`) and the
+/// Schema IR of both; events likewise as `psio_history_events` and
+/// `psio_merkle_events`. Every parameter and result type is a PSIO value,
+/// named as the service module sees it and not through `self::` or `super::`.
 ///
 /// Two actions whose names have the same method number are a compile error.
 ///

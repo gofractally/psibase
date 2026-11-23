@@ -9,7 +9,17 @@ pub use crate::services::events::EventDb;
 /// various purposes. This enum identifies which database to
 /// use when invoking those functions.
 #[repr(u32)]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::JsonText,
+)]
 pub enum DbId {
     /// Services should store their tables here
     ///

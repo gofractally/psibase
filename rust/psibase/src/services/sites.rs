@@ -46,6 +46,7 @@ pub mod service {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct SitesContentRow {
@@ -78,6 +79,7 @@ pub mod service {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct SiteConfigRow {
@@ -102,6 +104,7 @@ pub mod service {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct SitesDataRow {
@@ -123,6 +126,7 @@ pub mod service {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct SitesDataRefRow {

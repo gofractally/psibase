@@ -72,9 +72,7 @@ mod tests {
             }
         };
 
-        let plain = service_macro_impl(quote! {}, before.clone(), &method_number).to_string();
-        assert!(!plain.contains("PsioActions"));
-        let psio = service_macro_impl(quote! { psio = true }, before, &method_number).to_string();
+        let psio = service_macro_impl(quote! {}, before, &method_number).to_string();
         assert!(psio.contains("psibase :: psio :: interface"), "{psio}");
         assert!(psio.contains("pub trait PsioActions"), "{psio}");
         assert!(psio.contains("fn add (a : i32 , b : i32) -> i32 ;"), "{psio}");

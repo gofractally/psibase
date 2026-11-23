@@ -4,7 +4,7 @@ mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "SubjectiveTable", index = 0, db = "Subjective")]
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     pub struct SubjectiveRow {
         #[primary_key]
         pub id: i32,

@@ -14,7 +14,7 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "WsTicketTable", index = 0, db = "Session")]
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct WsTicketRow {
         #[primary_key]
         pub ticket: String,
@@ -41,7 +41,7 @@ mod service {
     use psibase::{Pack, ServiceWrapper, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
     pub struct WsTicketInfo {
         pub user: AccountNumber,
         pub app: AccountNumber,

@@ -37,6 +37,7 @@ pub type TID = u32;
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct TokenRecord {
@@ -69,6 +70,7 @@ crate::define_flags!(TokenFlags, u8, {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Holder {
@@ -91,6 +93,7 @@ pub struct Holder {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SharedBalance {
@@ -117,6 +120,7 @@ pub struct SharedBalance {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Balance {

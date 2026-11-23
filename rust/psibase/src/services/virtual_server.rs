@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ServerSpecs {
@@ -40,6 +41,7 @@ pub struct ServerSpecs {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct NetworkVariables {
@@ -68,6 +70,7 @@ pub struct NetworkVariables {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct BufferConfig {

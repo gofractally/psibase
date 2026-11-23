@@ -13,7 +13,7 @@ mod service {
 
     /// Holds an answer to a calculation done by an account `id`
     #[table(name = "AnswerTable", index = 0)]
-    #[derive(Pack, Unpack, Serialize, Deserialize, SimpleObject, ToSchema)]
+    #[derive(Pack, Unpack, Serialize, Deserialize, SimpleObject, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     pub struct Answer {
         /// The account responsible for the calculation
         #[primary_key]
@@ -33,7 +33,7 @@ mod service {
         result: i32,
     }
 
-    #[derive(SimpleObject, Serialize, Deserialize, Pack, Unpack, ToSchema, Debug, Clone)]
+    #[derive(SimpleObject, Serialize, Deserialize, Pack, Unpack, ToSchema, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     pub struct ExampleRecord {
         count: u32,
         value: i32,

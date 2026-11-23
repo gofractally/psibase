@@ -183,6 +183,19 @@ pub fn process_service_tables(
 
         let sk_fn_name = Ident::new(&format!("get_index_{}", sk_ident), Span::call_site());
 
+        // The key of every index is a PSIO key.
+        let psio_path = if psibase_mod.to_string() == "crate" {
+            quote! { ::psio }
+        } else {
+            quote! { #psibase_mod::psio }
+        };
+        items.push(parse_quote! {
+            const _: fn() = || {
+                fn is_key<K: #psio_path::key::KeyPack>() {}
+                is_key::<#sk_ty>();
+            };
+        });
+
         sks_fns = quote! {
             #sks_fns
             pub fn #sk_fn_name(&self) -> #psibase_mod::TableIndex<#sk_ty, #table_record_struct_name> {

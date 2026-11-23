@@ -25,6 +25,7 @@ pub mod tables {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+        psio::JsonText,
 )]
     pub struct Profile {
         #[primary_key]

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageSource {
@@ -48,6 +49,7 @@ mod service {
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
+        psio::JsonText,
     )]
     pub struct InstalledPackage {
         pub name: String,
@@ -68,7 +70,7 @@ mod service {
     }
 
     #[table(name = "PackageManifestTable", index = 1)]
-    #[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+    #[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     struct PackageManifest {
         name: String,
         owner: AccountNumber,
@@ -82,7 +84,7 @@ mod service {
     }
 
     #[table(name = "TransactionOrderTable", index = 2)]
-    #[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+    #[derive(Debug, Clone, Default, Serialize, Deserialize, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     struct TransactionOrder {
         owner: AccountNumber,
         id: u64,
@@ -108,12 +110,12 @@ mod service {
         unimplemented!()
     }
 
-    #[action]
+    #[action(legacy)]
     fn setSchema(schema: Schema) {
         unimplemented!()
     }
 
-    #[action]
+    #[action(legacy)]
     fn getSchema(service: AccountNumber) -> Option<Schema> {
         unimplemented!()
     }

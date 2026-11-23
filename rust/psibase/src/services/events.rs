@@ -15,6 +15,7 @@ use crate as psibase;
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[psio(transparent)]
 pub struct EventDb(u8);

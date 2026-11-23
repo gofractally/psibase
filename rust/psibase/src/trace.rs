@@ -20,14 +20,13 @@ use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::rc::Rc;
 
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct ActionTrace {
     pub action: Action,
     pub raw_retval: Hex<Vec<u8>>,
     pub inner_traces: Vec<InnerTrace>,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub total_time: i64,
     pub error: Option<String>,
 }
@@ -49,6 +48,7 @@ impl fmt::Display for ActionTrace {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
@@ -56,21 +56,21 @@ pub struct ConsoleTrace {
     pub console: String,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum InnerTraceEnum {
     ConsoleTrace(ConsoleTrace),
     ActionTrace(ActionTrace),
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct InnerTrace {
     pub inner: InnerTraceEnum,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionTrace {

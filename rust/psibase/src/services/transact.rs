@@ -8,8 +8,8 @@ pub use crate::ServiceMethod;
 
 type CallbackType = u32;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-struct AuthTarget {
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+pub struct AuthTarget {
     sender: AccountNumber,
     action: Option<ServiceMethod>,
 }
@@ -192,7 +192,7 @@ mod service {
     }
 
     /// Called by RTransact to execute a transaction speculatively
-    #[action]
+    #[action(legacy)]
     fn execTrx(transaction: Nested<Transaction>, speculative: bool) {
         unimplemented!()
     }

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "InviteRecordInput")]
@@ -44,6 +45,7 @@ pub struct InviteRecord {
 
 #[derive(
     Clone, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct InvPayload {
@@ -152,7 +154,7 @@ mod service {
 
     /// Called synchronously by other services to retrieve the specified invite record
     #[action]
-    fn getInvite(inviteId: u32) -> Option<super::InviteRecord> {
+    fn getInvite(inviteId: u32) -> Option<crate::services::invite::InviteRecord> {
         unimplemented!()
     }
 

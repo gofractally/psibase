@@ -114,6 +114,7 @@ pub fn compress_content(
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageRef {
@@ -137,6 +138,7 @@ pub struct PackageRef {
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageExport {
@@ -148,20 +150,15 @@ fn network_scope() -> String {
     "network".to_string()
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Meta {
     pub name: String,
     pub version: String,
-    #[serde(default = "network_scope")]
     pub scope: String,
-    #[serde(default)]
     pub description: String,
-    #[serde(default)]
     pub depends: Vec<PackageRef>,
-    #[serde(default)]
     pub accounts: Vec<AccountNumber>,
-    #[serde(default)]
     pub services: Vec<AccountNumber>,
     pub exports: Vec<PackageExport>,
 }

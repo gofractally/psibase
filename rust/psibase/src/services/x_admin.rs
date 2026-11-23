@@ -35,9 +35,9 @@ mod service {
         unimplemented!()
     }
 
-    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+    #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
     #[fracpack(fracpack_mod = "fracpack")]
-    struct AdminOptionsRow {
+    pub struct AdminOptionsRow {
         p2p: bool,
         hosts: Vec<String>,
         peers: Vec<String>,

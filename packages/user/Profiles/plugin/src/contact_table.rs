@@ -21,7 +21,7 @@ fn contacts_table() -> Bucket {
     )
 }
 
-#[derive(Pack, Unpack, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
+#[derive(Pack, Unpack, Debug, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
 pub struct ContactEntry {
     pub account: AccountNumber,
     pub nickname: Option<String>,

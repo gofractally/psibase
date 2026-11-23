@@ -8,11 +8,11 @@ use serde_json::{json, Value};
 
 pub const MAX_PAGE: u32 = 100;
 
-#[derive(psibase::Pack, psibase::Unpack)]
+#[derive(psibase::Pack, psibase::Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct IndexInfo {
     index_num: u8,
 }
-#[derive(psibase::Pack, psibase::Unpack)]
+#[derive(psibase::Pack, psibase::Unpack, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
 struct ReadyIndex {
     db: u8,
     service: AccountNumber,

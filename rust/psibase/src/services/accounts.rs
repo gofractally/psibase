@@ -7,12 +7,11 @@ use serde_aux::field_attributes::deserialize_number_from_string;
 
 pub const MIN_ALLOWED_ACCOUNT_LENGTH: u8 = 8;
 // TODO: tables
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Account {
     pub accountNum: AccountNumber,
     pub authService: AccountNumber,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub authSequence: u64,
 }
 
@@ -75,7 +74,7 @@ mod service {
     }
 
     #[action]
-    fn getAccount(name: AccountNumber) -> Option<super::Account> {
+    fn getAccount(name: AccountNumber) -> Option<crate::services::accounts::Account> {
         unimplemented!()
     }
 
