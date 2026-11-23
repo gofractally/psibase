@@ -124,7 +124,7 @@ impl WasmConfigRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct CodeRow {
     pub codeNum: AccountNumber,
@@ -146,7 +146,7 @@ impl CodeRow {
 }
 
 /// where code is actually stored, duplicate services are reused
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct CodeByHashRow {
     pub codeHash: Checksum256,
@@ -183,7 +183,7 @@ impl NotifyRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct BlockDataRow {
     pub blockId: Checksum256,
@@ -232,14 +232,14 @@ impl ConsensusChangeRow {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct StateChecksum {
     pub serviceRoot: Checksum256,
     pub nativeRoot: Checksum256,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct StateSignature {
     pub account: AccountNumber,
@@ -247,14 +247,14 @@ pub struct StateSignature {
     pub rawData: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SnapshotStateItem {
     pub state: StateChecksum,
     pub signatures: Vec<StateSignature>,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SnapshotRow {
     pub id: Checksum256,

@@ -35,6 +35,11 @@ pub type BlockTime = TimePointUSec;
     InputObject,
     PartialEq,
     Eq,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
 )]
 #[fracpack(fracpack_mod = "fracpack", custom = "Action")]
 #[to_key(psibase_mod = "crate")]
@@ -53,7 +58,7 @@ pub struct Action {
     pub rawData: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, psio::PsszPack)]
 #[fracpack(fracpack_mod = "fracpack", custom = "Action")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedAction<'a> {
@@ -66,7 +71,7 @@ pub struct SharedAction<'a> {
 /// The genesis action is the first action of the first transaction of
 /// the first block. The action struct's fields are ignored, except
 /// rawData, which contains this struct.
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
 pub struct GenesisActionData {
@@ -74,7 +79,7 @@ pub struct GenesisActionData {
     pub services: Vec<GenesisService>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, psio::PsszPack)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedGenesisActionData<'a> {
@@ -83,7 +88,7 @@ pub struct SharedGenesisActionData<'a> {
     pub services: Vec<SharedGenesisService<'a>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
 pub struct GenesisService {
@@ -94,7 +99,7 @@ pub struct GenesisService {
     pub code: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, psio::PsszPack)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedGenesisService<'a> {
@@ -119,6 +124,11 @@ pub struct SharedGenesisService<'a> {
     InputObject,
     PartialEq,
     Eq,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
@@ -243,6 +253,11 @@ type TermNum = u32;
     Deserialize,
     SimpleObject,
     InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
@@ -254,6 +269,10 @@ pub struct Producer {
 
 #[derive(
     Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct CftConsensus {
@@ -262,6 +281,10 @@ pub struct CftConsensus {
 
 #[derive(
     Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct BftConsensus {
@@ -317,6 +340,11 @@ pub struct ConsensusBytes {
     Deserialize,
     SimpleObject,
     InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]

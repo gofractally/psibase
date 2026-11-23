@@ -12,6 +12,7 @@
 //!
 //! Every type in the fixture must be checked, so a type added in C++ fails
 //! here until Rust declares it.
+#![allow(non_upper_case_globals)]
 
 use psibase::services::tokens::{Decimal, Precision, Quantity};
 use psibase::*;
@@ -84,22 +85,36 @@ impl Fixture {
     }
 }
 
-/// How a string member is declared. C++ `std::string` is raw bytes
-/// (`Custom{List<u8>, "string"}`); a Rust `String` is UTF-8
-/// (`Custom{List<u8>, "utf8"}`). The bytes are the same.
-#[derive(Clone, Copy, PartialEq)]
-enum Strings {
-    /// The two schemas are equal as they stand.
-    Same,
-    /// C++ declares the type's strings raw and Rust UTF-8; nothing else
-    /// differs.
-    RawInCpp,
+/// The differences between two declarations that leave every byte, key
+/// and text the same and are known and listed (each is a decision or a gap
+/// recorded in doc/pssz-conversion.md):
+///
+/// * a string member: C++ `std::string` is raw bytes
+///   (`Custom{List<u8>, "string"}`), a Rust `String` is UTF-8
+///   (`Custom{List<u8>, "utf8"}`);
+/// * a byte sequence: C++ `std::vector<char>` is hex over the element
+///   `Custom{u8, "char"}`, a Rust `Vec<u8>` hex over `u8`.
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct Reading {
+    /// A raw string reads as a UTF-8 one.
+    raw_as_utf8: bool,
+    /// A `char` reads as the `u8` it is.
+    char_as_u8: bool,
 }
 
-/// A node with every reference replaced by what it refers to. With
-/// `raw_as_utf8`, a raw string reads as a UTF-8 one.
-fn resolved(schema: &schema_ir::Schema, ty: &AnyType, raw_as_utf8: bool) -> AnyType {
-    let go = |ty: &AnyType| Box::new(resolved(schema, ty, raw_as_utf8));
+/// The two schemas are equal as they stand.
+const Same: Reading = Reading { raw_as_utf8: false, char_as_u8: false };
+/// C++ declares the type's strings raw and Rust UTF-8; nothing else differs.
+const RawInCpp: Reading = Reading { raw_as_utf8: true, char_as_u8: false };
+/// C++ declares the type's byte sequences over `char`; nothing else differs.
+const CharInCpp: Reading = Reading { raw_as_utf8: false, char_as_u8: true };
+/// Both.
+const RawAndCharInCpp: Reading = Reading { raw_as_utf8: true, char_as_u8: true };
+
+/// A node with every reference replaced by what it refers to, read as
+/// `reading` says.
+fn resolved(schema: &schema_ir::Schema, ty: &AnyType, reading: Reading) -> AnyType {
+    let go = |ty: &AnyType| Box::new(resolved(schema, ty, reading));
     let members = |members: &Vec<schema_ir::Member>| {
         members
             .iter()
@@ -115,7 +130,7 @@ fn resolved(schema: &schema_ir::Schema, ty: &AnyType, raw_as_utf8: bool) -> AnyT
             return resolved(
                 schema,
                 schema.get(&reference.r#type).expect("a known type"),
-                raw_as_utf8,
+                reading,
             )
         }
         V::Object(o) => V::Object(schema_ir::Object {
@@ -144,9 +159,12 @@ fn resolved(schema: &schema_ir::Schema, ty: &AnyType, raw_as_utf8: bool) -> AnyT
         V::Option(o) => V::Option(schema_ir::Optional {
             r#type: go(&o.r#type),
         }),
+        V::Custom(c) if reading.char_as_u8 && c.id == "char" => {
+            return resolved(schema, &c.r#type, reading)
+        }
         V::Custom(c) => V::Custom(schema_ir::Custom {
             r#type: go(&c.r#type),
-            id: if raw_as_utf8 && c.id == "string" {
+            id: if reading.raw_as_utf8 && c.id == "string" {
                 "utf8".to_string()
             } else {
                 c.id.clone()
@@ -161,7 +179,7 @@ fn resolved(schema: &schema_ir::Schema, ty: &AnyType, raw_as_utf8: bool) -> AnyT
 
 /// The Rust type `T` and the C++ type the fixture calls `name` have one
 /// schema and one pSSZ encoding.
-fn same_schema_and_bytes<T>(fixture: &mut Fixture, name: &str, strings: Strings)
+fn same_schema_and_bytes<T>(fixture: &mut Fixture, name: &str, reading: Reading)
 where
     T: ToPsszSchema
         + psio::pssz::PsszPack<psio::Pssz>
@@ -175,24 +193,27 @@ where
         .schema
         .get(name)
         .unwrap_or_else(|| panic!("{name} is not in the fixture's schema"));
-    let exact = resolved(&ours, &root, false) == resolved(&fixture.schema, theirs, false);
-    match strings {
-        Strings::Same => assert_eq!(
-            resolved(&ours, &root, false),
-            resolved(&fixture.schema, theirs, false),
-            "{name}: schema"
-        ),
-        Strings::RawInCpp => {
-            assert!(
-                !exact,
-                "{name}: the schemas are equal now; check it with Strings::Same"
-            );
-            assert_eq!(
-                resolved(&ours, &root, true),
-                resolved(&fixture.schema, theirs, true),
-                "{name}: schema, apart from raw / UTF-8 strings"
-            );
-        }
+    let equal_under = |reading: Reading| {
+        resolved(&ours, &root, reading) == resolved(&fixture.schema, theirs, reading)
+    };
+    assert_eq!(
+        resolved(&ours, &root, reading),
+        resolved(&fixture.schema, theirs, reading),
+        "{name}: schema, read as {reading:?}"
+    );
+    // Each difference a type is listed with is one it has: the list is
+    // exact, and a type leaves it when either declaration changes.
+    if reading.raw_as_utf8 {
+        assert!(
+            !equal_under(Reading { raw_as_utf8: false, ..reading }),
+            "{name}: its strings are declared alike now"
+        );
+    }
+    if reading.char_as_u8 {
+        assert!(
+            !equal_under(Reading { char_as_u8: false, ..reading }),
+            "{name}: its byte sequences are declared alike now"
+        );
     }
 
     for vector in fixture.vectors(name) {
@@ -247,7 +268,6 @@ where
 #[test]
 fn rust_and_cpp_declare_the_same_types() {
     let mut f = Fixture::load();
-    use Strings::*;
 
     // Names (slice R1).
     same_schema_and_bytes::<AccountNumber>(&mut f, "AccountNumber", Same);
@@ -294,6 +314,41 @@ fn rust_and_cpp_declare_the_same_types() {
     same_schema_and_bytes::<PackageExport>(&mut f, "PackageExport", RawInCpp);
     same_schema_and_bytes::<ConsoleTrace>(&mut f, "ConsoleTrace", RawInCpp);
 
+    // Byte sequences behind `Hex<T>`, and the records that hold them.
+    same_schema_and_bytes::<Checksum256>(&mut f, "Checksum256", Same);
+    same_key::<Checksum256>(&f, "Checksum256");
+    same_text::<Checksum256>(&f, "Checksum256");
+    same_schema_and_bytes::<Hex<Vec<u8>>>(&mut f, "Bytes", CharInCpp);
+    same_key::<Hex<Vec<u8>>>(&f, "Bytes");
+    same_text::<Hex<Vec<u8>>>(&f, "Bytes");
+    same_schema_and_bytes::<Hex<Vec<u8>>>(&mut f, "Octets", Same);
+    same_key::<Hex<Vec<u8>>>(&f, "Octets");
+    same_text::<Hex<Vec<u8>>>(&f, "Octets");
+    same_schema_and_bytes::<Action>(&mut f, "Action", CharInCpp);
+    same_key::<Action>(&f, "Action");
+    same_schema_and_bytes::<GenesisService>(&mut f, "GenesisService", CharInCpp);
+    same_key::<GenesisService>(&f, "GenesisService");
+    same_schema_and_bytes::<GenesisActionData>(&mut f, "GenesisActionData", RawAndCharInCpp);
+    same_key::<GenesisActionData>(&f, "GenesisActionData");
+    same_schema_and_bytes::<Claim>(&mut f, "Claim", CharInCpp);
+    same_key::<Claim>(&f, "Claim");
+    same_schema_and_bytes::<Producer>(&mut f, "Producer", CharInCpp);
+    same_key::<Producer>(&f, "Producer");
+    same_schema_and_bytes::<CftConsensus>(&mut f, "CftConsensus", CharInCpp);
+    same_schema_and_bytes::<BftConsensus>(&mut f, "BftConsensus", CharInCpp);
+    same_schema_and_bytes::<BlockHeaderAuthAccount>(&mut f, "BlockHeaderAuthAccount", Same);
+    same_key::<BlockHeaderAuthAccount>(&f, "BlockHeaderAuthAccount");
+    same_schema_and_bytes::<HttpRequest>(&mut f, "HttpRequest", RawAndCharInCpp);
+    same_schema_and_bytes::<HttpReply>(&mut f, "HttpReply", RawAndCharInCpp);
+    same_schema_and_bytes::<CodeRow>(&mut f, "CodeRow", Same);
+    same_schema_and_bytes::<CodeByHashRow>(&mut f, "CodeByHashRow", Same);
+    same_schema_and_bytes::<BlockDataRow>(&mut f, "BlockDataRow", CharInCpp);
+    same_schema_and_bytes::<StateChecksum>(&mut f, "StateChecksum", Same);
+    same_schema_and_bytes::<StateSignature>(&mut f, "StateSignature", CharInCpp);
+    same_schema_and_bytes::<SnapshotStateItem>(&mut f, "SnapshotStateItem", CharInCpp);
+    same_schema_and_bytes::<SnapshotRow>(&mut f, "SnapshotRow", CharInCpp);
+    borrowed_records_write_the_bytes_of_the_owned_ones(&f);
+
     memo_differs_only_in_its_declared_bound(&mut f);
 
     let in_fixture: BTreeSet<String> = f.vectors.iter().map(|(ty, _)| ty.clone()).collect();
@@ -301,6 +356,43 @@ fn rust_and_cpp_declare_the_same_types() {
         f.checked, in_fixture,
         "every type of the fixture is checked"
     );
+}
+
+/// `SharedAction`, `SharedGenesisService` and `SharedGenesisActionData`
+/// borrow their bytes and are only written (`PsszPack`); what they write is
+/// what `Action`, `GenesisService` and `GenesisActionData` write.
+fn borrowed_records_write_the_bytes_of_the_owned_ones(f: &Fixture) {
+    for vector in f.vectors("Action") {
+        let owned = psio::from_pssz::<Action>(&vector.pssz).unwrap();
+        let shared = SharedAction {
+            sender: owned.sender,
+            service: owned.service,
+            method: owned.method,
+            rawData: Hex(&owned.rawData.0[..]),
+        };
+        assert_eq!(hex(&psio::to_pssz(&shared)), hex(&vector.pssz));
+    }
+    for vector in f.vectors("GenesisActionData") {
+        let owned = psio::from_pssz::<GenesisActionData>(&vector.pssz).unwrap();
+        let shared = SharedGenesisActionData {
+            memo: owned.memo.clone(),
+            services: owned
+                .services
+                .iter()
+                .map(|s| SharedGenesisService {
+                    service: s.service,
+                    flags: s.flags,
+                    vmType: s.vmType,
+                    vmVersion: s.vmVersion,
+                    code: Hex(&s.code.0[..]),
+                })
+                .collect(),
+        };
+        assert_eq!(hex(&psio::to_pssz(&shared)), hex(&vector.pssz));
+        for (shared, owned) in shared.services.iter().zip(&owned.services) {
+            assert_eq!(hex(&psio::to_pssz(shared)), hex(&psio::to_pssz(owned)));
+        }
+    }
 }
 
 /// `Memo`. Rust declares what the type is to be at the wire flip: a UTF-8
@@ -326,8 +418,8 @@ fn memo_differs_only_in_its_declared_bound(f: &mut Fixture) {
     }
 
     let (ours, root) = schema_for::<Memo>().unwrap();
-    let ours = resolved(&ours, &root, false);
-    let theirs = resolved(&f.schema, f.schema.get("Memo").unwrap(), false);
+    let ours = resolved(&ours, &root, Same);
+    let theirs = resolved(&f.schema, f.schema.get("Memo").unwrap(), Same);
     assert_ne!(
         ours, theirs,
         "Memo: the schemas are equal now; check it like the others"

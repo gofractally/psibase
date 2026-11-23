@@ -14,6 +14,7 @@
 #include <psibase/Memo.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Rpc.hpp>
+#include <psibase/SnapshotHeader.hpp>
 #include <psibase/SocketInfo.hpp>
 #include <psibase/block.hpp>
 #include <psibase/nativeTables.hpp>
@@ -160,6 +161,59 @@ namespace
       f.add<PackageExport>("PackageExport",
                            {PackageExport{}, PackageExport{"tokens", AccountNumber{"tokens"}}});
       f.add<ConsoleTrace>("ConsoleTrace", {ConsoleTrace{}, ConsoleTrace{"hello\n"}});
+
+      // Byte sequences: what Rust's `Hex<T>` wraps. `Bytes` is the member type
+      // most C++ records use, a `std::vector<char>`; `Octets` holds
+      // `unsigned char`, as `CodeByHashRow::code` does.
+      const Checksum256 digest = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+                                  0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5,
+                                  0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff};
+      const std::vector<char> bytes = {'\x00', '\x01', '\x7f', '\x80', '\xff'};
+      f.add<Checksum256>("Checksum256", {Checksum256{}, digest});
+      f.add<std::vector<char>>("Bytes", {{}, bytes});
+      f.add<std::vector<std::uint8_t>>("Octets", {{}, {0x00, 0x01, 0x7f, 0x80, 0xff}});
+
+      // Core records that hold byte sequences.
+      const Action action{AccountNumber{"alice"}, AccountNumber{"tokens"}, MethodNumber{"credit"},
+                          bytes};
+      const Claim  claim{AccountNumber{"verify-sig"}, bytes};
+      const GenesisService genesisService{AccountNumber{"transact"}, 3, 1, 1, bytes};
+      const Producer       producer{AccountNumber{"prod1"}, claim};
+      f.add<Action>("Action", {Action{}, action});
+      f.add<GenesisService>("GenesisService", {GenesisService{}, genesisService});
+      f.add<GenesisActionData>("GenesisActionData",
+                               {GenesisActionData{}, GenesisActionData{"boot", {genesisService}}});
+      f.add<Claim>("Claim", {Claim{}, claim});
+      f.add<Producer>("Producer", {Producer{}, producer});
+      f.add<CftConsensus>("CftConsensus", {CftConsensus{}, CftConsensus{{producer, Producer{}}}});
+      f.add<BftConsensus>("BftConsensus", {BftConsensus{}, BftConsensus{{producer}}});
+      f.add<BlockHeaderAuthAccount>(
+          "BlockHeaderAuthAccount",
+          {BlockHeaderAuthAccount{}, BlockHeaderAuthAccount{AccountNumber{"verify-sig"}, digest, 1, 1}});
+      f.add<HttpRequest>(
+          "HttpRequest",
+          {HttpRequest{},
+           HttpRequest{"psibase.localhost", "POST", "/graphql?x=1", "application/json",
+                       {HttpHeader{"Accept", "*/*"}}, {'{', '}'}}});
+      f.add<HttpReply>("HttpReply",
+                       {HttpReply{}, HttpReply{HttpStatus::notFound, "text/html", {'n', 'o'},
+                                               {HttpHeader{"Cache-Control", "no-store"}}}});
+      f.add<CodeRow>("CodeRow", {CodeRow{}, CodeRow{AccountNumber{"transact"}, CodeRow::isPrivileged,
+                                                    digest, 1, 1}});
+      f.add<CodeByHashRow>("CodeByHashRow",
+                           {CodeByHashRow{}, CodeByHashRow{digest, 1, 1, {0x00, 0x61, 0x73, 0x6d}}});
+      f.add<BlockDataRow>("BlockDataRow",
+                          {BlockDataRow{}, BlockDataRow{digest, std::nullopt},
+                           BlockDataRow{digest, bytes}});
+      const snapshot::StateChecksum  stateChecksum{digest, Checksum256{}};
+      const snapshot::StateSignature stateSignature{AccountNumber{"prod1"}, claim, bytes};
+      const SnapshotStateItem        stateItem{stateChecksum, {stateSignature}};
+      f.add<snapshot::StateChecksum>("StateChecksum", {snapshot::StateChecksum{}, stateChecksum});
+      f.add<snapshot::StateSignature>("StateSignature",
+                                      {snapshot::StateSignature{}, stateSignature});
+      f.add<SnapshotStateItem>("SnapshotStateItem", {SnapshotStateItem{}, stateItem});
+      f.add<SnapshotRow>("SnapshotRow",
+                         {SnapshotRow{}, SnapshotRow{digest, stateItem, {stateItem, SnapshotStateItem{}}}});
 
       return std::move(f).text();
    }

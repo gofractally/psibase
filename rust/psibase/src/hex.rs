@@ -21,7 +21,27 @@ trait FromHex: ToHex {
 ///
 /// `Hex<Vec<u8>>`, `Hex<&[u8]>`, and `Hex<[u8; SIZE]>` store binary
 /// data. This wrapper does not support other inner types.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+///
+/// For PSIO a `Hex<T>` is its `T` (`transparent`): the same pSSZ bytes, key
+/// and schema node, and the same text, because PSIO already writes a byte
+/// sequence as one hex string. The wrapper is what gives the serde and
+/// GraphQL impls below their hex text; it is deleted, and its uses become
+/// the plain `Vec<u8>` / `[u8; N]`, when those move to PSIO's text.
+#[derive(
+    Debug,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::Key,
+    psio::JsonText,
+)]
+#[psio(transparent)]
 pub struct Hex<T>(pub T);
 
 impl<T> Default for Hex<T>

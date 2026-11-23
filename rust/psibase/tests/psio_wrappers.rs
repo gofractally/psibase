@@ -212,3 +212,90 @@ fn the_packed_and_json_forms_in_use_are_unchanged() {
         "{\"value\":5}"
     );
 }
+
+// ── Hex<T>, Checksum256 ─────────────────────────────────────────────────────
+
+/// `Hex<T>` is its `T` for PSIO: the bytes, the key, the text and the
+/// schema node of the bare `Vec<u8>` / `[u8; N]`. (That those are also the
+/// C++ member's is checked through the fixture in `psio_twins.rs`.)
+#[test]
+fn hex_is_the_byte_sequence_it_wraps() {
+    use psibase::{Checksum256, Hex};
+    use psio::pssz::schema_ir::schema_for;
+
+    let bytes: Vec<u8> = vec![0x00, 0x01, 0x7f, 0x80, 0xff];
+    let wrapped = Hex(bytes.clone());
+    assert_eq!(hex(&psio::to_pssz(&wrapped)), "00017f80ff");
+    assert_eq!(psio::to_pssz(&wrapped), psio::to_pssz(&bytes));
+    assert_eq!(hex(&psio::to_key(&wrapped)), "0001017f80ff0000");
+    assert_eq!(psio::to_key(&wrapped), psio::to_key(&bytes));
+    assert_eq!(psio::to_ijson(&wrapped), "\"00017F80FF\"");
+    assert_eq!(psio::to_ijson(&wrapped), psio::to_ijson(&bytes));
+    assert_eq!(psio::from_pssz::<Hex<Vec<u8>>>(&psio::to_pssz(&bytes)).unwrap(), wrapped);
+    assert_eq!(psio::from_key::<Hex<Vec<u8>>>(&psio::to_key(&bytes)).unwrap(), wrapped);
+    assert_eq!(psio::from_ijson::<Hex<Vec<u8>>>("\"00017f80FF\"").unwrap(), wrapped);
+    assert!(psio::from_ijson::<Hex<Vec<u8>>>("\"0\"").is_err());
+    assert!(psio::from_ijson::<Hex<Vec<u8>>>("[0,1]").is_err());
+    // A borrowed sequence writes the same bytes.
+    assert_eq!(psio::to_pssz(&Hex(&bytes[..])), psio::to_pssz(&bytes));
+
+    let mut digest = [0u8; 32];
+    for (i, b) in digest.iter_mut().enumerate() {
+        *b = i as u8 * 8;
+    }
+    let checksum: Checksum256 = Hex(digest);
+    assert_eq!(psio::to_pssz(&checksum), digest.to_vec());
+    assert_eq!(psio::to_pssz(&checksum), psio::to_pssz(&digest));
+    assert_eq!(psio::to_key(&checksum), digest.to_vec());
+    assert_eq!(psio::to_key(&checksum), psio::to_key(&digest));
+    assert_eq!(psio::to_ijson(&checksum), psio::to_ijson(&digest));
+    assert_eq!(psio::from_pssz::<Checksum256>(&digest).unwrap(), checksum);
+    assert!(psio::from_pssz::<Checksum256>(&digest[..31]).is_err());
+    assert!(psio::from_ijson::<Checksum256>("\"00\"").is_err());
+
+    // One schema node, with every reference followed.
+    use psio::pssz::schema_ir::{AnyType, AnyValue, Schema, ToPsszSchema};
+    fn followed(schema: &Schema, ty: &AnyType) -> String {
+        match &ty.value {
+            AnyValue::Type(reference) => followed(schema, schema.get(&reference.r#type).unwrap()),
+            AnyValue::Custom(c) => format!("Custom({}, {})", followed(schema, &c.r#type), c.id),
+            AnyValue::List(l) => format!("List({})", followed(schema, &l.r#type)),
+            AnyValue::Array(a) => format!("Array({}, {})", followed(schema, &a.r#type), a.len),
+            other => format!("{other:?}"),
+        }
+    }
+    fn node<T: ToPsszSchema>() -> String {
+        let (schema, ty) = schema_for::<T>().unwrap();
+        followed(&schema, &ty)
+    }
+    assert!(node::<Hex<Vec<u8>>>().starts_with("Custom(List(Int("), "{}", node::<Hex<Vec<u8>>>());
+    assert!(node::<Hex<Vec<u8>>>().ends_with(", hex)"));
+    assert_eq!(node::<Hex<Vec<u8>>>(), node::<Vec<u8>>());
+    assert_eq!(node::<Checksum256>(), node::<[u8; 32]>());
+
+    // In a record and in a list it takes the place of the bare type.
+    assert_eq!(
+        psio::to_pssz(&(7u32, wrapped.clone(), checksum.clone(), vec![wrapped.clone()])),
+        psio::to_pssz(&(7u32, bytes.clone(), digest, vec![bytes.clone()]))
+    );
+    assert_eq!(
+        psio::to_key(&(7u32, wrapped.clone(), checksum.clone())),
+        psio::to_key(&(7u32, bytes.clone(), digest))
+    );
+}
+
+/// What psibase writes today is untouched: fracpack bytes, the legacy key
+/// and the hex text serde gives.
+#[test]
+fn the_forms_of_hex_in_use_are_unchanged() {
+    use psibase::{Checksum256, Hex, ToKey};
+    let wrapped = Hex(vec![0x00u8, 0x01, 0xff]);
+    assert_eq!(hex(&wrapped.packed()), "030000000001ff");
+    assert_eq!(hex(&wrapped.to_key()), "0001" .to_string() + "01ff0000");
+    assert_eq!(serde_json::to_string(&wrapped).unwrap(), "\"0001FF\"");
+    assert_eq!(serde_json::from_str::<Hex<Vec<u8>>>("\"0001ff\"").unwrap(), wrapped);
+    let checksum: Checksum256 = Hex([0xab; 32]);
+    assert_eq!(checksum.packed(), vec![0xab; 32]);
+    assert_eq!(serde_json::to_string(&checksum).unwrap(), format!("\"{}\"", "AB".repeat(32)));
+    assert_eq!(Checksum256::unpacked(&[0xab; 32]).unwrap(), checksum);
+}
