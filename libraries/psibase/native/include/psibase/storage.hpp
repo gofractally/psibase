@@ -45,6 +45,40 @@ namespace psibase::storage
    struct database_view;
    class database;
 
+   // Changes to one tree, kept aside in key order until they are applied.
+   // Reading a tree "through" a delta shows the tree with the changes made.
+   // Nothing here touches the store: writing, marking and rolling back cost no
+   // lock and no copy of the tree, so a caller that throws its changes away
+   // never becomes a writer at all. One thread at a time.
+   class delta
+   {
+     public:
+      delta();
+      delta(delta&&) noexcept;
+      delta& operator=(delta&&) noexcept;
+      ~delta();
+      void put(std::span<const char> key, std::span<const char> value);
+      void erase(std::span<const char> key);
+      bool empty() const noexcept;
+      // Bytes held. Rolling back does not lower it; clear() does.
+      std::uint64_t bytes() const noexcept;
+      // A point the changes can be rolled back to. Marks nest.
+      struct mark
+      {
+         std::uint32_t root = 0xffffffffu;
+         std::uint32_t size = 0;
+      };
+      mark save();
+      void restore(const mark&);
+      void clear() noexcept;
+
+     private:
+      struct impl;
+      std::unique_ptr<impl> self;
+      friend class read_session;
+      friend class write_session;
+   };
+
    class read_session
    {
      protected:
@@ -74,6 +108,23 @@ namespace psibase::storage
                                                std::vector<char>*,
                                                std::vector<char>*,
                                                std::vector<shared_root>* = nullptr);
+      // The same reads through changes kept aside. A null root is an empty tree.
+      bool get(const shared_root&, const delta&, std::span<const char>, std::vector<char>* value);
+      bool get_greater_equal(const shared_root&,
+                             const delta&,
+                             std::span<const char>,
+                             std::vector<char>*,
+                             std::vector<char>*);
+      bool get_less_than(const shared_root&,
+                         const delta&,
+                         std::span<const char>,
+                         std::vector<char>*,
+                         std::vector<char>*);
+      bool get_max(const shared_root&,
+                   const delta&,
+                   std::span<const char>,
+                   std::vector<char>*,
+                   std::vector<char>*);
       bool is_empty(const shared_root&, std::span<const char> lower, std::span<const char> upper);
       bool is_equal_weak(const shared_root&,
                          const shared_root&,
@@ -99,6 +150,11 @@ namespace psibase::storage
       void        upsert(shared_root&, std::span<const char>, std::span<const char>);
       void        upsert(shared_root&, std::span<const char>, std::span<const shared_root>);
       void        remove(shared_root&, std::span<const char>);
+      // Apply changes kept aside to a tree, in key order, as one edit. With a
+      // mark: the changes as they were at that mark. The delta keeps them.
+      void        apply(shared_root&, delta&, const delta::mark* at = nullptr);
+      // Throws on a read-only database.
+      void        require_writable() const;
       void        splice(shared_root&,
                          const shared_root&,
                          std::span<const char> lower,

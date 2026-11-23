@@ -482,10 +482,10 @@ namespace psibase
       try
       {
          auto session = db.startWrite(writer);
-         auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
+         auto maxTime = saturatingCast<RunClock::duration>(row.maxTime().unpack());
          if (row.mode() == RunMode::verify && proofTimeout)
-            maxTime = saturatingCast<CpuClock::duration>(*proofTimeout);
-         tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
+            maxTime = saturatingCast<RunClock::duration>(*proofTimeout);
+         tc.setWatchdog(std::max(maxTime, RunClock::duration::zero()));
          if (row.mode() == RunMode::speculative)
          {
             db.checkoutEmptySubjective();

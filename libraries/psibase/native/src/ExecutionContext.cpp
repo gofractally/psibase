@@ -363,8 +363,23 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
              [&]
              {
                 auto& cache = wasmCache;
-                cache.awaitCompile(code.codeHash, vmOptions, code.vmVersion);
                 backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
+                // Waiting for a compile in flight, or compiling here, is not
+                // billed to the transaction.
+                //
+                // NOT VERIFIED ON THESE ENGINES: this file serves the psizam
+                // engines (JIT2, LLVM AOT, JIT1). The watchdog-only CPU budget
+                // changed the order here (cache first, pause only on a miss)
+                // and the trace timing below, and was qualified on wasmtime
+                // only; work on the other engines is paused. Run their suites
+                // before relying on a build that selects one of them.
+                std::optional<TransactionContext::BillingPause> unbilled;
+                if (!backend.backend)
+                {
+                   unbilled.emplace(transactionContext);
+                   cache.awaitCompile(code.codeHash, vmOptions, code.vmVersion);
+                   backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
+                }
                 if (!backend.backend)
                 {
                    loadCode();
@@ -435,20 +450,18 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
              });
       }
 
+      // The time an action took, for its trace. This is elapsed time, read
+      // without a system call; the thread's CPU clock is read only where a
+      // value is billed.
       struct RecordActionTime
       {
-         explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext)
-         {
-            actionContext.actionTrace.totalTime =
-                actionContext.transactionContext.getBillableTime();
-         }
+         explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext) {}
          ~RecordActionTime()
          {
-            actionContext.actionTrace.totalTime =
-                actionContext.transactionContext.getBillableTime() -
-                actionContext.actionTrace.totalTime;
+            actionContext.actionTrace.totalTime = std::chrono::steady_clock::now() - start;
          }
-         ActionContext& actionContext;
+         ActionContext&                        actionContext;
+         std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
       };
 
       template <typename F>

@@ -9,8 +9,7 @@ namespace psibase
    struct OpenSSLProver : Prover
    {
      public:
-      // Creates a new key
-      // TODO: parameterize this. Right now it creates a P-256 key
+      // Creates a new secp256k1 key
       OpenSSLProver(AccountNumber service);
       OpenSSLProver(AccountNumber service, std::span<const char> key);
       ~OpenSSLProver();

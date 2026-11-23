@@ -56,7 +56,22 @@ namespace psibase::vm_wasmtime
       constexpr std::uint64_t nativeStackBytes     = std::uint64_t(256) << 20;
       constexpr std::uint64_t nativeBytesPerBudget = 16;
 
-      wt::engine_options engineOptions(psizam::float_profile profile)
+      // Instance slots kept by each pooled engine. A transfer runs about
+      // sixteen services, each a new instance, and a slot stays warm for the
+      // service that last used it. Zero turns the pool off; anything the pool
+      // cannot serve runs on the engine without one.
+      std::uint32_t pooledInstances()
+      {
+         static const std::uint32_t count = []() -> std::uint32_t
+         {
+            if (const char* text = std::getenv("PSIBASE_WASMTIME_POOL"))
+               return static_cast<std::uint32_t>(std::strtoul(text, nullptr, 10));
+            return 256;
+         }();
+         return count;
+      }
+
+      wt::engine_options engineOptions(psizam::float_profile profile, bool pooled = false)
       {
          wt::engine_options o;
          // Mirrors NativeVMOptions; psizam's validator has the final word.
@@ -69,12 +84,44 @@ namespace psibase::vm_wasmtime
                                     : wt::float_profile::performance;
          o.native_stack       = nativeStackBytes;
          o.epoch_interruption = true;
+         if (pooled)
+         {
+            o.pool_instances      = pooledInstances();
+            o.pool_table_elements = 65536;
+         }
          return o;
       }
 
       // One wasmtime engine per float profile: the profile a service runs
       // under comes from the version its code was deployed with.
+      // Modules are compiled and instantiated here: instances come from the
+      // engine's pool of slots.
+      wt::runtime<ExecutionContextImpl> pooledRuntime(psizam::float_profile profile)
+      {
+         try
+         {
+            return wt::runtime<ExecutionContextImpl>{engineOptions(profile, true)};
+         }
+         catch (const wt::error&)
+         {
+            // The pool reserves address space for every slot up front. Where
+            // the system refuses that, instances are created one at a time.
+            return wt::runtime<ExecutionContextImpl>{engineOptions(profile)};
+         }
+      }
+
       wt::runtime<ExecutionContextImpl>& vmRuntime(psizam::float_profile profile)
+      {
+         static wt::runtime<ExecutionContextImpl> strict =
+             pooledRuntime(psizam::float_profile::strict);
+         static wt::runtime<ExecutionContextImpl> performance =
+             pooledRuntime(psizam::float_profile::performance);
+         return profile == psizam::float_profile::strict ? strict : performance;
+      }
+
+      // The same engine without a pool, for an instance the pool cannot
+      // provide. It runs the same compiled code.
+      wt::runtime<ExecutionContextImpl>& unpooledRuntime(psizam::float_profile profile)
       {
          static wt::runtime<ExecutionContextImpl> strict{
              engineOptions(psizam::float_profile::strict)};
@@ -109,6 +156,9 @@ namespace psibase::vm_wasmtime
       {
          Key        key;
          wt::module module;
+         // The module loaded into the engine without an instance pool, once
+         // an instance of it could not be taken from the pool.
+         std::optional<wt::module> unpooled;
       };
       std::mutex                                   mutex;
       std::uint32_t                                cacheSize;
@@ -154,6 +204,29 @@ namespace psibase::vm_wasmtime
          return it->second->module;
       }
 
+      // The module as the engine without an instance pool holds it.
+      wt::module unpooled(const Checksum256&    hash,
+                          const VMOptions&      vmOptions,
+                          std::uint8_t          vmVersion,
+                          psizam::float_profile profile,
+                          const wt::module&     module)
+      {
+         const Key key{hash, vmOptions, vmVersion};
+         {
+            std::lock_guard lock{mutex};
+            auto            it = index.find(key);
+            if (it != index.end() && it->second->unpooled)
+               return *it->second->unpooled;
+         }
+         const auto artifact = module.serialize();
+         auto       loaded   = unpooledRuntime(profile).load(artifact);
+         std::lock_guard lock{mutex};
+         auto            it = index.find(key);
+         if (it != index.end() && !it->second->unpooled)
+            it->second->unpooled = loaded;
+         return loaded;
+      }
+
       // wasmtime owns its code and memory mappings.
       std::vector<std::span<const char>> span() const override { return {}; }
 
@@ -195,6 +268,7 @@ namespace psibase::vm_wasmtime
    struct ExecutionContextImpl : NativeFunctions, vm::Context
    {
       VMOptions                                              vmOptions;
+      WasmCacheImpl&                                         cache;
       psizam::float_profile floatProfile = psizam::float_profile::strict;
       std::optional<wt::module>                              module;
       // Reading the stack counter goes through the store, which is not const.
@@ -211,7 +285,8 @@ namespace psibase::vm_wasmtime
                            AccountNumber       service)
           : NativeFunctions{transactionContext.blockContext.db, transactionContext,
                             transactionContext.dbMode},
-            vmOptions{vmOptions}
+            vmOptions{vmOptions},
+            cache{cache}
       {
          database.checkoutSubjective();
          psibase::finally _{[&] { database.abortSubjective(); }};
@@ -254,6 +329,10 @@ namespace psibase::vm_wasmtime
                "max_stack_bytes is larger than the wasmtime engine's native stack allows");
 
          module      = cache.get(code.codeHash, vmOptions, code.vmVersion);
+         // Loading or compiling the code is not billed to the transaction.
+         std::optional<TransactionContext::BillingPause> unbilled;
+         if (!module)
+            unbilled.emplace(transactionContext);
          if (!module)
          {
             // An artifact stored under this key was admitted and compiled from
@@ -328,7 +407,20 @@ namespace psibase::vm_wasmtime
              .max_memory_bytes   = std::uint64_t(vmOptions.max_pages) * 65536,
              .max_table_elements = vmOptions.max_table_elements,
          };
-         instance.emplace(vmRuntime(floatProfile), *module, *this, limits);
+         try
+         {
+            instance.emplace(vmRuntime(floatProfile), *module, *this, limits);
+         }
+         catch (const wt::instantiation_error&)
+         {
+
+            // No slot is free, or this module does not fit one. Nothing has
+            // run; the engine without a pool creates the same instance, or
+            // reports why none can be created.
+            module = cache.unpooled(code.codeHash, vmOptions, code.vmVersion, floatProfile,
+                                    *module);
+            instance.emplace(unpooledRuntime(floatProfile), *module, *this, limits);
+         }
          {
             std::lock_guard lock{interruptMutex};
             interrupter.emplace(instance->make_interrupter());
@@ -341,20 +433,18 @@ namespace psibase::vm_wasmtime
          initialized = true;
       }
 
+      // The time an action took, for its trace. This is elapsed time, read
+      // without a system call; the thread's CPU clock is read only where a
+      // value is billed.
       struct RecordActionTime
       {
-         explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext)
-         {
-            actionContext.actionTrace.totalTime =
-                actionContext.transactionContext.getBillableTime();
-         }
+         explicit RecordActionTime(ActionContext& actionContext) : actionContext(actionContext) {}
          ~RecordActionTime()
          {
-            actionContext.actionTrace.totalTime =
-                actionContext.transactionContext.getBillableTime() -
-                actionContext.actionTrace.totalTime;
+            actionContext.actionTrace.totalTime = std::chrono::steady_clock::now() - start;
          }
-         ActionContext& actionContext;
+         ActionContext&                        actionContext;
+         std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
       };
 
       template <typename F>
@@ -420,10 +510,18 @@ namespace psibase::vm_wasmtime
           once,
           []
           {
-             for (auto profile :
-                  {psizam::float_profile::strict, psizam::float_profile::performance})
+             // Both engines of a profile import the same host functions.
+             const auto profiles = {psizam::float_profile::strict,
+                                    psizam::float_profile::performance};
+             std::vector<wt::runtime<ExecutionContextImpl>*> runtimes;
+             for (auto profile : profiles)
              {
-                auto& rt = vmRuntime(profile);
+                runtimes.push_back(&vmRuntime(profile));
+                runtimes.push_back(&unpooledRuntime(profile));
+             }
+             for (auto* runtime : runtimes)
+             {
+                auto& rt = *runtime;
                 rt.add<&ExecutionContextImpl::getResult>("env", "getResult");
                 rt.add<&ExecutionContextImpl::getKey>("env", "getKey");
                 rt.add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");

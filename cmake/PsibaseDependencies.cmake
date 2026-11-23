@@ -34,8 +34,8 @@ function(psibase_declare_dependencies)
         SOURCE_DIR "${psibase_root}/external/psio"
         ${psio_scope})
     FetchContent_Declare(psitri
-        GIT_REPOSITORY git@github.com:gofractally/psitri.git
-        GIT_TAG a7c6660de883c6190135e213e2206d006286a7ee
+        GIT_REPOSITORY https://github.com/gofractally/psitri.git
+        GIT_TAG 94fa32878b1cd71765323aebd7665e196b870b73
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/psitri"
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
@@ -47,7 +47,7 @@ function(psibase_declare_dependencies)
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
     FetchContent_Declare(psizam
         GIT_REPOSITORY https://github.com/gofractally/psizam.git
-        GIT_TAG 63b2ee3054992ce53500ead3e14108f3db166c9c
+        GIT_TAG 2e93ecd1561ed7d4808a1a83af1d0137bac17b41
         GIT_SHALLOW FALSE
         # The native adapter does not build the optional spec testsuite.
         GIT_SUBMODULES ""

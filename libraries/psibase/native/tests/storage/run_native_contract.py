@@ -31,11 +31,9 @@ sources = ['cmake/PsibaseDependencies.cmake', 'cmake/PsibaseDependencyValidation
            'libraries/psibase/native/src/usePsitri.cpp',
            'libraries/psibase/native/src/Watchdog.cpp',
            'libraries/psibase/native/tests/WatchdogTests.cpp',
-           'libraries/psibase/native/tests/PsitriDatabaseTests.cpp',
-           'libraries/psibase/native/tests/DarwinCpuVmTrapTests.cpp']
+           'libraries/psibase/native/tests/PsitriDatabaseTests.cpp']
 sources += ['libraries/psibase/native/include/psibase/' + name for name in
-            ['NativeThreadClock.hpp', 'DarwinCpuClock.hpp', 'DarwinWatchdogWake.hpp',
-             'CpuAccounting.hpp', 'Watchdog.hpp']]
+            ['CpuAccounting.hpp', 'Watchdog.hpp']]
 for relative in sources:
     report['source_sha256'][relative] = hashlib.sha256((root / relative).read_bytes()).hexdigest()
 
@@ -65,14 +63,10 @@ def native_test(name):
 
 try:
     targets = ['WatchdogTests', 'PsitriDatabaseTests', 'psinode', 'psitest']
-    if platform.system() == 'Darwin':
-        targets.append('DarwinCpuVmTrapTests')
     run('build', ['cmake', '--build', build, '--target', *targets, '--parallel', a.jobs])
     for i in range(a.watchdog_repetitions):
         run('watchdog-' + str(i), [native_test('WatchdogTests')])
     run('database', [native_test('PsitriDatabaseTests')])
-    if platform.system() == 'Darwin':
-        run('vm-traps', [native_test('DarwinCpuVmTrapTests')])
     node = build / 'psinode'
     help = run('config-help', [node, '--help'], expected=1)
     if '--database-cache-policy' not in help.stderr or '--database-cache-size' in help.stderr:

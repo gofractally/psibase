@@ -3,7 +3,9 @@
 
 #include <botan/auto_rng.h>
 #include <botan/ber_dec.h>
+#include <botan/bigint.h>
 #include <botan/der_enc.h>
+#include <botan/ecc_key.h>
 #include <botan/entropy_src.h>
 #include <botan/pem.h>
 #include <botan/pk_algs.h>
@@ -58,6 +60,14 @@ namespace SystemService
          std::vector<uint8_t> msg = signer.sign_message({checksum.data(), checksum.size()}, rng);
 
          psibase::check(msg.size() == 64, "Signing failed");
+
+         // verify-sig only accepts the low-S form: s <= n/2.
+         auto ec = dynamic_cast<const Botan::EC_PrivateKey*>(key.get());
+         psibase::check(ec != nullptr, "Not an elliptic curve key");
+         const Botan::BigInt& order = ec->domain().get_order();
+         Botan::BigInt        sValue(msg.data() + 32, 32);
+         if (sValue > order / 2)
+            Botan::BigInt::encode_1363(msg.data() + 32, 32, order - sValue);
 
          return msg;
       }

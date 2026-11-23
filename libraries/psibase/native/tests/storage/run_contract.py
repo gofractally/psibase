@@ -33,9 +33,6 @@ for relative in ['cmake/PsibaseDependencies.cmake','cmake/PsibaseDependencyValid
                  'cmake/ucc.cmake','cmake/psitri.cmake','libraries/psibase/native/src/psitriStorage.cpp',
                  'libraries/psibase/native/include/psibase/storage.hpp',
                  'libraries/psibase/native/include/psibase/CpuAccounting.hpp',
-                 'libraries/psibase/native/include/psibase/NativeThreadClock.hpp',
-                 'libraries/psibase/native/include/psibase/DarwinCpuClock.hpp',
-                 'libraries/psibase/native/include/psibase/DarwinWatchdogWake.hpp',
                  'libraries/psibase/native/include/psibase/Watchdog.hpp',
                  'libraries/psibase/native/src/Watchdog.cpp',
                  'libraries/psibase/native/include/psibase/storageDiagnostics.hpp']:

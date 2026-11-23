@@ -21,9 +21,9 @@ The defaults are immutable Git revisions:
 | Name | Revision | Acquisition boundary |
 | --- | --- | --- |
 | psio | `fdb5de259f5059861a80a99b10a75d156a63d5eb` | Maintained upstream CMake target |
-| psitri | `a7c6660de883c6190135e213e2206d006286a7ee` | Sources only |
+| psitri | `94fa32878b1cd71765323aebd7665e196b870b73` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
-| psizam | `63b2ee3054992ce53500ead3e14108f3db166c9c` | Sources only |
+| psizam | `2e93ecd1561ed7d4808a1a83af1d0137bac17b41` | Sources only |
 
 The PSIO pin is `main` of gofractally/psio: PSSZ with record evolution by
 appended optionals, mandatory pruning, type-derived offset widths, the `key`
@@ -34,8 +34,8 @@ published `checkpoint/native-runtime-2026-11-21` revision.
 UCC is the public standalone extraction with its two qualified header fixes;
 its checkpoint covers the existing container tests and header consumer, not
 the complete database engine.
-The psitri repository remains private; its SSH URL requires authorized GitHub
-access. Dependency acquisition does not change that repository's visibility.
+All four repositories are public and are fetched over HTTPS; no GitHub
+credentials are needed to configure.
 
 For psitri, UCC, and psizam, the first declaration MUST retain
 `SOURCE_SUBDIR .psibase-no-top-level-cmake`. `psibase_acquire_dependency(name)`

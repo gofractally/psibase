@@ -1,0 +1,40 @@
+== w15-wide
+wasm: build/k1/k1-w15-wide.wasm (1147685 bytes), cranelift compile 15.5 ms
+(no input)               wasm instantiate + start only           54.6      69.3      83.9
+secp256k1_valid          wasm (wasmtime, fresh instance)         71.2      80.8      95.2  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        14.1      14.4      15.9  accepted
+secp256k1_valid          native libk1-w15-wide.dylib             12.0      12.2      14.5  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         73.7      88.6     108.2  rejected: signature
+secp256k1_invalid        native libk1-w15-wide.dylib             15.8      16.1      18.5  rejected: signature
+== w10-wide
+wasm: build/k1/k1-w10-wide.wasm (131867 bytes), cranelift compile 15.1 ms
+(no input)               wasm instantiate + start only            8.6      11.0      12.1
+secp256k1_valid          wasm (wasmtime, fresh instance)         24.8      29.3      34.3  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        14.7      14.9      17.0  accepted
+secp256k1_valid          native libk1-w10-wide.dylib             12.4      12.6      13.7  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         27.0      31.5      36.8  rejected: signature
+secp256k1_invalid        native libk1-w10-wide.dylib             16.3      16.6      18.3  rejected: signature
+== w8-wide
+wasm: build/k1/k1-w8-wide.wasm (107288 bytes), cranelift compile 19.4 ms
+(no input)               wasm instantiate + start only            7.2      10.2      11.1
+secp256k1_valid          wasm (wasmtime, fresh instance)         24.5      28.2      33.1  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        15.4      15.6      17.2  accepted
+secp256k1_valid          native libk1-w8-wide.dylib              13.0      13.2      15.5  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         25.0      28.6      32.1  rejected: signature
+secp256k1_invalid        native libk1-w8-wide.dylib              16.6      16.8      19.0  rejected: signature
+== w4-wide
+wasm: build/k1/k1-w4-wide.wasm (99608 bytes), cranelift compile 18.7 ms
+(no input)               wasm instantiate + start only            7.0       9.3      10.1
+secp256k1_valid          wasm (wasmtime, fresh instance)         26.5      30.8      39.9  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        17.5      17.8      23.2  accepted
+secp256k1_valid          native libk1-w4-wide.dylib              14.7      14.9      16.8  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         26.5      30.5      35.0  rejected: signature
+secp256k1_invalid        native libk1-w4-wide.dylib              18.2      18.5      21.4  rejected: signature
+== w8-int64-noopt
+wasm: build/k1/k1-w8-int64-noopt.wasm (78624 bytes), cranelift compile 16.5 ms
+(no input)               wasm instantiate + start only            6.9       9.3      10.5
+secp256k1_valid          wasm (wasmtime, fresh instance)         39.1      43.1      50.0  accepted
+secp256k1_valid          wasm (wasmtime, reused instance)        29.8      30.2      34.9  accepted
+secp256k1_valid          native libk1-w8-int64-noopt.dylib       24.8      25.1      29.7  accepted
+secp256k1_invalid        wasm (wasmtime, fresh instance)         40.3      44.6      51.4  rejected: signature
+secp256k1_invalid        native libk1-w8-int64-noopt.dylib       28.5      28.9      31.9  rejected: signature

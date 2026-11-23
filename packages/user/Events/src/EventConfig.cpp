@@ -93,7 +93,9 @@ void Events::startBlock()
 
 void Events::sync()
 {
-   to<EventIndex>().withFlags(CallFlags::runModeCallback).sync();
+   // Indexing is not part of a transaction. The log is appended to as events
+   // are emitted; the indexer catches up from it once, at the end of the
+   // block (EventIndex::onBlock). Kept so that existing callers still link.
 }
 
 PSIBASE_DISPATCH(UserService::EventConfig)

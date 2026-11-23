@@ -36,8 +36,7 @@ for relative in ['cmake/psitri.cmake', 'libraries/psibase/native/tests/storage',
     for source in sorted(path.rglob('*')) if path.is_dir() else [path]:
         if source.is_file():
             report['source_sha256'][str(source.relative_to(root))] = hashlib.sha256(source.read_bytes()).hexdigest()
-for name in ['storage.hpp', 'CpuAccounting.hpp', 'NativeThreadClock.hpp', 'DarwinCpuClock.hpp',
-             'DarwinWatchdogWake.hpp', 'Watchdog.hpp']:
+for name in ['storage.hpp', 'CpuAccounting.hpp', 'Watchdog.hpp']:
     source = root / 'libraries/psibase/native/include/psibase' / name
     report['source_sha256'][str(source.relative_to(root))] = hashlib.sha256(source.read_bytes()).hexdigest()
 

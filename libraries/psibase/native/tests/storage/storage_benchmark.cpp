@@ -20,10 +20,10 @@ template <typename F>
 auto measure(F function)
 {
    auto wall = steady_clock::now();
-   auto cpu  = psibase::CpuClock::now();
+   auto cpu  = psibase::RunClock::now();
    function();
    return std::pair(duration_cast<nanoseconds>(steady_clock::now() - wall).count(),
-                    (psibase::CpuClock::now() - cpu).count());
+                    (psibase::RunClock::now() - cpu).count());
 }
 int main(int argc, char** argv)
 {

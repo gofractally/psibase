@@ -13,7 +13,7 @@ namespace psibase
       Action                     action;
       std::vector<char>          rawRetval;
       std::vector<InnerTrace>    innerTraces;
-      std::chrono::nanoseconds   totalTime;  // includes time in inner actions
+      std::chrono::nanoseconds   totalTime;  // elapsed time, including inner actions
       std::optional<std::string> error;
    };
    PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)

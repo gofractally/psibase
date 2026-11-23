@@ -1,6 +1,7 @@
 #include <psibase/CpuAccounting.hpp>
 #include <psibase/storage.hpp>
 #include <psitri/engines/big.hpp>
+#include <psitri/transactions.hpp>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -296,10 +297,9 @@ namespace psibase::storage
 
    // Run a read on the caller's thread through that thread's reader.
    template <class F>
-   auto reading(const shared_root& source, F&& function)
+   auto reading(State& state, F&& function)
    {
       accounting::check();
-      auto& state = *source->state;
       auto  body  = [&](Engine::read_session& session)
       {
          decltype(auto) result = std::forward<F>(function)(session);
@@ -309,6 +309,11 @@ namespace psibase::storage
       if (auto* session = threadReader(state))
          return body(*session);
       return state.readers.use(*state.engine, body);
+   }
+   template <class F>
+   auto reading(const shared_root& source, F&& function)
+   {
+      return reading(*source->state, std::forward<F>(function));
    }
 
    void readValue(const shared_root&        source,
@@ -519,7 +524,235 @@ namespace psibase::storage
                      });
    }
 
+   // ---- changes kept aside -------------------------------------------------
+   struct delta::impl
+   {
+      psitri::pooled_delta_store store;
+   };
+   delta::delta()                            = default;
+   delta::delta(delta&&) noexcept            = default;
+   delta& delta::operator=(delta&&) noexcept = default;
+   delta::~delta()                           = default;
+   void delta::put(std::span<const char> key, std::span<const char> value)
+   {
+      if (!self)
+         self = std::make_unique<impl>();
+      self->store->put(storage::bytes(key), storage::bytes(value));
+   }
+   void delta::erase(std::span<const char> key)
+   {
+      if (!self)
+         self = std::make_unique<impl>();
+      self->store->erase(storage::bytes(key));
+   }
+   bool delta::empty() const noexcept
+   {
+      return !self || self->store->empty();
+   }
+   std::uint64_t delta::bytes() const noexcept
+   {
+      return self ? self->store->bytes() : 0;
+   }
+   delta::mark delta::save()
+   {
+      if (!self)
+         return {};
+      const auto m = self->store->save();
+      return {m.root, m.size};
+   }
+   void delta::restore(const mark& m)
+   {
+      if (self)
+         self->store->restore({m.root, m.size});
+   }
+   void delta::clear() noexcept
+   {
+      if (self)
+         self->store->clear();
+   }
+
+   namespace
+   {
+      // Stands in for the tree of a null root: nothing in it.
+      struct EmptyCursor
+      {
+         bool             seek_begin() { return false; }
+         bool             lower_bound(std::string_view) { return false; }
+         bool             upper_bound(std::string_view) { return false; }
+         bool             seek_last() { return false; }
+         bool             next() { return false; }
+         bool             prev() { return false; }
+         bool             is_end() const { return true; }
+         bool             is_rend() const { return true; }
+         bool             is_subtree() { return false; }
+         std::string_view key() const { return {}; }
+         template <class T = std::string>
+         std::optional<T> value()
+         {
+            return {};
+         }
+         template <class F>
+         bool get_value(F&&)
+         {
+            return false;
+         }
+         template <class F>
+         bool get(std::string_view, F&&)
+         {
+            return false;
+         }
+         template <class T = std::string>
+         std::optional<T> get(std::string_view)
+         {
+            return {};
+         }
+      };
+      static_assert(adb::mergeable_cursor<EmptyCursor>);
+
+      template <class Base>
+      bool seekMerged(psitri::merged_cursor<Base> c,
+                      std::span<const char>       key,
+                      Seek                        kind,
+                      std::vector<char>*          outKey,
+                      std::vector<char>*          value)
+      {
+         bool found = false;
+         if (kind == Seek::lower)
+            found = c.lower_bound(bytes(key));
+         else if (kind == Seek::less)
+            found = c.lower_bound(bytes(key)) ? c.prev() : c.seek_last();
+         else
+         {
+            const auto end = prefixEnd(bytes(key));
+            found = end.empty() ? c.seek_last() : (c.lower_bound(end) ? c.prev() : c.seek_last());
+            found = found && c.key().starts_with(bytes(key));
+         }
+         if (!found)
+            return false;
+         if (c.is_subtree())
+            throw std::runtime_error("root-list read through pending changes");
+         // Copy after seeking: callers commonly alias the input key and outKey.
+         if (outKey)
+            outKey->assign(c.key().begin(), c.key().end());
+         if (value)
+         {
+            value->clear();
+            c.get_value([&](std::string_view v) { value->assign(v.begin(), v.end()); });
+         }
+         return true;
+      }
+   }  // namespace
+
+   bool read_session::get(const shared_root&     source,
+                          const delta&           changes,
+                          std::span<const char>  key,
+                          std::vector<char>*     value)
+   {
+      if (changes.self)
+         if (const auto* entry = changes.self->store->find(bytes(key)))
+         {
+            // Answered without touching the store; still a storage call the
+            // caller's budget has to be able to stop.
+            accounting::check();
+            if (entry->removed)
+               return false;
+            if (value)
+            {
+               const auto v = entry->value();
+               value->assign(v.begin(), v.end());
+            }
+            return true;
+         }
+      return get(source, key, value, nullptr);
+   }
+   static bool seek(database_view&         view,
+                    const shared_root&     source,
+                    const delta&           changes,
+                    psitri::delta_store*   store,
+                    std::span<const char>  key,
+                    Seek                   kind,
+                    std::vector<char>*     outKey,
+                    std::vector<char>*     value)
+   {
+      if (source && source->state != view.state)
+         throw std::runtime_error("foreign storage root");
+      if (!store || store->empty())
+         return seek(source, key, kind, outKey, value, nullptr);
+      if (!source)
+      {
+         accounting::check();
+         return seekMerged(psitri::merged_cursor<EmptyCursor>(store->freeze(), EmptyCursor{}), key,
+                           kind, outKey, value);
+      }
+      return reading(source,
+                     [&](Engine::read_session& session)
+                     {
+                        return seekMerged(
+                            psitri::merged_cursor<Cursor>(store->freeze(),
+                                                          session.borrow_cursor(source->tree)),
+                            key, kind, outKey, value);
+                     });
+   }
+   bool read_session::get_greater_equal(const shared_root&    r,
+                                        const delta&          d,
+                                        std::span<const char> k,
+                                        std::vector<char>*    o,
+                                        std::vector<char>*    v)
+   {
+      return seek(*view, r, d, d.self ? &*d.self->store : nullptr, k, Seek::lower, o, v);
+   }
+   bool read_session::get_less_than(const shared_root&    r,
+                                    const delta&          d,
+                                    std::span<const char> k,
+                                    std::vector<char>*    o,
+                                    std::vector<char>*    v)
+   {
+      return seek(*view, r, d, d.self ? &*d.self->store : nullptr, k, Seek::less, o, v);
+   }
+   bool read_session::get_max(const shared_root&    r,
+                              const delta&          d,
+                              std::span<const char> k,
+                              std::vector<char>*    o,
+                              std::vector<char>*    v)
+   {
+      return seek(*view, r, d, d.self ? &*d.self->store : nullptr, k, Seek::max, o, v);
+   }
+
    write_session::write_session(std::shared_ptr<database_view> v) : read_session(std::move(v)) {}
+   void write_session::require_writable() const
+   {
+      view->state->writable();
+   }
+   void write_session::apply(shared_root& source, delta& changes, const delta::mark* at)
+   {
+      if (!changes.self)
+         return;
+      auto& store   = *changes.self->store;
+      auto  pending = at ? store.at({at->root, at->size}) : store.freeze();
+      if (pending.begin() == pending.end())
+         return;
+      auto state = view->state;
+      state->writable();
+      if (source && source->state != state)
+         throw std::runtime_error("foreign storage root");
+      // One edit for all of it: each node on the way to a changed key is
+      // copied once, however many of the keys below it changed, and the
+      // writer's gate is entered once.
+      source = state->access.invoke(
+          [&]
+          {
+             auto edit = state->writer->start_write_transaction(native(state, source));
+             for (auto it = pending.begin(), end = pending.end(); it != end; ++it)
+             {
+                accounting::check();
+                if (it.value().removed)
+                   edit.remove(it.key());
+                else
+                   edit.upsert(it.key(), it.value().value());
+             }
+             return publishable(state, edit.get_tree());
+          });
+   }
    shared_root write_session::get_top_root()
    {
       std::lock_guard lock(view->mutex);
@@ -544,10 +777,8 @@ namespace psibase::storage
          state->access.invoke(
              [&]
              {
-                // Defer CPU sampling across accepted atomic publication. SAL retries
-                // interrupted flushes; the publication gate still requires accepted
-                // root/effect work to finish before cancellation is reported.
-                accounting::PublicationSignalMask samplingMask;
+                // SAL retries interrupted flushes; the publication gate still requires
+                // accepted root/effect work to finish before cancellation is reported.
                 auto                              tx = state->writer->start_transaction(0);
                 tx.primary().set_root(native(state, updated));
                 tx.commit();
@@ -570,7 +801,6 @@ namespace psibase::storage
          state->access.invoke(
              [&]
              {
-                accounting::PublicationSignalMask samplingMask;
                 // Published, never flushed: it becomes durable with the next
                 // flushed publication of the top root.
                 state->writer->set_root(localRootIndex, native(state, source));

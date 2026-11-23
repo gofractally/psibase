@@ -172,19 +172,30 @@ class PrivateKey:
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding, load_pem_private_key, load_der_private_key
         if data is None:
-            self.private = ec.generate_private_key(ec.SECP256R1())
+            # Software keys use secp256k1, which is the faster curve to verify
+            self.private = ec.generate_private_key(ec.SECP256K1())
         else:
             try:
-                self.private = load_pem_private_key(data)
+                self.private = load_pem_private_key(data, None)
             except ValueError:
-                self.private = load_der_public_key(data)
-            if not isinstance(self.private, ec.EllipticCurvePrivateKey) or self.private.curve != ec.SECP256R1:
-                raise Exception("Only P-256 keys are supported")
+                self.private = load_der_private_key(data, None)
+            if not isinstance(self.private, ec.EllipticCurvePrivateKey) or not isinstance(self.private.curve, (ec.SECP256K1, ec.SECP256R1)):
+                raise Exception("Only secp256k1 and P-256 keys are supported")
     def sign_prehashed(self, digest):
         from cryptography.hazmat.primitives.hashes import SHA256
         from cryptography.hazmat.primitives.asymmetric import ec, utils
         result = self.private.sign(digest, ec.ECDSA(utils.Prehashed(SHA256())))
         (r, s) = utils.decode_dss_signature(result)
+        # verify-sig only accepts the low-S form, s <= n/2. Older releases of
+        # the cryptography package do not expose the group order.
+        orders = {
+            'secp256k1': 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
+            'secp256r1': 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551,
+        }
+        curve = self.private.curve
+        n = getattr(curve, 'group_order', None) or orders[curve.name]
+        if s > n // 2:
+            s = n - s
         return r.to_bytes(32, byteorder='big') + s.to_bytes(32, byteorder='big')
     def claim(self):
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding

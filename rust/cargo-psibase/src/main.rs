@@ -36,6 +36,73 @@ const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const SERVICE_ARGS: &[&str] = &["--lib"];
 
+/// Target features of code that runs in a psibase node, beyond rustc's
+/// defaults for the target. Every psibase engine executes wide arithmetic, so
+/// 128-bit math compiles to it instead of calls into compiler-rt. Plugins run
+/// in browsers and do not get this.
+///
+/// rustc still calls the feature unstable and warns that the flag will become
+/// an error; when a toolchain update does that, this is the line to change.
+const SERVICE_TARGET_FEATURES: &str = "-Ctarget-feature=+wide-arithmetic";
+
+/// The first rustc release whose wide-arithmetic code generation is known to
+/// be right. rustc 1.98.0 accepts the flag and then computes wrong 128-bit
+/// products and sums: the same source gives different results with and
+/// without it, on every engine. 1.100.0 is correct. Releases between the two
+/// have not been checked, so they do not get the flag either.
+const WIDE_ARITHMETIC_MIN_RUSTC_MINOR: u32 = 100;
+
+/// The minor version of the rustc cargo will run, if it can be determined.
+fn rustc_minor_version() -> Option<u32> {
+    let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+    let output = std::process::Command::new(rustc).arg("-vV").output().ok()?;
+    let text = String::from_utf8(output.stdout).ok()?;
+    let release = text.lines().find_map(|line| line.strip_prefix("release: "))?;
+    let mut parts = release.split('.');
+    if parts.next()? != "1" {
+        return None;
+    }
+    parts.next()?.parse().ok()
+}
+
+fn wide_arithmetic_is_safe() -> bool {
+    static SAFE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *SAFE.get_or_init(|| {
+        let safe = matches!(rustc_minor_version(), Some(minor) if minor >= WIDE_ARITHMETIC_MIN_RUSTC_MINOR);
+        if !safe {
+            eprintln!(
+                "cargo-psibase: building without wide arithmetic: this rustc is older than 1.{} \
+                 (or its version could not be read), and earlier releases miscompile 128-bit \
+                 math with the feature on",
+                WIDE_ARITHMETIC_MIN_RUSTC_MINOR
+            );
+        }
+        safe
+    })
+}
+
+/// Compiles the crate and its dependencies with SERVICE_TARGET_FEATURES, on a
+/// compiler known to generate it correctly. Cargo reads RUSTFLAGS in
+/// preference to the per-target variable, so the flag goes wherever the
+/// caller's own flags already are.
+fn service_rustflags(command: &mut tokio::process::Command) {
+    if !wide_arithmetic_is_safe() {
+        return;
+    }
+    const TARGET_VARIABLE: &str = "CARGO_TARGET_WASM32_WASIP1_RUSTFLAGS";
+    let variable = if std::env::var_os("RUSTFLAGS").is_some() {
+        "RUSTFLAGS"
+    } else {
+        TARGET_VARIABLE
+    };
+    let mut flags = std::env::var(variable).unwrap_or_default();
+    if !flags.is_empty() {
+        flags.push(' ');
+    }
+    flags.push_str(SERVICE_TARGET_FEATURES);
+    command.env(variable, flags);
+}
+
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
 
@@ -235,6 +302,11 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
         .enable_feature(wasm_opt::Feature::TruncSat)
         .enable_feature(wasm_opt::Feature::SignExt)
         .enable_feature(wasm_opt::Feature::Simd)
+        // Every psibase engine executes wide arithmetic; a service may use it.
+        .enable_feature(wasm_opt::Feature::WideArithmetic)
+        // wasm-opt holds a wide instruction's two results as a tuple, which
+        // it only accepts with multivalue enabled.
+        .enable_feature(wasm_opt::Feature::Multivalue)
         .debug_info(debug_build)
         .run(file.path(), file.path())?;
 
@@ -693,6 +765,7 @@ async fn build_service_impl(
     rustc_args: &[OsString],
 ) -> Result<Vec<PathBuf>, Error> {
     let mut command = tokio::process::Command::new(get_cargo());
+    service_rustflags(&mut command);
     command
         .arg("rustc")
         .arg("--release")
@@ -820,6 +893,7 @@ async fn build(
     extra: &[&PackageId],
 ) -> Result<Vec<ServiceArtifacts>, Error> {
     let mut command = tokio::process::Command::new(get_cargo());
+    service_rustflags(&mut command);
     command
         .arg("build")
         .args(SERVICE_ARGS)
@@ -1081,6 +1155,7 @@ async fn test(
     let mut packages = Vec::new();
 
     let mut command = tokio::process::Command::new(get_cargo());
+    service_rustflags(&mut command);
     command
         .arg("build")
         .arg("--tests")

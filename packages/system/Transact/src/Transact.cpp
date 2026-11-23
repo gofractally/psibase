@@ -1000,7 +1000,6 @@ namespace SystemService
          //
          // Therefore, we do one more event indexer sync, which will only index the new events (and uses
          // cached service schemas so isn't as expensive).
-         to<EventIndexerInterface>(eventIndexer->service).sync();
          auto mroot       = to<EventIndexerInterface>(eventIndexer->service).saveMerkle();
          auto statusTable = Native::tables().open<StatusTable>();
          auto status      = statusTable.get({}).value();

@@ -599,14 +599,10 @@ namespace psibase
          if (it != executionContexts.end())
             return it->second;
       }
-      impl->watchdog->pause();
-      auto resume = psibase::finally{[&] { impl->watchdog->resume(); }};
-      {
-         // A callback may have won the manager lock just before pause().
-         std::lock_guard guard{impl->mutex};
-         if (impl->timedOut)
-            throw TimeoutException{};
-      }
+      // Creating a context is billed like any other work, except for
+      // compiling the service: the context pauses the budget around that
+      // itself (BillingPause). Pausing here cost two thread CPU clock reads
+      // for every service a transaction calls, compiled or not.
       check(impl->executionContexts.size() < blockContext.systemContext.executionMemories.size(),
             "exceeded maximum number of running services");
       if (impl->executionContexts.size() + impl->altExecContexts.size() >=
@@ -657,6 +653,15 @@ namespace psibase
          ec.asyncTimeout();
    }
 
+   TransactionContext::BillingPause::BillingPause(TransactionContext& context) : context(context)
+   {
+      context.impl->watchdog->pause();
+   }
+   TransactionContext::BillingPause::~BillingPause()
+   {
+      context.impl->watchdog->resume();
+   }
+
    std::chrono::nanoseconds TransactionContext::getBillableTime()
    {
       return impl->watchdog->elapsed();
@@ -667,7 +672,7 @@ namespace psibase
       return impl->wasmConfig.vmOptions;
    }
 
-   void TransactionContext::setWatchdog(CpuClock::duration watchdogLimit)
+   void TransactionContext::setWatchdog(RunClock::duration watchdogLimit)
    {
       impl->watchdog->setLimit(watchdogLimit);
    }  // TransactionContext::setWatchdog

@@ -26,131 +26,78 @@ void cancelled(F f)
    }
    require(caught, "cancelled request was accepted");
 }
-void burn(std::chrono::nanoseconds time)
-{
-   auto start = accounting::rawCpu(CLOCK_THREAD_CPUTIME_ID);
-   while (accounting::rawCpu(CLOCK_THREAD_CPUTIME_ID) - start < time)
-   {
-   }
-}
 int main()
 {
    try
    {
       {
-         auto                    counter = accounting::threadCounter();
-         std::atomic<bool>       active = false, run = false;
+         // Two limits on one manager, reached by a thread that is only
+         // waiting: elapsed time is what is measured and what is limited.
          std::mutex              mutex;
          std::condition_variable condition;
          std::atomic<unsigned>   fired = 0;
-         std::jthread            worker(
-             [&](std::stop_token stop)
-             {
-                accounting::ActiveJob cpu(counter);
-                active = true;
-                condition.notify_all();
-                while (!run && !stop.stop_requested())
-                   std::this_thread::sleep_for(1ms);
-                while (!stop.stop_requested())
-                   burn(1ms);
-                active = false;
-             });
-         {
-            std::unique_lock lock(mutex);
-            require(condition.wait_for(lock, 3s, [&] { return active.load(); }),
-                    "owner job did not start");
-         }
-         WatchdogManager manager;
-         Watchdog        first(manager,
-                               [&]
-                               {
-                           fired.fetch_or(1);
-                           condition.notify_all();
-                               });
-         Watchdog        second(manager,
-                                [&]
-                                {
-                            fired.fetch_or(2);
-                            condition.notify_all();
-                                });
+         WatchdogManager         manager;
+         Watchdog                first(manager,
+                                       [&]
+                                       {
+                                          fired.fetch_or(1);
+                                          condition.notify_all();
+                                       });
+         Watchdog                second(manager,
+                                        [&]
+                                        {
+                                           fired.fetch_or(2);
+                                           condition.notify_all();
+                                        });
          first.setLimit(10ms);
          second.setLimit(20ms);
-         run = true;
          {
             std::unique_lock lock(mutex);
             require(condition.wait_for(lock, 3s, [&] { return fired.load() == 3; }),
-                    "watchdogs did not see live worker CPU");
+                    "watchdogs did not fire while the thread was blocked");
          }
-         require(active, "owner finished before live watchdog observation");
          const auto live = first.elapsed();
-         require(live >= 20ms, "live billable time omitted worker CPU");
-         worker.request_stop();
-         worker.join();
-         require(first.elapsed() >= live, "clock decreased at job completion");
+         require(live >= 20ms, "elapsed time omitted time spent blocked");
+         require(first.elapsed() >= live, "clock decreased");
       }
       {
+         // Paused time is not measured and cannot reach the limit; a request
+         // scope does not reset the measurement.
          WatchdogManager   manager;
          std::atomic<bool> fired = false;
          Watchdog          wd(manager, [&] { fired = true; });
-         wd.setLimit(30ms);
-         auto        counter = accounting::threadCounter();
-         std::thread worker(
-             [&]
-             {
-                std::this_thread::sleep_for(80ms);
-                accounting::ActiveJob cpu(counter);
-                burn(5ms);
-             });
-         worker.join();
-         require(!fired, "queued wait counted as CPU");
-         require(wd.elapsed() >= 5ms && wd.elapsed() < 30ms, "CPU time wrong after queue wait");
-         const auto           before  = CpuClock::now();
-         auto                 request = std::make_shared<accounting::Request>([] { return true; });
-         CpuClock::time_point inside;
+         wd.setLimit(200ms);
+         wd.pause();
+         const auto paused = wd.elapsed();
+         std::this_thread::sleep_for(400ms);
+         require(!fired, "paused time reached the limit");
+         require(wd.elapsed() == paused, "paused time was measured");
+         wd.resume();
+         const auto before  = wd.elapsed();
+         auto       request = std::make_shared<accounting::Request>([] { return true; });
+         RunClock::duration inside;
          {
             accounting::Scope scope(request);
-            inside = CpuClock::now();
+            inside = wd.elapsed();
          }
-         require(inside >= before && CpuClock::now() >= inside,
-                 "scope reset cumulative clock debt");
+         require(inside >= before && wd.elapsed() >= inside, "scope reset the measurement");
       }
       {
-         WatchdogManager manager;
-         Watchdog        wd(manager, [] {});
-         auto            counter = accounting::threadCounter();
-         wd.pause();
-         auto                     paused = wd.elapsed();
-         const auto               before = counter->sample();
-         std::chrono::nanoseconds measured{};
-         std::thread              worker(
-             [&]
-             {
-                auto start = accounting::rawCpu(CLOCK_THREAD_CPUTIME_ID);
-                try
-                {
-                   accounting::ActiveJob cpu(counter);
-                   burn(10ms);
-                   throw std::runtime_error("expected");
-                }
-                catch (const std::runtime_error&)
-                {
-                }
-                measured = accounting::rawCpu(CLOCK_THREAD_CPUTIME_ID) - start;
-             });
-         worker.join();
-         require(counter->sample() - before >= 10ms && counter->sample() - before <= measured + 1ms,
-                 "exception CPU charged more or less than once");
-         require(wd.elapsed() == paused, "paused work was billed");
-         wd.resume();
-         auto        start = wd.elapsed();
-         std::thread next(
-             [&]
-             {
-                accounting::ActiveJob cpu(counter);
-                burn(5ms);
-             });
-         next.join();
-         require(wd.elapsed() - start >= 5ms, "exception cleanup lost subsequent CPU");
+         // A limit raised before it is reached is honoured; one lowered below
+         // the elapsed time cancels.
+         WatchdogManager   manager;
+         std::atomic<bool> fired = false;
+         Watchdog          wd(manager, [&] { fired = true; });
+         wd.setLimit(300ms);
+         std::this_thread::sleep_for(50ms);
+         wd.setLimit(60s);
+         while (wd.elapsed() < 600ms)
+            std::this_thread::sleep_for(5ms);
+         require(!fired, "cancelled on a limit that had been raised");
+         wd.setLimit(1ms);
+         for (int i = 0; i < 3000 && !fired; ++i)
+            std::this_thread::sleep_for(1ms);
+         require(fired, "lowered limit did not cancel");
       }
       {
          auto parent = std::make_shared<accounting::Request>([] { return true; });
@@ -187,39 +134,8 @@ int main()
          cancelled([] { accounting::check(); });
          cancelled([] { accounting::Publication gate; });
       }
-#ifdef __APPLE__
-      {
-         auto references = []
-         {
-            const auto        port  = mach_thread_self();
-            mach_port_urefs_t count = 0;
-            require(mach_port_get_refs(mach_task_self(), port, MACH_PORT_RIGHT_SEND, &count) ==
-                        KERN_SUCCESS,
-                    "thread port ref query failed");
-            require(mach_port_deallocate(mach_task_self(), port) == KERN_SUCCESS,
-                    "thread port probe release failed");
-            return count;
-         };
-         const auto before = references();
-         {
-            std::vector<std::shared_ptr<accounting::NativeThreadClock>> clocks;
-            for (unsigned i = 0; i < 32; ++i)
-               clocks.push_back(std::make_shared<accounting::NativeThreadClock>());
-            require(references() == before,
-                    "shared thread sampler unexpectedly acquired more port rights");
-            std::thread sampler(
-                [clocks]
-                {
-                   for (auto& clock : clocks)
-                      require(clock->read().count() >= 0, "remote CPU sample invalid");
-                });
-            sampler.join();
-         }
-         require(references() == before, "thread port send rights leaked");
-      }
-#endif
-      std::cout << "{\"passed\":true,\"groups\":5,\"live_cpu\":true,\"cumulative_clock\":true,"
-                   "\"scoped_cancellation\":true}\n";
+      std::cout << "{\"passed\":true,\"groups\":5,\"blocked_time_counts\":true,"
+                   "\"limit_can_be_raised\":true,\"scoped_cancellation\":true}\n";
    }
    catch (const std::exception& e)
    {

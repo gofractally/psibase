@@ -1,0 +1,49 @@
+{
+ "schema": 1,
+ "suite": "plugins",
+ "label": "x86 cloud; WASMTIME; plugin signing tests",
+ "recorded": "2026-11-23T09:32:20Z",
+ "source": {
+  "commit": "e26c20a60888ad1fed29ceb89315496e26b43f8c",
+  "branch": "HEAD",
+  "dirty": false,
+  "psitri": "b7b8647a3fd40277b965f5f60bc2b320529a37cd"
+ },
+ "system": {
+  "os": "Linux",
+  "os_release": "6.17.0-22-generic",
+  "machine": "x86_64",
+  "cpu": "AMD EPYC-Turin Processor",
+  "logical_cpus": 16,
+  "memory_bytes": 130497327104,
+  "fingerprint": "9504829d18fa",
+  "test_filesystem": {
+   "type": "ext4"
+  }
+ },
+ "build": {
+  "type": "Release",
+  "compiler": "Ubuntu clang version 20.1.8 (0ubuntu4)",
+  "flags": "",
+  "generator": "Ninja"
+ },
+ "ctest_arguments": [
+  "-R",
+  "^plugin-",
+  "--timeout",
+  "1800"
+ ],
+ "wall_seconds": 77.14,
+ "summary": {
+  "tests": 1,
+  "passed": 1,
+  "test_seconds": 77.13
+ },
+ "tests": [
+  {
+   "name": "plugin-web-crypto-tests",
+   "status": "passed",
+   "seconds": 77.13
+  }
+ ]
+}
