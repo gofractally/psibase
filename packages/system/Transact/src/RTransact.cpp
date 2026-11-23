@@ -23,13 +23,14 @@ using namespace LocalService;
 namespace
 {
    // Must be run inside PSIBASE_SUBJECTIVE_TX
-   void scheduleVerify(const Checksum256&           id,
-                       const SignedTransaction&     trx,
-                       bool                         verified,
-                       std::optional<std::uint64_t> speculative);
+   void scheduleVerify(const Checksum256&                 id,
+                       psio::pssz_view<SignedTransaction> trx,
+                       bool                               verified,
+                       std::optional<std::uint64_t>       speculative);
 
    void cancelSpeculative(const std::optional<std::uint64_t>& id);
-   void forwardTransaction(const SignedTransaction& trx);
+   void forwardTransaction(psio::pssz_view<SignedTransaction> trx);
+   void forwardStoredTransaction(const Checksum256& id);
 
    // Flushes the transaction queue and schedules all the
    // transactions in it to have their signatures verified again.
@@ -54,11 +55,11 @@ namespace
       }
    }
 
-   bool validateTransaction(const Checksum256& id, const SignedTransaction& trx)
+   bool validateTransaction(const Checksum256& id, psio::pssz_view<SignedTransaction> trx)
    {
-      check(trx.transaction->claims().size() == trx.proofs.size(),
+      check(trx.transaction()->claims().size() == trx.proofs().size(),
             "proofs and claims must have same size");
-      return to<Transact>().checkFirstAuth(id, *trx.transaction);
+      return to<Transact>().checkFirstAuth(id, *trx.transaction());
    }
 
    bool isResMonitoring()
@@ -261,6 +262,53 @@ namespace
       }
    };
 
+   // A trace repeats the arguments of every action, so the trace of a
+   // large transaction is larger than the transaction. A trace above this
+   // size, packed, is neither kept nor sent: reducedTrace stands for it.
+   // The size leaves room for the row (ConfigRow's maxValueSize, 8 MiB)
+   // and for the reply: its JSON text is twice the bytes and is in this
+   // service's memory three times while it is sent (the text, the
+   // arguments of sendReply, the action), beside the trace itself. Measured,
+   // a trace of 3.46 MiB is answered within the service's 32 MiB and one of
+   // 3.56 MiB is not.
+   constexpr std::size_t maxFullTraceSize = 13 * 1024 * 1024 / 4;
+
+   bool isFullSize(psio::pssz_view<TransactionTrace> trace)
+   {
+      return psio::bytes(trace).size() <= maxFullTraceSize;
+   }
+
+   // What is kept and sent in place of a trace that is too large: its
+   // outcome (the error, or none), and one action trace, in the name of
+   // this service, whose console output says where the rest went. A client
+   // reads the outcome as from any trace.
+   TransactionTrace reducedTrace(psio::pssz_view<TransactionTrace> trace)
+   {
+      TransactionTrace result;
+      auto&            note = result.actionTraces.emplace_back();
+      note.action.sender    = RTransact::service;
+      note.action.service   = RTransact::service;
+      note.innerTraces.push_back({ConsoleTrace{
+          std::format("The trace of this transaction is {} bytes packed, more than the {} that {} "
+                      "keeps and sends: its action traces are omitted.",
+                      psio::bytes(trace).size(), maxFullTraceSize, RTransact::service.str())}});
+      if (auto error = trace.error())
+         result.error = std::string{static_cast<std::string_view>(*error)};
+      return result;
+   }
+
+   void putFailed(const Checksum256&                id,
+                  TimePointSec                      expiration,
+                  psio::pssz_view<TransactionTrace> trace)
+   {
+      auto table = RTransact::Subjective{}.open<TxFailedTable>();
+      if (isFullSize(trace))
+         table.put(TxFailedView{.id = id, .expiration = expiration, .trace = trace});
+      else
+         table.put(
+             TxFailedRecord{.id = id, .expiration = expiration, .trace = reducedTrace(trace)});
+   }
+
    std::vector<RunToken> resolveVerifies(
        std::vector<UnverifiedTransactionRecord::VerifyStatus>&& tokens)
    {
@@ -459,11 +507,18 @@ namespace
 
    void sendReply(const ClaimedSockets& clients, psio::pssz_view<psibase::TransactionTrace> trace)
    {
-      TransactionTraceRef pruned            = PruneTrace{true}(trace);
       const auto& [jsonClients, binClients] = clients;
 
       if (jsonClients.empty() && binClients.empty())  // failsafe
          return;
+
+      if (!isFullSize(trace))
+      {
+         auto reduced = psio::to_pssz(reducedTrace(trace));
+         return sendReply(clients, psio::pssz_view<TransactionTrace>{reduced});
+      }
+
+      TransactionTraceRef pruned = PruneTrace{true}(trace);
 
       ActionViewBuilder<HttpServer> http{getReceiver(), HttpServer::service};
 
@@ -483,6 +538,10 @@ namespace
       if (!jsonClients.empty())
       {
          HttpReply reply{.contentType = "application/json", .headers = allowCors()};
+         // The text is written once, into a buffer of about its size: it
+         // is mostly the hex of the trace's bytes.
+         auto packedSize = psio::bytes(trace).size();
+         reply.body.reserve(2 * packedSize + packedSize / 8 + 4096);
          // A trace may hold a string with no JSON text (an abort message that
          // is not UTF-8): the clients are told so rather than left waiting.
          if (!psio::encode_json_checked(psio::ijson{}, pruned, reply.body).ok())
@@ -674,13 +733,7 @@ namespace
          if (std::ranges::any_of(client->clients, WaitFor::isApplied))
             errorTxId = id;
          if (std::ranges::any_of(client->clients, WaitFor::isFinal))
-         {
-            RTransact{}.open<TxFailedTable>().put(TxFailedView{
-                .id         = id,
-                .expiration = expiration,
-                .trace      = trace,
-            });
-         }
+            putFailed(id, expiration, trace);
       }
    }
 
@@ -727,21 +780,19 @@ void RTransact::onTrx(const Checksum256& id, psio::pssz_view<TransactionTrace> t
    {
       if (!trace.error().has_value())
       {
-         WriteOnly{}.open<TxSuccessTable>().put(TxSuccessView{
-             .id       = id,
-             .blockNum = to<Transact>().currentBlock().blockNum,
-             .trace    = trace,
-         });
+         auto table    = WriteOnly{}.open<TxSuccessTable>();
+         auto blockNum = to<Transact>().currentBlock().blockNum;
+         if (isFullSize(trace))
+            table.put(TxSuccessView{.id = id, .blockNum = blockNum, .trace = trace});
+         else
+            table.put(
+                TxSuccessRecord{.id = id, .blockNum = blockNum, .trace = reducedTrace(trace)});
       }
       else
       {
          PSIBASE_SUBJECTIVE_TX
          {
-            Subjective{}.open<TxFailedTable>().put(TxFailedView{
-                .id         = id,
-                .expiration = row->expiration,
-                .trace      = trace,
-            });
+            putFailed(id, row->expiration, trace);
          }
       }
    }
@@ -917,9 +968,9 @@ void RTransact::onVerify(std::uint64_t                      id,
             }
             else
             {
-               auto data = open<TransactionDataTable>().get(tx->id);
+               auto data = open<TransactionDataTable>().getView(tx->id);
                check(data.has_value(), "Missing transaction data");
-               scheduleVerify(tx->id, data->trx, tx->verified, tx->speculative);
+               scheduleVerify(tx->id, (*data)->trx(), tx->verified, tx->speculative);
             }
          }
       }
@@ -929,17 +980,7 @@ void RTransact::onVerify(std::uint64_t                      id,
       sendReply(*errorTxId, trace, WaitFor::isApplied);
    }
    if (broadcastTxId)
-   {
-      std::optional<TransactionData> data;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         data = open<TransactionDataTable>().get(*broadcastTxId);
-      }
-      if (data)
-      {
-         forwardTransaction(data->trx);
-      }
-   }
+      forwardStoredTransaction(*broadcastTxId);
 }
 
 void RTransact::onRequeue(std::uint64_t id, psio::pssz_view<TransactionTrace> trace)
@@ -1022,17 +1063,7 @@ void RTransact::onSpecTrx(std::uint64_t id, psio::pssz_view<TransactionTrace> tr
       sendReply(*errorTxId, trace, WaitFor::isApplied);
    }
    if (broadcastTxId)
-   {
-      std::optional<TransactionData> data;
-      PSIBASE_SUBJECTIVE_TX
-      {
-         data = open<TransactionDataTable>().get(*broadcastTxId);
-      }
-      if (data)
-      {
-         forwardTransaction(data->trx);
-      }
-   }
+      forwardStoredTransaction(*broadcastTxId);
 }
 
 namespace
@@ -1040,45 +1071,54 @@ namespace
    using Subjective = RTransact::Subjective;
    using WriteOnly  = RTransact::WriteOnly;
 
-   std::uint64_t scheduleSpeculative(const Checksum256& id, const SignedTransaction& trx)
+   // The largest body push_transaction accepts. While a transaction is
+   // handed on to the other producers this service holds it five to six
+   // times (the trace of its speculative run, which has it twice, the token
+   // of that run where it carries the action, and three times for the call
+   // of sendProds: the arguments of recv, those of sendProds, the action),
+   // of its 32 MiB.
+   constexpr std::size_t maxPushedTransactionSize = 5 * 1024 * 1024;
+
+   std::uint64_t scheduleSpeculative(const Checksum256& id, psio::pssz_view<SignedTransaction> trx)
    {
       transactor<Transact> transact{RTransact::service, Transact::service};
-      auto runid = to<XRun>().post(RunMode::speculative, transact.execTrx(trx.transaction, true),
+      auto runid = to<XRun>().post(RunMode::speculative, transact.execTrx(trx.transaction(), true),
                                    std::chrono::seconds(1), MethodNumber{"onSpecTrx"});
       RTransact{}.open<SpeculativeTransactionTable>().put({id, runid});
       return runid;
    }
 
    // Must be run inside PSIBASE_SUBJECTIVE_TX
-   void scheduleVerify(const Checksum256&           id,
-                       const SignedTransaction&     trx,
-                       bool                         verified,
-                       std::optional<std::uint64_t> speculative)
+   void scheduleVerify(const Checksum256&                 id,
+                       psio::pssz_view<SignedTransaction> trx,
+                       bool                               verified,
+                       std::optional<std::uint64_t>       speculative)
    {
       auto pendingVerifies        = RTransact{}.open<PendingVerifyTable>();
       auto unverifiedTransactions = RTransact{}.open<UnverifiedTransactionTable>();
 
       std::vector<UnverifiedTransactionRecord::VerifyStatus> remaining;
 
-      auto claims = trx.transaction->claims();
-      check(claims.size() == trx.proofs.size(), "Claims and proofs must have the same size");
-      for (auto&& [claim, proof] : std::views::zip(claims, trx.proofs))
+      auto claims = trx.transaction()->claims();
+      auto proofs = trx.proofs();
+      check(claims.size() == proofs.size(), "Claims and proofs must have the same size");
+      for (std::size_t i = 0; i < claims.size(); ++i)
       {
-         auto runid = to<XRun>().verify(id, claim, proof, std::chrono::milliseconds(200),
+         auto runid = to<XRun>().verify(id, claims[i], proofs[i], std::chrono::milliseconds(200),
                                         MethodNumber{"onVerify"});
          remaining.push_back(runid);
          pendingVerifies.put({.txid = id, .runid = runid});
       }
       if (claims.empty())
       {
-         queueTransaction(id, trx.transaction->tapos().expiration(), std::move(remaining),
+         queueTransaction(id, trx.transaction()->tapos().expiration(), std::move(remaining),
                           speculative);
       }
       else
       {
          UnverifiedTransactionRecord row{
              .id          = id,
-             .expiration  = trx.transaction->tapos().expiration(),
+             .expiration  = trx.transaction()->tapos().expiration(),
              .verifies    = std::move(remaining),
              .verified    = verified,
              .speculative = speculative,
@@ -1087,10 +1127,10 @@ namespace
       }
    }
 
-   bool pushTransaction(const Checksum256&             id,
-                        const SignedTransaction&       trx,
-                        bool                           speculate,
-                        std::optional<TraceClientInfo> client = std::nullopt)
+   bool pushTransaction(const Checksum256&                 id,
+                        psio::pssz_view<SignedTransaction> trx,
+                        bool                               speculate,
+                        std::optional<TraceClientInfo>     client = std::nullopt)
    {
       bool result = true;
       PSIBASE_SUBJECTIVE_TX
@@ -1099,7 +1139,7 @@ namespace
          {
             auto clients = RTransact{}.open<TraceClientTable>();
             auto row     = clients.get(id).value_or(
-                TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
+                TraceClientRow{.id = id, .expiration = trx.transaction()->tapos().expiration()});
             row.clients.push_back(*client);
             clients.put(row);
             to<HttpServer>().deferReply(client->socket);
@@ -1118,23 +1158,41 @@ namespace
          }
          auto speculative = speculate ? std::optional{scheduleSpeculative(id, trx)} : std::nullopt;
          scheduleVerify(id, trx, false, speculative);
-         Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
+         Subjective{}.open<TransactionDataTable>().put(TransactionDataView{id, trx});
          auto statsTable = Subjective{}.open<TxStatsTable>();
          auto stats      = statsTable.get({}).value_or(TxStatsRecord{});
          ++stats.unprocessed;
          ++stats.total;
          statsTable.put(stats);
       }
-      if (result && !speculate && trx.transaction->claims().empty())
+      if (result && !speculate && trx.transaction()->claims().size() == 0)
       {
          forwardTransaction(trx);
       }
       return result;
    }
-   void forwardTransaction(const SignedTransaction& trx)
+
+   // The action that hands a transaction to another producer
+   Action recvAction(psio::pssz_view<SignedTransaction> trx)
    {
-      to<HttpServer>().sendProds(
-          transactor<RTransact>(HttpServer::service, RTransact::service).recv(trx));
+      return transactor<RTransact>(HttpServer::service, RTransact::service).recv(trx);
+   }
+   void forwardTransaction(psio::pssz_view<SignedTransaction> trx)
+   {
+      to<HttpServer>().sendProds(recvAction(trx));
+   }
+   // The row is read as it is stored, and released before the action is
+   // packed for the call.
+   void forwardStoredTransaction(const Checksum256& id)
+   {
+      std::optional<Action> recv;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (auto data = RTransact{}.open<TransactionDataTable>().getView(id))
+            recv = recvAction((*data)->trx());
+      }
+      if (recv)
+         to<HttpServer>().sendProds(*recv);
    }
 
    constexpr auto ws = " \t";  // (SP / HTAB)
@@ -1272,12 +1330,12 @@ void RTransact::requeue()
             auto item = *iter;
             if (item.sequence < endSequence)
             {
-               auto data = txdata.get(item.id);
+               auto data = txdata.getView(item.id);
                check(!!data, "Missing transaction data");
 
                pending.remove(item);
 
-               scheduleVerify(item.id, data->trx, true, item.speculative);
+               scheduleVerify(item.id, (*data)->trx(), true, item.speculative);
             }
             foundSequence = item.sequence;
          }
@@ -1288,10 +1346,11 @@ void RTransact::requeue()
    }
 }
 
-void RTransact::recv(const SignedTransaction& trx)
+void RTransact::recv(psio::pssz_view<SignedTransaction> trx)
 {
    check(getSender() == HttpServer::service, "Wrong sender");
-   auto id          = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+   auto packed      = trx.transaction().bytes();
+   auto id          = psibase::sha256(packed.data(), packed.size());
    bool enforceAuth = validateTransaction(id, trx);
    pushTransaction(id, trx, enforceAuth);
 }
@@ -1378,10 +1437,19 @@ struct TransactQuery
 PSIO_REFLECT(TransactQuery, method(snapshotInfo));
 PSIO_TYPE_ATTRS(TransactQuery, psio::graphql::name_as{"Query"})
 
-std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  request,
-                                             std::optional<std::int32_t>  socket,
-                                             std::optional<AccountNumber> user)
+std::optional<HttpReply> RTransact::serveSys(psio::pssz_view<psibase::HttpRequest> packedRequest,
+                                             std::optional<std::int32_t>           socket,
+                                             std::optional<AccountNumber>          user)
 {
+   // Everything but the body, which push_transaction reads where it lies
+   // and the other endpoints copy below.
+   HttpRequest           request{.host        = std::string{packedRequest.host()},
+                                 .method      = std::string{packedRequest.method()},
+                                 .target      = std::string{packedRequest.target()},
+                                 .contentType = std::string{packedRequest.contentType()},
+                                 .headers     = packedRequest.headers().unpack()};
+   std::span<const char> body = packedRequest.body();
+
    auto make400 = [&](std::string_view message)
    {
       return HttpReply{
@@ -1433,15 +1501,35 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       if (request.contentType != "application/octet-stream")
          return make415("Expected PSSZ encoded signed transaction (application/octet-stream)");
 
-      auto query       = request.query<WaitFor>();
-      auto trx         = psio::from_pssz<SignedTransaction>(request.body);
-      auto id          = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+      if (body.size() > maxPushedTransactionSize)
+      {
+         auto message =
+             std::format("The transaction is {} bytes. push_transaction accepts at most {} bytes.",
+                         body.size(), maxPushedTransactionSize);
+         return HttpReply{
+             .status      = HttpStatus::contentTooLarge,
+             .contentType = "text/html",
+             .body{message.begin(), message.end()},
+             .headers = allowCorsSubdomains(request),
+         };
+      }
+
+      auto query = request.query<WaitFor>();
+      // The body comes from a client: it is validated once, here, and
+      // then read through the view. Nothing below unpacks it.
+      auto trx         = psio::validated_view<SignedTransaction>(psio::pssz{}, body).value();
+      auto packed      = trx.transaction().bytes();
+      auto id          = psibase::sha256(packed.data(), packed.size());
       bool enforceAuth = validateTransaction(id, trx);
       bool json        = acceptJson(request.headers);
       auto client      = TraceClientInfo{*socket, json, query.flag()};
       pushTransaction(id, trx, enforceAuth, std::move(client));
+      return {};
    }
-   else if (request.method == "POST" && target == "/login")
+
+   request.body.assign(body.begin(), body.end());
+
+   if (request.method == "POST" && target == "/login")
    {
       auto trx = parseBody<SignedTransaction>(request);
       // A JSON body gives the packed transaction as hex, which the JSON

@@ -722,7 +722,9 @@ namespace
 // the packed bytes) and reads it through views: the service holds the
 // transaction once, so what it can process is bounded by its memory
 // (WasmConfigRow: 512 pages, 32 MiB). r-transact, which takes a transaction
-// from a client and answers it, copies more and stops earlier.
+// from a client, hands it on and answers it, has two limits of its own: a
+// body of push_transaction is at most 5 MiB, and a trace of more than
+// 3.25 MiB is answered by its outcome alone. See doc/pssz-conversion.md 7.9.
 TEST_CASE("Test transaction size")
 {
    DefaultTestChain t;
@@ -746,20 +748,68 @@ TEST_CASE("Test transaction size")
 
    SECTION("posted to push_transaction")
    {
-      auto post = [&](std::size_t size)
+      auto post = [&](std::size_t size, std::string_view waitFor = "applied")
       {
-         return t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+         return t.asyncPost(Transact::service, "/push_transaction?wait_for=" + std::string{waitFor},
                             FracPackBody{makeLargeTransaction(t, alice, size)});
       };
+      // The arguments of the actions in a trace
+      auto argumentBytes = [](const TransactionTrace& trace)
+      {
+         std::size_t result = 0;
+         auto        add    = [&](this auto&& self, const ActionTrace& at) -> void
+         {
+            result += at.action.rawData.size();
+            for (const auto& inner : at.innerTraces)
+               if (auto* nested = std::get_if<ActionTrace>(&inner.inner))
+                  self(*nested);
+         };
+         for (const auto& at : trace.actionTraces)
+            add(at);
+         return result;
+      };
+      // What r-transact sends in place of a trace it does not keep: the
+      // outcome, and one action trace of its own that says so.
+      auto isReduced = [](const TransactionTrace& trace)
+      {
+         if (trace.actionTraces.size() != 1)
+            return false;
+         const auto& note = trace.actionTraces[0];
+         if (note.action.service != RTransact::service || note.innerTraces.size() != 1)
+            return false;
+         auto* console = std::get_if<ConsoleTrace>(&note.innerTraces[0].inner);
+         return console && console->console.contains("its action traces are omitted");
+      };
+
       SECTION("1 MiB: the client gets the trace")
       {
-         CHECK(Result<void>(post(MiB).get<TransactionTrace>()).succeeded());
+         auto trace = post(MiB).get<TransactionTrace>();
+         CHECK(!isReduced(trace));
+         CHECK(argumentBytes(trace) >= 2 * MiB);
+         CHECK(Result<void>(std::move(trace)).succeeded());
       }
-      SECTION("4.5 MiB: accepted, queued and applied")
+      SECTION("1.6 MiB: the client gets the trace")
       {
-         // The reply is another matter: r-transact keeps and sends the
-         // trace, which holds the arguments twice, and a row is at most
-         // 8 MiB (ConfigRow::maxValueSize). See doc/pssz-conversion.md 7.9.
+         // A trace of 3.2 MiB, 6.4 MiB as JSON: about the largest that is
+         // sent whole.
+         auto size  = 16 * MiB / 10;
+         auto trace = post(size).get<TransactionTrace>();
+         CHECK(!isReduced(trace));
+         CHECK(argumentBytes(trace) >= 2 * size);
+         CHECK(Result<void>(std::move(trace)).succeeded());
+      }
+      SECTION("2 MiB: the client gets the outcome")
+      {
+         auto reply = post(2 * MiB).get();
+         CHECK(reply.status == HttpStatus::ok);
+         auto trace = unpackReply<TransactionTrace>(std::move(reply));
+         CHECK(isReduced(trace));
+         CHECK(Result<void>(std::move(trace)).succeeded());
+      }
+      SECTION("4.5 MiB: accepted, queued, applied and answered")
+      {
+         // The trace, 9 MiB, is more than a row holds (ConfigRow's
+         // maxValueSize, 8 MiB): r-transact keeps and sends the outcome.
          t.setAutoRun(false);
          auto reply = post(9 * MiB / 2);
          CHECK(!reply.poll());
@@ -769,6 +819,53 @@ TEST_CASE("Test transaction size")
          auto trace = t.pushNextTransaction();
          REQUIRE(!!trace);
          CHECK(TraceResult{std::move(*trace)}.succeeded());
+         auto answer = reply.poll<TransactionTrace>();
+         REQUIRE(!!answer);
+         CHECK(isReduced(*answer));
+         CHECK(Result<void>(std::move(*answer)).succeeded());
+      }
+      SECTION("4.5 MiB: a client that waits for finality gets the outcome")
+      {
+         auto                            reply = post(9 * MiB / 2, "final");
+         std::optional<TransactionTrace> answer;
+         for (int i = 0; i < 8 && !answer; ++i)
+         {
+            t.startBlock();
+            t.finishBlock();
+            answer = reply.poll<TransactionTrace>();
+         }
+         REQUIRE(!!answer);
+         CHECK(isReduced(*answer));
+         CHECK(Result<void>(std::move(*answer)).succeeded());
+      }
+      SECTION("4.5 MiB that fails: the client gets the error")
+      {
+         auto trx = t.signTransaction(
+             t.makeTransaction({Action{.sender  = alice,
+                                       .service = AccountNumber{"no-such-svc"},
+                                       .rawData = std::vector<char>(9 * MiB / 2, 'x')}}));
+         auto trace = t.post<TransactionTrace>(
+             Transact::service, "/push_transaction?wait_for=applied", FracPackBody{std::move(trx)});
+         CHECK(isReduced(trace));
+         CHECK(trace.error.value_or("") != "");
+      }
+      SECTION("5 MiB less 1 KiB: the largest body")
+      {
+         auto trace = post(5 * MiB - 1024).get<TransactionTrace>();
+         CHECK(isReduced(trace));
+         CHECK(Result<void>(std::move(trace)).succeeded());
+      }
+      SECTION("above 5 MiB: refused, with the limit")
+      {
+         for (std::size_t size : {5 * MiB, 6 * MiB, 15 * MiB / 2})
+         {
+            INFO("size: " << size);
+            auto reply = post(size).poll();
+            REQUIRE(!!reply);
+            CHECK(reply->status == HttpStatus::contentTooLarge);
+            CHECK(std::string_view{reply->body.data(), reply->body.size()}.contains(
+                "push_transaction accepts at most 5242880 bytes"));
+         }
       }
    }
 
@@ -835,8 +932,9 @@ TEST_CASE("Measure transaction size", "[.measure]")
       // to the block (transact), the reply (r-transact's onTransaction).
       // A failed continuation ends the run (the tester aborts).
       t.setAutoRun(false);
-      for (std::size_t size : {MiB, 3 * MiB / 2, 7 * MiB / 4, 2 * MiB, 4 * MiB - 200, 9 * MiB / 2,
-                               11 * MiB / 2, 6 * MiB})
+      for (std::size_t size : {MiB, 3 * MiB / 2, 16 * MiB / 10, 7 * MiB / 4, 2 * MiB, 4 * MiB - 200,
+                               9 * MiB / 2, 5 * MiB - 1024, 5 * MiB, 6 * MiB, 13 * MiB / 2, 7 * MiB,
+                               15 * MiB / 2, 8 * MiB, 20 * MiB})
       {
          auto trx   = makeLargeTransaction(t, alice, size, salt++);
          auto start = std::chrono::steady_clock::now();
@@ -846,7 +944,7 @@ TEST_CASE("Measure transaction size", "[.measure]")
          if (auto refused = reply.poll())
          {
             std::printf("refused, HTTP %d %.*s\n", static_cast<int>(refused->status),
-                        static_cast<int>(std::min<std::size_t>(refused->body.size(), 60)),
+                        static_cast<int>(std::min<std::size_t>(refused->body.size(), 700)),
                         refused->body.data());
             t.startBlock();
             continue;
@@ -859,8 +957,14 @@ TEST_CASE("Measure transaction size", "[.measure]")
          auto time  = std::chrono::steady_clock::now() - start;
          std::printf("%s, ", !trace ? "not pushed" : trace->error ? trace->error->c_str() : "ok");
          if (auto answer = reply.poll())
+         {
             std::printf("reply HTTP %d (%zu bytes)", static_cast<int>(answer->status),
                         answer->body.size());
+            if (answer->status != HttpStatus::ok)
+               std::printf(" %.*s",
+                           static_cast<int>(std::min<std::size_t>(answer->body.size(), 200)),
+                           answer->body.data());
+         }
          else
             std::printf("no reply");
          std::printf(", %lld ms\n", static_cast<long long>(ms(time)));

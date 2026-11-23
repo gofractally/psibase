@@ -25,6 +25,15 @@ namespace SystemService
    using TransactionDataTable = psibase::Table<TransactionData, &TransactionData::id>;
    PSIO_REFLECT_TYPENAME(TransactionDataTable)
 
+   // A TransactionData row over a packed transaction that is already in
+   // memory: the row is written from the bytes, without unpacking them.
+   struct TransactionDataView
+   {
+      psibase::Checksum256                        id;
+      psio::pssz_view<psibase::SignedTransaction> trx;
+   };
+   PSIO_REFLECT(TransactionDataView, id, trx)
+
    struct PendingTransactionRecord
    {
       psibase::Checksum256  id;
@@ -277,7 +286,7 @@ namespace SystemService
       std::optional<std::vector<std::optional<psibase::RunToken>>> preverify(
           psio::pssz_view<psibase::SignedTransaction> transaction);
       // Handles transactions coming over P2P
-      void recv(const psibase::SignedTransaction& transaction);
+      void recv(psio::pssz_view<psibase::SignedTransaction> transaction);
       // Callbacks used to track successful/expired transactions
       void onTrx(const psibase::Checksum256& id, psio::pssz_view<psibase::TransactionTrace> trace);
       // Callback run when after signature verification
@@ -289,7 +298,10 @@ namespace SystemService
       void requeue();
       void onRequeue(std::uint64_t id, psio::pssz_view<psibase::TransactionTrace> trace);
       void onBlock();
-      auto serveSys(const psibase::HttpRequest&           request,
+      // The request is read where it lies: the body of push_transaction is
+      // a packed SignedTransaction, which is validated and read through a
+      // view, never unpacked.
+      auto serveSys(psio::pssz_view<psibase::HttpRequest> request,
                     std::optional<std::int32_t>           socket,
                     std::optional<psibase::AccountNumber> user)
           -> std::optional<psibase::HttpReply>;
