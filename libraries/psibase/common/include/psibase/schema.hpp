@@ -104,22 +104,25 @@ namespace psibase
              [&](auto index, std::string_view name)
              {
                 constexpr std::size_t I = decltype(index)::value;
-                using Args              = typename reflect::template method_arg_tuple<I>;
-                using Result = psio::wire_type_t<typename reflect::template method_result<I>>;
+                using Result            = psio::method_result_t<T, I>;
                 if (out.contains(std::string(name)))
                    return;
-                psio::schema_types::FunctionType type{
-                    psio::schema_types::Box<psio::schema_types::AnyType>{builder.insert<Args>()},
-                    std::nullopt};
                 // A result that carries table handles is on the wire what
                 // it exports (psibaseExport): the handles travel beside it.
+                // Any other result is the type its returns(...) describes.
                 if constexpr (hasExport<Result>)
-                   type.result = psio::schema_types::Box<psio::schema_types::AnyType>{
-                       builder.insert<exportType<Result>>()};
-                else if constexpr (!std::is_void_v<Result>)
-                   type.result = psio::schema_types::Box<psio::schema_types::AnyType>{
-                       builder.insert<Result>()};
-                out.emplace(std::string(name), std::move(type));
+                {
+                   out.emplace(std::string(name),
+                               psio::schema_types::FunctionType{
+                                   psio::schema_types::Box<psio::schema_types::AnyType>{
+                                       builder.insert_method_args<T, I>()},
+                                   psio::schema_types::Box<psio::schema_types::AnyType>{
+                                       builder.insert<exportType<Result>>()}});
+                }
+                else
+                {
+                   out.emplace(std::string(name), builder.insert_method<T, I>());
+                }
              });
       }
 

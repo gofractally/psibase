@@ -812,7 +812,7 @@
                     "Variant": {
                         "members": [
                             {
-                                "name": "0",
+                                "name": "Struct",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -820,15 +820,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Struct"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "1",
+                                "name": "Object",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -836,15 +831,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Object"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "2",
+                                "name": "Array",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -852,15 +842,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Array"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "3",
+                                "name": "List",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -868,15 +853,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "List"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "4",
+                                "name": "BoundedList",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -884,15 +864,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "BoundedList"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "5",
+                                "name": "Option",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -900,15 +875,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Option"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "6",
+                                "name": "Variant",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -916,15 +886,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Variant"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "7",
+                                "name": "Tuple",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -932,15 +897,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Tuple"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "8",
+                                "name": "Int",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -948,15 +908,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Int"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "9",
+                                "name": "Float",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -964,15 +919,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Float"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "10",
+                                "name": "Nested",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -980,15 +930,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Nested"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "11",
+                                "name": "Custom",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -996,15 +941,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Custom"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "12",
+                                "name": "Resource",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -1012,15 +952,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Resource"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "13",
+                                "name": "Type",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -1028,15 +963,10 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Type"
-                                    }
-                                ]
+                                "attributes": []
                             },
                             {
-                                "name": "14",
+                                "name": "Enum",
                                 "type": {
                                     "value": {
                                         "Type": {
@@ -1044,12 +974,7 @@
                                         }
                                     }
                                 },
-                                "attributes": [
-                                    {
-                                        "name": "ijsonName",
-                                        "value": "Enum"
-                                    }
-                                ]
+                                "attributes": []
                             }
                         ],
                         "attributes": []

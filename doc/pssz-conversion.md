@@ -5115,12 +5115,12 @@ not worked around, reproduction given), **engine** (VM, storage), **test**
 | # | Where it showed | Failure | Class | Resolution |
 |---|---|---|---|---|
 | M1 | `psio_twins` | `NewAccountMode`: C++ `Custom{Enum, "NewAccountMode"}` (its invariant), Rust a bare `Enum` | interop, Rust deviated | `#[psio(custom = "NewAccountMode")]` on the Rust enum |
-| M2 | `psio_twins` | types that hold a variant (`IPAddress`, `SocketEndpoint`, `ServiceSchema` through the Schema IR's `AnyValue`): C++ labels the alternatives `"0"`, `"1"` with `ijsonName`, Rust by identifier; same bytes, same text, unequal nodes | PSIO (the open rule of flip-interop 0.1) | not worked around: these three are compared with PSIO's `equivalent(…, Compare::Wire)` and their texts through the values; the test fails when the nodes become equal. Every other type is compared node for node |
+| M2 | `psio_twins` | types that hold a variant (`IPAddress`, `SocketEndpoint`, `ServiceSchema` through the Schema IR's `AnyValue`): C++ labels the alternatives `"0"`, `"1"` with `ijsonName`, Rust by identifier; same bytes, same text, unequal nodes | PSIO (the open rule of flip-interop 0.1) | not worked around: these three are compared with PSIO's `equivalent(…, Compare::Wire)` and their texts through the values; the test fails when the nodes become equal. Every other type is compared node for node. **Closed by PSIO `66abb1b5`** (7.10): one label rule, no `ijsonName` |
 | M3 | writing the twin of `XProxy::onError` / `XPeers::errP2P` | a Rust service could not declare a capped argument list: the service macro dropped `#[pssz(max_dynamic_data = N)]` | Rust | `psio_interface_fn` hands `#[pssz(…)]` / `#[psio(…)]` of an action to the PSIO interface. The spelling in flip-interop (`max_dynamic_data = 4294967295`) is right: same bytes as C++ for both callbacks, with and without a reply |
 | M4 | `verify_schema` (Rust lib tests over the built packages) | `r-events::sqlQuery` returns `std::vector<char>` in C++, `String` in the Rust view | Rust (mirror behind) | the view returns `Vec<u8>`; five callers read the bytes |
 | M5 | `verify_schema` | `WsTicketInfo::path`: the Rust service says `String`, the Rust view `RawString`, the C++ header a raw `std::string` | Rust view and C++ header behind the Rust service | view: `String`; header: `attr(path, utf8)` |
 | M6 | `verify_schema` | results of `http::rootHost`, `http::getSiblingUrl`, `x-http::rootHost`: C++ `std::string` (raw), Rust views `String` | interop: results were not on the list of strings that became UTF-8 (1.20) | the views return `psio::pssz::RawString`, which is what C++ declares; four callers use `to_string_lossy()`. Declaring `returns(utf8)` in C++ is the better end state but cannot reach the service schema today (M7) |
-| M7 | while fixing M6 | the Schema IR node of a method's result under its `returns(…)` annotation is built only inside `SchemaBuilder::insert_interface`; `ServiceSchema::makeActions` (`insert<wire result type>`) loses it | PSIO gap | reproduction `~/psibase-pssz-scratch-merge/psio_gap_result_node.cpp` (prints `"string"` for `insert<result>` and `"utf8"` for `insert_interface`). Wanted: a public `insert_method_result<T, I>()`. Also for the team: `Actor.hpp` reads a result as the plain wire type, not with `psio::decode_method_result` (same bytes for `utf8`; different for a bounded result) |
+| M7 | while fixing M6 | the Schema IR node of a method's result under its `returns(…)` annotation is built only inside `SchemaBuilder::insert_interface`; `ServiceSchema::makeActions` (`insert<wire result type>`) loses it | PSIO gap | reproduction `~/psibase-pssz-scratch-merge/psio_gap_result_node.cpp` (prints `"string"` for `insert<result>` and `"utf8"` for `insert_interface`). Wanted: a public `insert_method_result<T, I>()`. Also for the team: `Actor.hpp` reads a result as the plain wire type, not with `psio::decode_method_result` (same bytes for `utf8`; different for a bounded result). **Closed by PSIO `66abb1b5`** (7.10): `insert_method<T, I>()`, and `Actor.hpp` reads a result through the method |
 | M8 | every `t-*` test (C++ tester boot) | `service 'transact' aborted with message: service exceeded its memory limit` on a boot transaction of 4 371 950 bytes (32 actions, one of 3 480 045) | C++ behaviour change (S6, "strict means canonical") over a PSIO property: `psio::validate_strict` for PSSZ decodes the value and allocates a second, canonical copy (`pssz.hpp` `validate_exact_materialized`); guests never free | **Open, for the owner and the team.** The largest transaction a chain processes dropped from at least 4.4 MiB to between 3.5 and 4.4 MiB (the Rust boot has the 3.48 MiB action in a transaction of its own and passes). Reproduction: `psitest AuthSig-test.wasm` at `6e3c7853d`. What changed here: the C++ tester groups boot transactions as the Rust boot does (flush before 1 MiB is exceeded; the two builders differed, flip-interop 1 "Boot transactions"), which no longer builds the 4.4 MiB transaction. The limit itself needs a non-materializing canonical check in PSIO, or fewer copies in Transact. **Closed by PSIO `599943b`** (7.9): the check walks the bytes in place, Transact processes 31.6 MiB, and the tester's grouping is the original one again |
 | M9 | `t-Transact-test` | `invalid argument encoding for onverify: pssz: optional selector not 0/1` | C++ (tester; predicted in 1.23) | `TestChain::runQueueItem` packs the token as `optional<RunToken>`, as `BlockContext` does |
 | M10 | `t-Nft-test`, `t-Invite-test` | `Action aborted, no return value` where an action returned an empty optional | C++ (tester) | an empty optional is no bytes in PSSZ; `Result<T>` decodes the return value whatever its size. (`trace.cpp:428` still prints a result only when it has bytes: cosmetic) |
@@ -5296,7 +5296,7 @@ Documentation that still describes the old formats (not edited):
 
 Nothing blocks the hand-over. Open, in order of weight: the size of a
 transaction pushed over HTTP against `r-transact`'s memory and the trace
-row (7.9; M8 itself is closed), M7 and M2 (PSIO), the trust refinement
+row (7.9; M8 itself is closed; M7 and M2 are closed by 7.10), the trust refinement
 and the size caps (team review log 0.1, 0.2), the unexercised front ends
 and plugins (0.3), the documentation above.
 
@@ -5693,3 +5693,110 @@ libstdc++ 15, wasmtime, rustc 1.100.0, on `a217d99bb` + zip `<limits>` fix
 + PSIO bound fix: native 19/19, end-to-end 39/39, Rust 29/29, plugin
 signing 1/1 (source: engine session, 2026-11-23); LLVM AOT run pending on
 `b488a7fdd`.
+
+### 7.10 Pin moved to PSIO `66abb1b5`: method results, variant labels
+
+The pin is `66abb1b50a96d1eeef33c61504ae67d509b868e1` (PSIO `main`; one
+commit after `599943b`). It brings a method's result as its `returns(...)`
+types it, everywhere (gofractally/psio#1), and one rule for the label of a
+variant alternative in every language, without the `ijsonName` schema
+attribute (gofractally/psio#2). **No byte of a value, no JSON text of a
+value and no GraphQL name changed**; serialized *schemas* did. Nothing
+stopped compiling with the pin alone.
+
+**What changed in psibase.**
+
+| # | Where | Was | Now |
+|---|---|---|---|
+| 1 | `schema.hpp` `ServiceSchema::makeActions` | `FunctionType{insert<Args>, insert<plain result>}`: `returns(...)` lost (M7) | `builder.insert_method<T, I>()`; a result with a `psibaseExport` keeps its override (`insert_method_args<T, I>()` and the exported type, so the handle type itself is not inserted, as before). A `returns(...)` item without a type form fails `ServiceSchema::make` through `builder.status()`, which it already checked. No psibase action trips it: no service declared `returns(...)` at all before this section's test service |
+| 2 | Rust `schema.rs` `function_type` | `insert::<M>()` and `insert::<M::Result>()` | `builder.insert_method::<M>()`; the bound `M::Result: ToPsszSchema` is gone |
+| 3a | `Actor.hpp` | `callPacked<R>` validated the bytes as the plain type `R`; local alias `MethodResult<T, I>` | `callPacked<T, I>` validates with `psio::validate_method_result<T, I>` and returns the bytes as `psio::buffer<psio::method_result_t<T, I>, method_result_view<T, I>::format_type, shared>`: for every result whose `returns(...)` narrows no offset width (all of today's) that type *is* `psio::shared_pssz<R>`, as before; for one that does, its view reads the result's own widths. New `callUnpacked<T, I>` (what `Actor<T>` uses): `psio::decode_method_result<T, I>` (validates, decodes, and the value checks of `returns(...)`). `MethodResult` is deleted (`psio::method_result_t`). `callPacked<R>` stays for a call without a declaration (`EventEmitter` → `events::event`). The message is unchanged: `value returned from <method> was not serialized as expected` |
+| 3b | Rust caller (`service.rs` `ServiceCaller`, `RunAsCaller`; `tester.rs` `ChainResult::get`) | `psio::from_pssz::<Ret>` (the same gap) | `Args::result_from_pssz` (`Caller::call` requires `Args: Method<Result = Ret>`; `ChainResult<T>` holds the method's reader instead of a `PhantomData`) |
+| 3c | Rust callee (service macro `dispatch.rs`) | `set_retval(&val)`: the plain codec, so `#[psio(returns(...))]` on an action was honoured by nothing | `psibase::set_method_retval::<args::name>(&val)` → `Method::result_to_pssz`; a value outside the declaration aborts the action (`the result of <name> has no encoding: …`). `set_retval` stays for hand-written dispatch |
+| 4 | variant agreements made by hand | `psio_twins.rs` `same_wire_and_bytes` for `IPAddress`, `SocketEndpoint`, `ServiceSchema`; `Compare::Wire` in `schema.rs` `assert_schemas_equivalent` (`verify_schema`); the comment in `checkSchema.cpp`; flip-interop 0.1 "Variants" | `IPAddress` and `SocketEndpoint` are compared node for node like every other type. `ServiceSchema` is compared with `equivalent` under `Compare::Contract` (`same_contract_and_bytes`): it is recursive through an anonymous type, whose builder name (`@N`) differs between the two builders and is not part of the type — the one type of the fixture that cannot be compared node for node. `verify_schema` compares under `Compare::Contract`. No psibase type states a label (`psio::variant_labels`, `#[psio(name)]`): the Rust twins already used the C++ type names as identifiers. `psio::schema_variant_labels` / `variant_labels` was and is not used in the tree (`git grep`) |
+| 5 | fixtures | below | below |
+
+**C++ and Rust schemas under `contract`.** With the variant labels out of
+the way, `verify_schema` under `Compare::Contract` (43 Rust views against
+the schemas in the C++- and Rust-built packages) reported eight differences
+in six services, none of them a variant and none a difference of bytes. All
+were declarations behind the implementing service, and are fixed at the
+declaration:
+
+| Service | Difference | Fix |
+|---|---|---|
+| `cpu-limit::getCpuTime` | C++ returns `std::chrono::nanoseconds` (custom id `duration-nanos`), the Rust view `i64` | the view returns `psio::time::Duration<Nanos>` (one caller, `VirtualServer`, prints `.ticks()`) |
+| `events::addIndex` | parameter `db`, view `db_id` | view renamed |
+| `events::event`, `transact::addCallback`, `transact::removeCallback` | parameter `type`, view `type_` | view: `r#type` (the name is `type`) |
+| `x-admin::isAdmin` | parameter `forwardedFor`, view `forwarded` | view renamed |
+| `tokens` event `supplyChanged` | the Rust service says `actor`, the Rust view `counter_party` | view renamed |
+| `events+1::serveSys` (`REvents.hpp`) | `method(serveSys, request)` named one of three parameters, so the list was positional; the Rust view names all three | C++: `method(serveSys, request, socket, user)`. JSON arguments of that action may now be the object as well as the array; its schema changed from `tuple=positional` to `tuple=named` |
+
+After that: **every Rust view is `equivalent` to the schema of the built
+package under `contract`, without a special case** (43 / 43), and the
+three known parameter-name differences of `psio_twins`
+(`rust_views_name_parameters_as_the_implementation_does`) are gone with
+their list. What remains outside `contract` equality: (a) the sample of
+`service_schema.rs` keeps one `Compare::Wire` comparison on purpose
+(`getRow`: the C++ sample leaves the parameter unnamed, a Rust action
+cannot); (b) C++ test services that name only some parameters
+(`XKeysCaller`, `EmitEvents` `serveSys`) have no Rust twin and were left.
+
+**Regenerated, and why.**
+
+| File | Why | What changed |
+|---|---|---|
+| `libraries/psibase/common/tests/rust-twins.json` | holds the Schema IR of the shared types (`schema_ir`, PSSZ as hex) | `schema_ir` only (49 608 → 48 518 characters: the `ijsonName` attributes are gone, alternatives are named by label). `vectors`, `calls`, `transactions`, `names` are identical, compared key by key |
+| `doc/src/specifications/data-formats/schema-schema.json` | the Schema IR of `ServiceSchema`, which holds the IR's own 15-alternative variant | the 15 alternatives are named `Struct` … `Enum` (were `"0"` … `"14"` with `ijsonName`); nothing else. The attribute is rejected at this pin (seen here: the Rust comparison over a package built before the pin answers `unsupported schema constraint or annotation`) |
+| every `<Target>-schema.json`, `service/<acct>.json` and package built by the build | generated | compared with the packages of the previous tip, member by member: 9 of 91 service schemas differ (`events+2`, `packages`, `producers`, `transact`, `transact+1`, `x-admin`, `x-basic`, `x-http`, `x-proxy`), each **only** in variant alternatives, whose label is the former `ijsonName` (`CftConsensus`, `IPV4Endpoint`, `uint64`, `char[]`, …), so the I-JSON key of every alternative is what it was; `events+1` after the `serveSys` fix above. No non-schema file of a package changed except the copy of `schema-schema.json` in `Docs`. 30 packages were not rewritten by the build: none holds a compiled service (UI / plugin / meta packages, `Nop` from its `.wat`, the 54-byte stub of `events+3`) |
+
+Not regenerated because unchanged: `rust/psibase/tests/service-schema-sample.json`,
+`packages/user/Nop/src/Nop-schema.json`, the schema text pinned in
+`common/tests/schema.cpp` and in `test_psibase_types.py` (no variant). No
+schema hash is checked in.
+
+**The test for gofractally/psibase#2235.** `TestService::TestResult`
+(`packages/psibase_tests`): `symbol` is `returns(utf8 | max<8>)`, `names`
+`returns(max<4> | element(utf8 | max<16>))` (a list with one-byte
+offsets); `TestResultLoose` has the same two actions without annotations;
+`relay*` call an account through the `TestResult` declaration, unpacking
+and through the view. `test_result.cpp` (43 assertions, in
+`t-psibase-tests`): the schema's result nodes are UTF-8 of at most 8 bytes
+and a list of at most 4 UTF-8 strings of at most 16, the loose ones the
+plain types, and a schema-driven reader refuses nine bytes against the
+node; a result inside the declaration comes back from both callees; the
+strict callee aborts rather than write nine bytes, bytes that are not
+UTF-8 or five names; the caller refuses each of those from the loose
+callee, and refuses its list of two names (the plain type's four-byte
+offsets: another encoding). Rust:
+`service_schema.rs` `an_annotated_result_is_in_the_schema_and_is_what_a_caller_reads`
+(the same two declarations with `#[psio(returns(...))]`: the same nodes,
+the writer and the reader the macro and `Caller` use).
+
+**For PSIO** (observed, not worked around; nothing in psibase needs it
+today): an owning buffer of a result whose `returns(...)` narrows a width
+(`psio::buffer<R, psio::pssz_at<A>, shared>`, spelled through
+`method_result_view<T, I>::format_type`) has `view()` but no `unpack()`:
+`pssz_at` is not a codec tag. `view().unpack()` works. There is no public
+name for "the packed result of method I of T" as an owning value.
+Reproduction: `~/psibase-pssz-scratch-repin/probe_buf.cpp` (`-DUNPACK`).
+`validate_method_result` does not run the value checks of `returns(...)`
+(`sorted`, `unique`): only `decode_method_result` does, so the view path
+of `callPacked<T, I>` does not either.
+
+| Step | Result |
+|---|---|
+| full build | exit 0 (`build-repin5.log`, after `repin1`–`repin4`); `share/psibase/packages/index.json`: 91 entries; every package that holds a compiled service was rewritten, and no schema in any package has an `ijsonName` |
+| twin fixture | regenerated (`schema_ir` only); `psio_twins` 4 / 4, `psio_json` 13 / 13, `service_schema` 5 / 5, `psio_leaf_types` 13 / 13, `psio_wrappers` 7 / 7 |
+| native unit tests | C++ `psibase-psio-tests` 1421 assertions in 69 cases; Rust lib 105 / 105 (43 `verify_schema` under `contract`), the others as before (`rust-unit-repin2.log`) |
+| `ctest -j4` | **88 / 88** (`ctest-repin3.log`; `repin1` was 87 / 88: the new test case itself, a service calling its own account) |
+| every Rust workspace | `check_all.sh repin`: all exit 0 except `packages/user --tests` (`tokens-plugin` 5 errors, Favor's tests 2: the known seven) |
+| end to end (7.5's commands, state `~/psibase-pssz-e2e-repin`) | boot exit 0; `create alice`, `bob`, `carol` exit 0; the seven queries answer as in 7.5; `GET packages…/schema?service=producers`: `ConsensusData` is `{"Variant":{"members":[{"name":"CftConsensus",…,"attributes":[]},{"name":"BftConsensus",…,"attributes":[]}],…}}`, no `ijsonName` in the document, `getProducers` is `{"params":…"@19","result":…"@20"}` with `@20` = `List<AccountNumber>`; `kill -TERM` at block 0x22, restart continuing at 0x23, the same answers, `create dave` exit 0, `getAccounts` returns all four; no `[error]` line in either log |
+
+Not verified: Linux (clang + libstdc++) — the new C++ is three function
+templates with `if constexpr`, explicit standard includes, no new
+constant-evaluated code; the LLVM AOT backend; front ends and plugins
+(as 7.6); a Rust *service* that declares `#[psio(returns(...))]` running
+in a chain (the macro's writer and the callers' reader are tested
+natively through the same `Method` functions; no Rust service declares
+one).

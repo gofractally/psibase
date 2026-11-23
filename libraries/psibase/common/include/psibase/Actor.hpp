@@ -13,6 +13,12 @@
 #include <psio/pssz_view.hpp>
 #include <psio/wire_type.hpp>
 
+#include <cstddef>
+#include <span>
+#include <string>
+#include <type_traits>
+#include <vector>
+
 namespace psibase
 {
    template <typename T>
@@ -31,14 +37,6 @@ namespace psibase
    /// The class whose reflection lists the method `MemberPtr` points to
    template <auto MemberPtr>
    using MethodClass = typename psio::method_traits<decltype(MemberPtr)>::class_type;
-
-   /// The value method `I` of `T` returns, as it is packed
-   ///
-   /// A method that returns a view of `X` returns a packed `X`; `void` for a
-   /// method that returns nothing.
-   template <typename T, std::size_t I>
-   using MethodResult =
-       psio::wire_type_t<typename psio::reflect<T>::template method_result<I>>;
 
    /**
     *  When an action is called it returns
@@ -75,41 +73,102 @@ namespace psibase
       T unpack() const { return psibaseImport((T*)nullptr, raw.unpack(), handles.unpack()); }
    };
 
+   namespace detail
+   {
+      [[noreturn]] inline void badResult(std::span<const char> packed_action)
+      {
+         psio::pssz_view<Action> action{packed_action};
+         auto                    method_name = action.method().unpack().str();
+         abortMessage(std::string("value returned from ") + method_name +
+                      " was not serialized as expected");
+      }
+   }  // namespace detail
+
    /// Calls a service with a packed [Action] and returns its packed result
    ///
    /// `R` is the type of the result as it is packed. The bytes the callee
-   /// returned are validated as an `R`.
+   /// returned are validated as an `R`. This is the call for an action that
+   /// has no declaration here; a call of a reflected method goes through
+   /// `callPacked<T, I>`, which reads the result as the method declares it.
    template <typename R>
    auto callPacked(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
    {
       auto result_size = raw::call(packed_action.data(), packed_action.size(), flags);
       if constexpr (not std::is_same_v<void, R>)
       {
-         auto getPacked = [&]<typename U>(std::uint32_t size)
-         {
-            auto bytes = getResult(size);
-            if (!psio::validate_pssz<U>(bytes).ok())
-            {
-               psio::pssz_view<Action> action{packed_action};
-               auto                    method_name = action.method().unpack().str();
-               check(false, std::string("value returned from ") + method_name +
-                                " was not serialized as expected");
-            }
-            return psio::shared_pssz<U>::unchecked(std::move(bytes));
-         };
+         auto bytes = getResult(result_size);
+         if (!psio::validate_pssz<R>(bytes).ok())
+            detail::badResult(packed_action);
+         return psio::shared_pssz<R>::unchecked(std::move(bytes));
+      }
+   }
+
+   /// Calls method `I` of the service `T` with a packed [Action] and returns
+   /// its packed result
+   ///
+   /// The bytes the callee returned are validated as the result of the
+   /// method: the type its `returns(...)` describes
+   /// (`psio::validate_method_result`), so a bound or a string kind declared
+   /// for the result is enforced here. What is returned holds those bytes
+   /// and views them as that type: `psio::shared_pssz<R>` unless
+   /// `returns(...)` narrows an offset width of `R`, in which case the view
+   /// reads the result's own widths. A result that carries table handles
+   /// (`psibaseExport`) is what it exports, with the handles beside it.
+   template <typename T, std::size_t I>
+   auto callPacked(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
+   {
+      using R          = psio::method_result_t<T, I>;
+      auto result_size = raw::call(packed_action.data(), packed_action.size(), flags);
+      if constexpr (not std::is_void_v<R>)
+      {
+         auto bytes = getResult(result_size);
          if constexpr (hasExport<R>)
          {
-            auto result       = getPacked.template operator()<exportType<R>>(result_size);
+            if (!psio::validate_pssz<exportType<R>>(bytes).ok())
+               detail::badResult(packed_action);
             auto handles_size = raw::importHandles();
             // The host wrote the handles
             auto handles =
                 psio::shared_pssz<std::vector<KvHandle>>::unchecked(getResult(handles_size));
-            return ImportView<R>{std::move(result), std::move(handles)};
+            return ImportView<R>{psio::shared_pssz<exportType<R>>::unchecked(std::move(bytes)),
+                                 std::move(handles)};
          }
          else
          {
-            return getPacked.template operator()<R>(result_size);
+            if (!psio::validate_method_result<T, I>(bytes).ok())
+               detail::badResult(packed_action);
+            using Format = typename psio::method_result_view<T, I>::format_type;
+            return psio::buffer<R, Format, psio::storage::shared>::unchecked(std::move(bytes));
          }
+      }
+   }
+
+   /// Calls method `I` of the service `T` with a packed [Action] and returns
+   /// its result
+   ///
+   /// The bytes the callee returned are validated and decoded as the result
+   /// of the method, with everything its `returns(...)` states
+   /// (`psio::decode_method_result`).
+   template <typename T, std::size_t I>
+   psio::method_result_t<T, I> callUnpacked(std::span<const char> packed_action,
+                                            CallFlags             flags = CallFlags::none)
+   {
+      using R = psio::method_result_t<T, I>;
+      if constexpr (std::is_void_v<R>)
+      {
+         raw::call(packed_action.data(), packed_action.size(), flags);
+      }
+      else if constexpr (hasExport<R>)
+      {
+         return callPacked<T, I>(packed_action, flags).unpack();
+      }
+      else
+      {
+         auto bytes = getResult(raw::call(packed_action.data(), packed_action.size(), flags));
+         R    result{};
+         if (!psio::decode_method_result<T, I>(bytes, result).ok())
+            detail::badResult(packed_action);
+         return result;
       }
    }
 
@@ -171,7 +230,7 @@ namespace psibase
       {
          auto act = ActionViewProxy(sender, receiver)
                         .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
-         return psibase::callPacked<MethodResult<MethodClass<MemberPtr>, I>>(act.bytes(), flags);
+         return psibase::callPacked<MethodClass<MemberPtr>, I>(act.bytes(), flags);
       }
    };
 
@@ -191,11 +250,7 @@ namespace psibase
       {
          auto act          = ActionViewProxy(sender, receiver)
                                  .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
-         using result_type = MethodResult<MethodClass<MemberPtr>, I>;
-         if constexpr (not std::is_void_v<result_type>)
-            return psibase::callPacked<result_type>(act.bytes(), flags).unpack();
-         else
-            psibase::callPacked<void>(act.bytes(), flags);
+         return psibase::callUnpacked<MethodClass<MemberPtr>, I>(act.bytes(), flags);
       }
    };
 

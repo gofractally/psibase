@@ -214,14 +214,13 @@ where
     same_bytes::<T>(fixture, name);
 }
 
-/// The same for a type that holds a variant. PSIO's C++ schema labels the
-/// alternatives of a `std::variant` `"0"`, `"1"`, … and carries each one's
-/// name as the attribute `ijsonName`; its Rust schema labels them by the
-/// enum's identifiers. The two nodes describe one encoding and one text
-/// but are not equal, so they are compared with PSIO's `equivalent` under
-/// `Compare::Wire` (doc/flip-interop.md 0.1); the texts are compared
-/// through the values.
-fn same_wire_and_bytes<T>(fixture: &mut Fixture, name: &str)
+/// The same for a recursive type: the Schema IR's own types, which a
+/// `ServiceSchema` holds. A type that refers to itself through an anonymous
+/// type does so by the builder's name for it (`@N`), which is not part of
+/// the type and differs between the two builders, so the nodes are compared
+/// with PSIO's `equivalent` under `Compare::Contract` (bytes, member names,
+/// variant labels, custom ids) instead of node for node.
+fn same_contract_and_bytes<T>(fixture: &mut Fixture, name: &str)
 where
     T: ToPsszSchema
         + psio::pssz::PsszPack<psio::Pssz>
@@ -236,13 +235,8 @@ where
         .schema
         .get(name)
         .unwrap_or_else(|| panic!("{name} is not in the fixture's schema"));
-    let result = equivalent(&ours, &root, &fixture.schema, theirs, Compare::Wire);
+    let result = equivalent(&ours, &root, &fixture.schema, theirs, Compare::Contract);
     assert!(result.ok, "{name}: schema: {result:?}");
-    assert_ne!(
-        resolved(&ours, &root),
-        resolved(&fixture.schema, theirs),
-        "{name}: the two schemas are equal now: compare it with same_schema_and_bytes"
-    );
     same_bytes::<T>(fixture, name);
 }
 
@@ -442,15 +436,15 @@ fn rust_and_cpp_declare_the_same_types() {
     same_schema_and_bytes::<SubjectPublicKeyInfo>(&mut f, "SubjectPublicKeyInfo");
     same_text::<SubjectPublicKeyInfo>(&f, "SubjectPublicKeyInfo");
     same_serde_text::<SubjectPublicKeyInfo>(&f, "SubjectPublicKeyInfo");
-    same_wire_and_bytes::<IPAddress>(&mut f, "IPAddress");
+    same_schema_and_bytes::<IPAddress>(&mut f, "IPAddress");
     same_text::<IPAddress>(&f, "IPAddress");
     same_serde_text::<IPAddress>(&f, "IPAddress");
-    same_wire_and_bytes::<SocketEndpoint>(&mut f, "SocketEndpoint");
+    same_schema_and_bytes::<SocketEndpoint>(&mut f, "SocketEndpoint");
     same_text::<SocketEndpoint>(&f, "SocketEndpoint");
     same_serde_text::<SocketEndpoint>(&f, "SocketEndpoint");
 
     // A service's schema: the record, its bytes and its text.
-    same_wire_and_bytes::<ServiceSchema>(&mut f, "ServiceSchema");
+    same_contract_and_bytes::<ServiceSchema>(&mut f, "ServiceSchema");
     same_text::<ServiceSchema>(&f, "ServiceSchema");
     same_serde_text::<ServiceSchema>(&f, "ServiceSchema");
 
@@ -775,18 +769,6 @@ fn rust_views_name_parameters_as_the_implementation_does() {
     let json: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
 
-    // (service, method) -> why the names differ.
-    let known: std::collections::BTreeMap<(&str, &str), &str> = [
-        // `type` is a Rust keyword; the view says `type_`.
-        (("transact", "addCallback"), "keyword"),
-        (("transact", "removeCallback"), "keyword"),
-        // The C++ reflection misnames or does not name a parameter
-        // (doc/pssz-conversion.md 6.22); the view has the declared name.
-        (("x-admin", "isAdmin"), "C++ reflection"),
-    ]
-    .into_iter()
-    .collect();
-
     let mut views: std::collections::BTreeMap<&str, std::collections::BTreeMap<String, Vec<String>>> =
         Default::default();
     macro_rules! view {
@@ -806,7 +788,6 @@ fn rust_views_name_parameters_as_the_implementation_does() {
     }
 
     let mut problems = Vec::new();
-    let mut seen_known = BTreeSet::new();
     let mut compared = 0;
     for service in json["names"].as_array().unwrap() {
         let account = service["service"].as_str().unwrap();
@@ -824,11 +805,7 @@ fn rust_views_name_parameters_as_the_implementation_does() {
             let Some(ours) = view.get(method) else { continue };
             compared += 1;
             if *ours != theirs {
-                if known.contains_key(&(account, method.as_str())) {
-                    seen_known.insert((account, method.clone()));
-                } else {
-                    problems.push(format!("{account}::{method}: view {ours:?}, C++ {theirs:?}"));
-                }
+                problems.push(format!("{account}::{method}: view {ours:?}, C++ {theirs:?}"));
             }
         }
         for method in view.keys() {
@@ -838,7 +815,6 @@ fn rust_views_name_parameters_as_the_implementation_does() {
         }
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
-    assert_eq!(seen_known.len(), known.len(), "a listed difference is gone: {seen_known:?}");
     assert_eq!(json["names"].as_array().unwrap().len(), views.len());
     assert!(compared >= 265, "{compared} methods compared");
 }

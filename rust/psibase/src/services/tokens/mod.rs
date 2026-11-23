@@ -593,7 +593,7 @@ mod service {
     #[event(history)]
     pub fn supplyChanged(
         token_id: TID,
-        counter_party: AccountNumber,
+        actor: AccountNumber,
         action: String,
         amount: String,
         memo: Memo,

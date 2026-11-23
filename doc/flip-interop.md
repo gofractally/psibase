@@ -16,10 +16,12 @@ schemas flipped in its section 1.21 (stage S2); JSON in its section 1.22
 (stage S4); GraphQL in its section 1.24 (stage S5): a C++ GraphQL answer
 is written by PSIO's engine. The legacy library is deleted (section 1.25).
 
-PSIO pin for both languages: `fdb5de259f5059861a80a99b10a75d156a63d5eb`
-(`cmake/PsibaseDependencies.cmake`; PSIO `main`). No wire change from
-`f811c6f9`, on which the two halves were merged: `rust-twins.json` is
-identical on both.
+PSIO pin for both languages: `66abb1b50a96d1eeef33c61504ae67d509b868e1`
+(`cmake/PsibaseDependencies.cmake`; PSIO `main`). No byte of a value and no
+JSON text of a value changed since `f811c6f9`, on which the two halves were
+merged; at `66abb1b5` the *schemas* changed (variant alternative labels,
+section 0.1; method results, section 1 "Return values"):
+`doc/pssz-conversion.md` section 7.10.
 
 ## 0. Already in force with the pin (before any flip commit)
 
@@ -65,12 +67,23 @@ half of `rust/psibase_names` is gone.
   mirror headers of Rust services (about 60 places) and removes
   leading-underscore public names in Rust. The C++ side does not edit
   parameter names in mirror headers of Rust services.
-* **Variants.** C++ labels the alternatives of a variant `"0"`, `"1"`, …
-  with an `ijsonName` attribute; Rust labels them by the enum variant's
-  identifier. Until PSIO settles one rule, a comparison of a C++ schema
-  with a Rust schema uses `psio::pssz_ir::compare::wire` (bytes only); a
-  comparison within one language — `Packages::setSchema` of a service's
-  installed schema against its new one, `CHECK_SCHEMA` — uses
+* **Variants.** An alternative of a variant has one label, by PSIO's rule
+  for every language (PSIO `docs/annotations.md`, "Variant alternative
+  labels"; `conformance/variant-label-vectors.md`): the name the
+  declaration gives it (a Rust enum variant's identifier), else the name
+  of its type (a C++ `std::variant`: the reflected name, or `uint64`,
+  `string`, `char[]`, `T[]`, `T?`, … for a type without one), else its
+  position where a variant holds one type name twice. The label is the
+  member name in the schema and the key of the I-JSON form
+  (`{"CftConsensus": …}`); a schema has no `ijsonName` attribute, and a
+  reader refuses one. The language that implements a type names its
+  alternatives; the twin states a label it would not derive itself (C++:
+  a specialization of `psio::variant_labels<V>`; Rust:
+  `#[psio(name = "…")]`). No psibase type needs either today: every Rust
+  twin of a C++ variant uses the C++ type names as its identifiers
+  (`IPAddress`, `SocketEndpoint`, `SocketInfo`, `ConsensusData`, the
+  inner trace, the Schema IR's own `AnyValue`). Every schema comparison,
+  within a language and across C++ and Rust, is
   `psio::pssz_ir::compare::contract`.
 * **Strings.** Twins must agree on UTF-8 or raw: a Rust `String` is UTF-8,
   a C++ `std::string` is raw unless the member says `attr(m, utf8)`. The
@@ -173,7 +186,7 @@ and how the list was made, are in section 1.23 of `doc/pssz-conversion.md`.
 |---|---|---|---|
 | Action (`psibase::Action`, `block.hpp`) | every caller; the node hands the current action to a service packed (`getCurrentAction`) | services, the node (`call`) | PSSZ of `Action {sender: AccountNumber, service: AccountNumber, method: MethodNumber, rawData: bytes}`. Example (`methods.cpp`, "the bytes of an action"): sender 1, service 2, method 3, rawData `010203` is `1C000000` `0100000000000000` `0200000000000000` `0300000000000000` `1C000000` `010203`. A service checks the action it is handed with `psio::validate_strict` (canonical, no unknown members); the node checks the argument of `call` with `psio::validate_strict` |
 | Action arguments (`Action::rawData`) | C++ `psibase/Actor.hpp` (`psio::method_args_to_pssz`, used by `Actor`, `transactor`, `ActionViewBuilder`, the tester); Rust service wrappers; JS through `/pack_action` | `psibase/dispatch.hpp` (C++ services), Rust dispatch | PSSZ of `psio::reflect<Service>::method_arg_tuple<I>`: the tuple of the parameters' **wire types**, in declaration order. A parameter declared `psio::pssz_view<X>` / `psio::pssz_view<const X>` is an `X`; `std::string_view` is a `std::string`; `std::span<const char>` is a `std::vector<char>`; `const X&` / `X&&` / `X` is an `X`. No method declares a cap or a parameter annotation, so the bytes are those of the plain `std::tuple` of those types (`psio::to_pssz(std::tuple{...})`); a method with no parameters has the bytes of the empty tuple. A caller may pass a view, a `std::string_view`, a span or a value convertible to the parameter: the bytes are the same. The dispatcher validates the bytes (`psio::validate_method_args`; unknown trailing optional members of a record are accepted, as PSSZ's compatible rule says) and aborts with `invalid argument encoding for <method>: <reason>` |
-| Return values | C++ `dispatch.hpp` (`psio::call_method_pssz` → `setRetval`); Rust | C++ `Actor.hpp` (`fraccall`), Rust | PSSZ of the result's wire type (a method that returns a view of `X` returns an `X`); nothing is set for `void`. **An empty optional is no bytes** (merge): the size of a return value does not say whether the action returned one. A `returns(...)` annotation is honoured by the C++ dispatcher's bytes but not by the service schema (PSIO gap, `doc/pssz-conversion.md` 7.2 M7): no C++ method declares one, and a string result is raw unless the type says otherwise (`http::rootHost`, `http::getSiblingUrl`, `x-http::rootHost` are raw strings; their Rust views return `RawString`). The caller validates what it receives (`value returned from <method> was not serialized as expected`). A result with a `psibaseExport` (table handles) is the PSSZ of the exported value, with the handle list passed beside it as the PSSZ of `std::vector<KvHandle>` |
+| Return values | C++ `dispatch.hpp` (`psio::call_method_pssz` → `setRetval`); Rust dispatch (`psibase::set_method_retval::<M>` → `Method::result_to_pssz`) | C++ `Actor.hpp` (`callPacked<T, I>`, `callUnpacked<T, I>`); Rust `Caller::call` (`Method::result_from_pssz`), the Rust tester's `ChainResult::get` | PSSZ of **the result as the method declares it**: the wire type of what it returns (a method that returns a view of `X` returns an `X`) under its `returns(...)` annotation (C++ `method(symbol, token, returns(utf8 \| max<8>))`, Rust `#[psio(returns(max = 8))]` on the action); without one, the plain type. Nothing is set for `void`. **An empty optional is no bytes** when its payload cannot be empty (a record, a number); an optional string or list has a selector byte (`00` for none) and no bytes are not a result of such a method: the size of a return value does not say whether the action returned one. `returns(...)` can narrow an offset width (a list of bounded strings), so a result is written and read through the method (`psio::method_result_to_pssz<T, I>` / `validate_method_result` / `decode_method_result`), never with the plain codec of the return type. The callee does not write a value outside its declaration (the action aborts); the caller validates what it receives as its own declaration of the method types it (`value returned from <method> was not serialized as expected`), in both languages; the service schema carries the same type (section 2). No psibase service declares `returns(...)` yet outside the tests (`TestResult`): a string result is raw unless the type says otherwise (`http::rootHost`, `http::getSiblingUrl`, `x-http::rootHost` are raw strings; their Rust views return `RawString`). A result with a `psibaseExport` (table handles) is the PSSZ of the exported value, with the handle list passed beside it as the PSSZ of `std::vector<KvHandle>` |
 | Method numbers | `MethodNumber{"name"}` | dispatch | `psio::compress_name` method coder (section 0) |
 | Events | C++ `Actor.hpp` `EventEmitter`; Rust event macro | `Events` service (index and SQL), history queries | An action to `events::event` whose `rawData` is the PSSZ of `std::tuple{EventDb db, MethodNumber type, bytes payload}`, where `payload` is the PSSZ of `method_arg_tuple<I>` of the events struct (a byte list: the same bytes as a nested value). The `Events` service validates and reads the payload with the service's schema (`psio::pssz_ir::decode_auto` over `history[name].type` / `merkle[name].type`); a payload that is not a value of that type is not indexed and its SQL columns are errors |
 | Table rows | C++ `psibase/Table.hpp` `put`; Rust table macro | same service; foreign readers; `Events`, `Packages`, tester | PSSZ of the row record. A secondary-index entry's value is the primary key as the table's handle sees it (`00` + key). `Table.hpp` reads its rows without validating (a service's own rows) |
@@ -262,7 +275,13 @@ Rules:
   members are `"0"`, `"1"`, … and the attribute is `tuple=positional`. A
   view / `string_view` / span parameter appears as the type it carries on
   the wire. `result` is absent for `void`, else the node of the result
-  type. An action with no parameters has the empty named object.
+  as the method's `returns(...)` types it (the plain result type without
+  one): the two members are what `SchemaBuilder::insert_method<Service,
+  I>()` returns (Rust: `SchemaBuilder::insert_method::<M>()`). A
+  `returns(...)` item that has no type form (`exact<N>`, `min<N>`, an
+  integer text form) cannot be in such a node: building the schema of a
+  service that declares one fails with PSIO's message. An action with no
+  parameters has the empty named object.
 * `history[name].type` / `merkle[name].type` are the same kind of node for
   the event's parameters. `access` is `"private"` unless the service
   declares the event public.
@@ -286,9 +305,9 @@ Rules:
   the record (`psio::to_pssz`), like any other argument / row — no JSON
   inside bytes.
 * **Compatibility.** `Packages::setSchema` and `CHECK_SCHEMA` compare with
-  `psio::pssz_ir::evolves_from` / `equivalent` (`psio/pssz_ir_compare.hpp`):
-  `compare::contract` within one language, `compare::wire` across C++ and
-  Rust (section 0.1).
+  `psio::pssz_ir::evolves_from` / `equivalent` (`psio/pssz_ir_compare.hpp`)
+  under `compare::contract`, within one language and across C++ and Rust
+  (section 0.1).
 
 Example (a service with `credit(to, amount, memo)`, `getRow(AccountNumber)`
 with an unnamed parameter returning `optional<Row>`, `init()`, and one
@@ -356,22 +375,20 @@ at the pin):
 * `types` is the Schema IR document: `{"package":…,"interfaces":[],"worlds":[],"uses":[],"types":[{"name","type","attributes"}…],"ir_version":1}`; today it is an object keyed by `@N`;
 * every type node is wrapped: `{"value":{"Object":{…}}}`;
 * reflected records carry their own (unqualified) name; anonymous types are `@N`;
-* variant members are labelled `"0"`, `"1"`, … with an `ijsonName` attribute holding the alternative's text name;
+* variant members are named by their label (section 0.1): the alternative's type name for a C++ variant, without attributes;
 * `std::vector<char>` is `Custom{List{Custom{Int8 unsigned,"char"}},"hex"}`; Rust `Vec<u8>` is `hex` over `Int8` directly (decision D41 still open);
 * `AccountNumber` is `Custom{Object{value: u64}[definitionWillNotChange], "AccountNumber"}`;
 * a packed member is `Nested{T}` (legacy `FracPack`);
 * an unnamed action parameter was `c0`, `c1` in an object; it is positional now and its JSON is an array.
 
 Two schemas of one service built by C++ and by Rust must be *equivalent*
-(`psio::pssz_ir::equivalent` with `compare::wire`, section 0.1; gap G33 is
-closed). C++ compares schemas in three places, all with
-`compare::contract` (they compare a service with itself):
-`Packages::setSchema` (rows and event argument lists: `evolves_from`;
-index key types: `equivalent`), `CHECK_SCHEMA` in the tester (a C++
-service against the schema in its package; if that package was built by
-Rust the check would need `compare::wire` — the tester does not know the
-language of a package, so `CHECK_SCHEMA` of a C++ mirror of a Rust service
-reports variant label and custom id differences), and `test_schema.cpp`
+(`psio::pssz_ir::equivalent` with `compare::contract`, section 0.1: the
+same bytes, member and parameter names, variant labels, custom ids and
+argument list forms). C++ compares schemas in three places, all with
+`compare::contract`: `Packages::setSchema` (rows and event argument lists:
+`evolves_from`; index key types: `equivalent`), `CHECK_SCHEMA` in the
+tester (a C++ declaration against the schema in the service's package,
+whichever language built the package), and `test_schema.cpp`
 (`schema-schema.json`). A consequence of `evolves_from` every service
 author meets: **no offset width may move**. A row or event whose members
 are all fixed-size or bounded has a 1- or 2-byte offset width, and
@@ -396,7 +413,10 @@ declares for events are named `<service>.history` / `<service>.merkle`;
 the names appear nowhere in a `ServiceSchema`. `rust-twins.json` holds a
 C++-built `ServiceSchema` that Rust reads, writes and packs identically;
 the two languages' schemas of one service are compared with
-`compare::wire` (`verify_schema`, 42 services).
+`compare::contract` (`verify_schema`, every Rust view in
+`rust/psibase/src/services` against the schema in the built package;
+`psio_twins` compares the shared types node for node, the ones that hold a
+variant included).
 
 ## 2.1 `DbId`
 
@@ -509,7 +529,7 @@ writer on the other side must do:
 * bytes (`std::vector<char>`, `std::vector<uint8_t>`, `std::array<uint8_t, N>`, digests): upper-case hex written, either case read; exactly 2N digits for a fixed-size array.
 * `std::optional`: `null` or the value; **a missing optional member reads as empty**; it is written as `null`, never left out.
 * **A missing required member is an error** (`json: missing required member "x" of Record`); unknown members are skipped; a repeated key: last wins.
-* variants: `{"AlternativeTypeName": value}` (`{"CftConsensus": …}`), exactly one member.
+* variants: `{"<label>": value}`, exactly one member; the label of an alternative is PSIO's (section 0.1): the alternative's type name for a C++ `std::variant` (`{"CftConsensus": …}`, `{"uint64": 5}`), the variant's identifier for a Rust enum.
 * enums: an unreflected enum is its number (`HttpStatus`: `404`; `RunMode`, `NotifyType`, `LogMessage::Severity`). A `PSIO_REFLECT_ENUM` enum is its **name** and reads the name, the number or the number as a string: `DbId` (section 2.1) and `NewAccountMode` (`"keepExisting"`, `"matchExisting"`, `"requireNew"`; any other number is refused, `mode out of range`, in JSON and in PSSZ).
 * `std::map<std::string, T>`: an object; other maps: an array of `[key, value]`.
 * tuples and pairs: arrays. **Action arguments**: an object keyed by parameter name, or the positional array (section 4).

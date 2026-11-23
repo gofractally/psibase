@@ -12,11 +12,11 @@ namespace psibase
    std::optional<std::string> findDifference(const ServiceSchema& lhs, const ServiceSchema& rhs)
    {
       // Both schemas are of one service. Compared as contracts: the bytes
-      // and what a consumer of the text forms sees (member names, custom
-      // ids, argument list forms). A package built by another language than
-      // the service under test would need compare::wire
-      // (doc/flip-interop.md section 0.1); the tester does not know the
-      // language of a package.
+      // and what a consumer of the text forms sees (member and parameter
+      // names, variant alternative labels, custom ids, argument list
+      // forms). The comparison is the same whichever language built the
+      // package: a declaration and its twin in the other language are one
+      // contract (doc/flip-interop.md section 0.1).
       std::string why;
       auto        same = [&](const psio::schema_types::AnyType& l,
                              const psio::schema_types::AnyType& r)

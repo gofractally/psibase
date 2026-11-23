@@ -174,3 +174,68 @@ fn an_action_view_gives_the_method_and_the_argument_bytes() {
     let view = psio::PsszView::<Action>::new(&bytes).unwrap();
     assert!(view.rawData().bytes().is_empty());
 }
+
+/// A service whose results are annotated, as C++ `TestService::TestResult`
+/// declares them (`method(symbol, token, returns(utf8 | max<8>))`,
+/// `method(names, count, returns(max<4> | element(utf8 | max<16>)))`).
+mod annotated {
+    #[psibase::service(name = "test-res", dispatch = false)]
+    #[allow(non_snake_case, unused_variables)]
+    pub mod service {
+        #[action]
+        #[psio(returns(max = 8))]
+        fn symbol(token: u32) -> String {
+            unimplemented!()
+        }
+        #[action]
+        #[psio(returns(max = 4, element(max = 16)))]
+        fn names(count: u32) -> Vec<String> {
+            unimplemented!()
+        }
+    }
+}
+
+/// `#[psio(returns(...))]` on an action types its result: in the schema of
+/// the service, for the service that writes it (`set_method_retval`) and
+/// for a caller that reads it (`Caller::call`, `ChainResult::get`), which
+/// all go through the action's `Method` (gofractally/psibase#2235).
+#[test]
+fn an_annotated_result_is_in_the_schema_and_is_what_a_caller_reads() {
+    use annotated::service::action_structs::{names, symbol};
+    use psio::interface::Method;
+    use psio::pssz::schema_ir::AnyValue;
+
+    let schema = annotated::service::Wrapper::schema();
+    let resolve = |ty: &psio::pssz::schema_ir::AnyType| schema.types.resolve(ty).unwrap().value.clone();
+    // UTF-8 of at most `max` bytes: the node C++ builds for
+    // returns(utf8 | max<N>) (packages/psibase_tests/test/test_result.cpp).
+    let utf8_max = |ty: &psio::pssz::schema_ir::AnyType| -> u64 {
+        let AnyValue::Custom(custom) = resolve(ty) else { panic!("a custom type") };
+        assert_eq!(custom.id, "utf8");
+        let AnyValue::BoundedList(bytes) = resolve(&custom.r#type) else { panic!("a bounded list") };
+        assert!(matches!(resolve(&bytes.r#type), AnyValue::Int(int) if int.bits == 8 && !int.isSigned));
+        bytes.maxCount as u64
+    };
+    assert_eq!(utf8_max(schema.actions["symbol"].result.as_ref().unwrap()), 8);
+    let AnyValue::BoundedList(list) = resolve(schema.actions["names"].result.as_ref().unwrap()) else {
+        panic!("the result of names is a bounded list")
+    };
+    assert_eq!(list.maxCount, 4);
+    assert_eq!(utf8_max(&list.r#type), 16);
+
+    // The service: a value outside returns(...) has no encoding.
+    assert_eq!(symbol::result_to_pssz(&"USD".to_string()).unwrap(), b"USD");
+    assert!(symbol::result_to_pssz(&"123456789".to_string()).is_err());
+    let two = vec!["alice".to_string(), "alice".to_string()];
+    // One-byte offsets, where the plain list has four.
+    assert_eq!(names::result_to_pssz(&two).unwrap().len(), 2 + 10);
+    assert_eq!(psio::to_pssz(&two).len(), 2 * 4 + 10);
+    assert!(names::result_to_pssz(&vec![String::new(); 5]).is_err());
+
+    // The caller: what a callee that promises less may return is refused.
+    assert_eq!(symbol::result_from_pssz(b"USD").unwrap(), "USD");
+    assert!(symbol::result_from_pssz(b"123456789").is_err());
+    assert!(symbol::result_from_pssz(b"ab\xff").is_err());
+    assert_eq!(names::result_from_pssz(&names::result_to_pssz(&two).unwrap()).unwrap(), two);
+    assert!(names::result_from_pssz(&psio::to_pssz(&two)).is_err());
+}

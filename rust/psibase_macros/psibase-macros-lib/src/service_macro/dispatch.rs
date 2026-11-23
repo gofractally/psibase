@@ -26,7 +26,7 @@ pub fn process_dispatch_body(
     } else {
         quote! {
             let val = super::#name(#invoke_struct_args);
-            #psibase_mod::set_retval(&val);
+            #psibase_mod::set_method_retval::<super::#args_mod::#name>(&val);
         }
     };
 

@@ -131,6 +131,18 @@ pub fn set_retval<T: PsszPack<Pssz>>(val: &T) {
     unsafe { native_raw::setRetval(bytes.as_ptr(), bytes.len() as u32) };
 }
 
+/// Set the return value of the currently-executing action, the method `M`
+/// of a service: the result as the method declares it (its
+/// `#[psio(returns(...))]` applied). A value outside that declaration has
+/// no encoding and aborts the action. Used by what `#[psibase::service]`
+/// generates.
+pub fn set_method_retval<M: psio::interface::Method>(val: &M::Result) {
+    let bytes = M::result_to_pssz(val).unwrap_or_else(|e| {
+        abort_message(&format!("the result of {} has no encoding: {e}", M::NAME))
+    });
+    unsafe { native_raw::setRetval(bytes.as_ptr(), bytes.len() as u32) };
+}
+
 pub fn get_optional_result_bytes(size: u32) -> Option<Vec<u8>> {
     if size < u32::MAX {
         Some(get_result_bytes(size))

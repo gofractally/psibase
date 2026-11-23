@@ -140,14 +140,16 @@ impl ServiceSchema {
     }
 }
 
-/// Panics unless the two schemas describe the same wire contract: the same
+/// Panics unless the two schemas describe the same contract: the same
 /// actions, events and (where `rhs` has them) tables, each with equivalent
-/// types. Names and text forms are not compared (`Compare::Wire`): the two
-/// may come from different languages.
+/// types — the same bytes and the same text forms: member and parameter
+/// names, variant alternative labels, custom ids, argument list forms
+/// (`Compare::Contract`). The two may come from different languages: a
+/// declaration and its twin are one contract.
 #[cfg(test)]
 pub(crate) fn assert_schemas_equivalent(lhs: &ServiceSchema, rhs: &ServiceSchema) {
     let same = |what: String, lty: &AnyType, rty: &AnyType| {
-        let result = dynamic::equivalent(&lhs.types, lty, &rhs.types, rty, Compare::Wire);
+        let result = dynamic::equivalent(&lhs.types, lty, &rhs.types, rty, Compare::Contract);
         if !result.ok {
             panic!("{} does not match: {} ({})", what, result.reason, result.path);
         }
@@ -228,7 +230,7 @@ pub(crate) fn assert_schemas_equivalent(lhs: &ServiceSchema, rhs: &ServiceSchema
                     for (lfield, rfield) in std::iter::zip(lindex, rindex) {
                         let tymatch = match (&lfield.r#type, &rfield.r#type) {
                             (Some(lty), Some(rty)) => {
-                                dynamic::equivalent(&lhs.types, lty, &rhs.types, rty, Compare::Wire)
+                                dynamic::equivalent(&lhs.types, lty, &rhs.types, rty, Compare::Contract)
                                     .ok
                             }
                             (None, None) => true,
@@ -320,26 +322,16 @@ impl ToEventsSchema for NoEvents {
     }
 }
 
-/// The node of an action's argument list and of its result. Used by what
+/// An action as its schema lists it: the node of its argument list and of
+/// its result as `returns(...)` types it. Used by what
 /// `#[psibase::service]` generates.
 pub fn function_type<M>(builder: &mut SchemaBuilder) -> FunctionType
 where
     M: psio::interface::Method + psio::pssz::schema_ir::ToPsszSchema,
-    M::Result: psio::pssz::schema_ir::ToPsszSchema,
 {
-    let params = Box::new(
-        builder
-            .insert::<M>()
-            .expect("the argument list of an action has a schema"),
-    );
-    let result = M::HAS_RESULT.then(|| {
-        Box::new(
-            builder
-                .insert::<M::Result>()
-                .expect("the result of an action has a schema"),
-        )
-    });
-    FunctionType { params, result }
+    builder
+        .insert_method::<M>()
+        .unwrap_or_else(|e| panic!("the action {} has no schema: {e}", M::NAME))
 }
 
 /// The node of an event's argument list.

@@ -242,12 +242,12 @@ mod service {
     ///
     /// The order in which callbacks are executed is unspecified.
     #[action]
-    fn addCallback(type_: CallbackType, objective: bool, action: Action) {
+    fn addCallback(r#type: CallbackType, objective: bool, action: Action) {
         unimplemented!()
     }
     /// Removes an existing callback
     #[action]
-    fn removeCallback(type_: CallbackType, objective: bool, action: Action) {
+    fn removeCallback(r#type: CallbackType, objective: bool, action: Action) {
         unimplemented!()
     }
 

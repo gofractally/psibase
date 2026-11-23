@@ -106,9 +106,9 @@ TEST_CASE("methods: the packed argument tuple and result", "[methods]")
        std::is_same_v<psio::reflect<Ledger::Events::History>::method_arg_tuple<0>::tuple_type,
                       std::tuple<AccountNumber, std::string>>);
 
-   static_assert(std::is_void_v<MethodResult<Ledger, 0>>);
-   static_assert(std::is_same_v<MethodResult<Ledger, 1>, std::string>);
-   static_assert(std::is_same_v<MethodResult<Ledger, 4>, std::int32_t>);
+   static_assert(std::is_void_v<psio::method_result_t<Ledger, 0>>);
+   static_assert(std::is_same_v<psio::method_result_t<Ledger, 1>, std::string>);
+   static_assert(std::is_same_v<psio::method_result_t<Ledger, 4>, std::int32_t>);
 
    static_assert(methodNumber<1, &Ledger::transfer> == MethodNumber{"transfer"});
    static_assert(methodNumber<0, &Ledger::Events::History::noted> == MethodNumber{"noted"});

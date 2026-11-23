@@ -9,7 +9,7 @@ mod service {
     fn isAdmin(
         account: Option<AccountNumber>,
         socket: Option<i32>,
-        forwarded: Vec<Option<IPAddress>>,
+        forwardedFor: Vec<Option<IPAddress>>,
     ) -> bool {
         unimplemented!()
     }

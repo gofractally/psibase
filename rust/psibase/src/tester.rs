@@ -1073,7 +1073,9 @@ impl ChainEmptyResult {
 
 pub struct ChainResult<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> {
     pub trace: TransactionTrace,
-    _marker: PhantomData<T>,
+    /// Reads the result as the called method declares it
+    /// (`Method::result_from_pssz`: validated, `returns(...)` applied)
+    decode: fn(&[u8]) -> psio::pssz::PsszResult<T>,
 }
 
 impl<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> ChainResult<T> {
@@ -1127,7 +1129,7 @@ impl<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> C
                     );
                     println!(">>> ChainResult::get - Unpacking ret: `{}`", psio::to_hex(&ret));
                 }
-                let unpacked_ret = psio::from_pssz::<T>(ret)?;
+                let unpacked_ret = (self.decode)(ret)?;
                 return Ok(unpacked_ret);
             }
         }
@@ -1185,7 +1187,7 @@ impl<'a> Caller for ChainPusher<'a> {
         ChainEmptyResult { trace }
     }
 
-    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: psio::interface::Method>(
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: psio::interface::Method<Result = Ret>>(
         &self,
         method: crate::MethodNumber,
         args: Args,
@@ -1208,7 +1210,7 @@ impl<'a> Caller for ChainPusher<'a> {
         });
         let ret = ChainResult::<Ret> {
             trace,
-            _marker: Default::default(),
+            decode: Args::result_from_pssz,
         };
 
         if self.chain.is_auto_block_start {
@@ -1313,7 +1315,7 @@ impl<'a> Caller for ProposalPusher<'a> {
         }
     }
 
-    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: psio::interface::Method>(
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: psio::interface::Method<Result = Ret>>(
         &self,
         method: crate::MethodNumber,
         args: Args,

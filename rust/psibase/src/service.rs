@@ -115,7 +115,10 @@ pub trait Caller: Clone {
         args: Args,
     ) -> Self::ReturnsNothing;
 
-    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method>(
+    /// `Ret` is the result of the method `Args`. A caller that reads the
+    /// bytes that come back reads them as the method declares its result
+    /// (`Args::result_from_pssz`: validated, `returns(...)` applied).
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
         &self,
         method: MethodNumber,
         args: Args,
@@ -130,7 +133,7 @@ impl Caller for JustSchema {
     type ReturnType<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> = ();
 
     fn call_returns_nothing<Args: Method>(&self, _method: MethodNumber, _args: Args) {}
-    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method>(
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
         &self,
         _method: MethodNumber,
         _args: Args,
@@ -165,7 +168,7 @@ impl Caller for ServiceCaller {
         unsafe { native_raw::call(act.as_ptr(), act.len() as u32, self.flags) };
     }
 
-    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method>(
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
         &self,
         method: MethodNumber,
         args: Args,
@@ -174,8 +177,13 @@ impl Caller for ServiceCaller {
         let ret = get_result_bytes(unsafe {
             native_raw::call(act.as_ptr(), act.len() as u32, self.flags)
         });
-        // The result of another service: validated.
-        psio::from_pssz::<Ret>(&ret).unwrap()
+        // The result of another service: validated as the method declares it.
+        Args::result_from_pssz(&ret).unwrap_or_else(|e| {
+            crate::abort_message(&format!(
+                "value returned from {} was not serialized as expected: {e}",
+                Args::NAME
+            ))
+        })
     }
 }
 
@@ -198,7 +206,7 @@ impl Caller for ActionPacker {
         }
     }
 
-    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method>(
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
         &self,
         method: MethodNumber,
         args: Args,
@@ -378,7 +386,7 @@ impl Caller for RunAsCaller {
         crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
     }
 
-    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method>(
+    fn call<Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>, Args: Method<Result = Ret>>(
         &self,
         method: MethodNumber,
         args: Args,
@@ -391,6 +399,11 @@ impl Caller for RunAsCaller {
         };
         let ret =
             crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
-        psio::from_pssz::<Ret>(&ret).unwrap()
+        Args::result_from_pssz(&ret).unwrap_or_else(|e| {
+            crate::abort_message(&format!(
+                "value returned from {} was not serialized as expected: {e}",
+                Args::NAME
+            ))
+        })
     }
 }

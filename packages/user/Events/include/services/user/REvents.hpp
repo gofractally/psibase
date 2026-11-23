@@ -20,7 +20,7 @@ namespace UserService
                                                  std::optional<std::int32_t>           socket,
                                                  std::optional<psibase::AccountNumber> user);
    };
-   PSIO_REFLECT(REvents, method(sqlQuery, attr(query, utf8), params), method(serveSys, request))
+   PSIO_REFLECT(REvents, method(sqlQuery, attr(query, utf8), params), method(serveSys, request, socket, user))
    PSIBASE_REFLECT_TABLES(REvents)
 
 }  // namespace UserService

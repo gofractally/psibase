@@ -7,7 +7,7 @@ mod service {
     }
 
     #[action]
-    fn getCpuTime() -> i64 {
+    fn getCpuTime() -> psio::time::Duration<psio::time::Nanos> {
         unimplemented!()
     }
 }

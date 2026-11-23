@@ -33,13 +33,13 @@ mod service {
     }
 
     #[action]
-    fn addIndex(db_id: EventDb, service: AccountNumber, event: MethodNumber, column: u8) {
+    fn addIndex(db: EventDb, service: AccountNumber, event: MethodNumber, column: u8) {
         unimplemented!()
     }
 
     /// Writes an event to the event log
     #[action]
-    fn event(db: EventDb, type_: MethodNumber, rawData: Vec<u8>) -> u64 {
+    fn event(db: EventDb, r#type: MethodNumber, rawData: Vec<u8>) -> u64 {
         unimplemented!()
     }
 

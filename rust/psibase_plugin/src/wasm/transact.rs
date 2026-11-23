@@ -11,19 +11,19 @@ impl Caller for AddToTxCaller {
     type ReturnType<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> = ();
 
     fn call_returns_nothing<Args: psio::interface::Method>(&self, method: MethodNumber, args: Args) {
-        self.call::<(), _>(method, args);
+        transact::plugin::api::add_action_to_transaction(&method.to_string(), &psio::to_pssz(&args))
+            .unwrap_or_else(|e| panic!("add_action_to_transaction failed: {e}"));
     }
 
     fn call<
         Ret: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>,
-        Args: psio::interface::Method,
+        Args: psio::interface::Method<Result = Ret>,
     >(
         &self,
         method: MethodNumber,
         args: Args,
     ) {
-        transact::plugin::api::add_action_to_transaction(&method.to_string(), &psio::to_pssz(&args))
-            .unwrap_or_else(|e| panic!("add_action_to_transaction failed: {e}"));
+        self.call_returns_nothing(method, args)
     }
 }
 

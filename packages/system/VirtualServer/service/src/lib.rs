@@ -475,7 +475,7 @@ mod service {
         }
 
         let cpu_time = CpuLimit::rpc().getCpuTime();
-        psibase::write_console(&format!("CPU time at limit change: {} ns\n", cpu_time));
+        psibase::write_console(&format!("CPU time at limit change: {} ns\n", cpu_time.ticks()));
     }
 
     /// Allows the sender to manage the behavior of client-side tooling with respect to the
