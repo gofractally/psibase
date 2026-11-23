@@ -163,14 +163,15 @@ class PrivateKey:
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding, load_pem_private_key, load_der_private_key
         if data is None:
-            self.private = ec.generate_private_key(ec.SECP256R1())
+            # Software keys use secp256k1, which is the faster curve to verify
+            self.private = ec.generate_private_key(ec.SECP256K1())
         else:
             try:
-                self.private = load_pem_private_key(data)
+                self.private = load_pem_private_key(data, None)
             except ValueError:
-                self.private = load_der_public_key(data)
-            if not isinstance(self.private, ec.EllipticCurvePrivateKey) or self.private.curve != ec.SECP256R1:
-                raise Exception("Only P-256 keys are supported")
+                self.private = load_der_private_key(data, None)
+            if not isinstance(self.private, ec.EllipticCurvePrivateKey) or not isinstance(self.private.curve, (ec.SECP256K1, ec.SECP256R1)):
+                raise Exception("Only secp256k1 and P-256 keys are supported")
     def sign_prehashed(self, digest):
         from cryptography.hazmat.primitives.hashes import SHA256
         from cryptography.hazmat.primitives.asymmetric import ec, utils
