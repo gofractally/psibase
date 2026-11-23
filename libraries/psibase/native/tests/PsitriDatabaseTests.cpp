@@ -4,6 +4,8 @@
 #include <catch2/matchers/catch_matchers.hpp>
 #include <filesystem>
 #include <fstream>
+#include <map>
+#include <random>
 #include <psibase/CpuAccounting.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/api.hpp>
@@ -115,6 +117,157 @@ TEST_CASE("psitri native database preserves complete nested root frames", "[stor
       auto           session = db.startRead();
       for (unsigned i = 0; i < numChainDatabases; ++i)
          REQUIRE(value(db, DbId(i)) == "inner");
+   }
+}
+
+TEST_CASE("psitri write sessions read their own pending changes in every direction",
+          "[storage][psitri][pending]")
+{
+   // A write session keeps its changes aside and folds them into the trees
+   // only when a revision is asked for. Every read has to see them anyway:
+   // point reads, both seek directions and prefix maxima, through nested
+   // sessions that commit or are abandoned, and across a fold that happens
+   // while nested sessions are still open. A std::map per nesting level is the
+   // reference.
+   using Model = std::map<std::string, std::string>;
+   SharedDatabase shared(directory("pending"), config, psibase::storage::open_mode::create_new);
+   auto           writer = shared.createWriter();
+   std::mt19937   rng(20261122);
+   auto           randomKey = [&]
+   {
+      // Short keys over a small alphabet, so prefixes and neighbours collide.
+      std::string key(1 + rng() % 3, 'a');
+      for (auto& c : key)
+         c = char('a' + rng() % 4);
+      return key;
+   };
+   auto check = [&](Database& db, DbId id, const Model& model)
+   {
+      for (int i = 0; i < 12; ++i)
+      {
+         const auto key = randomKey();
+         {
+            auto it = model.find(key);
+            REQUIRE(value(db, id, key) == (it == model.end() ? "<missing>" : it->second));
+            REQUIRE(db.kvContains(id, span(key)) == (it != model.end()));
+         }
+         {
+            auto found = db.kvGreaterEqualRaw(id, span(key), 0);
+            auto it    = model.lower_bound(key);
+            REQUIRE(bool(found) == (it != model.end()));
+            if (found)
+            {
+               REQUIRE(std::string(found->key.pos, found->key.end) == it->first);
+               REQUIRE(std::string(found->value.pos, found->value.end) == it->second);
+            }
+         }
+         {
+            auto found = db.kvLessThanRaw(id, span(key), 0);
+            auto it    = model.lower_bound(key);
+            REQUIRE(bool(found) == (it != model.begin()));
+            if (found)
+            {
+               --it;
+               REQUIRE(std::string(found->key.pos, found->key.end) == it->first);
+               REQUIRE(std::string(found->value.pos, found->value.end) == it->second);
+            }
+         }
+         {
+            const auto prefix = key.substr(0, 1);
+            auto       found  = db.kvMaxRaw(id, span(prefix));
+            auto       it     = model.lower_bound(std::string(1, char(prefix[0] + 1)));
+            const bool expect = it != model.begin() && std::prev(it)->first.starts_with(prefix);
+            REQUIRE(bool(found) == expect);
+            if (found)
+               REQUIRE(std::string(found->key.pos, found->key.end) == std::prev(it)->first);
+         }
+      }
+   };
+   const DbId       ids[] = {DbId::service, DbId::native, DbId::writeOnly};
+   ConstRevisionPtr base  = shared.emptyRevision();
+   std::array<Model, 3> committed;
+   for (unsigned block = 1; block <= 12; ++block)
+   {
+      Database                          db(shared, base);
+      std::vector<Database::Session>    sessions;
+      std::vector<std::array<Model, 3>> levels{committed};
+      sessions.push_back(db.startWrite(writer));
+      // A revision taken while sessions are open, and what it has to hold.
+      std::vector<std::pair<ConstRevisionPtr, std::array<Model, 3>>> taken;
+      for (int step = 0; step < 400; ++step)
+      {
+         const auto which = rng() % 3;
+         const auto roll  = rng() % 100;
+         auto&      model = levels.back()[which];
+         if (roll < 55)
+         {
+            const auto key = randomKey();
+            const auto v   = "b" + std::to_string(block) + "s" + std::to_string(step);
+            put(db, ids[which], v, key);
+            model[key] = v;
+         }
+         else if (roll < 75)
+         {
+            const auto key = randomKey();
+            db.kvRemoveRaw(ids[which], span(key));
+            model.erase(key);
+         }
+         else if (roll < 83 && levels.size() < 5)
+         {
+            sessions.push_back(db.startWrite(writer));
+            levels.push_back(levels.back());
+         }
+         else if (roll < 88 && levels.size() > 1)
+         {
+            // Commit the innermost session into the one around it.
+            sessions.back().commit();
+            sessions.pop_back();
+            levels[levels.size() - 2] = std::move(levels.back());
+            levels.pop_back();
+         }
+         else if (roll < 93 && levels.size() > 1)
+         {
+            sessions.pop_back();  // abandoned
+            levels.pop_back();
+         }
+         else if (roll < 96)
+            taken.emplace_back(db.getModifiedRevision(), levels.back());
+         check(db, ids[which], levels.back()[which]);
+      }
+      while (levels.size() > 1)
+      {
+         sessions.pop_back();
+         levels.pop_back();
+      }
+      for (unsigned i = 0; i < 3; ++i)
+         check(db, ids[i], levels.back()[i]);
+      // Revisions taken part-way are trees of their own: later writes and
+      // rollbacks of the session they came from do not show in them.
+      for (auto& [revision, models] : taken)
+      {
+         Database snapshot(shared, revision);
+         auto     reading = snapshot.startRead();
+         for (unsigned i = 0; i < 3; ++i)
+            check(snapshot, ids[i], models[i]);
+      }
+      if (block % 3 == 0)
+      {
+         sessions.clear();  // an abandoned block leaves nothing behind
+         Database again(shared, base);
+         auto     reading = again.startRead();
+         for (unsigned i = 0; i < 3; ++i)
+            check(again, ids[i], committed[i]);
+      }
+      else
+      {
+         base      = sessions.back().writeRevision(blockId(block));
+         committed = levels.back();
+         sessions.clear();
+         Database again(shared, base);
+         auto     reading = again.startRead();
+         for (unsigned i = 0; i < 3; ++i)
+            check(again, ids[i], committed[i]);
+      }
    }
 }
 
