@@ -177,8 +177,14 @@ class PrivateKey:
         from cryptography.hazmat.primitives.asymmetric import ec, utils
         result = self.private.sign(digest, ec.ECDSA(utils.Prehashed(SHA256())))
         (r, s) = utils.decode_dss_signature(result)
-        # verify-sig only accepts the low-S form, s <= n/2
-        n = self.private.curve.group_order
+        # verify-sig only accepts the low-S form, s <= n/2. Older releases of
+        # the cryptography package do not expose the group order.
+        orders = {
+            'secp256k1': 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141,
+            'secp256r1': 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551,
+        }
+        curve = self.private.curve
+        n = getattr(curve, 'group_order', None) or orders[curve.name]
         if s > n // 2:
             s = n - s
         return r.to_bytes(32, byteorder='big') + s.to_bytes(32, byteorder='big')
