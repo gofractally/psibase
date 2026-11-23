@@ -56,7 +56,7 @@ These are the changes the team has to agree to, as opposed to review for quality
 
 **What changed.** `verify-sig` no longer links Botan. It uses libsecp256k1 for secp256k1 and BearSSL's P-256, each pinned and built by its own build system. The service went from 936 KB and twelve pages of memory, with a build-time `wasm-ctor-eval` step, to 122 KB and one page with no init step. Botan is still built for AuthSig, XKeys and XBasic.
 
-**Where to look.** b474c3e15: `packages/system/VerifySig/src/VerifySig.cpp` (under 200 lines), the two `ExternalProject` blocks in the root `CMakeLists.txt`, and `packages/psibase_tests/test/test_verify_sig_keys.cpp`.
+**Where to look.** b474c3e15: `packages/system/VerifySig/src/VerifySig.cpp` (about 220 lines), the two `ExternalProject` blocks in the root `CMakeLists.txt`, and `packages/psibase_tests/test/test_verify_sig_keys.cpp`.
 
 **Evidence.**
 - x86 server, idle, before 44c57f739 and after b474c3e15: one `verify-sig` call about 896 µs before and 135 µs after; signature time per signed transfer on a validating node 1.012 ms before and 0.169 ms after.
