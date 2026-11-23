@@ -2516,6 +2516,122 @@ validates, with the messages `Memo` always had ("Memo exceeds 80 bytes",
 "Memo must be valid UTF-8"); legacy bytes are unchanged (`test_memo.cpp`
 and the pinned forms pass as they were).
 
+### 6.24 Rust readiness for the wire flip (the owner's priority: old library out, then refine)
+
+Order changed by the owner: reach a tree without the legacy library
+quickly; polish later. What was done towards it in Rust, in order.
+
+**Variants** (`243197cf0`). `ConsensusData`'s alternatives are
+`CftConsensus` and `BftConsensus`, the C++ type names (C++ is the
+authority; D39). serde wrote `{"CFT": ...}` before, which no C++ reader
+accepts. The other four Rust enums on the wire already named their
+alternatives after the types. Variant *labels* in the Schema IR still
+differ between the languages (C++ `"0"`, `"1"` with `ijsonName`; Rust the
+identifier): a PSIO question; schemas of the two languages are to be
+compared on the wire shape until it is settled, and psibase adds no
+per-type label annotation.
+
+**Time is `psio::time`** (`11b964218`). `TimePointSec`, `TimePointUSec`,
+`Seconds`, `MicroSeconds` are aliases of `psio::time::TimePoint<Seconds |
+Micros>` and `psio::time::Duration<..>`; psibase's four structs are
+deleted. The use sites (60 files) call PSIO directly: `.ticks()`,
+`from_ticks(n)`, `floor::<Seconds>()`, `ceil`, `to_unit().unwrap()`,
+`from_chrono_floor`. Temporary, deleted with the legacy crate:
+`rust/fracpack/src/psio_time.rs` gives the four types the legacy `Pack /
+Unpack / ToSchema` with the bytes and legacy schema nodes the structs had
+(a test redeclares the old structs and compares); `ToKey` is in
+`rust/psibase` with the same key bytes. Changes a client sees (approved):
+
+| | Before | Now |
+|---|---|---|
+| `TimePointSec` in JSON | `"2026-11-22T10:15:30+00:00"` | `"2026-11-22T10:15:30Z"` |
+| `TimePointUSec` | `"…30.123456+00:00"`, no fraction when zero | `"…30.123456Z"`, always six digits |
+| a duration | `{"value":5}` | `5` (a string beyond 2^53) |
+| a fraction finer than the unit | dropped | rejected |
+| GraphQL scalars | `TimePointSec`, `TimePointUSec` | `DateTimeSeconds`, `DateTimeMicroseconds`; durations `Seconds`, `Microseconds` |
+
+Readers accept `Z`, an offset, and extra zero digits, so what C++ writes
+and what Rust wrote before both parse. `floor` rounds toward negative
+infinity where the old `.seconds()` truncated (differs before 1970 only).
+RG16 (PSIO, convenience): no arithmetic or infallible conversion across
+units — `TimePoint<Micros> + Duration<Seconds>` does not compile and
+`Duration<Seconds>` has no `Into<Duration<Micros>>`; 20 call sites write
+`to_unit().unwrap()`.
+
+**Every packed type declared** (`b5af09d5a`, `1b213b1c3`). The
+add-and-let-the-compiler-refuse pass over all four workspaces:
+
+| Workspace | Types that gained the PSIO derives | Refused |
+|---|---|---|
+| `rust/psibase` | 36 more (consensus records, `SignedTransaction`, `BlockHeader`, `Block`, `SignedBlock`, `BlockInfo`, `StatusRow`, the socket records and variants, `SubjectPublicKeyInfo` as `transparent`, `AuthRecord`, `Tapos`, `Transaction`, `RunRow`, …) | `package::Meta`, `accounts::Account`, `ActionTrace` (a serde attribute PSIO's schema derive refuses: `default`, `deserialize_with`) and with it `InnerTrace`, `InnerTraceEnum`, `TransactionTrace`; the legacy schema records `Schema`, `EventType`, `FieldId`, `TableInfo`, `InstalledSchema` |
+| `packages/system`, `packages/user`, plugins | 158 types in 39 files; 100 manifests gained `psio.workspace = true` | Permissions plugin `PackablePromptContext`, `Permission`, `Permissions` (they hold `TrustLevel`, a wit-bindgen type with a hand-written codec) |
+
+All workspaces compile with them (`cargo check --workspace --target
+wasm32-wasip1`; the six packages the build never compiles included; five
+plugin crates that need a generated `bindings.rs` do not compile under
+`cargo check`, before and after).
+
+**Names** (the owner's rule applied to parameters). Rust actions no
+longer expose a leading underscore as the JSON name of an unused
+parameter: 20 actions in 15 services (`auth-dyn`, `auth-rcovr`,
+`credential` `checkAuthSys` / `getDlgsSys` / `isAuthSys` / `isRejectSys`;
+`serveSys(.., socket, user)` of eight services; `verifySys`,
+`role_policy`, `is_role_ok`, `on_attest`, `on_ev_unreg`) say `flags`,
+`sender`, `socket`, … with `#[allow(unused_variables)]`. The C++ mirror
+headers of `nft`, `symbol`, `tokens` take the Rust names (`4c3d12af3`, 42
+parameters). The Rust views take the authority's names (19 parameters:
+`accounts` `name`, `producers` `consensus` / `producers` / `maxProds`,
+`transact` `transaction` / `action`, `x-http` `service` / `request`,
+`cpu-limit` `limit_ns`, `nft` `nft_id`, …); the view's `SharedBalance`
+has `shared_bal_id`. A cross-check fails on any mismatch now: C++ writes
+the methods and parameter names of 28 services into the fixture
+(`"names"`), and `psio_twins.rs`
+(`rust_views_name_parameters_as_the_implementation_does`) compares each
+with the view's generated schema: 265 methods. Listed exceptions, each
+pinned so that it fails when it is gone: `transact::addCallback` /
+`removeCallback` (`type` is a Rust keyword; the view says `type_`), and
+the four C++ reflections of 6.22 (`packages::setSchema` / `getSchema`,
+`x-admin::isAdmin`, `x-packages::serveSys`). Not in it: `brotli-svc`,
+`chainmail`, `subgroups` (their C++ headers are not on the test target's
+include path), services without a C++ header, type names, and the Rust
+view against the Rust implementation directly (the script of 6.22 does
+that; a test would have to live in each service crate).
+
+**String kinds** (raw or UTF-8, D35 decided by the owner: fix the
+declarations, per the audit `~/psibase-pssz-audit/v2`). The C++ members
+and parameters that gain `attr(m, utf8)` (84) were sent to the C++ side
+(`~/psibase-pssz-build.cpp-utf8-members.tsv`). The Rust members that
+become `psio::pssz::RawString` — `HttpHeader::value`,
+`HttpRequest::target`, `LocalEndpoint::path`, `EnvRow::name` / `value`,
+`ActionTrace::error`, `TransactionTrace::error`, `ConsoleTrace::console`,
+`WsTicketInfo::path`, `SitesContentRow::path`, the `path` parameter of
+eight `sites` actions, `r-events::sqlQuery` `params` — can only change
+with the wire flip: `RawString` has no legacy codec.
+
+**What is left before and in the Rust wire flip (R7), not done here.**
+
+1. The service macro: `psio = true` as the only mode (the argument
+   records, events as interfaces, dispatch with `psio::from_pssz`, callers
+   with `psio::to_pssz`), and `service_tables` on `psio::Key`. With every
+   type declared, what still blocks "all parameter types qualify" is
+   `JsonText` (the PSIO interface asks it of every parameter, and the
+   derive pass added the binary and schema derives only) and result types
+   written `super::Record`.
+2. The runtime of `rust/psibase`: `Pack` / `UnpackOwned` bounds in
+   `service.rs`, `native.rs`, `table.rs`, `tester.rs`, `db.rs`
+   (41 bounds), 198 `.packed()` and 62 `unpacked(` call sites, `Nested`,
+   the three borrowing records.
+3. The schema path: `psibase::Schema` (legacy) → the `ServiceSchema`
+   record over PSIO's Schema IR that the C++ side defines
+   (`~/psibase-flip-cpp/doc/flip-interop.md`, section 2), in `schema.rs`,
+   `trace.rs`, `package.rs`, `cargo-psibase`, the tester's schema fetcher.
+   This is a contract with the C++ flip and was "proposed" there when read.
+4. The remaining refused types above (serde attributes; `TrustLevel`),
+   `String` → `RawString` for the members listed, the Rust CLI's
+   `LocalPackage::exports`.
+5. Deleting `rust/fracpack`, the legacy derives, `rust/test_fracpack*`,
+   and `rust/fracpack/src/psio_time.rs` with them.
+
 ### 6.21 What was checked after each of these steps
 
 Each row: full build exit 0, full `ctest -j4`, the generated

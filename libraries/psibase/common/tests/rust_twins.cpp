@@ -20,10 +20,34 @@
 #include <psibase/block.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
+#include <services/local/XAdmin.hpp>
+#include <services/local/XDb.hpp>
+#include <services/local/XHttp.hpp>
+#include <services/local/XKeys.hpp>
+#include <services/local/XPackages.hpp>
+#include <services/local/XSites.hpp>
+#include <services/system/Accounts.hpp>
+#include <services/system/AuthAny.hpp>
 #include <services/system/AuthDelegate.hpp>
+#include <services/system/AuthNone.hpp>
+#include <services/system/AuthSig.hpp>
+#include <services/system/CpuLimit.hpp>
+#include <services/system/Credentials.hpp>
+#include <services/system/Db.hpp>
+#include <services/system/HttpServer.hpp>
+#include <services/system/Producers.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/StagedTx.hpp>
+#include <services/system/Transact.hpp>
+#include <services/system/VerifySig.hpp>
+#include <services/system/VirtualServer.hpp>
+#include <services/system/WsAuth.hpp>
+#include <services/user/DynLd.hpp>
+#include <services/user/Nft.hpp>
 #include <services/user/Packages.hpp>
+#include <services/user/Sites.hpp>
+#include <services/user/Symbol.hpp>
+#include <services/user/Tokens.hpp>
 #include <services/user/tokenTypes.hpp>
 
 #include <psio/emit_pssz.hpp>
@@ -93,6 +117,37 @@ namespace
       psio::SchemaBuilder builder;
       std::string         vectors;
       std::string         calls;
+      std::string         names;
+
+      // The methods of a service with the names of their parameters, as
+      // `PSIO_REFLECT(Service, method(name, params...))` states them: the
+      // names of an action's arguments in JSON.
+      template <typename Service>
+      void interfaceNames(std::string_view account)
+      {
+         using R = psio::reflect<Service>;
+         std::string methods;
+         R::for_each_method(
+             [&](auto index, std::string_view name)
+             {
+                constexpr std::size_t I = decltype(index)::value;
+                if (!methods.empty())
+                   methods += ",";
+                methods += jsonString(name) + ":[";
+                bool first = true;
+                for (std::string_view param : R::template method_param_names<I>)
+                {
+                   if (!first)
+                      methods += ",";
+                   first = false;
+                   methods += jsonString(param);
+                }
+                methods += "]";
+             });
+         if (!names.empty())
+            names += ",\n";
+         names += "{\"service\":" + jsonString(account) + ",\"methods\":{" + methods + "}}";
+      }
 
       // The arguments of a call of `Method`, as psibase packs them: the
       // tuple of the method's parameter types.
@@ -125,7 +180,8 @@ namespace
       std::string text() &&
       {
          return "{\n\"schema_ir\":" + jsonString(hex(psio::emit_pssz(std::move(builder).build()))) +
-                ",\n\"vectors\":[\n" + vectors + "\n],\n\"calls\":[\n" + calls + "\n]\n}\n";
+                ",\n\"vectors\":[\n" + vectors + "\n],\n\"calls\":[\n" + calls +
+                "\n],\n\"names\":[\n" + names + "\n]\n}\n";
       }
    };
 
@@ -297,6 +353,43 @@ namespace
                                         NewAccountMode::requireNew);
       f.call<&AuthDelegate::getOwner>("auth-delg", "getOwner", alice);
       f.call<&AuthDelegate::checkOwner>("auth-delg", "checkOwner", alice);
+
+      // Every service that has a Rust view: its methods and their parameter
+      // names. The first group is implemented in C++ (C++ is the authority
+      // and the Rust view mirrors it); the second is implemented in Rust and
+      // mirrored by a C++ header (the Rust view is checked against the
+      // header, which was renamed to the Rust service's names). Not here:
+      // brotli-svc, chainmail and subgroups, whose C++ headers are not on
+      // this target's include path.
+      f.interfaceNames<SystemService::Accounts>("accounts");
+      f.interfaceNames<SystemService::AuthAny>("auth-any");
+      f.interfaceNames<SystemService::AuthDelegate>("auth-delg");
+      f.interfaceNames<SystemService::AuthNone>("auth-none");
+      f.interfaceNames<SystemService::AuthSig::AuthSig>("auth-sig");
+      f.interfaceNames<SystemService::CpuLimit>("cpu-limit");
+      f.interfaceNames<SystemService::Db>("db");
+      f.interfaceNames<UserService::DynLd>("dyn-ld");
+      f.interfaceNames<SystemService::HttpServer>("http");
+      f.interfaceNames<UserService::Packages>("packages");
+      f.interfaceNames<SystemService::Producers>("producers");
+      f.interfaceNames<SystemService::SetCode>("setcode");
+      f.interfaceNames<SystemService::Sites>("sites");
+      f.interfaceNames<SystemService::Transact>("transact");
+      f.interfaceNames<SystemService::VerifySig>("verify-sig");
+      f.interfaceNames<LocalService::XAdmin>("x-admin");
+      f.interfaceNames<LocalService::XDb>("x-db");
+      f.interfaceNames<LocalService::XHttp>("x-http");
+      f.interfaceNames<LocalService::XKeys>("x-keys");
+      f.interfaceNames<LocalService::XPackages>("x-packages");
+      f.interfaceNames<LocalService::XSites>("x-sites");
+
+      f.interfaceNames<SystemService::Credentials>("credential");
+      f.interfaceNames<UserService::Nft>("nft");
+      f.interfaceNames<SystemService::StagedTxService>("staged-tx");
+      f.interfaceNames<UserService::Symbol>("symbol");
+      f.interfaceNames<UserService::Tokens>("tokens");
+      f.interfaceNames<SystemService::VirtualServer>("vserver");
+      f.interfaceNames<SystemService::WsAuth>("wsauth");
 
       return std::move(f).text();
    }

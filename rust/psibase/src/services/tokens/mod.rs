@@ -94,6 +94,8 @@ pub struct Holder {
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SharedBalance {
+    /// The row's id (the primary key of the tokens service's table).
+    pub shared_bal_id: u64,
     pub creditor: AccountNumber,
     pub debitor: AccountNumber,
     pub token_id: TID,

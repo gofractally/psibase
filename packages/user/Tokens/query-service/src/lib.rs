@@ -439,9 +439,10 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    #[allow(unused_variables)]
     fn serveSys(
         request: HttpRequest,
-        _socket: Option<i32>,
+        socket: Option<i32>,
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         assert_eq!(

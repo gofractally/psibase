@@ -91,10 +91,11 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    #[allow(unused_variables)]
     fn serveSys(
         request: HttpRequest,
-        _socket: Option<i32>,
-        _user: Option<AccountNumber>,
+        socket: Option<i32>,
+        user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         None.or_else(|| serve_graphql(&request, Query))
     }

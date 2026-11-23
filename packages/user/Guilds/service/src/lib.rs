@@ -364,7 +364,8 @@ pub mod service {
     /// * `evaluation_id` - The ID of the evaluation.
     /// * `account` - The account number of the unregistering user.
     #[action]
-    fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {}
+    #[allow(unused_variables)]
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {}
 
     fn check_is_sender(account: AccountNumber) {
         assert_eq!(get_sender(), account, "sender must be {}", account);
@@ -378,10 +379,11 @@ pub mod service {
     /// * `user` - The account number of the user submitting the attestation.
     /// * `attestation` - The attestation data.
     #[action]
+    #[allow(unused_variables)]
     fn on_attest(
         evaluation_id: u32,
         group_number: u32,
-        _user: AccountNumber,
+        user: AccountNumber,
         attestation: Vec<u8>,
     ) {
         check_is_sender(psibase::services::evaluations::SERVICE);

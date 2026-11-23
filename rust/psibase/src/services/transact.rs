@@ -193,7 +193,7 @@ mod service {
 
     /// Called by RTransact to execute a transaction speculatively
     #[action]
-    fn execTrx(trx: Nested<Transaction>, speculative: bool) {
+    fn execTrx(transaction: Nested<Transaction>, speculative: bool) {
         unimplemented!()
     }
 
@@ -243,12 +243,12 @@ mod service {
     ///
     /// The order in which callbacks are executed is unspecified.
     #[action]
-    fn addCallback(type_: CallbackType, objective: bool, act: Action) {
+    fn addCallback(type_: CallbackType, objective: bool, action: Action) {
         unimplemented!()
     }
     /// Removes an existing callback
     #[action]
-    fn removeCallback(type_: CallbackType, objective: bool, act: Action) {
+    fn removeCallback(type_: CallbackType, objective: bool, action: Action) {
         unimplemented!()
     }
 

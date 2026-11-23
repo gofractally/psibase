@@ -38,8 +38,9 @@ pub mod service {
     }
 
     #[action]
+    #[allow(unused_variables)]
     fn checkAuthSys(
-        _flags: u32,
+        flags: u32,
         sender: AccountNumber,
         action: ServiceMethod,
         claims: Vec<Claim>,
@@ -89,7 +90,8 @@ pub mod service {
     }
 
     #[action]
-    fn getDlgsSys(_sender: AccountNumber) -> Vec<AccountNumber> {
+    #[allow(unused_variables)]
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
         Vec::new()
     }
 

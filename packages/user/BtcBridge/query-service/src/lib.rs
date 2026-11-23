@@ -31,10 +31,11 @@ pub mod service {
         })
     }
     #[action]
+    #[allow(unused_variables)]
     fn serveSys(
         request: HttpRequest,
-        _socket: Option<i32>,
-        _user: Option<AccountNumber>,
+        socket: Option<i32>,
+        user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         assert_eq!(
             get_sender(),

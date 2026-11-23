@@ -70,12 +70,12 @@ mod service {
     }
 
     #[action]
-    fn exists(num: AccountNumber) -> bool {
+    fn exists(name: AccountNumber) -> bool {
         unimplemented!()
     }
 
     #[action]
-    fn getAccount(num: AccountNumber) -> Option<super::Account> {
+    fn getAccount(name: AccountNumber) -> Option<super::Account> {
         unimplemented!()
     }
 
@@ -85,7 +85,7 @@ mod service {
     }
 
     #[action]
-    fn incAuthSeq(num: AccountNumber) {
+    fn incAuthSeq(name: AccountNumber) {
         unimplemented!()
     }
 

@@ -101,19 +101,22 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn getDlgsSys(_sender: AccountNumber) -> Vec<AccountNumber> {
+    #[allow(unused_variables)]
+    fn getDlgsSys(sender: AccountNumber) -> Vec<AccountNumber> {
         Vec::new()
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn isAuthSys(_sender: AccountNumber, _authorizers: Vec<AccountNumber>) -> bool {
+    #[allow(unused_variables)]
+    fn isAuthSys(sender: AccountNumber, authorizers: Vec<AccountNumber>) -> bool {
         abort_message("isAuthSys not supported");
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn isRejectSys(_sender: AccountNumber, _rejecters: Vec<AccountNumber>) -> bool {
+    #[allow(unused_variables)]
+    fn isRejectSys(sender: AccountNumber, rejecters: Vec<AccountNumber>) -> bool {
         abort_message("isRejectSys not supported");
     }
 

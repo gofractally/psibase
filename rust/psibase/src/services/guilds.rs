@@ -341,7 +341,7 @@ pub mod Service {
     /// * `evaluation_id` - The ID of the evaluation.
     /// * `account` - The account number of the unregistering user.
     #[action]
-    fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {}
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {}
 
     /// Called when a user submits an attestation for decrypted proposals in a fractal evaluation.
     ///
@@ -354,7 +354,7 @@ pub mod Service {
     fn on_attest(
         evaluation_id: u32,
         group_number: u32,
-        _user: AccountNumber,
+        user: AccountNumber,
         attestation: Vec<u8>,
     ) {
         unimplemented!()

@@ -39,12 +39,12 @@ mod service {
     }
 
     #[action]
-    fn setConsensus(prods: ConsensusData) {
+    fn setConsensus(consensus: ConsensusData) {
         unimplemented!();
     }
 
     #[action]
-    fn setProducers(prods: Vec<Producer>) {
+    fn setProducers(producers: Vec<Producer>) {
         unimplemented!();
     }
 
@@ -69,7 +69,7 @@ mod service {
     }
 
     #[action]
-    fn setMaxProds(max_prods: u8) {
+    fn setMaxProds(maxProds: u8) {
         unimplemented!()
     }
 

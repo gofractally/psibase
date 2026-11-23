@@ -111,7 +111,7 @@ impl ProducersPlugin {
 
     fn set_consensus_internal(consensus_data: psibase::ConsensusData) -> Result<(), Error> {
         let set_consensus = Actions::setConsensus {
-            prods: consensus_data,
+            consensus: consensus_data,
         };
 
         add_action_to_transaction(Actions::setConsensus::ACTION_NAME, &set_consensus.packed())
@@ -138,7 +138,7 @@ impl Api for ProducersPlugin {
         add_action_to_transaction(
             Actions::setProducers::ACTION_NAME,
             &Actions::setProducers {
-                prods: Self::lookup_candidates(&prods)?,
+                producers: Self::lookup_candidates(&prods)?,
             }
             .packed(),
         )
@@ -182,7 +182,7 @@ impl Api for ProducersPlugin {
         assert!(Client::get_sender() == "config");
         add_action_to_transaction(
             Actions::setMaxProds::ACTION_NAME,
-            &Actions::setMaxProds { max_prods }.packed(),
+            &Actions::setMaxProds { maxProds: max_prods }.packed(),
         )
     }
 }

@@ -2,7 +2,7 @@
 #[allow(non_snake_case, unused_variables)]
 mod service {
     #[action]
-    fn setCpuLimit(limit: Option<u64>) {
+    fn setCpuLimit(limit_ns: Option<u64>) {
         unimplemented!()
     }
 

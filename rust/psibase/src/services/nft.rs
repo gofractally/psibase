@@ -99,12 +99,12 @@ mod service {
     }
 
     #[action]
-    fn credit(nftId: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
+    fn credit(nft_id: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
         unimplemented!()
     }
 
     #[action]
-    fn transfer(nftId: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
+    fn transfer(nft_id: crate::services::nft::NID, debitor: AccountNumber, memo: Memo) {
         unimplemented!()
     }
 

@@ -68,7 +68,7 @@ mod service {
     /// socket must be the sender. If local is false, then the
     /// reply is expected to come through http-server.
     #[action]
-    fn giveSocket(socket: i32, account: AccountNumber, local: bool) {
+    fn giveSocket(socket: i32, service: AccountNumber, local: bool) {
         unimplemented!()
     }
 
@@ -128,7 +128,7 @@ mod service {
     }
 
     #[action]
-    fn serveSys(req: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
+    fn serveSys(request: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
         unimplemented!()
     }
 

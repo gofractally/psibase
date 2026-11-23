@@ -609,3 +609,113 @@ fn rust_and_cpp_declare_the_same_services() {
         (alice, 1u64).packed()
     );
 }
+
+// ── Parameter names ─────────────────────────────────────────────────────────
+
+/// The actions of a Rust view with the names of their parameters, from the
+/// schema the service macro generates for it.
+fn view_names<W: psibase::ToServiceSchema>() -> std::collections::BTreeMap<String, Vec<String>> {
+    use psibase::fracpack::AnyType as T;
+    let schema = W::schema();
+    let mut out = std::collections::BTreeMap::new();
+    for (name, function) in &schema.actions {
+        let mut params = &function.params;
+        while let T::Type(reference) = params {
+            params = schema.types.get(reference).expect("a known type");
+        }
+        let names = match params {
+            T::Object(members) | T::Struct(members) => members.keys().cloned().collect(),
+            T::Tuple(members) if members.is_empty() => Vec::new(),
+            other => panic!("{}: unexpected parameter node {other:?}", name.0),
+        };
+        out.insert(name.0.clone(), names);
+    }
+    out
+}
+
+/// A parameter of an action has one name in both languages: it is the name
+/// of the argument in JSON. The authority is the implementation (C++ for
+/// the first group of the fixture, the Rust service for the second, whose
+/// C++ header carries the Rust names); the views in `psibase::services` are
+/// mirrors. The differences that remain are listed here, each with its
+/// reason; anything else fails.
+#[test]
+fn rust_views_name_parameters_as_the_implementation_does() {
+    use psibase::services::*;
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../libraries/psibase/common/tests/rust-twins.json"
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+
+    // (service, method) -> why the names differ.
+    let known: std::collections::BTreeMap<(&str, &str), &str> = [
+        // `type` is a Rust keyword; the view says `type_`.
+        (("transact", "addCallback"), "keyword"),
+        (("transact", "removeCallback"), "keyword"),
+        // The C++ reflection misnames or does not name a parameter
+        // (doc/pssz-conversion.md 6.22); the view has the declared name.
+        (("packages", "setSchema"), "C++ reflection"),
+        (("packages", "getSchema"), "C++ reflection"),
+        (("x-admin", "isAdmin"), "C++ reflection"),
+        (("x-packages", "serveSys"), "C++ reflection"),
+    ]
+    .into_iter()
+    .collect();
+
+    let mut views: std::collections::BTreeMap<&str, std::collections::BTreeMap<String, Vec<String>>> =
+        Default::default();
+    macro_rules! view {
+        ($($account:literal => $module:ident),* $(,)?) => {
+            $(views.insert($account, view_names::<$module::Wrapper>());)*
+        };
+    }
+    view! {
+        "accounts" => accounts, "auth-any" => auth_any, "auth-delg" => auth_delegate,
+        "auth-none" => auth_none, "auth-sig" => auth_sig, "cpu-limit" => cpu_limit, "db" => db,
+        "dyn-ld" => dyn_ld, "http" => http_server, "packages" => packages,
+        "producers" => producers, "setcode" => setcode, "sites" => sites, "transact" => transact,
+        "verify-sig" => verify_sig, "x-admin" => x_admin, "x-db" => x_db, "x-http" => x_http,
+        "x-keys" => x_keys, "x-packages" => x_packages, "x-sites" => x_sites,
+        "credential" => credentials, "nft" => nft, "staged-tx" => staged_tx, "symbol" => symbol,
+        "tokens" => tokens, "vserver" => virtual_server, "wsauth" => ws_auth,
+    }
+
+    let mut problems = Vec::new();
+    let mut seen_known = BTreeSet::new();
+    let mut compared = 0;
+    for service in json["names"].as_array().unwrap() {
+        let account = service["service"].as_str().unwrap();
+        let view = views
+            .get(account)
+            .unwrap_or_else(|| panic!("{account} has no view in this test"));
+        let methods = service["methods"].as_object().unwrap();
+        for (method, params) in methods {
+            let theirs: Vec<String> = params
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|p| p.as_str().unwrap().to_string())
+                .collect();
+            let Some(ours) = view.get(method) else { continue };
+            compared += 1;
+            if *ours != theirs {
+                if known.contains_key(&(account, method.as_str())) {
+                    seen_known.insert((account, method.clone()));
+                } else {
+                    problems.push(format!("{account}::{method}: view {ours:?}, C++ {theirs:?}"));
+                }
+            }
+        }
+        for method in view.keys() {
+            if !methods.contains_key(method) {
+                problems.push(format!("{account}::{method}: in the view, not in C++"));
+            }
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+    assert_eq!(seen_known.len(), known.len(), "a listed difference is gone: {seen_known:?}");
+    assert_eq!(json["names"].as_array().unwrap().len(), views.len());
+    assert!(compared >= 265, "{compared} methods compared");
+}
