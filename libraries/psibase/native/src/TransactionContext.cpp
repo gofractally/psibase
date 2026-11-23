@@ -670,7 +670,7 @@ namespace psibase
       return impl->wasmConfig.vmOptions;
    }
 
-   void TransactionContext::setWatchdog(CpuClock::duration watchdogLimit)
+   void TransactionContext::setWatchdog(RunClock::duration watchdogLimit)
    {
       impl->watchdog->setLimit(watchdogLimit);
    }  // TransactionContext::setWatchdog

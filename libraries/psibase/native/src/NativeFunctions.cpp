@@ -590,7 +590,7 @@ namespace psibase
       // wasm and does not affect consensus and there's no way a transaction can
       // run for 300 years.
       if (transactionContext.blockContext.isProducing)
-         transactionContext.setWatchdog(saturatingCast<CpuClock::duration>(
+         transactionContext.setWatchdog(saturatingCast<RunClock::duration>(
              std::chrono::duration<std::uint64_t, std::nano>(nanoseconds)));
    }
 

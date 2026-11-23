@@ -82,7 +82,7 @@ namespace psibase
       // This may be called multiple times with different limits; the most-recent limit applies.
       /// The VM limits this context executes services under.
       const VMOptions& vmOptions() const;
-      void setWatchdog(CpuClock::duration watchdogLimit);
+      void setWatchdog(RunClock::duration watchdogLimit);
 
       const WasmConfigRow& getWasmConfig() const;
 

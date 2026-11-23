@@ -1,7 +1,5 @@
 #pragma once
 #include <atomic>
-#include <pthread.h>
-#include <time.h>
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
@@ -11,7 +9,6 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <psibase/NativeThreadClock.hpp>
 #include <stdexcept>
 #include <system_error>
 #include <utility>
@@ -19,76 +16,6 @@
 
 namespace psibase::accounting
 {
-   // Cumulative per-caller logical CPU supplement. Request scopes never reset
-   // it. A live owner-job sample and its completed debt are exchanged under
-   // one mutex, so logical time remains monotonic across every transition.
-   class Counter
-   {
-      struct Active
-      {
-         std::shared_ptr<NativeThreadClock> clock;
-         Duration                           start;
-      };
-      std::mutex                                           mutex;
-      Duration                                             completed{};
-      std::optional<Active>                                active;
-      std::vector<std::pair<void*, std::function<void()>>> listeners;
-      void                                                 notify()
-      {
-         for (auto& entry : listeners)
-            entry.second();
-      }
-
-     public:
-      Duration sample()
-      {
-         std::lock_guard lock(mutex);
-         return completed + (active ? active->clock->read() - active->start : Duration{});
-      }
-      void begin()
-      {
-         auto            clock = currentThreadClock();
-         const auto      start = clock->read();
-         std::lock_guard lock(mutex);
-         if (active)
-            throw std::logic_error("overlapping owner jobs for one synchronous caller");
-         active = Active{std::move(clock), start};
-         notify();
-      }
-      void end()
-      {
-         std::lock_guard lock(mutex);
-         if (!active)
-            std::terminate();
-         completed += active->clock->read() - active->start;
-         active.reset();
-         notify();
-      }
-      void subscribe(void* id, std::function<void()> function)
-      {
-         std::lock_guard lock(mutex);
-         listeners.emplace_back(id, std::move(function));
-      }
-      void unsubscribe(void* id)
-      {
-         std::lock_guard lock(mutex);
-         std::erase_if(listeners, [&](auto& entry) { return entry.first == id; });
-      }
-   };
-   inline std::shared_ptr<Counter> threadCounter()
-   {
-      thread_local auto counter = std::make_shared<Counter>();
-      return counter;
-   }
-   class ActiveJob
-   {
-      std::shared_ptr<Counter> counter;
-
-     public:
-      explicit ActiveJob(std::shared_ptr<Counter> c) : counter(std::move(c)) { counter->begin(); }
-      ~ActiveJob() { counter->end(); }
-   };
-
    class Cancelled : public std::runtime_error
    {
      public:

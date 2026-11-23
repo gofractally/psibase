@@ -1,98 +1,108 @@
 #pragma once
 
-#include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <functional>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <psibase/CpuAccounting.hpp>
 #include <thread>
 #include <vector>
 
-#include <time.h>
-#ifdef __APPLE__
-#include <psibase/DarwinWatchdogWake.hpp>
-#endif
-
 namespace psibase
 {
-
-   struct CpuClock
+   // The one clock execution is measured with: elapsed time on the monotonic
+   // clock. An action's trace time, a transaction's limit and what it is
+   // billed all read it, so the three are comparable. Time a transaction
+   // spends blocked or descheduled is part of what it cost. Reading it is not
+   // a system call.
+   struct RunClock
    {
       using rep                       = std::int64_t;
       using period                    = std::ratio<1, 1000000000>;
       using duration                  = std::chrono::duration<rep, period>;
-      using time_point                = std::chrono::time_point<CpuClock>;
-      static constexpr bool is_steady = false;
-      static time_point     now();                 // logical caller CPU, including live owner jobs
-      static time_point     now(clockid_t clock);  // raw explicit host clock
+      using time_point                = std::chrono::time_point<RunClock>;
+      static constexpr bool is_steady = true;
+      static time_point     now()
+      {
+         return time_point(std::chrono::duration_cast<duration>(
+             std::chrono::steady_clock::now().time_since_epoch()));
+      }
    };
 
    class Watchdog;
 
+   // One thread that cancels whichever watchdog's deadline has passed. The
+   // threads being watched never evaluate their own limits.
    class WatchdogManager
    {
      public:
       WatchdogManager();
       ~WatchdogManager();
 
+      // The worker looks at the deadlines at least this often. A deadline
+      // further away than this never needs the worker to be woken, so starting
+      // a transaction with an ordinary limit costs no system call.
+      static constexpr RunClock::duration idlePeriod = std::chrono::milliseconds(20);
+
      private:
       friend class Watchdog;
-      void       add(Watchdog* wd);
-      void       remove(Watchdog* wd);
-      void       run();
-      std::mutex mutex;
-#ifdef __APPLE__
-      DarwinWatchdogWake cond;
-#else
+      void add(Watchdog* wd);
+      void remove(Watchdog* wd);
+      void run();
+      // Called with mutex held when a watchdog's deadline is set or moved.
+      // Wakes the worker only if the deadline is before its next look.
+      void deadlineChanged(const std::optional<RunClock::time_point>& deadline);
+
+      std::mutex              mutex;
       std::condition_variable cond;
-#endif
-      std::vector<Watchdog*> children;
-      bool                   done = false;
-      // When the worker will next look at the budgets if nothing wakes it.
-      // Guarded by mutex.
-      // The epoch, which is always past, while the worker is awake or due.
-      std::chrono::steady_clock::time_point nextCheck{};
-      // Wakes the worker only if a budget with `remaining` left could run out
-      // before nextCheck. Called with mutex held.
-      void checkWithin(CpuClock::duration remaining);
-      std::thread            worker;
+      std::vector<Watchdog*>  children;
+      bool                    done = false;
+      // When the worker will next look at the deadlines if nothing wakes it.
+      // Guarded by mutex; the worker holds the mutex whenever it is awake.
+      RunClock::time_point nextLook{};
+      std::thread          worker;
    };
 
+   // Measures a run and cancels it at a limit.
+   //
+   //    deadline = (when it last started running) + limit - (time run before that)
+   //
+   // The deadline is recomputed under the manager's mutex whenever the limit
+   // changes or the run is resumed. A limit can be raised while the run is in
+   // progress, for example by funding resources just in time: a raise that
+   // returns before the worker has cancelled is honoured, and the worker never
+   // cancels on a limit that is no longer current. A raise after the cancel
+   // changes nothing; the budget had already run out.
    class Watchdog
    {
      public:
       Watchdog(WatchdogManager& m, std::function<void()> f);
       ~Watchdog();
-      void               setLimit(CpuClock::duration dur);
+      void               setLimit(RunClock::duration dur);
+      // Time between pause() and resume() is not measured.
       void               pause();
       void               resume();
-      CpuClock::duration elapsed();
+      RunClock::duration elapsed();
       void               interrupt();
       accounting::Scope  accountingScope() { return accounting::Scope(request); }
 
      private:
       friend class WatchdogManager;
-      // Called with manager mutex held
-      CpuClock::duration wait_duration();
-      CpuClock::duration remaining() const;
-      CpuClock::duration logicalNow() const;
-      void               publishBudget();
-      struct Budget
-      {
-         bool               paused;
-         CpuClock::duration elapsedOrStart;
-         CpuClock::duration limit;
-      };
-      WatchdogManager*                               manager;
-      std::shared_ptr<accounting::Counter>           extraCpu;
-      std::shared_ptr<accounting::NativeThreadClock> cpuclock;
-      std::shared_ptr<accounting::Request>           request;
-      std::shared_ptr<const Budget> publishedBudget;  // atomic_load/store for libc++ compatibility
-      bool                          paused;
-      CpuClock::duration            elapsedOrStart;
-      CpuClock::duration            limit = CpuClock::duration::max();
-      std::function<void()>         handler;
+      // Both called with the manager's mutex held.
+      std::optional<RunClock::time_point> deadline() const;
+      RunClock::duration                  elapsedAt(RunClock::time_point now) const;
+
+      WatchdogManager*                     manager;
+      std::shared_ptr<accounting::Request> request;
+      // Guarded by the manager's mutex.
+      bool                  paused = false;
+      RunClock::duration    accumulated{0};
+      RunClock::time_point  runningSince;
+      RunClock::duration    limit = RunClock::duration::max();
+      std::function<void()> handler;
    };
 
 }  // namespace psibase
