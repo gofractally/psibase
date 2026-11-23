@@ -21,7 +21,7 @@ The defaults are immutable Git revisions:
 | Name | Revision | Acquisition boundary |
 | --- | --- | --- |
 | psio | `66abb1b50a96d1eeef33c61504ae67d509b868e1` | Maintained upstream CMake target |
-| psitri | `94fa32878b1cd71765323aebd7665e196b870b73` | Sources only |
+| psitri | `d3bba0e6a5f59e37c3eea08a1a720ae553cafb2c` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
 | psizam | `2e93ecd1561ed7d4808a1a83af1d0137bac17b41` | Sources only |
 
