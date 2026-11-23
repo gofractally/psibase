@@ -5198,9 +5198,9 @@ Decision per use:
 | return values (`test_subjective.py`) | `psio.from_pssz(psio.u32, bytes)` |
 | `py_test_psibase_types` | pins the PSSZ of an action and a transaction, reads the two transactions of `rust-twins.json` (bytes, id, text), and packs arguments by name, by position and with names as text over a hand-written service schema |
 
-`name.py` keeps a method coder of its own beside the account coder (it has
-its own test, `py_test_name`); the harness uses PSIO's. For the team: drop
-the duplicate.
+`name.py` is the account coder only (7.8): the method coder it kept beside
+PSIO's is gone, and `py_test_name` checks its method vectors against
+`psio.method_to_number` / `psio.number_to_method`.
 
 ### 7.5 End to end, by hand (checklist step 9)
 
@@ -5377,3 +5377,52 @@ sources outside the build, left as the head has them: `gen/gen.cpp` and
 `diff/gen_cases.cpp` pack with `psio::to_frac` and the build scripts name
 `libraries/psio`, so they describe the tree before the flip and do not
 build against this one); front ends and plugins, as in 7.6.
+
+**Cleanups after the merge** (each its own commit; then a full build,
+`build-head2-3.log`, and `ctest -j4`, `ctest-head2-2.log`: exit 0 and **88 / 88** again).
+
+1. Wording (`828cb7145`): comments and short pages that said "fracpack"
+   for what is PSSZ now — `Table.hpp`, `api.hpp`, `BlockContext.cpp`,
+   `TransactionContext.cpp`, `StagedTx/service/src/db.rs`, the two comments
+   of `Transact/plugin/transact/wit/world.wit`, `Explorer/ui/src/lib/types.ts`,
+   `rust/psibase/src/{native_raw,tester_raw,serve_http,from_bin,to_bin}.rs`,
+   the macro crates' READMEs and `psibase-macros-derive/src/lib.rs`,
+   `rust/.config/hakari.toml`, and the message of Transact's 415 reply
+   ("Expected PSSZ encoded signed transaction"; no test pins it). Exchange:
+   "Fracpack deliberately has no primitive u128" was the reason given for
+   storing `Wide` as two `u64` limbs; PSSZ has a `u128`, so the comment and
+   the README now state only the layout, and `test_math.py` /
+   `test_stops.py`, which locate that comment by its text, follow (5 and 25
+   tests pass). Doc pages updated: `default-apps/common-api.md`,
+   `transact.md`, `x-admin/http-endpoints.md` (push_boot),
+   `specifications/blockchain/entry-points.md`.
+2. `name.py` (`ed11f71b9`), as above; `py_test_name` gets the PSIO
+   `PYTHONPATH` in CMake.
+3. `doc/team-review.md` is the coordinator's copy (`943610c47`).
+
+Names that still say fracpack, not renamed (a rename is a public change):
+
+| Name | Where | Users | Recommendation |
+|---|---|---|---|
+| `psibase::fraccall` | `Actor.hpp` (3 overloads) | `Actor.hpp` itself (4 calls); no service calls it by name | rename with the next C++ API change (`pssz_call` or simply `call`) |
+| `FracPackBody<T>` | `tester.hpp` | `tester.cpp` (1), `Transact-test.cpp` (14), `test_subjective.cpp` (2), `XKeys-test.cpp` (1) | rename to `PsszBody`: tests only, mechanical |
+| `FracpackHttpReply<T>` | `Rpc.hpp` | none | delete, or `PsszHttpReply` |
+| `publicKeyPairToFracpack`, `signatureToFracpack` | `common-lib/src/key-conversions.ts` (exported), documented in `js-libraries.md` | none in the tree | delete with their two rows of the page: they write the legacy bytes of a key and a signature variant, which nothing accepts (a claim is the DER of a SubjectPublicKeyInfo, a proof the 64 bytes) |
+| `block.frac` | `VmConsensusReplay.{hpp,cpp}` (a file name in a replay directory) | the engine tests | the engine sessions' to rename; the bytes are PSSZ |
+| `"FracPack"` schema type | `doc/src/specifications/data-formats/schema.md` | the page only | goes with the page |
+
+Pages and files left as they are: `doc/src/specifications/data-formats/fracpack.md`
+(the format's specification: replace by a pointer to PSIO's `pssz-spec.md`,
+or keep as history) and its entry in `SUMMARY.md`; `schema.md` (describes
+the legacy schema JSON; the Schema IR is PSIO's `docs/`); `js-libraries.md`
+(the two functions above); `rust-service/tables.md` (its last paragraph
+says a one-field tuple struct is its member in "Fracpack, serde_json and
+schema": not checked against PSIO's derives); `Favor/README.md` (a history
+note about a fix in the deleted crate); `docs/exchange/SECURITY.md`,
+`experiments/stop-cascade/SECURITY_REVIEW.md`, the JSON records under
+`doc/migration`, `doc/runtime`, `doc/storage`, `tests/timing/runs`
+(records of past runs); `doc/review-tour.md`, `doc/verify-sig/` (the
+head's); `demo/token-metadata-host/Cargo.lock` (names the `fracpack` crate:
+the demo is outside every workspace and was not built);
+`rust/cargo-psibase/test-data/simple.wasm` (a module built against the
+old crate, used by the linker's tests in `link.rs` as input; not rebuilt).
