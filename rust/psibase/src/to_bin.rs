@@ -6,7 +6,7 @@ struct Serializer {
     data: Vec<u8>,
 }
 
-/// [crate::from_bin()] and [crate::to_bin()] are incomplete. They'll disappear when switch to fracpack is complete.
+/// [crate::from_bin()] and [crate::to_bin()] are incomplete. They are a serde reader and writer of their own, not PSSZ; nothing in the tree calls them.
 pub fn to_bin<T: Serialize>(v: &T) -> Vec<u8> {
     v.serialize(Serializer { data: Vec::new() }).unwrap().data
 }

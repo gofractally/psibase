@@ -179,12 +179,12 @@ namespace psibase
       ///
       /// Handles cannot be exported across a boundary that changes the run mode.
       ///
-      /// `handles` must contain a fracpacked `vector<KvHandle>`.
+      /// `handles` must contain a PSSZ-packed `vector<KvHandle>`.
       PSIBASE_NATIVE(exportHandles) void exportHandles(const char* handles, uint32_t len);
 
       /// Loads handles from the caller or the last callee.
       ///
-      /// The result is a fracpacked `vector<KvHandle>`. Handles are
+      /// The result is a PSSZ-packed `vector<KvHandle>`. Handles are
       /// scoped to a single service, and their representation in this
       /// service is not the same as the representation in the service
       /// that provided them.

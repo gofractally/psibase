@@ -30,7 +30,7 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 
 ### Pack transaction
 
-`POST /common/pack/Transaction` and `POST /common/pack/SignedTransaction` use [fracpack](../specifications/data-formats/fracpack.md) to convert unsigned and signed transactions to binary. They accept JSON as input and return the binary data.
+`POST /common/pack/Transaction` and `POST /common/pack/SignedTransaction` use [PSSZ](https://github.com/gofractally/psio/blob/main/docs/pssz-spec.md) to convert unsigned and signed transactions to binary. They accept JSON as input and return the binary data.
 
 `Transaction` has these fields:
 ```json
@@ -73,7 +73,7 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
                         // the claim, e.g. "verify-sig"
   "rawData": "..."      // Hex string containing the claim data.
                         // e.g. `verify-sig` expects a public key
-                        // in fracpack format.
+                        // (the DER bytes of a SubjectPublicKeyInfo).
 }
 ```
 

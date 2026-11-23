@@ -4,7 +4,7 @@
 
 ### Push transaction
 
-`POST /push_transaction` pushes a transaction. The user must pack the transaction using fracpack and pass in the binary as the request body. The `Content-Type` of the request body should be `application/octet-stream`.
+`POST /push_transaction` pushes a transaction. The user must pack the transaction as [PSSZ](https://github.com/gofractally/psio/blob/main/docs/pssz-spec.md) and pass in the binary as the request body. The `Content-Type` of the request body should be `application/octet-stream`.
 
 #### Http response timing
 
@@ -16,7 +16,7 @@ The `/push_transaction` endpoint accepts a `wait_for` query parameter with two o
 
 #### Http response encoding
 
-The trace can be returned either as JSON (`application/json`) or fracpack (`application/octet-stream`). The `Accept` header can be used to choose a representation.
+The trace can be returned either as JSON (`application/json`) or PSSZ (`application/octet-stream`). The `Accept` header can be used to choose a representation.
 
 ```json
 {

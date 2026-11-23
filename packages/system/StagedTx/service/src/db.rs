@@ -25,7 +25,7 @@ pub mod tables {
         pub id: u32,
 
         /// A unique ID for a staged transaction that can be computed client-side
-        ///   by fracpacking a tuple containing (id, proposed block number, vec<action>) and
+        ///   by packing (PSSZ) a tuple containing (id, proposed block number, vec<action>) and
         ///   then computing the sha256 of the result.
         #[graphql(skip)]
         pub txid: Checksum256,

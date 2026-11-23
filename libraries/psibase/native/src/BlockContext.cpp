@@ -920,7 +920,7 @@ namespace psibase
          checkActive();
          check(enableUndo || commit, "neither enableUndo or commit is set");
 
-         // TODO: fracpack verify, allow new fields. Might be redundant elsewhere?
+         // TODO: verify the PSSZ encoding, allow new fields. Might be redundant elsewhere?
          check(!commit || !(trx.transaction->tapos().flags() & Tapos::do_not_broadcast_flag),
                "cannot commit a do_not_broadcast transaction");
 

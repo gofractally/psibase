@@ -1431,7 +1431,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
          };
       }
       if (request.contentType != "application/octet-stream")
-         return make415("Expected fracpack encoded signed transaction (application/octet-stream)");
+         return make415("Expected PSSZ encoded signed transaction (application/octet-stream)");
 
       auto query       = request.query<WaitFor>();
       auto trx         = psio::from_pssz<SignedTransaction>(request.body);

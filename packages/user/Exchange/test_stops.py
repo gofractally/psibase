@@ -37,7 +37,7 @@ def extracted_source():
     financial = (SRC / "lib.rs").read_text()
     # Keep constants/functions verbatim. Wide's wire derives are irrelevant to
     # pure arithmetic; this adapter preserves its value/get/From behavior.
-    arithmetic = math[:math.index("/// Fracpack")]
+    arithmetic = math[:math.index("/// A wide value is persisted")]
     arithmetic += """
 #[derive(Clone,Copy,Debug)] pub struct Wide(pub u128);
 impl Wide { pub fn get(self)->u128 {self.0} }

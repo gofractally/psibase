@@ -1,5 +1,5 @@
-//! This defines macros for the [fracpack crate](https://docs.rs/fracpack) and
-//! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
+//! This defines macros for the [psibase crate](https://docs.rs/psibase). See the
+//! documentation for that crate.
 
 use authorized_macro::authorized_attr_impl;
 use component_name_macro::component_name_macro_impl;
@@ -249,7 +249,7 @@ pub fn authorized(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     // Pack actions into psibase::Action.
 ///     //
 ///     // `pack_*` functions return an object which has methods (one per action)
-///     // which pack the action's arguments using fracpack and return a psibase::Action.
+///     // which pack the action's arguments as PSSZ and return a psibase::Action.
 ///     // The `pack_*` series of functions is mainly useful to applications which
 ///     // push transactions to blockchains.
 ///     pub fn pack() -> Actions<psibase::ActionPacker>;
@@ -290,7 +290,8 @@ pub fn authorized(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// `action_structs` contains a public struct for each action. Each struct has the same
 /// name as its action and has the same fields as the action's arguments. The structs
-/// implement `fracpack::Packable`.
+/// are the argument records of the PSIO interface: the PSSZ of one is the action's
+/// `rawData`.
 ///
 /// ## service_wasm_interface module
 ///

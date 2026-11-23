@@ -1,7 +1,7 @@
 # Core macros for Psibase
 
-This defines the core functions that back the macros for the [fracpack crate](https://docs.rs/fracpack) and
-[psibase crate](https://docs.rs/psibase). See the documentation for those crates.
+This defines the core functions that back the macros for the
+[psibase crate](https://docs.rs/psibase). See the documentation for that crate.
 
 ## Service macro test suite
 

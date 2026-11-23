@@ -81,7 +81,7 @@ pub fn serve_action_templates<Wrapper: ToServiceSchema>(
 ///
 /// If `request` is a `POST /pack_action/x`, where `x` is an action
 /// on `Wrapper`, then this parses a JSON object containing the arguments
-/// to `x`, packs them using fracpack, and returns the result as an
+/// to `x`, packs them as PSSZ, and returns the result as an
 /// `application/octet-stream`.
 ///
 /// If `request` doesn't match the above, or the action name is not found,

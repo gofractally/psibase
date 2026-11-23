@@ -852,7 +852,7 @@ namespace psibase
    /// Each secondary index is numbered `1 <= i <= 255` above. The secondary indexes
    /// point to the primary index.
    ///
-   /// `Table` serializes keys using `psio::to_key` (the `psio::key` format). It serializes `T` using fracpack.
+   /// `Table` serializes keys using `psio::to_key` (the `psio::key` format). It serializes `T` as PSSZ (`psio::to_pssz`).
    template <typename T, auto Primary, auto... Secondary>
    class Table
    {

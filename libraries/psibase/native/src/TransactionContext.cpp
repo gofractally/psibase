@@ -215,7 +215,7 @@ namespace psibase
 
       if (blockContext.needGenesisAction)
       {
-         // TODO: full fracpack validate, no unknown, recursive
+         // TODO: full PSSZ validation, no unknown, recursive
          //       might be redundant elsewhere?
          auto trxView     = *signedTransaction.transaction;
          auto actionsView = trxView.actions();
@@ -320,7 +320,7 @@ namespace psibase
    {
       // Propagate this request's budget/cancellation into synchronous storage-owner jobs.
       auto storageAccounting = impl->watchdog->accountingScope();
-      // TODO: fracpack validation, allowing new fields in inner transaction. Might be redundant elsewhere?
+      // TODO: PSSZ validation, allowing new fields in inner transaction. Might be redundant elsewhere?
       auto trxView    = *signedTransaction.transaction;
       auto claimsView = trxView.claims();
       check(signedTransaction.proofs.size() == claimsView.size(),

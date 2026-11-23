@@ -3,7 +3,7 @@
 pub const MAX: u64 = (1 << 40) - 1;
 pub const Q: u128 = 1 << 40;
 pub const MAX_PRICE: u64 = (1 << 32) - 1;
-/// Fracpack deliberately has no primitive u128; persist two native u64 limbs.
+/// A wide value is persisted as two native u64 limbs.
 #[derive(
     Clone,
     Copy,

@@ -55,7 +55,7 @@ extern "C" {
 
     /// Store the currently-executing action into result and return the result size
     ///
-    /// The result contains a fracpacked [crate::Action]; use [getResult] to get it.
+    /// The result contains a PSSZ-packed [crate::Action]; use [getResult] to get it.
     ///
     /// If the service, while handling action A, calls itself with action B:
     /// * Before the call to B, `getCurrentAction()` returns A.
@@ -67,7 +67,7 @@ extern "C" {
 
     /// Call a service, store the return value into result, and return the result size
     ///
-    /// `action` must contain a fracpacked [crate::Action].
+    /// `action` must contain a PSSZ-packed [crate::Action].
     ///
     /// Use [getResult] to get result.
     pub fn call(action: *const u8, len: u32, flags: u64) -> u32;

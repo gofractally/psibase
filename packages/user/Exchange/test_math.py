@@ -1,7 +1,7 @@
 """Run the unchanged arithmetic tests on the host, including should_panic.
 
 Psitest's aborting WASM harness skips should_panic cases. Strip only the
-Fracpack storage adapter, which depends on the platform, and compile the exact
+storage adapter (`Wide`), which depends on the platform, and compile the exact
 constants, arithmetic functions and test bodies from service/src/math.rs.
 No financial algorithm is duplicated in this runner.
 """
@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 
 source = (Path(__file__).parent / "service/src/math.rs").read_text()
-adapter = source.index("/// Fracpack deliberately")
+adapter = source.index("/// A wide value is persisted")
 functions = source.index("pub fn amount(", adapter)
 with tempfile.TemporaryDirectory(prefix="exchange-math-") as directory:
     root = Path(directory)

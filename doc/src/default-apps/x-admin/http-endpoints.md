@@ -62,7 +62,7 @@ The [x-peers](../../default-apps/x-peers.md#http-endpoints) service also provide
 
 The `POST /native/admin/push_boot` endpoint can be used manually in conjunction with the [transact service](../transact.md#push-transaction) to perform a custom boot sequence.
 
-The body of the `POST /native/admin/push_boot` request contains a list of transactions that will each be executed in order in the first block. It must have `Content-Type: application/octet-stream` and be a fracpack encoded `Vec<SignedTransaction>`. The first transaction is a special transaction known as the genesis transaction. The genesis transaction uploads the core services to the blockchain and it is not permitted to do anything else.
+The body of the `POST /native/admin/push_boot` request contains a list of transactions that will each be executed in order in the first block. It must have `Content-Type: application/octet-stream` and be a PSSZ encoded `Vec<SignedTransaction>`. The first transaction is a special transaction known as the genesis transaction. The genesis transaction uploads the core services to the blockchain and it is not permitted to do anything else.
 
 A typical boot sequence contains more configuration than is able to fit in a single block. To understand how such a boot sequence is accomplished, see the description of [SystemService::Transact::startBoot].
 

@@ -244,7 +244,7 @@ uses checked u64 addition and must equal its native subaccount balance.
 Prices are positive 32-bit ticks; per-unit price/lot products also
 obey the amount limit. K<2^80, K·C<2^120 and coverage cross products fit within
 121 bits. Checked u128 scratch is sufficient under those explicit bounds.
-Fracpack has no primitive u128, so persisted wide values use two native u64
+Persisted wide values use two native u64
 limbs. Spot indices are additionally bounded below 2^80, keeping share/index
 and entry-debt arithmetic inside u128. No financial calculation uses a float.
 

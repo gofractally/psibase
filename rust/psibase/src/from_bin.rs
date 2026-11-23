@@ -16,7 +16,7 @@ impl serde::de::Error for Error {
     }
 }
 
-/// [crate::from_bin()] and [crate::to_bin()] are incomplete. They'll disappear when switch to fracpack is complete.
+/// [crate::from_bin()] and [crate::to_bin()] are incomplete. They are a serde reader and writer of their own, not PSSZ; nothing in the tree calls them.
 pub fn from_bin<'de, T: de::Deserialize<'de>>(mut data: &'de [u8]) -> Result<T, Error> {
     T::deserialize(Deserializer { data: &mut data })
 }

@@ -31,7 +31,7 @@ interface types {
         service: string,
         /// The name of the action to execute
         method: string,
-        /// The data passed to the action, packed in fracpack format
+        /// The data passed to the action, packed as PSSZ
         raw-data: list<u8>,
     }
 }
@@ -64,7 +64,7 @@ interface api {
     ///
     /// Parameters
     /// * `method-name`: The method name of the action being called
-    /// * `packed-args`: The arguments for the action, packed into fracpack format
+    /// * `packed-args`: The arguments for the action, packed as PSSZ
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
 
     /// Append a `claim` to the current transaction. At finish-tx, the transact
