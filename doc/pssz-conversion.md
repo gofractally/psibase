@@ -5296,3 +5296,84 @@ Nothing blocks the hand-over. Open, in order of weight: M8 (transaction
 size against Transact's memory), M7 and M2 (PSIO), the trust refinement
 and the size caps (team review log 0.1, 0.2), the unexercised front ends
 and plugins (0.3), the documentation above.
+
+### 7.8 Second head merge (`bytemaster/head` `7fe3cda05`)
+
+`bytemaster/head` at `7fe3cda05` (59 commits after `44c57f739`, the head
+merged in 1.16) is merged into `claude/pssz` by the merge commit
+`5d08266a7`. The head brought: canonical (low-S) signatures in
+`verify-sig` and every signer; wide arithmetic for Rust services
+(`cargo-psibase` turns it on for rustc 1.100 or newer; this machine has
+rustc 1.100.0, so it is on); one monotonic clock for trace time, the limit
+and billing; a purchase of resources raising the running transaction's CPU
+limit; a write session's changes kept aside and folded once per block;
+events indexed once per block; pooled service instances; the psitri pin
+`94fa328` and the psizam pin `2e93ecd` (the checkouts in `external/psitri`
+and `external/psizam` were moved by hand, psitri fetched over HTTPS); the
+review tour and the benchmark and verify-sig records (the head's files,
+unchanged). The PSIO pin is still `fdb5de25`.
+
+`ActionTrace.totalTime` needed no reconciliation by hand: the head keeps
+the member a `std::chrono::nanoseconds` and only changes what is assigned
+to it (`steady_clock::now() - start`, elapsed time), so the head's meaning
+and this branch's form (a PSIO nanosecond duration; `total_time:
+psio::time::Duration<Nanos>` in Rust) merged textually.
+
+Conflicts (six files):
+
+| File | Resolution |
+|---|---|
+| `libraries/psibase/native/src/TransactionContext.cpp` | the head's side: no budget pause around creating an execution context (this branch had only respelled `finally` there) |
+| `libraries/psibase/native/src/usePsitri.cpp` (7 hunks) | the head's side (`keptAside` / `pendingFor`, the kept-aside reads) with a key or value read as `std::span<const char>` (`std::string_view{key.data(), key.size()}`), as in the rest of the file |
+| `packages/user/Favor/service/src/contract_tests.rs` | both: the head's low-S normalization, this branch's `psio::to_pssz(&tx)` and `psio::pssz::Nested::unchecked(bytes)` |
+| `rust/CMakeLists.txt` | the head's SoftHSM variables for `rs-tests` and its new `plugin-web-crypto-tests`; without `-p test_fracpack` and the Boost include path that existed only for it |
+| `rust/Cargo.lock` | no `fracpack`, `test_fracpack`, `test_fracpack_macros` packages; the head's dependency moves (walrus, wasmparser, wasm-opt) merged by themselves |
+| `tests/cmake/dependencies/README.md` | PSIO `fdb5de25` (this branch), psitri `94fa328` and psizam `2e93ecd` (the head) |
+
+Code the head added against the old serialization that merged without a
+conflict, converted:
+
+| Site | Was | Now |
+|---|---|---|
+| `packages/psibase_tests/test/test_verify_sig_keys.cpp` (new) | `psio::convert_to_frac(trx)` signed; `SignedTransaction{.transaction = trx, …}` | `psio::to_pssz(trx)`; `.transaction = psio::shared_pssz<Transaction>{trx}` (the same bytes `TestChain::signTransaction` signs) |
+| `packages/user/Tokens/test/src/TransferBench.cpp` | `psio::to_frac(std::tuple(std::uint32_t(i)))` for `nop::withId` | `psio::to_pssz(…)`, as the `credit` beside it |
+| `packages/system/VirtualServer/service/src/tests/chain.rs` (new test `resources_bought_in_a_transaction_pay_for_the_rest_of_it`) | hand-built `Action`s with `(…).packed()`, `trx.packed().into()`, `trx.packed().len()` | the generated callers (`Wrapper::pack_from(alice).buy_res(…)`, `Tokens::pack_from(alice).credit(…)`: the memo's argument list has its own offset width), `psio::pssz::Nested::unchecked(psio::to_pssz(&trx))`, `psio::to_pssz(trx).len()` |
+| `libraries/psibase/native/tests/PsitriDatabaseTests.cpp` (new cases) | `found->key.pos` / `.end` (the old `input_stream`) | `found->key.begin()` / `.end()` (a span) |
+| `rust/psibase/src/crypto.rs` (new tests) | `signer.get_claim().rawData.0` | `.rawData` (a `Vec<u8>`) |
+
+The head added no type that exists in both languages and changed no
+service interface, so the twin fixture has no new entry; regenerated, it is
+byte-identical.
+
+| Step | Result |
+|---|---|
+| full build | exit 0 (`build-head2-2.log`; `head2-1` stopped at `PsitriDatabaseTests.cpp`, above). `share/psibase/packages/index.json`: 91 entries |
+| twin fixture | regenerated, unchanged; `psio_twins` 4 / 4, `psio_json` 13 / 13, `service_schema` 4 / 4, `psio_leaf_types` 13 / 13, `psio_wrappers` 7 / 7 |
+| native unit tests | C++ `psibase-psio-tests` 1421 assertions in 69 cases; Rust lib 105 / 105 (the 102 of before and the head's three signer tests; SoftHSM is installed here, so the PKCS #11 one ran), the others as before (`rust-unit-head2.log`) |
+| `ctest -j4` | **88 / 88** (`ctest-head2-1.log`). 88 = the 90 of before, minus the four `DarwinCpu*` tests the head deleted with the Darwin CPU clock, plus `plugin-web-crypto-tests` and `t-Tokens-test-one-pool-slot`. The head's own records (`tests/timing/runs/*87fa12b7b*`, `*97e725eca*`, `*77e4e4d60*`, x86) list 90 names: the 88 here less `n-psibase-psio-tests` and `t-psibase-psio-tests`, plus `n-psio-tests`, `t-psio-tests`, `py_test_fracpack` (the old library's tests, gone with it) and `VmConsensusTests` (registered only with the LLVM AOT backend; this build is wasmtime) |
+| every Rust workspace | `check_all.sh head2`: all exit 0 except `packages/user --tests` (`tokens-plugin`, and Favor's tests without their two environment variables), the same seven errors as before the merge. With the variables set `cargo check -p favor --tests` passes, which covers the conflict resolved above |
+| end to end (7.5's commands, state `~/psibase-pssz-e2e-head2`) | boot exit 0; `create alice`, `bob`, `carol` exit 0; the seven queries answer as in 7.5 (head `refBlockIndex` 83); `kill -TERM`, restart, the same answers (head 89), `create dave` exit 0, `getAccounts` returns all four; no `[error]` line in either log |
+
+No engine, VM or storage failure; no psitri "reference count exceeded
+limits" (nothing copied to `~/psitri-refcount-evidence/`);
+`psinode_test_crash` passed.
+
+One observation, not classified: `psibase boot` returns (exit 0) while the
+node is still applying the boot's transactions (about 100, over about 50
+one-second blocks). Three `psibase create` issued in those seconds were
+refused with `service 'transact' aborted with message: transaction
+references non-existing block`, and Explorer answered `service 'auth-delg'
+aborted with message: account does not have an owning account`; once the
+head block passed 50 the same commands succeeded. The run of 7.5 also took
+about 67 s from the first to the last boot transaction; whether a
+transaction pushed during those seconds was refused before this merge was
+not tried.
+
+Not verified: the LLVM AOT backend and `VmConsensusTests` (not built
+here); Linux x86-64; the interpreter, JIT1 and JIT2 beyond what the suite
+runs; the benchmarks (`TransferBench` cases are hidden tests: compiled, not
+run); `doc/verify-sig/` (the head's record of a measurement, stand-alone
+sources outside the build, left as the head has them: `gen/gen.cpp` and
+`diff/gen_cases.cpp` pack with `psio::to_frac` and the build scripts name
+`libraries/psio`, so they describe the tree before the flip and do not
+build against this one); front ends and plugins, as in 7.6.
