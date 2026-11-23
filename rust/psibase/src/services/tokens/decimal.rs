@@ -11,12 +11,28 @@ use crate::services::tokens::{Precision, Quantity, TokensError};
 /// Examples:
 /// - `quantity = 30_000`, `precision = 4` represents `3.0`
 /// - `quantity = 3`, `precision = 0` also represents `3.0`
+///
+/// For PSIO a decimal is the record of its two members in pSSZ and in a key,
+/// and its text is the decimal number ([`Display`](std::fmt::Display) writes
+/// it, [`FromStr`] reads it).
+#[derive(psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key)]
+#[psio(custom = "Decimal")]
 pub struct Decimal {
     pub quantity: Quantity,
     pub precision: Precision,
 }
 
 serialize_as_str!(Decimal, "decimal");
+
+impl psio::json::TextForm for Decimal {
+    fn to_text(&self, out: &mut String) {
+        out.push_str(&self.to_string());
+    }
+    fn from_text(text: &str) -> Option<Self> {
+        text.parse().ok()
+    }
+}
+psio::json_text_form!(Decimal);
 
 impl Decimal {
     pub fn new(quantity: Quantity, precision: Precision) -> Self {
@@ -71,7 +87,9 @@ impl FromStr for Decimal {
         }
 
         let precision: u8 = match s.split_once('.') {
-            Some((_, fraction_part)) => fraction_part.len() as u8,
+            // More digits than a `u8` counts is more than any precision.
+            Some((_, fraction_part)) => u8::try_from(fraction_part.len())
+                .map_err(|_| TokensError::PrecisionOverflow)?,
             None => 0,
         };
         let precision: Precision = precision.try_into()?;

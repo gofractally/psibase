@@ -6,13 +6,46 @@ use serde::{Deserialize, Serialize};
 use crate::services::tokens::TokensError;
 use async_graphql::scalar;
 
-#[derive(PartialEq, Debug, Copy, Clone, Pack, ToSchema, Serialize)]
+/// The number of decimal places of a token amount, 0 to 8.
+///
+/// For PSIO a precision is its number (`transparent`) and the range is an
+/// invariant, so every reader and writer refuses a value above 8.
+#[derive(
+    PartialEq,
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    ToSchema,
+    Serialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::Key,
+    psio::JsonText,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[psio(transparent, invariant = "Precision::in_range")]
 pub struct Precision(u8);
 
 impl Precision {
+    /// The largest precision.
+    pub const MAX: u8 = 8;
+
+    fn in_range(&self) -> Result<(), String> {
+        if self.0 <= Self::MAX {
+            Ok(())
+        } else {
+            Err(format!(
+                "Value {} outside allowed Precision range: 0 to {}",
+                self.0,
+                Self::MAX
+            ))
+        }
+    }
+
     pub fn new(value: u8) -> Result<Self, TokensError> {
-        if value <= 8 {
+        if value <= Self::MAX {
             Ok(Self(value))
         } else {
             Err(TokensError::PrecisionOverflow)
