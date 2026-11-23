@@ -32,6 +32,18 @@ pinned dependencies. Native Exchange tests passed with this matching tester:
 The exact live zero-output maker-boundary regression is included. The Exchange
 README documents the remaining zero-output loan/stop boundary limitation.
 
+The dedicated taker was given 100 BTC and 10 million USD of local demo working
+capital from the liquidity fixture's existing primary balances. It can refill
+in bounded chunks of 5 BTC or 500,000 USD when its available funds fall below
+1 BTC or 100,000 USD. Pending trade inputs and unconfirmed refills are reserved.
+The additional lifetime allowance per persisted chain is 1,000 BTC and
+100 million USD. It never mints tokens or draws from human wallets or committed
+relay/lending reserves. Each refill joins the ordinary trade transaction.
+Allowance is durably charged before publication and is not restored after a
+rejected or unknown outcome. Exhausting the allowance or source funds pauses
+trading. The native refill-plus-trade path was verified against actual token
+balances; this fixture uses AuthAny rather than cryptographic signatures.
+
 Fresh seeding supports `python3 demo/seed.py --price-usd PRICE`; it refuses a
 second issuance when its state directory already has a seed marker. This is a
 local development network using demonstration tokens.

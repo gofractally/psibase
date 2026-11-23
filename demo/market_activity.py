@@ -36,12 +36,116 @@ MIN_BASE_TRADE = 30_000
 RESERVE_FRACTION = Decimal('.0015')
 PASSIVE_GUARD = Decimal('.002')
 MAINTENANCE_EVERY = 4
+REFILL_SOURCE = 'liquidity'
+REFILL_KEY = 'taker_refill'
 
 
-def write_json(path, value):
+def write_json(path, value, durable=False):
     temporary = path.with_name(path.name + f'.{os.getpid()}.tmp')
-    temporary.write_text(json.dumps(value, indent=2) + "\n")
+    with temporary.open('w') as stream:
+        stream.write(json.dumps(value, indent=2) + "\n")
+        if durable:
+            stream.flush()
+            os.fsync(stream.fileno())
     temporary.replace(path)
+    if durable:
+        descriptor = os.open(path.parent, os.O_RDONLY)
+        try:os.fsync(descriptor)
+        finally:os.close(descriptor)
+
+
+def initialize_refill_allowance(config):
+    """One finite devnet allowance per persisted chain, never reset on restart."""
+    if REFILL_KEY in config:
+        return False
+    config[REFILL_KEY] = {'chain': API.rstrip('/'), 'owner': TAKER, 'source': REFILL_SOURCE,
+        'tokens': {str(token): {'cap': str(cap), 'remaining': str(cap), 'reserved': '0',
+                               'chunk': str(chunk), 'low_water': str(low)}
+                   for token,cap,chunk,low in (
+                       (config['base'], 1000*10**8, BASE_TARGET, 10**8),
+                       (config['quote'], 100_000_000*10**4, QUOTE_TARGET, 100_000*10**4))}}
+    return True
+
+
+def refill_entry(config, token):
+    policy = config.get(REFILL_KEY, {})
+    if (policy.get('chain') != API.rstrip('/') or policy.get('owner') != TAKER
+            or policy.get('source') != REFILL_SOURCE):
+        raise RuntimeError('Missing or mismatched finite demo refill allowance')
+    entry = policy.get('tokens', {}).get(str(token))
+    if not isinstance(entry, dict):
+        raise RuntimeError('Missing demo refill token allowance')
+    values = {}
+    for key in ('cap', 'remaining', 'reserved', 'chunk', 'low_water'):
+        text = str(entry.get(key, ''))
+        if not text.isascii() or not text.isdigit() or not 0 <= int(text) <= (1 << 64)-1:
+            raise RuntimeError('Invalid finite demo refill allowance')
+        values[key] = int(text)
+    if values['remaining'] + values['reserved'] != values['cap'] or values['chunk'] < 1:
+        raise RuntimeError('Invalid finite demo refill accounting')
+    return entry, values
+
+
+def plan_taker_refill(config, state, plan, pending=(), source_state=None):
+    """Plan only normal Tokens transfers; no mint, human accounts or extra tx."""
+    token = config['base' if plan['sell'] else 'quote']
+    pending = list(pending)
+    committed = sum(int(p['amount']) for p in pending if p['sell'] == plan['sell'])
+    row = next(r for r in state['balances'] if int(r['token']) == token)
+    available = max(0, int(row['spendable']) - committed)
+    # Ordinary sufficiently funded ticks do not query the source wallet.
+    allowance = refill_entry(config, token)[1] if REFILL_KEY in config else None
+    low = allowance['low_water'] if allowance else (10**8 if plan['sell'] else 100_000*10**4)
+    if available >= max(low, plan['amount']):
+        return None
+    if state.get('owner') != TAKER:
+        raise RuntimeError('Only the dedicated demo taker may be refilled')
+    if allowance is None:
+        raise RuntimeError('Missing finite demo taker refill allowance')
+    if any(int(p.get('refill', {}).get(token, 0)) for p in pending):
+        if available >= plan['amount']:
+            return None
+        raise ValueError('Demo refill confirmation pending; skipping this tick')
+    if allowance['remaining'] == 0:
+        if available >= plan['amount']:
+            return None
+        raise ValueError('Finite demo taker refill allowance exhausted; trading paused')
+    if type(row.get('auto_debit')) is not bool:
+        raise RuntimeError('Native taker auto-debit setting required for a refill')
+    source_state = source_state if source_state is not None else read_state(REFILL_SOURCE)
+    if source_state.get('owner') != REFILL_SOURCE:
+        raise RuntimeError('Demo refill source identity mismatch')
+    source = next((r for r in source_state['balances'] if int(r['token']) == token), {})
+    reserved_source = sum(int(p.get('refill', {}).get(token, 0)) for p in pending)
+    primary = max(0, int(source.get('wallet', 0)) - reserved_source)
+    amount = min(allowance['chunk'], allowance['remaining'], primary)
+    if amount < 1 or available + amount < plan['amount']:
+        if available >= plan['amount']:
+            return None
+        raise ValueError('Demo primary funding or finite allowance cannot cover this trade; paused')
+    q = quantity(amount)
+    actions = [action(REFILL_SOURCE, 'tokens', 'credit', {'token_id':token, 'debitor':TAKER,
+                'amount':q, 'memo':'Bounded local demo taker refill'})]
+    if not row['auto_debit']:
+        actions.append(action(TAKER, 'tokens', 'debit', {'token_id':token, 'creditor':REFILL_SOURCE,
+                        'amount':q, 'memo':'Accept bounded local demo refill'}))
+    actions.append(action(TAKER, 'tokens', 'credit', {'token_id':token, 'debitor':'exchange',
+                    'amount':q, 'memo':'Fund bounded local demo trade'}))
+    return {'token':token, 'amount':amount, 'actions':actions, 'source_state':source_state}
+
+
+def reserve_taker_refill(config, refill):
+    if refill is None:
+        return
+    entry, allowance = refill_entry(config, refill['token'])
+    amount = refill['amount']
+    if not 0 < amount <= min(allowance['remaining'], allowance['chunk']):
+        raise RuntimeError('Demo refill exceeds its finite allowance')
+    entry['remaining'] = str(allowance['remaining'] - amount)
+    entry['reserved'] = str(allowance['reserved'] + amount)
+    # Charge before publication, including rejected/unknown outcomes. A restart
+    # never retries a transfer or restores uncertain spending authority.
+    write_json(MARKER, config, durable=True)
 
 
 @contextmanager
@@ -86,6 +190,8 @@ def setup():
         config = json.loads(MARKER.read_text())
         config.setdefault('operating_center', config['center'])
         config.setdefault('quote_center', config['center'])
+        if initialize_refill_allowance(config):
+            write_json(MARKER, config, durable=True)
         return config
     seed = json.loads((state_dir() / "seed.json").read_text())
     state = read_state("liquidity")
@@ -96,7 +202,8 @@ def setup():
               "accounts": []}
     # Persist each completed setup so a rerun never resets or duplicates funds.
     config['operating_center'] = config['quote_center'] = config['center']
-    write_json(MARKER, config)
+    initialize_refill_allowance(config)
+    write_json(MARKER, config, durable=True)
     return config
 
 
@@ -331,9 +438,11 @@ def submit_concurrently(actions):
     return time.time()
 
 
-def run(config, interval):
+def run(interval):
     with activity_lock():
-        return run_locked(config, interval)
+        # Read persisted spending authority only after excluding another bot or
+        # seed operation; a stale startup must never overwrite a charged cap.
+        return run_locked(setup(), interval)
 
 
 def run_locked(config, interval):
@@ -388,10 +497,6 @@ def run_locked(config, interval):
                         int(m['base_lot']) != 10_000 or int(m['quote_tick']) != 1):
                     raise RuntimeError('Demo market identity/grid changed; absolute USD pricing unavailable')
                 plan = plan_trade(m, target, step, pending.values())
-                token = config['base' if plan['sell'] else 'quote']
-                available = next(int(r['spendable']) for r in state['balances'] if int(r['token']) == token)
-                if plan['amount'] > available:
-                    raise RuntimeError('Dedicated demo taker funding exhausted')
                 if recenter_quotes(config, target, time.monotonic(), last_recenter):
                     last_recenter = time.monotonic()
                     write_json(MARKER, config)
@@ -415,18 +520,27 @@ def run_locked(config, interval):
                 live_price, tick_time = feed.current()
                 target = target_price(live_price, config.get('operating_center', config['center']))
                 plan = plan_trade(m, target, step, pending.values())
-                token = config['base' if plan['sell'] else 'quote']
-                available = next(int(r['spendable']) for r in state['balances'] if int(r['token']) == token)
-                if plan['amount'] > available:
-                    raise RuntimeError('Dedicated demo taker funding exhausted')
+                refill = plan_taker_refill(config, state, plan, pending.values())
+                if refill is not None:
+                    # Reading the source can take time. Recheck the live feed
+                    # and exact trade before consuming any finite allowance.
+                    live_price, tick_time = feed.current()
+                    target = target_price(live_price, config.get('operating_center', config['center']))
+                    plan = plan_trade(m, target, step, pending.values())
+                    refill = plan_taker_refill(config, state, plan, pending.values(), refill['source_state'])
+                actions = (refill['actions'] if refill else []) + actions
                 actions.append(action(TAKER, 'exchange', 'trade', {'market': config['market'],
                     'sell_base': plan['sell'], 'amount': plan['amount'],
                     'min_output': plan['min_output'], 'max_events': 64}))
                 if stopping.is_set():
                     break
+                reserve_taker_refill(config, refill)
+                if stopping.is_set():
+                    break
                 submitted = time.time()
                 pending[workers.submit(submit_concurrently, actions)] = {
-                    'sell': plan['sell'], 'amount': plan['amount']}
+                    'sell': plan['sell'], 'amount': plan['amount'],
+                    'refill': {refill['token']:refill['amount']} if refill else {}}
                 # Anchor to this actual submission, including after a slow
                 # query/maintenance pass, instead of bursting to catch up.
                 deadline = time.monotonic() + interval
@@ -437,6 +551,7 @@ def run_locked(config, interval):
                           'side': 'sell' if plan['sell'] else 'buy',
                           'base_atoms': plan['base_amount'], 'quote_center': quote_center(config),
                           'pending_input': plan['pending_input'],
+                          'refill': {'token':refill['token'], 'amount':refill['amount']} if refill else None,
                           'operating_center': config.get('operating_center', config['center']),
                           'submitted_at': submitted}
                 status('running')
@@ -522,12 +637,13 @@ def main():
         if pid:
             print(f'Demo activity already running (PID {pid})')
             return
-    config = setup()
     if args.operation == 'run':
-        return run(config, args.interval)
-    fund_accounts(config)
-    initialize_quote_center(config)
-    count = inventory(config)
+        return run(args.interval)
+    with activity_lock():
+        config = setup()
+        fund_accounts(config)
+        initialize_quote_center(config)
+        count = inventory(config)
     print(f"Added or replenished {count} funded orders across 48 prices")
     if args.operation == "start":
         start(NAME, [sys.executable, str(SCRIPT), "run", "--interval", str(args.interval)], SCRIPT)

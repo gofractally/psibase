@@ -27,7 +27,132 @@ def feed():
     return value
 
 
+def refill_config():
+    config={'market':1,'base':1,'quote':2,'center':57000,'quote_center':57000}
+    bot.initialize_refill_allowance(config)
+    return config
+
+
+def refill_state(base=0,quote=0,auto=False):
+    return {'owner':bot.TAKER,'markets':[market()], 'balances':[
+        {'token':1,'spendable':base,'wallet':0,'auto_debit':auto},
+        {'token':2,'spendable':quote,'wallet':0,'auto_debit':auto}]}
+
+
+def refill_source(wallet=10**12):
+    return {'owner':'liquidity','balances':[{'token':token,'wallet':wallet,'spendable':10**15}
+                                           for token in (1,2)]}
+
+
 class MarketActivityTests(unittest.TestCase):
+    def test_every_startup_locks_before_loading_or_changing_finite_authority(self):
+        for operation in ('run','seed','start'):
+            with self.subTest(operation=operation),patch.object(bot.sys,'argv',['market_activity.py',operation]),patch.object(bot,'active',return_value=None),patch.object(bot,'activity_lock') as lock,patch.object(bot,'setup') as setup,patch.object(bot,'fund_accounts') as fund:
+                lock.return_value.__enter__.side_effect=RuntimeError('already locked')
+                with self.assertRaisesRegex(RuntimeError,'already locked'):bot.main()
+                setup.assert_not_called();fund.assert_not_called()
+        with patch.object(bot,'activity_lock') as lock,patch.object(bot,'setup',return_value={'finite':'authority'}) as setup,patch.object(bot,'run_locked') as run:
+            bot.run(1)
+            lock.return_value.__enter__.assert_called_once()
+            run.assert_called_once_with({'finite':'authority'},1)
+
+    def test_finite_refill_allowance_is_persisted_before_publish_and_never_reset(self):
+        config=refill_config();plan={'sell':True,'amount':20_000_000}
+        refill=bot.plan_taker_refill(config,refill_state(),plan,source_state=refill_source())
+        with TemporaryDirectory() as directory,patch.object(bot,'MARKER',Path(directory)/'marker.json'),patch.object(bot.os,'fsync') as sync:
+            bot.reserve_taker_refill(config,refill)
+            saved=json.loads(bot.MARKER.read_text())
+            self.assertEqual(sync.call_count,2)
+        self.assertEqual(saved[bot.REFILL_KEY]['tokens']['1']['remaining'],str(1000*10**8-bot.BASE_TARGET))
+        self.assertEqual(saved[bot.REFILL_KEY]['tokens']['1']['reserved'],str(bot.BASE_TARGET))
+        self.assertFalse(bot.initialize_refill_allowance(saved))
+        self.assertEqual(saved,config)
+
+    def test_refill_only_spends_liquidity_primary_for_the_dedicated_taker(self):
+        config=refill_config();state=refill_state();plan={'sell':True,'amount':20_000_000}
+        refill=bot.plan_taker_refill(config,state,plan,source_state=refill_source())
+        self.assertEqual(refill['amount'],bot.BASE_TARGET)
+        self.assertEqual([(a['sender'],a['service'],a['method']) for a in refill['actions']],
+                         [('liquidity','tokens','credit'),(bot.TAKER,'tokens','debit'),(bot.TAKER,'tokens','credit')])
+        self.assertEqual(refill['actions'][0]['data']['debitor'],bot.TAKER)
+        self.assertEqual(refill['actions'][-1]['data']['debitor'],'exchange')
+        self.assertTrue(all(a['data']['amount']['value']==bot.BASE_TARGET for a in refill['actions']))
+        auto=bot.plan_taker_refill(config,refill_state(auto=True),plan,source_state=refill_source())
+        self.assertEqual([a['method'] for a in auto['actions']],['credit','credit'])
+        with self.assertRaises(ValueError):bot.plan_taker_refill(config,state,plan,source_state=refill_source(0))
+        state['owner']='alice'
+        with patch.object(bot,'read_state') as read:
+            with self.assertRaises(RuntimeError):bot.plan_taker_refill(config,state,plan)
+            read.assert_not_called()
+        self.assertEqual(config[bot.REFILL_KEY]['tokens']['1']['reserved'],'0')
+
+    def test_pending_inputs_are_reserved_and_pending_refills_are_not_duplicated(self):
+        config=refill_config();state=refill_state(base=110_000_000);plan={'sell':True,'amount':20_000_000}
+        with patch.object(bot,'read_state') as read:
+            self.assertIsNone(bot.plan_taker_refill(config,state,plan));read.assert_not_called()
+        pending=[{'sell':True,'amount':10_000_000}]*2
+        self.assertIsNotNone(bot.plan_taker_refill(config,state,plan,pending,refill_source()))
+        pending=[{'sell':True,'amount':20_000_000,'refill':{1:bot.BASE_TARGET}}]
+        with patch.object(bot,'read_state') as read:
+            with self.assertRaisesRegex(ValueError,'confirmation pending'):
+                bot.plan_taker_refill(config,refill_state(),plan,pending)
+            self.assertIsNone(bot.plan_taker_refill(config,refill_state(base=50_000_000),plan,pending))
+            read.assert_not_called()
+
+    def test_refill_cap_primary_and_identity_fail_closed_without_reserving(self):
+        config=refill_config();entry=config[bot.REFILL_KEY]['tokens']['1'];cap=int(entry['cap'])
+        entry['remaining']='10000000';entry['reserved']=str(cap-10_000_000)
+        with self.assertRaises(ValueError):
+            bot.plan_taker_refill(config,refill_state(),{'sell':True,'amount':20_000_000},source_state=refill_source())
+        refill=bot.plan_taker_refill(config,refill_state(),{'sell':True,'amount':5_000_000},source_state=refill_source())
+        self.assertEqual(refill['amount'],10_000_000)
+        with TemporaryDirectory() as directory,patch.object(bot,'MARKER',Path(directory)/'marker.json'):
+            bot.reserve_taker_refill(config,refill)
+        with self.assertRaisesRegex(ValueError,'allowance exhausted'):
+            bot.plan_taker_refill(config,refill_state(),{'sell':True,'amount':1},source_state=refill_source())
+        invalid=refill_config();invalid[bot.REFILL_KEY]['chain']='http://other-chain/'
+        with self.assertRaises(RuntimeError):bot.plan_taker_refill(invalid,refill_state(),{'sell':True,'amount':1})
+        missing=refill_state();del missing['balances'][0]['auto_debit']
+        with self.assertRaisesRegex(RuntimeError,'auto-debit'):
+            bot.plan_taker_refill(refill_config(),missing,{'sell':True,'amount':1},source_state=refill_source())
+
+    def test_refill_and_trade_share_one_submission_and_unknown_outcome_never_retries(self):
+        for failure,stop_on_submit in [(TimeoutError('unknown funded outcome'),False),
+                                       (bot.MinimumOutputRejected('known rollback'),True)]:
+            config=refill_config();handlers={};captured=[];executor=MagicMock()
+            fake=MagicMock();fake.current.return_value=(Decimal('57500'),'fresh')
+            def submit(fn,actions):
+                saved=json.loads(bot.MARKER.read_text())
+                self.assertEqual(saved[bot.REFILL_KEY]['tokens']['2']['reserved'],str(bot.QUOTE_TARGET))
+                captured.append(actions)
+                future=Future();future.set_exception(failure)
+                if stop_on_submit:handlers[bot.signal.SIGTERM]()
+                return future
+            executor.submit.side_effect=submit
+            with TemporaryDirectory() as directory,patch.object(bot,'MARKER',Path(directory)/'marker.json'),patch.object(bot,'STATUS',Path(directory)/'status.json'),patch.object(bot,'LiveFeed',return_value=fake),patch.object(bot.signal,'signal',side_effect=lambda sig,handler:handlers.__setitem__(sig,handler)),patch.object(bot,'read_state',side_effect=lambda owner:refill_source() if owner=='liquidity' else refill_state()),patch.object(bot,'inventory',return_value=[]),patch.object(bot,'ThreadPoolExecutor',return_value=executor),redirect_stdout(io.StringIO()):
+                if stop_on_submit:bot.run_locked(config,0)
+                else:
+                    with self.assertRaises(TimeoutError):bot.run_locked(config,0)
+                saved=json.loads(bot.MARKER.read_text())
+            self.assertEqual(len(captured),1)
+            self.assertEqual([a['method'] for a in captured[0]],['credit','debit','credit','trade'])
+            self.assertEqual(saved[bot.REFILL_KEY]['tokens']['2']['reserved'],str(bot.QUOTE_TARGET))
+            self.assertEqual(int(saved[bot.REFILL_KEY]['tokens']['2']['remaining']),100_000_000*10**4-bot.QUOTE_TARGET)
+
+    def test_stale_feed_after_source_lookup_cannot_consume_refill_allowance(self):
+        config=refill_config();handlers={};fake=MagicMock();count=[0]
+        def tick():
+            count[0]+=1
+            if count[0]==3:
+                handlers[bot.signal.SIGTERM]();raise ValueError('feed became stale')
+            return Decimal('57500'),'fresh'
+        fake.current.side_effect=tick
+        executor=MagicMock()
+        with TemporaryDirectory() as directory,patch.object(bot,'MARKER',Path(directory)/'marker.json'),patch.object(bot,'STATUS',Path(directory)/'status.json'),patch.object(bot,'LiveFeed',return_value=fake),patch.object(bot.signal,'signal',side_effect=lambda sig,handler:handlers.__setitem__(sig,handler)),patch.object(bot,'read_state',side_effect=lambda owner:refill_source() if owner=='liquidity' else refill_state()),patch.object(bot,'inventory',return_value=[]),patch.object(bot,'ThreadPoolExecutor',return_value=executor),redirect_stdout(io.StringIO()):
+            bot.run_locked(config,0)
+        executor.submit.assert_not_called()
+        self.assertEqual(config[bot.REFILL_KEY]['tokens']['2']['reserved'],'0')
+
     def test_activity_lock_and_pid_use_the_selected_chain_state_directory(self):
         with TemporaryDirectory() as directory,patch.object(bot,'state_dir',return_value=Path(directory)),patch.object(bot,'active',return_value=None):
             with bot.activity_lock():
