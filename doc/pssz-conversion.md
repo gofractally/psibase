@@ -20,7 +20,7 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 
 | | |
 |---|---|
-| Legacy library | `libraries/psio1`: include prefix `<psio1/…>`, namespace `psio1`, macros `PSIO1_…`, CMake target `psio1`, archive `libpsio1.a`. It is deleted at the end of the conversion. |
+| Legacy library | `libraries/psio1`: include prefix `<psio1/…>`, namespace `psio1`, macros `PSIO1_…`, CMake target `psio1`, archive `libpsio1.a`. It is deleted at the end of the conversion. **After the flip (section 1.25): deleted; `git grep psio1` finds only this document and `doc/flip-interop.md`.** |
 | PSIO | `gofractally/psio` at `c6d9940441463c7ba3b6087595770a765f5fffac` (section 1.16; before that `415ea1a6`), which is its `main`, pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`, a topic branch; the pin moved to `main` in section 1.14, `224f80de`, and along it in section 1.15.) |
 | Since (sections 1.16, 6.16–6.20) | The integration head `44c57f739` is merged and the pin is `c6d99404`; ctest's baseline is 93. Rust: `Hex<T>` is `transparent` (D29 revised) and 44 of the 78 core records are declared; the stale Rust mirrors of D36 are corrected; the service macro can declare a service's actions as a PSIO interface (`psio = true`, three services); the C++ ↔ Rust fixture has 50 types, 115 values, legacy bytes for each, two service interfaces and 18 calls. |
 | Rust | The `psio` crate is a path dependency into the pinned checkout (`external/psio/rust/psio`). Declared with the official PSIO derives beside the legacy ones, which still write every byte: `AccountNumber`, `MethodNumber` (R1, 6.10); `Memo`, `tokens::Precision`, `Quantity`, `Decimal` (R2, 6.13); 20 core records of `rust/psibase/src` (R3, 6.14). 26 types are proved equal to their C++ twins through one fixture (6.15). Waiting, each for a stated reason: the time types and `Hex<T>` / `Checksum256` and every record that holds one (the JSON flip), 56 core records in all. Two behaviour changes: the name parsers no longer panic on malformed text (D30), and `Quantity::from_str` rejects a quantity over 2^64 − 1 (D17) and a fraction of 256 or more digits (D38). |
@@ -33,10 +33,10 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 | Slice 2b: the deferred records | 15 declarations: `Memo` and `Precision` are `transparent()` wrappers with an `invariant`; `Decimal` is a record with a text adapter; `XAdmin::Auth::Account`, `LocalUsername` and `AuthSig::PrivateKeyInfo` are `transparent()` wrappers; `TimerRow`, `UrlRow`, `TimerQueueRow`, `ServiceSchema`, `DynDepGroups`, `PsinodeServiceConfig`, `TypedAction<T>` and the two records of `debug_eos_vm` changed macro only (section 1.11). |
 | Slice 4b: data-member consumers | Everything psibase derives from a record's data members reads `psio::reflect<T>` directly: table keys and views (`Table.hpp`), table and key schemas (`schema.hpp`), `zip.cpp`, query strings (`Rpc.hpp`), `jwt.hpp`, XAdmin's option names, the data-member parts of `serveGraphQL.hpp` (section 1.12). Nothing outside `libraries/psio1` names `psio1::reflect`, `psio1::Reflected`, `MemberList`, `MemberPtrType`, `for_each_member`, `get_data_member` or `psio1::get_type_name`. |
 | Follow-up on PSIO `dfd0db17` | Section 1.13. `Precision`'s rejection names the value again (G21): no behaviour change of slice 2b is left. GraphQL names are `psio::fixed_string` (G19), key member lookup and key flattening use `index_of_member` / `member_types` (G20), `flatten_key` asks `psio::Reflected<T>` alone (G22), keyword-only includes removed (G14); `psio1::reflected_name` deleted, `psio1::FixedString` no longer named outside `psio1`. One owner-approved behaviour change: `Decimal::fromStr` rejects a quantity over 2^64 − 1 instead of wrapping (D17). |
-| Still declared with the legacy macro | 5 `PSIO1_REFLECT` sites and 1 `PSIO1_REFLECT_TYPENAME`, all in `rust/test_fracpack/tests/test.hpp` (the legacy library's own C++/Rust cross-check, deleted with it). Not reflected at all and still on legacy ADL hooks: `SubjectPublicKeyInfo`, `IPAddress`, `SocketEndpoint` (section 1.9). |
-| Temporary glue | Only in `libraries/psio1` (section 1.5). Every block is marked `// TEMPORARY: removed when psio1 is deleted`. |
-| Unchanged | Every wire, key, JSON and schema byte psibase produces (one text is no longer read: a `Decimal` whose quantity does not fit 64 bits, D17): everything is still packed, keyed, written as JSON, described and dispatched by `psio1`, which reads the PSIO declarations through the glue. Evidence: after every slice all 68 generated `*-schema.json` files are byte-identical to the build before it (slices 2b, 4b and the follow-up: to the build of 0167a3056); pinned bytes, keys, JSON, GraphQL and schemas in `canonical_glue_tests.cpp` (sections 1.8, 1.10–1.12). |
-| Tests | ctest 92/92 after each slice, 2b, 4b, the earlier pin moves and the follow-up included; 92/92 again on the pin of 1.15 and after each of R1, R2 and R3. On the pin of section 1.14 no single run was clean (91/92 three times: an intermittent failure of `psinode_test_crash` in the storage engine; every test passed in some run; see there). `psio-tests`: 67 test cases natively, 26 in the guest (2 added in 2b: the legacy forms of the 2b types, pinned before they were re-declared). `psibase-psio-tests`: 37 test cases, native and guest (7 added in 2b, `wrappers.cpp`; 2 in 4b, `tables.cpp`; 1 in the follow-up, the `Decimal` boundary). |
+| Still declared with the legacy macro | 5 `PSIO1_REFLECT` sites and 1 `PSIO1_REFLECT_TYPENAME`, all in `rust/test_fracpack/tests/test.hpp` (the legacy library's own C++/Rust cross-check, deleted with it). Not reflected at all and still on legacy ADL hooks: `SubjectPublicKeyInfo`, `IPAddress`, `SocketEndpoint` (section 1.9). **After the flip: none; `rust/test_fracpack` is deleted.** |
+| Temporary glue | Only in `libraries/psio1` (section 1.5). Every block is marked `// TEMPORARY: removed when psio1 is deleted`. **After the flip: gone with the library.** |
+| Unchanged | Every wire, key, JSON and schema byte psibase produces (one text is no longer read: a `Decimal` whose quantity does not fit 64 bits, D17): everything is still packed, keyed, written as JSON, described and dispatched by `psio1`, which reads the PSIO declarations through the glue. Evidence: after every slice all 68 generated `*-schema.json` files are byte-identical to the build before it (slices 2b, 4b and the follow-up: to the build of 0167a3056); pinned bytes, keys, JSON, GraphQL and schemas in `canonical_glue_tests.cpp` (sections 1.8, 1.10–1.12). **After the flip: no longer true. Wire, keys, schemas, JSON and GraphQL are PSIO's (sections 1.18–1.24).** |
+| Tests | ctest 92/92 after each slice, 2b, 4b, the earlier pin moves and the follow-up included; 92/92 again on the pin of 1.15 and after each of R1, R2 and R3. On the pin of section 1.14 no single run was clean (91/92 three times: an intermittent failure of `psinode_test_crash` in the storage engine; every test passed in some run; see there). `psio-tests`: 67 test cases natively, 26 in the guest (2 added in 2b: the legacy forms of the 2b types, pinned before they were re-declared). `psibase-psio-tests`: 37 test cases, native and guest (7 added in 2b, `wrappers.cpp`; 2 in 4b, `tables.cpp`; 1 in the follow-up, the `Decimal` boundary). **After the flip (section 1.25): 91 tests (`psio-tests` is deleted, native and guest); 27 pass in this worktree, every failure waits for the Rust side. `psibase-psio-tests`: 69 test cases natively.** |
 
 ## 1. The conversion pattern
 
@@ -2147,7 +2147,270 @@ untouched.
 * `demo/` was not built (its build files still name the `psio1` target).
 * The installed (SDK) form of the headers.
 
+### 1.24 GraphQL flipped (S5)
+
+Two code commits (`7b4e1046d`, `78bbe30ca`). The C++ services answer
+GraphQL with PSIO's engine (`psio/graphql.hpp`, PSIO `docs/graphql.md`);
+nothing in psibase names `psio1` any more.
+
+**`serveGraphQL.hpp`** (1119 → 734 lines).
+
+* `serveGraphQL(request, root, limits = {})` runs
+  `psio::graphql::schema<Query>`: `GET /graphql` returns `sdl()`;
+  `?query=` (the text after it, not URL-decoded, as before), `POST` with
+  `application/graphql`, or `application/json` with
+  `{"query", "variables", "operationName"}` (`variables` is read as a
+  `psio::json_value` and handed on as text; `null` is no variables). The
+  request is parsed by one non-template function.
+* `IndexView<T, K>` adapts a `TableIndex<T, K>` to
+  `psio::graphql::ordered_index`: `lower_bound(span)` is
+  `index.lower_bound(KeyView)`, `upper_bound(span)` searches the key
+  followed by a zero byte (the smallest byte string above it),
+  `key(it)` is `keyWithoutPrefix()`, `row(it)` is the packed row
+  (`psio::shared_pssz<T>`: a query reads the selected members in place),
+  `row_bytes(it)` is `valueSize()`.
+* `psio::graphql::resolver<TableIndex<T, K>>` with the argument group
+  `IndexArgs<K>` (`key_range<K>`, `page_args`): a `Query` method that
+  returns an index is a connection field with `gt/ge/lt/le/first/last/
+  before/after`, unchanged in the service (5 methods: `owned`,
+  `allCandidates`, Packages' `installed`, `users`, `sockets`).
+* `allRows` = `page_limits{SIZE_MAX}`: every connection of the tree passes
+  it, so a query without `first` / `last` still returns the whole range and
+  `first` is not capped (PSIO's default is 100). Explorer's `blocks` passes
+  `page_budget{.max_bytes = 6 MiB, .max_page_size = allRows.max_page_size}`.
+  The test's `shown` field is the only one with a page cap (2).
+* `WithBlockContext<T>` is `PSIO_REFLECT(WithBlockContext, block,
+  attr(data, psio::graphql::flatten))`; `type_name` specializations name
+  it `<T>WithBlockContext` and an event connection `<T>Connection` /
+  `<T>Edge`. `EventQuery<T>` takes `.page(page_args)`, returns
+  `psio::graphql::result<connection<WithBlockContext<T>>>` built with
+  `connection_builder`, and reports a bad argument as a field error instead
+  of aborting the query.
+* Deleted: `makeConnection`, `makeConnectionIter`, `makeConnectionView`,
+  `makeVirtualConnection` (no caller), `TransformedConnection{,View}`,
+  `PageInfo`, `Edge`, `Connection`, `gql_callable_args`, `gql_callable_fn`,
+  `fill_gql_schema_members`, `gql_query_inline`, the three `get_type_name`
+  overloads, the rapidjson includes.
+* `ConsensusData` (`block.hpp`), `SocketInfo` and `SocketEndpoint`
+  (`SocketInfo.hpp`) are named by `psio::graphql::type_name`
+  specializations (the template is forward-declared there: no GraphQL
+  header is included). The four `#include <psio1/chrono.hpp>` are gone;
+  nothing needed them.
+
+**The 16 query roots.**
+
+| Root | Change |
+|---|---|
+| `RAccounts.cpp` | `accountsByPre(prefix, page)`, `frozenAccounts(page)` → `paginate(IndexView{…}, range, page, allRows)`; "no account matches" is the empty range `ge = lt`; `name_as{"Query"}` |
+| `RAuthSig.cpp` | `accWithKey(pubkeyPem, range, page)`; the names `AuthConnection` / `AuthEdge` kept by two `type_name` specializations; `name_as{"Query"}` |
+| `RProducers.cpp`, `RTransact.cpp`, `XSocketListService.cpp` | `name_as{"Query"}` only |
+| `RAuthDelegate.cpp`, `RSetCode.cpp`, `RDynLd.cpp`, `XProxy.cpp` | unchanged |
+| `Explorer.cpp` | `blocks(range, page)` → `paginate(transform(IndexView{blockLog()}, fn), range, page, page_budget{…})`; `transactionCensor` hidden; `limits{.max_complexity = 10'000'000}` (below) |
+| `RInvite.cpp` | `invitesByInviter(inviter, range, page)` with `transform`; `history(inviteId, page)` |
+| `RPackages.cpp` | `packages(owner, name, page)` |
+| `Sites.cpp` | `getContent(account, range, page)` with `transform`; `service` hidden |
+| `XPackages.cpp` | `installed(range, page)` (the page is built inside the subjective transaction) |
+| `XPeers.cpp` | `peers(range, page)`, `urls(range, page)` with `transform` |
+| `EmitEvents.cpp` | `foo2Events(page)`, `exampleRecords(page)` |
+
+No field or argument was renamed: every method still takes the arguments it
+took, under the same names.
+
+**Client-visible changes.**
+
+| | Before | Now |
+|---|---|---|
+| 64-bit integers (`Account.authSequence` is the only one in the 16 roots) | always a string; schema `String` | a number up to 2^53 − 1, a string beyond; `UInt64` / `Int64`. Arguments accept both |
+| `uint32` | schema `Float` | `Int` (values above 2^31 − 1 are written and accepted) |
+| An `Int` argument written as a string (`inviteById(inviteId: "5")`) | accepted | `Expected value of type "Int", found "5".` |
+| Bytes, digests | `String` (hex) | `Bytes` (upper-case hex, either case read) |
+| Time points | `String` | `DateTimeSeconds` / `DateTimeMicroseconds` (same RFC 3339 text) |
+| `AccountNumber`, `MethodNumber`, `Decimal`, `Memo`, `Precision`, `SocketEndpoint`, `IPAddress`, … | `String` | a scalar named after the type, same text; an argument that is not a valid value is a validation error |
+| Input objects | `<T>_Input` | `<T>Input` |
+| Type names of objects, unions, connections, edges, `PageInfo`, the root `Query`, `<T>WithBlockContext` | | unchanged |
+| A connection field | `…Connection!` | nullable (it is `null` when its arguments are in error) |
+| `pageInfo.startCursor` / `endCursor` | `String!`, `""` on an empty page | `String`, `null` on an empty page |
+| `first` with `last` on a table connection | allowed | field error `Arguments "first" and "last" cannot both be given.` |
+| A malformed cursor | ignored | field error `Argument "after" is not a cursor.`; `before: ""` is "before the first key" (an empty page) |
+| Negative `first` / `last` | not an error | field error |
+| Event cursors (`history`, `foo2Events`, `exampleRecords`) | the decimal row id | 16 hex digits: the key of the row id |
+| `gt` / `le` with a leading part of a composite key | compared the encoded prefix | `gt` skips and `le` includes every row that starts with it (the same rows as before: `TableIndex::upper_bound` already did this) |
+| Records without members (`TLSInfo`, `LogSocketInfo`, `ProducerMulticastSocketInfo`) | `{}`; `tls {}` was accepted | one field `_: Boolean` (`true`); an empty selection set is a syntax error: `tls { __typename }` or `tls { _ }` |
+| Errors | `{"errors":[{"message"}]}` | `{"data":…,"errors":[{"message","locations","path"}]}`; a failed field is `null` and the other fields are answered |
+| Limits | none | PSIO's (`docs/graphql.md`, "Limits"): complexity 100 000, response 16 MiB / 1 000 000 fields, depth 32, document 64 KiB. Explorer: complexity 10 000 000 |
+| New | | variables, `operationName`, named fragments, `@skip` / `@include`, aliases everywhere, introspection (`__schema`, `__type`), `__typename` |
+
+**The complexity limit (G53, section 5.3).** PSIO counts the selection
+under a paged field times `first` / `last` and the `edges` list inside it
+times `default_list_size` (10) again: `conn(first: N) { edges { node { k
+fields } } }` costs `1 + N × (1 + 10 × (1 + k))`. With the default limit a
+page of 1000 rows may select 8 node fields. Affected in the tree, all on
+Explorer's `blocks`: the Explorer plugin's block query costs 3 726 per row
+with transactions (26 rows at most) and its callers ask for 50, 300 and
+720; Homepage asks for `last: 600` at 253 per row. Explorer's pages are
+bounded by the byte budget, so `Explorer.cpp` passes
+`limits{.max_complexity = 10'000'000}` (720 × 3 726 = 2.7 million); every
+other service keeps PSIO's defaults, under which the largest query of the
+tree costs 71 401 (`packages(first: 100)`). Without `first` the complexity
+assumes 10 rows whatever the table holds; the response limits then bound
+the answer.
+
+**Clients.** Surveyed by reading every query sent to one of the 16 roots
+(TypeScript, Rust plugins and CLI, Python, C++ tests); not run.
+
+*Updated here:* `XProxy/ui/src/app.tsx` (`tls {}` → `tls { __typename }`);
+`Config/ui/src/hooks/use-frozen-accounts.ts` and
+`use-accounts-by-prefix.ts` (`endCursor` nullable);
+`doc/src/development/services/cpp-service/reference/web-services.md`
+(names `IndexView`, `IndexArgs`, `WithBlockContext`). The Python tests and
+`test_event.cpp` / `Explorer-test.cpp` need no change (cursors are only
+handed back; no empty page is read).
+
+*For the Rust side* (not edited: `rust/` and the plugins are its):
+
+| File | Change needed |
+|---|---|
+| `packages/user/Invite/plugin/src/db.rs:64, 88` | `inviteById(inviteId: "{id}")` → `inviteById(inviteId: {id})`: a quoted `Int` is refused and the plugin unwraps the reply (every invite flow) |
+| `rust/psibase/src/package.rs:2323` (used at 2157, 2503, 2524) | `NextPageInfo.endCursor: String` → `Option<String>`: an owner without packages, or a node without local packages, has an empty page |
+| `packages/user/Packages/plugin/src/lib.rs:231, 263` | the same |
+| `packages/user/Explorer/plugin/src/block_log.rs:127–135` | its retry without `transactions` on *any* error hides a rejected query as "transactions unavailable"; with Explorer's limit raised the query runs, but the retry should look at the error |
+| `rust/psibase/src/main.rs:1484` | builds `query { }` when there is no package: now a syntax error |
+
+OK as they are: `Accounts/plugin/query` (`authSequence` is read as number
+or string), `AuthSig/plugin` (`endCursor: Option<String>`, `after: null`),
+`AuthDelegate/plugin`, `Producers/plugin`, `Invite/plugin/src/lib.rs`
+(`getInviteCost`), `VirtualServer` and `SingleProd` service tests, and the
+pass-through plugins. Latent, no caller in the tree:
+`CommonApi/common/resources/useGraphQLQuery.mjs` (interpolates a `null`
+cursor; its default `before: ""` now gives an empty page).
+
+**The tester.** `chain_polyfill.cpp`: `getKey` returned the key with the
+prefix of the handle it was found through, while a service on a node gets
+it without; iterating a table through a prefixed handle in a tester wasm
+ended in `no such key`. It strips the prefix now. (It also includes
+`<unistd.h>`, which it had through the legacy headers.)
+
+**Tests.** `libraries/psibase/common/tests/graphql.cpp`, native and guest
+(the guest reads a test chain's service database, the native build the
+key-value store of `tables.cpp`, which gained `kvGreaterEqual`,
+`kvLessThan`, `kvMax`, `getKey` and byte-ordered keys): the SDL of a root
+with an index-returning method, a subindex, a range over a composite key,
+transformed rows, a byte budget, the two unions, `WithBlockContext`, a
+hand-built connection, an empty record, and the scalar names, pinned in
+full; a root renamed `Query`; fields, methods with arguments, optional /
+list / variant results with inline fragments; `first/after`,
+`last/before`, `ge/lt`, `gt/le`, upper-case hex cursors, null cursors on
+an empty page, `first` with `last`, a bad cursor, a negative size; a
+resolver's error as a field error; unknown and hidden fields, a syntax
+error, a wrong argument type; variables, a named fragment, a missing
+variable; `serveGraphQL` for each request form. 5 test cases; `tables.cpp`'s
+name case reads `psio::graphql::type_name`.
+
+**Checked.** Full builds `-k 0`: `build-s5d.log`, `build-s5f.log` (only
+the `index.json` edge fails). `ctest-s5-full.log`: 29 / 93, the passing
+set identical to `ctest-s6-full.log`.
+
+**Not verified.** No GraphQL query was sent to a running node or through a
+tester chain: every psinode / package test that would do so fails earlier
+for want of the Rust side (section 1.25). The 16 roots are compiled; the
+engine, the index adapter and `serveGraphQL` are exercised by
+`graphql.cpp` only. `EventQuery` was compiled, not run (`test_event.cpp`
+needs a booted chain). No browser was run. The `?query=` form is still not
+URL-decoded. A response over 16 MiB from Explorer (6 MiB of blocks in hex
+is about 12 MiB) was not measured.
+
+### 1.25 psio1 deleted (S7)
+
+Commit `13a1785f7`, then the IPv6 fix `877f9d182` and the pin `fbbfa1980`.
+
+**Deleted** (70 files, 27 720 lines):
+
+| | |
+|---|---|
+| `libraries/psio1` | 54 files, 18 920 lines: 27 headers, 5 sources, 20 test files, two CMake files. With it the temporary glue (section 1.5), `canonical_glue_tests.cpp`, the target `psio1`, `libpsio1.a` and the test binaries `psio-tests` |
+| `libraries/debug_eos_vm` | 7 files, 6 304 lines. Dead: referenced only by `.vscode/.clangd`, by two build logs under `doc/storage/evidence` (a build of an older tree) and by this document; no CMake file added it; psinode and psitest use `psizam::debug` |
+| `rust/test_fracpack`, `rust/test_fracpack_macros` | 9 files, 2 496 lines: the C++ ↔ Rust cross-check of the legacy library (`build.rs` compiled `libraries/psio1`). The Rust branch removed both in `867e9799b`; the same lines are removed here from `rust/Cargo.toml` (members and default-members) and `rust/CMakeLists.txt` (`-p test_fracpack`, the Boost include probe), and `rust/Cargo.lock` loses the two packages (rewritten by cargo). `rust/gen-cpp-doc/src/main.rs` loses its two `-I…/libraries/psio1/…` lines (the Rust branch still has them) |
+
+**Build.** `libraries/CMakeLists.txt` (`add_subdirectory(psio1)`),
+`libraries/psibase/CMakeLists.txt` (links `rapidjson` in place of `psio1`:
+`Memo.hpp` validates UTF-8 with it, which it had through `psio1`), the SDK
+(`psibase-config.cmake`: the `psio1` target and link line;
+`psibase-config.cmake.build`: the same, and rapidjson's include directory
+moves to the `psibase` target), two commented lines of
+`libraries/net/test/CMakeLists.txt`, `.vscode/.clangd`,
+`tests/cmake/dependencies/README.md`, `demo/*-build/build.py` and
+`compile-command.json` (not built: unverified).
+
+**The Python codec.** `programs/psinode/tests/test_fracpack.py` tests
+`fracpack.py`, which the Python tests still pack with. Its data file moved
+from `libraries/psio1/tests/` to
+`programs/psinode/tests/fracpack-tests.json`. The Python codec is the last
+fracpack implementation in the tree; it is legacy and is replaced when the
+Python tests move to PSIO (owner: whoever flips them; section 6.12).
+
+**Docs.** `doc/src/specifications/data-formats/fracpack.md` linked the
+legacy header as the reference implementation: replaced by a note that the
+format is PSSZ (PSIO `docs/pssz-spec.md`). Pages that still describe
+fracpack, the legacy schema or the legacy JSON forms, for the team:
+`specifications/data-formats/fracpack.md`, `…/schema.md`,
+`specifications/blockchain/entry-points.md`,
+`default-apps/common-api.md`, `default-apps/transact.md`,
+`default-apps/x-admin/http-endpoints.md`,
+`development/front-ends/reference/js-libraries.md`,
+`development/services/rust-service/tables.md`, `SUMMARY.md` (the entry).
+
+**Acceptance.** `git grep -n psio1` returns lines in
+`doc/pssz-conversion.md` and `doc/flip-interop.md` only;
+`git grep -nE "PSIO1_|<psio1/"` likewise (both documents quote the names
+as history).
+
+**The IPv6 parser** (`877f9d182`, a C++ bug found by the Rust side's
+vectors). `parseIPV6AddressImpl` accepted the end of an address after
+`::`, and after an IPv4-mapped tail, only at `]` or `%` — the two
+characters that follow an address inside an endpoint or before a zone —
+not at the end of the text. So `"[::]:80"` was read and `"::"`, `"1::"`,
+`"fe80::"`, `"::ffff:1.2.3.4"` were not, although `to_string` writes them:
+C++ could not read back its own JSON for those addresses. Both ends are
+accepted now, and `::` after eight groups is refused. `json.cpp` has the
+Rust test's vectors (`rust/psibase/tests/psio_json.rs`): 16 texts parsed,
+written, re-read and passed through the `IPAddress` and `SocketEndpoint`
+text adapters, 25 malformed texts refused.
+
+**Pin.** PSIO `f811c6f982fa62bbdcd77587f123d80cde983bdc` (`main`:
+`f03f7304` and one commit under `rust/psio`; `git diff f03f7304 f811c6f
+-- cpp cmake CMakeLists.txt` is empty), the hash the Rust branch names.
+
+**Test suite.** 91 tests (was 93): `n-psio-tests` and `t-psio-tests` are
+gone with the library. `build-final.log`: the one
+failed edge is `share/psibase/packages/index.json`. `ctest-final.log`
+(after the pin move): **27 / 91 pass**, the 29 of `ctest-s6-full.log`
+without the two deleted binaries; the failed set is the same 64.
+
+| Failures | First error | Needs |
+|---|---|---|
+| 28: `rs-test-*` (27), `rs-subjective-test` | the Rust tester panics at `rust/psibase/src/tester.rs:283` | the Rust side: its tester and services on PSSZ (they read what the C++ node now writes) |
+| 22: `t-*-test` (21), `t-psibase-tests` | `tester wasm asserted: service/<name>.json: json: missing required member "package" of Schema` | the Rust side: the packages of Rust services, whose `service/<name>.json` is still the legacy schema (the package index edge of the build is the same artifact) |
+| 13: `psinode_test_*` except `config` and `timer` | `Error: data did not match any variant of untagged enum AnyType` | the Rust side: the `psibase` CLI reading a C++ schema (Schema IR) at boot |
+| 1: `rs-tests` | the pre-flip Rust unit tests of this worktree | the Rust side |
+
+**No failure is a C++ bug**: each stops at an artifact the Rust branch
+produces or reads, before any C++ under test runs, as in sections 1.22
+and 1.23. Passing: the native unit tests, `n-psibase-common-tests`,
+`n-psibase-psio-tests` and `t-psibase-psio-tests` (69 test cases natively,
+with `rust_twins.cpp` matching its fixture; 5 GraphQL and 1 IPv6 case
+added), the three Python unit tests (`py_test_fracpack` with the moved
+file), `test_consensus*`, the three timer / routing tests,
+`psinode_test_config`, `psinode_test_timer`.
+
+**Not verified.** `demo/` (not built). The installed SDK
+(`psibase-config.cmake`): edited, not installed or consumed. `rs-tests`
+with the cross-check crates removed runs the pre-flip Rust tests of this
+worktree and fails as before. The book (`doc/src`) was not built by hand;
+`gen-cpp-doc` builds in the full build.
+
 ## 2. Inventory of what remains
+
+**Historical.** This inventory was taken before the flip; nothing of it remains in C++ (sections 1.17–1.25). It is kept as the record of what was counted.
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,
 `external/` and `doc/` (`git grep -P`). Section 2.1 is re-counted at the end
@@ -2348,6 +2611,8 @@ use it too. Replacement: a PSSZ codec driven by the Schema IR. PSIO has no
 Python implementation (G9).
 
 ## 3. Proposed order of the remaining slices
+
+**Historical.** The order below was the plan before the flip; the C++ stages that replaced it are S1–S7 (sections 1.19–1.25).
 
 Principle: **declarations first, bytes last.** Because `psio1::reflect<T>` is
 derived from `psio::reflect<T>` (1.5), a type can be re-declared with PSIO's
@@ -2693,6 +2958,12 @@ section 1.23. The table is kept as the record of what was found.
 | G49 (D) | A record or tuple whose known members are all fixed-size is not readable from a wider or a narrower declaration. With a variable-size known member the wider bytes are accepted. | `s1_gap_unknown_after_fixed.cpp` → prints `(int32) read as (int32, optional): pssz: record fixed region truncated`, `(int32, nullopt) read as (int32): pssz: fixed record has trailing payload`, `fixed known members, unknown absent : pssz: fixed record has trailing payload`, `fixed known members, unknown present: pssz: invalid record payload offset`, `variable known member, unknown present: ok`. Reproduces. | `XHttp::autoClose` reads `TempPendingRequestRow` and `PendingRequestRow` as themselves; `XHttp`'s close hook packs the error callback's arguments as the callback declares them. Whether another site relies on this was not searched exhaustively (1.19, "Not verified"). |
 | G50 (E) | A view does not convert to what it designates where the legacy view did: a view of `std::vector<unsigned char>` to `std::span<const unsigned char>`; a view of `std::array<std::uint8_t, N>` (`Checksum256`) to the array; a view of a `definitionWillNotChange` one-member record with a text adapter (`AccountNumber`, `MethodNumber`) to the record. Each compares with its value and has `.unpack()`. | `s1_gap_view_convert.cpp` (new; a stand-in `Name` for `AccountNumber`), `-DCASE=1` → `error: no matching function for call to 'takesSpan'`; `-DCASE=2` → `… 'takesDigest'`; `-DCASE=3` → `… 'takesName'`; without `CASE` it compiles and prints `ok: owner==value 1`. Reproduces. | About 100 `.unpack()` at call sites. |
 | G51 (F) | No compile-time relation "a `U` packs as a `T`" (the legacy `PackableAs<U, T>`): a concept that is true exactly when `psio::to_pssz(const U&)` yields the bytes of a `T`, for example a record of references, views or `std::string_view`s standing for the owning record (`TxSuccessView` for `TxSuccessRecord`). | `s1_gap_packs_as.cpp` (new), `-DCASE=1` → `error: no member named 'packs_as' in namespace 'psio'` (the name is psibase's wish, PSIO has none under any name); without `CASE` it runs: `RecView packs as Rec: bytes equal 1, run-time check 1`, `Wrong packs as Rec: run-time check 0 (compiled without complaint)`. Reproduces. | `Table::put` of such a record packs it and checks `psio::validate_pssz<T>` of the bytes at run time (3 call sites); a wrong record is found when the action runs, not when it is compiled. |
+
+### 5.3 Found during S5 (G53)
+
+| # | Missing | Reproduction → output at `f03f7304` / `f811c6f9` | What psibase does meanwhile |
+|---|---|---|---|
+| G53 | The complexity of a connection counts its page size twice: the selection under a field with `first` / `last` is multiplied by that page size, and the `edges` list inside it by `limits::default_list_size` (10) again, although `edges` holds exactly the page. `rows(first: N) { edges { node { k fields } } }` costs `1 + N × (1 + 10 × (1 + k))`. Expected: `edges` (a list directly under a paged field) multiplies by 1. | `~/psibase-flip-cpp-scratch/json/g_complexity.cpp` (PSIO headers only): `rows(first: 1000)` with 8 node fields runs (91 001), with 9 → `Query complexity exceeds the limit of 100000.`; `rows(first: 9000) { edges { node { a } } }` → the same error | `Explorer.cpp` passes `limits{.max_complexity = 10'000'000}` to `serveGraphQL` (its pages are bounded by a byte budget); every other service keeps the default, under which the tree's largest query costs 71 401 (section 1.24). No wrapper. |
 
 ## 6. Rust, JavaScript and Python
 

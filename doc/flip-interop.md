@@ -7,20 +7,16 @@ the C++ file that defines it). The Rust side (`cargo-psibase`, the `psibase`
 CLI, Rust services and plugins) must produce and accept exactly the "after"
 column.
 
-Status of this file: sections 0 to 5 are **definitive**: keys flipped in
+Status of this file: **every section is definitive.** Keys flipped in
 section 1.18 and the binary wire in section 1.19 of
 `doc/pssz-conversion.md`; string kinds were applied in its section 1.20;
-schemas flipped in its section 1.21 (stage S2), which implements the
-`ServiceSchema` record of section 2; JSON flipped in its section 1.22
-(stage S4): every JSON text C++ reads or writes outside GraphQL is PSIO's
-I-JSON, and sections 3, 4, 5 and 5.1 say what the code does. Section 6
-(GraphQL) states the intended format and is still to be confirmed by
-stage S5; until then a C++ GraphQL answer is written by the legacy
-library (64-bit integers always quoted, `DbId` a number).
+schemas flipped in its section 1.21 (stage S2); JSON in its section 1.22
+(stage S4); GraphQL in its section 1.24 (stage S5): a C++ GraphQL answer
+is written by PSIO's engine. The legacy library is deleted (section 1.25).
 
-PSIO pin for both languages: `f03f7304cd0e6b9dcb9bcccc3939743e1b96ddec`
-(`cmake/PsibaseDependencies.cmake`; PSIO `main`; gaps G46–G51 closed at
-`50092a4b`, which it contains. No wire change against `e12e4f6d`).
+PSIO pin for both languages: `f811c6f982fa62bbdcd77587f123d80cde983bdc`
+(`cmake/PsibaseDependencies.cmake`; PSIO `main`: `f03f7304` plus one
+commit under `rust/psio`; no C++ or wire change).
 
 ## 0. Already in force with the pin (before any flip commit)
 
@@ -554,12 +550,87 @@ trustfiles}` and the other members of the node configuration's `host`
 part (`producer`, `pkcs11_modules`, `listen`, `service_threads`,
 `loggers`, and `tls` when the node is built with TLS).
 
-## 6. GraphQL (C++ services after S5; names observed with PSIO's engine)
+## 6. GraphQL (C++ services; definitive, S5)
 
-* scalars: `uint32` → `Int`; 64-bit → `UInt64` / `Int64` (bare up to 2^53 − 1); bytes and digests → `Bytes`; time points → `DateTimeSeconds` / `DateTimeMicroseconds`; `AccountNumber`, `MethodNumber`, `Decimal`, `Memo`, `Precision` → named scalars;
-* input objects are `<Type>Input` (legacy `<Type>_Input`);
-* connections: `<Node>Connection` / `<Node>Edge`; cursors are upper-case hex of the key (as today); `startCursor` / `endCursor` are `null` on an empty page (legacy `""`); `first` together with `last` and a malformed cursor are errors;
-* errors: `{"data":…,"errors":[{"message","locations","path"}]}`.
+The engine is `psio::graphql` (PSIO `docs/graphql.md`); psibase's part is
+`psibase/serveGraphQL.hpp`. Pinned by
+`libraries/psibase/common/tests/graphql.cpp`.
 
-Rust services keep their own GraphQL engine; where a client reads both a C++
-and a Rust service, the scalar names above are what C++ will expose.
+**Requests.** `GET /graphql` → the schema in SDL (`text/plain`).
+`/graphql?query=…` (not URL-decoded), `POST` `application/graphql`, or
+`POST` `application/json` `{"query": …, "variables": {…}, "operationName":
+…}` (the last two optional; `variables: null` allowed) → `application/json`.
+
+**Scalars** (text as in I-JSON, section 5):
+
+| C++ | GraphQL | Value |
+|---|---|---|
+| `bool` | `Boolean` | |
+| integers up to 32 bits (`uint32` included) | `Int` | a number; an argument must be a number literal, not a string |
+| `uint64` / `int64` | `UInt64` / `Int64` | a number up to 2^53 − 1, a string beyond; both accepted as arguments |
+| `std::string` | `String` | |
+| `std::vector<char>`, `Checksum160/256/512`, byte arrays | `Bytes` | upper-case hex written, either case read |
+| `TimePointSec` / `TimePointUSec` (`BlockTime`) | `DateTimeSeconds` / `DateTimeMicroseconds` | RFC 3339 UTC |
+| `Seconds` / `MicroSeconds` | `Seconds` / `Microseconds` | the tick count |
+| a type with a text adapter or a transparent wrapper: `AccountNumber`, `MethodNumber`, `Decimal`, `Memo`, `Precision`, `IPAddress`, `SocketEndpoint`, `SubjectPublicKeyInfo`, … | a scalar named after the type | its JSON text; an invalid argument is a validation error |
+| reflected enum | an enum of its names | |
+
+**Types.** A record is an object type under its reflected name; as an
+argument it is the input object `<Type>Input`. `std::optional` is nullable,
+everything else non-null. `std::variant` of records is a union:
+`ConsensusData = CftConsensus | BftConsensus`, `SocketInfo =
+ProducerMulticastSocketInfo | LogSocketInfo | HttpSocketInfo |
+HttpClientSocketInfo | WebSocketInfo | P2PSocketInfo`. A record without
+members (`TLSInfo`, `LogSocketInfo`, `ProducerMulticastSocketInfo`) has the
+one field `_: Boolean` (`true`). The root type is `Query`.
+`WithBlockContext<T>` is `<T>WithBlockContext`: `block: EventBlockInfo!`
+followed by the fields of `T`.
+
+**Connections.** `<Node>Connection { edges: [<Node>Edge!]! pageInfo:
+PageInfo! }`, `<Node>Edge { node: <Node>! cursor: String! }`, `PageInfo {
+hasNextPage: Boolean! hasPreviousPage: Boolean! startCursor: String
+endCursor: String }`. Exceptions to the name: `AuthConnection` / `AuthEdge`
+(auth-sig `accWithKey`); an event connection is `<Event>Connection` /
+`<Event>Edge` over `<Event>WithBlockContext` nodes. The connection field
+itself is nullable.
+
+* Arguments: `first`, `last` (`Int`), `before`, `after` (`String`), and
+  for a table index `gt`, `ge`, `lt`, `le` of the index's key type (for a
+  composite key, its leading part: `gt` skips and `le` includes every row
+  that starts with it).
+* Cursor: the upper-case hex of the row's key in the index (without the
+  index prefix); for an event query the 16 hex digits of the row id.
+  Opaque: hand it back.
+* `startCursor` / `endCursor` are `null` on a page without edges.
+* `first` with `last`, a negative size, and a cursor that is not hex are
+  field errors (`Arguments "first" and "last" cannot both be given.`,
+  `Arguments "first" and "last" must not be negative.`,
+  `Argument "after" is not a cursor.`); the field is `null`.
+* Without `first` / `last` a page is every row of the range (no service
+  caps it; Explorer's `blocks` stops at 6 MiB of stored blocks and says so
+  in `pageInfo`).
+
+**Errors.** `{"data": …, "errors": [{"message": …, "locations": [{"line",
+"column"}], "path": […]}]}`; `{"errors": […]}` when the document does not
+parse or validate. HTTP status 200 in both cases.
+
+**Limits.** PSIO's defaults (complexity 100 000, counted as
+`1 + N × (1 + 10 × (1 + node fields))` for a connection with `first: N`;
+response 16 MiB; depth 32); Explorer allows complexity 10 000 000.
+
+**Clients of the C++ GraphQL services and what they must change**
+(`doc/pssz-conversion.md` section 1.24 has the full survey):
+
+| Client | Change |
+|---|---|
+| Rust: `packages/user/Invite/plugin/src/db.rs:64, 88` | `inviteId: "{id}"` → `inviteId: {id}` (a quoted `Int` is refused) |
+| Rust: `rust/psibase/src/package.rs:2323`; `packages/user/Packages/plugin/src/lib.rs:231` | `endCursor: Option<String>` |
+| Rust: `packages/user/Explorer/plugin/src/block_log.rs:127` | do not retry without `transactions` on every error |
+| Rust: `rust/psibase/src/main.rs:1484` | do not send `query { }` |
+| Rust: any reader of a 64-bit field as `String` | accept a number (`Accounts/plugin/query` already does) |
+| TypeScript (done): `XProxy/ui/src/app.tsx`, `Config/ui/src/hooks/use-frozen-accounts.ts`, `use-accounts-by-prefix.ts` | `tls { __typename }`; nullable `endCursor` |
+| Python tests, `test_event.cpp`, `Explorer-test.cpp` | none |
+
+Rust services keep their own GraphQL engine (`async-graphql`); PSIO's time
+and integer scalar names are the ones its Rust scalars use, so a client
+that reads both sees one set of names.
