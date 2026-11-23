@@ -671,7 +671,8 @@ TEST_CASE("psibase records: an event", "[canonical][records]")
 // hooks (psio_unwrap_packable, psio_validate_packable, to_json, from_json,
 // use_json_string_for_gql).
 // ---------------------------------------------------------------------------
-static_assert(psio::is_transparent_v<psibase::Memo> && psio::has_invariant_v<psibase::Memo> &&
+static_assert(psio::is_transparent_v<psibase::Memo> && !psio::has_invariant_v<psibase::Memo> &&
+              psio1::canonical_bounded_wrapper_v<psibase::Memo> &&
               psio::is_transparent_v<UserService::Precision> &&
               psio::has_invariant_v<UserService::Precision> &&
               psio::has_adapter_v<UserService::Decimal, psio::text_category> &&

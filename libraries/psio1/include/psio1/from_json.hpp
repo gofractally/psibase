@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <functional>
 #include <optional>
+#include <psio1/canonical_bounded.hpp>
 #include <psio1/check.hpp>
 #include <psio1/reflect.hpp>
 #include <psio1/untagged.hpp>
@@ -622,6 +623,10 @@ namespace psio1
       {
          if (auto status = ::psio::check_invariant(obj); !status.ok())
             abort_error(status.error().what);
+      }
+      else if constexpr (canonical_bounded_wrapper_v<T>)
+      {
+         canonical_check_bounded(obj);
       }
    }
 
