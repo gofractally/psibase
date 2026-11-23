@@ -7,7 +7,7 @@ set(PSIBASE_DEPENDENCY_PROOF_MODE consumer CACHE STRING
 set(PSIBASE_DEPENDENCY_PROOF_PREDECLARE_PSIO_TAG "" CACHE STRING
     "Optional containing-project first declaration, for acquisition proof only")
 set(PSIBASE_DEPENDENCY_PROOF_EXPECT_HEAD
-    f811c6f982fa62bbdcd77587f123d80cde983bdc CACHE STRING
+    fdb5de259f5059861a80a99b10a75d156a63d5eb CACHE STRING
     "Exact source revision expected by this proof (also checked for overrides)")
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../../cmake/PsibaseDependencies.cmake")
