@@ -2768,6 +2768,200 @@ Stages R-A … R-F as the coordinator defined them. Scratch tools:
 `~/psibase-pssz-scripts/rflip/` (`add_jsontext.py`, `add_psio_all.py`,
 `flip.py`, `clean_imports.py`); logs `~/psibase-pssz-build.*rflip*.log`.
 
+**HANDOVER: the state after R-E (JSON).** Branch `claude/pssz`, not
+pushed, PSIO pin `f811c6f982fa62bbdcd77587f123d80cde983bdc`. JSON has one
+source of behaviour in Rust: PSIO's I-JSON. Every wire, table, action and
+event type takes its serde impls from `psio::Serde`, so what an HTTP
+handler, an async-graphql scalar, a plugin or the CLI writes and accepts
+through serde is what `psio::to_ijson` / `from_ijson` do. The C++ of this
+tree is still on the legacy formats (as below): the two halves meet at the
+merge, for which `doc/merge-checklist.md` is written. The older handover
+(R-B … R-D) follows this one and still describes the wire, the schemas and
+the keys.
+
+*What R-E did.* Scratch tools: `~/psibase-pssz-scripts/re/`
+(`serde_bridge.py`, `unhex.py`, `fix_dot0.py`, `fix_unused_imports.py`,
+`scan_bytes.py`, `serde_attrs.py`, `check_all.sh`); logs
+`~/psibase-pssz-build.*-re*.log`.
+
+* **Derives.** 263 derive lists in 63 files (and the two of
+  `package-templates/`): serde `Serialize` / `Deserialize` →
+  `psio::Serde`.
+* **`#[serde(...)]` attributes** (159 before, 154 now; `serde_attrs.py`
+  prints the table). On PSIO types only `rename_all = "camelCase"` (16)
+  and `rename = "…"` (2) remain: both honoured. Everything else is on
+  serde-only types (below). Removed: the `default`s of `PackageInfo`
+  (every member of an `index.json` entry is required, as in C++).
+* **`Hex<T>` is deleted**: byte members are `Vec<u8>` / `[u8; N]`;
+  `Checksum256` is `[u8; 32]` (the C++ name of 32 bytes). Hex text
+  outside JSON (manifest URLs, GraphQL cursors, printed keys) is
+  `psio::to_hex` / `from_hex` (RG21 closed at this pin).
+* **`serialize_as_str!` is deleted**: `AccountNumber`, `MethodNumber`,
+  `Memo`, `Decimal`, `Precision` are `psio::Serde` over their `TextForm`
+  and GraphQL scalars through `psio::async_graphql_scalar!` (same scalar
+  names as before).
+* **`ExactAccountNumber` is deleted.** It existed to make account text
+  strict in JSON and on the command line. Strict account text *is*
+  `AccountNumber`'s PSIO text form (JSON, serde, GraphQL); the CLIs parse
+  arguments with `#[arg(value_parser = AccountNumber::from_exact)]`.
+  `FromStr` stays the lenient conversion services use (text that names no
+  account is the null account), as in C++.
+* **Text forms that follow C++** (`doc/flip-interop.md` 5; C++ is the
+  authority for these mirrors; texts pinned from
+  `libraries/psibase/common/tests/json.cpp` of the C++ branch):
+  `SubjectPublicKeyInfo` is its PEM armor (custom id
+  `SubjectPublicKeyInfo`; before, PSIO wrote hex and serde PEM);
+  `IPAddress` and `SocketEndpoint` are one string (`rust/psibase/src/ip_text.rs`:
+  the C++ printer and parser, ported); `NewAccountMode` is the reflected
+  enum (`"keepExisting"`, `"matchExisting"`, `"requireNew"`); `DbId` by
+  its C++ name through serde too.
+* **Package records are PSIO records**: `PackageInfo`, `LocalPackageInfo`
+  (C++ `LocalPackage`; the CLI's borrowing `LocalPackage<'a>` is gone),
+  `PackageDataFile`, `PackageManifest`, `ServiceInfo`, `PrettyAction`
+  (`data: Option<psio::JsonValue>`: any JSON, numbers as written),
+  `x_http::RegisterServerRequest`. Package files, manifests and the
+  requests to `x-packages` / `x-http` are written with `psio::to_ijson`
+  and read with `psio::from_ijson`.
+* **Readers of node JSON.** Traces (`TransactionTrace`, `ActionTrace`:
+  `totalTime` nanoseconds, bare or quoted), `Account.authSequence`,
+  schemas, `meta.json`, `index.json`, `SignedTransaction` (the inner
+  object), time (`psio::time` text): all PSIO types, so both forms of a
+  64-bit integer are read. `graph_ql.rs` `SqlRow` reads `rowid` as a
+  number or a string.
+* **`psio::pssz::RawString` helpers** (pin `2c17312a`): comparisons with
+  text and `to_string_lossy()` replace `to_str().unwrap_or_default()` and
+  `String::from_utf8_lossy(x.as_bytes())`. `error_text()` on the traces
+  stays (about 25 callers want `Option<String>`); its body is `e.to_string()`.
+* **`to_unit().unwrap()` → `.into()`** (13 sites, RG16).
+* **Schemas.** With anonymous argument lists at the pin (RG18 closed) a
+  plain `insert::<args::m>()` gives the C++ `@N`; psibase does not call
+  `insert_argument_lists` (the C++ `ServiceSchema` has no aliases; the
+  coordinator's decision). No source change.
+
+*Types that keep plain serde, and why* (230 derive lists, `scan_bytes.py`
+/ `serde_attrs.py` list them). They are JSON-only (never packed, no
+schema) and PSIO's rules either do not apply or are met by hand:
+
+| Kind | Where | Why plain serde |
+|---|---|---|
+| GraphQL response shapes read by plugins, the CLI and tests (`ResponseRoot`, `Data`, `…Connection`, `…Edge`, `…Response`) | `packages/**/plugin/src`, `rust/psibase/src/package.rs`, `rpc.rs`, service tests | the shape of one query's answer; members that are PSIO types (`AccountNumber`, `Checksum256` inside a PSIO record, time) read PSIO's text; 64-bit members carry `deserialize_number_from_string` (39) and read both forms |
+| Event rows read from the Events service's SQL results | `**/query-service/src` (`…Event`, `Update`, `KeysSet`, …) | the columns of one SQL row; numbers read leniently; byte members read hex through `#[serde(with = "psio::serde_bridge")]` (3) |
+| Documents with an externally imposed format | `EthRelay/core` (`Fact`, `Witness`, …: `tag` / `content`, `deny_unknown_fields`: Ethereum proofs), `BtcBridge/core`, `EthBridge/core`, `Favor/service/src/crypto.rs`, `Signing/daemon`, `Exchange` (`Cursor`, `PendingPlan`, …) | not psibase's format; strict (`deny_unknown_fields`) or tagged on purpose |
+| Tool configuration | `cli/config.rs` (TOML), `cargo-psibase` `PsibaseMetadata` (`Cargo.toml` metadata: kebab-case, `deny_unknown_fields`), `depgraph.rs` | read by serde formats other than JSON, or internal |
+| `rpc.rs` `TaposRefBlock`, `LoginReply`, `flags.rs` | small replies with only 8- to 32-bit members | PSIO's text is the same |
+
+A hazard that the compiler does not catch: **a bare `Vec<u8>` or
+`[u8; N]` handed to serde directly** (a member of a serde-only struct, an
+element of a `json!`, `serde_json::to_string(&digest)`) is serde's array
+of numbers, not hex; only a PSIO type has PSIO's text. The tree was
+searched for it (`scan_bytes.py serde`, the `json!` sites); the readers
+found were made PSIO types (`StagedTxDetailsInner`, `TokenIcon`,
+`staged-tx` `Update`) or given the bridge on the member. The twin test
+checks serde against the fixture for the PSIO types only for this reason.
+
+*GraphQL (RG20).* async-graphql implements `[T; N]` and `Vec<T>` as lists,
+so a `Vec<u8>` / `[u8; N]` member of an object is `[Int!]`, and neither
+psibase nor PSIO can make it a scalar (C++ exposes `Bytes`). The members
+that were `Hex` / `Checksum256` keep their hex text through a field
+resolver (`#[graphql(skip)]` or `skip_output`, `#[graphql(complex)]`, a
+`#[ComplexObject]` returning `psio::to_hex`):
+
+| Object | Member | File |
+|---|---|---|
+| `Action` | `rawData` | `rust/psibase/src/block.rs` |
+| `Claim` | `rawData` | `rust/psibase/src/block.rs` |
+| `BlockHeaderAuthAccount` | `codeHash` | `rust/psibase/src/block.rs` |
+| `SitesContentRow` | `contentHash` | `rust/psibase/src/services/sites.rs` |
+| `StagedTx` (mirror) | `txid` | `rust/psibase/src/services/staged_tx.rs` |
+| `AuthRow` | `keyFingerprint` | `packages/system/AuthRecover/service/src/lib.rs` |
+| `StagedTx` | `txid` | `packages/system/StagedTx/service/src/db.rs` |
+| `Update` (event) | `txid` | `packages/system/StagedTx/query-service/src/lib.rs` |
+
+and the four `icon_hash` resolvers (`Tokens`, `TokenSwap`) return the hex
+`String`. Members that were a bare `Vec<u8>` before are lists as before
+(`ConsensusBytes.data`, `BlockHeaderCode.code`, the `Evaluations` rows).
+**As GraphQL input** bytes are a list of integers (`ActionInput.rawData`,
+`ClaimInput.rawData`, `BlockHeaderAuthAccount` as input: the three types
+that are also `InputObject`s). Nothing in the tree takes one of them, a
+digest or a byte sequence as a GraphQL argument (searched: every
+`async fn` of an `#[Object]` / `#[ComplexObject]`), so no client sees the
+difference from C++'s `Bytes` today.
+
+*Behaviour changes, for the team log.*
+
+1. `AccountNumber` through serde is strict (it was lenient: `"Alice"`
+   read as the null account).
+2. `PackageInfo` / `index.json` entries and `meta.json` need every member.
+3. `LocalPackage` in the CLI is `LocalPackageInfo`.
+4. `SubjectPublicKeyInfo` has one text, the PEM armor, with line feeds
+   (the `pem` crate wrote CRLF) and the C++ shape check.
+5. `NewAccountMode` is a reflected enum, written by name; the constants
+   `KEEP_EXISTING`, … are the variants `KeepExisting`, ….
+6. `IPAddress` / `SocketEndpoint` are one string in JSON (were the
+   variant object); their members are public.
+7. A digest in a `psibase` GraphQL object is still hex text; its GraphQL
+   type is `String` (was the scalar `Hex`).
+8. `HttpStatus` no longer derives serde (C++ writes the number; nothing
+   serialized it).
+
+*Temporary items that MUST be removed at the merge with the C++ flip:*
+`doc/merge-checklist.md` section 1 (three pass-throughs in
+`psio_twins.rs`: the custom ids `Action` and `ServiceMethod`, and
+`NewAccountMode` as an enum; the fixture's `"frac"` members; the
+`RawInCpp` readings).
+
+*PSIO gaps of this round.*
+
+| # | Gap | Reproduction / status |
+|---|---|---|
+| RG18 | closed at `50092a4b` | interface argument lists are anonymous |
+| RG19 | closed at `2c17312a` | `RawString` text helpers; used |
+| RG20 | **open.** Bytes cannot be a GraphQL scalar in Rust | `#[derive(async_graphql::SimpleObject)] struct S { h: [u8; 32], b: Vec<u8> }` → both fields are `[Int!]!`; `async-graphql` owns the impls for `[T; N]` / `Vec<T>`, so only a PSIO-owned bytes type or PSIO's own GraphQL for Rust can give C++'s `Bytes`. Interim: the resolvers above |
+| RG21 | closed at `f811c6f9` | `psio::to_hex` / `from_hex`; used, psibase's two functions deleted |
+
+*Found in C++ while porting* (`libraries/psibase/common/src/SocketInfo.cpp`
+`parseIPV6AddressImpl`, the same in this tree and on the C++ branch): the
+parser refuses an IPv6 address whose text ends in `::` (`"::"`, `"1::"`,
+`"fe80::"`) and an IPv4-mapped one at the end of the text
+(`"::ffff:1.2.3.4"`), although `to_string` writes exactly these; inside
+brackets or before `%zone` they are read. The Rust reader accepts them
+(it must read what C++ writes); the C++ side should fix the parser, or
+C++ cannot read back its own JSON for those addresses.
+
+*Verification at this tip.*
+
+| Check | Command | Result |
+|---|---|---|
+| every Rust workspace | `~/psibase-pssz-scripts/re/check_all.sh <tag>` (the eight `cargo check` commands of the older table) | all exit 0 except `packages/user --tests`: `tokens-plugin` (its records derive the codec with `cfg(not(test))`) and the Favor contract tests (`FAVOR_TEST_SERVICE` at compile time), as before |
+| the five plugin crates with generated bindings | `cd packages/user && cargo component check -p btcbridge-plugin -p btcrelay-plugin -p ethbridge-plugin -p exchange-plugin -p favor-plugin-legacy --target wasm32-wasip1` | exit 0 each: `cargo component` writes `src/bindings.rs` (ignored by git), after which the plain `cargo check` covers them too. This also uncovered the `Exchange` service's test sources, which had not been compiled since the flip (fixed) |
+| Rust unit tests | `cd rust && cargo test -r --no-fail-fast -p psibase -p cargo-psibase -p psibase-macros-lib -p psibase-macros-derive -p psibase_plugin` | `psio_json` 13 / 13 (new), `psio_twins` 3 / 3, `psio_leaf_types` 13 / 13, `psio_wrappers` 7 / 7, `service_schema` 4 / 4, macro-lib 6 / 6, cargo-psibase 8 / 8, psibase lib 60 pass and the 42 `verify_schema` fail without `PSIBASE_DATADIR`; under ctest (`rs-tests`) 77 pass and 25 fail: the `verify_schema` of the mirrors of C++ services |
+| `serde_json` features | `cargo tree -e features -i serde_json` in each workspace; `cargo test -p psio-serde-json-stock` in `external/psio/rust` | `psio` enables `raw_value` only (7 / 7); `preserve_order` and `unbounded_depth` come from psibase's own graph (`rust-workspace-hack`, `cargo_metadata`), as before |
+| full build | `~/psibase-pssz-scripts/build.sh re-f` | exit 1 at the last step only (`share/psibase/packages/index.json`: the Rust `reserved-names` tool refuses the legacy schema JSON of the C++-built `AccountsService.psi`), as at the previous tip |
+| full suite | `~/psibase-pssz-scripts/ctest.sh re-f` | 29 / 93, the same 29 as at the previous tip. The 64 failures have the one known cause, the other language's package schema JSON: 28 `rs-test-*` / `rs-subjective-test` and 13 `psinode_test_*` with `json: missing required member "package" of Schema`; 22 `t-*` (C++ tester) with `Invalid type for variant`; `rs-tests` with 25 × `verify_schema` (the mirrors of C++ services; the 17 of Rust-built packages pass) and nothing else. None fails for another reason (classified from `~/psibase-pssz-build.ctest-re-f.LastTest.log`) |
+
+`tests/psio_json.rs` pins, through `to_ijson`, `from_ijson`, serde in both
+directions and `serde_json::Value`: an action's arguments with a 64-bit
+integer and bytes (bare / string at 2^53, hex, the positional array, a
+missing member's message), a missing optional argument, text forms in
+arguments, an `Action`, a `Transaction` and a `SignedTransaction` (the
+inner object; its packed bytes), a variant, `DbId` and `NewAccountMode`,
+a transaction trace, time values, two table rows, a public key (the C++
+test's cases), the package files, IP addresses and socket endpoints.
+
+*Not compile-verifiable, and why:* `tokens-plugin` under `--tests` and
+the Favor contract tests (above); `package-templates/` (converted by
+hand) and `demo/` are not built.
+
+*What is left.* **R-F, the rest** (unchanged): `from_bin.rs` / `to_bin.rs`
+(check for consumers); comments and documentation that still say
+"fracpack" (`rust/psibase_macros/**/README.md`, the macro docs,
+`native_raw.rs`, `tester_raw.rs`, `serve_http.rs`, `rust/.config/hakari.toml`,
+`StagedTx/service/src/db.rs`, `Exchange/service/src/math.rs`, two `.wit`
+files, `doc/src`); redundant `.into()` calls where `ExactAccountNumber`
+and `Hex` were converted (`cargo clippy` lists them as
+`useless_conversion`). **The merge** (`doc/merge-checklist.md`). Then the
+trust refinement and the caps (the team).
+
 **HANDOVER: the state after the sweep R-B + R-C + R-D (+ the Rust part
 of R-F).** Branch `claude/pssz`, not pushed, PSIO pin `e12e4f6d`. Every
 byte Rust writes or reads is PSIO's: there is no `rust/fracpack`, no
@@ -2947,7 +3141,7 @@ not built.
 
 *What is left.*
 
-**R-E, the JSON flip (not started).** 263 types in 63 files derive both
+**R-E, the JSON flip (done: the handover above; kept as the scope that was planned).** 263 types in 63 files derive both
 `psio::JsonText` and `serde::Serialize` / `Deserialize`: the serde
 derives become `psio::Serde` (the bridge; six types have it already:
 `ServiceSchema` and its three records, `ActionTrace`, `accounts::Account`,

@@ -1,17 +1,15 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
     #[derive(
-        Serialize,
-        Deserialize,
         Debug,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct InitRow {}
     impl InitRow {
@@ -23,13 +21,12 @@ pub mod tables {
     #[derive(
         Default,
         SimpleObject,
-        Serialize,
-        Deserialize,
         Debug,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct ExampleThing {
         pub thing: String,
