@@ -1,6 +1,6 @@
 #[crate::service(name = "staged-tx", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
-mod service {
+pub mod service {
     use crate::{AccountNumber, Action, Checksum256, Pack, TimePointUSec, Unpack};
     use async_graphql::SimpleObject;
     use fracpack::ToSchema;
@@ -33,6 +33,33 @@ mod service {
         pub proposer: AccountNumber,
         pub action_list: ActionList,
         pub auto_exec: bool,
+    }
+
+    /// A response to a staged transaction: a row of the service's
+    /// `ResponseTable`.
+    #[derive(
+        Debug,
+        Pack,
+        Unpack,
+        Serialize,
+        Deserialize,
+        ToSchema,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct Response {
+        /// The ID of the staged transaction
+        pub id: u32,
+        /// The account that responded to the staged transaction
+        pub account: AccountNumber,
+        /// The account's authSequence when the response was made
+        pub seq: u64,
+        /// Whether the response is an acceptance or rejection
+        pub accepted: bool,
     }
 
     /// Initialize the service

@@ -393,6 +393,9 @@ fn rust_and_cpp_declare_the_same_types() {
     same_key::<RunMode>(&f, "RunMode");
     same_text::<RunMode>(&f, "RunMode");
 
+    // Records of services implemented in Rust, mirrored in C++ headers.
+    same_schema_and_bytes::<services::staged_tx::service::Response>(&mut f, "Response", Same);
+
     // What Rust writes today: the legacy declarations pack what C++ packs.
     // (`Decimal` has no legacy codec in Rust.)
     macro_rules! legacy {
@@ -427,6 +430,7 @@ fn rust_and_cpp_declare_the_same_types() {
         "StateSignature" => StateSignature, "SnapshotStateItem" => SnapshotStateItem,
         "SnapshotRow" => SnapshotRow, "ConfigRow" => ConfigRow, "LogMessage" => LogMessage,
         "NotifyRow" => NotifyRow, "RunMode" => RunMode,
+        "Response" => services::staged_tx::service::Response,
     }
 
     memo_differs_only_in_its_declared_bound(&mut f);
