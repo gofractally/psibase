@@ -64,7 +64,7 @@ async function fetchOriginServers(): Promise<ProxyRow[]> {
             originServers {
                 subdomain
                 host
-                tls {}
+                tls { __typename }
                 bypassPrefixes
             }
         }

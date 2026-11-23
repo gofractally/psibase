@@ -210,6 +210,11 @@ static TableIndex<Block, std::uint32_t> blockLog()
 // this much, which must fit in a query's 32 MiB of memory.
 static constexpr std::uint32_t blocksPageBytes = 6 * 1024 * 1024;
 
+// A page of blocks is bounded by its stored size, not by the number of rows
+// asked for: the complexity of `blocks(first: 720) { ... transactions ... }`
+// (counted with `first` as the page size) is above the engine's default limit.
+static constexpr psio::graphql::limits queryLimits{.max_complexity = 10'000'000};
+
 static std::optional<Checksum256> parseChecksum(const std::string& hex)
 {
    std::vector<char> bytes;
@@ -302,7 +307,7 @@ namespace SystemService
                                                         std::optional<psibase::AccountNumber> user)
    {
       psibase::check(psibase::getSender() == HttpServer::service, "Wrong sender");
-      if (auto result = psibase::serveGraphQL(request, Query{user}))
+      if (auto result = psibase::serveGraphQL(request, Query{user}, queryLimits))
          return result;
       return std::nullopt;
    }

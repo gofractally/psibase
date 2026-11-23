@@ -117,9 +117,14 @@ namespace psibase
    /// reports an error by returning `psio::graphql::result<T>`
    /// (`return psio::graphql::fail("message")`).
    ///
+   /// `limits` bound the query and the response (PSIO's `docs/graphql.md`, "Limits");
+   /// a service whose pages are bounded otherwise may raise them.
+   ///
    /// See PSIO's `docs/graphql.md` and the [connection example](#connection-example).
    template <typename QueryRoot>
-   std::optional<HttpReply> serveGraphQL(const HttpRequest& request, const QueryRoot& queryRoot)
+   std::optional<HttpReply> serveGraphQL(const HttpRequest&           request,
+                                         const QueryRoot&             queryRoot,
+                                         const psio::graphql::limits& limits = {})
    {
       using Schema = psio::graphql::schema<std::remove_cvref_t<QueryRoot>>;
       auto req     = detail::parseGraphQLRequest(request);
@@ -132,7 +137,7 @@ namespace psibase
       gqlRequest.operation_name = req.operationName;
       gqlRequest.variables      = req.variables;
       std::string out;
-      Schema::run(queryRoot, req.query, out, gqlRequest);
+      Schema::run(queryRoot, req.query, out, gqlRequest, limits);
       return detail::graphQLReply("application/json", out);
    }  // serveGraphQL
 
@@ -176,6 +181,109 @@ namespace psibase
    /// - `psio::graphql::paginate(IndexView{index}, range, page, allRows)`: a page of the index
    /// - `psio::graphql::transform(IndexView{index}, fn)`: the rows shown as another
    ///   record; `fn` takes a `psio::shared_pssz<T>`
+   ///
+   /// A const method of a query object that returns a [TableIndex] is a connection
+   /// field: it takes `gt`, `ge`, `lt`, `le`, `first`, `last`, `before`, and `after`
+   /// and yields `<T>Connection`.
+   ///
+   /// #### connection example
+   ///
+   /// ```c++
+   /// #include <psibase/Service.hpp>
+   /// #include <psibase/dispatch.hpp>
+   /// #include <psibase/serveGraphQL.hpp>
+   /// #include <psibase/serveSimpleUI.hpp>
+   ///
+   /// struct MyType
+   /// {
+   ///    uint32_t    primaryKey;
+   ///    std::string secondaryKey;
+   ///    std::string moreData;
+   ///
+   ///    std::string someFn(std::string arg1, std::string arg2) const
+   ///    {
+   ///       return arg1 + secondaryKey + arg2 + moreData;
+   ///    }
+   /// };
+   /// PSIO_REFLECT(MyType,
+   ///    primaryKey, secondaryKey, moreData,
+   ///    method(someFn, arg1, arg2))
+   ///
+   /// using MyTable  = psibase::Table<
+   ///    MyType, &MyType::primaryKey, &MyType::secondaryKey>;
+   /// using MyTables = psibase::ServiceTables<MyTable>;
+   ///
+   /// struct Query
+   /// {
+   ///    psibase::AccountNumber service;
+   ///
+   ///    auto rowsByPrimary() const {
+   ///       return MyTables{service}.open<MyTable>().getIndex<0>();
+   ///    }
+   ///    // The same, spelled out: a range and a page of an index
+   ///    auto rowsBySecondary(psio::graphql::key_range<std::string> range,
+   ///                         psio::graphql::page_args              page) const {
+   ///       return psio::graphql::paginate(
+   ///          psibase::IndexView{MyTables{service}.open<MyTable>().getIndex<1>()},
+   ///          range, page, psibase::allRows);
+   ///    }
+   /// };
+   /// PSIO_REFLECT(Query, attr(service, psio::graphql::hidden),
+   ///              method(rowsByPrimary), method(rowsBySecondary, range, page))
+   ///
+   /// struct ExampleService : psibase::Service
+   /// {
+   ///    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
+   ///    {
+   ///       if (auto result = psibase::serveSimpleUI<ExampleService, true>(request))
+   ///          return result;
+   ///       if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
+   ///          return result;
+   ///       return std::nullopt;
+   ///    }
+   /// };
+   /// PSIO_REFLECT(ExampleService, method(serveSys, request))
+   ///
+   /// PSIBASE_DISPATCH(ExampleService)
+   /// ```
+   ///
+   /// [serveGraphQL] generates this GraphQL schema and processes queries which
+   /// conform to it:
+   ///
+   /// ```
+   /// type Query {
+   ///   rowsByPrimary(gt: Int, ge: Int, lt: Int, le: Int, first: Int, last: Int, before: String, after: String): MyTypeConnection
+   ///   rowsBySecondary(gt: String, ge: String, lt: String, le: String, first: Int, last: Int, before: String, after: String): MyTypeConnection
+   /// }
+   /// type MyTypeConnection {
+   ///   edges: [MyTypeEdge!]!
+   ///   pageInfo: PageInfo!
+   /// }
+   /// type MyTypeEdge {
+   ///   node: MyType!
+   ///   cursor: String!
+   /// }
+   /// type PageInfo {
+   ///   hasNextPage: Boolean!
+   ///   hasPreviousPage: Boolean!
+   ///   startCursor: String
+   ///   endCursor: String
+   /// }
+   /// type MyType {
+   ///   primaryKey: Int!
+   ///   secondaryKey: String!
+   ///   moreData: String!
+   ///   someFn(arg1: String!, arg2: String!): String!
+   /// }
+   /// ```
+   ///
+   /// - `gt`, `ge`, `lt`, and `le` restrict the range. They can be used in any
+   ///   combination (set intersection).
+   /// - `first` and `after` page forward, `last` and `before` backward; `first`
+   ///   together with `last` is an error. A cursor is the hex of a row's key.
+   /// - `psio::graphql::transform(IndexView{index}, fn)` shows the rows as another
+   ///   record, and `psio::graphql::page_budget{.max_bytes = n, .max_page_size = m}`
+   ///   in place of `allRows` limits the stored size of a page.
    template <typename T, typename K>
    struct IndexView
    {
@@ -226,108 +334,8 @@ namespace psibase
 template <typename K>
 inline constexpr bool psio::graphql::argument_group<psibase::IndexArgs<K>> = true;
 
-/// A const method of a query object that returns a [TableIndex] is a connection
-/// field: it takes `gt`, `ge`, `lt`, `le`, `first`, `last`, `before`, and `after`
-/// and yields `<T>Connection`.
-///
-/// #### connection example
-///
-/// ```c++
-/// #include <psibase/Service.hpp>
-/// #include <psibase/dispatch.hpp>
-/// #include <psibase/serveGraphQL.hpp>
-/// #include <psibase/serveSimpleUI.hpp>
-///
-/// struct MyType
-/// {
-///    uint32_t    primaryKey;
-///    std::string secondaryKey;
-///    std::string moreData;
-///
-///    std::string someFn(std::string arg1, std::string arg2) const
-///    {
-///       return arg1 + secondaryKey + arg2 + moreData;
-///    }
-/// };
-/// PSIO_REFLECT(MyType,
-///    primaryKey, secondaryKey, moreData,
-///    method(someFn, arg1, arg2))
-///
-/// using MyTable  = psibase::Table<
-///    MyType, &MyType::primaryKey, &MyType::secondaryKey>;
-/// using MyTables = psibase::ServiceTables<MyTable>;
-///
-/// struct Query
-/// {
-///    psibase::AccountNumber service;
-///
-///    auto rowsByPrimary() const {
-///       return MyTables{service}.open<MyTable>().getIndex<0>();
-///    }
-///    // The same, spelled out: a range and a page of an index
-///    auto rowsBySecondary(psio::graphql::key_range<std::string> range,
-///                         psio::graphql::page_args              page) const {
-///       return psio::graphql::paginate(
-///          psibase::IndexView{MyTables{service}.open<MyTable>().getIndex<1>()},
-///          range, page, psibase::allRows);
-///    }
-/// };
-/// PSIO_REFLECT(Query, attr(service, psio::graphql::hidden),
-///              method(rowsByPrimary), method(rowsBySecondary, range, page))
-///
-/// struct ExampleService : psibase::Service
-/// {
-///    std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
-///    {
-///       if (auto result = psibase::serveSimpleUI<ExampleService, true>(request))
-///          return result;
-///       if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
-///          return result;
-///       return std::nullopt;
-///    }
-/// };
-/// PSIO_REFLECT(ExampleService, method(serveSys, request))
-///
-/// PSIBASE_DISPATCH(ExampleService)
-/// ```
-///
-/// [serveGraphQL] generates this GraphQL schema and processes queries which
-/// conform to it:
-///
-/// ```
-/// type Query {
-///   rowsByPrimary(gt: Int, ge: Int, lt: Int, le: Int, first: Int, last: Int, before: String, after: String): MyTypeConnection
-///   rowsBySecondary(gt: String, ge: String, lt: String, le: String, first: Int, last: Int, before: String, after: String): MyTypeConnection
-/// }
-/// type MyTypeConnection {
-///   edges: [MyTypeEdge!]!
-///   pageInfo: PageInfo!
-/// }
-/// type MyTypeEdge {
-///   node: MyType!
-///   cursor: String!
-/// }
-/// type PageInfo {
-///   hasNextPage: Boolean!
-///   hasPreviousPage: Boolean!
-///   startCursor: String
-///   endCursor: String
-/// }
-/// type MyType {
-///   primaryKey: Int!
-///   secondaryKey: String!
-///   moreData: String!
-///   someFn(arg1: String!, arg2: String!): String!
-/// }
-/// ```
-///
-/// - `gt`, `ge`, `lt`, and `le` restrict the range. They can be used in any
-///   combination (set intersection).
-/// - `first` and `after` page forward, `last` and `before` backward; `first`
-///   together with `last` is an error. A cursor is the hex of a row's key.
-/// - `psio::graphql::transform(IndexView{index}, fn)` shows the rows as another
-///   record, and `psio::graphql::page_budget{.max_bytes = n, .max_page_size = m}`
-///   in place of `allRows` limits the stored size of a page.
+// A const method of a query object that returns a TableIndex is a connection
+// field with the arguments of IndexArgs: see IndexView.
 template <typename T, typename K>
 struct psio::graphql::resolver<psibase::TableIndex<T, K>>
 {
