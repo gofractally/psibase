@@ -97,11 +97,10 @@ namespace psibase
       {
          if (!_t.error.has_value())
          {
-            auto actionTrace = getTopAction(t, 0);
-            if (actionTrace.rawRetval.size() != 0)
-            {
-               _return = psio::from_pssz<ReturnType>(actionTrace.rawRetval);
-            }
+            // Every value has an encoding, and an empty optional's is no
+            // bytes at all: the size says nothing about whether the action
+            // returned.
+            _return = psio::from_pssz<ReturnType>(getTopAction(t, 0).rawRetval);
          }
       }
 

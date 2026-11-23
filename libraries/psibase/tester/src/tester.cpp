@@ -741,8 +741,10 @@ bool psibase::TestChain::runQueueItem()
       auto trace = tester::runAction(id, row->mode, true, row->action);
       auto token = psio::to_pssz(RunTokenData{!trace.error, row->mode, row->action,
                                               makeRunContext(*this, row->mode, status)});
-      auto continuationArgs =
-          psio::to_pssz(std::tuple(row->id, std::move(trace), std::move(token)));
+      // The continuation takes an optional token (RTransact::onVerify), as
+      // psinode packs it (BlockContext::callRun).
+      auto continuationArgs = psio::to_pssz(
+          std::tuple(row->id, std::move(trace), std::optional<RunToken>{std::move(token)}));
       auto continuation      = Action{.service = row->continuation.service,
                                       .method  = row->continuation.method,
                                       .rawData = std::move(continuationArgs)};
