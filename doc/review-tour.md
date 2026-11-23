@@ -76,7 +76,8 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 - Wide arithmetic is lowered in JIT2 and LLVM as 64-bit operations plus a carry compare, with two new high-multiply operations, and is tested against a 128-bit oracle on every engine. Is unconditional acceptance what the team wants?
 
 **Known limits.**
-- wasmtime is the engine. psizam's interpreter, JIT1 and JIT2 are kept only as a cross-check for wasmtime and for LLVM AOT, and are to be marked experimental with their failures documented. They are largely compatible, with only minor known issues, and could be revived later for something wasmtime lacks, such as debugging. LLVM AOT is paused. c45c060cd marks the psizam-engine execution context as unverified after the CPU budget change, and the suites are qualified on wasmtime only (#2228).
+- wasmtime is the engine. psizam's interpreter, JIT1 and JIT2 are kept only as a cross-check for wasmtime and for LLVM AOT, and are to be marked experimental with their failures documented. They are largely compatible, with only minor known issues, and could be revived later for something wasmtime lacks, such as debugging. LLVM AOT is the second engine and is paused. The status of each engine and the known problems of the experimental ones are in psizam's [KNOWN_ISSUES.md](https://github.com/gofractally/psizam/blob/main/KNOWN_ISSUES.md). c45c060cd marks the psizam-engine execution context as unverified after the CPU budget change, and the suites are qualified on wasmtime only (#2228).
+- `psitest` still runs every test module on JIT2 while the services it drives run on wasmtime: the one place an experimental engine is on the path of the suites (#2231).
 - psizam tests a reviewer will see fail, all predating this work: the `memory_grow_2` spec cases on every engine, `psizam_host_tail_reentry_tests` (intentionally red), and on x86 "Test call depth dynamic - jit_llvm".
 - Rust services are not compiled with wide arithmetic in this head. Branch `claude/canonical-next` adds it and is next to land. It moves `cargo-psibase` to newer walrus, wasmparser and wasm-opt versions and passes `--enable-multivalue` beside `--enable-wide-arithmetic` to the optimizer. rustc calls the wide-arithmetic target feature unstable and warns that using it will become an error.
 
@@ -193,7 +194,7 @@ Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime:
 
 Open items are tracked as issues and closed as they are fixed.
 
-- wasmtime (a pinned fork) is the only qualified engine. The interpreter, JIT1 and JIT2 are experimental cross-checks, and LLVM AOT is paused; none is verified on this head: #2228. Engine tests red on psizam main: [psizam#1](https://github.com/gofractally/psizam/issues/1), [psizam#2](https://github.com/gofractally/psizam/issues/2).
+- wasmtime (a pinned fork) is the only qualified engine. The interpreter, JIT1 and JIT2 are experimental cross-checks, and LLVM AOT is paused; none is verified on this head: #2228. `psitest` still runs test modules on JIT2: #2231. Engine tests red on psizam main: [psizam#1](https://github.com/gofractally/psizam/issues/1), [psizam#2](https://github.com/gofractally/psizam/issues/2).
 - One monotonic clock for trace time, the limit and billing: #2227.
 - Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
 - Buying resources during a transaction does not raise that transaction's CPU limit: #2217 (fix on a branch).
@@ -204,7 +205,7 @@ Open items are tracked as issues and closed as they are fixed.
 - Crypto library sources are fetched from their upstream sites, not mirrored: #2224.
 - The verifier's differential and Wycheproof checks are not an in-tree test: #2225.
 - psitri is fetched over SSH: #2226. psitri, ucc and psio have no license file.
-- psitri's own failing tests: three fixed on branch `claude/test-triage`, not yet merged; the legacy engine's compatibility leg ([psitri#2](https://github.com/gofractally/psitri/issues/2)) and an x86-only large-value compaction test ([psitri#1](https://github.com/gofractally/psitri/issues/1)) are open.
+- psitri's own failing tests: three fixed on branch `claude/test-triage`, not yet merged; the legacy engine's compatibility leg is open ([psitri#2](https://github.com/gofractally/psitri/issues/2)). The x86-only large-value compaction failure ([psitri#1](https://github.com/gofractally/psitri/issues/1)) was traced to the test's setup, not the compactor; a corrected test is on the same branch, awaiting its x86 run.
 - The reference-count abort seen in `psinode_test_crash`: not reproduced on the current line, root cause not found: #2229.
 - Rust services lack wide arithmetic until `claude/canonical-next` lands; rustc treats the target feature as unstable: #2230.
 - Canonical signatures are not in the head.
