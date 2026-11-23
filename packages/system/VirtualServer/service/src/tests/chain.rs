@@ -526,6 +526,7 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
     // The work: enough transfers to take many times the starting allowance.
     const TRANSFERS: usize = 40;
     const STARTING_CPU_NS: u64 = 5_000_000; // 5 ms, plus the service's leeway
+    const PURCHASE_DISK_BYTES: u64 = 2_000;
     let build = |with_purchase: bool| {
         let memo: psibase::Memo = "".into();
         let mut actions = Vec::new();
@@ -559,7 +560,8 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
             subjectiveData: None,
         }
     };
-    // Give alice exactly what the transaction's bytes cost plus a little CPU.
+    // Give alice what the transaction's bytes cost, what the purchase writes,
+    // and a little CPU.
     // The balance is one pool, so anything over the byte cost is CPU she can
     // afford: the byte cost has to be the transaction's own, not an estimate.
     let fund_start = |trx: &SignedTransaction| -> Result<(), psibase::Error> {
@@ -572,7 +574,15 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
         let cpu = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .get_cpu_cost(STARTING_CPU_NS)
             .get()?;
-        let wanted = net.value + cpu.value;
+        // The purchase itself writes rows before it credits the balance.
+        let disk = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_disk_cost(PURCHASE_DISK_BYTES)
+            .get()?;
+        println!(
+            "starting balance: net {} + cpu {} + disk {}",
+            net.value, cpu.value, disk.value
+        );
+        let wanted = net.value + cpu.value + disk.value;
         if wanted <= available.value {
             return Ok(());
         }
