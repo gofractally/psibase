@@ -467,7 +467,7 @@ fn fetch_block_start_rows(
     );
 
     let json = crate::services::r_events::Wrapper::call().sqlQuery(sql, vec![]);
-    serde_json::from_str(&json).map_err(|e| {
+    serde_json::from_slice(&json).map_err(|e| {
         async_graphql::Error::new(format!("Failed to deserialize row block starts: {}", e))
     })
 }
@@ -679,8 +679,9 @@ impl<T: DeserializeOwned + OutputType + ContainerType> EventQuery<T> {
             println!("[EventQuery] SQL params: {:?}", params);
         }
 
-        let json_str = crate::services::r_events::Wrapper::call()
+        let json = crate::services::r_events::Wrapper::call()
             .sqlQuery(query, params.into_iter().map(Into::into).collect());
+        let json_str = String::from_utf8(json).expect("r-events answers with JSON text");
 
         if self.debug {
             println!("[EventQuery] Raw JSON response: {}", json_str);

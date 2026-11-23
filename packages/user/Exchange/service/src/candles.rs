@@ -222,7 +222,7 @@ pub fn read(market: u64, interval: u32, limit: u32, before: Option<u64>) -> Resu
         let keys = ids.iter().map(u64::to_string).collect::<Vec<_>>().join(",");
         let sql=format!("SELECT ROWID AS event_id,market,candle FROM \"history.exchange.{event}\" WHERE ROWID IN ({keys}) AND market={market} ORDER BY ROWID DESC LIMIT {}",limit+1);
         let body = psibase::services::r_events::Wrapper::call().sqlQuery(sql, vec![]);
-        serde_json::from_str(&body).map_err(|_| "Invalid native candle response")?
+        serde_json::from_slice(&body).map_err(|_| "Invalid native candle response")?
     };
     page(
         market,

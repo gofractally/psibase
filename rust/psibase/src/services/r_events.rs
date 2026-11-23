@@ -4,7 +4,9 @@ mod service {
     use crate::{AccountNumber, HttpRequest};
 
     #[action]
-    fn sqlQuery(query: String, params: Vec<psio::pssz::RawString>) -> String {
+    /// The result is the JSON text of the rows, as bytes (C++
+    /// `std::vector<char>`).
+    fn sqlQuery(query: String, params: Vec<psio::pssz::RawString>) -> Vec<u8> {
         unimplemented!()
     }
 

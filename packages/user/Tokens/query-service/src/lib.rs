@@ -175,7 +175,7 @@ mod service {
                     .to_string(),
                 vec![user.to_string().into()],
             );
-            let rows: Vec<Row> = serde_json::from_str(&json).map_err(|e| {
+            let rows: Vec<Row> = serde_json::from_slice(&json).map_err(|e| {
                 async_graphql::Error::new(format!("Failed to read balance history: {e}"))
             })?;
 
@@ -455,6 +455,7 @@ mod service {
         // from that account's host must not expose private Tokens projections.
         // Public token metadata remains available through the normal schema.
         let root = http_server::Wrapper::call().rootHost(request.host.clone());
+        let root = root.to_string_lossy();
         let user = request.host.eq_ignore_ascii_case(&format!("tokens.{root}"))
             .then_some(user).flatten();
 

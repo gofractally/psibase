@@ -26,10 +26,12 @@ pub mod service {
         };
         let http = psibase::services::http_server::Wrapper::call();
         let root = http.rootHost(request.host.clone());
+        let root = root.to_string_lossy();
         let local = root == "localhost" || root.ends_with(".localhost");
         // Native request.host excludes the port; the original Host header and
         // socket/proxy protocol are handled by the platform URL constructor.
         let sibling = http.getSiblingUrl(request.clone(), socket, account!("supervisor"), false);
+        let sibling = sibling.to_string_lossy();
         let expected = sibling.trim_end_matches('/');
         let allowed = origin == expected && (origin.starts_with("https://") || local);
         if !allowed {
@@ -151,6 +153,7 @@ pub mod service {
         if private_path(path) {
             let root =
                 psibase::services::http_server::Wrapper::call().rootHost(request.host.clone());
+            let root = root.to_string_lossy();
             if !request
                 .host
                 .eq_ignore_ascii_case(&format!("exchange.{root}"))

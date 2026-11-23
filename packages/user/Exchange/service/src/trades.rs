@@ -212,6 +212,7 @@ pub fn read(
     }
     let sql = query(market, limit, &normal, &liquidations, &stops);
     let raw = psibase::services::r_events::Wrapper::call().sqlQuery(sql, vec![]);
+    let raw = String::from_utf8(raw).map_err(|_| "Invalid native trade response")?;
     normalize(&raw, market, limit)
 }
 

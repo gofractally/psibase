@@ -112,7 +112,7 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             status: 200,
             contentType: String::from("application/json"),
             headers: allow_cors_with_origin("*"),
-            body: query_response.as_bytes().to_vec(),
+            body: query_response,
         });
     }
     return None;

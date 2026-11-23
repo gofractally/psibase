@@ -122,7 +122,7 @@ mod service {
 
     /// Returns the root host for a given host
     #[action]
-    fn rootHost(host: String) -> String {
+    fn rootHost(host: String) -> psio::pssz::RawString {
         unimplemented!()
     }
 

@@ -35,7 +35,7 @@ mod service {
     pub struct WsTicketInfo {
         pub user: AccountNumber,
         pub app: AccountNumber,
-        pub path: psio::pssz::RawString,
+        pub path: String,
     }
 }
 
