@@ -205,7 +205,7 @@ Open items are tracked as issues and closed as they are fixed.
 - Crypto library sources are fetched from their upstream sites, not mirrored: #2224.
 - The verifier's differential and Wycheproof checks are not an in-tree test: #2225.
 - psitri is fetched over SSH: #2226. psitri, ucc and psio have no license file.
-- psitri's own failing tests: three fixed on branch `claude/test-triage`, not yet merged; the legacy engine's compatibility leg is open ([psitri#2](https://github.com/gofractally/psitri/issues/2)). The x86-only large-value compaction failure ([psitri#1](https://github.com/gofractally/psitri/issues/1)) was traced to the test's setup, not the compactor; a corrected test is on the same branch, awaiting its x86 run.
+- psitri's own failing tests: three fixed on branch `claude/test-triage`, not yet merged; the legacy engine's compatibility leg is open ([psitri#2](https://github.com/gofractally/psitri/issues/2)). The x86-only large-value compaction failure ([psitri#1](https://github.com/gofractally/psitri/issues/1)) was traced to the test's setup, not the compactor; the corrected test on the same branch passes 20 of 20 runs on x86. It also showed that pinned and unpinned segments are compacted separately, so up to a segment of freed space per pool can stay uncompacted ([psitri#7](https://github.com/gofractally/psitri/issues/7)).
 - The reference-count abort seen in `psinode_test_crash`: not reproduced on the current line, root cause not found: #2229.
 - Rust services lack wide arithmetic until `claude/canonical-next` lands; rustc treats the target feature as unstable: #2230.
 - Canonical signatures are not in the head.
