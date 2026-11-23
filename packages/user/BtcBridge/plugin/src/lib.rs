@@ -3,7 +3,7 @@
 mod bindings;
 use bindings::exports::btcbridge::plugin::api::Guest;
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use bindings::transact::plugin::api::add_action_to_transaction;
 use psibase::fracpack::Pack;
 use serde::Deserialize;
 use serde_json::Value;
@@ -36,7 +36,7 @@ struct Plugin;
 impl Guest for Plugin {
     fn submit(actions: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::submit)?;
-        let user = bindings::accounts::query::api::get_current_user()
+        let user = bindings::host::accounts::api::get_current_user()
             .ok_or_else(|| error("Connect a Psibase account"))?;
         let account = bindings::accounts::query::api::get_account(&user)?
             .ok_or_else(|| error("Account no longer exists"))?;

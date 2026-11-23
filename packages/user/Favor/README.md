@@ -195,7 +195,11 @@ forged senders and invalid signatures before checking successful signed actions.
 - `python3 -m unittest discover -s packages/user/Favor/test -p test_rejections.py`:
   verifies that CLI/transport failures, missing traces, successful target actions
   and failures in unrelated actions cannot pass the rejection helper.
-- `npm test` in `ui`: 10 exact-amount, request-link and demo-state tests.
+- `npm test` in `ui`: 17 exact-amount, request-link, demo-state and native API
+  adapter tests. The adapter tests run the production TypeScript with a mocked
+  Common API transport, including current/legacy account routing, private-page
+  cursors, exact payment parameters and query failures. They do not execute
+  installed WASM plugins or drive a browser.
 - `test/live.py --cli /path/to/psibase`: 28 checks on the actual local WASM
   services, including native transactions, multihop fees, privacy,
   tampering, rollback, replay, requests, revocation and external repayments.

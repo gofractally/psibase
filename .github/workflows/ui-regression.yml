@@ -1,0 +1,59 @@
+name: App UI regression
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main, bytemaster/head, 'release/*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Enable pinned Yarn
+        run: corepack enable
+      - name: Install XAdmin component toolchain
+        run: |
+          rustup target add wasm32-wasip1
+          cargo install cargo-component --locked --version 0.21.1
+      - name: Install pinned WASI C compiler
+        run: |
+          curl --fail --location --retry 3 https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz --output "$RUNNER_TEMP/wasi-sdk.tar.gz"
+          echo "c6c38aab56e5de88adf6c1ebc9c3ae8da72f88ec2b656fb024eda8d4167a0bc5  $RUNNER_TEMP/wasi-sdk.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/wasi-sdk.tar.gz" --directory "$RUNNER_TEMP"
+          echo "CC_wasm32_wasip1=$RUNNER_TEMP/wasi-sdk-24.0-x86_64-linux/bin/clang" >> "$GITHUB_ENV"
+          echo "AR_wasm32_wasip1=$RUNNER_TEMP/wasi-sdk-24.0-x86_64-linux/bin/llvm-ar" >> "$GITHUB_ENV"
+          echo "WASI_SYSROOT=$RUNNER_TEMP/wasi-sdk-24.0-x86_64-linux/share/wasi-sysroot" >> "$GITHUB_ENV"
+      - name: Install Chromium system dependencies
+        working-directory: tests/ui
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install-deps chromium
+      - name: Build and test every UI
+        run: node tests/ui/run.mjs --install
+      - name: Check financial app WASM plugin interfaces
+        shell: bash
+        run: |
+          cargo component build --manifest-path packages/user/Cargo.toml --release -p exchange-plugin -p tokens-plugin -p favor-plugin -p btcbridge-plugin -p btcrelay-plugin -p ethbridge-plugin 2>&1 | tee build-app-regression/ui/plugin-build.log
+      - name: Upload regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-regression-${{ github.sha }}
+          path: |
+            build-app-regression/ui/
+            tests/ui/test-results/
+            tests/ui/playwright-report/
+          retention-days: 14

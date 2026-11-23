@@ -383,8 +383,11 @@ function renderChart() {
   if(PROFILE)profile('chart',{view:state.chart,changed:Boolean(changed),durationMs:+(performance.now()-started).toFixed(2)});
 }
 function drawChart() {
-  const m = market(); const { b, q } = assets(m);
-  if($('#trade-view').hidden)return;
+  // Public history can return while account/market switching has cleared the
+  // private snapshot. The next successful refresh renders the cached history.
+  const m = market();
+  if(!m||$('#trade-view').hidden)return;
+  const { b, q } = assets(m);
   $('#chart-heading').textContent = state.chart === 'price' ? `${symbol(b)} / ${symbol(q)}` : 'Market depth';
   $('#chart-subtitle').textContent = state.chart === 'price' ? (state.interval===86400?'Daily candles · UTC':state.interval===3600?'Hourly candles · UTC':'Trading prices') : 'Cumulative buy and sell liquidity';
   document.querySelector('.curve-label').textContent = state.chart === 'price' ? '' : 'BUY / SELL DEPTH';

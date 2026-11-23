@@ -18,7 +18,7 @@ import {
 } from "@shared/shadcn/ui/card";
 
 interface ConfirmKeyStepProps {
-    /** The account the user must re-enter to confirm they saved their credentials. */
+    /** The account being confirmed; its name is prefilled in the form. */
     expectedAccount: string;
     /** Called after the credentials have been successfully imported. */
     onImported: (account: string) => Promise<void> | void;
@@ -56,7 +56,7 @@ export const ConfirmKeyStep = ({
     const form = useAppForm({
         defaultValues: {
             account: {
-                account: "",
+                account: expectedAccount.trim(),
             },
             privateKey: "",
         },

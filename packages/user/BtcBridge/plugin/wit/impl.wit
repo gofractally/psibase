@@ -2,6 +2,7 @@ package btcbridge:plugin;
 world impl {
     include host:client/imports;
     include host:http/imports;
+    include host:accounts/imports;
     include accounts:query/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;

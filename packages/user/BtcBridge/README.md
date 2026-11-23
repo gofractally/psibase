@@ -161,9 +161,10 @@ The bridge plugin exposes a bounded allowlist and only permits token settlement
 with `btcbridge` using the configured bridge token. It does not expose deployment,
 key-administration, arbitrary sender, or arbitrary token-transfer operations.
 
-The native plugin interfaces under `wallet-wit` are deliberately pinned to the
-released Psibase 0.29 runtime used by this environment. The checkout's newer
-Host/Accounts API is different; change the runtime and these interfaces together.
+The bridge and relay plugins use this checkout's canonical native interfaces.
+The connected account and account prompts use `host:accounts`; account records
+remain on `accounts:query`, and transaction assembly uses `transact:plugin/api`.
+Build and deploy matching Host, Accounts and Transact packages with these plugins.
 `Accounts`, `Host`, `Transact`, `Tokens`, and `Permissions` must be direct package
 dependencies so DynLd can resolve their namespaces. Supervisor's released runtime
 also requires WebCrypto. Installation includes these dependencies.

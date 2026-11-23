@@ -33,7 +33,7 @@ function message(text:string,error=false){const m=el('message');m.hidden=false;m
 function action(sender:string,service:string,method:string,data:unknown){return{sender,service,method,data};}
 async function transact(actions:any[]){
  if(!account)throw Error('Connect your Psibase account to continue.');
- const current=await callPlugin('accounts','api','getCurrentUser',[],'query',false);
+ const current=await callPlugin('host','api','getCurrentUser',[],'accounts',false);
  if(current!==account||state?.owner!==account)throw Error('Your connected account changed. Refresh before signing.');
  const record=await callPlugin('accounts','api','getAccount',[account],'query',false);
  if(record?.authService!=='auth-sig')throw Error('This account must use key-based Psibase authentication.');
@@ -41,7 +41,7 @@ async function transact(actions:any[]){
  return callPlugin('btcbridge','api','submit',[JSON.stringify(actions)]);
 }
 async function wallet(){
- const current=await callPlugin('accounts','api','getCurrentUser',[],'query',false)||'';
+ const current=await callPlugin('host','api','getCurrentUser',[],'accounts',false)||'';
  if(current!==account){account=current;recipient=current;recipientState=null;profile=null;contacts=[];contactsLoaded=false;pending.clear();++loadSequence;}
  el('account-label').textContent=account?`@${account}`:'Connect account';el('account-handle').textContent=account?`@${account}`:'';el('account-handle').hidden=!account;
  document.querySelectorAll<HTMLButtonElement|HTMLSelectElement|HTMLInputElement>('[data-account-required],#withdraw-form input,#withdraw-form button,#new-address,#fresh-address,#sync,#participate,[data-wallet-required]').forEach(b=>b.disabled=!account);
@@ -172,9 +172,9 @@ async function sync(){if(syncing||busy||!state||!account)return;syncing=true;try
  }catch(e){el('sync-status').textContent=(e as Error).message;}finally{syncing=false;}}
 async function refreshUntil(predicate:(snapshot:any)=>boolean){for(let n=0;n<20;n++){await load();if(predicate(state))return;await new Promise(resolve=>setTimeout(resolve,500));}throw Error('Transaction submitted. Chain confirmation is still pending; refresh to check its status.');}
 function newAddress(){return run('Deposit address created and independently verified.',async()=>{const owner=account,last=Math.max(-1,...state.addresses.map((a:any)=>a.index));if(recipient!==account)throw Error('Only the recipient can create a new deposit address.');await transact([action(account,'btcbridge','newAddress',{})]);await refreshUntil(s=>s.owner===owner&&s.addresses.some((a:any)=>a.owner===owner&&a.index>last));});}
-el('connect-account').onclick=()=>{if(account)el<HTMLDialogElement>('account-dialog').showModal();else void callPlugin('accounts','activeApp','connectAccount',[],'plugin').then(wallet).catch(e=>message(e.message,true));};
-el('switch-account').onclick=()=>{el<HTMLDialogElement>('account-dialog').close();void callPlugin('accounts','activeApp','connectAccount',[],'plugin').then(wallet).catch(e=>message(e.message,true));};
-el('disconnect-account').onclick=()=>{void callPlugin('accounts','activeApp','logout',[],'plugin').then(()=>{el<HTMLDialogElement>('account-dialog').close();return wallet();}).catch(e=>message(e.message,true));};
+el('connect-account').onclick=()=>{if(account)el<HTMLDialogElement>('account-dialog').showModal();else void callPlugin('host','activeApp','connectAccount',[],'accounts').then(wallet).catch(e=>message(e.message,true));};
+el('switch-account').onclick=()=>{el<HTMLDialogElement>('account-dialog').close();void callPlugin('host','activeApp','connectAccount',[],'accounts').then(wallet).catch(e=>message(e.message,true));};
+el('disconnect-account').onclick=()=>{void callPlugin('host','activeApp','logout',[],'accounts').then(()=>{el<HTMLDialogElement>('account-dialog').close();return wallet();}).catch(e=>message(e.message,true));};
 el('deposit-recipient').onchange=()=>{recipient=el<HTMLSelectElement>('deposit-recipient').value;void loadRecipient().catch(e=>message(e.message,true));};
 el('avatar-file').onchange=e=>{const file=(e.target as HTMLInputElement).files?.[0];if(!file)return;void run('Your on-chain avatar was updated.',async()=>{if(file.size>100*1024)throw Error('Choose an avatar smaller than 100 KB.');await callPlugin('profiles','api','uploadAvatar',[{contentType:file.type,content:Array.from(new Uint8Array(await file.arrayBuffer()))}]);await wallet();});};
 el('remove-avatar').onclick=()=>{void run('Profile avatar removed.',async()=>{await callPlugin('profiles','api','removeAvatar');await wallet();});};
