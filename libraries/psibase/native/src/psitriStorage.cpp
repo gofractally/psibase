@@ -777,10 +777,8 @@ namespace psibase::storage
          state->access.invoke(
              [&]
              {
-                // Defer CPU sampling across accepted atomic publication. SAL retries
-                // interrupted flushes; the publication gate still requires accepted
-                // root/effect work to finish before cancellation is reported.
-                accounting::PublicationSignalMask samplingMask;
+                // SAL retries interrupted flushes; the publication gate still requires
+                // accepted root/effect work to finish before cancellation is reported.
                 auto                              tx = state->writer->start_transaction(0);
                 tx.primary().set_root(native(state, updated));
                 tx.commit();
@@ -803,7 +801,6 @@ namespace psibase::storage
          state->access.invoke(
              [&]
              {
-                accounting::PublicationSignalMask samplingMask;
                 // Published, never flushed: it becomes durable with the next
                 // flushed publication of the top root.
                 state->writer->set_root(localRootIndex, native(state, source));
