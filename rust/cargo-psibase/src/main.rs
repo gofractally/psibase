@@ -233,6 +233,11 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
         .enable_feature(wasm_opt::Feature::TruncSat)
         .enable_feature(wasm_opt::Feature::SignExt)
         .enable_feature(wasm_opt::Feature::Simd)
+        // Every psibase engine executes wide arithmetic; a service may use it.
+        .enable_feature(wasm_opt::Feature::WideArithmetic)
+        // wasm-opt holds a wide instruction's two results as a tuple, which
+        // it only accepts with multivalue enabled.
+        .enable_feature(wasm_opt::Feature::Multivalue)
         .debug_info(debug_build)
         .run(file.path(), file.path())?;
 

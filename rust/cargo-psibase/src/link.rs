@@ -576,6 +576,34 @@ fn to_dest_seq(
             Instr::I8x16Shuffle(i) => {
                 dest_seq.instr(i.clone());
             }
+
+            // Arithmetic with no reference to anything in the module
+            Instr::TernOp(i) => {
+                dest_seq.instr(i.clone());
+            }
+            Instr::I64Add128(i) => {
+                dest_seq.instr(i.clone());
+            }
+            Instr::I64Sub128(i) => {
+                dest_seq.instr(i.clone());
+            }
+            Instr::I64MulWideS(i) => {
+                dest_seq.instr(i.clone());
+            }
+            Instr::I64MulWideU(i) => {
+                dest_seq.instr(i.clone());
+            }
+
+            // Everything else names a function, type, tag or block that would
+            // have to be mapped into the destination module. Polyfills are
+            // plain code and use none of them; copying one unmapped would be
+            // silently wrong, so refuse.
+            other => {
+                return Err(anyhow!(
+                    "polyfill uses an instruction that cannot be copied between modules: {:?}",
+                    other
+                ));
+            }
         }
     }
 
@@ -687,13 +715,17 @@ fn copy_func(
 }
 
 fn new_validator() -> Validator {
-    let validator = wasmparser::Validator::new_with_features(wasmparser::WasmFeatures {
-        sign_extension: true,
-        bulk_memory: true,
-        simd: true,
-        saturating_float_to_int: true,
-        ..wasmparser::WasmFeatures::default()
-    });
+    use wasmparser::WasmFeatures;
+    // What a psibase node executes, on top of the defaults.
+    let validator = wasmparser::Validator::new_with_features(
+        WasmFeatures::default()
+            | WasmFeatures::SIGN_EXTENSION
+            | WasmFeatures::BULK_MEMORY
+            | WasmFeatures::SIMD
+            | WasmFeatures::SATURATING_FLOAT_TO_INT
+            | WasmFeatures::MULTI_VALUE
+            | WasmFeatures::WIDE_ARITHMETIC,
+    );
     return validator;
 }
 
@@ -790,26 +822,38 @@ fn retarget(module: &mut Module, map: &HashMap<FunctionId, FunctionId>) {
     if let Some(start) = &mut module.start {
         visitor.rewrite(start);
     }
-    for elem in module.elements.iter_mut() {
-        if let walrus::ElementKind::Active {
-            offset: walrus::InitExpr::RefFunc(fid),
-            ..
-        } = &mut elem.kind
-        {
-            visitor.rewrite(fid);
+    let rewrite_const = |visitor: &RetargetCalls, expr: &mut walrus::ConstExpr| match expr {
+        walrus::ConstExpr::RefFunc(fid) => visitor.rewrite(fid),
+        walrus::ConstExpr::Extended(ops) => {
+            for op in ops {
+                if let walrus::ConstOp::RefFunc(fid) = op {
+                    visitor.rewrite(fid);
+                }
+            }
         }
-        for member in &mut elem.members {
-            if let Some(fid) = member {
-                visitor.rewrite(fid);
+        _ => {}
+    };
+    for elem in module.elements.iter_mut() {
+        if let walrus::ElementKind::Active { offset, .. } = &mut elem.kind {
+            rewrite_const(&visitor, offset);
+        }
+        match &mut elem.items {
+            walrus::ElementItems::Functions(functions) => {
+                for fid in functions {
+                    visitor.rewrite(fid);
+                }
+            }
+            walrus::ElementItems::Expressions(_, expressions) => {
+                for expr in expressions {
+                    rewrite_const(&visitor, expr);
+                }
             }
         }
     }
     let global_ids: Vec<_> = module.globals.iter().map(|g| g.id()).collect();
     for id in global_ids {
-        if let walrus::GlobalKind::Local(walrus::InitExpr::RefFunc(fid)) =
-            &mut module.globals.get_mut(id).kind
-        {
-            visitor.rewrite(fid);
+        if let walrus::GlobalKind::Local(init) = &mut module.globals.get_mut(id).kind {
+            rewrite_const(&visitor, init);
         }
     }
     for export in module.exports.iter_mut() {
@@ -1021,6 +1065,52 @@ mod tests {
             println!("{}", f);
         }
 
+        Ok(())
+    }
+
+    fn count_wide_arithmetic(module: &Module) -> usize {
+        use walrus::ir::{Instr, InstrLocId, Visitor};
+        struct Count(usize);
+        impl<'instr> Visitor<'instr> for Count {
+            fn visit_instr(&mut self, instr: &'instr Instr, _: &'instr InstrLocId) {
+                if matches!(
+                    instr,
+                    Instr::I64Add128(_)
+                        | Instr::I64Sub128(_)
+                        | Instr::I64MulWideS(_)
+                        | Instr::I64MulWideU(_)
+                ) {
+                    self.0 += 1;
+                }
+            }
+        }
+        let mut count = Count(0);
+        for (_, function) in module.funcs.iter_local() {
+            walrus::ir::dfs_in_order(&mut count, function, function.entry_block());
+        }
+        count.0
+    }
+
+    // A service may use wide arithmetic (i64.add128, i64.mul_wide_u, ...):
+    // linking and optimizing must read it and keep it. The module is the
+    // hand-assembled fixture of psizam's wide-arithmetic tests.
+    #[test]
+    fn wide_arithmetic_survives_link_and_optimize() -> Result<(), Error> {
+        let path = &rel_to_manifest("/test-data/wide-arithmetic.wasm");
+        let original = wasm(path)?;
+        let before = count_wide_arithmetic(&original);
+        assert!(before >= 17, "fixture should contain wide arithmetic");
+
+        let mut destination = wasm(path)?;
+        let polyfill = wasm(SERVICE_POLYFILL)?;
+        link_module(&polyfill, &mut destination)?;
+        assert_eq!(count_wide_arithmetic(&destination), before);
+
+        crate::optimize(&mut destination)?;
+        assert!(count_wide_arithmetic(&destination) > 0);
+        new_validator()
+            .validate_all(&destination.emit_wasm())
+            .map_err(|e| anyhow!("[optimized module not valid] {}", e))?;
         Ok(())
     }
 
