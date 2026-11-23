@@ -651,6 +651,9 @@ namespace psibase::storage
       if (changes.self)
          if (const auto* entry = changes.self->store->find(bytes(key)))
          {
+            // Answered without touching the store; still a storage call the
+            // caller's budget has to be able to stop.
+            accounting::check();
             if (entry->removed)
                return false;
             if (value)
