@@ -6,6 +6,31 @@
 
 Status when this was last updated: head at 054a0c386.
 
+## Why this is worth your time
+
+The same token transfer, on the same server, runs between five and six times faster on this branch than on `main`.
+
+Transactions per second, 16-core x86 server, 5,000 transactions in one block in the tester, three runs each:
+
+| | Team `main` | 44c57f739 | c45c060cd | 054a0c386 (head now) | Increase |
+|---|---|---|---|---|---|
+| Unsigned transfer | 157 | 292–301 | 353–366 | 895–900 | 5.7× vs `main` |
+| Signed P-256 transfer | 109 | 199–200 | 313–314 | 628–633 | 5.8× vs `main` |
+| Signed secp256k1 transfer | — | 191–192 | 351–366 | 811–816 | 4.2× vs 44c57f739 |
+| Do-nothing, unsigned | — | — | 590–661 | 1,790–1,794 | 2.8× vs c45c060cd |
+| Do-nothing, secp256k1 | — | — | 592–609 | 1,490–1,499 | 2.5× vs c45c060cd |
+
+Why that matters:
+
+- **Per-transaction cost is what limits psibase today, not block size.** On `main` a transfer costs about 6.4 ms of execution; on this head it costs about 1.1 ms. A token transfer is the reference case other chains are compared on, so this is the number that decides how psibase compares.
+- **The gain is spread across the stack, so it applies to every service, not just Tokens.** It comes from a new storage engine, a new execution engine with pooled instances, a signature check that went from about 900 µs to about 135 µs, and indexing events once per block. A transaction that does nothing at all now runs at about 1,790 per second, which is the platform's own overhead and the floor for everything built on it.
+- **Signatures are no longer a tax.** With secp256k1 keys a signed transfer costs close to an unsigned one.
+- **It is measured, repeatable and still moving.** The benchmark and a per-service call profile are in the tree, suite results are recorded for every commit on two machines, and each step in the table is a specific commit you can check out. More is queued: the serialization change, canonical signatures, and wide arithmetic for Rust services.
+
+What it asks of the team is real, which is why it needs review and not just a merge: the state format changes, the consensus engine becomes a pinned fork of wasmtime, several validity rules change, and one dependency is currently private. The table below lists every such change. The tour after it says where to look and what we would most like challenged.
+
+These are tester figures, one block on one thread, and not network throughput; the caveats are in the Throughput section.
+
 ## Read this first: what changes consensus or formats
 
 These are the changes the team has to agree to, as opposed to review for quality.
@@ -124,14 +149,7 @@ The first commits (a4e5c0a0e through 0a93ef490) add Exchange, Favor, Signing and
 
 ## Throughput
 
-Token transfers per second on an idle 16-core x86 cloud server: one block of 5,000 transactions built in the tester on one thread. The three head commits were measured in one session, three runs each.
-
-| | Unsigned | Signed, P-256 | Signed, secp256k1 |
-|---|---|---|---|
-| `main` (eos-vm, triedent) | 157 | 109 | not measured |
-| 44c57f739 (wide arithmetic, Botan `verify-sig`) | 292–301 | 199–200 | 191–192 |
-| c45c060cd (adds new `verify-sig`, secp256k1 default keys, instance pool, watchdog-only CPU budget) | 353–366 | 313–314 | 351–366 |
-| 054a0c386 (adds psitri transaction stack, per-block event indexing, 1 ms psitri timer) | 895–900 | 628–633 | 811–816 |
+The table is at the top of this document. The three head commits in it were measured in one session on an idle server.
 
 So the head today against `main` is about 5.7 times faster unsigned and about 5.8 times faster signed with P-256. A transaction that does nothing runs at about 1,790 per second unsigned and 1,490 signed with secp256k1 at 054a0c386.
 
