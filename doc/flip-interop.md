@@ -109,23 +109,139 @@ half of `rust/psibase_names` is gone.
 One document, in two encodings: I-JSON (files, HTTP) and PSSZ (the
 `setSchema` action, the stored row).
 
-*(proposed — the C++ definition will be `libraries/psibase/common/include/psibase/schema.hpp`)*
+**Settled** (PSIO pin `3bf2b94b9f6f2aa3a468d10bb0782edfe8f1b07b`; the C++
+definition is `libraries/psibase/common/include/psibase/schema.hpp`,
+namespace `psibase`; a probe that builds, writes, reads and packs exactly
+this record is `~/psibase-flip-cpp-scratch/schema/service_schema_record.cpp`).
+psibase keeps its own record; its members are PSIO Schema IR types
+(`psio/schema_ir.hpp`, namespace `psio::schema_types`). PSIO's own
+`Interface` / `Func` envelope is **not** used (`types.interfaces` stays
+empty): it has no place for tables, keys or event access.
 
+```cpp
+struct FieldId {                                   // one component of an index key
+   std::vector<std::uint32_t>                   path;       // member indexes from the row type down
+   std::optional<std::string>                   transform;  // name of a key transform, if any
+   std::optional<psio::schema_types::AnyType>   type;       // the transform's result type, if any
+};
+PSIO_REFLECT(FieldId, path, transform, type)
+
+struct TableInfo {
+   std::optional<std::string>          name;      // table type name ("AccountTable")
+   std::uint16_t                       table;     // table number
+   psio::schema_types::AnyType         type;      // row type
+   std::vector<std::vector<FieldId>>   indexes;   // [0] is the primary key
+};
+PSIO_REFLECT(TableInfo, name, table, type, indexes)
+
+struct EventType {
+   psio::schema_types::AnyType type;              // the event's argument list (see below)
+   std::string                 access;            // "public" | "private"
+};
+PSIO_REFLECT(EventType, type, access)
+
+struct ServiceSchema {
+   psibase::AccountNumber                                     service;   // the service's account
+   psio::schema_types::Schema                                 types;     // the Schema IR document
+   std::map<std::string, psio::schema_types::FunctionType>    actions;   // by action name as declared
+   std::map<std::string, EventType>                           history;   // by event name as declared
+   std::map<std::string, EventType>                           merkle;
+   std::optional<std::map<std::string, std::vector<TableInfo>>> database; // "service" | "writeOnly" | "subjective" | "session"
+};
+PSIO_REFLECT(ServiceSchema, service, types, actions, history, merkle, database)
 ```
-ServiceSchema {
-   service  : AccountNumber                       // the service's account
-   types    : psio::schema_types::Schema          // PSIO Schema IR
-   actions  : map<string, psio::schema_types::FunctionType>
-                                                  // params = the Schema IR node of method_arg_tuple<I>
-                                                  //   (Object, attribute tuple=named; unnamed parameters:
-                                                  //    members "0","1",…, attribute tuple=positional)
-   history  : map<string, EventType{ type: psio::schema_types::AnyType, access: string }>
-   merkle   : map<string, EventType>
-   database : optional<map<string, vector<TableInfo>>>   // "service" | "writeOnly" | "subjective" | "session"
-}
-TableInfo { name: string, table: u16, type: AnyType, indexes: vector<vector<FieldId>> }
-FieldId   { path: vector<u32>, transform: optional<string>, type: optional<AnyType> }
+
+Rules:
+
+* Member order is as written; none of the four records is
+  `definitionWillNotChange`; no caps or bounds; every string is raw
+  (`std::string`). Rust: `BTreeMap<String, _>` for the maps (PSIO's map
+  order is the order of the keys' key encoding = byte order of the names),
+  `Option` where C++ says `std::optional`.
+* `actions[name]` is `FunctionType{ params, result }`. `params` is the
+  Schema IR node of the action's **wire argument list**: what
+  `SchemaBuilder::insert<psio::reflect<Service>::method_arg_tuple<I>>()`
+  returns — a reference (`Type{"@N"}`) to an `Object` whose members are the
+  parameters in order, named by the reflected parameter names, with the
+  attribute `tuple=named`; when the reflection names no parameters the
+  members are `"0"`, `"1"`, … and the attribute is `tuple=positional`. A
+  view / `string_view` / span parameter appears as the type it carries on
+  the wire. `result` is absent for `void`, else the node of the result
+  type. An action with no parameters has the empty named object.
+* `history[name].type` / `merkle[name].type` are the same kind of node for
+  the event's parameters. `access` is `"private"` unless the service
+  declares the event public.
+* The key of `actions` / `history` / `merkle` is the name exactly as
+  declared (it is what `MethodNumber{name}` is computed from). Lookup by
+  number compares `MethodNumber{key}`.
+* `types` is built by one `psio::SchemaBuilder` for the whole service;
+  every node referenced from the other members resolves in it.
+  `types.package`, `types.interfaces`, `types.worlds`, `types.uses` are
+  left empty.
+* Custom ids psibase's readers know: `AccountNumber`, `MethodNumber`
+  (text adapters), `Action` and `ServiceMethod` (objects presented by
+  psibase's schema handlers), and PSIO's own (`string`, `hex`, `char`,
+  `json`, time ids, `Memo`, `Precision`, `Decimal`, …).
+* **Encodings.** In files and over HTTP (`<Target>-schema.json`,
+  `<crate>.schema.json`, `service/<acct>.json`'s `schema` member, the
+  install manifest, `GET …/schema`): `psio::to_ijson(schema)`, read with
+  `psio::from_ijson<ServiceSchema>` (every member present, `database` may
+  be `null`). As the argument of `Packages::setSchema(schema)` and in the
+  `InstalledSchemaTable` row (`InstalledSchema{account, schema}`): PSSZ of
+  the record (`psio::to_pssz`), like any other argument / row — no JSON
+  inside bytes.
+* **Compatibility.** `Packages::setSchema` and `CHECK_SCHEMA` compare with
+  `psio::pssz_ir::evolves_from` / `equivalent` (`psio/pssz_ir_compare.hpp`):
+  `compare::contract` within one language, `compare::wire` across C++ and
+  Rust (section 0.1).
+
+Example (a service with `credit(to, amount, memo)`, `getRow(AccountNumber)`
+with an unnamed parameter returning `optional<Row>`, `init()`, and one
+table), exactly as `psio::to_ijson` writes it at the pin, line breaks
+added:
+
+```json
+{"service":"svc",
+ "types":{"package":{"name":"","version":"","attributes":[]},"interfaces":[],"worlds":[],"uses":[],
+  "types":[
+   {"name":"@0","type":{"value":{"Object":{"members":[
+      {"name":"to","type":{"value":{"Type":{"type":"AccountNumber"}}},"attributes":[]},
+      {"name":"amount","type":{"value":{"Type":{"type":"@2"}}},"attributes":[]},
+      {"name":"memo","type":{"value":{"Type":{"type":"@3"}}},"attributes":[]}],
+     "attributes":[{"name":"tuple","value":"named"}]}}},"attributes":[]},
+   {"name":"AccountNumber","type":{"value":{"Custom":{"type":{"value":{"Object":{"members":[
+      {"name":"value","type":{"value":{"Type":{"type":"@2"}}},"attributes":[]}],
+     "attributes":[{"name":"definitionWillNotChange","value":""}]}}},"id":"AccountNumber"}}},"attributes":[]},
+   {"name":"@2","type":{"value":{"Int":{"bits":64,"isSigned":false}}},"attributes":[]},
+   {"name":"@3","type":{"value":{"Option":{"type":{"value":{"Type":{"type":"@4"}}}}}},"attributes":[]},
+   {"name":"@4","type":{"value":{"Custom":{"type":{"value":{"List":{"type":{"value":{"Type":{"type":"@5"}}}}}},"id":"string"}}},"attributes":[]},
+   {"name":"@5","type":{"value":{"Int":{"bits":8,"isSigned":false}}},"attributes":[]},
+   {"name":"@6","type":{"value":{"Object":{"members":[
+      {"name":"0","type":{"value":{"Type":{"type":"AccountNumber"}}},"attributes":[]}],
+     "attributes":[{"name":"tuple","value":"positional"}]}}},"attributes":[]},
+   {"name":"@7","type":{"value":{"Option":{"type":{"value":{"Type":{"type":"Row"}}}}}},"attributes":[]},
+   {"name":"Row","type":{"value":{"Object":{"members":[
+      {"name":"owner","type":{"value":{"Type":{"type":"AccountNumber"}}},"attributes":[]},
+      {"name":"n","type":{"value":{"Type":{"type":"@2"}}},"attributes":[]}],"attributes":[]}}},"attributes":[]},
+   {"name":"@9","type":{"value":{"Object":{"members":[],"attributes":[{"name":"tuple","value":"named"}]}}},"attributes":[]}],
+  "ir_version":1},
+ "actions":{
+  "credit":{"params":{"value":{"Type":{"type":"@0"}}},"result":null},
+  "getRow":{"params":{"value":{"Type":{"type":"@6"}}},"result":{"value":{"Type":{"type":"@7"}}}},
+  "init":{"params":{"value":{"Type":{"type":"@9"}}},"result":null}},
+ "history":{},"merkle":{},
+ "database":{"service":[{"name":"RowTable","table":0,"type":{"value":{"Type":{"type":"Row"}}},
+   "indexes":[[{"path":[0],"transform":null,"type":null}]]}]}}
 ```
+
+The PSSZ of this example is 1336 bytes and validates as `ServiceSchema`;
+reading the JSON back and packing gives the same bytes. The `@N` names
+are the builder's and are not part of the contract: two schemas are
+compared with `pssz_ir::equivalent`, not by text.
+
+Status in C++: the header still holds the legacy (`psio1`) definition
+until the rest of stage S2 lands; the record above is what it becomes,
+member for member.
 
 Differences from today's JSON that every reader will see (observed by
 encoding a `psio::schema_types::Schema` with `psio::encode(psio::ijson{}, …)`
