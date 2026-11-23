@@ -397,9 +397,9 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void configured(TID tokenId, std::string action, Memo memo) {}
-            void supplyChanged(TID tokenId, Account actor, std::string action, std::string amount, Memo memo) {}
-            void balChanged(TID tokenId, Account account, Account counterParty, std::string action, std::string amount, Memo memo) {}
+            void configured(TID token_id, std::string action, Memo memo) {}
+            void supplyChanged(TID token_id, Account actor, std::string action, std::string amount, Memo memo) {}
+            void balChanged(TID token_id, Account account, Account counter_party, std::string action, std::string amount, Memo memo) {}
          };
       };
       // clang-format on
@@ -438,9 +438,9 @@ namespace UserService
       method(getTokenConf, token_id, index),
     );
    PSIBASE_REFLECT_HISTORY_EVENTS(Tokens,
-      method(configured, tokenId, attr(action, utf8), memo),
-      method(supplyChanged, tokenId, actor, attr(action, utf8), attr(amount, utf8), memo),
-      method(balChanged, tokenId, account, counterParty, attr(action, utf8), attr(amount, utf8), memo),
+      method(configured, token_id, attr(action, utf8), memo),
+      method(supplyChanged, token_id, actor, attr(action, utf8), attr(amount, utf8), memo),
+      method(balChanged, token_id, account, counter_party, attr(action, utf8), attr(amount, utf8), memo),
    );
    PSIBASE_REFLECT_TABLES(Tokens, Tokens::Tables)
    // clang-format on

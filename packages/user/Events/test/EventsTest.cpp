@@ -79,6 +79,21 @@ struct TestEvent
    REFLECT_EVENT(TestEvent, i, d, v, s)
 };
 
+// The rows of queries that select some of the columns of `testevent`: a row
+// is read as a record of exactly the selected columns.
+struct TestEventNumbers
+{
+   int    i = 0;
+   double d = 0;
+   REFLECT_EVENT(TestEventNumbers, i, d)
+};
+
+struct TestEventInt
+{
+   int i = 0;
+   REFLECT_EVENT(TestEventInt, i)
+};
+
 struct Opt
 {
    std::optional<std::int32_t> opt;
@@ -146,17 +161,18 @@ TEST_CASE("events")
              R"""(SELECT i,d,v,s FROM "history.test-svc.testevent" WHERE d > 2 ORDER BY d)""") ==
          std::vector<TestEvent>{{42, 2.718, {3}, "c"}, {72, 3.14159, {2}, "b"}});
 
-   CHECK(query<TestEvent>(
+   CHECK(query<TestEventNumbers>(
              chain, R"""(SELECT i,d FROM "history.test-svc.testevent" WHERE d > 2 ORDER BY d)""") ==
-         std::vector<TestEvent>{{42, 2.718}, {72, 3.14159}});
+         std::vector<TestEventNumbers>{{42, 2.718}, {72, 3.14159}});
 
-   CHECK(query<TestEvent>(chain,
-                          R"""(SELECT i FROM "history.test-svc.testevent" ORDER BY ROWID)""") ==
-         std::vector<TestEvent>{{42}, {72}, {42}, {91}});
+   CHECK(query<TestEventInt>(chain,
+                             R"""(SELECT i FROM "history.test-svc.testevent" ORDER BY ROWID)""") ==
+         std::vector<TestEventInt>{{42}, {72}, {42}, {91}});
 
    constexpr std::string_view descendingSql =
        R"""(SELECT i FROM "history.test-svc.testevent" ORDER BY ROWID DESC)""";
-   CHECK(query<TestEvent>(chain, descendingSql) == std::vector<TestEvent>{{91}, {42}, {72}, {42}});
+   CHECK(query<TestEventInt>(chain, descendingSql) ==
+         std::vector<TestEventInt>{{91}, {42}, {72}, {42}});
 
    {
       std::string plan;
@@ -173,10 +189,10 @@ TEST_CASE("events")
    }
 
    CHECK(
-       query<TestEvent>(
+       query<TestEventInt>(
            chain,
            R"""(SELECT i FROM "history.test-svc.testevent" WHERE i = '"history.unknown.unknown"')""") ==
-       std::vector<TestEvent>{});
+       std::vector<TestEventInt>{});
 
    // optional
    expect(testService.to<TestService>().sendOptional(std::nullopt).trace());

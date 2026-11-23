@@ -405,12 +405,13 @@ fn system_writes_accumulate_shortfall(chain: psibase::Chain) -> Result<(), psiba
         net_after,
     );
 
-    // Confirm the free was exactly 93 bytes (the IncludedTrxTable row size)
+    // Confirm the free was exactly 92 bytes (the IncludedTrxTable row size:
+    // its key and the PSSZ of the row, a one-byte header and 40 bytes)
     let freed_bytes =
         disk_after.remaining_capacity as i128 - disk_before.remaining_capacity as i128;
     assert_eq!(
-        freed_bytes, 93,
-        "Expected exactly 93 bytes freed by startBlock system writes, got {}",
+        freed_bytes, 92,
+        "Expected exactly 92 bytes freed by startBlock system writes, got {}",
         freed_bytes,
     );
 
