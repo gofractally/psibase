@@ -582,8 +582,31 @@ namespace psibase
       std::shared_ptr<const Revision>         baseRevision;
       std::shared_ptr<storage::write_session> writeSession;
       std::shared_ptr<storage::read_session>  readSession;
-      std::vector<std::shared_ptr<Revision>>  writeRevisions;
       std::shared_ptr<const Revision>         readOnlyRevision;
+
+      // The open write session. Writes to the chain databases are not made to
+      // the trees: they are kept aside, one set of changes per database, and
+      // reads see them merged over the tree. They become trees only when a
+      // revision is asked for (the end of a block, normally), in one ordered
+      // edit per database. A session that is abandoned, which is every
+      // speculative execution, never writes to the store at all and so never
+      // waits for, or holds up, the store's writer.
+      //
+      // `work` holds the trees the changes sit on. A nested session is a mark
+      // in each set of changes plus the trees as they were, so abandoning it
+      // is a rollback to the mark.
+      struct Frame
+      {
+         storage::shared_root  roots[numChainDatabases];
+         storage::delta::mark  marks[numChainDatabases];
+      };
+      bool                                           writing = false;
+      Revision                                       work;
+      std::array<storage::delta, numChainDatabases>  pending;
+      std::vector<Frame>                             frames;
+      // The changes of one database are folded into its tree early once they
+      // hold this much; their memory is one region of at most 4 GiB.
+      static constexpr std::uint64_t foldBytes = std::uint64_t(256) << 20;
       std::vector<char>                       keyBuffer;
       std::vector<char>                       valueBuffer;
 
@@ -619,6 +642,61 @@ namespace psibase
          }
       }
 
+      // Chain databases keep their changes aside; node-local ones are edited as trees.
+      static bool keptAside(DbId db) { return !isIndependent(db) && db != DbId::temporary; }
+      const storage::delta* pendingFor(DbId db) const
+      {
+         if (!writing || !keptAside(db))
+            return nullptr;
+         const auto& changes = pending[(int)db];
+         return changes.empty() ? nullptr : &changes;
+      }
+      void put(storage::write_session& session,
+               DbId                    db,
+               std::span<const char>   key,
+               std::span<const char>   value)
+      {
+         session.require_writable();
+         auto& changes = pending[(int)db];
+         changes.put(key, value);
+         if (changes.bytes() > foldBytes)
+            fold();
+      }
+      void erase(storage::write_session& session, DbId db, std::span<const char> key)
+      {
+         session.require_writable();
+         pending[(int)db].erase(key);
+      }
+      // Make the trees current: apply every database's changes to its tree and
+      // drop them. Each open nested session's saved trees are brought up to its
+      // own mark first, so rolling back to it still gives what it saw.
+      void fold()
+      {
+         check((bool)writeSession, "writeSession is missing");
+         for (std::size_t i = 0; i < numChainDatabases; ++i)
+         {
+            auto& changes = pending[i];
+            if (changes.empty())
+               continue;
+            for (auto& frame : frames)
+            {
+               writeSession->apply(frame.roots[i], changes, &frame.marks[i]);
+               frame.marks[i] = {};
+            }
+            writeSession->apply(work.roots[i], changes);
+            changes.clear();
+         }
+      }
+      void endWrite()
+      {
+         writing = false;
+         frames.clear();
+         for (auto& changes : pending)
+            changes.clear();
+         for (auto& root : work.roots)
+            root.reset();
+      }
+
       DbChangeSet* getChangeSet(DbId db)
       {
          if (isIndependent(db))
@@ -634,8 +712,8 @@ namespace psibase
          {
             if (readOnlyRevision)
                return *readOnlyRevision;
-            check(!writeRevisions.empty(), "no database sessions active");
-            return *writeRevisions.back();
+            check(writing, "no database sessions active");
+            return work;
          }();
 
          if (readSession)
@@ -649,23 +727,21 @@ namespace psibase
       template <typename F>
       auto write(F f)
       {
-         check(writeSession && !writeRevisions.empty(), "no database write sessions active");
-         return f(*writeSession, *writeRevisions.back());
+         check(writeSession && writing, "no database write sessions active");
+         return f(*writeSession, work);
       }
 
       // TODO: release old revision roots in GC thread
       void setRevision(ConstRevisionPtr revision)
       {
-         check(writeRevisions.empty() && !readOnlyRevision,
-               "setRevision: database session is active");
+         check(!writing && !readOnlyRevision, "setRevision: database session is active");
          check(revision != nullptr, "null revision");
          baseRevision = std::move(revision);
       }
 
       void startRead()
       {
-         check(writeRevisions.empty() && !readOnlyRevision,
-               "startRead: database session already active");
+         check(!writing && !readOnlyRevision, "startRead: database session already active");
          if (!readSession && !writeSession)
             readSession = shared.impl->trie->start_read_session();
          readOnlyRevision = baseRevision;
@@ -678,20 +754,31 @@ namespace psibase
          check(shared.impl->trie->owns(*writer), "writer belongs to another database view");
          writeSession = std::move(writer);
          readSession  = nullptr;
-         if (writeRevisions.empty())
-            writeRevisions.push_back(baseRevision->clone());
+         if (!writing)
+         {
+            for (std::size_t i = 0; i < numChainDatabases; ++i)
+               work.roots[i] = baseRevision->roots[i];
+            writing = true;
+         }
          else
-            writeRevisions.push_back(writeRevisions.back()->clone());
+         {
+            auto& frame = frames.emplace_back();
+            for (std::size_t i = 0; i < numChainDatabases; ++i)
+            {
+               frame.roots[i] = work.roots[i];
+               frame.marks[i] = pending[i].save();
+            }
+         }
       }
 
       void commit()
       {
          if (readOnlyRevision)
             readOnlyRevision = nullptr;
-         else if (writeRevisions.size() == 1)
+         else if (writing && frames.empty())
             throw std::runtime_error("final commit needs writeRevision()");
-         else if (writeRevisions.size() > 1)
-            writeRevisions.erase(writeRevisions.end() - 2);
+         else if (writing)
+            frames.pop_back();  // the nested session's changes stay
          else
             throw std::runtime_error("mismatched commit");
       }
@@ -699,11 +786,12 @@ namespace psibase
       ConstRevisionPtr writeRevision(const Checksum256& blockId)
       {
          check((bool)writeSession, "writeSession is missing");
-         check(writeRevisions.size() == 1, "not final commit");
-         auto rev = writeRevisions.back();
+         check(writing && frames.empty(), "not final commit");
+         fold();
+         auto rev = work.clone();
          shared.impl->writeRevision(*writeSession, blockId, *rev);
          baseRevision = std::move(rev);
-         writeRevisions.pop_back();
+         endWrite();
          return baseRevision;
       }
 
@@ -711,8 +799,27 @@ namespace psibase
       {
          if (readOnlyRevision)
             readOnlyRevision = nullptr;
-         else if (!writeRevisions.empty())
-            writeRevisions.pop_back();
+         else if (writing && frames.empty())
+            endWrite();
+         else if (writing)
+         {
+            auto& frame = frames.back();
+            for (std::size_t i = 0; i < numChainDatabases; ++i)
+            {
+               work.roots[i] = std::move(frame.roots[i]);
+               pending[i].restore(frame.marks[i]);
+            }
+            frames.pop_back();
+         }
+      }
+
+      // The state of the open write session as trees.
+      ConstRevisionPtr modifiedRevision()
+      {
+         if (!writing)
+            return baseRevision;
+         fold();
+         return work.clone();
       }
 
       void checkoutEmptySubjective()
@@ -900,10 +1007,7 @@ namespace psibase
 
    ConstRevisionPtr Database::getModifiedRevision()
    {
-      if (!impl->writeRevisions.empty())
-         return impl->writeRevisions.back();
-      else
-         return impl->baseRevision;
+      return impl->modifiedRevision();
    }
 
    Database::Session Database::startRead()
@@ -961,6 +1065,7 @@ namespace psibase
           {
              auto index  = static_cast<std::uint32_t>(DbId::prevAuthServices);
              auto native = static_cast<std::uint32_t>(DbId::native);
+             check(impl->pending[index].empty(), "prevAuthServices has pending changes");
              if (revision)
              {
                 writeRevision.roots[index] = revision->roots[native];
@@ -1065,7 +1170,10 @@ namespace psibase
              {
                 changes->onWrite(key.string_view());
              }
-             session.upsert(impl->db(revision, db), key.string_view(), value.string_view());
+             if (impl->keptAside(db))
+                impl->put(session, db, key.string_view(), value.string_view());
+             else
+                session.upsert(impl->db(revision, db), key.string_view(), value.string_view());
           });
    }
 
@@ -1080,7 +1188,10 @@ namespace psibase
              {
                 changes->onWrite(key.string_view());
              }
-             session.remove(impl->db(revision, db), key.string_view());
+             if (impl->keptAside(db))
+                impl->erase(session, db, key.string_view());
+             else
+                session.remove(impl->db(revision, db), key.string_view());
           });
    }
 
@@ -1094,8 +1205,11 @@ namespace psibase
                 changes->onRead(key.string_view());
              }
 
-             if (!session.get(impl->db(revision, db), key.string_view(), &impl->valueBuffer,
-                              nullptr))
+             const auto* pending = impl->pendingFor(db);
+             if (!(pending ? session.get(impl->db(revision, db), *pending, key.string_view(),
+                                         &impl->valueBuffer)
+                           : session.get(impl->db(revision, db), key.string_view(),
+                                         &impl->valueBuffer, nullptr)))
              {
                 return {};
              }
@@ -1113,6 +1227,8 @@ namespace psibase
              {
                 changes->onRead(key.string_view());
              }
+             if (const auto* pending = impl->pendingFor(db))
+                return session.get(impl->db(revision, db), *pending, key.string_view(), nullptr);
              return session.get(impl->db(revision, db), key.string_view(), nullptr, nullptr);
           });
    }
@@ -1124,8 +1240,12 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_greater_equal(impl->db(revision, db), key.string_view(),
-                                                    &impl->keyBuffer, &impl->valueBuffer, nullptr);
+             const auto* pending = impl->pendingFor(db);
+             auto        found =
+                 pending ? session.get_greater_equal(impl->db(revision, db), *pending, key.string_view(),
+                                      &impl->keyBuffer, &impl->valueBuffer)
+                         : session.get_greater_equal(impl->db(revision, db), key.string_view(),
+                                      &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
                            (matchKeySize && memcmp(impl->keyBuffer.data(), key.pos, matchKeySize))))
                 found = false;
@@ -1151,8 +1271,12 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_less_than(impl->db(revision, db), key.string_view(),
-                                                &impl->keyBuffer, &impl->valueBuffer, nullptr);
+             const auto* pending = impl->pendingFor(db);
+             auto        found =
+                 pending ? session.get_less_than(impl->db(revision, db), *pending, key.string_view(),
+                                      &impl->keyBuffer, &impl->valueBuffer)
+                         : session.get_less_than(impl->db(revision, db), key.string_view(),
+                                      &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
                            (matchKeySize && memcmp(impl->keyBuffer.data(), key.pos, matchKeySize))))
                 found = false;
@@ -1176,8 +1300,12 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_max(impl->db(revision, db), key.string_view(),
-                                          &impl->keyBuffer, &impl->valueBuffer, nullptr);
+             const auto* pending = impl->pendingFor(db);
+             auto        found =
+                 pending ? session.get_max(impl->db(revision, db), *pending, key.string_view(),
+                                           &impl->keyBuffer, &impl->valueBuffer)
+                         : session.get_max(impl->db(revision, db), key.string_view(),
+                                           &impl->keyBuffer, &impl->valueBuffer, nullptr);
 
              if (auto* changes = impl->getChangeSet(db))
              {
