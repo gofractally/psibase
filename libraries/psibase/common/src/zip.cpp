@@ -1,3 +1,4 @@
+#include <limits>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
