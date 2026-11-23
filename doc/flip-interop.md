@@ -45,6 +45,48 @@ in particular the Rust CLI's boot (`psibase boot`) and the Rust tester call
 what fails in the baseline test run on this pin (section 1.17 of
 `doc/pssz-conversion.md`).
 
+**Exact spelling.** A hashed method name is the hash of its exact bytes
+(the coder is case-sensitive on the hash path). Wherever a `method` string
+appears in JSON — `postinstall.json`, client requests, test scripts — it
+must be spelled exactly as the service declares it (`regEvIdx`, not
+`regevidx`). Since the merge of `7ae0dde70` Rust's `MethodNumber`, the
+service macros and Python's `name.py` follow the same rule, and the method
+half of `rust/psibase_names` is gone.
+
+## 0.1 Division of labour and cross-language rules
+
+* **Parameter names.** Action arguments in JSON are keyed by the
+  *implementation's* parameter names: for a service implemented in Rust,
+  the Rust names verbatim. The Rust side renames the parameters in the C++
+  mirror headers of Rust services (about 60 places) and removes
+  leading-underscore public names in Rust. The C++ side does not edit
+  parameter names in mirror headers of Rust services.
+* **Variants.** C++ labels the alternatives of a variant `"0"`, `"1"`, …
+  with an `ijsonName` attribute; Rust labels them by the enum variant's
+  identifier. Until PSIO settles one rule, a comparison of a C++ schema
+  with a Rust schema uses `psio::pssz_ir::compare::wire` (bytes only); a
+  comparison within one language — `Packages::setSchema` of a service's
+  installed schema against its new one, `CHECK_SCHEMA` — uses
+  `psio::pssz_ir::compare::contract`.
+* **Strings.** Twins must agree on UTF-8 or raw: a Rust `String` is UTF-8,
+  a C++ `std::string` is raw unless the member says `attr(m, utf8)`. The
+  Rust side sends the list of C++ members that must gain `attr(m, utf8)`;
+  the C++ side applies it (string kind only, no size caps).
+* **`Memo`** is UTF-8, at most 80 bytes: `transparent()` over `std::string`
+  with `attr(contents, utf8 | max<80>)`
+  (`libraries/psibase/common/include/psibase/Memo.hpp`). It is the one
+  bounded type; a record or argument list holding a `Memo` gets a narrower
+  inferred pSSZ offset width than one holding a `std::string`.
+* **Time** has no psibase-specific form in either language: it is PSIO's
+  (`psio/time.hpp`, `docs/time.md`). A time point is its tick count
+  (`int64`) in PSSZ, sign-flipped big-endian in a key, and in JSON an
+  RFC 3339 `date-time` in UTC written with exactly the unit's fraction
+  digits (`"2026-11-22T10:15:30Z"` for seconds, `"…30.123456Z"` for
+  microseconds); a reader accepts `Z` or a numeric offset (converted to
+  UTC) and extra *zero* fraction digits, and rejects a finer fraction, a
+  missing offset and a number. A duration is its tick count everywhere (in
+  JSON a number, a decimal string beyond 2^53 − 1).
+
 ## 1. Binary values
 
 | Artifact | Producer | Consumers | Today | After the flip |
@@ -121,7 +163,7 @@ Container and layout do not change.
 | Postinstall script | `script/postinstall.json` | `pack_service.cmake` (generated for `INIT` services, or a hand-written file); cargo-psibase | C++ `package.cpp` (`readPostinstall`, `to_action`); Rust `package.rs` | JSON array of `{sender, service, method, rawData?: hex, data?: JSON}`. After: `data` is packed to PSSZ with the target service's schema (action arguments as an object keyed by parameter name, or an array). The CMake-generated `"rawData":"0000"` (fracpack of no arguments) is replaced by `"data":{}`; any hand-written `rawData` hex must be re-encoded |
 | Package index | `<dir>/index.json` | `make_package_index.sh`; Rust registries | C++ `package.cpp` `DirectoryRegistry` → `PackageInfo`; Rust registries | JSON array of `meta.json` objects plus `file`, `sha256` (every hash changes) |
 | Install manifest | argument of `Packages::postinstall`; `GET packages/manifest?package=&owner=` | C++ `package.cpp` `manifest`; Rust `package.rs` | `RPackages.cpp`; Rust CLI; Packages plugin; XAdmin UI | gzip of JSON `{"services":{<acct>:ServiceInfo},"data":[{account, filename}]}`; after: new-format schemas inside |
-| Local package registration | `POST x-packages/postinstall` (`/preinstall`, `/prerm`, `/postrm`) | `programs/psinode/init.cpp`; C++ tester; `psibase install --local` | `packages/local/XPackages/src/XPackages.cpp` | JSON `LocalPackage`. Note: the Rust CLI's struct has no `exports`; the member becomes optional in C++ or Rust sends it |
+| Local package registration | `POST x-packages/postinstall` (`/preinstall`, `/prerm`, `/postrm`) | `programs/psinode/init.cpp`; C++ tester; `psibase install --local` | `packages/local/XPackages/src/XPackages.cpp` | JSON `LocalPackage`, every member present: the Rust CLI sends `exports` from the flip on (it does not today) |
 
 ## 4. HTTP endpoints that pack
 
