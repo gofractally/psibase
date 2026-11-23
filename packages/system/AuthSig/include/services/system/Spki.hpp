@@ -9,6 +9,10 @@ namespace SystemService
    {
       /// The public key type used by this library.
       /// It is encoded as an X.509 SubjectPublicKeyInfo.
+      ///
+      /// Wherever it is packed it is its DER bytes (`transparent()`); the
+      /// bytes are not parsed when a key is unpacked. `validate` checks
+      /// their structure; an action that stores a key calls it.
       struct SubjectPublicKeyInfo
       {
          std::vector<unsigned char> data;
@@ -22,22 +26,10 @@ namespace SystemService
          }
 
          psibase::Checksum256 fingerprint() const;
+         PSIO_REFLECT(SubjectPublicKeyInfo, transparent(), data)
       };
 
       PSIBASE_REFLECT_KEY_TRANSFORM(&SubjectPublicKeyInfo::fingerprint, "sha256-key-fingerprint")
-
-      inline std::vector<unsigned char>& psio_unwrap_packable(SubjectPublicKeyInfo& obj)
-      {
-         return obj.data;
-      }
-      inline const std::vector<unsigned char>& psio_unwrap_packable(const SubjectPublicKeyInfo& obj)
-      {
-         return obj.data;
-      }
-      inline bool psio_validate_packable(const SubjectPublicKeyInfo& obj)
-      {
-         return SubjectPublicKeyInfo::validate(obj.data);
-      }
 
       // Takes a public key as a PEM encoded X.509 SubjectPublicKeyInfo
       // Returns a DER encoded SubjectPublicKeyInfo

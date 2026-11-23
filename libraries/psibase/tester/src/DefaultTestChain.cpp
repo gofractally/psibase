@@ -168,13 +168,15 @@ namespace
          group.push_back(std::move(act));
          if (size >= 1024 * 1024)
          {
-            result.push_back(SignedTransaction{chain.makeTransaction(std::move(group), 30)});
+            result.push_back(SignedTransaction{
+                psio::shared_pssz<Transaction>{chain.makeTransaction(std::move(group), 30)}});
             size = 0;
          }
       }
       if (!group.empty())
       {
-         result.push_back(SignedTransaction{chain.makeTransaction(std::move(group), 30)});
+         result.push_back(SignedTransaction{
+                psio::shared_pssz<Transaction>{chain.makeTransaction(std::move(group), 30)}});
       }
       return result;
    }

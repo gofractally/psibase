@@ -34,11 +34,28 @@ namespace psibase
       return psio::from_pssz<Action>(psio::trusted{data});
    }
 
+   // A packed Action with no members this build does not know.
+   // (psio::validate_strict needs exceptions for a type with adapters: in a
+   // guest it reports "unsupported".)
+   static void checkActionFormat(std::span<const char> data)
+   {
+      bool unknown = false;
+      check(psio::validate_pssz_compatible<Action>(psio::pssz{}, data, unknown).ok() && !unknown,
+            "invalid action format");
+   }
+
    psio::shared_pssz<Action> getCurrentActionView()
    {
       auto data = getResult(raw::getCurrentAction());
-      check(psio::validate_strict<Action>(psio::pssz{}, data).ok(), "invalid action format");
+      checkActionFormat(data);
       return psio::shared_pssz<Action>::unchecked(std::move(data));
+   }
+
+   psio::pssz_buffer<Action> getCurrentActionPacked()
+   {
+      auto data = getResult(raw::getCurrentAction());
+      checkActionFormat(data);
+      return psio::pssz_buffer<Action>::unchecked(std::move(data));
    }
 
    std::vector<char> call(const char* action, uint32_t len, CallFlags flags)

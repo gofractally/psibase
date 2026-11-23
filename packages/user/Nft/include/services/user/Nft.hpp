@@ -23,19 +23,19 @@ namespace UserService
 
       static constexpr auto service = psibase::AccountNumber("nft");
 
-      Nft(psio1::shared_view_ptr<psibase::Action> action);
+      Nft(psio::shared_pssz<psibase::Action> action);
 
       void init();
       NID  mint(std::optional<NID> nftId);
       void burn(NID nftId);
       void credit(NID                              nft_id,
                   psibase::AccountNumber           debitor,
-                  psio1::view<const psibase::Memo> memo);
+                  psio::pssz_view<psibase::Memo> memo);
       void transfer(NID                              nft_id,
                     psibase::AccountNumber           debitor,
-                    psio1::view<const psibase::Memo> memo);
-      void uncredit(NID nftId, psio1::view<const psibase::Memo> memo);
-      void debit(NID nftId, psio1::view<const psibase::Memo> memo);
+                    psio::pssz_view<psibase::Memo> memo);
+      void uncredit(NID nftId, psio::pssz_view<psibase::Memo> memo);
+      void debit(NID nftId, psio::pssz_view<psibase::Memo> memo);
       void setAutoDebit(std::optional<bool> autodebit);
 
       // Read-only:
@@ -48,7 +48,7 @@ namespace UserService
       struct Events
       {
          using Account  = psibase::AccountNumber;
-         using MemoView = psio1::view<const psibase::Memo>;
+         using MemoView = psio::pssz_view<psibase::Memo>;
          // clang-format off
          struct History
          {

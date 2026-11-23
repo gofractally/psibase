@@ -203,7 +203,7 @@ namespace SystemService
                return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
-                .body        = psio1::convert_to_frac(extractData<Transaction>(request)),
+                .body        = psio::to_pssz(extractData<Transaction>(request)),
                 .headers     = allowCors(),
             };
          }
@@ -213,7 +213,7 @@ namespace SystemService
                return result;
             return HttpReply{
                 .contentType = "application/octet-stream",
-                .body        = psio1::convert_to_frac(extractData<SignedTransaction>(request)),
+                .body        = psio::to_pssz(extractData<SignedTransaction>(request)),
                 .headers     = allowCors(),
             };
          }

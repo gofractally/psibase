@@ -15,7 +15,7 @@ extern "C" void called(AccountNumber thisService, AccountNumber sender)
 {
    auto act = getCurrentAction();
    check(act.method == MethodNumber{"verifySys"}, "Unknown action");
-   auto data = psio1::from_frac<VerifyArgs>(act.rawData);
+   auto data = psio::from_pssz<VerifyArgs>(act.rawData);
 
    auto ber_pubkey = std::span{reinterpret_cast<const std::uint8_t*>(data.claim.rawData.data()),
                                data.claim.rawData.size()};

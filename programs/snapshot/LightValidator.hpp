@@ -86,10 +86,8 @@ namespace psibase
 
    Checksum256 makeSignatureHash(const CommitMessage& msg)
    {
-      std::vector<char>   result;
-      psio1::vector_stream stream{result};
-      stream.write(static_cast<char>(CommitMessage::type));
-      psio::to_pssz(msg, stream);
+      std::vector<char> result{static_cast<char>(CommitMessage::type)};
+      psio::to_pssz(msg, result);
       return sha256(result.data(), result.size());
    }
 

@@ -2,7 +2,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/trace.hpp>
-#include <psio1/view.hpp>
+#include <psio/pssz_view.hpp>
 
 namespace TestService
 {
@@ -35,7 +35,7 @@ namespace TestService
       using Subjective = psibase::SubjectiveTables<FailTable>;
       static constexpr auto service = psibase::AccountNumber{"notify1"};
       void                  onBlock();
-      void onTrx(const psibase::Checksum256& id, psio1::view<const psibase::TransactionTrace> trace);
+      void onTrx(const psibase::Checksum256& id, psio::pssz_view<psibase::TransactionTrace> trace);
    };
    PSIO_REFLECT(NotifyService, method(onBlock), method(onTrx, id, trace));
    PSIBASE_REFLECT_TABLES(NotifyService, NotifyService::WriteOnly, NotifyService::Subjective)

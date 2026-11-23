@@ -152,8 +152,17 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    bool bad = (expected.empty() && !error.empty()) || error.find(expected) == std::string::npos;
    if (bad || always_show)
    {
-      auto schemas = TestChainSchemas{};
-      std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+      if (tester::raw::selectedChain)
+      {
+         auto schemas = TestChainSchemas{};
+         std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+      }
+      else if (t.error)
+      {
+         // The schemas are read from the selected chain; without one (a
+         // chain that is still booting) there is only the error.
+         std::cout << "error: " << *t.error << "\n";
+      }
    }
    if (bad)
    {
@@ -168,8 +177,17 @@ std::string psibase::show(bool include, TransactionTrace t)
 {
    if (include || t.error)
    {
-      auto schemas = TestChainSchemas{};
-      std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+      if (tester::raw::selectedChain)
+      {
+         auto schemas = TestChainSchemas{};
+         std::cout << prettyTrace(t, std::ref(schemas)) << "\n";
+      }
+      else if (t.error)
+      {
+         // The schemas are read from the selected chain; without one (a
+         // chain that is still booting) there is only the error.
+         std::cout << "error: " << *t.error << "\n";
+      }
    }
    if (t.error)
       return *t.error;
@@ -503,7 +521,7 @@ psibase::SignedTransaction psibase::TestChain::signTransaction(Transaction trx, 
           .rawData = {pub.data.begin(), pub.data.end()},
       });
    SignedTransaction signedTrx;
-   signedTrx.transaction = trx;
+   signedTrx.transaction = psio::shared_pssz<Transaction>{trx};
    auto hash             = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
    for (auto& [pub, priv] : keys)
    {
@@ -631,9 +649,9 @@ namespace
       auto verifyContext = makeRunContext(chain, RunMode::verify, status);
       for (auto&& [claim, proof, token] : std::views::zip(claims, trx.proofs, tokens))
       {
-         VerifyArgs args{trxId, claim, proof};
+         VerifyArgs args{trxId, claim.unpack(), proof};
          Action     act{.sender  = AccountNumber{},
-                        .service = claim.service(),
+                        .service = claim.service().unpack(),
                         .method  = MethodNumber("verifySys"),
                         .rawData = psio::to_pssz(args)};
          if (token && token->success && token->mode == RunMode::verify && token->action == act &&
@@ -813,7 +831,7 @@ std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
                                          std::chrono::seconds(10),
                            .flags      = Tapos::do_not_broadcast_flag};
    Transaction       trx{.tapos = tapos, .actions = {loginTransactor.loginSys("psibase.io")}};
-   SignedTransaction strx{trx};
+   SignedTransaction strx{psio::shared_pssz<Transaction>{trx}};
    auto reply = post<SystemService::LoginReply>(SystemService::Transact::service, "/login",
                                                 FracPackBody{std::move(strx)});
    return reply.access_token;

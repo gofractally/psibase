@@ -4,7 +4,8 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/psibase.hpp>
 #include <psibase/webServices.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/HttpServerRequest.hpp>
@@ -74,13 +75,13 @@ namespace SystemService
    }
 
    void HttpServer::recv(std::int32_t                        socket,
-                         psio1::view<const std::vector<char>> data,
+                         psio::pssz_view<std::vector<char>> data,
                          std::uint32_t                       flags)
    {
       check(getSender() == XHttp::service, "Wrong sender");
       if (socket == producer_multicast)
       {
-         auto act = psio1::from_frac<Action>(data);
+         auto act = psio::from_pssz<Action>(data);
          checkRecvAuth(act);
          auto _ = recurse();
          psibase::call(act);
@@ -92,7 +93,7 @@ namespace SystemService
       if (getSender() != action.service)
          psibase::abortMessage(getSender().str() + " cannot send messages to " + action.service.str());
       checkRecvAuth(action);
-      to<XHttp>().send(producer_multicast, psio1::to_frac(action), 0);
+      to<XHttp>().send(producer_multicast, psio::to_pssz(action), 0);
    }
 
    namespace
@@ -373,7 +374,7 @@ namespace SystemService
       }
    }  // serve()
 
-   std::string HttpServer::rootHost(psio1::view<const std::string> host)
+   std::string HttpServer::rootHost(psio::pssz_view<std::string> host)
    {
       return to<XHttp>().rootHost(host);
    }

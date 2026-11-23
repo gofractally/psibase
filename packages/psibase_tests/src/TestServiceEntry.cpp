@@ -39,7 +39,10 @@ extern "C" void called(AccountNumber this_service, AccountNumber sender)
 {
    psibase::internal::receiver = this_service;
    auto act                    = getCurrentAction();
-   auto pl                     = psio1::from_frac_strict<payload>(act.rawData);
+   bool unknown = false;
+   check(psio::validate_pssz_compatible<payload>(psio::pssz{}, act.rawData, unknown).ok() && !unknown,
+         "invalid payload");
+   auto pl = psio::from_pssz<payload>(psio::trusted{act.rawData});
    check(ctors_called == 1, "ctors != 1");
    check(start_called == 1, "start != 1");
    check(this_service == TestServiceEntry::service, "called: this_service = " + this_service.str());
@@ -63,11 +66,11 @@ extern "C" void called(AccountNumber this_service, AccountNumber sender)
    }
    if (pl.number)
    {
-      auto r = psio1::from_frac<int>(call({
+      auto r = psio::from_pssz<int>(call({
           .sender  = this_service,
           .service = this_service,
           .method  = act.method,
-          .rawData = psio1::convert_to_frac(payload{
+          .rawData = psio::to_pssz(payload{
               .number = pl.number - 1,
               .memo   = pl.memo,
           }),

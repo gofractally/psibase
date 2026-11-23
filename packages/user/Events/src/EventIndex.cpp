@@ -67,11 +67,11 @@ namespace
          if (!row)
             return false;
 
-         const CompiledType* ctype = cache.getSchemaType({}, db, row->service(), row->type());
+         const CompiledType* ctype = cache.getSchemaType({}, db, (*row)->service().unpack(), (*row)->type().unpack());
          if (!ctype)
             return true;
 
-         FracParser parser(psio1::FracStream{row->rawData()}, ctype, psibase_builtins, false);
+         FracParser parser(psio1::FracStream{(*row)->rawData()}, ctype, psibase_builtins, false);
 
          // validate remaining data
          while (auto item = parser.next())
@@ -81,12 +81,12 @@ namespace
          }
 
          auto indexes = secondary.getIndex<0>().get(
-             std::tuple(db, row->service().unpack(), row->type().unpack()));
+             std::tuple(db, (*row)->service().unpack(), (*row)->type().unpack()));
          if (!indexes)
             indexes.emplace(SecondaryIndexRecord{.indexes = std::vector{SecondaryIndexInfo{}}});
          for (const auto& index : indexes->indexes)
          {
-            psio::to_key(EventIndexTable{db, row->service(), row->type()}, key);
+            psio::to_key(EventIndexTable{db, (*row)->service().unpack(), (*row)->type().unpack()}, key);
             psio::to_key(index.indexNum, key);
             // The columns are read from the packed event by its schema
             psio1::vector_stream stream{key};
@@ -176,7 +176,7 @@ namespace
                 auto event = events.getView(eventNum);
                 if (!event)
                    return true;
-                FracParser parser{psio1::FracStream{event->rawData()}, ctype, psibase_builtins,
+                FracParser parser{psio1::FracStream{(*event)->rawData()}, ctype, psibase_builtins,
                                   false};
                 psio1::vector_stream stream{subkey};
                 for (const auto& column : item.info.columns())

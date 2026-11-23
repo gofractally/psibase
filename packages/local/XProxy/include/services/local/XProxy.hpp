@@ -52,7 +52,7 @@ namespace LocalService
       void onReply(std::int32_t socket, psibase::HttpReply reply);
       void onAccept(std::int32_t socket, psibase::HttpReply reply);
       void onError(std::int32_t socket, std::optional<psibase::HttpReply> reply);
-      void recv(std::int32_t socket, psio1::view<const std::vector<char>> data, std::uint32_t flags);
+      void recv(std::int32_t socket, psio::pssz_view<std::vector<char>> data, std::uint32_t flags);
       void close(std::int32_t socket);
    };
    PSIO_REFLECT(XProxy,

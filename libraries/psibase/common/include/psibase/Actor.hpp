@@ -7,6 +7,7 @@
 #include <psibase/serviceState.hpp>
 #include <psio/reflect.hpp>
 #include <psio/buffer.hpp>
+#include <psio/mutable_view.hpp>
 #include <psio/nested.hpp>
 #include <psio/pssz.hpp>
 #include <psio/pssz_view.hpp>
@@ -39,6 +40,49 @@ namespace psibase
    using MethodResult =
        psio::wire_type_t<typename psio::reflect<T>::template method_result<I>>;
 
+   namespace detail
+   {
+      // An argument as it is handed to the packer: itself when it already
+      // packs as the parameter (the parameter's type, or something that
+      // refers to one: a view, a std::string_view, a span); otherwise
+      // converted to the parameter's type: constructed from the argument
+      // where that is possible, implicitly converted otherwise.
+      template <typename P, typename A>
+      decltype(auto) methodArg(A&& arg)
+      {
+         if constexpr (std::is_same_v<psio::wire_type_t<A>, P>)
+            return std::forward<A>(arg);
+         else if constexpr (std::is_constructible_v<P, A&&>)
+            return P(std::forward<A>(arg));
+         else
+         {
+            P converted = std::forward<A>(arg);
+            return converted;
+         }
+      }
+   }  // namespace detail
+
+   /// The packed arguments of method `I` of `T`: the PSSZ of
+   /// `psio::reflect<T>::method_arg_tuple<I>`
+   ///
+   /// This is the content of [Action::rawData] for an action, and the
+   /// payload of an event.
+   template <typename T, std::size_t I, typename... Args>
+   std::vector<char> packMethodArgs(Args&&... args)
+   {
+      using Tuple = typename psio::reflect<T>::template method_arg_tuple<I>;
+      static_assert(std::tuple_size_v<typename Tuple::tuple_type> <= sizeof...(Args),
+                    "too few arguments passed to method");
+      static_assert(std::tuple_size_v<typename Tuple::tuple_type> == sizeof...(Args),
+                    "too many arguments passed to method");
+      return [&]<std::size_t... N>(std::index_sequence<N...>)
+      {
+         return psio::method_args_to_pssz<T, I>(
+             detail::methodArg<std::tuple_element_t<N, typename Tuple::tuple_type>>(
+                 std::forward<Args>(args))...);
+      }(std::index_sequence_for<Args...>{});
+   }
+
    /**
     *  When an action is called it returns
     *
@@ -61,7 +105,7 @@ namespace psibase
       auto call(Args&&... args) const
       {
          return psibase::Action{sender, receiver, methodNumber<I, MemberPtr>,
-                                psio::method_args_to_pssz<MethodClass<MemberPtr>, I>(args...)};
+                                packMethodArgs<MethodClass<MemberPtr>, I>(std::forward<Args>(args)...)};
       }
    };
 
@@ -128,7 +172,9 @@ namespace psibase
    };
 
    /// Packs an action: the result is a packed [Action] whose `rawData`
-   /// is typed as the method's argument tuple
+   /// is typed as the method's argument tuple. The caller owns the bytes
+   /// and may overwrite a fixed-size argument in place
+   /// (`psio::as_mutable_view`) to send the action again.
    struct ActionViewProxy
    {
       ActionViewProxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
@@ -141,9 +187,9 @@ namespace psibase
       {
          using Class = MethodClass<MemberPtr>;
          using Tuple = typename psio::reflect<Class>::template method_arg_tuple<I>;
-         return psio::shared_pssz<TypedAction<Tuple>>::unchecked(
+         return psio::pssz_buffer<TypedAction<Tuple>>::unchecked(
              psio::to_pssz(Action{sender, receiver, methodNumber<I, MemberPtr>,
-                                  psio::method_args_to_pssz<Class, I>(args...)}));
+                                  packMethodArgs<Class, I>(std::forward<Args>(args)...)}));
       }
    };
 
@@ -217,7 +263,7 @@ namespace psibase
              .service = AccountNumber{"events"},
              .method  = MethodNumber{"event"},
              .rawData = psio::to_pssz(std::tuple(
-                 event_log, type, psio::method_args_to_pssz<MethodClass<MemberPtr>, I>(args...))),
+                 event_log, type, packMethodArgs<MethodClass<MemberPtr>, I>(std::forward<Args>(args)...))),
          };
          return fraccall<EventNumber>(action).unpack();
       }

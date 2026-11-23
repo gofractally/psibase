@@ -15,9 +15,10 @@ extern "C" void psibase_psio_codec_abort(const char*   what,
                                          const char*   format,
                                          std::size_t   format_size)
 {
-   std::string message{format, format_size};
-   message += ": ";
-   message.append(what, what_size);
+   // (PSIO's messages name their format: "pssz: offset out of range")
+   std::string message{what, what_size};
+   if (!message.starts_with(std::string_view{format, format_size}))
+      message = std::string{format, format_size} + ": " + message;
    message += " (at byte " + std::to_string(byte_offset) + ")";
    psibase::abortMessage(message);
 }

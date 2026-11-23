@@ -3,7 +3,8 @@
 #include <format>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/checkSchema.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/commonErrors.hpp>
 #include <string>

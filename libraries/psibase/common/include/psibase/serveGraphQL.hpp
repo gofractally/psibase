@@ -701,7 +701,8 @@ namespace psibase
    template <typename T, typename Key, typename F>
    constexpr auto gql_callable_fn(const TransformedConnectionView<TableIndex<T, Key>, F>*)
    {
-      using R          = decltype(std::declval<F>()(std::declval<T>()));
+      // The transform is given the packed row
+      using R = decltype(std::declval<F>()(std::declval<psio::shared_pssz<T>>()));
       using Connection = psibase::Connection<  //
           R, psio::reflect<R>::fixed_name + "Connection", psio::reflect<R>::fixed_name + "Edge">;
       return &detail::makeTransformedConnectionView<Connection, TableIndex<T, Key>, F, Key>;

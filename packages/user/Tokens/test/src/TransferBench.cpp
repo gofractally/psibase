@@ -81,7 +81,7 @@ namespace
          Action action{.sender  = alice.id,
                        .service = Tokens::service,
                        .method  = "credit"_m,
-                       .rawData = psio1::to_frac(std::tuple(token, bob.id, Quantity{std::uint64_t{1}},
+                       .rawData = psio::to_pssz(std::tuple(token, bob.id, Quantity{std::uint64_t{1}},
                                                            psibase::Memo{std::to_string(i)}))};
          auto signedTrx = t.signTransaction(t.makeTransaction({action}, 60), signers);
          bytes += signedTrx.transaction.size();

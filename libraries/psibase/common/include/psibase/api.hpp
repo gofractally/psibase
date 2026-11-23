@@ -7,6 +7,8 @@
 #include <psibase/db.hpp>
 #include <psio/key.hpp>
 #include <psio/shapes.hpp>
+#include <psio/buffer.hpp>
+#include <psio/mutable_view.hpp>
 #include <psio/pssz.hpp>
 #include <psio/pssz_view.hpp>
 #include <psio1/stream.hpp>
@@ -392,6 +394,13 @@ namespace psibase
    ///
    /// Note: The above only applies if the service uses [call]. [Actor] uses [call].
    psio::shared_pssz<Action> getCurrentActionView();
+
+   /// Get the currently-executing action, packed, in a buffer of the caller
+   ///
+   /// Like [getCurrentActionView], but the caller owns the bytes: a service
+   /// that forwards the action may overwrite its fixed-size members in place
+   /// (`psio::as_mutable_view`) instead of packing it again.
+   psio::pssz_buffer<Action> getCurrentActionPacked();
 
    /// Call a service and return its result
    std::vector<char> call(const Action& action, CallFlags flags = CallFlags::none);

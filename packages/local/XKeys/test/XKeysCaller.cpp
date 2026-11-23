@@ -20,7 +20,7 @@ std::optional<psibase::HttpReply> XKeysCaller::serveSys(psibase::HttpRequest req
       auto actions = psio1::convert_from_json<std::vector<Action>>(
           std::string(request.body.begin(), request.body.end()));
       return HttpReply{.contentType = "application/octet-stream",
-                       .body        = psio1::to_frac(to<XKeys>().signTx(actions))};
+                       .body        = psio::to_pssz(to<XKeys>().signTx(actions))};
    }
    return {};
 }

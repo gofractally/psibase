@@ -118,9 +118,7 @@ void write_consensus_change_blocks(std::uint32_t             chain,
       lastId          = psibase::BlockInfo{header}.blockId;
       // Drop transactions. We don't need them
       {
-         block.clear();
-         psio1::vector_stream bstream{block};
-         psio::to_pssz(psibase::Block{header}, bstream);
+         block = psio::to_pssz(psibase::Block{header});
       }
       write_row(static_cast<std::uint32_t>(DbId::blockLog), blockKey, block, stream);
       last = num;

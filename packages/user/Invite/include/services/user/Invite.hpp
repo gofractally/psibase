@@ -42,7 +42,7 @@ namespace UserService
 
          static constexpr auto service = SystemService::Accounts::inviteService;
 
-         Invite(psio1::shared_view_ptr<psibase::Action> action);
+         Invite(psio::shared_pssz<psibase::Action> action);
 
          void init();
 

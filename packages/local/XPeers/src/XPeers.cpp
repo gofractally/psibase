@@ -269,17 +269,17 @@ namespace
    template <typename T>
    std::vector<char> serializeMessage(const T& msg)
    {
+      // The type of the message, then its PSSZ
       std::vector<char> result;
       result.push_back(T::type);
-      psio1::vector_stream stream{result};
-      psio1::to_frac(psio1::nested<const T&>{msg}, stream);
+      psio::to_pssz(msg, result);
       return result;
    }
 
    template <typename T>
    T deserializeMessage(std::span<const char> msg)
    {
-      return psio1::from_frac<psio1::nested<T>>(msg.subspan(1)).value;
+      return psio::from_pssz<T>(msg.subspan(1));
    }
 
    bool hasCommonHost(const PeerConnection& lhs, const PeerConnection& rhs)
@@ -904,7 +904,7 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
 }
 
 void XPeers::recvP2P(std::int32_t                        socket,
-                     psio1::view<const std::vector<char>> data,
+                     psio::pssz_view<std::vector<char>> data,
                      std::uint32_t                       flags)
 {
    check(getSender() == XHttp::service, "Wrong sender");

@@ -965,7 +965,11 @@ namespace psibase
       void remove(const T& oldValue) { removeImpl(oldValue); }
 
       /// Remove object from table
-      void remove(psio::pssz_view<T> oldValue) { removeImpl(oldValue); }
+      template <typename F, psio::storage S>
+      void remove(psio::view<T, F, S> oldValue)
+      {
+         removeImpl(oldValue);
+      }
 
       // TODO: get index by name
       /// Get a primary or secondary index

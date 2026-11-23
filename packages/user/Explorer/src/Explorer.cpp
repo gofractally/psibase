@@ -12,7 +12,7 @@
 using namespace psibase;
 using namespace SystemService;
 
-using SharedBlock = psio1::shared_view_ptr<Block>;
+using SharedBlock = psio::shared_pssz<Block>;
 
 struct TransactionAuthChecker
 {
@@ -36,11 +36,11 @@ struct TransactionAuthChecker
       }
       return pos->second;
    }
-   bool operator()(psio1::view<const Action> action) const
+   bool operator()(psio::pssz_view<Action> action) const
    {
-      return (*this)(action.sender()) || (*this)(action.service());
+      return (*this)(action.sender().unpack()) || (*this)(action.service().unpack());
    }
-   bool operator()(psio1::view<const Transaction> transaction) const
+   bool operator()(psio::pssz_view<Transaction> transaction) const
    {
       for (auto action : transaction.actions())
       {
@@ -49,7 +49,7 @@ struct TransactionAuthChecker
       }
       return false;
    }
-   bool operator()(psio1::view<const SignedTransaction> transaction) const
+   bool operator()(psio::pssz_view<SignedTransaction> transaction) const
    {
       return (*this)(*transaction.transaction());
    }
@@ -57,10 +57,10 @@ struct TransactionAuthChecker
 
 struct ActionQuery
 {
-   psio1::view<const Action> action;
-   AccountNumber            sender() const { return action.sender(); }
-   AccountNumber            service() const { return action.service(); }
-   MethodNumber             method() const { return action.method(); }
+   psio::pssz_view<Action> action;
+   AccountNumber            sender() const { return action.sender().unpack(); }
+   AccountNumber            service() const { return action.service().unpack(); }
+   MethodNumber             method() const { return action.method().unpack(); }
    std::string              rawData() const
    {
       std::span<const char> result = action.rawData();
@@ -71,7 +71,7 @@ struct ActionQuery
 
 struct TransactionQuery
 {
-   psio1::view<const Transaction> transaction;
+   psio::pssz_view<Transaction> transaction;
    std::vector<ActionQuery>      actions() const
    {
       std::vector<ActionQuery> result;
@@ -87,9 +87,9 @@ struct TransactionQuery
 
 struct SignedTransactionQuery
 {
-   psio1::view<const SignedTransaction> value;
+   psio::pssz_view<SignedTransaction> value;
    const TransactionAuthChecker*       censor;
-   Checksum256 id() const { return sha256(value.transaction().data(), value.transaction().size()); }
+   Checksum256 id() const { return sha256(value.transaction().bytes().data(), value.transaction().bytes().size()); }
    // Available even when the transaction is censored
    std::uint32_t numActions() const { return value.transaction()->actions().size(); }
    std::optional<TransactionQuery> transaction() const
@@ -139,7 +139,7 @@ struct BlockQuery
    SharedBlock                         block;
    const TransactionAuthChecker*       transactionCensor;
    Checksum256                         id() const { return BlockInfo{header()}.blockId; }
-   BlockHeader                         header() const { return block->header(); }
+   BlockHeader                         header() const { return block->header().unpack(); }
    std::vector<SignedTransactionQuery> transactions() const
    {
       std::vector<SignedTransactionQuery> result;
@@ -159,7 +159,7 @@ struct BlockQuery
       {
          for (auto action : transaction.transaction()->actions())
          {
-            ++counts[action.service()];
+            ++counts[action.service().unpack()];
          }
       }
       std::vector<ServiceActionCount> result;
@@ -182,7 +182,7 @@ struct TransactionLocation
    SharedBlock                         block;
    BlockHeader                         blockHeader;
    std::uint32_t                       txIndex;
-   psio1::view<const SignedTransaction> value;
+   psio::pssz_view<SignedTransaction> value;
    const TransactionAuthChecker*       censor;
 
    BlockNum               blockNum() const { return blockHeader.blockNum; }
@@ -237,7 +237,7 @@ struct Query
       auto block = blockLog().getView(blockNum);
       if (!block)
          return std::nullopt;
-      return BlockQuery{std::move(block), &transactionCensor};
+      return BlockQuery{std::move(*block), &transactionCensor};
    }
 
    std::optional<BlockHeader> head() const
@@ -247,7 +247,7 @@ struct Query
       --it;
       if (it == index.end())
          return std::nullopt;
-      BlockHeader header = it.view()->header();
+      BlockHeader header = it.view()->header().unpack();
       return header;
    }
 
@@ -271,9 +271,9 @@ struct Query
          std::uint32_t i     = 0;
          for (auto trx : block->transactions())
          {
-            if (sha256(trx.transaction().data(), trx.transaction().size()) == *target)
+            if (sha256(trx.transaction().bytes().data(), trx.transaction().bytes().size()) == *target)
             {
-               BlockHeader header = block->header();
+               BlockHeader header = block->header().unpack();
                return TransactionLocation{std::move(block), std::move(header), i, trx,
                                           &transactionCensor};
             }

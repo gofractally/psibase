@@ -292,7 +292,7 @@ void XProxy::close(std::int32_t socket)
 }
 
 void XProxy::recv(std::int32_t                        socket,
-                  psio1::view<const std::vector<char>> data,
+                  psio::pssz_view<std::vector<char>> data,
                   std::uint32_t                       flags)
 {
    check(getSender() == XHttp::service, "Wrong sender");

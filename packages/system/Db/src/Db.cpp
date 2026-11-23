@@ -56,7 +56,7 @@ namespace
    }
 }  // namespace
 
-UniqueKvHandle Db::open(DbId db, psio1::view<const std::vector<char>> prefixView, KvMode mode)
+UniqueKvHandle Db::open(DbId db, psio::pssz_view<std::vector<char>> prefixView, KvMode mode)
 {
    auto prefix = std::span<const char>(prefixView);
    auto sender = getSender();

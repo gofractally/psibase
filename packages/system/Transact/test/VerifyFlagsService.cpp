@@ -30,7 +30,7 @@ void VerifyFlagsService::verifySys(Checksum256       transactionHash,
                                    Claim             claim,
                                    std::vector<char> proof)
 {
-   auto flags = psio1::from_frac<std::uint64_t>(proof);
+   auto flags = psio::from_pssz<std::uint64_t>(proof);
    if (flags & CodeRow::isPrivileged)
    {
       Native::tables().open<ConfigTable>().put({});

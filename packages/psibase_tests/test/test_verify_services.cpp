@@ -46,7 +46,7 @@ namespace
       auto                                prefixLen = key.size();
       while (auto row = t.kvGreaterEqualRaw(CodeRow::db, key, prefixLen))
       {
-         auto a = psio1::from_frac<CodeRow>(*row);
+         auto a = psio::from_pssz<CodeRow>(*row);
          if ((a.flags & CodeRow::isVerify) &&
              t.kvGet<CodeByHashRow>(CodeByHashRow::db,
                                     codeByHashKey(a.codeHash, a.vmType, a.vmVersion)))

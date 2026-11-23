@@ -185,11 +185,11 @@ struct EventCursor : sqlite3_vtab_cursor
                check(false, "Internal error: indexed event does not exist");
             }
             // Extract just the data
-            if (row->service() != vtab()->index.service)
+            if ((*row)->service() != vtab()->index.service)
             {
                check(false, "Internal error: event service does not match index");
             }
-            data = row->rawData();
+            data = (*row)->rawData().unpack();
          }
       }
    }

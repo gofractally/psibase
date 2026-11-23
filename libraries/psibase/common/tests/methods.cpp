@@ -14,6 +14,8 @@
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/servePackAction.hpp>
 
+#include <psio/to_hex.hpp>
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -172,7 +174,7 @@ TEST_CASE("methods: ActionViewBuilder packs a whole action", "[methods]")
    {
       static_assert(
           std::is_same_v<decltype(packed),
-                         const psio::shared_pssz<
+                         const psio::pssz_buffer<
                              TypedAction<psio::reflect<Ledger>::method_arg_tuple<1>>>&>);
       auto data = packed.bytes();
       return std::vector<char>(data.begin(), data.end()) == bytes;
@@ -189,6 +191,15 @@ TEST_CASE("methods: ActionViewBuilder packs a whole action", "[methods]")
    CHECK(packed->sender() == alice);
    CHECK(packed->method() == MethodNumber{"transfer"});
    CHECK(std::get<1>(packed->rawData()->unpack()) == "rent");
+   // The caller owns the bytes: a fixed-size argument is overwritten in place.
+   {
+      auto                   locate = ledger.locate(Point{4, "here"}, 3);
+      (*psio::as_mutable_view(locate).rawData()).template get<1>() = 8;
+      CHECK(std::ranges::equal(
+          locate.bytes(),
+          psio::to_pssz(Action{alice, Ledger::service, MethodNumber{"locate"},
+                               psio::to_pssz(std::tuple{Point{4, "here"}, std::int32_t{8}})})));
+   }
    // A view as an argument is packed as the value it designates.
    const auto                   point = psio::to_pssz(Point{4, "here"});
    const psio::pssz_view<Point> pointView{point};
@@ -324,6 +335,40 @@ namespace methods_test
       PSIO_REFLECT(Twin, transaction, proofs, subjectiveData)
    };
 }  // namespace methods_test
+
+TEST_CASE("methods: the bytes of an action", "[methods][transaction]")
+{
+   // What the host hands to a service and a service to the host: the same
+   // bytes natively and in a guest.
+   const Action act{AccountNumber{1}, AccountNumber{2}, MethodNumber{3}, {1, 2, 3}};
+   const auto   bytes = psio::to_pssz(act);
+   CHECK(psio::to_hex(std::span<const char>{bytes}) ==
+         "1C000000"            // the record's fixed part is 28 bytes
+         "0100000000000000"    // sender
+         "0200000000000000"    // service
+         "0300000000000000"    // method
+         "1C000000"            // rawData starts after the fixed part
+         "010203");
+   CHECK(psio::validate_pssz<Action>(bytes).ok());
+   // What the node hands to x-http::serve
+   {
+      HttpRequest req{.host = "h", .method = "GET", .target = "/", .contentType = "t",
+                      .headers = {{"n", "v"}}, .body = {1, 2}};
+      const auto packed = psio::to_pssz(std::tuple(std::int32_t{7}, req));
+      INFO(psio::to_hex(std::span<const char>{packed}));
+      CHECK(psio::to_hex(std::span<const char>{packed}) ==
+            "0800000007000000080000001800000018000000190000001C0000001D0000001E0000002C00000068"
+            "4745542F740400000008000000090000006E760102");
+      auto status = psio::validate_pssz<std::tuple<std::int32_t, HttpRequest>>(packed);
+      INFO(std::string(status.ok() ? std::string_view{} : status.error().what));
+      CHECK(status.ok());
+   }
+   // The check a service makes on the action it is handed (a guest
+   // without exceptions cannot use psio::validate_strict for this type).
+   bool unknown = true;
+   CHECK(psio::validate_pssz_compatible<Action>(psio::pssz{}, bytes, unknown).ok());
+   CHECK(!unknown);
+}
 
 TEST_CASE("methods: a signed transaction holds its transaction packed", "[methods][transaction]")
 {

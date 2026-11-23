@@ -28,7 +28,7 @@ namespace UserService
       static constexpr uint8_t unrecallable   = 1;
       static constexpr uint8_t autoDebit      = 0;
 
-      Tokens(psio1::shared_view_ptr<psibase::Action> action);
+      Tokens(psio::shared_pssz<psibase::Action> action);
 
       void init();
 

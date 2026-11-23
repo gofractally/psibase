@@ -20,7 +20,7 @@ namespace TestService
 #endif
 
       std::string testValue(Memo memo);
-      std::string testView(psio1::view<const Memo> memo);
+      std::string testView(psio::pssz_view<Memo> memo);
       void        testJson(const std::string& memo);
       void        testConstruct(const std::string& memo);
    };

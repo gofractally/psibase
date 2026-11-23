@@ -91,7 +91,7 @@ void XTimer::runOne()
       call(Action{.sender  = XTimer::service,
                   .service = row->service,
                   .method  = row->method,
-                  .rawData = psio1::convert_to_frac(std::tuple(row->id))});
+                  .rawData = psio::to_pssz(std::tuple(row->id))});
 }
 
 PSIBASE_DISPATCH(XTimer)

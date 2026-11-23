@@ -79,14 +79,14 @@ TEST_CASE("ec")
    });
 
    SignedTransaction signedTrx;
-   signedTrx.transaction = ec_trx;
+   signedTrx.transaction = psio::shared_pssz<Transaction>{ec_trx};
    CHECK(TraceResult(t.pushTransaction(signedTrx)).failed("proofs and claims must have same size"));
    t.startBlock(0);
 
-   auto              packed_ec_trx = psio1::convert_to_frac(ec_trx);
+   auto              packed_ec_trx = psio::to_pssz(ec_trx);
    auto              data = sign(priv_key2, sha256(packed_ec_trx.data(), packed_ec_trx.size()));
    SignedTransaction ec_signed = {
-       .transaction = ec_trx,
+       .transaction = psio::shared_pssz<Transaction>{ec_trx},
        .proofs      = {{data.begin(), data.end()}},
    };
 

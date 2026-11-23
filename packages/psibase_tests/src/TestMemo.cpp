@@ -11,9 +11,9 @@ std::string TestMemo::testValue(Memo memo)
 {
    return memo.contents;
 }
-std::string TestMemo::testView(view<const Memo> memo)
+std::string TestMemo::testView(psio::pssz_view<Memo> memo)
 {
-   return memo.contents();
+   return memo.unpack().contents;
 }
 void TestMemo::testJson(const std::string& memo)
 {

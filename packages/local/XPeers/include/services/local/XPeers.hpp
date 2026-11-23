@@ -130,7 +130,7 @@ namespace LocalService
       void onP2P(std::int32_t socket, psibase::HttpReply reply);
       void errP2P(std::int32_t socket, std::optional<psibase::HttpReply> reply);
       void recvP2P(std::int32_t                        socket,
-                   psio1::view<const std::vector<char>> data,
+                   psio::pssz_view<std::vector<char>> data,
                    std::uint32_t                       flags);
       void closeP2P(std::int32_t socket);
       void onTimer(std::uint64_t timerId);

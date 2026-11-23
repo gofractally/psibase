@@ -11,7 +11,7 @@ namespace UserService
      public:
       static constexpr auto service = psibase::AccountNumber("chainmail");
 
-      Chainmail(psio1::shared_view_ptr<psibase::Action> action);
+      Chainmail(psio::shared_pssz<psibase::Action> action);
 
       void init();
 

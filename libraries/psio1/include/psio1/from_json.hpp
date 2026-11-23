@@ -665,3 +665,9 @@ namespace psio1
       return from_json<T>(stream);
    }
 }  // namespace psio1
+
+// TEMPORARY: removed when psio1 is deleted.
+// psibase's time types are std::chrono types declared without reference to
+// this library; their JSON is in psio1/chrono.hpp, which psibase reached
+// through psio1/fracpack.hpp before its binary wire flipped.
+#include <psio1/fracpack.hpp>

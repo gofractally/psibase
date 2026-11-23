@@ -885,6 +885,287 @@ Not checked here: the service tests that boot a chain (57 of 93 fail on this
 pin before any flip work, 1.17), so table reads and writes through a running
 chain were exercised only by the five `t-*` tests of the baseline set.
 
+### 1.19 The binary wire flipped (S1)
+
+Three commits on the flip branch ("S1 part 1/3 … 3/3"). Everything psibase's
+C++ packs, unpacks, views and hashes is PSSZ through PSIO; the legacy
+library is left with JSON, schemas, GraphQL, the `bin` format and plain
+byte-range parameter types (`psio1::input_stream`). What crosses to Rust is
+in `doc/flip-interop.md` section 1, which is definitive now.
+
+**What changed, by area** (occurrences outside `libraries/psio1`, `doc`,
+`rust`, `external`; before → after):
+
+| Legacy | Before | Now |
+|---|---|---|
+| `psio1::to_frac` / `convert_to_frac` | 137 | `psio::to_pssz(v)` / `psio::to_pssz(v, vector)` (185 uses; one `convert_to_frac` is left, see below) |
+| `psio1::from_frac` / `from_frac_strict` | 74 | `psio::from_pssz<T>(bytes)` (validating) or `psio::from_pssz<T>(psio::trusted{bytes})`; 81 uses |
+| `psio1::prevalidated` | 45 | `psio::trusted{…}` for decodes (29); nothing for views (a PSIO view never validates) |
+| `psio1::fracpack_validate` / `_strict` | 25 | `psio::validate_pssz<T>(b).ok()`; `psio::validate_strict<T>(psio::pssz{}, b).ok()` natively; `psio::validate_pssz_compatible` + "no unknown members" in guests (below) |
+| `psio1::view<const T>` | 134 | `psio::pssz_view<T>` (130); named accessors as before; about 100 `.unpack()` added where a view was converted implicitly, about 15 removed where the member is arithmetic and now comes back by value |
+| `psio1::shared_view_ptr<T>` | 59 | `psio::shared_pssz<T>` (78 uses), `std::optional<psio::shared_pssz<T>>` where null was a state, `psio::pssz_buffer<T>` where the bytes are written in place |
+| `psio1::nested<T>` | 6 | `psio::nested<T>` (`TypedAction<T>::rawData`, `FracpackHttpReply<T>`); the three `nested<T&>` / `nested_json<T&>` uses were removed (below) |
+| `size_tag`, `size_stream` + `fast_buf_stream`, `fracpack_size` | 11 (outside `dwarf.cpp`) | a `std::vector<char>` filled by the host call, then `shared_pssz<T>::unchecked(vector)`; `psio::to_pssz(v, vector)` appends |
+| `psibase/MethodArgs.hpp` (`MethodArgs<M>`, `MethodResult<M>`) | 20 | deleted. `psio::reflect<T>::method_arg_tuple<I>` (its `tuple_type` where a `std::tuple` is wanted) and `psio::wire_type_t<method_result<I>>` (`psibase::MethodResult<T, I>` in `Actor.hpp`) |
+
+129 source and build files changed since the pin commit (`libraries/psibase`
+44, `libraries/net` 12, `libraries/psibase_http` 5, `libraries/psio1` 4,
+`programs` 6, `packages` 57, `libraries/CMakeLists.txt`).
+
+* **Action arguments and results** (`Actor.hpp`, `dispatch.hpp`).
+  `packMethodArgs<T, I>(args…)` is what `Actor`, `transactor`,
+  `ActionViewBuilder`, `EventEmitter` and the tester's `ServiceUser` pack
+  with: each argument is passed to `psio::method_args_to_pssz<T, I>` as it is
+  when it already packs as the parameter (the parameter's type, a view of it,
+  a `std::string_view`, a span), and is converted to the parameter's type
+  first otherwise (constructed from the argument where possible, implicitly
+  converted otherwise: what the legacy `std::tuple` construction did; see
+  gap A). `dispatch` validates with `psio::validate_method_args<Service, I>`,
+  aborts with `invalid argument encoding for <method>: <reason>` and calls
+  `psio::call_method_pssz<Service, I>(service, psio::trusted{args}, out)`;
+  PSIO hands each parameter over as declared (views, borrowed strings and
+  spans, unpacked values) and encodes the result, a returned view included.
+  The export / import of table handles (`psibaseExport`, `psibaseImport`)
+  keeps its own path; `psibaseImport` takes the index and the handle list by
+  value. `ActionViewBuilder` returns a `psio::pssz_buffer<TypedAction<Args>>`.
+* **`Table.hpp`.** Rows are PSSZ. `getView` returns
+  `std::optional<psio::shared_pssz<T>>`; `KvIterator::view()` a
+  `psio::shared_pssz<T>`. `put` takes the row, a `shared_pssz<T>` /
+  `pssz_buffer<T>` / `pssz_view<T>` (stored as it is, keys read through the
+  view), or a record that refers to its members (`TxSuccessView`: packed with
+  `psio::to_pssz`, then checked with `validate_pssz<T>` — PSIO has no
+  compile-time "packs as" relation, so `PackableAs` became a run-time check
+  on these three puts). A key read through a view is unpacked
+  (`psio::value_of(view.get<I>())`); `appendKey` lost its view cases
+  (`psio::to_key` takes views and tuples of them). `remove` of a view is a
+  template over the view's format so that `remove({})` stays unambiguous.
+* **Hashes.** `sha256(const T&)` and `Merkle::hash_leaf` hash the PSSZ form:
+  every transaction id, block id, Merkle root and state checksum changed.
+* **Node** (`libraries/psibase/native`, `libraries/net`,
+  `libraries/psibase_http`, `programs`). `SignedTransaction::transaction`,
+  `ProcessTransactionArgs::transaction`, `SignedMessage<M>::data`,
+  `BlockMessage::block` and `BlockHeaderMessage::block` are
+  `psio::shared_pssz` members. Construction of a `shared_pssz<T>` from a `T`
+  is explicit (the legacy pointer converted implicitly), so `SignedMessage`,
+  `BlockMessage` and `BlockHeaderMessage` gained constructors from the value
+  and from the packed value, and about 25 sites spell
+  `psio::shared_pssz<Transaction>{trx}`. `ForkDb::get` and
+  `get_block_by_num` return an optional. A message is its type byte followed
+  by `psio::to_pssz(msg)`.
+* **Guests.** `PSIO_CODEC_ABORT_HANDLER=psibase_psio_codec_abort` is a
+  compile definition of the `psio` target in `libraries/CMakeLists.txt` (wasm)
+  and in both SDK config files; the function is in
+  `libraries/psibase/common/src/codecAbort.cpp` (wasm builds of `libpsibase`)
+  and calls `abortMessage` with `<reason> (at byte <offset>)`.
+* **`SubjectPublicKeyInfo`** is `PSIO_REFLECT(…, transparent(), data)`
+  (D26, the owner's leaning): opaque DER bytes wherever it is packed. Its
+  legacy pack hooks are gone; its ADL JSON functions stay until the JSON
+  flip. `AuthSig::setKey` and `AuthSig::newAccount` call
+  `SubjectPublicKeyInfo::validate` themselves.
+* **Generated `postinstall.json`** (`pack_service.cmake`): the `init` action's
+  `rawData` is `""` (the PSSZ of no arguments), was `"0000"`.
+
+**Trust decisions.** Parity with the legacy code, read against the audit
+(`~/psibase-pssz-audit/trust/sites.md`):
+
+| Site | Legacy | Now |
+|---|---|---|
+| `ForkDb.hpp` snapshot scan (`SnapshotRow`), `psinode/main.cpp` keyring row and host-config row, `psitest/main.cpp` `HttpReply` and `HttpRequest`, `XHttp.cpp` `recv` arguments, the two `HttpReply` views in `recv`, `close` arguments, `Transact.cpp` and `MockTransact.cpp` `processTransaction` arguments, `net/test/test_util.cpp` `setConsensus` arguments (12 of the 13 `view(span)` sites) | the view constructor validated | explicit `psio::validate_pssz<T>` (`validate_method_args` in `test_util.cpp`) and `psibase::check` / `throw` before the view |
+| `RunQueue.cpp` timer row (the 13th) | `fracpack_validate` two lines above, then `view(span)` validated again | one validation (the one above it) |
+| Views built with `prevalidated` (25: native table checks in `NativeFunctions.cpp`, `RunQueue`, `BlockContext`, `Transact`, `RTransact`, `create-snapshot`) | not validated | the view is constructed; the `validate_*` call that precedes each is unchanged |
+| `Table.hpp` reads (`get`, `getView`, iterator, the old row in `put`), `api.hpp` `kvGet` family, `db.hpp` `kvGet`, `LightValidator.hpp`, `usePsitri.cpp` | not validated | `psio::trusted` / `shared_pssz::unchecked` |
+| `intrinsic.cpp` `getCurrentActionView` (and the new `getCurrentActionPacked`) | `validate_strict`, then adopt | `validate_pssz_compatible` + no unknown members, then `unchecked` |
+| `Actor.hpp` `fraccall` | fill, then `validate()` | `validate_pssz<R>` of the callee's bytes, then `shared_pssz<R>::unchecked`; the handle list is adopted unchecked as before (host-written) |
+| `dispatch.hpp` | `fracpack_validate`, then a prevalidated view | `validate_method_args`, then `call_method_pssz(trusted)` |
+| The bool-returning `from_frac(value, bytes)` (`BlockContext.cpp` ×2, `ForkDb.hpp` ×2 with the result ignored, `RTransact.cpp` `parseBody`) | validate, decode if valid | `validate_pssz`, then a trusted decode if valid; the ignoring sites still ignore |
+| `from_frac_strict` (`TransactionContext.cpp` genesis data, `TestServiceEntry.cpp`) | strict | `validate_strict` + trusted decode natively; compatible + no unknown members in the guest |
+| `Transact.cpp` transaction check | `fracpack_validate_strict<Transaction>` | `validate_pssz_compatible<Transaction>` + no unknown members (a guest cannot use `validate_strict`, gap C). It no longer requires the canonical encoding that PSIO's strict mode adds; the legacy check did not either |
+| `Table::put` of a record that refers to its members | compile-time `PackableAs` | `validate_pssz<T>` of the packed bytes (new, 3 call sites) |
+| Every plain `from_frac<T>(bytes)` (p2p messages in `routing_base.hpp`, HTTP bodies, host-call arguments, return values in the tester, snapshot files, …) | validating | `psio::from_pssz<T>(bytes)`, validating |
+| Members `shared_pssz<T>` of a decoded record | validated with the record | validated with the record (PSIO validates a packed member as its type) |
+
+The existing unvalidated reads the audit flags (snapshot import, typed
+`kvGet` over a foreign handle) are unchanged: S1 did not add or remove
+checks beyond the table above.
+
+**Mutable views** (15 statements that assigned through a legacy view):
+
+* `XHttp.cpp` `recv` (two forwards) and `close`, `Transact.cpp`
+  `nextTransaction`: the action is fetched with the new
+  `getCurrentActionPacked()` (a `psio::pssz_buffer<Action>` the service owns)
+  and `sender` / `service` / `method` are overwritten through
+  `psio::as_mutable_view(act)` (12 statements).
+* `RTransact.cpp` `sendReply`: the action comes from `ActionViewBuilder` as
+  a `pssz_buffer`; the socket argument is overwritten in place for each
+  client (`(*psio::as_mutable_view(action).rawData()).get<0>() = socket`;
+  2 statements, now one lambda).
+* `net/test/test_util.cpp` `signTransaction`: wrote `tapos` through the
+  shared transaction; it sets the member on the value and packs (a shared
+  packed value is immutable). No site changed a size in place.
+
+**Null states → optional:** `Table::getView`, `TableIndex::getView`,
+`ForkDb::get`, `ForkDb::get_block_by_num`; callers write `(*row)->member()`.
+`RTransact::sendReplies` kept a `std::shared_ptr<void>` to whichever packed
+row owned the trace; it holds three optionals of the concrete packed types.
+
+**Temporary glue added to `libraries/psio1`** (each block marked
+`// TEMPORARY: removed when psio1 is deleted`):
+
+| File | What | Why |
+|---|---|---|
+| `psio1/to_json.hpp`, `from_json.hpp` | `to_json` / `from_json` of a PSIO packed value (`psio::nested`, `pssz_buffer`, `shared_pssz`): the hex of its bytes, as the legacy library wrote its own packed values; reading validates (`T::checked`). `to_json` of a `psio::view`: the JSON of the value it designates. | Legacy JSON of `SignedTransaction`, `TypedAction`, signed messages keeps its shape until JSON flips. |
+| `psio1/to_json.hpp`, `from_json.hpp` (end) | include `psio1/fracpack.hpp` | psibase reached `psio1/chrono.hpp` (legacy JSON of the time types) through `fracpack.hpp`, which its headers no longer include. |
+| `psio1/schema.hpp` | a PSIO packed value is a `FracPack` node (`is_nested_wrapper_v`, `nested_wrapped<T>`) | The generated legacy schemas keep their shape (the pinned schema hashes of `SignedTransaction` and `TypedAction` in `canonical_glue_tests.cpp` still hold). |
+| `psio1/schema.hpp` (end) | `psio1::legacy_frac_adapter<T>` registered as PSIO's `binary_category` adapter of `psio1::schema_types::Schema`, `AnyType` and `FunctionType`: inside a PSSZ value each is an opaque payload holding its fracpack form | `psibase::ServiceSchema` is a PSIO record whose members are legacy schema types until schemas flip; it is an argument of `Packages::setSchema` and a table row, so it must have a PSSZ form for dispatch and tables to compile. Replaced when `ServiceSchema` is rewritten over the Schema IR (S2). |
+
+`libraries/psio1/tests/canonical_glue_tests.cpp`: removed the pins that no
+longer apply — the fracpack and JSON of `SignedTransaction` and
+`TypedAction` (their members are PSIO packed values), the event payload
+built with `psio1::make_param_value_tuple` (it does not strip a PSIO view),
+and `StatusRow` (it contains a block id, a hash of the packed header). The
+schema pins of the same types stayed and pass.
+
+**Behaviour changes.**
+
+* Every packed byte, id and hash (above).
+* A failed decode in a guest aborts with PSIO's reason, for example
+  `pssz: offset out of range (at byte 12)`; dispatch says
+  `invalid argument encoding for <method>: <reason>` (the reason is new).
+* `SubjectPublicKeyInfo` is not parsed when it is unpacked; `setKey` and
+  `newAccount` refuse a malformed key with `invalid public key`. Other
+  actions that take a key (`Invite::createAccount`, `XKeys::deleteKey`, test
+  services) no longer refuse malformed DER at decode.
+* `Packages::setSchema` reflects one parameter, `schema` (it listed
+  `account, schema` for a one-parameter function; PSIO rejects that at
+  compile time). Its JSON argument object changes accordingly.
+* `XHttp::serve` unpacks the request (it borrowed the body from the action
+  bytes): PSIO does not decode into a record that borrows (gap B).
+  `XHttp::autoClose` no longer reads a `TempPendingRequestRow` as the
+  narrower `PendingRequestRow`: PSSZ refuses that for a record whose known
+  members are all fixed-size (gap D); the two row types are read as
+  themselves. `XHttp`'s close hook called the error callback of a pending
+  request (`onError(socket, optional<HttpReply>)`) with `(socket)` alone,
+  which fracpack read as "no reply"; it now packs `(socket, nullopt)` for a
+  request or handshake and `(socket)` for a websocket's close callback.
+* `JsonHttpReply<T>` is gone (its one user, `RTransact`, writes the JSON
+  into an `HttpReply` body). `XPeers` messages are the type byte and the
+  PSSZ of the message (were a nested value).
+* Legacy JSON of a packed member reads and writes hex as before, but
+  *validates* what it reads (the legacy reader did not: audit 1B). With the
+  JSON flip the member becomes the inner value's JSON.
+* The tester prints `error: …` for a failed boot transaction instead of
+  aborting with `no chain is selected` (trace printing needs a selected
+  chain for the schemas).
+
+**What PSIO lacks or does differently** (reproductions in
+`~/psibase-flip-cpp-scratch/wire/`):
+
+| | | Reproduction | What psibase did |
+|---|---|---|---|
+| A | `psio::method_args_to_pssz` converts an argument with `static_cast` (explicit conversion) and takes `const Args&`: a type with an implicit and an explicit constructor (`Quantity(uint64)`, `explicit Quantity(double)`) is ambiguous for an `int`, and a non-const conversion operator (the tester's `UserContext`) is unusable | `s1_gap_arg_convert.cpp` | `packMethodArgs` converts first |
+| B | No decode into a record that borrows (`BasicHttpRequest<std::span<const char>>`), and such a record is not accepted as an argument of the owning record type | `s1_gap_decode_borrow.cpp` | `XHttp::serve` decodes an owning `HttpRequest` |
+| C | Without exceptions `psio::validate_strict<T>(psio::pssz{}, bytes)` answers "guest strict semantic validation unsupported" for any record holding a type with an adapter (every psibase record with an `AccountNumber`): a guest cannot ask "valid, and nothing I do not know" through it | `s1_gap_guest_strict.cpp` | `validate_pssz_compatible(…, unknown)` and `!unknown` (4 guest sites) |
+| D | A record or tuple whose known members are all fixed-size is not compatible with a wider declaration in either direction: `{i32, u64}` cannot be read from the bytes of `{i32, u64, optional<…>}` (optional absent: "fixed record has trailing payload"; present: "invalid record payload offset"), and the bytes of `(i32)` are not `(i32, optional<X>)` with the optional absent ("record fixed region truncated"). With a variable-size known member the wider bytes are accepted. Fracpack accepted all of these | `s1_gap_unknown_after_fixed.cpp` | `XHttp::autoClose`; `XHttp`'s close hook packs the error callback's arguments as the callback declares them |
+| E | A view of `std::vector<unsigned char>` does not convert to `std::span<const unsigned char>`, and a view of `std::array<uint8_t, N>` (`Checksum256`), of `AccountNumber` or of `MethodNumber` does not convert to its value, though it compares with one; `psio::bytes(view)` / `.unpack()` | — | about 100 `.unpack()` |
+| F | No compile-time relation "this record of sources packs as that record" (`PackableAs`) | — | run-time `validate_pssz<T>` in `Table::put` |
+
+Not gaps, but worth knowing: construction of a packed value from its value
+is explicit; cutting bytes off the end of a tuple whose last member is a
+string yields a shorter valid string, not an invalid tuple.
+`psio::nested<const T&>` was used in three places (`XPeers` messages, the
+two `…HttpReply<TransactionTraceRef&>` in `RTransact`); none needed it:
+`psio::to_pssz(value, out)` writes the same bytes. No reflected member
+collides with a view's own names (`get`, `unpack`, `view`, `set`,
+`assignable`, `element_type`, `format_type`, `storage_kind`, `psio_*`):
+searched by pattern over the `PSIO_REFLECT` lists, no hit.
+
+**Left on `psio1` after S1** (`git grep -ohP 'psio1::\w+(::\w+)?'` outside
+`libraries/psio1`, `doc`, `rust`, `external`):
+
+| Category | Names (count) |
+|---|---|
+| Byte-range parameter types and streams | `input_stream` 159, `vector_stream` 55, `string_stream` 4, `StreamBase` 8, `size_stream` 4 and `fixed_buf_stream` 1 (`dwarf.cpp`), `check` 36 (`dwarf.cpp`) |
+| `bin` (`debug_eos_vm/dwarf.cpp`, `TestKV.cpp`, psitest) | `to_bin` 145, `from_bin` 59, `varuint32_to_bin` 33, `varuint32_from_bin` 25, `sleb64_to_bin` 9, `sleb64_from_bin` 3, `varuint64_from_bin` 2, `convert_to_bin` 2, `convert_from_bin` 1, `finally` 1 |
+| JSON | `convert_to_json` 57, `convert_from_json` 51, `to_json` 32, `from_json` 10, `json::any` 34, `json::any_object` 16, `json::any_array` 5, `json_token_stream` 17, `json_token_type::*` 4, `from_json_object` 2, `json::null_t`, `json::from_json`, `json::entry`, `from_json_skip_value`, `format_json`, `parse_system_time`, `write_str` 3 |
+| Schemas and schema-driven codecs | `schema_types::*` 75, `SchemaBuilder` 16, `FracStream` 16, `Schema` 4, `SchemaDifference::equivalent` 2; in `Events/src/REvents.cpp` the hand-written column readers `is_packable<…>::unpack` 2 and `unpack_numeric` 2 |
+| GraphQL | `gql_stream`, `gql_query`, `gql_query_inline`, `get_gql_schema`, `generate_gql_*` 2, `fill_gql_schema_members`, `make_field_resolver`, `detail::write_field_name` |
+| Utilities | `unhex` 2 (`native/src/log.cpp`, `test_crypto.cpp`): PSIO now fills a fixed-size destination with `psio::from_hex`; not moved in S1 |
+| Fixture | `convert_to_frac` 1: `rust_twins.cpp` writes each value's legacy bytes into the fixture for the Rust test, until Rust flips |
+
+Between S1 and the schema stage the schema-driven packers still write
+fracpack: `package.cpp` (`postinstall.json` `data` → action arguments,
+`setSchema`), `trace.cpp` (pretty traces), `/pack_action` through a schema,
+and `Events` (index and SQL over event payloads). Their output does not
+match what the services now expect.
+
+**Checked.**
+
+* Full build exit 0 (`build-s3h.log`).
+* `psibase-psio-tests`: 46 test cases natively (`n-psibase-psio-tests`), the
+  same minus the native-only ones in the guest (`t-psibase-psio-tests`).
+  New: the bytes of an action and of the `x-http::serve` argument, pinned
+  (identical natively and in the guest); a method called with packed
+  arguments (a view, a `std::string_view` and values; a returned view;
+  refusal of four kinds of malformed bytes with a reason); dispatch of an
+  action through `psibase::detail::ActionTable` with a test host (native:
+  the result set, `invalid argument encoding for look: …`, the method not
+  run); a `SignedTransaction` (bytes equal to a record with a byte-list
+  member holding the transaction's PSSZ, id = SHA-256 of those bytes, view
+  access, a copy shares, a non-transaction member is refused); a row round
+  trip through `Table.hpp` over a test key-value store (native: stored
+  bytes, by value and by view through both indexes, a packed row, a view, a
+  record of references, removal through a view); the in-place overwrite of
+  an argument of a packed action. Existing expectations compare with
+  `psio::to_pssz(std::tuple{…})` of the wire types.
+* `rust-twins.json` was regenerated: one line changed, `schema_ir`, and the
+  cause is the PSIO pin of 33a4df21b, not S1 (PSIO `6f3ea87`: a byte list has
+  `u8` elements whichever C++ type spells the byte; the fixture had not been
+  regenerated after the pin moved). Every value's `pssz`, `key`, `ijson` and
+  `frac` and every call are unchanged.
+* `psio-tests` (legacy library): 67 test cases pass natively and in the
+  guest after the removals above.
+* Native unit tests: all pass, among them `test_consensus`,
+  `test_consensus-cft` and `test_consensus-bft` — a chain booted from the
+  freshly built `MockTransact.wasm` / `VerifySig.wasm`, blocks, signed
+  messages, transactions and `ForkDb` on PSSZ.
+* The full `ctest` run and the classification of its failures are in the
+  table below.
+
+**Full `ctest` after S1** (`ctest-s1-full.log`): 36 / 93 pass — the 36 of
+the baseline of section 1.17 (every native unit test, the consensus and
+network tests, the Python codec tests, `psinode_test_config`, `_fetch`,
+`_websocket`, `_timer`, both psio test binaries in the guest, and
+`t-StagedTx-test`, `t-VirtualServer-test`, `t-Chainmail-test`,
+`t-BrotliSvc-test`, `t-Subgroups-test`). The 57 failures:
+
+| Tests | First failure | Needs |
+|---|---|---|
+| 17 `t-*` (every C++ tester test that boots the default chain) | `service 'accounts' aborted with message: invalid argument encoding for init: pssz: fixed record has trailing payload`, then `Failed to boot` | the schema stage: `package.cpp` packs the actions of a package's `postinstall.json` through the legacy schema, so `init` gets fracpack's `0000` (the package here is built by Rust: `Accounts`); and Rust services built on PSSZ |
+| 27 `rs-test-*`, `rs-subjective-test` | `HttpRequest has invalid format` (psitest's check of the packed request) | the Rust tester packs fracpack: the Rust flip |
+| `rs-tests` | `psio_twins.rs:235`, `:540` | the Rust side of the twins fixture (failing since the pin: the fixture's `schema_ir` follows PSIO `6f3ea87`) |
+| 11 `psinode_test_*` (`connect`, `routing`, `crash`, `psibase`, `subjective`, `txqueue`, `query`, `sites`, `shutdown`, `snapshot`, `block_signing`) | `Error: exception: pssz: record header truncated` from `psibase boot` | the Rust CLI packs fracpack: the Rust flip. `block_signing` also runs `generate_verify_with_call.wasm`, which stops in the legacy schema decoder (`wrong offset`): the schema stage |
+
+No failure of the run is classified as a C++ bug of S1. Three were found
+through it and fixed before this run: the two `XHttp` uses of fracpack's
+record compatibility (gap D), and the guest's `validate_strict` (gap C),
+which stopped `test_consensus`.
+
+**Not verified.**
+
+* Service-level behaviour: no `t-*` test that boots a chain can pass until
+  the schema stage (the tester packs `postinstall.json` actions through the
+  legacy schema: the first failure is `accounts::init` given fracpack's
+  `0000`) and until Rust services are built on PSSZ. So table reads and
+  writes, events, inter-service calls with views, `RTransact`'s reply path,
+  the Explorer queries and the mutable-view forwards in `XHttp` /
+  `Transact` ran only as far as the psinode tests and the unit tests reach.
+* Whether any other place reads a row or an argument written by a wider
+  or narrower declaration (gap D); the two in `XHttp` were found by the
+  psinode tests, not by reading.
+* The snapshot tools (`programs/snapshot`) compile; they were not run.
+* The SDK's `psibase-config.cmake` (installed form) was edited like the
+  build-tree form and not exercised.
+
 ## 2. Inventory of what remains
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,
