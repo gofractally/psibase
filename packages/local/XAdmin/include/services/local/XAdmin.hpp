@@ -77,7 +77,7 @@ namespace LocalService
       AdminOptionsRow options();
    };
    PSIO_REFLECT(XAdmin,
-                method(isAdmin, account, socket),
+                method(isAdmin, account, socket, forwardedFor),
                 method(checkAuth, req, socket),
                 method(serveSys, req, socket),
                 method(startSession),

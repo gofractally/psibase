@@ -58,6 +58,6 @@ namespace LocalService
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest        request,
                                                  std::optional<std::int32_t> socket);
    };
-   PSIO_REFLECT(XPackages, method(serveSys, request))
+   PSIO_REFLECT(XPackages, method(serveSys, request, socket))
    PSIBASE_REFLECT_TABLES(XPackages, XPackages::Subjective)
 }  // namespace LocalService
