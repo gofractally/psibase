@@ -175,7 +175,7 @@ What to keep in mind:
 - The tester figures are one block on one thread, not network throughput.
 - The network figures are a single node with the load generator on the same machine, one run per case. There is no multi-node run at c45c060cd or 054a0c386. Signed throughput rose less than unsigned.
 - Per-block event indexing means indexing time is no longer in a transaction's billed CPU, and objective pricing of events is not built.
-- The tester verified every signature twice when this was last checked, which overstates signature cost there. That has not been rechecked at 054a0c386 (#2219).
+- A note on reading the signed tester figures: the tester verified every signature twice when this was last checked, where a node verifies once, so signature cost is overstated there. This is a property of the tester, not something to fix.
 
 The full report, with raw output, is on branch `claude/benchmark-report` under `doc/benchmarks/transfer-throughput/` and will be carried into the head.
 
@@ -195,9 +195,8 @@ Open items are tracked as issues and closed as they are fixed.
 - JIT2 and LLVM AOT paused and marked unverified; wasmtime (a pinned fork) is the only qualified engine.
 - Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
 - Buying resources during a transaction does not raise that transaction's CPU limit: #2217 (fix on a branch).
-- Events: objective pricing, one billing event per transaction, the per-block pipeline: #2218.
+- Events: one billing event per transaction and the per-block pipeline: #2218. Objective pricing for events, by size and index count: #2223.
 - Network throughput drops with more connections, and signed lags unsigned: #2220.
-- The tester verifies each transaction signature twice: #2219.
 - secp256k1 by default in the Rust library and the browser plugins: #2216.
 - P-256 verification is about eight times slower than secp256k1: #2222.
 - Crypto library sources are fetched from their upstream sites, not mirrored: #2224.
