@@ -252,6 +252,9 @@ namespace psibase
       void kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value);
       void kvRemoveRaw(DbId db, psio1::input_stream key);
       std::optional<psio1::input_stream> kvGetRaw(DbId db, psio1::input_stream key);
+      /// Whether the key exists. Recorded as a read like kvGetRaw, without
+      /// copying the value.
+      bool kvContains(DbId db, psio1::input_stream key);
       std::optional<KVResult>           kvGreaterEqualRaw(DbId               db,
                                                           psio1::input_stream key,
                                                           size_t             matchKeySize);

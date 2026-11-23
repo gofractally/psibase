@@ -24,7 +24,7 @@ The defaults are immutable Git revisions:
 | psio | `415ea1a61db6ee0667be7f41793e18c7e4d6ad9b` | Maintained upstream CMake target |
 | psitri | `a7c6660de883c6190135e213e2206d006286a7ee` | Sources only |
 | ucc | `d79166da0290fdf9d1f9d5880d4dfb45b2822cf3` | Sources only |
-| psizam | `98eec58c4bbaf1735a5e184b7b1ba3d1c379d52e` | Sources only |
+| psizam | `63b2ee3054992ce53500ead3e14108f3db166c9c` | Sources only |
 
 The PSIO pin is `main` of gofractally/psio: PSSZ with record evolution by
 appended optionals, mandatory pruning, type-derived offset widths, the `key`

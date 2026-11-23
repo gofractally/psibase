@@ -421,6 +421,12 @@ TEST_CASE("Watchdog completion and destruction cannot cancel the next backend ow
          catch (const psizam::timeout_exception&)
          {
          }
+         catch (const psizam::wasm_memory_exception&)
+         {
+            // A direct context call reports the revoked code pages as a fault;
+            // only the timed-run wrapper renames it.
+            CHECK(timedOut.load());
+         }
       }
       runtime.backend.get_module().allocator.enable_code(true);
       timedOut = false;

@@ -1,3 +1,6 @@
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <psibase/db.hpp>
 
 #include <boost/filesystem/operations.hpp>
@@ -181,6 +184,19 @@ namespace psibase
       std::shared_ptr<const Revision> head;
 
       mutable std::mutex  subjectiveMutex;
+      // Guards only the value of `subjective`. A subjective writer holds
+      // subjectiveMutex for its whole comparison, splice and publication;
+      // readers that only need the current roots must not wait behind that.
+      // Every execution context takes those roots when it is created, and on
+      // a producer verifying signatures a sixth of the main thread's time
+      // was spent waiting here for the service thread's commits.
+      // Lock order: subjectiveMutex, then this.
+      mutable std::mutex  subjectiveSnapshotMutex;
+      void setSubjective(IndependentRevision&& next)
+      {
+         std::lock_guard l{subjectiveSnapshotMutex};
+         subjective = std::move(next);
+      }
       IndependentRevision subjective;
 
       static constexpr auto numPersistentDatabases =
@@ -246,7 +262,7 @@ namespace psibase
 
       auto getNativeSubjective(DbId db = DbId::nativeSubjective)
       {
-         std::lock_guard l{subjectiveMutex};
+         std::lock_guard l{subjectiveSnapshotMutex};
          return subjective[independentIndex(db)];
       }
 
@@ -425,7 +441,7 @@ namespace psibase
       writer.upsert(proposedSubjective[independentIndex(db)], key, value);
       accounting::Publication publication;
       impl->publishSubjective(writer, proposedSubjective);
-      impl->subjective = std::move(proposedSubjective);
+      impl->setSubjective(std::move(proposedSubjective));
       publication.finish();
    }
 
@@ -437,7 +453,7 @@ namespace psibase
       writer.remove(proposedSubjective[independentIndex(db)], key);
       accounting::Publication publication;
       impl->publishSubjective(writer, proposedSubjective);
-      impl->subjective = std::move(proposedSubjective);
+      impl->setSubjective(std::move(proposedSubjective));
       publication.finish();
    }
 
@@ -452,7 +468,7 @@ namespace psibase
 
    IndependentRevision SharedDatabase::getSubjective()
    {
-      std::lock_guard l{impl->subjectiveMutex};
+      std::lock_guard l{impl->subjectiveSnapshotMutex};
       return impl->subjective;
    }
 
@@ -508,7 +524,7 @@ namespace psibase
             return false;
          }
          impl->publishSubjective(writer, proposedSubjective);
-         impl->subjective = std::move(proposedSubjective);
+         impl->setSubjective(std::move(proposedSubjective));
       }
       else
          publication.emplace();
@@ -557,6 +573,9 @@ namespace psibase
       return result;
    }
 
+
+   // Prints the per-database write counts and returns their sum.
+   std::uint64_t psibaseWriteCountsHook();
    struct DatabaseImpl
    {
       SharedDatabase                          shared;
@@ -735,6 +754,21 @@ namespace psibase
             assert(subjectiveRevisions.size() == 2);
             if (writeSession)
             {
+               // With PSIBASE_CALL_PROFILE set: how often a top-level subjective
+               // commit loses to a concurrent one and its caller has to run again.
+               static const bool             countCommits = std::getenv("PSIBASE_CALL_PROFILE") != nullptr;
+               static std::atomic<std::uint64_t> attempts{0}, conflicts{0};
+               bool                          counted = false;
+               if (countCommits)
+               {
+                  auto n = ++attempts;
+                  if (n % 2000 == 0)
+                     std::fprintf(stderr, "SUBJECTIVE commits=%llu conflicts=%llu writes=%llu\n",
+                                  (unsigned long long)n, (unsigned long long)conflicts.load(),
+                                  (unsigned long long)psibaseWriteCountsHook());
+                  counted = true;
+               }
+               (void)counted;
                if (!shared.commitSubjective(
                        *writeSession, subjectiveRevisions.front().db, subjectiveRevisions.back().db,
                        std::move(subjectiveChanges), std::move(socketChanges), sockets, closing,
@@ -745,6 +779,8 @@ namespace psibase
                              shared.impl->callbacks->run(callbackFlags);
                        }))
                {
+                  if (countCommits)
+                     ++conflicts;
                   subjectiveRevisions[1].db              = subjectiveRevisions[0].db;
                   subjectiveRevisions[1].temporaryDb     = subjectiveRevisions[0].temporaryDb;
                   subjectiveRevisions[0].changeSetPos    = {};
@@ -980,8 +1016,48 @@ namespace psibase
       impl->clearTemporary();
    }
 
+
+   // With PSIBASE_CALL_PROFILE set: writes per logical database, printed with
+   // the subjective commit counts.
+   namespace
+   {
+      std::atomic<std::uint64_t> writeCounts[8];
+      const bool countWrites = std::getenv("PSIBASE_CALL_PROFILE") != nullptr;
+      std::size_t writeSlot(DbId db)
+      {
+         switch (db)
+         {
+            case DbId::service:          return 0;
+            case DbId::writeOnly:        return 1;
+            case DbId::native:           return 2;
+            case DbId::subjective:       return 3;
+            case DbId::nativeSubjective: return 4;
+            case DbId::session:          return 5;
+            case DbId::nativeSession:    return 6;
+            default:                     return 7;
+         }
+      }
+   }  // namespace
+
+   std::uint64_t psibaseWriteCountsHook()
+   {
+      static const char* names[8] = {"service", "writeOnly", "native", "subjective",
+                                     "nativeSubjective", "session", "nativeSession", "other"};
+      std::uint64_t total = 0;
+      std::fprintf(stderr, "WRITES");
+      for (int i = 0; i < 8; ++i)
+      {
+         auto v = writeCounts[i].load();
+         total += v;
+         std::fprintf(stderr, " %s=%llu", names[i], (unsigned long long)v);
+      }
+      std::fprintf(stderr, "\n");
+      return total;
+   }
    void Database::kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value)
    {
+      if (countWrites)
+         ++writeCounts[writeSlot(db)];
       impl->write(
           [&](auto& session, auto& revision)
           {
@@ -995,6 +1071,8 @@ namespace psibase
 
    void Database::kvRemoveRaw(DbId db, psio1::input_stream key)
    {
+      if (countWrites)
+         ++writeCounts[writeSlot(db)];
       impl->write(
           [&](auto& session, auto& revision)
           {
@@ -1025,6 +1103,19 @@ namespace psibase
              return {{impl->valueBuffer}};
           });
    }  // Database::kvGetRaw
+
+   bool Database::kvContains(DbId db, psio1::input_stream key)
+   {
+      return impl->read(
+          [&](auto& session, auto& revision) -> bool
+          {
+             if (auto* changes = impl->getChangeSet(db))
+             {
+                changes->onRead(key.string_view());
+             }
+             return session.get(impl->db(revision, db), key.string_view(), nullptr, nullptr);
+          });
+   }
 
    std::optional<Database::KVResult> Database::kvGreaterEqualRaw(DbId               db,
                                                                  psio1::input_stream key,

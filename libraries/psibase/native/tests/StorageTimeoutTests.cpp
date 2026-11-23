@@ -91,7 +91,8 @@ int main()
          // the first storage call made by the entry point is what must fail.
          bool               exhausted = false;
          auto               request =
-             std::make_shared<accounting::Request>([&] { return !exhausted; });
+             std::make_shared<accounting::Request>([&] { return !exhausted; },
+                                                   std::chrono::microseconds{0});
          accounting::Scope  outer(request);
          exhausted = true;
          ActionTrace        result;
@@ -135,7 +136,9 @@ int main()
          // Deterministically win the race with the asynchronous watchdog:
          // reject a synchronous accounting check inside the DB-heavy guest.
          unsigned checks  = 0;
-         auto     request = std::make_shared<accounting::Request>([&] { return ++checks < 500; });
+         // Evaluated at every check, so the count is exact.
+         auto     request = std::make_shared<accounting::Request>(
+             [&] { return ++checks < 500; }, std::chrono::microseconds{0});
          accounting::Scope outer(request);
          ActionTrace       result;
          timeout([&] { transaction.execExport("heavy", fixture.action(), result); });

@@ -640,34 +640,97 @@ namespace psibase::storage
    {
       auto state = view->state;
       state->writable();
+      if ((destination && destination->state != state) || (source && source->state != state))
+         throw std::runtime_error("foreign storage root");
+      // Both roots are immutable snapshots, so what differs between them in
+      // the range can be found by this thread's reader, without the writer
+      // gate. Only the differing keys are then applied under it. Replacing
+      // the range wholesale, every key removed and every key written again
+      // under the gate, made each subjective commit hold the engine's one
+      // writer for as long as its ranges were large, and every other writer,
+      // the block producer included, waited behind it.
+      struct Change
+      {
+         std::string                key;
+         std::optional<std::string> value;  // absent and not a subtree: remove
+         bool                       subtree = false;
+      };
+      std::vector<Change> changes;
+      if (const shared_root& either = destination ? destination : source)
+      {
+         reading(either,
+                 [&](Engine::read_session& session)
+                 {
+                    std::optional<Cursor> before, after;
+                    bool                  hasBefore = false, hasAfter = false;
+                    if (destination)
+                    {
+                       before.emplace(session.borrow_cursor(destination->tree));
+                       hasBefore = before->lower_bound(bytes(lower));
+                    }
+                    if (source)
+                    {
+                       after.emplace(session.borrow_cursor(source->tree));
+                       hasAfter = after->lower_bound(bytes(lower));
+                    }
+                    auto inRange = [&](Cursor& c)
+                    { return upper.empty() || c.key() < bytes(upper); };
+                    auto take = [&](Cursor& c)
+                    {
+                       if (c.is_subtree())
+                          changes.push_back({std::string(c.key()), {}, true});
+                       else
+                          changes.push_back({std::string(c.key()), *c.value<std::string>()});
+                    };
+                    while (true)
+                    {
+                       accounting::check();
+                       hasBefore = hasBefore && inRange(*before);
+                       hasAfter  = hasAfter && inRange(*after);
+                       if (!hasBefore && !hasAfter)
+                          break;
+                       if (hasBefore && (!hasAfter || before->key() < after->key()))
+                       {
+                          changes.push_back({std::string(before->key()), {}, false});
+                          hasBefore = before->next();
+                       }
+                       else if (hasAfter && (!hasBefore || after->key() < before->key()))
+                       {
+                          take(*after);
+                          hasAfter = after->next();
+                       }
+                       else
+                       {
+                          bool same = before->is_subtree() == after->is_subtree();
+                          if (same && after->is_subtree())
+                             same = equalCursors(before->subtree_cursor(), after->subtree_cursor(),
+                                                 {}, {});
+                          else if (same)
+                             same = before->value<std::string>() == after->value<std::string>();
+                          if (!same)
+                             take(*after);
+                          hasBefore = before->next();
+                          hasAfter  = after->next();
+                       }
+                    }
+                    return 0;
+                 });
+      }
+      if (changes.empty())
+         return;
       destination = state->access.invoke(
           [&]
           {
              auto edit = state->writer->start_write_transaction(native(state, destination));
-             if (destination)
+             for (const auto& change : changes)
              {
-                const auto before = native(state, destination);
-                auto       c      = before.snapshot_cursor();
-                for (bool found = c.lower_bound(bytes(lower));
-                     found && (upper.empty() || c.key() < bytes(upper)); found = c.next())
-                {
-                   accounting::check();
-                   edit.remove(c.key());
-                }
-             }
-             if (source)
-             {
-                const auto from = native(state, source);  // validates ownership first
-                auto       c    = from.snapshot_cursor();
-                for (bool found = c.lower_bound(bytes(lower));
-                     found && (upper.empty() || c.key() < bytes(upper)); found = c.next())
-                {
-                   accounting::check();
-                   if (c.is_subtree())
-                      edit.upsert_subtree(c.key(), from.get_subtree(c.key()));
-                   else
-                      edit.upsert(c.key(), *c.value<std::string>());
-                }
+                accounting::check();
+                if (change.subtree)
+                   edit.upsert_subtree(change.key, native(state, source).get_subtree(change.key));
+                else if (change.value)
+                   edit.upsert(change.key, *change.value);
+                else
+                   edit.remove(change.key);
              }
              return publishable(state, edit.get_tree());
           });

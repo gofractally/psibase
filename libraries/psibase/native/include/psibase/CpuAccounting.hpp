@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <pthread.h>
 #include <time.h>
 #include <algorithm>
@@ -101,12 +102,27 @@ namespace psibase::accounting
       bool                  closed     = false;
       unsigned              publishing = 0;
       std::function<bool()> withinBudget;
+      // The budget costs a thread CPU clock read, which is a system call, and
+      // storage checks it around every operation. Between evaluations a
+      // check only looks for a cancellation: `settled` is true while nothing
+      // is cancelled, closed or publishing, and `evaluateAfter` is when the
+      // budget is next worth reading. A cancellation from the watchdog still
+      // takes effect at the very next check.
+      // Zero evaluates the budget at every check.
+      std::chrono::microseconds evaluationInterval;
+      std::atomic<bool>                          settled{true};
+      std::atomic<std::chrono::steady_clock::rep> evaluateAfter{0};
 
      public:
-      explicit Request(std::function<bool()> check) : withinBudget(std::move(check)) {}
+      explicit Request(std::function<bool()>     check,
+                       std::chrono::microseconds interval = std::chrono::microseconds{100})
+          : withinBudget(std::move(check)), evaluationInterval(interval)
+      {
+      }
       void cancel()
       {
          std::lock_guard lock(mutex);
+         settled.store(false, std::memory_order_release);
          if (publishing)
             pending = true;
          else
@@ -115,12 +131,17 @@ namespace psibase::accounting
       void close()
       {
          std::lock_guard lock(mutex);
+         settled.store(false, std::memory_order_release);
          closed       = true;
          cancelled    = true;
          withinBudget = {};
       }
       void check()
       {
+         const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+         if (settled.load(std::memory_order_acquire) &&
+             now < evaluateAfter.load(std::memory_order_relaxed))
+            return;
          std::lock_guard lock(mutex);
          if (closed)
             throw Cancelled();
@@ -128,9 +149,14 @@ namespace psibase::accounting
             return;
          if (cancelled || !withinBudget || !withinBudget())
          {
+            settled.store(false, std::memory_order_release);
             cancelled = true;
             throw Cancelled();
          }
+         evaluateAfter.store(
+             now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(evaluationInterval)
+                       .count(),
+             std::memory_order_relaxed);
       }
       void beginPublication()
       {
@@ -139,9 +165,11 @@ namespace psibase::accounting
             throw Cancelled();
          if (!publishing && (!withinBudget || !withinBudget()))
          {
+            settled.store(false, std::memory_order_release);
             cancelled = true;
             throw Cancelled();
          }
+         settled.store(false, std::memory_order_release);
          ++publishing;
       }
       void endPublication()
@@ -149,10 +177,15 @@ namespace psibase::accounting
          std::lock_guard lock(mutex);
          if (!publishing)
             std::terminate();
-         if (--publishing == 0 && pending)
+         if (--publishing == 0)
          {
-            cancelled = true;
-            pending   = false;
+            if (pending)
+            {
+               cancelled = true;
+               pending   = false;
+            }
+            else
+               settled.store(true, std::memory_order_release);
          }
       }
    };

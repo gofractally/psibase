@@ -49,6 +49,13 @@ namespace psibase
 #endif
       std::vector<Watchdog*> children;
       bool                   done = false;
+      // When the worker will next look at the budgets if nothing wakes it.
+      // Guarded by mutex.
+      // The epoch, which is always past, while the worker is awake or due.
+      std::chrono::steady_clock::time_point nextCheck{};
+      // Wakes the worker only if a budget with `remaining` left could run out
+      // before nextCheck. Called with mutex held.
+      void checkWithin(CpuClock::duration remaining);
       std::thread            worker;
    };
 

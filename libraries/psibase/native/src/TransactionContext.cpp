@@ -9,6 +9,108 @@
 #include <psio1/finally.hpp>
 #include <psizam/detail/execution_context.hpp>
 #include <thread>
+#include <chrono>
+#include <cstdio>
+#include <csignal>
+#include <cstdlib>
+#include <map>
+
+// Optional call profile: with PSIBASE_CALL_PROFILE set, the time spent in each
+// service (excluding the services it calls) and in setting up execution
+// contexts is accumulated and printed when the process exits.
+namespace
+{
+   struct CallProfile
+   {
+      struct Entry
+      {
+         std::uint64_t calls = 0, exclusive = 0, contexts = 0, contextTime = 0;
+      };
+      static bool enabled()
+      {
+         static const bool on = std::getenv("PSIBASE_CALL_PROFILE") != nullptr;
+         static const int  hooked = on ? (std::signal(SIGUSR1, [](int) { flush() = 1; }), 0) : 0;
+         (void)hooked;
+         return on;
+      }
+      // Set by SIGUSR1: print and clear the table at the next top-level call.
+      static volatile std::sig_atomic_t& flush()
+      {
+         static volatile std::sig_atomic_t f = 0;
+         return f;
+      }
+      static std::mutex& mutex()
+      {
+         static std::mutex m;
+         return m;
+      }
+      static std::map<psibase::AccountNumber, Entry>& table()
+      {
+         static std::map<psibase::AccountNumber, Entry> t;
+         static const int registered = (std::atexit(&CallProfile::dump), 0);
+         (void)registered;
+         return t;
+      }
+      static std::uint64_t now()
+      {
+         return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch())
+             .count();
+      }
+      static void dump()
+      {
+         std::uint64_t total = 0, calls = 0, ctx = 0, ctxTime = 0;
+         for (auto& [k, e] : table())
+            total += e.exclusive, calls += e.calls, ctx += e.contexts, ctxTime += e.contextTime;
+         std::fprintf(stderr, "CALLPROFILE total_ms=%.1f calls=%llu contexts=%llu context_ms=%.1f\n",
+                      total / 1e6, (unsigned long long)calls, (unsigned long long)ctx, ctxTime / 1e6);
+         for (auto& [k, e] : table())
+            std::fprintf(stderr,
+                         "CALLPROFILE service=%s calls=%llu exclusive_ms=%.1f contexts=%llu "
+                         "context_ms=%.1f\n",
+                         k.str().c_str(), (unsigned long long)e.calls, e.exclusive / 1e6,
+                         (unsigned long long)e.contexts, e.contextTime / 1e6);
+      }
+      struct Scope
+      {
+         static inline thread_local Scope* current = nullptr;
+         psibase::AccountNumber service;
+         Scope*                 parent = nullptr;
+         std::uint64_t          start = 0, child = 0, ctx = 0;
+         bool                   created = false, on;
+         explicit Scope(psibase::AccountNumber service) : service(service), on(enabled())
+         {
+            if (on)
+            {
+               parent  = current;
+               current = this;
+               start   = now();
+            }
+         }
+         ~Scope()
+         {
+            if (!on)
+               return;
+            auto elapsed = now() - start;
+            current      = parent;
+            if (parent)
+               parent->child += elapsed;
+            std::lock_guard l{mutex()};
+            auto&           e = table()[service];
+            ++e.calls;
+            e.exclusive += elapsed - child - ctx;
+            e.contexts += created;
+            e.contextTime += ctx;
+            if (!parent && flush())
+            {
+               flush() = 0;
+               dump();
+               table().clear();
+            }
+         }
+      };
+   };
+}  // namespace
 
 namespace psibase
 {
@@ -123,6 +225,7 @@ namespace psibase
       }
       else
       {
+         CallProfile::Scope profile{AccountNumber{"transact"}};
          execProcessTransaction(*this);
       }
 
@@ -294,7 +397,15 @@ namespace psibase
       ActionContext ac = {*this, action, atrace};
       try
       {
-         auto& ec = getExecutionContext(action.service);
+         CallProfile::Scope profile{action.service};
+         auto               before = impl->executionContexts.size() + impl->altExecContexts.size();
+         auto               t0     = profile.on ? CallProfile::now() : 0;
+         auto&              ec     = getExecutionContext(action.service);
+         if (profile.on)
+         {
+            profile.ctx     = CallProfile::now() - t0;
+            profile.created = impl->executionContexts.size() + impl->altExecContexts.size() != before;
+         }
          ec.execCalled(callerFlags, ac);
       }
       catch (std::exception& e)
@@ -320,7 +431,15 @@ namespace psibase
       ActionContext ac       = {*this, action, atrace};
       try
       {
-         auto& ec = getExecutionContext(action.service);
+         CallProfile::Scope profile{action.service};
+         auto               before = impl->executionContexts.size() + impl->altExecContexts.size();
+         auto               t0     = profile.on ? CallProfile::now() : 0;
+         auto&              ec     = getExecutionContext(action.service);
+         if (profile.on)
+         {
+            profile.ctx     = CallProfile::now() - t0;
+            profile.created = impl->executionContexts.size() + impl->altExecContexts.size() != before;
+         }
          ec.execCalled(callerFlags, ac);
       }
       catch (std::exception& e)

@@ -25,6 +25,22 @@ endif()
 option(BUILD_RELEASE_WASM "Build release wasms" ON)
 option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
+# Services are compiled with wide arithmetic. The binaryen tools that post-process
+# them (wasm-ctor-eval always, wasm-opt when present) read it from version 133.
+find_program(PSIBASE_WASM_CTOR_EVAL wasm-ctor-eval)
+if(NOT PSIBASE_WASM_CTOR_EVAL)
+    message(FATAL_ERROR "wasm-ctor-eval (binaryen 133 or newer) is required to build the services")
+endif()
+execute_process(COMMAND ${PSIBASE_WASM_CTOR_EVAL} --version
+    OUTPUT_VARIABLE binaryen_version_text OUTPUT_STRIP_TRAILING_WHITESPACE)
+string(REGEX MATCH "version ([0-9]+)" binaryen_version_match "${binaryen_version_text}")
+if(NOT CMAKE_MATCH_1 OR CMAKE_MATCH_1 LESS 133)
+    message(FATAL_ERROR
+        "${PSIBASE_WASM_CTOR_EVAL} is '${binaryen_version_text}'. binaryen 133 or newer is "
+        "required: older versions cannot read the wide-arithmetic instructions services are "
+        "compiled with. Put a newer binaryen first on PATH.")
+endif()
+
 # Point to psidk-config.cmake to allow documentation examples to build
 set(psidk_DIR ${CMAKE_SOURCE_DIR})
 
@@ -76,7 +92,9 @@ endmacro()
 include(GNUInstallDirs)
 install(FILES ${ROOT_SOURCE_DIR}/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses COMPONENT libpsibase)
 
-set(WASM_FEATURES -msign-ext -mnontrapping-fptoint -msimd128 -mbulk-memory)
+# Wide arithmetic (i64.add128, i64.mul_wide_u, ...) is part of the instruction
+# set every psibase engine executes; 128-bit math compiles to it directly.
+set(WASM_FEATURES -msign-ext -mnontrapping-fptoint -msimd128 -mbulk-memory -mwide-arithmetic)
 
 add_library(wasm-base INTERFACE)
 target_compile_options(wasm-base INTERFACE ${WASM_FEATURES} -fno-exceptions -DCOMPILING_WASM -mthread-model single -O3)

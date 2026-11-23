@@ -1,0 +1,241 @@
+{
+ "schema": 1,
+ "suite": "end-to-end",
+ "label": "Mac; default build (WASMTIME); psizam 98eec58; transfer benchmark merged; database-sync=none",
+ "recorded": "2026-11-22T18:30:43Z",
+ "source": {
+  "commit": "3d83103efed35daea815f035ea795c666b4e06b5",
+  "branch": "claude/psitri-psizam",
+  "dirty": false,
+  "psitri": "a7c6660de883c6190135e213e2206d006286a7ee"
+ },
+ "system": {
+  "os": "Darwin",
+  "os_release": "25.3.0",
+  "machine": "arm64",
+  "os_version": "26.3.1",
+  "cpu": "Apple M5 Max",
+  "model": "Mac17,6",
+  "logical_cpus": 18,
+  "performance_cores": 6,
+  "memory_bytes": 137438953472,
+  "fingerprint": "fe6bcd3e9102",
+  "test_filesystem": {
+   "type": "APFS",
+   "solid_state": "Yes",
+   "protocol": "Apple Fabric"
+  }
+ },
+ "build": {
+  "type": "Release",
+  "compiler": "Homebrew clang version 22.1.2",
+  "flags": "",
+  "generator": "Ninja"
+ },
+ "ctest_arguments": [
+  "-R",
+  "^t-|^psinode_test_",
+  "-j",
+  "4",
+  "--timeout",
+  "1500"
+ ],
+ "wall_seconds": 609.203,
+ "summary": {
+  "tests": 38,
+  "passed": 38,
+  "test_seconds": 939.556
+ },
+ "tests": [
+  {
+   "name": "psinode_test_block_signing",
+   "status": "passed",
+   "seconds": 30.2656
+  },
+  {
+   "name": "psinode_test_config",
+   "status": "passed",
+   "seconds": 0.544902
+  },
+  {
+   "name": "psinode_test_connect",
+   "status": "passed",
+   "seconds": 10.4693
+  },
+  {
+   "name": "psinode_test_crash",
+   "status": "passed",
+   "seconds": 178.402
+  },
+  {
+   "name": "psinode_test_fetch",
+   "status": "passed",
+   "seconds": 2.9232
+  },
+  {
+   "name": "psinode_test_psibase",
+   "status": "passed",
+   "seconds": 208.638
+  },
+  {
+   "name": "psinode_test_query",
+   "status": "passed",
+   "seconds": 27.0798
+  },
+  {
+   "name": "psinode_test_routing",
+   "status": "passed",
+   "seconds": 122.927
+  },
+  {
+   "name": "psinode_test_shutdown",
+   "status": "passed",
+   "seconds": 137.955
+  },
+  {
+   "name": "psinode_test_sites",
+   "status": "passed",
+   "seconds": 13.6252
+  },
+  {
+   "name": "psinode_test_snapshot",
+   "status": "passed",
+   "seconds": 40.5797
+  },
+  {
+   "name": "psinode_test_subjective",
+   "status": "passed",
+   "seconds": 28.3717
+  },
+  {
+   "name": "psinode_test_timer",
+   "status": "passed",
+   "seconds": 5.24154
+  },
+  {
+   "name": "psinode_test_txqueue",
+   "status": "passed",
+   "seconds": 82.644
+  },
+  {
+   "name": "psinode_test_websocket",
+   "status": "passed",
+   "seconds": 1.24114
+  },
+  {
+   "name": "t-AuthDelegate-test",
+   "status": "passed",
+   "seconds": 2.49721
+  },
+  {
+   "name": "t-AuthSig-test",
+   "status": "passed",
+   "seconds": 2.51786
+  },
+  {
+   "name": "t-BrotliSvc-test",
+   "status": "passed",
+   "seconds": 0.0377482
+  },
+  {
+   "name": "t-Chainmail-test",
+   "status": "passed",
+   "seconds": 0.0439345
+  },
+  {
+   "name": "t-Credentials-test",
+   "status": "passed",
+   "seconds": 2.05137
+  },
+  {
+   "name": "t-Events-test",
+   "status": "passed",
+   "seconds": 2.38384
+  },
+  {
+   "name": "t-Explorer-test",
+   "status": "passed",
+   "seconds": 3.23566
+  },
+  {
+   "name": "t-Invite-test",
+   "status": "passed",
+   "seconds": 2.70835
+  },
+  {
+   "name": "t-Nft-test",
+   "status": "passed",
+   "seconds": 2.89123
+  },
+  {
+   "name": "t-Packages-test",
+   "status": "passed",
+   "seconds": 2.35432
+  },
+  {
+   "name": "t-Producers-test",
+   "status": "passed",
+   "seconds": 2.96012
+  },
+  {
+   "name": "t-StagedTx-test",
+   "status": "passed",
+   "seconds": 0.0474429
+  },
+  {
+   "name": "t-Subgroups-test",
+   "status": "passed",
+   "seconds": 0.0356637
+  },
+  {
+   "name": "t-Symbol-test",
+   "status": "passed",
+   "seconds": 3.03159
+  },
+  {
+   "name": "t-Tokens-test",
+   "status": "passed",
+   "seconds": 5.27898
+  },
+  {
+   "name": "t-Transact-test",
+   "status": "passed",
+   "seconds": 3.24002
+  },
+  {
+   "name": "t-TransferBench-test",
+   "status": "passed",
+   "seconds": 2.44606
+  },
+  {
+   "name": "t-VirtualServer-test",
+   "status": "passed",
+   "seconds": 0.0518162
+  },
+  {
+   "name": "t-XBasic-test",
+   "status": "passed",
+   "seconds": 2.26017
+  },
+  {
+   "name": "t-XKeys-test",
+   "status": "passed",
+   "seconds": 2.28005
+  },
+  {
+   "name": "t-XSites-test",
+   "status": "passed",
+   "seconds": 2.24143
+  },
+  {
+   "name": "t-psibase-tests",
+   "status": "passed",
+   "seconds": 4.02659
+  },
+  {
+   "name": "t-psio-tests",
+   "status": "passed",
+   "seconds": 0.0264784
+  }
+ ]
+}

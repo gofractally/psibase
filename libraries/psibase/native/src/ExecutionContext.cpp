@@ -327,13 +327,29 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
          auto [ca, db] = getCode(service);
 
          code   = std::move(ca);
-         auto c = database.kvGet<CodeByHashRow>(
-             db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
-         check(c.has_value(), "service code record is missing");
-         check(c->vmType == 0, "vmType is not 0");
+         // The code itself is read only to compile it. It is hundreds of
+         // kilobytes, and a context is created for every service a
+         // transaction touches; reading and unpacking it each time, to then
+         // take the compiled module from the cache, was a fifth of the time
+         // a transfer spent in the chain. The record must still exist, so
+         // that a node with the module cached and one without agree.
+         const auto codeRecord =
+             psio1::convert_to_key(codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
+         check(database.kvContains(db, codeRecord), "service code record is missing");
+         std::optional<CodeByHashRow> c;
+         auto                         loadCode = [&]
+         {
+            if (!c)
+            {
+               c = database.kvGet<CodeByHashRow>(
+                   db, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
+               check(c.has_value(), "service code record is missing");
+            }
+         };
+         check(code.vmType == 0, "vmType is not 0");
          // The version a service was deployed under selects the execution
          // policy its code keeps until it is next deployed.
-         auto profile = nativeFloatProfile(c->vmVersion);
+         auto profile = nativeFloatProfile(code.vmVersion);
          check(profile.has_value(), "vmVersion is not supported");
          this->vmOptions.float_profile = *profile;
          if (transactionContext.dbMode.verifyOnly)
@@ -351,6 +367,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
                 backend = cache.get(code.codeHash, vmOptions, code.vmVersion);
                 if (!backend.backend)
                 {
+                   loadCode();
                    validateNativeWasm(c->code, this->vmOptions);
                    psizam::debug::binary::input_stream s{
                        reinterpret_cast<const char*>(c->code.data()), c->code.size()};
