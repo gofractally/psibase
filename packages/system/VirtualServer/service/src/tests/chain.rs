@@ -526,7 +526,7 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
     // The work: enough transfers to take many times the starting allowance.
     const TRANSFERS: usize = 40;
     const STARTING_CPU_NS: u64 = 5_000_000; // 5 ms, plus the service's leeway
-    let work = |with_purchase: bool| {
+    let build = |with_purchase: bool| {
         let memo: psibase::Memo = "".into();
         let mut actions = Vec::new();
         if with_purchase {
@@ -553,21 +553,30 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
             claims: vec![],
         };
         chain.fill_tapos(&mut trx, 2);
-        chain.push(&SignedTransaction {
+        SignedTransaction {
             transaction: trx.packed().into(),
             proofs: vec![],
             subjectiveData: None,
-        })
+        }
     };
-    let fund_start = || -> Result<(), psibase::Error> {
-        // Enough for the transaction's bytes and a little CPU, no more.
+    // Give alice exactly what the transaction's bytes cost plus a little CPU.
+    // The balance is one pool, so anything over the byte cost is CPU she can
+    // afford: the byte cost has to be the transaction's own, not an estimate.
+    let fund_start = |trx: &SignedTransaction| -> Result<(), psibase::Error> {
+        let available = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .get_resources(alice)
+            .get()?;
         let net = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .get_net_cost(16_384)
+            .get_net_cost(trx.packed().len() as u64)
             .get()?;
         let cpu = Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .get_cpu_cost(STARTING_CPU_NS)
             .get()?;
-        let start: Quantity = (net.value + cpu.value).into();
+        let wanted = net.value + cpu.value;
+        if wanted <= available.value {
+            return Ok(());
+        }
+        let start: Quantity = (wanted - available.value).into();
         Tokens::push_from(&chain, PRODUCER_ACCOUNT)
             .credit(sys, Wrapper::SERVICE, start, "".into())
             .get()?;
@@ -577,22 +586,26 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
         Ok(())
     };
 
-    // The same work without the purchase does not fit in the starting balance.
-    fund_start()?;
-    let unfunded = work(false);
+    // The same work without the purchase is stopped by the CPU limit.
+    let unfunded = build(false);
+    fund_start(&unfunded)?;
+    let trace = chain.push(&unfunded);
+    let error = trace.error.unwrap_or_default();
+    println!("without the purchase: {error}");
     assert!(
-        unfunded.error.is_some(),
-        "the work was meant to exceed the starting balance"
+        error.contains("timed out"),
+        "the work was meant to exceed the starting CPU allowance, got: {error:?}"
     );
     chain.finish_block();
 
     // With the purchase as its first action it runs to the end.
-    fund_start()?;
-    let funded = work(true);
+    let funded = build(true);
+    fund_start(&funded)?;
+    let trace = chain.push(&funded);
     assert!(
-        funded.error.is_none(),
+        trace.error.is_none(),
         "a transaction that bought resources was still limited to its starting balance: {}",
-        funded.error.unwrap_or_default()
+        trace.error.unwrap_or_default()
     );
     chain.finish_block();
     Ok(())
