@@ -6,6 +6,7 @@
 #include <psibase/api.hpp>
 #include <psibase/export.hpp>
 #include <psio/reflect.hpp>
+#include <psio/shapes.hpp>
 #include <psio1/fracpack.hpp>
 
 #include <array>
@@ -24,7 +25,7 @@ namespace psibase
       if (!psio1::is_packable<std::remove_cv_t<T>>::template unpack<false, true>(
               nullptr, has_unknown, known_end, start, pos, 0xffffffffu))
       {
-         static_assert(!psio1::is_std_optional_v<std::remove_cv_t<T>>,
+         static_assert(!psio::is_optional<std::remove_cv_t<T>>::value,
                        "Optional members are not stored in contiguous memory");
          assert(!"View must be valid");
          __builtin_unreachable();

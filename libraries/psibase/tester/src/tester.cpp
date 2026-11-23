@@ -7,6 +7,7 @@
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/version.hpp>
+#include <psio/to_hex.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XPackages.hpp>
 #include <services/system/RTransact.hpp>
@@ -248,7 +249,7 @@ namespace
          requests.push_back(HttpRequest{
              .host        = XPackages::service.str() + "." + rootHost,
              .method      = "PUT",
-             .target      = "/manifest/" + psio1::hex(package.sha256.begin(), package.sha256.end()),
+             .target      = "/manifest/" + psio::to_hex(package.sha256.begin(), package.sha256.end()),
              .contentType = "application/json",
              .body        = package.manifest(),
          });

@@ -9,7 +9,7 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include <psio1/fracpack.hpp>
 #include <psibase/VmEngine.hpp>
 #include <psibase/NativeVM.hpp>
@@ -51,7 +51,7 @@ namespace
       std::int32_t call(std::int32_t value) { return nested(value); }
       void         fail()
       {
-         auto cleanup = psio1::finally{[&] { ++destructed; }};
+         auto cleanup = psibase::finally{[&] { ++destructed; }};
          auto payload = std::make_shared<int>(1);
          failurePayload = payload;
          throw TrackedHostFailure(std::move(payload));
@@ -280,7 +280,7 @@ TEST_CASE("LLVM raw host trampolines release caught exception ownership")
           return {};
        }};
    auto previous = context._host_trampoline_ptrs;
-   auto restore = psio1::finally{[&] { context._host_trampoline_ptrs = previous; }};
+   auto restore = psibase::finally{[&] { context._host_trampoline_ptrs = previous; }};
    context._host_trampoline_ptrs = raw;
    psizam::native_value argument{reinterpret_cast<uint64_t>(&runtime.host)};
    auto invoke = [&]
@@ -313,7 +313,7 @@ TEST_CASE("CPU watchdog cancellation uses executing-thread TLS and permits cache
    Runtime runtime;
    auto&   timedOut = psizam::detail::timed_run_has_timed_out;
    REQUIRE_FALSE(timedOut.load());
-   auto restore = psio1::finally{[&]
+   auto restore = psibase::finally{[&]
                                 {
                                    runtime.backend.get_module().allocator.enable_code(true);
                                    timedOut = false;
@@ -397,7 +397,7 @@ TEST_CASE("Watchdog completion and destruction cannot cancel the next backend ow
    Runtime                  runtime;
    psibase::WatchdogManager manager;
    auto&                    timedOut = psizam::detail::timed_run_has_timed_out;
-   auto                     restore  = psio1::finally{[&]
+   auto                     restore  = psibase::finally{[&]
                                                      {
                                    runtime.backend.get_module().allocator.enable_code(true);
                                    timedOut = false;

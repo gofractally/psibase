@@ -11,7 +11,7 @@
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/version.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include <psio1/to_bin.hpp>
 #include <psio1/to_json.hpp>
 #include <psio1/view.hpp>
@@ -1390,7 +1390,7 @@ struct callbacks
          if (signedTrx.subjectiveData)
          {
             chain.blockContext->isProducing = false;
-            auto resetProducing = psio1::finally{[&] { chain.blockContext->isProducing = true; }};
+            auto resetProducing = psibase::finally{[&] { chain.blockContext->isProducing = true; }};
             chain.blockContext->replayTransaction(std::move(signedTrx), trace);
          }
          else
@@ -1461,7 +1461,7 @@ struct callbacks
          auto                        startExecTime = std::chrono::steady_clock::now();
 
          chain.sys->sockets->add(*chain.writer, socket, &tc.ownedSockets);
-         auto setStatus = psio1::finally(
+         auto setStatus = psibase::finally(
              [&]
              {
                 auto endExecTime = std::chrono::steady_clock::now();

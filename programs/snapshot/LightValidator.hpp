@@ -7,6 +7,7 @@
 #include <psibase/headerValidation.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/testerApi.hpp>
+#include <psio/shapes.hpp>
 #include <psio1/fracpack.hpp>
 #include <psio1/stream.hpp>
 #include <vector>
@@ -38,7 +39,7 @@ namespace psibase
          tester::raw::kvPut(id, db, key.pos, key.remaining(), value.pos, value.remaining());
       }
       template <typename K, typename V>
-         requires(!psio1::is_std_optional<V>::value)
+         requires(!psio::is_optional<V>::value)
       void kvPut(DbId db, const K& key, const V& value)
       {
          kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));

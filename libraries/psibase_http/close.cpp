@@ -2,14 +2,14 @@
 
 #include <psibase/BlockContext.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 
 void psibase::http::callClose(const server_state&     server,
                               loggers::common_logger& logger,
                               AutoCloseSocket&        socket)
 {
    auto          system = server.sharedState->getSystemContext();
-   psio1::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
+   psibase::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
    if (socket.notifyClose)
    {
       BlockContext bc{*system, system->sharedDatabase.getHead(),

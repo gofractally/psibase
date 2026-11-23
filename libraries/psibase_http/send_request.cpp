@@ -18,7 +18,7 @@
 #include <psibase/WebSocket.hpp>
 #include <psibase/http.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include "server_state.hpp"
 
 namespace bhttp = boost::beast::http;
@@ -170,7 +170,7 @@ namespace
       {
          auto system = self->server.sharedState->getSystemContext();
 
-         psio1::finally f{[&]() { self->server.sharedState->addSystemContext(std::move(system)); }};
+         psibase::finally f{[&]() { self->server.sharedState->addSystemContext(std::move(system)); }};
          BlockContext  bc{*system, system->sharedDatabase.getHead(),
                           system->sharedDatabase.createWriter(), true};
          bc.start();

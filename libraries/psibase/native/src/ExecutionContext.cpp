@@ -18,7 +18,7 @@
 #include <psibase/PsizamPolicy.hpp>
 #include <psibase/NativeAotCache.hpp>
 #include <psibase/db.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include <psibase/NativeVM.hpp>
 #include <psibase/VmEngine.hpp>
 #include <psizam/debug/debug.hpp>
@@ -323,7 +323,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
             wa{memory.wa}
       {
          database.checkoutSubjective();
-         psio1::finally _{[&] { database.abortSubjective(); }};
+         psibase::finally _{[&] { database.abortSubjective(); }};
          auto [ca, db] = getCode(service);
 
          code   = std::move(ca);
@@ -458,7 +458,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
          currentActContext = &actionContext;
          auto& vmContext = backend.backend->get_context();
          const auto previousStack = vmContext.get_remaining_call_depth();
-         auto restore = psio1::finally{[&] {
+         auto restore = psibase::finally{[&] {
             currentActContext = prev;
             vmContext.set_max_call_depth(previousStack);
          }};
@@ -551,7 +551,7 @@ namespace psibase::PSIBASE_VM_ENGINE_NS
    void ExecutionContextImpl::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       onTransferControl(callerFlags);
-      auto cleanup = psio1::finally{[&] { onTransferControl(callerFlags); }};
+      auto cleanup = psibase::finally{[&] { onTransferControl(callerFlags); }};
 
       if ((callerFlags & (ExecutionContext::callerSudo | ExecutionContext::isLocal)) ==
           ExecutionContext::callerSudo)

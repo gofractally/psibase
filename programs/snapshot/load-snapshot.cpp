@@ -13,7 +13,7 @@
 #include <services/system/VerifySig.hpp>
 #include "LightValidator.hpp"
 
-#include <psio1/to_hex.hpp>
+#include <psio/to_hex.hpp>
 
 using psibase::BlockNum;
 using psibase::DbId;
@@ -87,7 +87,7 @@ std::string keyId(const psibase::Claim& claim)
    {
       auto fingerprint = keyFingerprint(SystemService::AuthSig::SubjectPublicKeyInfo{
           .data = {claim.rawData.begin(), claim.rawData.end()}});
-      return psio1::hex(fingerprint.data(), fingerprint.data() + 32, {':'});
+      return psio::to_hex(fingerprint.data(), fingerprint.data() + 32, {':'});
    }
    else
       return psio1::convert_to_json(claim);
@@ -595,8 +595,8 @@ int main(int argc, const char* const* argv)
    }
    raw::commitState(handle);
    std::cerr << "Snapshot successfully loaded\n"
-             << "Chain: " << psio1::hex(newStatus->chainId.begin(), newStatus->chainId.end())
+             << "Chain: " << psio::to_hex(newStatus->chainId.begin(), newStatus->chainId.end())
              << "\nHead: "
-             << psio1::hex(newStatus->head->blockId.begin(), newStatus->head->blockId.end())
+             << psio::to_hex(newStatus->head->blockId.begin(), newStatus->head->blockId.end())
              << std::endl;
 }

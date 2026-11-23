@@ -9,6 +9,7 @@
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
 #include <psibase/serveSimpleUI.hpp>
+#include <psio/to_hex.hpp>
 #include <regex>
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
@@ -503,7 +504,7 @@ namespace SystemService
          {
             std::string cspHeader =
                 getCspHeader(content, content->account, cspRootDomain(rootHost, request));
-            auto etag = psio1::hex(content->contentHash.data(), content->contentHash.data() + 8);
+            auto etag = psio::to_hex(content->contentHash.data(), content->contentHash.data() + 8);
 
             if (!notFound && useCache(content->account) && shouldCache(request, etag))
             {

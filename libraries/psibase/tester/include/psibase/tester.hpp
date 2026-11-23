@@ -6,7 +6,7 @@
 #include <psibase/fileUtil.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
-#include <psio1/to_hex.hpp>
+#include <psio/to_hex.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
@@ -801,6 +801,6 @@ struct Catch::StringMaker<psibase::Checksum256>
 {
    static std::string convert(const psibase::Checksum256& obj)
    {
-      return psio1::hex(obj.begin(), obj.end());
+      return psio::to_hex(obj.begin(), obj.end());
    }
 };

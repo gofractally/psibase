@@ -3,6 +3,7 @@
 #include <psibase/fileUtil.hpp>
 #include <psibase/package.hpp>
 #include <psibase/semver.hpp>
+#include <psio/to_hex.hpp>
 #include <psio1/schema.hpp>
 #include <services/local/XSites.hpp>
 #include <services/system/Accounts.hpp>
@@ -136,7 +137,7 @@ namespace psibase
          if (auto* s = data.get_if<std::string>())
          {
             std::vector<char> result;
-            if (!psio1::from_hex(*s, result))
+            if (!psio::from_hex(*s, result))
                abortMessage("expected hex string");
             return result;
          }

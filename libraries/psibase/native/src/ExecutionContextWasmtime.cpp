@@ -21,7 +21,7 @@
 #include <psibase/VmEngine.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include <psizam/wasmtime_admission.hpp>
 #include <psizam/wasmtime_backend.hpp>
 
@@ -214,7 +214,7 @@ namespace psibase::vm_wasmtime
             vmOptions{vmOptions}
       {
          database.checkoutSubjective();
-         psio1::finally _{[&] { database.abortSubjective(); }};
+         psibase::finally _{[&] { database.abortSubjective(); }};
          auto [ca, db] = getCode(service);
 
          code   = std::move(ca);
@@ -367,7 +367,7 @@ namespace psibase::vm_wasmtime
          // this one finishes, however it finishes.
          const bool          wasInitialized = initialized;
          const std::uint32_t previousStack  = wasInitialized ? instance->stack_remaining() : 0;
-         auto                restore        = psio1::finally{[&]
+         auto                restore        = psibase::finally{[&]
                                                             {
                                                                currentActContext = prev;
                                                                if (wasInitialized)
@@ -472,7 +472,7 @@ namespace psibase::vm_wasmtime
    void ExecutionContextImpl::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       onTransferControl(callerFlags);
-      auto cleanup = psio1::finally{[&] { onTransferControl(callerFlags); }};
+      auto cleanup = psibase::finally{[&] { onTransferControl(callerFlags); }};
 
       if ((callerFlags & (ExecutionContext::callerSudo | ExecutionContext::isLocal)) ==
           ExecutionContext::callerSudo)

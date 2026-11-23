@@ -1,7 +1,7 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/saturating.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 
 namespace psibase
 {
@@ -172,7 +172,7 @@ namespace psibase
       auto actions = psio1::view<const NotifyRow>(psio1::prevalidated{notifySpan}).actions().unpack();
 
       auto oldIsProducing = isProducing;
-      auto restore        = psio1::finally{[&] { isProducing = oldIsProducing; }};
+      auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
       for (const Action& action : actions)
@@ -214,7 +214,7 @@ namespace psibase
       auto actions = psio1::view<const NotifyRow>(psio1::prevalidated{notifySpan}).actions().unpack();
 
       auto oldIsProducing = isProducing;
-      auto restore        = psio1::finally{[&] { isProducing = oldIsProducing; }};
+      auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
       Action action{.sender = AccountNumber{}, .rawData = psio1::to_frac(std::tuple(id, trace))};
@@ -304,7 +304,7 @@ namespace psibase
       auto actions = psio1::view<const NotifyRow>(psio1::prevalidated{*notifyData}).actions();
 
       auto oldIsProducing = isProducing;
-      auto restore        = psio1::finally{[&] { isProducing = oldIsProducing; }};
+      auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
       Action action{.sender = AccountNumber{}, .rawData = psio1::to_frac(std::tuple())};
@@ -374,7 +374,7 @@ namespace psibase
       auto actions = psio1::view<const NotifyRow>(psio1::prevalidated{*notifyData}).actions();
 
       auto oldIsProducing = isProducing;
-      auto restore        = psio1::finally{[&] { isProducing = oldIsProducing; }};
+      auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
       Action action{.sender = AccountNumber{}, .rawData = psio1::to_frac(std::tie(trx))};
@@ -479,7 +479,7 @@ namespace psibase
          if (row.mode() == RunMode::speculative)
          {
             db.checkoutEmptySubjective();
-            auto _ = psio1::finally{[&] { db.abortSubjective(); }};
+            auto _ = psibase::finally{[&] { db.abortSubjective(); }};
             tc.execNonTrxAction(0, action, atrace);
          }
          else

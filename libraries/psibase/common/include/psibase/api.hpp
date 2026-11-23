@@ -5,6 +5,7 @@
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
+#include <psio/shapes.hpp>
 #include <psio1/fracpack.hpp>
 #include <psio1/to_key.hpp>
 #include <span>
@@ -20,7 +21,7 @@ namespace psibase
    using EventNumber = uint64_t;
 
    template <typename T>
-   concept NotOptional = std::is_base_of<std::false_type, psio1::is_std_optional<T>>::value;
+   concept NotOptional = !psio::is_optional<T>::value;
 
    enum class CallFlags : std::uint64_t
    {

@@ -8,7 +8,7 @@
 #include <psio/fixed_string.hpp>
 #include <psio/reflect.hpp>
 #include <psio1/graphql.hpp>
-#include <psio1/to_hex.hpp>
+#include <psio/to_hex.hpp>
 
 namespace psibase
 {
@@ -369,7 +369,7 @@ namespace psibase
          if (!s || s->empty())
             return bytes;
          bytes.reserve(s->size() / 2);
-         if (!psio1::from_hex(*s, bytes))
+         if (!psio::from_hex(*s, bytes))
             bytes.clear();
          return bytes;
       };
@@ -397,7 +397,7 @@ namespace psibase
       Connection result;
       auto       add_edge = [&](const auto& it)
       {
-         auto cursor = psio1::to_hex(it.keyWithoutPrefix());
+         auto cursor = psio::to_hex(it.keyWithoutPrefix());
          result.edges.push_back(typename Connection::Edge{proj(it), std::move(cursor)});
       };
       // Rows are sized before they're read, so a page only exceeds the budget

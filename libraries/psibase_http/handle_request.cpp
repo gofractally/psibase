@@ -14,7 +14,7 @@
 #include <psibase/TransactionContext.hpp>
 #include <psibase/WebSocket.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include <psio1/to_json.hpp>
 #include <unordered_set>
 
@@ -818,7 +818,7 @@ namespace psibase::http
             // TODO: time limit
             auto system = server.sharedState->getSystemContext();
 
-            psio1::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
+            psibase::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
             bc.start();
@@ -851,7 +851,7 @@ namespace psibase::http
                system->sockets->add(*bc.writer, socket, &tc.ownedSockets);
                // these can't throw and should run iff sockets->add succeeds
                send.pause_read = true;
-               auto setStatus  = psio1::finally(
+               auto setStatus  = psibase::finally(
                    [&]
                    {
                       auto endExecTime = steady_clock::now();

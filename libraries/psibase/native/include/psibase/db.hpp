@@ -3,6 +3,7 @@
 #include_next <psibase/db.hpp>
 
 #include <psibase/blob.hpp>
+#include <psio/shapes.hpp>
 #include <psio1/fracpack.hpp>
 #include <psio1/to_key.hpp>
 #include <psibase/storage.hpp>
@@ -263,7 +264,7 @@ namespace psibase
 
       template <typename K, typename V>
       auto kvPut(DbId db, const K& key, const V& value)
-          -> std::enable_if_t<!psio1::is_std_optional<V>(), void>
+          -> std::enable_if_t<!psio::is_optional<V>::value, void>
       {
          kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));
       }

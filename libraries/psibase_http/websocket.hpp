@@ -16,7 +16,7 @@
 #include <psibase/db.hpp>
 #include <psibase/peer_manager.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include <span>
 #include <string>
 #include "close.hpp"

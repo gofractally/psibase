@@ -41,12 +41,12 @@ void WebSocket::handleMessage(CloseLock&& l, bool binary)
 {
    auto inbuffer    = input.cdata();
    auto data        = std::span{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
-   auto clearBuffer = psio1::finally{[this] { input.consume(input.size()); }};
+   auto clearBuffer = psibase::finally{[this] { input.consume(input.size()); }};
    auto flags       = binary ? WebSocketFlags::binary : WebSocketFlags::text;
 
    auto system = server.sharedState->getSystemContext();
 
-   psio1::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
+   psibase::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
    BlockContext bc{*system, system->sharedDatabase.getHead(), system->sharedDatabase.createWriter(),
                    true};
    bc.start();

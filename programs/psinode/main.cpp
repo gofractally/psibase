@@ -15,7 +15,7 @@
 #include <psibase/serviceEntry.hpp>
 #include <psibase/storageDiagnostics.hpp>
 #include <psibase/version.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include <psio1/from_json/map.hpp>
 #include <psio1/to_json.hpp>
 #include <psio1/to_json/map.hpp>
@@ -1471,7 +1471,7 @@ void run(const std::string&              db_path,
    RunQueue                runQueue{sharedState, std::chrono::milliseconds(proof_timeout_ms)};
    boost::asio::io_context chainContext;
 
-   auto shutdown_sockets = psio1::finally{[&system] { system->sockets->shutdown(); }};
+   auto shutdown_sockets = psibase::finally{[&system] { system->sockets->shutdown(); }};
 
    auto server_work = boost::asio::make_work_guard(chainContext);
 
@@ -1607,7 +1607,7 @@ void run(const std::string&              db_path,
        });
 
    auto stop_threads =
-       psio1::finally{[&chainContext, &tpool]
+       psibase::finally{[&chainContext, &tpool]
                      {
                         tpool.setNumThreads(0);
                         auto& ectx = static_cast<boost::asio::execution_context&>(chainContext);

@@ -6,7 +6,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XPackages.hpp>
 
@@ -206,7 +206,7 @@ void initialize_database(SystemContext& context, const std::string& template_)
    TransactionContext tc{bc, trx, trace, DbMode::rpc()};
 
    auto cleanup =
-       psio1::finally{[&, saved = bc.db.saveSubjective()] { bc.db.restoreSubjective(saved); }};
+       psibase::finally{[&, saved = bc.db.saveSubjective()] { bc.db.restoreSubjective(saved); }};
    bc.db.checkoutSubjective();
 
    auto key = psio1::convert_to_key(codePrefix());

@@ -7,8 +7,8 @@
 #include <psibase/Socket.hpp>
 #include <psibase/saturating.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/finally.hpp>
-#include <psio1/to_hex.hpp>
+#include <psibase/finally.hpp>
+#include <psio/to_hex.hpp>
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -483,7 +483,7 @@ namespace psibase
       {
          auto& transactionStack = self.currentActContext->transactionContext.remainingStack;
          auto  saved            = transactionStack;
-         auto  restoreStack     = psio1::finally{[&] { transactionStack = saved; }};
+         auto  restoreStack     = psibase::finally{[&] { transactionStack = saved; }};
          auto remainingStack = self.currentExecContext->remainingStack();
          check(remainingStack >= VMOptions::stack_usage_for_call, "stack overflow");
          remainingStack -= VMOptions::stack_usage_for_call;
@@ -502,7 +502,7 @@ namespace psibase
          auto savedImported = std::move(self.transactionContext.importedHandles);
          auto savedExported = std::move(self.transactionContext.exportedHandles);
          auto _ =
-             psio1::finally{[&]
+             psibase::finally{[&]
                            {
                               self.transactionContext.importedHandles = std::move(savedImported);
                               self.transactionContext.exportedHandles = std::move(savedExported);
@@ -603,7 +603,7 @@ namespace psibase
    {
       auto& transactionStack = currentActContext->transactionContext.remainingStack;
       auto  saved            = transactionStack;
-      auto  restoreStack     = psio1::finally{[&] { transactionStack = saved; }};
+      auto  restoreStack     = psibase::finally{[&] { transactionStack = saved; }};
       auto remainingStack = currentExecContext->remainingStack();
       check(remainingStack >= VMOptions::stack_usage_for_call, "stack overflow");
       remainingStack -= VMOptions::stack_usage_for_call;

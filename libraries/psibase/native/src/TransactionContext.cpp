@@ -6,7 +6,7 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psio1/finally.hpp>
+#include <psibase/finally.hpp>
 #include <psizam/detail/execution_context.hpp>
 #include <thread>
 #include <chrono>
@@ -476,7 +476,7 @@ namespace psibase
             impl->altMode       = true;
             dbMode.isSync       = flags == CallFlags::runModeCallback;
             dbMode.isSubjective = true;
-            return psio1::finally{[this]
+            return psibase::finally{[this]
                                  {
                                     impl->altMode       = false;
                                     dbMode.isSync       = true;
@@ -598,7 +598,7 @@ namespace psibase
             return it->second;
       }
       impl->watchdog->pause();
-      auto resume = psio1::finally{[&] { impl->watchdog->resume(); }};
+      auto resume = psibase::finally{[&] { impl->watchdog->resume(); }};
       {
          // A callback may have won the manager lock just before pause().
          std::lock_guard guard{impl->mutex};

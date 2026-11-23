@@ -2,7 +2,7 @@
 
 #include <psibase/dispatch.hpp>
 #include <psibase/serveGraphQL.hpp>
-#include <psio1/to_hex.hpp>
+#include <psio/to_hex.hpp>
 #include <services/system/CommonApi.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
@@ -64,7 +64,7 @@ struct ActionQuery
    std::string              rawData() const
    {
       std::span<const char> result = action.rawData();
-      return psio1::to_hex(result);
+      return psio::to_hex(result);
    }
    PSIO_REFLECT(ActionQuery, method(sender), method(service), method(method), method(rawData))
 };
@@ -111,7 +111,7 @@ struct SignedTransactionQuery
          result.reserve(value.proofs().size());
          for (std::span<const char> proof : value.proofs())
          {
-            result.push_back(psio1::to_hex(proof));
+            result.push_back(psio::to_hex(proof));
          }
          return result;
       }
@@ -213,7 +213,7 @@ static constexpr std::uint32_t blocksPageBytes = 6 * 1024 * 1024;
 static std::optional<Checksum256> parseChecksum(const std::string& hex)
 {
    std::vector<char> bytes;
-   if (!psio1::from_hex(hex, bytes) || bytes.size() != Checksum256{}.size())
+   if (!psio::from_hex(hex, bytes) || bytes.size() != Checksum256{}.size())
       return std::nullopt;
    Checksum256 result;
    std::memcpy(result.data(), bytes.data(), result.size());

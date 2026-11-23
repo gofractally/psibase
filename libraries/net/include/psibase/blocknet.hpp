@@ -4,8 +4,8 @@
 #include <psibase/Socket.hpp>
 #include <psibase/net_base.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/finally.hpp>
-#include <psio1/to_hex.hpp>
+#include <psibase/finally.hpp>
+#include <psio/to_hex.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -126,8 +126,8 @@ namespace psibase::net
       {
          return "snapshot part: blockid=" + loggers::to_string(blockId) +
                 " nrows=" + std::to_string(rows.size()) +
-                " db=" + std::to_string(static_cast<unsigned>(db)) + " [" + psio1::to_hex(lowKey) +
-                "," + psio1::to_hex(highKey) + ")";
+                " db=" + std::to_string(static_cast<unsigned>(db)) + " [" + psio::to_hex(lowKey) +
+                "," + psio::to_hex(highKey) + ")";
       }
    };
    PSIO_REFLECT(SnapshotPartMessage, blockId, db, lowKey, highKey, rows)
@@ -805,7 +805,7 @@ namespace psibase::net
             chain().start_block(
                 TimePointSec{duration_cast<Seconds>(block_start.time_since_epoch())}, self,
                 current_term, commit_index);
-            auto  cleanup = psio1::finally{[&]
+            auto  cleanup = psibase::finally{[&]
                                          {
                                             if (!result)
                                             {
