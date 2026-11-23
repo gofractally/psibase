@@ -4,21 +4,6 @@
     "service": "transact",
     "method": "addcallback",
     "data": {
-      "type": 0,
-      "objective": true,
-      "action": {
-        "sender": "transact",
-        "service": "events",
-        "method": "sync",
-        "data": {}
-      }
-    }
-  },
-  {
-    "sender": "transact",
-    "service": "transact",
-    "method": "addcallback",
-    "data": {
       "type": 1,
       "objective": false,
       "action": {
