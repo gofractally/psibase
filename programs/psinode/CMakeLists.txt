@@ -77,6 +77,8 @@ if(Python_Interpreter_FOUND)
         NAME py_test_name
         COMMAND ${Python_EXECUTABLE} test_name.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    set_tests_properties(py_test_name PROPERTIES
+        ENVIRONMENT PYTHONPATH=${PSINODE_TEST_PYTHONPATH})
     add_test(
         NAME py_test_psibase_types
         COMMAND ${Python_EXECUTABLE} test_psibase_types.py
