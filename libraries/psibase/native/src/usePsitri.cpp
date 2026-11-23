@@ -657,6 +657,9 @@ namespace psibase
                std::span<const char>   value)
       {
          session.require_writable();
+         // No store work happens here, but every storage call is a point
+         // where an exhausted budget stops the caller.
+         accounting::check();
          auto& changes = pending[(int)db];
          changes.put(key, value);
          if (changes.bytes() > foldBytes)
@@ -665,6 +668,7 @@ namespace psibase
       void erase(storage::write_session& session, DbId db, std::span<const char> key)
       {
          session.require_writable();
+         accounting::check();
          pending[(int)db].erase(key);
       }
       // Make the trees current: apply every database's changes to its tree and
