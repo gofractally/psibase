@@ -892,7 +892,10 @@ mod tests {
         .unwrap();
         // Read by softhsm2-util and by the module when it is loaded below.
         std::env::set_var("SOFTHSM2_CONF", &conf);
+        // softhsm2-util looks for the library at a compiled-in path, which is
+        // wrong for a SoftHSM that is unpacked rather than installed.
         let status = std::process::Command::new(util)
+            .args(["--module", &module])
             .args(["--init-token", "--free", "--label", "psibase-test"])
             .args(["--so-pin", "12345678", "--pin", PIN])
             .stdout(std::process::Stdio::null())
