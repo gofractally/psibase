@@ -22,7 +22,7 @@ function(psibase_declare_dependencies)
         SOURCE_DIR "${psibase_root}/external/psio")
     FetchContent_Declare(psitri
         GIT_REPOSITORY git@github.com:gofractally/psitri.git
-        GIT_TAG 8eb36ddf35950a29d7e30a2520a642256dacf04f
+        GIT_TAG b7b8647a3fd40277b965f5f60bc2b320529a37cd
         GIT_SHALLOW FALSE
         SOURCE_DIR "${psibase_root}/external/psitri"
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
