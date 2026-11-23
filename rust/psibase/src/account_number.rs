@@ -142,7 +142,8 @@ impl std::fmt::Display for AccountNumber {
 }
 
 /// Like AccountNumber, except FromStr and deserializing JSON require exact round-trip conversion
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Pack, Unpack, ToKey)]
+#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Pack, Unpack, ToKey, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key)]
+#[psio(definition_will_not_change)]
 #[fracpack(
     definition_will_not_change,
     fracpack_mod = "fracpack",

@@ -45,7 +45,7 @@ pub fn status_key() -> (NativeTable, NativeIndex) {
     (STATUS_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct StatusRow {
     pub chainId: Checksum256,
@@ -366,7 +366,7 @@ pub struct IPV6Address {
     zone: u32,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum IPAddress {
     IPV4Address(IPV4Address),
@@ -432,7 +432,7 @@ pub struct LocalEndpoint {
     path: String,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum SocketEndpoint {
     IPV4Endpoint(IPV4Endpoint),
@@ -456,36 +456,36 @@ pub enum SocketEndpoint {
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct TLSInfo {}
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ProducerMulticastSocketInfo {}
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct LogSocketInfo {}
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct HttpSocketInfo {
     endpoint: Option<SocketEndpoint>,
     tls: Option<TLSInfo>,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct HttpClientSocketInfo {
     endpoint: Option<SocketEndpoint>,
     tls: Option<TLSInfo>,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct WebSocketInfo {
     endpoint: Option<SocketEndpoint>,
     tls: Option<TLSInfo>,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct P2PSocketInfo {
     endpoint: Option<SocketEndpoint>,
@@ -494,7 +494,7 @@ pub struct P2PSocketInfo {
 
 /// What a socket is. The alternatives and their order are those of the
 /// C++ variant (`psibase/SocketInfo.hpp`).
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum SocketInfo {
     ProducerMulticastSocketInfo(ProducerMulticastSocketInfo),
@@ -522,7 +522,7 @@ impl LogMessage {
     pub const CRITICAL: u32 = 5;
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct SocketRow {
     fd: i32,

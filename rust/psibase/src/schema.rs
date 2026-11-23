@@ -7,7 +7,8 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema)]
+#[psio(transparent)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct MethodString(pub String);
 
