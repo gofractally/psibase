@@ -1927,6 +1927,7 @@ dependencies = [
  "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_names",
+ "psio",
  "rand_core 0.6.4",
  "regex",
  "reqwest",
@@ -2000,6 +2001,26 @@ version = "0.29.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
+]
+
+[[package]]
+name = "psio"
+version = "0.1.0"
+dependencies = [
+ "paste",
+ "psio-macros",
+ "ryu",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "psio-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

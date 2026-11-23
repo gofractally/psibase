@@ -41,7 +41,8 @@ fn method_number_parse_hash(s: &str) -> Option<u64> {
     let mut i = 1;
 
     for c in chars {
-        let mut sym = (CHAR_TO_SYMBOL_METHOD[c as usize] - 1) as u64;
+        // A character outside the method alphabet is not part of a hash form.
+        let mut sym = CHAR_TO_SYMBOL_METHOD[c as usize].checked_sub(1)? as u64;
         sym <<= 4 * (i - 1);
         output |= sym;
         i += 1;

@@ -22,18 +22,48 @@ custom_error! { pub AccountNumberError
 /// use psibase::account;
 /// let hello = account!("hello");
 /// ```
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Hash, Pack, Unpack, ToKey, ToSchema)]
+#[derive(
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Copy,
+    Clone,
+    Hash,
+    Pack,
+    Unpack,
+    ToKey,
+    ToSchema,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
+)]
 #[fracpack(
     definition_will_not_change,
     fracpack_mod = "fracpack",
     custom = "AccountNumber"
 )]
 #[to_key(psibase_mod = "crate")]
+#[psio(definition_will_not_change, custom = "AccountNumber")]
 pub struct AccountNumber {
     pub value: u64,
 }
 
 serialize_as_str!(AccountNumber, "account number");
+
+/// The text of an account is its name. Exactly one text names each account,
+/// the one [`Display`](std::fmt::Display) writes; any other text is not a value.
+impl psio::json::TextForm for AccountNumber {
+    fn to_text(&self, out: &mut String) {
+        out.push_str(&account_number_to_string(self.value));
+    }
+    fn from_text(text: &str) -> Option<Self> {
+        AccountNumber::from_exact(text).ok()
+    }
+}
+psio::json_text_form!(AccountNumber);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Subaccount(pub u8);
