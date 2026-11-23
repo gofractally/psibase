@@ -5,7 +5,6 @@
 
 using namespace psibase;
 using namespace TestService;
-using namespace psio1;
 
 std::string TestMemo::testValue(Memo memo)
 {

@@ -3,9 +3,8 @@
 // the XAdmin authentication results without one), a record with a text form
 // (Decimal), rows with a monotonic time point, a record with a map member.
 //
-// What is checked here is the PSIO form (PSSZ, key, I-JSON, validation). The
-// bytes psibase puts on the wire today are still the legacy library's; they
-// are pinned in libraries/psio1/tests/canonical_glue_tests.cpp.
+// What is checked here is the PSIO form (PSSZ, key, I-JSON, validation):
+// what psibase puts on the wire.
 #include <psibase/Memo.hpp>
 #include <psibase/nativeTables.hpp>
 #include <services/local/XAdmin.hpp>

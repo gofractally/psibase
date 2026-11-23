@@ -12,9 +12,6 @@
 #include <psio/pssz.hpp>
 #include <psio/pssz_view.hpp>
 #include <psio/reflect.hpp>
-// Byte-range parameter types (psio1::input_stream, psio1::vector_stream):
-// moved off psio1 with the remaining stream uses.
-#include <psio1/stream.hpp>
 
 namespace psibase
 {

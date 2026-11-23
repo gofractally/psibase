@@ -37,7 +37,7 @@ namespace
          CodeRow row{.codeNum = service, .flags = CodeRow::isPrivileged};
          block.db.kvPut(row.db, row.key(), row);
          setCode(block.db, service, 0, 0,
-                 psio1::input_stream(reinterpret_cast<const char*>(timeoutService),
+                 std::span<const char>(reinterpret_cast<const char*>(timeoutService),
                                     sizeof(timeoutService)));
          // The guest traverses real populated storage rather than timing a
          // mocked host import or an empty tree.

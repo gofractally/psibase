@@ -5,6 +5,7 @@
 
 #include <psio/json.hpp>
 #include <psio/json_value.hpp>
+#include <psio/stream.hpp>
 #include <psio/to_hex.hpp>
 
 #include <boost/asio/io_context.hpp>
@@ -998,7 +999,7 @@ namespace psibase::loggers
                throw std::runtime_error("Invalid repeating interval");
             }
             repeating_interval result;
-            psio1::input_stream stream(s.substr(2));
+            psio::input_stream stream(s.substr(2));
             if (!parse_timestamp(result.base, stream))
             {
                throw std::runtime_error("Invalid time point");
@@ -1007,7 +1008,7 @@ namespace psibase::loggers
             {
                throw std::runtime_error("Expected /");
             }
-            result.d = parse_duration({stream.pos, stream.end});
+            result.d = parse_duration(std::string_view{stream.rest().data(), stream.remaining()});
             return result;
          };
          if (s.empty())
@@ -2268,7 +2269,7 @@ namespace psibase::loggers
       {
          return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
          {
-            psio1::input_stream                    stream(value);
+            psio::input_stream                     stream(value);
             std::chrono::system_clock::time_point v;
             // TODO: allow optional subseconds
             if (!parse_timestamp(v, stream) || stream.remaining())

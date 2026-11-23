@@ -10,16 +10,15 @@
 #include <psio/shapes.hpp>
 #include <psio/pssz.hpp>
 #include <psio/pssz_view.hpp>
-#include <psio1/stream.hpp>
 #include <vector>
 
 namespace psibase
 {
    struct ChainHandle
    {
-      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio1::input_stream key)
+      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, std::span<const char> key)
       {
-         auto size = tester::raw::kvGet(id, db, key.pos, key.remaining());
+         auto size = tester::raw::kvGet(id, db, key.data(), key.size());
          if (size == -1)
             return std::nullopt;
          return psibase::getResult(size);
@@ -35,9 +34,9 @@ namespace psibase
          return psio::from_pssz<V>(psio::trusted{*v});
       }
 
-      void kvPutRaw(psibase::DbId db, psio1::input_stream key, psio1::input_stream value)
+      void kvPutRaw(psibase::DbId db, std::span<const char> key, std::span<const char> value)
       {
-         tester::raw::kvPut(id, db, key.pos, key.remaining(), value.pos, value.remaining());
+         tester::raw::kvPut(id, db, key.data(), key.size(), value.data(), value.size());
       }
       template <typename K, typename V>
          requires(!psio::is_optional<V>::value)
@@ -46,9 +45,9 @@ namespace psibase
          kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
       }
 
-      void kvRemoveRaw(psibase::DbId db, psio1::input_stream key)
+      void kvRemoveRaw(psibase::DbId db, std::span<const char> key)
       {
-         tester::raw::kvRemove(id, db, key.pos, key.remaining());
+         tester::raw::kvRemove(id, db, key.data(), key.size());
       }
       template <typename K>
       void kvRemove(DbId db, const K& key)

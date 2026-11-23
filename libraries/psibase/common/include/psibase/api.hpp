@@ -11,7 +11,6 @@
 #include <psio/mutable_view.hpp>
 #include <psio/pssz.hpp>
 #include <psio/pssz_view.hpp>
-#include <psio1/stream.hpp>
 #include <span>
 
 #ifdef COMPILING_WASM
@@ -413,7 +412,7 @@ namespace psibase
    /// Call a service and return its result
    ///
    /// `action` must contain a packed [Action].
-   std::vector<char> call(psio1::input_stream action, CallFlags flags = CallFlags::none);
+   std::vector<char> call(std::span<const char> action, CallFlags flags = CallFlags::none);
 
    /// Set the return value of the currently-executing action
    template <typename T>
@@ -424,9 +423,9 @@ namespace psibase
    }
 
    /// Set the return value of the currently-executing action
-   inline void setRetvalBytes(psio1::input_stream s)
+   inline void setRetvalBytes(std::span<const char> s)
    {
-      raw::setRetval(s.pos, s.remaining());
+      raw::setRetval(s.data(), s.size());
    }
 
    /// Opens a key-value database
@@ -445,9 +444,9 @@ namespace psibase
    ///
    /// The handle is only usable by the current service. Use `exportHandles`
    /// to pass it to another service.
-   inline KvHandle kvOpen(DbId db, psio1::input_stream prefix, KvMode mode)
+   inline KvHandle kvOpen(DbId db, std::span<const char> prefix, KvMode mode)
    {
-      return raw::kvOpen(db, prefix.pos, prefix.remaining(), mode);
+      return raw::kvOpen(db, prefix.data(), prefix.size(), mode);
    }
 
    /// Opens a subtree of a key-value database
@@ -458,9 +457,9 @@ namespace psibase
    /// The maximum number of handles that a service can have open
    /// simultaneously is `WasmConfigRow::maxHandles`. If the limit
    /// is exceeded, this function will abort.
-   inline KvHandle kvOpen(KvHandle handle, psio1::input_stream prefix, KvMode mode)
+   inline KvHandle kvOpen(KvHandle handle, std::span<const char> prefix, KvMode mode)
    {
-      return raw::kvOpenAt(handle, prefix.pos, prefix.remaining(), mode);
+      return raw::kvOpenAt(handle, prefix.data(), prefix.size(), mode);
    }
 
    /// Closes a key-value database
@@ -506,9 +505,9 @@ namespace psibase
    /// Set a key-value pair
    ///
    /// If key already exists, then replace the existing value.
-   inline void kvPutRaw(KvHandle db, psio1::input_stream key, psio1::input_stream value)
+   inline void kvPutRaw(KvHandle db, std::span<const char> key, std::span<const char> value)
    {
-      raw::kvPut(db, key.pos, key.remaining(), value.pos, value.remaining());
+      raw::kvPut(db, key.data(), key.size(), value.data(), value.size());
    }
 
    /// Set a key-value pair
@@ -521,9 +520,9 @@ namespace psibase
    }
 
    /// Remove a key-value pair if it exists
-   inline void kvRemoveRaw(KvHandle db, psio1::input_stream key)
+   inline void kvRemoveRaw(KvHandle db, std::span<const char> key)
    {
-      raw::kvRemove(db, key.pos, key.remaining());
+      raw::kvRemove(db, key.data(), key.size());
    }
 
    /// Remove a key-value pair if it exists
@@ -534,9 +533,9 @@ namespace psibase
    }
 
    /// Get size of stored value, if any
-   inline std::optional<uint32_t> kvGetSizeRaw(KvHandle db, psio1::input_stream key)
+   inline std::optional<uint32_t> kvGetSizeRaw(KvHandle db, std::span<const char> key)
    {
-      auto size = raw::kvGet(db, key.pos, key.remaining());
+      auto size = raw::kvGet(db, key.data(), key.size());
       if (size == -1)
          return std::nullopt;
       return size;
@@ -550,9 +549,9 @@ namespace psibase
    }
 
    /// Get a key-value pair, if any
-   inline std::optional<std::vector<char>> kvGetRaw(KvHandle db, psio1::input_stream key)
+   inline std::optional<std::vector<char>> kvGetRaw(KvHandle db, std::span<const char> key)
    {
-      auto size = raw::kvGet(db, key.pos, key.remaining());
+      auto size = raw::kvGet(db, key.data(), key.size());
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -585,10 +584,10 @@ namespace psibase
    /// matches the provided key, then returns the value. Use [getKey] to
    /// get the found key.
    inline std::optional<std::vector<char>> kvGreaterEqualRaw(KvHandle           db,
-                                                             psio1::input_stream key,
+                                                             std::span<const char> key,
                                                              uint32_t           matchKeySize)
    {
-      auto size = raw::kvGreaterEqual(db, key.pos, key.remaining(), matchKeySize);
+      auto size = raw::kvGreaterEqual(db, key.data(), key.size(), matchKeySize);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -615,10 +614,10 @@ namespace psibase
    /// matches the provided key, then returns the value. Use [getKey] to
    /// get the found key.
    inline std::optional<std::vector<char>> kvLessThanRaw(KvHandle           db,
-                                                         psio1::input_stream key,
+                                                         std::span<const char> key,
                                                          uint32_t           matchKeySize)
    {
-      auto size = raw::kvLessThan(db, key.pos, key.remaining(), matchKeySize);
+      auto size = raw::kvLessThan(db, key.data(), key.size(), matchKeySize);
       if (size == -1)
          return std::nullopt;
       return getResult(size);
@@ -643,9 +642,9 @@ namespace psibase
    ///
    /// If one is found, then returns the value. Use [getKey] to
    /// get the found key.
-   inline std::optional<std::vector<char>> kvMaxRaw(KvHandle db, psio1::input_stream key)
+   inline std::optional<std::vector<char>> kvMaxRaw(KvHandle db, std::span<const char> key)
    {
-      auto size = raw::kvMax(db, key.pos, key.remaining());
+      auto size = raw::kvMax(db, key.data(), key.size());
       if (size == -1)
          return std::nullopt;
       return getResult(size);

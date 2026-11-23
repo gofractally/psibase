@@ -25,7 +25,7 @@ std::optional<Database::KVResult> Bucket::trimResult(std::optional<Database::KVR
 {
    if (result)
    {
-      result->key.skip(prefix.size());
+      result->key = result->key.subspan(prefix.size());
    }
    return result;
 }

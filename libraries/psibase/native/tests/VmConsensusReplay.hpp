@@ -137,8 +137,8 @@ namespace psibase::vm_consensus_replay
          std::vector<char> key;
          while (auto row = database.kvGreaterEqualRaw(id, key, 0))
          {
-            auto k = row->key.string_view();
-            auto v = row->value.string_view();
+            auto k = std::string_view{row->key.data(), row->key.size()};
+            auto v = std::string_view{row->value.data(), row->value.size()};
             check(k.size() <= (256ull << 20) && v.size() <= (256ull << 20),
                   "replay snapshot row exceeds explicit 256 MiB limit");
             writeUint(out, k.size(), 8);

@@ -16,7 +16,6 @@
 #include <psio/json.hpp>
 #include <psio/json_value.hpp>
 #include <psio/pssz_view.hpp>
-#include <psio1/to_bin.hpp>
 #include <psizam/debug/debug.hpp>
 #include "VmConsensusReplay.hpp"
 
@@ -46,7 +45,6 @@ using namespace std::literals;
 using std::span;
 namespace dwarf = psizam::debug;
 using psibase::WatchdogManager;
-using psio1::convert_to_bin;
 
 struct callbacks;
 using rhf_t = psizam::registered_host_functions<callbacks>;
@@ -1306,7 +1304,6 @@ struct callbacks
                             span<const char> args_packed)
    {
       auto&              chain = assert_chain(chain_index);
-      psio1::input_stream s     = {args_packed.data(), args_packed.size()};
       auto               act   = psio::from_pssz<psibase::Action>(args_packed);
 
       auto dbMode = psibase::DbMode::from(static_cast<psibase::RunMode>(mode));
@@ -1368,7 +1365,6 @@ struct callbacks
    uint32_t testerPushTransaction(uint32_t chain_index, span<const char> args_packed)
    {
       auto&              chain     = assert_chain(chain_index);
-      psio1::input_stream s         = {args_packed.data(), args_packed.size()};
       auto               signedTrx = psio::from_pssz<psibase::SignedTransaction>(args_packed);
 
       chain.start_if_needed();
@@ -1558,12 +1554,12 @@ struct callbacks
       state.result_value = std::move(n.result_value);
    }
 
-   uint32_t setResult(const std::optional<psio1::input_stream>& o)
+   uint32_t setResult(const std::optional<std::span<const char>>& o)
    {
       state.result_key.clear();
       if (o)
       {
-         state.result_value.assign(o->pos, o->end);
+         state.result_value.assign(o->begin(), o->end());
          return state.result_value.size();
       }
       else
@@ -1582,8 +1578,8 @@ struct callbacks
       }
       else
       {
-         state.result_key.assign(o->key.pos, o->key.end);
-         state.result_value.assign(o->value.pos, o->value.end);
+         state.result_key.assign(o->key.begin(), o->key.end());
+         state.result_value.assign(o->value.begin(), o->value.end());
          return state.result_value.size();
       }
    }

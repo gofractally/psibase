@@ -32,12 +32,6 @@
 #include <psio/pssz.hpp>
 #include <psio/schema_builder.hpp>
 
-// TEMPORARY: removed when psio1 is deleted. The fixture also carries each
-// value as the legacy library packs it, so that the Rust test can require
-// the legacy Rust declaration -- what Rust writes until the wire flip -- to
-// pack the same bytes.
-#include <psio1/fracpack.hpp>
-
 #include <catch2/catch_all.hpp>
 
 #include <cstdlib>
@@ -122,8 +116,7 @@ namespace
             vectors += "{\"type\":" + jsonString(name) +
                        ",\"pssz\":" + jsonString(hex(psio::to_pssz(value))) +
                        ",\"key\":" + jsonString(hex(psio::to_key(value))) +
-                       ",\"ijson\":" + jsonString(psio::to_ijson(value)) +
-                       ",\"frac\":" + jsonString(hex(psio1::convert_to_frac(value))) + "}";
+                       ",\"ijson\":" + jsonString(psio::to_ijson(value)) + "}";
          }
       }
 

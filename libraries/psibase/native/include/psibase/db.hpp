@@ -162,8 +162,8 @@ namespace psibase
 
       struct KVResult
       {
-         psio1::input_stream key;
-         psio1::input_stream value;
+         std::span<const char> key;
+         std::span<const char> value;
       };
 
       struct Session
@@ -251,17 +251,17 @@ namespace psibase
       // TODO: kvPutRaw, kvRemoveRaw: return deltas
       // TODO: getters: pass in input buffers instead of returning KVResult
 
-      void kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value);
-      void kvRemoveRaw(DbId db, psio1::input_stream key);
-      std::optional<psio1::input_stream> kvGetRaw(DbId db, psio1::input_stream key);
+      void kvPutRaw(DbId db, std::span<const char> key, std::span<const char> value);
+      void kvRemoveRaw(DbId db, std::span<const char> key);
+      std::optional<std::span<const char>> kvGetRaw(DbId db, std::span<const char> key);
       /// Whether the key exists. Recorded as a read like kvGetRaw, without
       /// copying the value.
-      bool kvContains(DbId db, psio1::input_stream key);
+      bool kvContains(DbId db, std::span<const char> key);
       std::optional<KVResult>           kvGreaterEqualRaw(DbId               db,
-                                                          psio1::input_stream key,
+                                                          std::span<const char> key,
                                                           size_t             matchKeySize);
-      std::optional<KVResult> kvLessThanRaw(DbId db, psio1::input_stream key, size_t matchKeySize);
-      std::optional<KVResult> kvMaxRaw(DbId db, psio1::input_stream key);
+      std::optional<KVResult> kvLessThanRaw(DbId db, std::span<const char> key, size_t matchKeySize);
+      std::optional<KVResult> kvMaxRaw(DbId db, std::span<const char> key);
 
       template <typename K, typename V>
       auto kvPut(DbId db, const K& key, const V& value)
@@ -282,7 +282,7 @@ namespace psibase
          auto s = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!s)
             return std::nullopt;
-         return psio::from_pssz<V>(psio::trusted{std::span<const char>{s->pos, s->end}});
+         return psio::from_pssz<V>(psio::trusted{std::span<const char>{*s}});
       }
 
       template <typename V, typename K>

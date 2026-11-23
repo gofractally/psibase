@@ -60,9 +60,9 @@ namespace psibase
       return getResult(raw::call(action, len, flags));
    }
 
-   std::vector<char> call(psio1::input_stream action, CallFlags flags)
+   std::vector<char> call(std::span<const char> action, CallFlags flags)
    {
-      return getResult(raw::call(action.pos, action.remaining(), flags));
+      return getResult(raw::call(action.data(), action.size(), flags));
    }
 
    std::vector<char> call(const Action& action, CallFlags flags)

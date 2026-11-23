@@ -98,12 +98,12 @@ namespace psibase::net
          return true;
       }
       template <typename T>
-      void try_recv_impl(peer_id peer, psio1::input_stream& s)
+      void try_recv_impl(peer_id peer, std::span<const char> s)
       {
          try
          {
             using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
-            return derived().recv(peer, psio::from_pssz<message_type>({s.pos, s.end}));
+            return derived().recv(peer, psio::from_pssz<message_type>(s));
          }
          catch (std::exception& e)
          {
@@ -114,7 +114,7 @@ namespace psibase::net
       template <template <typename...> class L, typename... T>
       void recv_impl(peer_id peer, int key, std::vector<char>&& msg, L<T...>*)
       {
-         psio1::input_stream s(msg.data() + 1, msg.size() - 1);
+         std::span<const char> s(msg.data() + 1, msg.size() - 1);
          ((key == T::type ? try_recv_impl<T>(peer, s) : (void)0), ...);
       }
       void recv(peer_id peer, std::vector<char>&& msg)
@@ -136,15 +136,15 @@ namespace psibase::net
          return result;
       }
       template <typename T, typename F>
-      void handle_message_impl(psio1::input_stream& s, F&& f)
+      void handle_message_impl(std::span<const char> s, F&& f)
       {
          using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
-         f(psio::from_pssz<message_type>({s.pos, s.end}));
+         f(psio::from_pssz<message_type>(s));
       }
       template <typename F, template <typename...> class L, typename... T>
       void handle_message_impl(int key, const std::vector<char>& msg, F&& f, L<T...>*)
       {
-         psio1::input_stream s(msg.data() + 1, msg.size() - 1);
+         std::span<const char> s(msg.data() + 1, msg.size() - 1);
          ((key == T::type ? handle_message_impl<T>(s, f) : (void)0), ...);
       }
       template <typename F>

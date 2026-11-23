@@ -494,7 +494,7 @@ namespace
             block.db.kvPut(row.db, row.key(), row);
             psibase::setCode(
                 block.db, account, 0, 0,
-                psio1::input_stream(reinterpret_cast<const char*>(code.data()), code.size()));
+                std::span<const char>(reinterpret_cast<const char*>(code.data()), code.size()));
          }
       }
       psibase::Action action(std::uint64_t sender = 0) const
@@ -595,7 +595,7 @@ TEST_CASE("Native config writes reject VM limits that cannot be instantiated")
          CHECK_THROWS(host.kvPut(handle, key, psio::to_pssz(invalid)));
          auto retained = fixture.block.db.kvGetRaw(psibase::DbId::native, key);
          REQUIRE(retained.has_value());
-         CHECK(std::ranges::equal(std::span(retained->pos, retained->end), expected));
+         CHECK(std::ranges::equal(*retained, expected));
       }
    }
 }

@@ -721,7 +721,7 @@ namespace psibase
       std::uint32_t nativeHandle() const { return id; }
 
       /// Get a key-value pair, if any
-      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio1::input_stream key);
+      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, std::span<const char> key);
 
       /// Get a key-value pair, if any
       template <typename V, typename K>
@@ -742,7 +742,7 @@ namespace psibase
       }
 
       std::optional<std::vector<char>> kvGreaterEqualRaw(DbId               db,
-                                                         psio1::input_stream key,
+                                                         std::span<const char> key,
                                                          uint32_t           matchKeySize);
 
       template <typename V, typename K>
@@ -754,7 +754,7 @@ namespace psibase
          return psio::from_pssz<V>(*v);
       }
 
-      void kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value);
+      void kvPutRaw(DbId db, std::span<const char> key, std::span<const char> value);
 
       template <typename K, typename V>
       void kvPut(DbId db, const K& key, const V& value)

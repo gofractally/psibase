@@ -781,8 +781,8 @@ namespace psibase
             {
                if (auto row = database.kvGreaterEqualRaw(currentDb, currentKey, 0))
                {
-                  auto key   = std::vector<char>{row->key.pos, row->key.end};
-                  auto value = std::vector<char>{row->value.pos, row->value.end};
+                  auto key   = std::vector<char>(row->key.begin(), row->key.end());
+                  auto value = std::vector<char>(row->value.begin(), row->value.end());
                   currentKey = key;
                   totalSize += key.size() + value.size() + 16;
                   rows.push_back({std::move(key), std::move(value)});
@@ -1418,7 +1418,7 @@ namespace psibase
          for (auto row = db.kvMaxRaw(DbId::nativeSubjective, key); row;
               row      = db.kvLessThanRaw(DbId::nativeSubjective, key, prefixLen))
          {
-            std::span<const char> bytes{row->value.pos, row->value.end};
+            std::span<const char> bytes = row->value;
             if (!psio::validate_pssz<SnapshotRow>(bytes).ok())
                throw std::runtime_error("SnapshotRow has invalid format");
             auto value = psio::pssz_view<SnapshotRow>(bytes);
@@ -1446,7 +1446,7 @@ namespace psibase
                    << "Snapshot " << loggers::to_string(value.id().unpack())
                    << " cannot be sent, because its checksum is not available";
             }
-            key.assign(row->key.pos, row->key.end);
+            key.assign(row->key.begin(), row->key.end());
          }
          return Checksum256{};
       }

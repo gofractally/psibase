@@ -92,8 +92,8 @@ namespace psibase
                next = 0;
                return {};
             }
-            std::vector<char> key(kv->key.pos, kv->key.end);
-            std::vector<char> runData(kv->value.pos, kv->value.end);
+            std::vector<char> key(kv->key.begin(), kv->key.end());
+            std::vector<char> runData(kv->value.begin(), kv->value.end());
             if (!psio::validate_pssz<RunRow>(runData).ok())
             {
                search_key = std::move(key);
@@ -127,15 +127,15 @@ namespace psibase
             return {};
          if (auto row = db.kvGetRaw(TimerRow::db, psio::encode(psio::key{}, timerKey())))
          {
-            if (psio::validate_pssz<TimerRow>(std::span(row->pos, row->end)).ok())
+            if (psio::validate_pssz<TimerRow>(*row).ok())
             {
-               auto view       = psio::pssz_view<TimerRow>(std::span<const char>(row->pos, row->end));
+               auto view       = psio::pssz_view<TimerRow>(*row);
                auto expiration = saturatingCast<std::chrono::steady_clock::time_point>(
                    view.expiration().unpack());
                if (expiration < std::chrono::steady_clock::now())
                {
                   timerRunning = true;
-                  return {this, std::vector(row->pos, row->end), Item::Kind::timer};
+                  return {this, std::vector(row->begin(), row->end()), Item::Kind::timer};
                }
                else
                {

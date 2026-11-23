@@ -165,7 +165,7 @@ namespace psibase
           db.kvGetRaw(NotifyRow::db, psio::encode(psio::key{}, notifyKey(NotifyType::acceptBlock)));
       if (!notifyData)
          return;
-      auto notifySpan = std::span{notifyData->pos, notifyData->end};
+      auto notifySpan = std::span<const char>{*notifyData};
       if (!psio::validate_pssz<NotifyRow>(notifySpan).ok())
          return;
 
@@ -208,7 +208,7 @@ namespace psibase
           db.kvGetRaw(NotifyRow::db, psio::encode(psio::key{}, notifyKey(notifyType)));
       if (!notifyData)
          return;
-      auto notifySpan = std::span{notifyData->pos, notifyData->end};
+      auto notifySpan = std::span<const char>{*notifyData};
       if (!psio::validate_pssz<NotifyRow>(notifySpan).ok())
          return;
 

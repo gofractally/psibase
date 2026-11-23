@@ -353,7 +353,7 @@ int event_connect(sqlite3*           db,
       return SQLITE_ERROR;
    auto                vtab = std::make_unique<EventVTab>(event_db, service, event, type);
    std::vector<char>   index;
-   psio1::vector_stream stream{index};
+   psio::vector_stream stream{index};
    stream.write("CREATE TABLE e(", 15);
    getColumns(*vtab->rowType, stream);
    stream.write(")", 2);

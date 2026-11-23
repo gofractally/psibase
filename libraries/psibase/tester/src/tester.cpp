@@ -834,25 +834,25 @@ std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
 }
 
 std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId      db,
-                                                              psio1::input_stream key)
+                                                              std::span<const char> key)
 {
-   auto size = tester::raw::kvGet(id, db, key.pos, key.remaining());
+   auto size = tester::raw::kvGet(id, db, key.data(), key.size());
    if (size == -1)
       return std::nullopt;
    return psibase::getResult(size);
 }
 
 std::optional<std::vector<char>> psibase::TestChain::kvGreaterEqualRaw(DbId               db,
-                                                                       psio1::input_stream key,
+                                                                       std::span<const char> key,
                                                                        uint32_t matchKeySize)
 {
-   auto size = tester::raw::kvGreaterEqual(id, db, key.pos, key.remaining(), matchKeySize);
+   auto size = tester::raw::kvGreaterEqual(id, db, key.data(), key.size(), matchKeySize);
    if (size == -1)
       return std::nullopt;
    return psibase::getResult(size);
 }
 
-void psibase::TestChain::kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value)
+void psibase::TestChain::kvPutRaw(DbId db, std::span<const char> key, std::span<const char> value)
 {
-   tester::raw::kvPut(id, db, key.pos, key.remaining(), value.pos, value.remaining());
+   tester::raw::kvPut(id, db, key.data(), key.size(), value.data(), value.size());
 }

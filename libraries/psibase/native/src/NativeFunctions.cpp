@@ -57,7 +57,7 @@ namespace psibase
          bool refundable;
       };
 
-      Writable getDbWrite(NativeFunctions& self, DbId db, psio1::input_stream key)
+      Writable getDbWrite(NativeFunctions& self, DbId db, std::span<const char> key)
       {
          if (db == DbId::subjective || db == DbId::session || db == DbId::temporary ||
              db == DbId::nativeSubjective || db == DbId::nativeSession)
@@ -79,23 +79,23 @@ namespace psibase
                                   "), or must use another intrinsic");
       }
 
-      void verifyStatusRow(psio1::input_stream                key,
-                           psio1::input_stream                value,
-                           std::optional<psio1::input_stream> oldValue)
+      void verifyStatusRow(std::span<const char>                key,
+                           std::span<const char>                value,
+                           std::optional<std::span<const char>> oldValue)
       {
-         check(psio::validate_strict<StatusRow>(psio::pssz{}, {value.pos, value.end}).ok(),
+         check(psio::validate_strict<StatusRow>(psio::pssz{}, value).ok(),
                "StatusRow has invalid format");
          // TODO: Verify that only nextConsensus has changed
          auto expectedKey = psio::to_key(statusKey());
-         check(key.remaining() == expectedKey.size() &&
-                   !std::memcmp(key.pos, expectedKey.data(), key.remaining()),
+         check(key.size() == expectedKey.size() &&
+                   !std::memcmp(key.data(), expectedKey.data(), key.size()),
                "StatusRow has incorrect key");
       }
 
       void verifyCodeRow(TransactionContext&               ctx,
-                         psio1::input_stream                key,
-                         psio1::input_stream                value,
-                         std::optional<psio1::input_stream> oldValue)
+                         std::span<const char>                key,
+                         std::span<const char>                value,
+                         std::optional<std::span<const char>> oldValue)
       {
          check(psio::validate_strict<CodeRow>(psio::pssz{}, value).ok(), "CodeRow has invalid format");
          auto code      = psio::pssz_view<CodeRow>(value);
@@ -116,14 +116,14 @@ namespace psibase
          }
          //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), 1);
          auto expected_key = psio::to_key(codeKey(code.codeNum()));
-         check(key.remaining() == expected_key.size() &&
-                   !std::memcmp(key.pos, expected_key.data(), key.remaining()),
+         check(key.size() == expected_key.size() &&
+                   !std::memcmp(key.data(), expected_key.data(), key.size()),
                "CodeRow has incorrect key");
       }
 
       void verifyRemoveCodeRow(TransactionContext& ctx,
-                               psio1::input_stream  key,
-                               psio1::input_stream  value)
+                               std::span<const char>  key,
+                               std::span<const char>  value)
       {
          auto code = psio::pssz_view<CodeRow>(value);
          if (code.flags() & CodeRow::isVerify)
@@ -133,34 +133,34 @@ namespace psibase
          //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), -1);
       }
 
-      void verifyCodeByHashRow(psio1::input_stream key, psio1::input_stream value)
+      void verifyCodeByHashRow(std::span<const char> key, std::span<const char> value)
       {
-         check(psio::validate_strict<CodeByHashRow>(psio::pssz{}, {value.pos, value.end}).ok(),
+         check(psio::validate_strict<CodeByHashRow>(psio::pssz{}, value).ok(),
                "CodeByHashRow has invalid format");
          // TODO: use a view here instead of unpacking to a rich object
          auto code =
-             psio::from_pssz<CodeByHashRow>(psio::trusted{std::span{value.pos, value.end}});
+             psio::from_pssz<CodeByHashRow>(psio::trusted{value});
          auto codeHash = sha256(code.code.data(), code.code.size());
          check(code.codeHash == codeHash, "CodeByHashRow has incorrect codeHash");
          auto expected_key = psio::to_key(code.key());
-         check(key.remaining() == expected_key.size() &&
-                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+         check(key.size() == expected_key.size() &&
+                   !memcmp(key.data(), expected_key.data(), key.size()),
                "CodeByHashRow has incorrect key");
       }
 
       void compileStoredCode(TransactionContext& context,
-                             psio1::input_stream  key,
-                             psio1::input_stream  value)
+                             std::span<const char>  key,
+                             std::span<const char>  value)
       {
          NativeTableNum table;
-         if (key.remaining() < sizeof(table))
+         if (key.size() < sizeof(table))
             return;
-         memcpy(&table, key.pos, sizeof(table));
+         memcpy(&table, key.data(), sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table != codeByHashTable)
             return;
          auto code = psio::pssz_view<CodeByHashRow>(
-             std::span{value.pos, value.end});
+             value);
          if (code.vmType() != 0)
             return;
          std::span<const char> bytes = psio::bytes(code.code());
@@ -170,22 +170,22 @@ namespace psibase
       }
 
       void verifyRemoveCodeByHashRow(TransactionContext& ctx,
-                                     psio1::input_stream  key,
-                                     psio1::input_stream  value)
+                                     std::span<const char>  key,
+                                     std::span<const char>  value)
       {
          auto code = psio::pssz_view<CodeByHashRow>(value);
          ctx.blockContext.removedCode.insert(
              codeByHashKey(code.codeHash(), code.vmType(), code.vmVersion()));
       }
 
-      void verifyConfigRow(psio1::input_stream key, psio1::input_stream value)
+      void verifyConfigRow(std::span<const char> key, std::span<const char> value)
       {
-         check(psio::validate_strict<ConfigRow>(psio::pssz{}, {value.pos, value.end}).ok(),
+         check(psio::validate_strict<ConfigRow>(psio::pssz{}, value).ok(),
                "ConfigRow has invalid format");
-         auto row = psio::from_pssz<ConfigRow>(psio::trusted{std::span{value.pos, value.end}});
+         auto row = psio::from_pssz<ConfigRow>(psio::trusted{value});
          auto expected_key = psio::to_key(row.key());
-         check(key.remaining() == expected_key.size() &&
-                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+         check(key.size() == expected_key.size() &&
+                   !memcmp(key.data(), expected_key.data(), key.size()),
                "ConfigRow has incorrect key");
 
          // Both of these are on the conservative side for the storage engine. The actual
@@ -200,36 +200,36 @@ namespace psibase
       }
 
       void verifyWasmConfigRow(NativeTableNum     table,
-                               psio1::input_stream key,
-                               psio1::input_stream value)
+                               std::span<const char> key,
+                               std::span<const char> value)
       {
-         check(psio::validate_strict<WasmConfigRow>(psio::pssz{}, {value.pos, value.end}).ok(),
+         check(psio::validate_strict<WasmConfigRow>(psio::pssz{}, value).ok(),
                "WasmConfigRow has invalid format");
          auto row =
-             psio::from_pssz<WasmConfigRow>(psio::trusted{std::span{value.pos, value.end}});
+             psio::from_pssz<WasmConfigRow>(psio::trusted{value});
          auto expected_key = psio::to_key(row.key(table));
-         check(key.remaining() == expected_key.size() &&
-                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+         check(key.size() == expected_key.size() &&
+                   !memcmp(key.data(), expected_key.data(), key.size()),
                "WasmConfigRow has incorrect key");
          // Reject an unusable execution policy while the privileged write can
          // still fail, rather than accepting a row that prevents its repair.
          static_cast<void>(NativeVMOptions{row.vmOptions});
       }
 
-      void verifyNotifyTableRow(psio1::input_stream key, psio1::input_stream value)
+      void verifyNotifyTableRow(std::span<const char> key, std::span<const char> value)
       {
          // The notifyTable is only processed subjectively
       }
 
       void verifySubjectiveNotifyTableRow(Database&          db,
-                                          psio1::input_stream key,
-                                          psio1::input_stream value)
+                                          std::span<const char> key,
+                                          std::span<const char> value)
       {
          // The notifyTable is only processed subjectively
-         if (psio::validate_pssz<NotifyRow>({value.pos, value.end}).ok())
+         if (psio::validate_pssz<NotifyRow>(value).ok())
          {
             auto row =
-                psio::pssz_view<NotifyRow>(std::span{value.pos, value.end});
+                psio::pssz_view<NotifyRow>(value);
             if (row.type() == NotifyType::nextTransaction)
             {
                db.setCallbackFlags(DatabaseCallbacks::nextTransactionFlag);
@@ -237,52 +237,52 @@ namespace psibase
          }
       }
 
-      void verifySubjectiveCodeRow(psio1::input_stream key, psio1::input_stream value)
+      void verifySubjectiveCodeRow(std::span<const char> key, std::span<const char> value)
       {
          check(psio::validate_strict<CodeRow>(psio::pssz{}, value).ok(), "CodeRow has invalid format");
          auto code         = psio::pssz_view<CodeRow>(value);
          auto expected_key = psio::to_key(codeKey(code.codeNum()));
-         check(key.remaining() == expected_key.size() &&
-                   !std::memcmp(key.pos, expected_key.data(), key.remaining()),
+         check(key.size() == expected_key.size() &&
+                   !std::memcmp(key.data(), expected_key.data(), key.size()),
                "CodeRow has incorrect key");
       }
 
       void verifySubjectiveRunTableRow(Database&          db,
-                                       psio1::input_stream key,
-                                       psio1::input_stream value)
+                                       std::span<const char> key,
+                                       std::span<const char> value)
       {
          // The runTable is only processed subjectively
-         if (psio::validate_pssz<RunRow>({value.pos, value.end}).ok())
+         if (psio::validate_pssz<RunRow>(value).ok())
          {
             auto row =
-                psio::pssz_view<NotifyRow>(std::span{value.pos, value.end});
+                psio::pssz_view<NotifyRow>(value);
             db.setCallbackFlags(DatabaseCallbacks::runQueueFlag);
          }
       }
 
-      void verifyScheduledSnapshotRow(psio1::input_stream key, psio1::input_stream value)
+      void verifyScheduledSnapshotRow(std::span<const char> key, std::span<const char> value)
       {
-         check(psio::validate_strict<ScheduledSnapshotRow>(psio::pssz{}, {value.pos, value.end}).ok(),
+         check(psio::validate_strict<ScheduledSnapshotRow>(psio::pssz{}, value).ok(),
                "ScheduledSnapshotRow has invalid format");
          auto row = psio::from_pssz<ScheduledSnapshotRow>(
-             psio::trusted{std::span{value.pos, value.end}});
+             psio::trusted{value});
          auto expected_key = psio::to_key(row.key());
-         check(key.remaining() == expected_key.size() &&
-                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+         check(key.size() == expected_key.size() &&
+                   !memcmp(key.data(), expected_key.data(), key.size()),
                "ScheduledSnapshotRow has incorrect key");
       }
 
-      void verifySocketRow(TransactionContext& tc, psio1::input_stream key, psio1::input_stream value)
+      void verifySocketRow(TransactionContext& tc, std::span<const char> key, std::span<const char> value)
       {
          auto existing = tc.blockContext.db.kvGetRaw(DbId::nativeSession, key);
          if (!existing)
             abortMessage("Cannot write a new socket");
          auto old = psio::pssz_view<SocketRow>(
-             std::span{existing->pos, existing->end});
-         check(psio::validate_strict<SocketRow>(psio::pssz{}, {value.pos, value.end}).ok(),
+             std::span<const char>{*existing});
+         check(psio::validate_strict<SocketRow>(psio::pssz{}, value).ok(),
                "SocketRow has invalid format");
          auto row =
-             psio::pssz_view<SocketRow>(std::span{value.pos, value.end});
+             psio::pssz_view<SocketRow>(value);
          if (old.fd() != row.fd())
             abortMessage("SocketRow has incorrect key");
 
@@ -306,60 +306,60 @@ namespace psibase
          }
       }
 
-      void verifyEnvRow(psio1::input_stream key, psio1::input_stream value)
+      void verifyEnvRow(std::span<const char> key, std::span<const char> value)
       {
          // Native doesn't do anything with the env table.
       }
 
       void verifyHostConfigRow(TransactionContext& context,
-                               psio1::input_stream  key,
-                               psio1::input_stream  value)
+                               std::span<const char>  key,
+                               std::span<const char>  value)
       {
-         check(psio::validate_pssz<HostConfigRow>({value.pos, value.end}).ok(),
+         check(psio::validate_pssz<HostConfigRow>(value).ok(),
                "HostConfigRow has invalid format");
          auto expected_key = psio::to_key(hostConfigKey());
-         check(key.remaining() == expected_key.size() &&
-                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+         check(key.size() == expected_key.size() &&
+                   !memcmp(key.data(), expected_key.data(), key.size()),
                "HostConfigRow has incorrect key");
          if (auto* callbacks = context.blockContext.systemContext.sharedDatabase.getCallbacks())
          {
             if (callbacks->validateHostConfig)
             {
-               callbacks->validateHostConfig({value.pos, value.end});
+               callbacks->validateHostConfig(value);
             }
          }
          context.blockContext.db.setCallbackFlags(DatabaseCallbacks::hostConfigFlag);
       }
 
       void verifyPendingShutdownRow(TransactionContext& context,
-                                    psio1::input_stream  key,
-                                    psio1::input_stream  value)
+                                    std::span<const char>  key,
+                                    std::span<const char>  value)
       {
-         check(psio::validate_pssz<PendingShutdownRow>({value.pos, value.end}).ok(),
+         check(psio::validate_pssz<PendingShutdownRow>(value).ok(),
                "PendingShutdownRow has invalid format");
          auto expected_key = psio::to_key(pendingShutdownKey());
-         check(key.remaining() == expected_key.size() &&
-                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+         check(key.size() == expected_key.size() &&
+                   !memcmp(key.data(), expected_key.data(), key.size()),
                "PendingShutdownRow has incorrect key");
          context.blockContext.db.setCallbackFlags(DatabaseCallbacks::shutdownFlag);
       }
 
-      void verifyTimerRow(Database& db, psio1::input_stream key, psio1::input_stream value)
+      void verifyTimerRow(Database& db, std::span<const char> key, std::span<const char> value)
       {
-         if (psio::validate_pssz<TimerRow>({value.pos, value.end}).ok())
+         if (psio::validate_pssz<TimerRow>(value).ok())
          {
             db.setCallbackFlags(DatabaseCallbacks::runQueueFlag);
          }
       }
 
       void verifyWriteConstrained(TransactionContext&               context,
-                                  psio1::input_stream                key,
-                                  psio1::input_stream                value,
-                                  std::optional<psio1::input_stream> existing)
+                                  std::span<const char>                key,
+                                  std::span<const char>                value,
+                                  std::optional<std::span<const char>> existing)
       {
          NativeTableNum table;
-         check(key.remaining() >= sizeof(table), "Unrecognized key in nativeConstrained");
-         memcpy(&table, key.pos, sizeof(table));
+         check(key.size() >= sizeof(table), "Unrecognized key in nativeConstrained");
+         memcpy(&table, key.data(), sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == statusTable)
             verifyStatusRow(key, value, existing);
@@ -379,11 +379,11 @@ namespace psibase
             throw std::runtime_error("Unrecognized key in nativeConstrained");
       }
 
-      void verifyWriteSubjective(Database& db, psio1::input_stream key, psio1::input_stream value)
+      void verifyWriteSubjective(Database& db, std::span<const char> key, std::span<const char> value)
       {
          NativeTableNum table;
-         check(key.remaining() >= sizeof(table), "Unrecognized key in nativeSubjective");
-         memcpy(&table, key.pos, sizeof(table));
+         check(key.size() >= sizeof(table), "Unrecognized key in nativeSubjective");
+         memcpy(&table, key.data(), sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == notifyTable)
             verifySubjectiveNotifyTableRow(db, key, value);
@@ -398,12 +398,12 @@ namespace psibase
       }
 
       void verifyWriteSession(TransactionContext& context,
-                              psio1::input_stream  key,
-                              psio1::input_stream  value)
+                              std::span<const char>  key,
+                              std::span<const char>  value)
       {
          NativeTableNum table;
-         check(key.remaining() >= sizeof(table), "Unrecognized key in nativeSession");
-         memcpy(&table, key.pos, sizeof(table));
+         check(key.size() >= sizeof(table), "Unrecognized key in nativeSession");
+         memcpy(&table, key.data(), sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == socketTable)
             verifySocketRow(context, key, value);
@@ -420,12 +420,12 @@ namespace psibase
       }
 
       void verifyRemoveConstrained(TransactionContext& context,
-                                   psio1::input_stream  key,
-                                   psio1::input_stream  value)
+                                   std::span<const char>  key,
+                                   std::span<const char>  value)
       {
          NativeTableNum table;
-         check(key.remaining() >= sizeof(table), "Unrecognized key in nativeConstrained");
-         memcpy(&table, key.pos, sizeof(table));
+         check(key.size() >= sizeof(table), "Unrecognized key in nativeConstrained");
+         memcpy(&table, key.data(), sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == codeTable)
             verifyRemoveCodeRow(context, key, value);
@@ -447,12 +447,12 @@ namespace psibase
          return self.result_value.size();
       }
 
-      uint32_t setResult(NativeFunctions& self, const std::optional<psio1::input_stream>& o)
+      uint32_t setResult(NativeFunctions& self, const std::optional<std::span<const char>>& o)
       {
          if (!o)
             return clearResult(self);
          self.result_key.clear();
-         self.result_value.assign(o->pos, o->end);
+         self.result_value.assign(o->begin(), o->end());
          return self.result_value.size();
       }
 
@@ -460,8 +460,8 @@ namespace psibase
       {
          if (!o)
             return clearResult(self);
-         self.result_key.assign(o->key.pos, o->key.end);
-         self.result_value.assign(o->value.pos, o->value.end);
+         self.result_key.assign(o->key.begin(), o->key.end());
+         self.result_value.assign(o->value.begin(), o->value.end());
          return self.result_value.size();
       }
 
@@ -784,7 +784,7 @@ namespace psibase
                    {
                       delta.records -= 1;
                       delta.keyBytes -= fullKey.size();
-                      delta.valueBytes -= existing->remaining();
+                      delta.valueBytes -= existing->size();
                    }
                    // nativeConstrained is both refundable and chargeable
                    if (bucketDb == DbId::native)
@@ -795,7 +795,7 @@ namespace psibase
                                         {value.data(), value.size()});
                    }
                    notifyKvMut(*this, bucketDb, fullKey.size(),
-                               existing ? existing->remaining() : -1, value.size());
+                               existing ? existing->size() : -1, value.size());
                 }
                 else
                 {
@@ -837,12 +837,12 @@ namespace psibase
                               KvResourceKey{code.codeNum, static_cast<std::uint32_t>(bucketDb)});
                           delta.records -= 1;
                           delta.keyBytes -= fullKey.size();
-                          delta.valueBytes -= existing->remaining();
+                          delta.valueBytes -= existing->size();
                           if (bucketDb == DbId::native)
                           {
                              verifyRemoveConstrained(transactionContext, fullKey, *existing);
                           }
-                          notifyKvMut(*this, bucketDb, fullKey.size(), existing->remaining(), -1);
+                          notifyKvMut(*this, bucketDb, fullKey.size(), existing->size(), -1);
                        }
                     }
                     database.kvRemoveRaw(bucketDb, fullKey);
