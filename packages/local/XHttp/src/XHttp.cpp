@@ -80,7 +80,7 @@ namespace
           info);
    }
 
-   std::string getUrl(const HttpRequest&        req,
+   std::string getUrl(const HttpRequestRef&       req,
                       std::int32_t                 socket,
                       std::string_view             rootHost,
                       std::optional<AccountNumber> subdomain = {})
@@ -156,7 +156,7 @@ namespace
       return result;
    }
 
-   void sendNotFound(std::int32_t sock, const HttpRequest& req)
+   void sendNotFound(std::int32_t sock, const HttpRequestRef& req)
    {
       auto reply = error(HttpStatus::notFound, "The resource '" + req.target + "' was not found");
       psibase::socketSend(sock, psio::to_pssz(std::move(reply)));
@@ -288,9 +288,10 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
    if (row)
    {
       // The error callback of a request or handshake takes the reply, if
-      // there is one; the close callback of a websocket takes the socket
-      // alone. (The arguments are packed as the callback declares them: an
-      // argument tuple without its last optional is another tuple.)
+      // there is one, and declares maxDynamicData(0xffffffff): 4-byte
+      // offsets, which (socket, no reply) has here. The close callback of
+      // a websocket takes the socket alone, without a cap: 1-byte offsets.
+      // The two argument lists are different encodings.
       call(Action{.sender  = XHttp::service,
                   .service = row->service,
                   .method  = row->err,
@@ -697,9 +698,9 @@ auto XHttp::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
 extern "C" [[clang::export_name("serve")]] void serve()
 {
    auto act                    = getCurrentActionView();
-   psibase::internal::receiver = act->service().unpack();
+   psibase::internal::receiver = act->service();
 
-   auto [sock, req] = psio::from_pssz<std::tuple<std::int32_t, HttpRequest>>(act->rawData());
+   auto [sock, req] = psio::from_pssz<std::tuple<std::int32_t, HttpRequestRef>>(act->rawData());
 
    auto owned    = Temporary{getReceiver(), KvMode::readWrite}.open<TempPendingRequestTable>();
    auto rootHost = getRootHost(req.host);

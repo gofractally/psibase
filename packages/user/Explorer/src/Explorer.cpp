@@ -38,7 +38,7 @@ struct TransactionAuthChecker
    }
    bool operator()(psio::pssz_view<Action> action) const
    {
-      return (*this)(action.sender().unpack()) || (*this)(action.service().unpack());
+      return (*this)(action.sender()) || (*this)(action.service());
    }
    bool operator()(psio::pssz_view<Transaction> transaction) const
    {
@@ -58,9 +58,9 @@ struct TransactionAuthChecker
 struct ActionQuery
 {
    psio::pssz_view<Action> action;
-   AccountNumber            sender() const { return action.sender().unpack(); }
-   AccountNumber            service() const { return action.service().unpack(); }
-   MethodNumber             method() const { return action.method().unpack(); }
+   AccountNumber            sender() const { return action.sender(); }
+   AccountNumber            service() const { return action.service(); }
+   MethodNumber             method() const { return action.method(); }
    std::string              rawData() const
    {
       std::span<const char> result = action.rawData();
@@ -159,7 +159,7 @@ struct BlockQuery
       {
          for (auto action : transaction.transaction()->actions())
          {
-            ++counts[action.service().unpack()];
+            ++counts[action.service()];
          }
       }
       std::vector<ServiceActionCount> result;

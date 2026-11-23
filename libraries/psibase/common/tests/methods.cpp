@@ -78,6 +78,17 @@ namespace methods_test
    PSIBASE_PUBLIC_EVENT(Ledger::Events::History::noted)
 
    using TransferArgs = std::tuple<AccountNumber, std::string, std::optional<std::int32_t>>;
+
+   // An Action with an appended member
+   struct ActionPlus
+   {
+      AccountNumber              sender;
+      AccountNumber              service;
+      MethodNumber               method;
+      std::vector<char>          rawData;
+      std::optional<std::string> extra;
+      PSIO_REFLECT(ActionPlus, sender, service, method, rawData, extra)
+   };
 }  // namespace methods_test
 
 using namespace methods_test;
@@ -296,7 +307,7 @@ TEST_CASE("methods: dispatch of an action", "[methods][dispatch]")
       retval.clear();
       retvalSet  = false;
       auto act   = action(method, std::move(args));
-      auto index = findAction<Disp>(act->method().unpack());
+      auto index = findAction<Disp>(act->method());
       REQUIRE(index.has_value());
       psibase::detail::ActionTable<Disp>::calls[*index](disp, act);
    };
@@ -364,11 +375,93 @@ TEST_CASE("methods: the bytes of an action", "[methods][transaction]")
       INFO(std::string(status.ok() ? std::string_view{} : status.error().what));
       CHECK(status.ok());
    }
-   // The check a service makes on the action it is handed (a guest
-   // without exceptions cannot use psio::validate_strict for this type).
-   bool unknown = true;
-   CHECK(psio::validate_pssz_compatible<Action>(psio::pssz{}, bytes, unknown).ok());
-   CHECK(!unknown);
+   // The check a service makes on the action it is handed: valid,
+   // canonical, nothing unknown. The same answers natively and in a guest.
+   CHECK(psio::validate_strict<Action>(psio::pssz{}, bytes).ok());
+   {
+      // An appended member this build does not know: compatible, not strict.
+      const auto wider = psio::to_pssz(
+          ActionPlus{AccountNumber{"alice"}, AccountNumber{"ledger"}, MethodNumber{"transfer"}, {1}, "x"});
+      CHECK(psio::validate_pssz<Action>(wider).ok());
+      auto status = psio::validate_strict<Action>(psio::pssz{}, wider);
+      CHECK(!status.ok());
+   }
+}
+
+// A view converts to what it designates when that is trivially copyable and
+// of fixed size, and a view of bytes to a span: no unpack() at a call.
+static_assert(std::is_trivially_copyable_v<AccountNumber>);
+static_assert(std::is_trivially_copyable_v<MethodNumber>);
+static_assert(std::is_trivially_copyable_v<Checksum256>);
+static_assert(std::is_convertible_v<psio::pssz_view<AccountNumber>, AccountNumber>);
+static_assert(std::is_convertible_v<psio::pssz_view<MethodNumber>, MethodNumber>);
+static_assert(std::is_convertible_v<psio::pssz_view<Checksum256>, Checksum256>);
+static_assert(std::is_convertible_v<psio::pssz_view<TimePointSec>, TimePointSec>);
+static_assert(std::is_convertible_v<psio::pssz_view<std::vector<unsigned char>>,
+                                    std::span<const unsigned char>>);
+static_assert(std::is_convertible_v<psio::pssz_view<std::vector<char>>, std::span<const char>>);
+// A conversion that allocates is spelled.
+static_assert(!std::is_convertible_v<psio::pssz_view<std::vector<char>>, std::vector<char>>);
+static_assert(!std::is_convertible_v<psio::pssz_view<Action>, Action>);
+
+TEST_CASE("methods: members of a packed action convert without unpack", "[methods][views]")
+{
+   const Action action{AccountNumber{"alice"}, AccountNumber{"ledger"}, MethodNumber{"transfer"},
+                       {1, 2, 3}};
+   const auto              bytes = psio::to_pssz(action);
+   psio::pssz_view<Action> view{bytes};
+   auto who  = [](AccountNumber a) { return a; };
+   auto what = [](MethodNumber m) { return m; };
+   auto raw  = [](std::span<const char> b) { return b.size(); };
+   CHECK(who(view.sender()) == action.sender);
+   CHECK(what(view.method()) == action.method);
+   CHECK(raw(view.rawData()) == 3);
+   ServiceMethod sm{view.service(), view.method()};
+   CHECK(sm.service == action.service);
+}
+
+// The error callback x-http calls for a request or a handshake:
+// (socket, optional<HttpReply>) under maxDynamicData(0xffffffff), as
+// XProxy::onError and XPeers::errP2P declare it. Under the same cap
+// (socket) alone is that call without a reply; without a cap it is not
+// (1-byte offsets against 4-byte ones).
+namespace methods_test
+{
+   struct ErrorCallbacks
+   {
+      void capped(std::int32_t socket) {}
+      void plain(std::int32_t socket) {}
+      void onError(std::int32_t socket, std::optional<HttpReply> reply) {}
+   };
+   PSIO_REFLECT(ErrorCallbacks,
+                method(capped, socket, maxDynamicData(0xffffffff)),
+                method(plain, socket),
+                method(onError, socket, reply, maxDynamicData(0xffffffff)))
+   using CappedArgs  = psio::reflect<ErrorCallbacks>::method_arg_tuple<0>;
+   using PlainArgs   = psio::reflect<ErrorCallbacks>::method_arg_tuple<1>;
+   using OnErrorArgs = psio::reflect<ErrorCallbacks>::method_arg_tuple<2>;
+}  // namespace methods_test
+static_assert(psio::auto_pssz_width_v<OnErrorArgs> == 4);
+static_assert(psio::auto_pssz_width_v<PlainArgs> == 1);
+static_assert(psio::pssz_evolves_from<CappedArgs, OnErrorArgs>);
+static_assert(!psio::pssz_evolves_from<PlainArgs, OnErrorArgs>);
+
+TEST_CASE("methods: the error callback's argument list keeps its width", "[methods][evolution]")
+{
+   psio::require_pssz_evolves_from<CappedArgs, OnErrorArgs>();
+   const std::int32_t socket = 7;
+   const auto one  = psio::method_args_to_pssz<ErrorCallbacks, 0>(socket);
+   const auto none = psio::method_args_to_pssz<ErrorCallbacks, 2>(socket, std::nullopt);
+   CHECK(one == none);
+   CHECK(psio::to_hex(std::span<const char>{none}) == "0400000007000000");
+   // What x-http packs when a socket closes before a reply.
+   CHECK(psio::to_pssz(std::tuple(socket, std::optional<HttpReply>{})) == none);
+   CHECK(psio::validate_method_args<ErrorCallbacks, 2>(one).ok());
+   // The uncapped one-argument list is another encoding.
+   const auto plain = psio::method_args_to_pssz<ErrorCallbacks, 1>(socket);
+   CHECK(psio::to_hex(std::span<const char>{plain}) == "0407000000");
+   CHECK(!psio::validate_method_args<ErrorCallbacks, 2>(plain).ok());
+   CHECK(!psio::validate_method_args<ErrorCallbacks, 1>(none).ok());
 }
 
 TEST_CASE("methods: a signed transaction holds its transaction packed", "[methods][transaction]")

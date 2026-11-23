@@ -903,8 +903,12 @@ namespace psibase
       /// object replaces it. If the object has any secondary keys which
       /// have the same value as another object, but not the one it's replacing,
       /// then `put` aborts the transaction.
-
+      ///
+      /// `value` is a `T`, something that converts to one, or anything that
+      /// packs as a `T` (`psio::packs_as`): a packed `T`, a view of one, a
+      /// record that refers to its members (views, string views, spans).
       template <typename U = T>
+         requires psio::packs_as<U, T> || std::is_convertible_v<const U&, T>
       void put(const U& value)
       {
          if constexpr (std::is_same_v<U, T>)
@@ -921,12 +925,9 @@ namespace psibase
          {
             putImpl(value, psio::bytes(value));
          }
-         else if constexpr (!std::is_convertible_v<const U&, T>)
+         else if constexpr (psio::packs_as<U, T>)
          {
-            // A record that refers to its members (views, string views,
-            // spans) and packs as a T
             auto serialized = psio::to_pssz(value);
-            check(psio::validate_pssz<T>(serialized).ok(), "value does not pack as the row type");
             putImpl(psio::pssz_view<T>{serialized}, serialized);
          }
          else

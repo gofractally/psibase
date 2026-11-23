@@ -117,7 +117,7 @@ namespace psibase
       };
       auto service{makeService()};
 
-      if (auto index = findAction<Service>(act->method().unpack()))
+      if (auto index = findAction<Service>(act->method()))
          detail::ActionTable<Service>::calls[*index](service, act);
       else
          abortMessage("unknown service action: " + act->method().unpack().str());

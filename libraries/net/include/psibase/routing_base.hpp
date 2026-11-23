@@ -175,7 +175,7 @@ namespace psibase::net
          Claim claim = msg.data->signer().unpack();
          if constexpr (has_block_id<T>)
          {
-            chain().verify(msg.data->block_id().unpack(), {raw.data(), raw.size()}, msg.data->producer().unpack(),
+            chain().verify(msg.data->block_id(), {raw.data(), raw.size()}, msg.data->producer(),
                            claim, msg.signature);
          }
          else

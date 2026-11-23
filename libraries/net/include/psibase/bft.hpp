@@ -590,7 +590,7 @@ namespace psibase::net
             PSIBASE_LOG(logger, debug) << "View change missing message";
             return nullptr;
          }
-         Checksum256       id    = leader_view.best_message->data->best_prepared().unpack();
+         Checksum256       id    = leader_view.best_message->data->best_prepared();
          BlockHeaderState* state = chain().get_state(id);
          if (id == Checksum256{})
          {
@@ -714,16 +714,16 @@ namespace psibase::net
          {
             return nullptr;
          }
-         if (info.best_message->data->best_prepared().unpack() == Checksum256{})
+         if (info.best_message->data->best_prepared() == Checksum256{})
          {
             return chain().get_state(chain().get_block_id(chain().commit_index()));
          }
-         BlockHeaderState* state = chain().get_state(info.best_message->data->best_prepared().unpack());
+         BlockHeaderState* state = chain().get_state(info.best_message->data->best_prepared());
          if (!state)
          {
-            if (getBlockNum(info.best_message->data->best_prepared().unpack()) > chain().commit_index())
+            if (getBlockNum(info.best_message->data->best_prepared()) > chain().commit_index())
             {
-               pendingBlocks.push_back(info.best_message->data->best_prepared().unpack());
+               pendingBlocks.push_back(info.best_message->data->best_prepared());
             }
             return nullptr;
          }
@@ -870,17 +870,17 @@ namespace psibase::net
          }
          for (const auto& msg : pos->second.prepares)
          {
-            if (auto expected = state->producers->getClaim(msg.data->producer().unpack());
+            if (auto expected = state->producers->getClaim(msg.data->producer());
                 expected && expected == msg.data->signer())
             {
-               result.prepares.push_back({msg.data->producer().unpack(), msg.signature});
+               result.prepares.push_back({msg.data->producer(), msg.signature});
             }
             if (result.nextPrepares)
             {
-               if (auto expected = state->nextProducers->getClaim(msg.data->producer().unpack());
+               if (auto expected = state->nextProducers->getClaim(msg.data->producer());
                    expected && expected == msg.data->signer())
                {
-                  result.nextPrepares->push_back({msg.data->producer().unpack(), msg.signature});
+                  result.nextPrepares->push_back({msg.data->producer(), msg.signature});
                }
             }
          }
@@ -1025,7 +1025,7 @@ namespace psibase::net
             return true;
          if (lhs.term() > rhs.term())
             return false;
-         if (is_leader(producers, lhs.term(), lhs.producer().unpack()))
+         if (is_leader(producers, lhs.term(), lhs.producer()))
          {
             return by_best_prepared(lhs) < by_best_prepared(rhs);
          }
@@ -1079,7 +1079,7 @@ namespace psibase::net
 
       bool set_producer_view(int group, const SignedMessage<ViewChangeMessage>& msg)
       {
-         return set_producer_view(group, msg.data->term(), msg.data->producer().unpack(),
+         return set_producer_view(group, msg.data->term(), msg.data->producer(),
                                   msg.data->signer().unpack(),
                                   &msg);
       }
@@ -1309,17 +1309,17 @@ namespace psibase::net
          }
          for (const auto& msg : iter->second.commits)
          {
-            if (auto expected = state->producers->getClaim(msg.data->producer().unpack());
+            if (auto expected = state->producers->getClaim(msg.data->producer());
                 expected && expected == msg.data->signer())
             {
-               result.commits.push_back({msg.data->producer().unpack(), msg.signature});
+               result.commits.push_back({msg.data->producer(), msg.signature});
             }
             if (state->nextProducers)
             {
-               if (auto expected = state->nextProducers->getClaim(msg.data->producer().unpack());
+               if (auto expected = state->nextProducers->getClaim(msg.data->producer());
                    expected && expected == msg.data->signer())
                {
-                  result.nextCommits->push_back({msg.data->producer().unpack(), msg.signature});
+                  result.nextCommits->push_back({msg.data->producer(), msg.signature});
                }
             }
          }
@@ -1546,7 +1546,7 @@ namespace psibase::net
 
       void recv(peer_id peer, const SignedMessage<PrepareMessage>& msg)
       {
-         auto* state = chain().get_state(msg.data->block_id().unpack());
+         auto* state = chain().get_state(msg.data->block_id());
          if (!state)
          {
             return;
@@ -1555,14 +1555,14 @@ namespace psibase::net
          {
             return;
          }
-         validate_producer(state, msg.data->producer().unpack(), msg.data->signer().unpack());
-         do_view_change(msg.data->producer().unpack(), msg.data->signer().unpack(), state->info.header.term);
-         on_prepare(state, msg.data->producer().unpack(), msg);
+         validate_producer(state, msg.data->producer(), msg.data->signer().unpack());
+         do_view_change(msg.data->producer(), msg.data->signer().unpack(), state->info.header.term);
+         on_prepare(state, msg.data->producer(), msg);
          //Base::switch_fork();
       }
       void recv(peer_id peer, const SignedMessage<CommitMessage>& msg)
       {
-         auto* state = chain().get_state(msg.data->block_id().unpack());
+         auto* state = chain().get_state(msg.data->block_id());
          if (!state)
          {
             return;
@@ -1571,9 +1571,9 @@ namespace psibase::net
          {
             return;
          }
-         validate_producer(state, msg.data->producer().unpack(), msg.data->signer().unpack());
-         do_view_change(msg.data->producer().unpack(), msg.data->signer().unpack(), state->info.header.term);
-         on_commit(state, msg.data->producer().unpack(), msg);
+         validate_producer(state, msg.data->producer(), msg.data->signer().unpack());
+         do_view_change(msg.data->producer(), msg.data->signer().unpack(), state->info.header.term);
+         on_commit(state, msg.data->producer(), msg);
          Base::switch_fork();
       }
 

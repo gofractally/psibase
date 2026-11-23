@@ -80,13 +80,13 @@ namespace
             return false;
 
          const EventSchema* type =
-             cache.getSchemaType({}, db, (*row)->service().unpack(), (*row)->type().unpack());
+             cache.getSchemaType({}, db, (*row)->service(), (*row)->type());
          if (!type)
             return true;
 
          // An event whose bytes are not its argument list is not indexed
          psio::pssz_ir::Value value;
-         if (!decodeEvent(*type, (*row)->rawData().unpack(), value))
+         if (!decodeEvent(*type, (*row)->rawData(), value))
             return true;
 
          auto indexes = secondary.getIndex<0>().get(
@@ -95,7 +95,7 @@ namespace
             indexes.emplace(SecondaryIndexRecord{.indexes = std::vector{SecondaryIndexInfo{}}});
          for (const auto& index : indexes->indexes)
          {
-            psio::to_key(EventIndexTable{db, (*row)->service().unpack(), (*row)->type().unpack()}, key);
+            psio::to_key(EventIndexTable{db, (*row)->service(), (*row)->type()}, key);
             psio::to_key(index.indexNum, key);
             for (const auto& column : index.columns())
                columnToKey(*type, value, column, key);
@@ -176,7 +176,7 @@ namespace
                 if (!event || !type)
                    return true;
                 psio::pssz_ir::Value value;
-                if (!decodeEvent(*type, (*event)->rawData().unpack(), value))
+                if (!decodeEvent(*type, (*event)->rawData(), value))
                    return true;
                 for (const auto& column : item.info.columns())
                    columnToKey(*type, value, column, subkey);

@@ -39,9 +39,7 @@ extern "C" void called(AccountNumber this_service, AccountNumber sender)
 {
    psibase::internal::receiver = this_service;
    auto act                    = getCurrentAction();
-   bool unknown = false;
-   check(psio::validate_pssz_compatible<payload>(psio::pssz{}, act.rawData, unknown).ok() && !unknown,
-         "invalid payload");
+   check(psio::validate_strict<payload>(psio::pssz{}, act.rawData).ok(), "invalid payload");
    auto pl = psio::from_pssz<payload>(psio::trusted{act.rawData});
    check(ctors_called == 1, "ctors != 1");
    check(start_called == 1, "start != 1");

@@ -46,7 +46,7 @@ namespace
 
 Invite::Invite(psio::shared_pssz<Action> action)
 {
-   MethodNumber m{action->method().unpack()};
+   MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables(getReceiver(), KvMode::read).open<InitTable>().get({});

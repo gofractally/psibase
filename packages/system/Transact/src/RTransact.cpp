@@ -218,9 +218,9 @@ namespace
       ActionRef operator()(psio::pssz_view<Action> action)
       {
          return {
-             .sender  = action.sender().unpack(),
-             .service = action.service().unpack(),
-             .method  = action.method().unpack(),
+             .sender  = action.sender(),
+             .service = action.service(),
+             .method  = action.method(),
              .rawData = args ? action.rawData() : std::span<const char>{},
          };
       }
@@ -1467,7 +1467,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
             return make400("Proofs and claims must have the same size");
          for (std::size_t i = 0; i < trx.proofs.size(); ++i)
          {
-            Actor<VerifyInterface> verify(RTransact::service, claims[i].service().unpack());
+            Actor<VerifyInterface> verify(RTransact::service, claims[i].service());
             verify.verifySys(sha256(trx.transaction.data(), trx.transaction.size()), claims[i],
                              trx.proofs[i]);
          }

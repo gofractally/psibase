@@ -139,7 +139,9 @@ namespace LocalService
                 method(serveSys, request, socket),
                 method(onConfig),
                 method(onP2P, socket, reply),
-                method(errP2P, socket, reply),
+                // An HTTP reply has no size limit: the 4-byte class, at its top. With the cap
+                // stated, (socket) under the same cap is this call without a reply.
+                method(errP2P, socket, reply, maxDynamicData(0xffffffff)),
                 method(recvP2P, socket, data, flags),
                 method(closeP2P, socket),
                 method(onTimer, timerId))

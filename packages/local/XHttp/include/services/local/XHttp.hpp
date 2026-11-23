@@ -127,6 +127,12 @@ namespace LocalService
       /// The sender must be the owner of the socket.
       ///
       /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
+      ///
+      /// `err` of a request or of a websocket handshake is called with
+      /// `(socket, optional<HttpReply>)` and must be declared
+      /// `method(err, socket, reply, maxDynamicData(0xffffffff))`; `err` of
+      /// an established websocket is called with `(socket)` and is declared
+      /// without a cap.
       void setCallback(std::int32_t          socket,
                        psibase::MethodNumber callback,
                        psibase::MethodNumber err);

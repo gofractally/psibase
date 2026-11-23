@@ -112,10 +112,10 @@ namespace psibase
          bool isAuth = code.flags() & CodeRow::isVerify;
          if (oldIsAuth || isAuth)
          {
-            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum().unpack());
+            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum());
          }
          //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), 1);
-         auto expected_key = psio::to_key(codeKey(code.codeNum().unpack()));
+         auto expected_key = psio::to_key(codeKey(code.codeNum()));
          check(key.remaining() == expected_key.size() &&
                    !std::memcmp(key.pos, expected_key.data(), key.remaining()),
                "CodeRow has incorrect key");
@@ -128,7 +128,7 @@ namespace psibase
          auto code = psio::pssz_view<CodeRow>(value);
          if (code.flags() & CodeRow::isVerify)
          {
-            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum().unpack());
+            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum());
          }
          //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), -1);
       }
@@ -165,7 +165,7 @@ namespace psibase
             return;
          std::span<const char> bytes = psio::bytes(code.code());
          context.blockContext.systemContext.wasmCache.compileAhead(
-             code.codeHash().unpack(), {bytes.data(), bytes.size()},
+             code.codeHash(), {bytes.data(), bytes.size()},
              context.vmOptions(), code.vmVersion());
       }
 
@@ -175,7 +175,7 @@ namespace psibase
       {
          auto code = psio::pssz_view<CodeByHashRow>(value);
          ctx.blockContext.removedCode.insert(
-             codeByHashKey(code.codeHash().unpack(), code.vmType(), code.vmVersion()));
+             codeByHashKey(code.codeHash(), code.vmType(), code.vmVersion()));
       }
 
       void verifyConfigRow(psio1::input_stream key, psio1::input_stream value)
@@ -241,7 +241,7 @@ namespace psibase
       {
          check(psio::validate_strict<CodeRow>(psio::pssz{}, value).ok(), "CodeRow has invalid format");
          auto code         = psio::pssz_view<CodeRow>(value);
-         auto expected_key = psio::to_key(codeKey(code.codeNum().unpack()));
+         auto expected_key = psio::to_key(codeKey(code.codeNum()));
          check(key.remaining() == expected_key.size() &&
                    !std::memcmp(key.pos, expected_key.data(), key.remaining()),
                "CodeRow has incorrect key");

@@ -648,7 +648,7 @@ namespace
       {
          VerifyArgs args{trxId, claim.unpack(), proof};
          Action     act{.sender  = AccountNumber{},
-                        .service = claim.service().unpack(),
+                        .service = claim.service(),
                         .method  = MethodNumber("verifySys"),
                         .rawData = psio::to_pssz(args)};
          if (token && token->success && token->mode == RunMode::verify && token->action == act &&

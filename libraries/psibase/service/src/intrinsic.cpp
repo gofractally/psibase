@@ -34,14 +34,11 @@ namespace psibase
       return psio::from_pssz<Action>(psio::trusted{data});
    }
 
-   // A packed Action with no members this build does not know.
-   // (psio::validate_strict needs exceptions for a type with adapters: in a
-   // guest it reports "unsupported".)
+   // A packed Action: valid, canonical, and with no members this build
+   // does not know.
    static void checkActionFormat(std::span<const char> data)
    {
-      bool unknown = false;
-      check(psio::validate_pssz_compatible<Action>(psio::pssz{}, data, unknown).ok() && !unknown,
-            "invalid action format");
+      check(psio::validate_strict<Action>(psio::pssz{}, data).ok(), "invalid action format");
    }
 
    psio::shared_pssz<Action> getCurrentActionView()

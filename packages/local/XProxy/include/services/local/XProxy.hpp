@@ -59,7 +59,9 @@ namespace LocalService
                 method(serveSys, request, socket),
                 method(onReply, socket, reply),
                 method(onAccept, socket, reply),
-                method(onError, socket, reply),
+                // An HTTP reply has no size limit: the 4-byte class, at its top. With the cap
+                // stated, (socket) under the same cap is this call without a reply.
+                method(onError, socket, reply, maxDynamicData(0xffffffff)),
                 method(recv, socket, data, flags),
                 method(close, socket))
    PSIBASE_REFLECT_TABLES(XProxy, XProxy::Subjective, XProxy::Session)

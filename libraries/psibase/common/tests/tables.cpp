@@ -51,9 +51,45 @@ namespace tables_test
       std::uint32_t          other;
       PSIO_REFLECT(RowRef, id, owner, inner, note, other)
    };
+   // Another record: the note is missing.
+   struct RowWrong
+   {
+      std::uint32_t          id;
+      psibase::AccountNumber owner;
+      psio::pssz_view<Inner> inner;
+      std::uint32_t          other;
+      PSIO_REFLECT(RowWrong, id, owner, inner, other)
+   };
+   // The members of a Row with another integer size.
+   struct RowWide
+   {
+      std::uint64_t          id;
+      psibase::AccountNumber owner;
+      psio::pssz_view<Inner> inner;
+      std::string_view       note;
+      std::uint32_t          other;
+      PSIO_REFLECT(RowWide, id, owner, inner, note, other)
+   };
+   using RowTable = psibase::Table<Row, &Row::id>;
+   template <typename U>
+   concept CanPut = requires(RowTable& table, const U& value) { table.put(value); };
 }  // namespace tables_test
 
 using namespace tables_test;
+
+// What Table<Row>::put accepts is decided when the call is compiled: the
+// row, what packs as one (psio::packs_as), what converts to one.
+static_assert(psio::packs_as<RowRef, Row>);
+static_assert(!psio::packs_as<RowWrong, Row>);
+static_assert(!psio::packs_as<RowWide, Row>);
+static_assert(CanPut<Row>);
+static_assert(CanPut<RowRef>);
+static_assert(CanPut<psio::pssz_view<Row>>);
+static_assert(CanPut<psio::shared_pssz<Row>>);
+static_assert(CanPut<psio::pssz_buffer<Row>>);
+static_assert(!CanPut<RowWrong>);
+static_assert(!CanPut<RowWide>);
+static_assert(!CanPut<Inner>);
 
 // A reflected record in a key is its members, flattened.
 static_assert(std::is_same_v<psibase::flatten_key_t<Inner>, std::tuple<std::uint32_t, std::string>>);

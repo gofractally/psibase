@@ -787,7 +787,7 @@ namespace SystemService
                      bool                      first,
                      bool                      readOnly)
       {
-         auto authService = to<Accounts>().getAuthOf(act.sender().unpack());
+         auto authService = to<Accounts>().getAuthOf(act.sender());
 
          if constexpr (enable_print)
             std::printf("call checkAuthSys on %s for sender account %s\n",
@@ -807,7 +807,7 @@ namespace SystemService
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;
          // This can execute user defined code, so we must set the timer first
-         if (!auth.checkAuthSys(flags, act.sender(), ServiceMethod{act.service().unpack(), act.method().unpack()},
+         if (!auth.checkAuthSys(flags, act.sender(), ServiceMethod{act.service(), act.method()},
                                 claims))
          {
             abortMessage(std::format("Authorization for {} -> {}::{} failed",
@@ -838,7 +838,7 @@ namespace SystemService
    {
       check(trx.actions().size() > 0, "transaction has no actions");
       auto _           = recurse();
-      bool enforceAuth = checkTapos(id, trx.tapos().unpack(), true, false);
+      bool enforceAuth = checkTapos(id, trx.tapos(), true, false);
       if (enforceAuth)
          checkAuth(trx.actions().front(), trx.claims().unpack(), true, true);
       return enforceAuth;
@@ -907,12 +907,9 @@ namespace SystemService
        bool                                                          speculative)
    {
       auto t = arg.bytes();
-      // No members this build does not know: they would be part of the
-      // transaction's id and ignored by its execution.
-      // (psio::validate_strict needs exceptions for this type: in a guest
-      // it reports "unsupported".)
-      bool unknown = false;
-      check(psio::validate_pssz_compatible<Transaction>(psio::pssz{}, t, unknown).ok() && !unknown,
+      // Canonical, and no members this build does not know: they would be
+      // part of the transaction's id and ignored by its execution.
+      check(psio::validate_strict<Transaction>(psio::pssz{}, t).ok(),
             "transaction has invalid format");
       trxData  = t;
       auto trx = psio::pssz_view<Transaction>(t);
@@ -920,7 +917,7 @@ namespace SystemService
 
       check(trx.actions().size() > 0, "transaction has no actions");
 
-      trxSender = trx.actions()[0].sender().unpack();
+      trxSender = trx.actions()[0].sender();
 
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
@@ -957,7 +954,7 @@ namespace SystemService
                if (resMonitoringEnabled())
                {
                   uint64_t      netUsage = t.size();
-                  AccountNumber sender   = act.sender().unpack();
+                  AccountNumber sender   = act.sender();
                   to<VirtualServer>().useNetSys(sender, netUsage);
                }
             }
@@ -1112,7 +1109,7 @@ namespace SystemService
       // forward to r-transact
       auto act         = getCurrentActionPacked();
       auto action      = psio::as_mutable_view(act);
-      action.sender()  = act->service().unpack();
+      action.sender()  = act->service();
       action.service() = RTransact::service;
       action.method()  = MethodNumber{"next"};
       setRetvalBytes(call(act.bytes()));

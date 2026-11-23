@@ -322,8 +322,8 @@ namespace psibase
             PSIBASE_LOG(trxLogger, warning) << "Invalid nextTransaction callback" << std::endl;
             continue;
          }
-         action.service = a.service().unpack();
-         action.method  = a.method().unpack();
+         action.service = a.service();
+         action.method  = a.method();
          SignedTransaction  trx;
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, DbMode::callback()};
@@ -397,8 +397,8 @@ namespace psibase
             PSIBASE_LOG(trxLogger, warning) << "Invalid preverifyTransaction callback" << std::endl;
             continue;
          }
-         action.service = a.service().unpack();
-         action.method  = a.method().unpack();
+         action.service = a.service();
+         action.method  = a.method();
          SignedTransaction  trx;
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, DbMode::callback()};
@@ -517,8 +517,8 @@ namespace psibase
          // Run the continuation
          Action action{
              .sender  = {},
-             .service = row.continuation().service().unpack(),
-             .method  = row.continuation().method().unpack(),
+             .service = row.continuation().service(),
+             .method  = row.continuation().method(),
              .rawData = psio::to_pssz(std::tuple(
                  row.id(), trace, std::optional{std::span(token.data(), token.size())}))};
          TransactionTrace   trace;
@@ -546,8 +546,8 @@ namespace psibase
       try
       {
          auto               session = db.startWrite(writer);
-         psibase::Action    action{.service = row.service().unpack(),
-                                   .method  = row.method().unpack(),
+         psibase::Action    action{.service = row.service(),
+                                   .method  = row.method(),
                                    .rawData = psio::to_pssz(std::tuple())};
          TransactionContext tc{*this, trx, trace, DbMode::rpc()};
          auto&              atrace = trace.actionTraces.emplace_back();

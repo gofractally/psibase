@@ -1559,7 +1559,7 @@ namespace psibase
             else if ((blockNum == commitIndex &&
                       !in_best_chain(ExtendedBlockId{iter->first, blockNum})) ||
                      (blockNum > commitIndex &&
-                      states.find(iter->second->block().header().previous().unpack()) == states.end()))
+                      states.find(iter->second->block().header().previous()) == states.end()))
             {
                msg    = "forked block";
                remove = true;
@@ -1670,7 +1670,7 @@ namespace psibase
             }
             if (auto current_block = get(tmp))
             {
-               tmp = (*current_block)->block().header().previous().unpack();
+               tmp = (*current_block)->block().header().previous();
             }
             else
             {
