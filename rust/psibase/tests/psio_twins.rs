@@ -328,16 +328,16 @@ fn rust_and_cpp_declare_the_same_types() {
     same_schema_and_bytes::<IPV6Address>(&mut f, "IPV6Address", Same);
     same_schema_and_bytes::<IPV4Endpoint>(&mut f, "IPV4Endpoint", Same);
     same_schema_and_bytes::<IPV6Endpoint>(&mut f, "IPV6Endpoint", Same);
-    same_schema_and_bytes::<LocalEndpoint>(&mut f, "LocalEndpoint", RawInCpp);
+    same_schema_and_bytes::<LocalEndpoint>(&mut f, "LocalEndpoint", Same);
     same_schema_and_bytes::<TLSInfo>(&mut f, "TLSInfo", Same);
     same_schema_and_bytes::<ServiceMethod>(&mut f, "ServiceMethod", Same);
     same_key::<ServiceMethod>(&f, "ServiceMethod");
-    same_schema_and_bytes::<EnvRow>(&mut f, "EnvRow", RawInCpp);
+    same_schema_and_bytes::<EnvRow>(&mut f, "EnvRow", Same);
     same_schema_and_bytes::<HostConfigRow>(&mut f, "HostConfigRow", RawInCpp);
     same_schema_and_bytes::<PendingShutdownRow>(&mut f, "PendingShutdownRow", RawInCpp);
     same_schema_and_bytes::<PackageRef>(&mut f, "PackageRef", RawInCpp);
     same_schema_and_bytes::<PackageExport>(&mut f, "PackageExport", RawInCpp);
-    same_schema_and_bytes::<ConsoleTrace>(&mut f, "ConsoleTrace", RawInCpp);
+    same_schema_and_bytes::<ConsoleTrace>(&mut f, "ConsoleTrace", Same);
 
     // Byte sequences behind `Hex<T>`, and the records that hold them.
     same_schema_and_bytes::<Checksum256>(&mut f, "Checksum256", Same);
