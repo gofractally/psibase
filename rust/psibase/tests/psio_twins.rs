@@ -356,41 +356,41 @@ fn rust_and_cpp_declare_the_same_types() {
     same_schema_and_bytes::<Checksum256>(&mut f, "Checksum256", Same);
     same_key::<Checksum256>(&f, "Checksum256");
     same_text::<Checksum256>(&f, "Checksum256");
-    same_schema_and_bytes::<Hex<Vec<u8>>>(&mut f, "Bytes", CharInCpp);
+    same_schema_and_bytes::<Hex<Vec<u8>>>(&mut f, "Bytes", Same);
     same_key::<Hex<Vec<u8>>>(&f, "Bytes");
     same_text::<Hex<Vec<u8>>>(&f, "Bytes");
     same_schema_and_bytes::<Hex<Vec<u8>>>(&mut f, "Octets", Same);
     same_key::<Hex<Vec<u8>>>(&f, "Octets");
     same_text::<Hex<Vec<u8>>>(&f, "Octets");
-    same_schema_and_bytes::<Action>(&mut f, "Action", CharInCpp);
+    same_schema_and_bytes::<Action>(&mut f, "Action", Same);
     same_key::<Action>(&f, "Action");
-    same_schema_and_bytes::<GenesisService>(&mut f, "GenesisService", CharInCpp);
+    same_schema_and_bytes::<GenesisService>(&mut f, "GenesisService", Same);
     same_key::<GenesisService>(&f, "GenesisService");
-    same_schema_and_bytes::<GenesisActionData>(&mut f, "GenesisActionData", RawAndCharInCpp);
+    same_schema_and_bytes::<GenesisActionData>(&mut f, "GenesisActionData", RawInCpp);
     same_key::<GenesisActionData>(&f, "GenesisActionData");
-    same_schema_and_bytes::<Claim>(&mut f, "Claim", CharInCpp);
+    same_schema_and_bytes::<Claim>(&mut f, "Claim", Same);
     same_key::<Claim>(&f, "Claim");
-    same_schema_and_bytes::<Producer>(&mut f, "Producer", CharInCpp);
+    same_schema_and_bytes::<Producer>(&mut f, "Producer", Same);
     same_key::<Producer>(&f, "Producer");
-    same_schema_and_bytes::<CftConsensus>(&mut f, "CftConsensus", CharInCpp);
-    same_schema_and_bytes::<BftConsensus>(&mut f, "BftConsensus", CharInCpp);
+    same_schema_and_bytes::<CftConsensus>(&mut f, "CftConsensus", Same);
+    same_schema_and_bytes::<BftConsensus>(&mut f, "BftConsensus", Same);
     same_schema_and_bytes::<BlockHeaderAuthAccount>(&mut f, "BlockHeaderAuthAccount", Same);
     same_key::<BlockHeaderAuthAccount>(&f, "BlockHeaderAuthAccount");
-    same_schema_and_bytes::<HttpRequest>(&mut f, "HttpRequest", RawAndCharInCpp);
-    same_schema_and_bytes::<HttpReply>(&mut f, "HttpReply", RawAndCharInCpp);
+    same_schema_and_bytes::<HttpRequest>(&mut f, "HttpRequest", RawInCpp);
+    same_schema_and_bytes::<HttpReply>(&mut f, "HttpReply", RawInCpp);
     same_schema_and_bytes::<CodeRow>(&mut f, "CodeRow", Same);
     same_schema_and_bytes::<CodeByHashRow>(&mut f, "CodeByHashRow", Same);
-    same_schema_and_bytes::<BlockDataRow>(&mut f, "BlockDataRow", CharInCpp);
+    same_schema_and_bytes::<BlockDataRow>(&mut f, "BlockDataRow", Same);
     same_schema_and_bytes::<StateChecksum>(&mut f, "StateChecksum", Same);
-    same_schema_and_bytes::<StateSignature>(&mut f, "StateSignature", CharInCpp);
-    same_schema_and_bytes::<SnapshotStateItem>(&mut f, "SnapshotStateItem", CharInCpp);
-    same_schema_and_bytes::<SnapshotRow>(&mut f, "SnapshotRow", CharInCpp);
+    same_schema_and_bytes::<StateSignature>(&mut f, "StateSignature", Same);
+    same_schema_and_bytes::<SnapshotStateItem>(&mut f, "SnapshotStateItem", Same);
+    same_schema_and_bytes::<SnapshotRow>(&mut f, "SnapshotRow", Same);
     borrowed_records_write_the_bytes_of_the_owned_ones(&f);
 
     // Rows whose Rust declaration had fallen behind the C++ one.
     same_schema_and_bytes::<ConfigRow>(&mut f, "ConfigRow", Same);
     same_schema_and_bytes::<LogMessage>(&mut f, "LogMessage", RawInCpp);
-    same_schema_and_bytes::<NotifyRow>(&mut f, "NotifyRow", CharInCpp);
+    same_schema_and_bytes::<NotifyRow>(&mut f, "NotifyRow", Same);
     same_schema_and_bytes::<RunMode>(&mut f, "RunMode", Same);
     same_key::<RunMode>(&f, "RunMode");
     same_text::<RunMode>(&f, "RunMode");
@@ -580,8 +580,8 @@ fn rust_and_cpp_declare_the_same_services() {
     use psibase::services::{auth_delegate, setcode};
     let f = Fixture::load();
 
-    same_interface::<setcode::psio_actions::Tag>(&f, CharInCpp);
-    same_interface::<auth_delegate::psio_actions::Tag>(&f, CharInCpp);
+    same_interface::<setcode::psio_actions::Tag>(&f, Same);
+    same_interface::<auth_delegate::psio_actions::Tag>(&f, Same);
 
     let mut checked = BTreeSet::new();
     macro_rules! arguments {
