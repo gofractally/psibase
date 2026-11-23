@@ -161,11 +161,11 @@ namespace psibase
    };
 
    template <typename T>
-   struct FracPackBody
+   struct PsszBody
    {
       static std::string  contentType() { return "application/octet-stream"; }
       std::vector<char>   body() const { return psio::to_pssz(value); }
-      static FracPackBody unpack(std::vector<char> data) { return {psio::from_pssz<T>(data)}; }
+      static PsszBody unpack(std::vector<char> data) { return {psio::from_pssz<T>(data)}; }
       T                   value;
    };
 

@@ -116,7 +116,7 @@ TEST_CASE("Test login")
    {
       SignedTransaction strx{psio::shared_pssz<Transaction>{trx}};
 
-      auto token = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
+      auto token = t.post<LoginReply>(Transact::service, "/login", PsszBody{std::move(strx)})
                        .access_token;
       auto client = t.http(getUser).auth_bearer(token);
       auto user   = client.get<std::optional<AccountNumber>>("/");
@@ -164,21 +164,21 @@ TEST_CASE("Test login")
    // Missing signature
    {
       SignedTransaction strx{psio::shared_pssz<Transaction>{trx}};
-      auto              reply = t.post(Transact::service, "/login", FracPackBody{std::move(strx)});
+      auto              reply = t.post(Transact::service, "/login", PsszBody{std::move(strx)});
       CHECK(static_cast<int>(reply.status) >= 400);
    }
    // Claim without signature
    {
       SignedTransaction strx{t.signTransaction(trx, {aliceKeys})};
       strx.proofs.clear();
-      auto reply = t.post(Transact::service, "/login", FracPackBody{std::move(strx)});
+      auto reply = t.post(Transact::service, "/login", PsszBody{std::move(strx)});
       CHECK(static_cast<int>(reply.status) >= 400);
    }
    // Correct signature
    {
       SignedTransaction strx{t.signTransaction(trx, {aliceKeys})};
 
-      auto token = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
+      auto token = t.post<LoginReply>(Transact::service, "/login", PsszBody{std::move(strx)})
                        .access_token;
       auto client = t.http(getUser).auth_bearer(token);
       auto user   = client.get<std::optional<AccountNumber>>("/");
@@ -193,7 +193,7 @@ TEST_CASE("Test push_transaction")
    auto httpPush = [&](const SignedTransaction& trx)
    {
       return Result<void>(t.post<TransactionTrace>(
-          Transact::service, "/push_transaction?wait_for=applied", FracPackBody{std::move(trx)}));
+          Transact::service, "/push_transaction?wait_for=applied", PsszBody{std::move(trx)}));
    };
 
    SECTION("No signature")
@@ -228,7 +228,7 @@ TEST_CASE("Test push_transaction")
          trx.proofs[0].clear();
          auto expiration = trx.transaction->tapos().expiration().unpack();
          auto reply      = t.asyncPost(Transact::service, "/push_transaction?wait_for=final",
-                                       FracPackBody{std::move(trx)});
+                                       PsszBody{std::move(trx)});
          // skip to the transaction expiration
          t.startBlock(expiration);
          t.finishBlock();
@@ -240,7 +240,7 @@ TEST_CASE("Test push_transaction")
       {
          trx.proofs.pop_back();
          auto reply = t.post(Transact::service, "/push_transaction?wait_for=applied",
-                             FracPackBody{std::move(trx)});
+                             PsszBody{std::move(trx)});
          CHECK(reply.status == HttpStatus::internalServerError);
          CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
                AuthSig::AuthSig::service);
@@ -249,7 +249,7 @@ TEST_CASE("Test push_transaction")
       {
          trx.proofs.push_back({});
          auto reply = t.post(Transact::service, "/push_transaction?wait_for=applied",
-                             FracPackBody{std::move(trx)});
+                             PsszBody{std::move(trx)});
          CHECK(reply.status == HttpStatus::internalServerError);
          CHECK(t.from(Accounts::service).to<Accounts>().getAuthOf(alice).returnVal() ==
                AuthSig::AuthSig::service);
@@ -277,7 +277,7 @@ TEST_CASE("Test push_transaction")
 
       t.setAutoRun(false);
       auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
-                               FracPackBody{std::move(trx)});
+                               PsszBody{std::move(trx)});
       // Verify signatures
       while (t.runQueueItem())
       {
@@ -336,7 +336,7 @@ TEST_CASE("Test push_transaction")
 
       t.setAutoRun(false);
       auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
-                               FracPackBody{std::move(trx)});
+                               PsszBody{std::move(trx)});
 
       // Count items in queue
       std::size_t                       queueSize = 0;
@@ -398,7 +398,7 @@ TEST_CASE("Test push_transaction")
       do
       {
          replies.push_back(t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
-                                       FracPackBody{trx}));
+                                       PsszBody{trx}));
       } while (t.runQueueItem() && --remaining != 0);
 
       t.runAll();
@@ -452,7 +452,7 @@ TEST_CASE("Test push_transaction")
       {
          t.setAutoRun(false);
          auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
-                                  FracPackBody{strx});
+                                  PsszBody{strx});
          while (t.runQueueItem())
          {
          }
@@ -479,7 +479,7 @@ TEST_CASE("Test firstAuth")
    auto alice = t.addAccount("alice");
    auto trx   = t.signTransaction(
        t.makeTransaction({Action{.sender = alice, .service = AccountNumber{"nop"}}}));
-   auto reply = t.post(Transact::service, "/push_transaction?wait_for=applied", FracPackBody{trx});
+   auto reply = t.post(Transact::service, "/push_transaction?wait_for=applied", PsszBody{trx});
    if (static_cast<int>(reply.status) < 400)
    {
       CHECK(TraceResult{unpackReply<TransactionTrace>(std::move(reply))}.failed(""));
@@ -495,7 +495,7 @@ TEST_CASE("Test stats")
        t.makeTransaction({Action{.sender = alice, .service = AccountNumber{"nop"}}}));
    CHECK(
        Result<void>(t.post<TransactionTrace>(
-                        Transact::service, "/push_transaction?wait_for=applied", FracPackBody{trx}))
+                        Transact::service, "/push_transaction?wait_for=applied", PsszBody{trx}))
            .succeeded());
 
    t.startBlock();
@@ -751,7 +751,7 @@ TEST_CASE("Test transaction size")
       auto post = [&](std::size_t size, std::string_view waitFor = "applied")
       {
          return t.asyncPost(Transact::service, "/push_transaction?wait_for=" + std::string{waitFor},
-                            FracPackBody{makeLargeTransaction(t, alice, size)});
+                            PsszBody{makeLargeTransaction(t, alice, size)});
       };
       // The arguments of the actions in a trace
       auto argumentBytes = [](const TransactionTrace& trace)
@@ -845,7 +845,7 @@ TEST_CASE("Test transaction size")
                                        .service = AccountNumber{"no-such-svc"},
                                        .rawData = std::vector<char>(9 * MiB / 2, 'x')}}));
          auto trace = t.post<TransactionTrace>(
-             Transact::service, "/push_transaction?wait_for=applied", FracPackBody{std::move(trx)});
+             Transact::service, "/push_transaction?wait_for=applied", PsszBody{std::move(trx)});
          CHECK(isReduced(trace));
          CHECK(trace.error.value_or("") != "");
       }
@@ -939,7 +939,7 @@ TEST_CASE("Measure transaction size", "[.measure]")
          auto trx   = makeLargeTransaction(t, alice, size, salt++);
          auto start = std::chrono::steady_clock::now();
          auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
-                                  FracPackBody{std::move(trx)});
+                                  PsszBody{std::move(trx)});
          std::printf("post %zu bytes: ", size);
          if (auto refused = reply.poll())
          {

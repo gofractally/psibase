@@ -831,7 +831,7 @@ std::string psibase::TestChain::login(AccountNumber user, AccountNumber service)
    Transaction       trx{.tapos = tapos, .actions = {loginTransactor.loginSys("psibase.io")}};
    SignedTransaction strx{psio::shared_pssz<Transaction>{trx}};
    auto reply = post<SystemService::LoginReply>(SystemService::Transact::service, "/login",
-                                                FracPackBody{std::move(strx)});
+                                                PsszBody{std::move(strx)});
    return reply.access_token;
 }
 
