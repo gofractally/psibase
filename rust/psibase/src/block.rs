@@ -295,15 +295,15 @@ pub struct BftConsensus {
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, Union)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub enum ConsensusData {
-    CFT(CftConsensus),
-    BFT(BftConsensus),
+    CftConsensus(CftConsensus),
+    BftConsensus(BftConsensus),
 }
 
 impl ConsensusData {
     pub fn producers(&self) -> &Vec<Producer> {
         match self {
-            ConsensusData::CFT(cft) => &cft.producers,
-            ConsensusData::BFT(bft) => &bft.producers,
+            ConsensusData::CftConsensus(cft) => &cft.producers,
+            ConsensusData::BftConsensus(bft) => &bft.producers,
         }
     }
 }

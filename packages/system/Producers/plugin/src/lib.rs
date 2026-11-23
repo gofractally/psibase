@@ -121,14 +121,14 @@ impl ProducersPlugin {
 impl Api for ProducersPlugin {
     fn set_cft_consensus(prods: Vec<String>) -> Result<(), Error> {
         assert!(Client::get_sender() == "config");
-        Self::set_consensus_internal(psibase::ConsensusData::CFT(psibase::CftConsensus {
+        Self::set_consensus_internal(psibase::ConsensusData::CftConsensus(psibase::CftConsensus {
             producers: Self::lookup_candidates(&prods)?,
         }))
     }
 
     fn set_bft_consensus(prods: Vec<String>) -> Result<(), Error> {
         assert!(Client::get_sender() == "config");
-        Self::set_consensus_internal(psibase::ConsensusData::BFT(psibase::BftConsensus {
+        Self::set_consensus_internal(psibase::ConsensusData::BftConsensus(psibase::BftConsensus {
             producers: Self::lookup_candidates(&prods)?,
         }))
     }
