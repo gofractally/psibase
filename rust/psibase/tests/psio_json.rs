@@ -445,3 +445,114 @@ fn package_files() {
     let manifest = r#"{"services":{"tokens":{"flags":[],"server":"r-tokens","schema":null}},"data":[{"account":"tokens","filename":"/index.html"}]}"#;
     assert_eq!(reread::<psibase::PackageManifest>(manifest), manifest);
 }
+
+// ── IP addresses and socket endpoints ───────────────────────────────────────
+
+#[test]
+fn an_ip_address_is_one_string() {
+    use psibase::{IPAddress, IPV4Address, IPV6Address};
+    // The cases of the C++ test "json: an IP address is one string".
+    let v4 = IPAddress::IPV4Address(IPV4Address { bytes: [127, 0, 0, 1] });
+    let mut one = [0u8; 16];
+    one[15] = 1;
+    let v6 = IPAddress::IPV6Address(IPV6Address { bytes: one, zone: 0 });
+    pinned(&v4, r#""127.0.0.1""#);
+    pinned(&v6, r#""::1""#);
+    assert_eq!(psio::from_ijson::<IPAddress>(r#""127.0.0.1""#).unwrap(), v4);
+    assert_eq!(psio::from_ijson::<IPAddress>(r#""::1""#).unwrap(), v6);
+    assert_eq!(reread::<IPAddress>(r#""10.1.2.3""#), r#""10.1.2.3""#);
+    for wrong in [
+        r#""300.1.1.1""#,
+        r#""localhost""#,
+        r#""""#,
+        r#""127.0.0.1:80""#,
+        // The variant's own text is not accepted: the text form replaces it.
+        r#"{"IPV4Address":{"bytes":"7F000001"}}"#,
+        "2130706433",
+    ] {
+        assert!(reread::<IPAddress>(wrong).starts_with("error: "), "{wrong}");
+    }
+    // On the wire it stays the variant.
+    assert_eq!(psio::to_pssz(&v4)[0], 0);
+    assert_eq!(psio::from_pssz::<IPAddress>(&psio::to_pssz(&v6)).unwrap(), v6);
+
+    // The printer and the parser of C++ `SocketInfo.cpp`.
+    let v6 = |text: &str| -> IPAddress { text.parse().unwrap_or_else(|e| panic!("{text}: {e}")) };
+    let bytes = |address: &IPAddress| match address {
+        IPAddress::IPV6Address(a) => a.bytes,
+        IPAddress::IPV4Address(_) => panic!("not IPv6"),
+    };
+    for (text, written) in [
+        ("::", "::"),
+        ("::1", "::1"),
+        ("1::", "1::"),
+        ("2001:db8::1", "2001:db8::1"),
+        ("2001:0DB8:0000:0000:0000:0000:0000:0001", "2001:db8::1"),
+        // The first longest run of zero groups is elided; one group is not.
+        ("1:0:0:2:0:0:0:3", "1:0:0:2::3"),
+        ("1:0:0:2:0:0:3:4", "1::2:0:0:3:4"),
+        ("1:0:2:3:4:5:6:7", "1:0:2:3:4:5:6:7"),
+        ("fe80::1%3", "fe80::1%3"),
+        ("ff02::1:ff00:42", "ff02::1:ff00:42"),
+        // IPv4-mapped.
+        ("::ffff:192.168.1.2", "::ffff:192.168.1.2"),
+        ("::ffff:c0a8:102", "::ffff:192.168.1.2"),
+    ] {
+        assert_eq!(v6(text).to_string(), written, "{text}");
+        assert_eq!(v6(written), v6(text), "{text}");
+    }
+    assert_eq!(bytes(&v6("2001:db8::1"))[..4], [0x20, 0x01, 0x0d, 0xb8]);
+    assert_eq!(bytes(&v6("1::2"))[..2], [0, 1]);
+    assert_eq!(bytes(&v6("1::2"))[14..], [0, 2]);
+    for wrong in [
+        ":", ":::", "1:2", "1:2:3:4:5:6:7", "1:2:3:4:5:6:7:8:9", "1::2::3", "12345::", "g::",
+        "1:2:3:4:5:6:7:8%", "::1%x", "1.2.3", "1.2.3.4.5", "1.2.3.256", " 1.2.3.4", "1.2.3.4 ",
+        "+1.2.3.4", "::1]", "[::1]",
+    ] {
+        assert!(wrong.parse::<IPAddress>().is_err(), "{wrong}");
+    }
+    // Digits as `std::from_chars` reads them: leading zeros are digits.
+    assert_eq!("001.2.3.4".parse::<IPAddress>().unwrap().to_string(), "1.2.3.4");
+}
+
+#[test]
+fn a_socket_endpoint_is_one_string() {
+    use psibase::{IPV4Address, IPV4Endpoint, LocalEndpoint, SocketEndpoint};
+    // The cases of the C++ test "json: a socket endpoint is one string".
+    let v4 = SocketEndpoint::IPV4Endpoint(IPV4Endpoint {
+        address: IPV4Address { bytes: [127, 0, 0, 1] },
+        port: 8080,
+    });
+    let v6: SocketEndpoint = "[::1]:8080".parse().unwrap();
+    assert!(matches!(&v6, SocketEndpoint::IPV6Endpoint(e) if e.port == 8080 && e.address.bytes[15] == 1));
+    let local = |path: &str| SocketEndpoint::LocalEndpoint(LocalEndpoint { path: path.into() });
+    pinned(&v4, r#""127.0.0.1:8080""#);
+    pinned(&v6, r#""[::1]:8080""#);
+    pinned(&local("/run/psinode.sock"), r#""/run/psinode.sock""#);
+    assert_eq!(psio::from_ijson::<SocketEndpoint>(r#""127.0.0.1:8080""#).unwrap(), v4);
+    // Text that is not an IP endpoint is the path of a local socket: no
+    // string is refused.
+    assert_eq!(psio::from_ijson::<SocketEndpoint>(r#""127.0.0.1""#).unwrap(), local("127.0.0.1"));
+    assert_eq!(
+        psio::from_ijson::<SocketEndpoint>(r#""127.0.0.1:99999""#).unwrap(),
+        local("127.0.0.1:99999")
+    );
+    assert_eq!(psio::from_ijson::<SocketEndpoint>(r#""[::1]""#).unwrap(), local("[::1]"));
+    // Anything but a string is.
+    assert!(reread::<SocketEndpoint>("8080").starts_with("error: "));
+    assert!(reread::<SocketEndpoint>(r#"{"LocalEndpoint":{"path":"x"}}"#).starts_with("error: "));
+    // A path without a '/' is written so that it is not read as an address.
+    assert_eq!(psio::to_ijson(&local("sock")), r#""./sock""#);
+    assert_eq!(psio::to_ijson(&local("")), r#""""#);
+    assert_eq!("[fe80::1%2]:443".parse::<SocketEndpoint>().unwrap().to_string(), "[fe80::1%2]:443");
+    // As a member, the optional one null or left out: `x-http::sendRequest`.
+    type Args = psibase::services::x_http::action_structs::sendRequest;
+    let text = r#"{"request":{"host":"h","method":"GET","target":"/","contentType":"","headers":[],"body":""},"tls":null,"endpoint":"127.0.0.1:8080"}"#;
+    assert_eq!(reread::<Args>(text), text);
+    assert_eq!(
+        reread::<Args>(&text.replace(r#","endpoint":"127.0.0.1:8080""#, "")),
+        text.replace(r#""127.0.0.1:8080""#, "null")
+    );
+    // On the wire it stays the variant.
+    assert_eq!(psio::to_pssz(&v4)[0], 0);
+}

@@ -768,11 +768,11 @@ fn private_http_snapshot_rejects_unauthenticated_queries(chain: Chain) -> Result
     );
     let public = chain.get(crate::SERVICE, "/markets")?;
     assert_eq!(public.status, 200);
-    let body: Value = serde_json::from_slice(&public.body.0).unwrap();
+    let body: Value = serde_json::from_slice(&public.body).unwrap();
     assert!(body.get("balances").is_none() && body.get("positions").is_none());
     let catalog = chain.get(crate::SERVICE, "/tokens?after=0&limit=1")?;
     assert_eq!(catalog.status, 200);
-    let body: Value = serde_json::from_slice(&catalog.body.0).unwrap();
+    let body: Value = serde_json::from_slice(&catalog.body).unwrap();
     assert_eq!(body["tokens"].as_array().unwrap().len(), 1);
     Ok(())
 }
@@ -794,9 +794,9 @@ fn recent_trade_feed_is_native_paginated_and_excludes_rejected_actions(
             response.status,
             200,
             "{}",
-            String::from_utf8_lossy(&response.body.0)
+            String::from_utf8_lossy(&response.body)
         );
-        Ok(serde_json::from_slice(&response.body.0)?)
+        Ok(serde_json::from_slice(&response.body)?)
     };
     let newest = read(&format!("/trades?market={}&limit=1", f.market))?;
     assert_eq!(newest["source"], "native-history");

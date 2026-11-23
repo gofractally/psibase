@@ -72,9 +72,9 @@ fn native_candles_hour_day_events_and_five_current_rows_survive_many_days(
             response.status,
             200,
             "{}",
-            String::from_utf8_lossy(&response.body.0)
+            String::from_utf8_lossy(&response.body)
         );
-        let page: Value = serde_json::from_slice(&response.body.0)?;
+        let page: Value = serde_json::from_slice(&response.body)?;
         let rows = page["candles"].as_array().unwrap();
         assert_eq!(
             rows.len(),
@@ -96,7 +96,7 @@ fn native_candles_hour_day_events_and_five_current_rows_survive_many_days(
                     &format!("/candles?market={}&interval={interval}&limit=2", f.market),
                 )?
                 .body
-                .0,
+                ,
         )?;
         let cursor = first["next_before"].as_str().unwrap();
         let second: Value = serde_json::from_slice(
@@ -109,7 +109,7 @@ fn native_candles_hour_day_events_and_five_current_rows_survive_many_days(
                     ),
                 )?
                 .body
-                .0,
+                ,
         )?;
         assert!(second["candles"]
             .as_array()

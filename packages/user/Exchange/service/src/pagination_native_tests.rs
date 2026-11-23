@@ -36,7 +36,7 @@ fn get(chain: &Chain, token: Option<&str>, path: &str) -> Result<Value, Error> {
         response.status,
         200,
         "{path}: {}",
-        String::from_utf8_lossy(&response.body.0)
+        String::from_utf8_lossy(&response.body)
     );
     if token.is_some() {
         assert!(response
@@ -44,7 +44,7 @@ fn get(chain: &Chain, token: Option<&str>, path: &str) -> Result<Value, Error> {
             .iter()
             .any(|h| h.name.eq_ignore_ascii_case("Cache-Control") && h.value == "no-store"));
     }
-    Ok(serde_json::from_slice(&response.body.0)?)
+    Ok(serde_json::from_slice(&response.body)?)
 }
 
 /// Seek cursors are opaque strings; only the market discovery cursor is numeric.
@@ -131,7 +131,7 @@ fn query_samples(chain: &Chain, token: Option<&str>, path: &str, label: &str) ->
         println!(
             "EXCHANGE_PAGE_METRIC {}",
             json!({"scenario":label,"repeat":repeat,
-            "thread_cpu_ns":elapsed.to_string(),"response_bytes":response.body.0.len(),
+            "thread_cpu_ns":elapsed.to_string(),"response_bytes":response.body.len(),
             "note":"Per native HTTP query, includes authentication and response encoding; fixture creation excluded"})
         );
     }

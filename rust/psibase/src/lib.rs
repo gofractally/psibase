@@ -13,6 +13,7 @@ mod flags;
 mod from_bin;
 mod graph_ql;
 mod http;
+mod ip_text;
 pub mod image_content_type;
 #[cfg(not(target_family = "wasm"))]
 mod local_socket;

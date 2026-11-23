@@ -21,7 +21,7 @@ fn native_supervisor_cors_preserves_owner_authority(chain: Chain) -> Result<(), 
             }).unwrap()
     };
     let header = |r: &HttpReply, name: &str| r.headers.iter()
-        .find(|h| h.name.eq_ignore_ascii_case(name)).map(|h| h.value.clone());
+        .find(|h| h.name.eq_ignore_ascii_case(name)).map(|h| h.value.to_string());
     let supervisor = "https://supervisor.psibase.io";
     let preflight = call(supervisor, "OPTIONS", "/snapshot", None);
     assert_eq!(preflight.status, 204);
@@ -31,7 +31,7 @@ fn native_supervisor_cors_preserves_owner_authority(chain: Chain) -> Result<(), 
     let private = call(supervisor, "GET", "/snapshot", Some(account!("alice")));
     assert_eq!(private.status, 200);
     assert_eq!(header(&private, "Cache-Control").as_deref(), Some("no-store"));
-    let body: Value = serde_json::from_slice(&private.body.0)?;
+    let body: Value = serde_json::from_slice(&private.body)?;
     assert_eq!(body["owner"], "alice");
     assert_eq!(call(supervisor, "GET", "/snapshot?owner=bob", Some(account!("alice"))).status, 403);
     assert_eq!(call(supervisor, "GET", "/snapshot", None).status, 403);

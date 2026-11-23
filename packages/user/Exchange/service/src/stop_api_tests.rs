@@ -17,12 +17,12 @@ fn stop_private_pages_and_point_reads_are_authenticated_owner_only(
     let token = chain.login(account!("alice"), crate::SERVICE)?;
     let get = |path: &str| -> Result<Value, Error> {
         let r = chain.get_auth(crate::SERVICE, path, &token)?;
-        assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body.0));
+        assert_eq!(r.status, 200, "{}", String::from_utf8_lossy(&r.body));
         assert!(r
             .headers
             .iter()
             .any(|h| h.name.eq_ignore_ascii_case("Cache-Control") && h.value == "no-store"));
-        Ok(serde_json::from_slice(&r.body.0)?)
+        Ok(serde_json::from_slice(&r.body)?)
     };
     let page = get("/stops?owner=alice&limit=1")?;
     assert_eq!(page["stop_positions"].as_array().unwrap().len(), 1);
@@ -85,7 +85,7 @@ fn stop_private_pages_and_point_reads_are_authenticated_owner_only(
                 &format!("/trades?market={}&limit=10", f.market),
             )?
             .body
-            .0,
+            ,
     )?;
     let executions = tape["trades"].as_array().unwrap();
     assert!(executions.iter().any(|r| r["kind"] == "stop"));
