@@ -88,8 +88,9 @@ impl FromStr for Decimal {
 
         let precision: u8 = match s.split_once('.') {
             // More digits than a `u8` counts is more than any precision.
-            Some((_, fraction_part)) => u8::try_from(fraction_part.len())
-                .map_err(|_| TokensError::PrecisionOverflow)?,
+            Some((_, fraction_part)) => {
+                u8::try_from(fraction_part.len()).map_err(|_| TokensError::PrecisionOverflow)?
+            }
             None => 0,
         };
         let precision: Precision = precision.try_into()?;

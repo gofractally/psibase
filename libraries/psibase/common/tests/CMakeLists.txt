@@ -10,7 +10,11 @@ if(DEFINED IS_NATIVE)
     set_target_properties(psibase-common-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
     native_test(psibase-common-tests)
 
-    add_executable(psibase-psio-tests psio.cpp leaf_types.cpp methods.cpp wrappers.cpp tables.cpp)
+    # rust_twins.cpp is native only: it compares the fixture that the Rust
+    # tests read (rust/psibase/tests/psio_twins.rs) with the C++ declarations.
+    add_executable(psibase-psio-tests psio.cpp leaf_types.cpp methods.cpp wrappers.cpp tables.cpp rust_twins.cpp)
+    target_compile_definitions(psibase-psio-tests PRIVATE
+        PSIBASE_RUST_TWINS_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/rust-twins.json")
     target_link_libraries(psibase-psio-tests psibase Catch2::Catch2WithMain Threads::Threads )
 endif()
 

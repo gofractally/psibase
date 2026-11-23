@@ -38,7 +38,18 @@ impl fmt::Display for ActionTrace {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleTrace {

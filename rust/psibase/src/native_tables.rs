@@ -77,7 +77,19 @@ impl ConfigRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct VMOptions {
     max_mutable_global_bytes: u32,
@@ -86,7 +98,19 @@ pub struct VMOptions {
     max_stack_bytes: u32,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct WasmConfigRow {
     numExecutionMemories: u32,
@@ -177,7 +201,19 @@ impl BlockDataRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ConsensusChangeRow {
     pub start: BlockNum,
@@ -233,7 +269,19 @@ impl SnapshotRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ScheduledSnapshotRow {
     pub blockNum: BlockNum,
@@ -251,7 +299,19 @@ impl ScheduledSnapshotRow {
 }
 
 // If this row is present it indicates the height the block log starts at.
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct LogTruncateRow {
     pub start: BlockNum,
@@ -264,14 +324,40 @@ impl LogTruncateRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+#[psio(definition_will_not_change)]
 pub struct IPV4Address {
     bytes: [u8; 4],
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+#[psio(definition_will_not_change)]
 pub struct IPV6Address {
     bytes: [u8; 16],
     zone: u32,
@@ -284,22 +370,61 @@ pub enum IPAddress {
     IPV6Address(IPV6Address),
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+#[psio(definition_will_not_change)]
 pub struct IPV4Endpoint {
     address: IPV4Address,
     port: u16,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+#[psio(definition_will_not_change)]
 pub struct IPV6Endpoint {
     address: IPV6Address,
     port: u16,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
+#[psio(definition_will_not_change)]
 pub struct LocalEndpoint {
     path: String,
 }
@@ -312,7 +437,19 @@ pub enum SocketEndpoint {
     LocalEndpoint(LocalEndpoint),
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct TLSInfo {}
 
@@ -412,6 +549,11 @@ pub type RunToken = Vec<u8>;
     Deserialize,
     SimpleObject,
     InputObject,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
 )]
 #[fracpack(fracpack_mod = "fracpack", custom = "ServiceMethod")]
 #[to_key(psibase_mod = "crate")]
@@ -444,7 +586,19 @@ impl RunRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct EnvRow {
     pub name: String,
@@ -458,7 +612,19 @@ impl EnvRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct HostConfigRow {
     pub hostVersion: String,
@@ -472,7 +638,19 @@ impl HostConfigRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PendingShutdownRow {
     pub args: String,

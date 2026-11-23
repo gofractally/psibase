@@ -12,10 +12,26 @@ use std::collections::HashMap;
 /// Note: `http-server` aborts when most services set HTTP headers. It only allows services
 /// it trust to set them in order to enforce security rules.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    Pack,
+    Unpack,
+    ToKey,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
+#[psio(definition_will_not_change)]
 pub struct HttpHeader {
     /// Name of header, e.g. "Content-Security-Policy"
     pub name: String,

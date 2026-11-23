@@ -25,7 +25,9 @@ fn memo_is_its_text_in_pssz_and_ijson() {
     assert_eq!(psio::to_ijson(&memo), psio::to_ijson(&text));
     assert_eq!(psio::to_ijson(&memo), "\"h\u{e9}llo\"");
     assert_eq!(
-        psio::from_pssz::<Memo>(&psio::to_pssz(&memo)).unwrap().to_string(),
+        psio::from_pssz::<Memo>(&psio::to_pssz(&memo))
+            .unwrap()
+            .to_string(),
         text
     );
     // In a record it takes the place of a string.
@@ -89,7 +91,9 @@ fn decimal_is_a_record_whose_text_is_the_decimal_number() {
     );
     assert!(psio::validate_pssz::<Decimal>(&psio::to_pssz(&d)).is_ok());
     assert_eq!(
-        psio::from_pssz::<Decimal>(&psio::to_pssz(&d)).unwrap().to_string(),
+        psio::from_pssz::<Decimal>(&psio::to_pssz(&d))
+            .unwrap()
+            .to_string(),
         "123.4567"
     );
     assert!(psio::validate_pssz::<Decimal>(&psio::to_pssz(&(Quantity::new(1), 9u8))).is_err());
@@ -110,7 +114,10 @@ fn decimal_is_a_record_whose_text_is_the_decimal_number() {
         "184467440737.09551615",
     ] {
         assert!(text.parse::<Decimal>().is_ok(), "{text}");
-        assert!(psio::from_ijson::<Decimal>(&format!("\"{text}\"")).is_ok(), "{text}");
+        assert!(
+            psio::from_ijson::<Decimal>(&format!("\"{text}\"")).is_ok(),
+            "{text}"
+        );
     }
     // ...and nothing else.
     for text in [
@@ -150,11 +157,20 @@ fn a_decimal_whose_quantity_does_not_fit_64_bits_is_rejected_not_wrapped() {
         // The largest quantity is read, by every reader, as itself.
         assert_eq!(decimal(u64::MAX, precision).to_string(), largest);
         let read: Decimal = largest.parse().unwrap();
-        assert_eq!((read.quantity.value, read.precision.value()), (u64::MAX, precision));
+        assert_eq!(
+            (read.quantity.value, read.precision.value()),
+            (u64::MAX, precision)
+        );
         let read = psio::from_ijson::<Decimal>(&format!("\"{largest}\"")).unwrap();
-        assert_eq!((read.quantity.value, read.precision.value()), (u64::MAX, precision));
+        assert_eq!(
+            (read.quantity.value, read.precision.value()),
+            (u64::MAX, precision)
+        );
         let read: Decimal = serde_json::from_str(&format!("\"{largest}\"")).unwrap();
-        assert_eq!((read.quantity.value, read.precision.value()), (u64::MAX, precision));
+        assert_eq!(
+            (read.quantity.value, read.precision.value()),
+            (u64::MAX, precision)
+        );
         // One more is not a Decimal.
         assert!(next.parse::<Decimal>().is_err(), "{next} was read");
         assert!(psio::from_ijson::<Decimal>(&format!("\"{next}\"")).is_err());
@@ -186,7 +202,10 @@ fn the_packed_and_json_forms_in_use_are_unchanged() {
     assert_eq!(hex(&Quantity::new(5).packed()), "08000500000000000000");
     // serde, which the services and the CLI use.
     assert_eq!(serde_json::to_string(&Memo::from("hi")).unwrap(), "\"hi\"");
-    assert_eq!(serde_json::to_string(&Precision::new(4).unwrap()).unwrap(), "4");
+    assert_eq!(
+        serde_json::to_string(&Precision::new(4).unwrap()).unwrap(),
+        "4"
+    );
     assert_eq!(serde_json::to_string(&decimal(15, 1)).unwrap(), "\"1.5\"");
     assert_eq!(
         serde_json::to_string(&Quantity::new(5)).unwrap(),

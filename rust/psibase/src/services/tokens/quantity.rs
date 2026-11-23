@@ -139,7 +139,10 @@ mod tests {
         assert!(matches!(read(".", 2), Err(TokensError::InvalidNumber)));
         assert!(matches!(read("1.2.3", 4), Err(TokensError::InvalidNumber)));
         assert!(matches!(read("-1", 0), Err(TokensError::InvalidNumber)));
-        assert!(matches!(read("1.234", 2), Err(TokensError::PrecisionOverflow)));
+        assert!(matches!(
+            read("1.234", 2),
+            Err(TokensError::PrecisionOverflow)
+        ));
     }
 
     /// 2^64 - 1 is the largest quantity at every precision; one unit more is
