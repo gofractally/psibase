@@ -21,8 +21,8 @@ namespace
       auto sockets() const
       {
          checkoutSubjective();
-         auto table =
-             Table<SocketRow, &SocketRow::fd>{SocketRow::db, psio1::convert_to_key(socketTable)};
+         auto table = Table<SocketRow, &SocketRow::fd>{SocketRow::db,
+                                                       psio::encode(psio::key{}, socketTable)};
          return table.getIndex<0>();
       }
    };

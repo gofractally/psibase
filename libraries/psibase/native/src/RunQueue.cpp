@@ -78,8 +78,8 @@ namespace psibase
       };
       Item pop_impl(std::unique_lock<std::mutex>&, Database& db)
       {
-         auto prefix     = psio1::convert_to_key(runPrefix());
-         auto search_key = psio1::convert_to_key(runKey(next));
+         auto prefix     = psio::encode(psio::key{}, runPrefix());
+         auto search_key = psio::encode(psio::key{}, runKey(next));
          while (true)
          {
             auto kv = db.kvGreaterEqualRaw(RunRow::db, search_key, prefix.size());
@@ -101,7 +101,7 @@ namespace psibase
                continue;
             }
             auto row = psio1::view<const RunRow>(psio1::prevalidated{runData});
-            if (psio1::convert_to_key(runKey(row.id())) != key)
+            if (psio::encode(psio::key{}, runKey(row.id())) != key)
             {
                search_key = std::move(key);
                search_key.push_back(0);
@@ -125,7 +125,7 @@ namespace psibase
       {
          if (timerRunning)
             return {};
-         if (auto row = db.kvGetRaw(TimerRow::db, psio1::convert_to_key(timerKey())))
+         if (auto row = db.kvGetRaw(TimerRow::db, psio::encode(psio::key{}, timerKey())))
          {
             if (psio1::fracpack_validate<TimerRow>(std::span(row->pos, row->end)))
             {

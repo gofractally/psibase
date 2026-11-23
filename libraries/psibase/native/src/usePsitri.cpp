@@ -393,8 +393,7 @@ namespace psibase
          else
          {
             tmpKey.clear();
-            psio1::vector_stream stream{tmpKey};
-            psio1::to_key(snapshotKey(id), stream);
+            psio::to_key(snapshotKey(id), tmpKey);
             if (!writer.get(nativeSubjective, tmpKey))
                writer.remove(proposed, key);
          }
@@ -407,7 +406,7 @@ namespace psibase
          // no longer present.
          std::vector<storage::shared_root> roots;
          std::vector<char>                 statusBytes;
-         auto                              sk = psio1::convert_to_key(statusKey());
+         auto                              sk = psio::to_key(statusKey());
          while (writer.get_greater_equal(proposed, key, &key, nullptr, &roots))
          {
             if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)

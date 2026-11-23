@@ -120,7 +120,7 @@ struct EventVTab : sqlite3_vtab
    {
       auto secondary = SecondaryIndexTable(
           DbId::writeOnly,
-          psio1::convert_to_key(std::tuple(EventIndex::service, secondaryIndexReadyTableNum)));
+          psio::encode(psio::key{}, std::tuple(EventIndex::service, secondaryIndexReadyTableNum)));
       if (auto row = secondary.getIndex<0>().get(std::tuple(db, service, event)))
          indexes = std::move(row->indexes);
       else
@@ -129,7 +129,7 @@ struct EventVTab : sqlite3_vtab
    EventIndexTable                 index;
    std::vector<SecondaryIndexInfo> indexes;
    const CompiledType*             rowType;
-   std::vector<char>               key() const { return psio1::convert_to_key(index); }
+   std::vector<char>               key() const { return psio::encode(psio::key{}, index); }
    std::string_view                get_collation(int column) const
    {
       if (const char* const* collate =
@@ -731,17 +731,16 @@ KeyResult sql_to_key(const Int& type, sqlite3_value* key, std::vector<char>& out
 
 KeyResult double_to_key(const Float& type, double value, std::vector<char>& out)
 {
-   psio1::vector_stream stream{out};
    if (type == Float{.exp = 11, .mantissa = 53})
    {
-      to_key(value, stream);
+      psio::to_key(value, out);
       return KeyResult::exact;
    }
    else if (type == Float{.exp = 8, .mantissa = 24})
    {
       auto fvalue = static_cast<float>(value);
       auto result = KeyResult::exact;
-      to_key(value, stream);
+      psio::to_key(value, out);
       if (fvalue != value)
       {
          result = KeyResult::rounded;
@@ -789,28 +788,24 @@ KeyResult sql_to_key(const auto& type, sqlite3_value* key, std::vector<char>& ou
 
 KeyResult string_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
 {
-   psio1::vector_stream stream(out);
-   to_key(std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
-                           static_cast<std::size_t>(sqlite3_value_bytes(key))},
-          stream);
+   psio::to_key(std::string{reinterpret_cast<const char*>(sqlite3_value_text(key)),
+                            static_cast<std::size_t>(sqlite3_value_bytes(key))},
+                out);
    return KeyResult::exact;
 }
 
 KeyResult account_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
 {
-   psio1::vector_stream stream(out);
-   auto                s = std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
-                                            static_cast<std::size_t>(sqlite3_value_bytes(key))};
-   to_key(AccountNumber{s}, stream);
+   auto s = std::string_view{reinterpret_cast<const char*>(sqlite3_value_text(key)),
+                             static_cast<std::size_t>(sqlite3_value_bytes(key))};
+   psio::to_key(AccountNumber{s}, out);
    return KeyResult::exact;
 }
 
 KeyResult blob_to_key(const CompiledType* type, sqlite3_value* key, std::vector<char>& out)
 {
-   psio1::vector_stream stream(out);
-   to_key(std::string_view{reinterpret_cast<const char*>(sqlite3_value_blob(key)),
-                           static_cast<std::size_t>(sqlite3_value_bytes(key))},
-          stream);
+   auto data = static_cast<const unsigned char*>(sqlite3_value_blob(key));
+   psio::to_key(std::vector<unsigned char>{data, data + sqlite3_value_bytes(key)}, out);
    return KeyResult::exact;
 }
 

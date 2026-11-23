@@ -225,7 +225,7 @@ namespace psibase::vm_wasmtime
          // a transfer spent in the chain. The record must still exist, so
          // that a node with the module cached and one without agree.
          const auto codeRecord =
-             psio1::convert_to_key(codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
+             psio::encode(psio::key{}, codeByHashKey(code.codeHash, code.vmType, code.vmVersion));
          check(database.kvContains(db, codeRecord), "service code record is missing");
          std::optional<CodeByHashRow> c;
          auto                         loadCode = [&]

@@ -42,7 +42,7 @@ namespace
    std::vector<BlockHeaderAuthAccount> getActual(TestChain& t)
    {
       std::vector<BlockHeaderAuthAccount> result;
-      std::vector<char>                   key       = psio1::convert_to_key(codePrefix());
+      std::vector<char>                   key       = psio::encode(psio::key{}, codePrefix());
       auto                                prefixLen = key.size();
       while (auto row = t.kvGreaterEqualRaw(CodeRow::db, key, prefixLen))
       {
@@ -51,7 +51,7 @@ namespace
              t.kvGet<CodeByHashRow>(CodeByHashRow::db,
                                     codeByHashKey(a.codeHash, a.vmType, a.vmVersion)))
             result.push_back({a.codeNum, a.codeHash, a.vmType, a.vmVersion});
-         key = psio1::convert_to_key(a.key());
+         key = psio::encode(psio::key{}, a.key());
          key.push_back(0);
       }
       return result;

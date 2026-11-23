@@ -64,7 +64,7 @@ UniqueKvHandle Db::open(DbId db, psio1::view<const std::vector<char>> prefixView
    {
       if (isWrite(mode))
       {
-         auto expected = psio1::convert_to_key(sender);
+         auto expected = psio::to_key(sender);
          if (!std::ranges::starts_with(prefix, expected))
          {
             prefixError(sender, prefix, "write to");
@@ -72,7 +72,7 @@ UniqueKvHandle Db::open(DbId db, psio1::view<const std::vector<char>> prefixView
       }
       else
       {
-         auto expected = psio1::convert_to_key(sender);
+         auto expected = psio::encode(psio::key{}, sender);
          // Subaccounts of the same primary account, all have
          // shared read access
          expected.pop_back();

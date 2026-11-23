@@ -1,8 +1,8 @@
 #include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
+#include <psio/key.hpp>
 #include <psio1/from_bin.hpp>
 #include <psio1/to_bin.hpp>
-#include <psio1/to_key.hpp>
 #include <services/test/TestKV.hpp>
 
 using namespace psibase;
@@ -57,7 +57,7 @@ void TestKV::test()
    if (enable_print)
       printf("kvPut\n");
 
-   auto handle = kvOpen(DbId::service, psio1::convert_to_key(thisService), KvMode::readWrite);
+   auto handle = kvOpen(DbId::service, psio::encode(psio::key{}, thisService), KvMode::readWrite);
 
    for (const auto& item : items)
       if (item.add)

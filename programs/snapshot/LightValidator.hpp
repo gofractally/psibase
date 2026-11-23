@@ -27,7 +27,7 @@ namespace psibase
       template <typename V, typename K>
       std::optional<V> kvGet(psibase::DbId db, const K& key)
       {
-         auto v = kvGetRaw(db, psio1::convert_to_key(key));
+         auto v = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!v)
             return std::nullopt;
          // TODO: validate (allow opt-in or opt-out)
@@ -42,7 +42,7 @@ namespace psibase
          requires(!psio::is_optional<V>::value)
       void kvPut(DbId db, const K& key, const V& value)
       {
-         kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio1::convert_to_frac(value));
       }
 
       void kvRemoveRaw(psibase::DbId db, psio1::input_stream key)
@@ -52,7 +52,7 @@ namespace psibase
       template <typename K>
       void kvRemove(DbId db, const K& key)
       {
-         kvRemoveRaw(db, psio1::convert_to_key(key));
+         kvRemoveRaw(db, psio::encode(psio::key{}, key));
       }
 
       std::uint32_t id;

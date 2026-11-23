@@ -52,10 +52,6 @@ namespace SystemService
       {
          to_json(to_string(key), stream);
       }
-      void to_key(const SubjectPublicKeyInfo& obj, auto& stream)
-      {
-         to_key(obj.data, stream);
-      }
       inline constexpr bool use_json_string_for_gql(SubjectPublicKeyInfo*)
       {
          return true;

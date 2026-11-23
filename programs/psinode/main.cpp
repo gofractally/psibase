@@ -438,7 +438,7 @@ PSIO_REFLECT(LockKeyringRequest, device);
 
 std::vector<char> pkcs11TokenKey(const std::string& uri)
 {
-   return psio1::composite_key(std::uint16_t{0}, std::uint8_t{0}, uri);
+   return psio::to_key(std::tuple{std::uint16_t{0}, std::uint8_t{0}, uri});
 }
 
 std::vector<char> pkcs11TokenKey(const pkcs11::token_info& token)
@@ -1533,8 +1533,8 @@ void run(const std::string&              db_path,
                setPKCS11Libs]
               {
                  auto writer = system->sharedDatabase.createWriter();
-                 auto row    = system->sharedDatabase.kvGetSubjective(
-                     *writer, HostConfigRow::db, psio1::convert_to_key(hostConfigKey()));
+                 auto row = system->sharedDatabase.kvGetSubjective(*writer, HostConfigRow::db,
+                                                                   psio::to_key(hostConfigKey()));
                  auto hostConfig = psio1::from_frac<HostConfigRow>(row.value());
                  auto combinedConfig =
                      psio1::convert_from_json<PsinodeCombinedConfig>(hostConfig.config);
@@ -1584,7 +1584,7 @@ void run(const std::string&              db_path,
               {
                  auto writer = system->sharedDatabase.createWriter();
                  auto row    = system->sharedDatabase.kvGetSubjective(
-                     *writer, PendingShutdownRow::db, psio1::convert_to_key(pendingShutdownKey()));
+                     *writer, PendingShutdownRow::db, psio::to_key(pendingShutdownKey()));
                  if (!row)
                     return;
                  auto shutdown  = psio1::from_frac<PendingShutdownRow>(row.value());

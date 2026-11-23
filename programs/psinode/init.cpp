@@ -209,7 +209,7 @@ void initialize_database(SystemContext& context, const std::string& template_)
        psibase::finally{[&, saved = bc.db.saveSubjective()] { bc.db.restoreSubjective(saved); }};
    bc.db.checkoutSubjective();
 
-   auto key = psio1::convert_to_key(codePrefix());
+   auto key = psio::encode(psio::key{}, codePrefix());
    if (!bc.db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
    {
       DirectoryRegistry registry{package_path().string()};

@@ -147,7 +147,7 @@ int verifyHeaders(psibase::TestChain&          chain,
       }
       else
       {
-         auto key  = psio1::composite_key(psibase::blockDataPrefix(), info.header.commitNum);
+         auto key  = psio::to_key(std::tuple{psibase::blockDataPrefix(), info.header.commitNum});
          auto size = raw::kvGreaterEqual(chain.nativeHandle(), psibase::BlockDataRow::db,
                                          key.data(), key.size(), key.size());
          if (size != -1)
@@ -382,7 +382,7 @@ std::vector<psibase::BlockHeaderAuthAccount> getAuthServices(std::uint32_t chain
 {
    std::vector<psibase::BlockHeaderAuthAccount> result;
 
-   auto key   = psio1::convert_to_key(psibase::codePrefix());
+   auto key   = psio::encode(psio::key{}, psibase::codePrefix());
    auto value = std::vector<char>();
    auto match = key.size();
    while (true)

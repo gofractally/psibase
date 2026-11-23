@@ -13,7 +13,8 @@ struct VerifyFlagsService : Service
    void sudo() { check(getSender() == sudoAccount, "wrong sender"); }
    void setRow()
    {
-      auto handle = kvOpen(DbId::writeOnly, psio1::convert_to_key(getReceiver()), KvMode::write);
+      auto handle =
+          kvOpen(DbId::writeOnly, psio::encode(psio::key{}, getReceiver()), KvMode::write);
       kvPutRaw(handle, {}, std::vector<char>{});
       kvClose(handle);
    }

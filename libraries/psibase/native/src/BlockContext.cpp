@@ -162,7 +162,7 @@ namespace psibase
    void BlockContext::callOnBlock()
    {
       auto notifyData =
-          db.kvGetRaw(NotifyRow::db, psio1::convert_to_key(notifyKey(NotifyType::acceptBlock)));
+          db.kvGetRaw(NotifyRow::db, psio::encode(psio::key{}, notifyKey(NotifyType::acceptBlock)));
       if (!notifyData)
          return;
       auto notifySpan = std::span{notifyData->pos, notifyData->end};
@@ -204,7 +204,8 @@ namespace psibase
    void BlockContext::callOnTransaction(const Checksum256& id, const TransactionTrace& trace)
    {
       auto notifyType = trace.error ? NotifyType::rejectTransaction : NotifyType::acceptTransaction;
-      auto notifyData = db.kvGetRaw(NotifyRow::db, psio1::convert_to_key(notifyKey(notifyType)));
+      auto notifyData =
+          db.kvGetRaw(NotifyRow::db, psio::encode(psio::key{}, notifyKey(notifyType)));
       if (!notifyData)
          return;
       auto notifySpan = std::span{notifyData->pos, notifyData->end};
@@ -289,7 +290,7 @@ namespace psibase
    {
       auto notifyType = NotifyType::nextTransaction;
       auto notifyData = systemContext.sharedDatabase.kvGetSubjective(
-          *writer, DbId::nativeSubjective, psio1::convert_to_key(notifyKey(notifyType)));
+          *writer, DbId::nativeSubjective, psio::to_key(notifyKey(notifyType)));
       if (!notifyData)
       {
          PSIBASE_LOG(trxLogger, debug) << "nextTransaction not set";
@@ -365,7 +366,7 @@ namespace psibase
       std::vector<Checksum256> tokens(trx.proofs.size());
       auto                     notifyType = NotifyType::preverifyTransaction;
       auto                     notifyData = systemContext.sharedDatabase.kvGetSubjective(
-          *writer, DbId::nativeSubjective, psio1::convert_to_key(notifyKey(notifyType)));
+          *writer, DbId::nativeSubjective, psio::to_key(notifyKey(notifyType)));
       if (!notifyData)
          return tokens;
       if (!psio1::fracpack_validate<NotifyRow>(*notifyData))
@@ -720,7 +721,7 @@ namespace psibase
          ConsensusChangeRow changeRow{status->consensus.next->blockNum, current.header.commitNum,
                                       current.header.blockNum};
          systemContext.sharedDatabase.kvPutSubjective(*writer, ConsensusChangeRow::db,
-                                                      psio1::convert_to_key(changeRow.key()),
+                                                      psio::to_key(changeRow.key()),
                                                       psio1::to_frac(changeRow));
       }
 

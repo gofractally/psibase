@@ -58,7 +58,7 @@ namespace
       SchemaCache&        cache = SchemaCache::instance();
       SecondaryIndexTable secondary{
           DbId::writeOnly,
-          psio1::convert_to_key(std::tuple(EventIndex::service, secondaryIndexTableNum))};
+          psio::encode(psio::key{}, std::tuple(EventIndex::service, secondaryIndexTableNum))};
       EventWrapper     wrapper{nullptr};
       EventIndexHandle handle{KvMode::write};
       bool             operator()(EventTable& events, EventDb db, std::uint64_t eventNum)
@@ -86,9 +86,10 @@ namespace
             indexes.emplace(SecondaryIndexRecord{.indexes = std::vector{SecondaryIndexInfo{}}});
          for (const auto& index : indexes->indexes)
          {
+            psio::to_key(EventIndexTable{db, row->service(), row->type()}, key);
+            psio::to_key(index.indexNum, key);
+            // The columns are read from the packed event by its schema
             psio1::vector_stream stream{key};
-            to_key(EventIndexTable{db, row->service(), row->type()}, stream);
-            to_key(index.indexNum, stream);
             for (const auto& column : index.columns())
             {
                parser.set_pos(0);
@@ -96,7 +97,7 @@ namespace
                parser.push(parser.select_child(column));
                to_key(parser, stream);
             }
-            to_key(eventNum, stream);
+            psio::to_key(eventNum, key);
             psibase::raw::kvPut(handle, key.data(), key.size(), nullptr, 0);
             key.clear();
          }
@@ -124,7 +125,7 @@ namespace
    {
       EventIndexTable id{item.db, item.service, item.event};
       auto            handle = EventIndexHandle{KvMode::readWrite};
-      auto            key    = psio1::convert_to_key(id);
+      auto            key    = psio::encode(psio::key{}, id);
       if (item.endKey != 0)
       {
          key.push_back(0xff);
@@ -185,7 +186,7 @@ namespace
                    parser.push(parser.select_child(column));
                    to_key(parser, stream);
                 }
-                to_key(eventNum, stream);
+                psio::to_key(eventNum, subkey);
                 psibase::raw::kvPut(handle, subkey.data(), subkey.size(), nullptr, 0);
                 subkey.resize(prefixLen);
                 data.clear();
@@ -196,7 +197,8 @@ namespace
             // mark index as ready
             auto secondary = SecondaryIndexTable{
                 DbId::writeOnly,
-                psio1::convert_to_key(std::tuple(EventIndex::service, secondaryIndexReadyTableNum)),
+                psio::encode(psio::key{},
+                             std::tuple(EventIndex::service, secondaryIndexReadyTableNum)),
                 KvMode::readWrite};
             auto row = lookupIndexRecord(secondary, std::tuple(item.db, item.service, item.event));
             row.indexes.push_back(item.info);
@@ -328,7 +330,7 @@ void queueIndexChanges()
             if (!existing)
             {
                auto key =
-                   psio1::convert_to_key(EventIndexTable{dirty.db, dirty.service, dirty.event});
+                   psio::encode(psio::key{}, EventIndexTable{dirty.db, dirty.service, dirty.event});
                if (add)
                {
                   key.push_back(0xFF);

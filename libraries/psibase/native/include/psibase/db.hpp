@@ -3,10 +3,10 @@
 #include_next <psibase/db.hpp>
 
 #include <psibase/blob.hpp>
+#include <psibase/storage.hpp>
+#include <psio/key.hpp>
 #include <psio/shapes.hpp>
 #include <psio1/fracpack.hpp>
-#include <psio1/to_key.hpp>
-#include <psibase/storage.hpp>
 
 #include <array>
 #include <filesystem>
@@ -266,19 +266,19 @@ namespace psibase
       auto kvPut(DbId db, const K& key, const V& value)
           -> std::enable_if_t<!psio::is_optional<V>::value, void>
       {
-         kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio1::convert_to_frac(value));
       }
 
       template <typename K>
       void kvRemove(DbId db, const K& key)
       {
-         kvRemoveRaw(db, psio1::convert_to_key(key));
+         kvRemoveRaw(db, psio::encode(psio::key{}, key));
       }
 
       template <typename V, typename K>
       std::optional<V> kvGet(DbId db, const K& key)
       {
-         auto s = kvGetRaw(db, psio1::convert_to_key(key));
+         auto s = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!s)
             return std::nullopt;
          return psio1::from_frac<V>(psio1::prevalidated{s->pos, s->end});

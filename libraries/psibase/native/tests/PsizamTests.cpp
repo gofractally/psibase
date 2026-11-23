@@ -578,7 +578,7 @@ TEST_CASE("Native config writes reject VM limits that cannot be instantiated")
           {.codeNum = fixture.service, .flags = psibase::CodeRow::isPrivileged}, &context};
       auto handle = host.kvOpen(static_cast<uint32_t>(psibase::DbId::native), {},
                                 static_cast<uint32_t>(psibase::KvMode::write));
-      auto key = psio1::convert_to_key(psibase::WasmConfigRow::key(table));
+      auto                   key    = psio::encode(psio::key{}, psibase::WasmConfigRow::key(table));
       psibase::WasmConfigRow valid;
       auto expected = psio1::to_frac(valid);
       // Seed the existing row through the fixture's database. The host writes

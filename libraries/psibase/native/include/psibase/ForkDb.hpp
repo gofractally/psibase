@@ -594,11 +594,11 @@ namespace psibase
             consensusChangeReady = true;
             ConsensusChangeRow changeRow{start, commit, info.header.blockNum};
             systemContext->sharedDatabase.kvPutSubjective(*writer, ConsensusChangeRow::db,
-                                                          psio1::convert_to_key(changeRow.key()),
+                                                          psio::to_key(changeRow.key()),
                                                           psio1::to_frac(changeRow));
          }
          prevBlockNum         = info.header.blockNum;
-         auto     blockNumKey = psio1::convert_to_key(info.header.blockNum);
+         auto     blockNumKey = psio::encode(psio::key{}, info.header.blockNum);
          Database database(systemContext->sharedDatabase, revision);
          auto     session = database.startWrite(writer);
          database.kvPutRaw(DbId::blockLog, blockNumKey, psio1::to_frac(block->block().unpack()));
@@ -611,7 +611,7 @@ namespace psibase
          {
             BlockDataRow row{info.blockId, *block->auxConsensusData()};
             systemContext->sharedDatabase.kvPutSubjective(
-                *writer, BlockDataRow::db, psio1::convert_to_key(row.key()), psio1::to_frac(row));
+                *writer, BlockDataRow::db, psio::to_key(row.key()), psio1::to_frac(row));
          }
          revision = database.getModifiedRevision();
       }
@@ -1292,10 +1292,9 @@ namespace psibase
          Database database{systemContext->sharedDatabase, systemContext->sharedDatabase.getHead()};
          auto     session = database.startRead();
          database.checkoutSubjective();
-         psio1::size_stream prefixLen;
-         psio1::to_key(consensusChangePrefix(), prefixLen);
-         auto key = psio1::convert_to_key(consensusChangeKey(prev + 1));
-         if (auto row = database.kvLessThanRaw(ConsensusChangeRow::db, key, prefixLen.size))
+         auto prefixLen = psio::key_size(consensusChangePrefix());
+         auto key       = psio::encode(psio::key{}, consensusChangeKey(prev + 1));
+         if (auto row = database.kvLessThanRaw(ConsensusChangeRow::db, key, prefixLen))
          {
             auto value = psio1::from_frac<ConsensusChangeRow>(row->value);
             if (value.start > prev)
@@ -1305,7 +1304,7 @@ namespace psibase
             if (value.end > prev)
                return value.end;
          }
-         if (auto row = database.kvGreaterEqualRaw(ConsensusChangeRow::db, key, prefixLen.size))
+         if (auto row = database.kvGreaterEqualRaw(ConsensusChangeRow::db, key, prefixLen))
          {
             auto value = psio1::from_frac<ConsensusChangeRow>(row->value);
             return value.start;
@@ -1400,12 +1399,12 @@ namespace psibase
          // Record the snapshot
          SnapshotRow snapshotRow{id, SnapshotRow::Item{hash, signatures}};
          systemContext->sharedDatabase.kvPutSubjective(*writer, SnapshotRow::db,
-                                                       psio1::convert_to_key(snapshotRow.key()),
+                                                       psio::to_key(snapshotRow.key()),
                                                        psio1::to_frac(snapshotRow));
          logStart = head->blockNum();
          LogTruncateRow logTruncateRow{logStart};
          systemContext->sharedDatabase.kvPutSubjective(*writer, LogTruncateRow::db,
-                                                       psio1::convert_to_key(logTruncateRow.key()),
+                                                       psio::to_key(logTruncateRow.key()),
                                                        psio1::to_frac(logTruncateRow));
          return head;
       }
@@ -1414,7 +1413,7 @@ namespace psibase
          Database db(systemContext->sharedDatabase, systemContext->sharedDatabase.getHead());
          auto     session = db.startRead();
          db.checkoutSubjective();
-         auto key       = psio1::convert_to_key(snapshotPrefix());
+         auto key       = psio::encode(psio::key{}, snapshotPrefix());
          auto prefixLen = key.size();
          for (auto row = db.kvMaxRaw(DbId::nativeSubjective, key); row;
               row      = db.kvLessThanRaw(DbId::nativeSubjective, key, prefixLen))
@@ -1455,8 +1454,8 @@ namespace psibase
       }
       SnapshotRow get_snapshot_info(const Checksum256& id)
       {
-         auto row = systemContext->sharedDatabase.kvGetSubjective(
-             *writer, SnapshotRow::db, psio1::convert_to_key(snapshotKey(id)));
+         auto row = systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db,
+                                                                  psio::to_key(snapshotKey(id)));
          if (!row)
             return SnapshotRow{id};
          return psio1::from_frac<SnapshotRow>(*row);
@@ -1526,13 +1525,13 @@ namespace psibase
       {
          BlockDataRow row{id, std::move(data)};
          systemContext->sharedDatabase.kvPutSubjective(
-             *writer, BlockDataRow::db, psio1::convert_to_key(row.key()), psio1::to_frac(row));
+             *writer, BlockDataRow::db, psio::to_key(row.key()), psio1::to_frac(row));
       }
 
       std::optional<std::vector<char>> getBlockData(const Checksum256& id) const
       {
          if (auto data = systemContext->sharedDatabase.kvGetSubjective(
-                 *writer, BlockDataRow::db, psio1::convert_to_key(blockDataKey(id))))
+                 *writer, BlockDataRow::db, psio::to_key(blockDataKey(id))))
          {
             auto row = psio1::from_frac<BlockDataRow>(*data);
             if (row.auxConsensusData)
@@ -1742,7 +1741,7 @@ namespace psibase
          ProducerSet producers(status.consensus.current.data);
          bool        inserted = false;
          SnapshotRow row{.id = id};
-         auto        key = psio1::convert_to_key(row.key());
+         auto        key = psio::to_key(row.key());
          if (auto bytes =
                  systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
@@ -1840,7 +1839,7 @@ namespace psibase
          bool        inserted = false;
          auto        log      = ChecksumLog::never;
          SnapshotRow row{.id = id};
-         auto        key = psio1::convert_to_key(row.key());
+         auto        key = psio::to_key(row.key());
          if (auto bytes =
                  systemContext->sharedDatabase.kvGetSubjective(*writer, SnapshotRow::db, key))
          {
@@ -2180,7 +2179,7 @@ namespace psibase
 
          // If the block log is truncated, find where it starts
          if (auto row = sc->sharedDatabase.kvGetSubjective(*writer, LogTruncateRow::db,
-                                                           psio1::convert_to_key(logTruncateKey())))
+                                                           psio::to_key(logTruncateKey())))
          {
             logStart = psio1::from_frac<LogTruncateRow>(*row).start;
          }

@@ -98,7 +98,7 @@ void write_consensus_change_blocks(std::uint32_t             chain,
 {
    BlockNum          last = 0;
    Checksum256       lastId;
-   std::vector<char> key = psio1::convert_to_key(psibase::consensusChangeKey(start));
+   std::vector<char> key = psio::encode(psio::key{}, psibase::consensusChangeKey(start));
    std::vector<char> value;
    std::vector<char> blockKey;
    std::vector<char> block;
@@ -107,8 +107,7 @@ void write_consensus_change_blocks(std::uint32_t             chain,
       if (num <= last || num >= end)
          return;
       blockKey.clear();
-      psio1::vector_stream kstream{blockKey};
-      psio1::to_key(num, kstream);
+      psio::to_key(num, blockKey);
       auto size = raw::kvGet(chain, DbId::blockLog, blockKey.data(), blockKey.size());
       if (size == -1)
          psibase::abortMessage("Block " + std::to_string(num) + " is not in the block log");
@@ -126,12 +125,11 @@ void write_consensus_change_blocks(std::uint32_t             chain,
       write_row(static_cast<std::uint32_t>(DbId::blockLog), blockKey, block, stream);
       last = num;
    };
-   psio1::size_stream prefix_size;
-   psio1::to_key(psibase::consensusChangePrefix(), prefix_size);
-   auto read_next = [&]() -> std::optional<psibase::ConsensusChangeRow>
+   auto prefix_size = psio::key_size(psibase::consensusChangePrefix());
+   auto read_next   = [&]() -> std::optional<psibase::ConsensusChangeRow>
    {
       auto size = raw::kvGreaterEqual(chain, psibase::ConsensusChangeRow::db, key.data(),
-                                      key.size(), prefix_size.size);
+                                      key.size(), prefix_size);
       if (size == -1)
          return {};
       value.resize(size);
@@ -184,8 +182,7 @@ void write_block_signatures(std::uint32_t                chain,
    for (BlockNum num : signatures_required)
    {
       key.clear();
-      psio1::vector_stream kstream{key};
-      psio1::to_key(num, kstream);
+      psio::to_key(num, key);
       auto size = raw::kvGet(chain, DbId::blockProof, key.data(), key.size());
       if (size != -1)
       {
@@ -205,8 +202,7 @@ void write_block_data(std::uint32_t                   chain,
    for (auto id : commit_required)
    {
       key.clear();
-      psio1::vector_stream kstream{key};
-      psio1::to_key(psibase::blockDataKey(id), kstream);
+      psio::to_key(psibase::blockDataKey(id), key);
       auto size =
           raw::kvGreaterEqual(chain, DbId::nativeSubjective, key.data(), key.size(), key.size());
       if (size != -1)
@@ -286,7 +282,7 @@ int main(int argc, const char* const* argv)
    psibase::TestChain chain(database_file, O_RDONLY);
    auto               handle = chain.nativeHandle();
    {
-      auto key       = psio1::convert_to_key(psibase::snapshotPrefix());
+      auto key       = psio::encode(psio::key{}, psibase::snapshotPrefix());
       auto size      = raw::kvMax(handle, psibase::SnapshotRow::db, key.data(), key.size());
       auto prefixLen = key.size();
       while (true)

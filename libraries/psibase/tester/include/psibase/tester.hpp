@@ -730,7 +730,7 @@ namespace psibase
       template <typename V, typename K>
       std::optional<V> kvGet(psibase::DbId db, const K& key)
       {
-         auto v = kvGetRaw(db, psio1::convert_to_key(key));
+         auto v = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!v)
             return std::nullopt;
          // TODO: validate (allow opt-in or opt-out)
@@ -751,7 +751,7 @@ namespace psibase
       template <typename V, typename K>
       inline std::optional<V> kvGreaterEqual(DbId db, const K& key, uint32_t matchKeySize)
       {
-         auto v = kvGreaterEqualRaw(db, psio1::convert_to_key(key), matchKeySize);
+         auto v = kvGreaterEqualRaw(db, psio::encode(psio::key{}, key), matchKeySize);
          if (!v)
             return std::nullopt;
          return psio1::from_frac<V>(*v);
@@ -762,7 +762,7 @@ namespace psibase
       template <typename K, typename V>
       void kvPut(DbId db, const K& key, const V& value)
       {
-         kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio1::convert_to_frac(value));
       }
    };  // TestChain
 

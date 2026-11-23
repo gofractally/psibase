@@ -5,9 +5,9 @@
 #include <psibase/block.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
+#include <psio/key.hpp>
 #include <psio/shapes.hpp>
 #include <psio1/fracpack.hpp>
-#include <psio1/to_key.hpp>
 #include <span>
 
 #ifdef COMPILING_WASM
@@ -506,7 +506,7 @@ namespace psibase
    template <typename K, NotOptional V>
    void kvPut(KvHandle db, const K& key, const V& value)
    {
-      kvPutRaw(db, psio1::convert_to_key(key), psio1::convert_to_frac(value));
+      kvPutRaw(db, psio::encode(psio::key{}, key), psio1::convert_to_frac(value));
    }
 
    /// Remove a key-value pair if it exists
@@ -519,7 +519,7 @@ namespace psibase
    template <typename K>
    void kvRemove(KvHandle db, const K& key)
    {
-      kvRemoveRaw(db, psio1::convert_to_key(key));
+      kvRemoveRaw(db, psio::encode(psio::key{}, key));
    }
 
    /// Get size of stored value, if any
@@ -535,7 +535,7 @@ namespace psibase
    template <typename K>
    inline std::optional<uint32_t> kvGetSize(KvHandle db, const K& key)
    {
-      return kvGetSizeRaw(db, psio1::convert_to_key(key));
+      return kvGetSizeRaw(db, psio::encode(psio::key{}, key));
    }
 
    /// Get a key-value pair, if any
@@ -551,7 +551,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGet(KvHandle db, const K& key)
    {
-      auto v = kvGetRaw(db, psio1::convert_to_key(key));
+      auto v = kvGetRaw(db, psio::encode(psio::key{}, key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -591,7 +591,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvGreaterEqual(KvHandle db, const K& key, uint32_t matchKeySize)
    {
-      auto v = kvGreaterEqualRaw(db, psio1::convert_to_key(key), matchKeySize);
+      auto v = kvGreaterEqualRaw(db, psio::encode(psio::key{}, key), matchKeySize);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -621,7 +621,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvLessThan(KvHandle db, const K& key, uint32_t matchKeySize)
    {
-      auto v = kvLessThanRaw(db, psio1::convert_to_key(key), matchKeySize);
+      auto v = kvLessThanRaw(db, psio::encode(psio::key{}, key), matchKeySize);
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
@@ -647,7 +647,7 @@ namespace psibase
    template <typename V, typename K>
    inline std::optional<V> kvMax(KvHandle db, const K& key)
    {
-      auto v = kvMaxRaw(db, psio1::convert_to_key(key));
+      auto v = kvMaxRaw(db, psio::encode(psio::key{}, key));
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)

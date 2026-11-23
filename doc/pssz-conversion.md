@@ -807,6 +807,84 @@ package, `external/psio/python`, read, not run); G1's
 `psio::to_ijson(schema)`; G23 is fixed at this pin
 (`decode_json_checked(psio::ijson{}, "200", u8)` reads 200).
 
+### 1.18 Keys and utilities flipped
+
+Two commits on the flip branch. No psibase code outside `libraries/psio1`
+calls a legacy key function any more, and the three small utilities have a
+home.
+
+**Utilities (commit "Flip utilities…").**
+
+| Legacy | Sites / files | Now |
+|---|---|---|
+| `psio1::finally` | 32 / 14 | `psibase::finally`, new header `psibase/finally.hpp` (`libraries/psibase/common/include`, installed with the other psibase headers by the directory rule in `libraries/psibase/CMakeLists.txt`; same semantics) |
+| `psio1::to_hex` / `psio1::hex` | 12 / 8 | `psio::to_hex` (`<psio/to_hex.hpp>`: same upper-case digits, same delimiter argument) |
+| `psio1::from_hex` | 3 / 3 | `psio::from_hex` (identical code) |
+| `psio1::is_std_optional[_v]` | 4 / 4 | `psio::is_optional<T>::value` (`<psio/shapes.hpp>`) |
+
+Left on `psio1`: `psio1::unhex(dest, begin, end)` in `native/src/log.cpp:2316`
+and `packages/psibase_tests/test/test_crypto.cpp:16` (G31: PSIO reads hex
+only into a `std::vector<char>`), and `libraries/debug_eos_vm/dwarf.cpp`
+(one `finally`, all the `check`s and the `bin` cursor: untouched, it waits for
+the decision on a parsing cursor).
+
+**Keys (commit "Flip keys…").** Every key is `psio::key`.
+
+| Legacy | Sites | Now |
+|---|---|---|
+| `psio1::convert_to_key(v)` / `(v, vec)` | 89 / 30 files | `psio::to_key(v)` where a fixed-size `std::array` will do; `psio::encode(psio::key{}, v)` (51 sites) where the result is a `std::vector<char>` that is grown, reassigned or handed to a `psio1::input_stream` parameter (`kvGetRaw` and friends: streams are not flipped yet, and a `std::array` does not convert to one); `psio::to_key(v, vec)` to append; `psio::key_size(v)` (4) where only the length was wanted |
+| `psio1::composite_key(…)` | 12 | `psio::to_key(std::tuple{…})` (5: snapshot footer keys, the Events index prefix, psinode's PKCS #11 token key, `load-snapshot`); `psibase::tablePrefix(service, table)` (1); prefix-then-append in `Table.hpp` (6) |
+| `psio1::to_key(v, stream)` and unqualified `to_key(v, legacyStream)` | 9 + 9 | `psio::to_key(v, vec)` |
+| custom ADL `to_key` | 3 | removed: `KeyView` (below); `SubjectPublicKeyInfo` (no table index uses the key itself, only its fingerprint; nothing needed a replacement, so the type was not touched further); `EventIndexTable` is now `PSIO_REFLECT(EventIndexTable, db, service, event)`, whose record key is the same concatenation |
+
+`Table.hpp`. One function builds every key, `psibase::detail::appendKey(k,
+out)`: `psio::to_key(k, out)`; a `KeyView` (still part of the public API:
+`Table` constructors, `lower_bound` / `upper_bound` with a cursor in
+`serveGraphQL.hpp`) is appended as bytes; a key read through a legacy view of
+the packed row (`get_view_member`, unchanged until views flip) is unpacked
+first. `TableIndex` copies its prefix and appends; `upper_bound` uses
+`psio::key_prefix_upper_bound` on the part after the prefix. The layout did
+not change: `service` (u64 BE) · `table` (u16 BE) · `index` (u8) · key;
+`psibase::tablePrefix` names the first two.
+
+G30 as met: the two `std::string_view` sites in `REvents.cpp` construct a
+`std::string` (text column) and a `std::vector<unsigned char>` (blob column);
+no psibase wrapper was written. No new PSIO gap was found.
+
+Left on the legacy library in this area: the per-column part of an `Events`
+secondary-index key (`to_key(parser, stream)`, 2 sites in `EventIndex.cpp`),
+which walks packed event bytes by the legacy schema (`psio1/schema.hpp`) and
+flips with schemas (S2). It is internal to `Events`.
+
+**Key bytes.** `~/psibase-flip-cpp-scratch/wire/keycmp.cpp` and `keycmp2.cpp`
+compare the two encoders. Beyond what 1.17 lists, a bare `char` and
+`std::array<char, N>` differ where `char` is signed (legacy flips the sign
+bit), and so does `optional` / `vector<optional>` of *any* one-byte type
+(`i8`, `char`, a signed one-byte enum as well). To find the affected tables, a
+temporary compile-time probe (a deprecation warning when a key type contains
+one of those shapes, recursing through tuples, optionals, lists, variants and
+reflected records) was put on `appendKey` (both the value and the view
+branch) and on the generic `kvPut` / `kvGet` / … of `api.hpp` and
+`tester.hpp`, and the whole tree was built (`build-b2.log`, `build-b3.log`):
+**no hit** in any service, test or tool. The native keys are tuples of `u16`,
+`u8`, `u32`, `u64`, `i32`, `AccountNumber`, `Checksum256`, a one-byte enum and
+`std::string`. So no C++ key changed its bytes with this commit; the list of
+differing shapes stands for the Rust side (`doc/flip-interop.md`, "Table
+keys").
+
+**Checked.** Full build exit 0 after each commit (`build-a1.log`,
+`build-b5.log`). The 36 tests of the baseline pass after each
+(`ctest-a1.log`, `ctest-b5.log`). New in `libraries/psibase/common/tests/tables.cpp`
+(native and guest): "tables: the bytes of a primary and of a composite
+secondary key" pins the table prefix, a primary key, a composite secondary
+key with an escaped `00`, the same keys read through a view of the packed
+row, that `psio::key_prefix` of the first component is a byte prefix of the
+full key and equals what `lower_bound(first)` searches with, and its
+`key_prefix_upper_bound`. No existing test pinned key bytes that changed.
+Not checked here: the service tests that boot a chain (57 of 93 fail on this
+pin before any flip work, 1.17), so table reads and writes through a running
+chain were exercised only by the five `t-*` tests of the baseline set.
+
 ## 2. Inventory of what remains
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,

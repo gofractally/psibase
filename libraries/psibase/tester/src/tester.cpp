@@ -182,7 +182,7 @@ namespace
    {
       using namespace psibase;
       using namespace LocalService;
-      auto prefix = psio1::convert_to_key(codePrefix());
+      auto prefix = psio::encode(psio::key{}, codePrefix());
       if (self.kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
          return;
       auto serviceRoot = std::getenv("PSIBASE_DATADIR");
@@ -722,8 +722,7 @@ std::optional<psibase::TransactionTrace> psibase::TestChain::pushNextTransaction
 
 bool psibase::TestChain::runQueueItem()
 {
-   if (auto row = kvGreaterEqual<RunRow>(RunRow::db, runPrefix(),
-                                         psio1::convert_to_key(runPrefix()).size()))
+   if (auto row = kvGreaterEqual<RunRow>(RunRow::db, runPrefix(), psio::key_size(runPrefix())))
    {
       auto trace = tester::runAction(id, row->mode, true, row->action);
       auto token = psio1::to_frac(RunTokenData{!trace.error, row->mode, row->action,

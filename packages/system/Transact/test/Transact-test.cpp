@@ -338,7 +338,7 @@ TEST_CASE("Test push_transaction")
 
       // Count items in queue
       std::size_t                       queueSize = 0;
-      TableIndex<RunRow, std::uint64_t> runIndex{RunRow::db, psio1::convert_to_key(runPrefix()),
+      TableIndex<RunRow, std::uint64_t> runIndex{RunRow::db, psio::encode(psio::key{}, runPrefix()),
                                                  false};
       for (auto _ : runIndex)
       {

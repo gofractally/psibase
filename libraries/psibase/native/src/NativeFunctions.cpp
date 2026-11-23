@@ -86,7 +86,7 @@ namespace psibase
          check(psio1::fracpack_validate_strict<StatusRow>({value.pos, value.end}),
                "StatusRow has invalid format");
          // TODO: Verify that only nextConsensus has changed
-         auto expectedKey = psio1::convert_to_key(statusKey());
+         auto expectedKey = psio::to_key(statusKey());
          check(key.remaining() == expectedKey.size() &&
                    !std::memcmp(key.pos, expectedKey.data(), key.remaining()),
                "StatusRow has incorrect key");
@@ -115,7 +115,7 @@ namespace psibase
             ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum());
          }
          //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), 1);
-         auto expected_key = psio1::convert_to_key(codeKey(code.codeNum()));
+         auto expected_key = psio::to_key(codeKey(code.codeNum()));
          check(key.remaining() == expected_key.size() &&
                    !std::memcmp(key.pos, expected_key.data(), key.remaining()),
                "CodeRow has incorrect key");
@@ -142,7 +142,7 @@ namespace psibase
              psio1::from_frac<CodeByHashRow>(psio1::prevalidated{std::span{value.pos, value.end}});
          auto codeHash = sha256(code.code.data(), code.code.size());
          check(code.codeHash == codeHash, "CodeByHashRow has incorrect codeHash");
-         auto expected_key = psio1::convert_to_key(code.key());
+         auto expected_key = psio::to_key(code.key());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "CodeByHashRow has incorrect key");
@@ -183,7 +183,7 @@ namespace psibase
          check(psio1::fracpack_validate_strict<ConfigRow>({value.pos, value.end}),
                "ConfigRow has invalid format");
          auto row = psio1::from_frac<ConfigRow>(psio1::prevalidated{std::span{value.pos, value.end}});
-         auto expected_key = psio1::convert_to_key(row.key());
+         auto expected_key = psio::to_key(row.key());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "ConfigRow has incorrect key");
@@ -207,7 +207,7 @@ namespace psibase
                "WasmConfigRow has invalid format");
          auto row =
              psio1::from_frac<WasmConfigRow>(psio1::prevalidated{std::span{value.pos, value.end}});
-         auto expected_key = psio1::convert_to_key(row.key(table));
+         auto expected_key = psio::to_key(row.key(table));
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "WasmConfigRow has incorrect key");
@@ -241,7 +241,7 @@ namespace psibase
       {
          check(psio1::fracpack_validate_strict<CodeRow>(value), "CodeRow has invalid format");
          auto code         = psio1::view<const CodeRow>(psio1::prevalidated{value});
-         auto expected_key = psio1::convert_to_key(codeKey(code.codeNum()));
+         auto expected_key = psio::to_key(codeKey(code.codeNum()));
          check(key.remaining() == expected_key.size() &&
                    !std::memcmp(key.pos, expected_key.data(), key.remaining()),
                "CodeRow has incorrect key");
@@ -266,7 +266,7 @@ namespace psibase
                "ScheduledSnapshotRow has invalid format");
          auto row = psio1::from_frac<ScheduledSnapshotRow>(
              psio1::prevalidated{std::span{value.pos, value.end}});
-         auto expected_key = psio1::convert_to_key(row.key());
+         auto expected_key = psio::to_key(row.key());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "ScheduledSnapshotRow has incorrect key");
@@ -317,7 +317,7 @@ namespace psibase
       {
          check(psio1::fracpack_validate<HostConfigRow>({value.pos, value.end}),
                "HostConfigRow has invalid format");
-         auto expected_key = psio1::convert_to_key(hostConfigKey());
+         auto expected_key = psio::to_key(hostConfigKey());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "HostConfigRow has incorrect key");
@@ -337,7 +337,7 @@ namespace psibase
       {
          check(psio1::fracpack_validate<PendingShutdownRow>({value.pos, value.end}),
                "PendingShutdownRow has invalid format");
-         auto expected_key = psio1::convert_to_key(pendingShutdownKey());
+         auto expected_key = psio::to_key(pendingShutdownKey());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "PendingShutdownRow has incorrect key");
