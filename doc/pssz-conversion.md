@@ -708,6 +708,105 @@ unchanged. RG13 is closed in this pin (6.8).
 | Generated `*-schema.json` (68) vs. `~/psibase-pssz-snap-head/` | byte-identical |
 | The six unbuilt packages | exit 0 (`~/psibase-pssz-build.repin-c6d9-check-unbuilt.log`) |
 
+### 1.17 The flip branch: pin moved to PSIO `b5cea0d4`; baseline; survey
+
+Branch `claude/pssz-flip-cpp` (worktree `~/psibase-flip-cpp`, build
+`~/psibase-flip-cpp-build`, logs `~/psibase-flip-cpp-logs/`), started from
+`bc71f6bb0`. Its purpose is the C++ flip: every byte, key, JSON text,
+schema and GraphQL answer produced by PSIO, and `libraries/psio1` deleted.
+The Rust side is flipped in parallel in `~/psibase-pssz`. What crosses
+between the two is specified in `doc/flip-interop.md`.
+
+**Pin.** `b5cea0d44613740f75fd5c3a428e406908ea9afc`, `main` of
+gofractally/psio (the same three files state it). No psibase source
+changed.
+
+**Baseline on the pin, before any flip work.**
+
+| | |
+|---|---|
+| Full build | exit 0 (`build-baseline.log`) |
+| `ctest -j4` | **36 / 93** (`ctest-baseline.log`, `ctest-baseline.LastTest.log`); 93 / 93 was expected |
+
+The 57 failures have one cause, and it is the pin, not the tree: at this
+pin PSIO's method-name coder gives a name that does not read back from its
+compressed form the hash of the name (decided: TEAM-REVIEW 3.4), and
+`psibase::MethodNumber` in C++ *is* that coder
+(`psio::detail::method_to_number`). Rust still computes method numbers
+with `rust/psibase_names`. So the two languages disagree on every such
+name from the moment the pin moves:
+
+* Rust callers of a C++ service: `transact::regEvIdx` is sent with the old
+  number and Transact answers "unknown service action: regevidzts" — 74
+  times in the log: the Rust CLI's `psibase boot` (every `psinode_test_*`
+  that boots a chain) and the Rust tester (every `rs-test-*`).
+* The C++ tester reading packages built by Rust: a Rust-generated schema
+  lists its actions under the text Rust's coder writes, C++ looks the
+  action of a `postinstall.json` up by its own number and aborts with
+  "Action not found" (`package.cpp:261`; every `t-*-test` whose chain
+  installs such a package; seen by running `psitest Nft-test.wasm`).
+* `rs-tests`: `psio_leaf_types.rs`
+  (`method_names_whose_code_overflows_are_hashed_by_psibase_and_truncated_by_psio`)
+  pins the old disagreement.
+
+The 36 that pass are the native unit tests, the consensus and network
+tests, the Python codec tests, four `psinode_test_*` that do not boot
+through the CLI, the two psio test binaries in the guest and five `t-*`
+tests whose chains do not meet such a name. The eight C++ names whose
+number changed are listed in `doc/flip-interop.md` section 0. **Needed
+from the Rust side: `psibase_names` computes method numbers with PSIO's
+coder.** Until that is in this worktree, no C++ change can be checked by
+the service tests here.
+
+**Survey.** Before changing call sites, what psibase does with the legacy
+library was compared with what PSIO offers at the pin, by compiling probes
+(three read-only surveys: wire / keys / streams, schemas and build-time
+files, JSON and GraphQL; probes in `~/psibase-flip-cpp-scratch/`). Result:
+22 things PSIO lacks, G24–G45 in section 5.1. Three of them stop a stage
+outright under the rule "no psibase-side wrapper":
+
+* **G24 + G25 (S1):** a PSIO record view has no named accessors and no way
+  to its value. psibase goes through views by name at about 385 places and
+  converts a view to its value at about 200, and `dispatch.hpp` does it for
+  every by-value action parameter.
+* **G29 (S1):** `method_arg_tuple<I>` with a view-typed parameter (22
+  methods): `validate_pssz` compiles and rejects valid bytes.
+* **G33 (S2):** no runtime schema comparison (`Packages::setSchema`,
+  `CHECK_SCHEMA`).
+
+Also established there, for the flip:
+
+* `psio::nested<T>` replaces `shared_view_ptr<T>` as a record member
+  (G26: `shared_pssz<T>` cannot be one);
+* key bytes: identical to today for every native table key; different for
+  `optional` of a one-byte type, `vector<bool>`, `vector` of a one-byte
+  enum or of `optional<u8>`, and `vector<char>` where `char` is signed;
+* the legacy `bin` format is used only by `debug_eos_vm/dwarf.cpp` (WASM,
+  DWARF and ELF structures — bytes fixed by those standards, nothing
+  hashed, nothing of consensus), by one test service for a one-byte row
+  and by an unused `using` in psitest. No consensus or Merkle hash goes
+  through `bin`; those hash the packed (fracpack → PSSZ) form;
+* the 12 sites that build a legacy view straight over a span (which
+  validated) and need an explicit `psio::validate_pssz` first:
+  `ForkDb.hpp:1422`, `RunQueue.cpp:132`, `psinode/main.cpp:1458,1522`,
+  `psitest/main.cpp:621,1431`, `XHttp.cpp:183,231,239,266`,
+  `Transact.cpp:1099`, `MockTransact.cpp:55`, `test_util.cpp:197`;
+* config and request records read from JSON with members that real input
+  omits (they become `std::optional` at the JSON flip): `ShutdownRequest`
+  (`restart`, `force`, `soft`), `NewKeyRequest::device`,
+  `UnlockKeyringRequest::pin`, `PsinodeServiceConfig::argv`,
+  `LocalPackage::exports`, `Tapos::flags` as sent by `SimpleUI.mjs` (a
+  `definitionWillNotChange` record: fix the client, not the type); and a
+  latent bug: `psinode/main.cpp:1523` parses the combined
+  `{"host":…,"service":…}` document as `PsinodeConfig`, which only the
+  lenient reader accepts.
+
+Corrections to earlier sections: G9 is closed (the pin has a Python
+package, `external/psio/python`, read, not run); G1's
+`psio::to_json(schema)` is spelled `psio::encode(psio::ijson{}, schema)` /
+`psio::to_ijson(schema)`; G23 is fixed at this pin
+(`decode_json_checked(psio::ijson{}, "200", u8)` reads 200).
+
 ## 2. Inventory of what remains
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,
@@ -1149,6 +1248,75 @@ and 6.12.
 | G21 | `psio/error.hpp` (`codec_error::what` is a `std::string_view`) | An invariant cannot report a message computed from the value. | `Precision`'s legacy message named the offending value (1.11, D27). | Closed, verified and used: `psio::codec_fail_owned` (1.13). A text adapter's `validate` must still return a message of static storage (`psio/adapter.hpp`); `DecimalText::validate` reports literals. |
 | G22 | `psio/reflect.hpp:228` | `psio::Reflected<T&>` is a hard error, not `false`: `reflect<T&>` forms `static_cast<T&*>`. Reproduction: `static_assert(!psio::Reflected<int&>);` → "'type' declared as a pointer to a reference of type 'int &'". | Constraints on generic code (`template <typename T> requires psio::Reflected<T>`) are tried with reference and cv-qualified types during partial-specialization matching (`flatten_key<T&>` in `Table.hpp`). psibase asked `std::is_class_v<T>` first. | Closed, verified and used: `Reflected<T&>` is `false`; the pre-check is deleted (1.13). |
 | G23 | `psio/json.hpp:2124` (`decode_json_checked(Fmt, std::span<const char> text, T& out)`) | Nothing missing; a trap. A string literal converts to `std::span<const char>` *with its terminating NUL*, so `psio::decode_json_checked(psio::ijson{}, "200", out)` compiles and reads the four bytes `2 0 0 \0`. | Found while writing the `Precision` test of 1.13: for a `std::uint8_t` (or a `transparent()` wrapper of one) the call fails with "json: integer is not a canonical in-range decimal", which reads as if 200 were out of range for 8 bits. With `std::string_view{"200"}` the same call succeeds. Reproduction: `std::uint8_t v; auto s = psio::decode_json_checked(psio::ijson{}, "200", v);` → not ok; `…, std::string_view{"200"}, v)` → ok. | New, minor. No psibase code is affected (the tests pass a `std::string_view`). A `std::string_view` overload, or rejecting a `const char[N]` argument, would remove it. |
+
+### 5.1 Found by the survey for the flip, at PSIO `b5cea0d4` (G24–G45)
+
+Found before any flip commit (section 1.17), by compiling probes against
+the pinned headers. Every reproduction below was compiled (and, where it
+has output, run) with
+
+```
+clang++ -std=c++23 -fbracket-depth=1024 -DPSIO_EXCEPTIONS_ENABLED=1 \
+  -I external/psio/cpp/include -I external/psio/cpp/external/xxhash -isystem /opt/homebrew/include X.cpp
+```
+
+The probe files are kept in `~/psibase-flip-cpp-scratch/{main,wire,schema,json}/`
+(the file name is given with each gap). "Sites" are counts in the C++ tree
+outside `libraries/psio1`. Nothing in psibase works around any of them.
+
+Common prelude of the wire snippets:
+
+```cpp
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
+struct Act { std::uint64_t sender = 0; std::string name; };
+PSIO_REFLECT(Act, sender, name)
+```
+
+**Views and packed values (stage S1)**
+
+| # | Missing | Reproduction → first error | What psibase needs it for |
+|---|---|---|---|
+| G24 | A record view has no named accessors: `psio::pssz_view<T>` offers only `get<N>()`, although `psio::reflect<T>::proxy<P>` generates `name()` members for any projection. | `auto b = psio::to_pssz(Act{7,"x"}); psio::pssz_view<Act> v{b}; return v.sender() == 7;` → `no member named 'sender' in 'psio::view<Act, psio::pssz, psio::storage::const_borrow>'` (`wire/g1_named.cpp`) | About 385 accessor hops through views (`trx.actions()`, `block->block().header().term()`): `bft.hpp` 60, `RTransact.cpp` 47, `Transact` 36, `blocknet.hpp` 35, `BlockContext.cpp` 34, `ForkDb.hpp` 31, `Explorer.cpp` 29, `NativeFunctions.cpp` 26. Rewriting them as `get<3>()` is unreadable and silently wrong when a member is inserted. **This blocks S1.** |
+| G25 | No way from a view to its value. (a) No `unpack()` / `decode()` on a record, list, string or optional view, no conversion, no `psio::decode` overload taking a view. (b) The spelled-out form `psio::from_pssz<T>(psio::trusted{psio::bytes(sub)})` is not uniform: `get<N>()` of an arithmetic member is already a value, an enum / time member needs `.get()`, a string `.view_()`, a `definitionWillNotChange` record such as `AccountNumber` needs the decode. (c) Under a cap it is wrong: the bytes of a member of a record with `maxDynamicData` are not a standalone encoding of the member's type. | (a) `Act a = v.unpack();` → `no member named 'unpack' in 'psio::view<Act, …>'` (`wire/g2_unpack.cpp`); `psio::from_pssz<Act>(v)` → `no matching function` (`wire/g2d_decode_view.cpp`). (b) `template <typename V> auto value_of(V v) { return psio::from_pssz<typename V::element_type>(psio::trusted{psio::bytes(v)}); } … value_of(v.get<0>());` → `type 'unsigned long long' cannot be used prior to '::'` (`wire/g2c_arith_bytes.cpp`). (c) `struct Row { std::uint32_t id; std::vector<std::string> tags; }; PSIO_REFLECT(Row, id, tags, maxDynamicData(1024))` … `psio::validate_pssz<std::vector<std::string>>(psio::bytes(psio::pssz_view<Row>{b}.get<1>()))` → runs, prints `REJECTED`, `member bytes 9 vs standalone bytes 13` (`wire/g2_subview_decode_capped.cpp`) | 62 `.unpack()` calls, about 140 implicit view → value conversions, and every by-value action parameter (`dispatch.hpp` reads the packed arguments through a view and converts each). (c) does not bite today (no caps are applied) and will when the team applies them. |
+| G26 | `psio::shared_pssz<T>` cannot be a member of a reflected record, and has no operations of its own (no construction from a value, no `->`, `*`, `==`, null state; only the free functions `bytes`, `size`, `as_view`). | `struct SignedTx { psio::shared_pssz<Act> transaction; std::vector<std::string> proofs; }; PSIO_REFLECT(SignedTx, transaction, proofs)` … `psio::to_pssz(s)` → `static assertion failed … psio::pssz: unsupported type in size_of_v` (`main/g25.cpp`, `wire/g3_shared_member.cpp`) | Five reflected members: `SignedTransaction::transaction`, `ProcessTransactionArgs::transaction`, `SignedMessage<M>::data`, `BlockMessage::block`, `BlockHeaderMessage::block`. `psio::nested<T>` fits the wire (same bytes as a byte list holding the encoding; view, key, JSON, schema all work: `wire/ok3_nested.cpp`) and is what the flip will use. Lost with it: shared ownership (a copy of a `SignedTransaction` or `BlockMessage` copies the bytes; cheap copies are relied on in `ForkDb.hpp`, `blocknet.hpp`, `bft.hpp`, `TransactionContext.cpp`, `Explorer.cpp`), the null state (10 null checks; a default `nested<T>` allocates the encoding of `T{}`), and the JSON form (hex before, the inner value now). Reported because a shared packed member is what the node wants for blocks. |
+| G27 | Small holes in the view surface: a list view has no `front()` / `back()` and only forward iteration; an optional view has no `->`, `value()`, `value_or`; a variant view has no `get_if` / comparison; no comparison of a view with a value or with another view; no structured bindings on a tuple view; no conversion of a byte-list / string view to `std::span<const char>` / `std::string_view` (only `psio::bytes(v)`, `.view_()`). | `struct R { std::vector<std::string> v; std::optional<std::string> o; }; PSIO_REFLECT(R, v, o)` … `r.get<0>().front();` → `no member named 'front' in 'psio::view<std::vector<std::string>, …>'` (`wire/g5.cpp`); `v.get<1>() == "x"` → `invalid operands to binary expression` (`wire/g2b.cpp`) | About 31 comparisons, 33 byte / string conversions, a handful of the others. Each has a longer working spelling; listed so that PSIO can decide. |
+| G28 | Packing from a non-owning source: `to_pssz` rejects a tuple of references (`std::tie`), `std::string_view`, `std::span<const T>`, `std::reference_wrapper`, `const char*`, and a view as a value. | `std::uint64_t id = 1; std::string t = "big"; psio::to_pssz(std::tie(id, t));` → `static assertion failed … 'sizeof(std::string &) == 0': psio::pssz: unsupported type in size_of_v` (`wire/g7_tie.cpp`) | `std::tie` packing at 4 sites (`api.cpp`, `serviceEntry.cpp`, `BlockContext.cpp`, `tester.cpp`: without it a `SignedTransaction` or `TransactionTrace` is copied per call); views passed on as arguments or members at about 15 sites (`XHttp.cpp`, `RTransact.cpp`, `TxSuccessView` / `TxFailedView`); the legacy `PackableAs<U, T>` ("U packs to the bytes of T") has no counterpart. |
+| G29 | View-typed method parameters. (a) `reflect<T>::method_arg_tuple<I>` of a method with a `psio::pssz_view<const X>` parameter has the view as its element: decoding does not compile and **`validate_pssz` compiles and rejects valid bytes**. (b) There is no view over `psio::annotated_tuple` (what `method_arg_tuple<I>` is once a method has a cap or a parameter annotation); viewing the bytes as the plain `std::tuple` compiles and reads wrong data. | (a) `struct Svc { void look(psio::pssz_view<const Act> a, std::uint32_t n) {} PSIO_REFLECT(Svc, method(look, a, n)) };` `using Args = psio::reflect<Svc>::method_arg_tuple<0>;` `psio::from_pssz<Args>(good)` → `psio::pssz: unsupported type in decode_value`; `psio::validate_pssz<Args>(good).ok()` is `false` for `good = to_pssz(std::tuple{Act{}, 4u})` (`wire/g8_view_param.cpp`, `wire/p8b.cpp`). (b) `method(put, id, name, tags, maxDynamicData(1024))`, `psio::pssz_view<Args> v{b};` → `implicit instantiation of undefined template 'psio::view<psio::annotated_tuple<…>>'` (`wire/g8_capped_args_view.cpp`); `wire/g8_capped_args_wrongview.cpp` prints `name through the plain-tuple view has size 0 (expected 2)` | 22 reflected methods take a view parameter (Transact 4, RTransact 5, Nft 5, HttpServer 2, XHttp 2, …), one returns a view. psibase's `MethodArgs<M>` already strips views itself and will keep doing so; what is missing in PSIO is the rule "a view parameter is a packed T" in `method_arg_tuple`, and a view of the annotated tuple so that dispatch keeps working when caps are applied. |
+| G30 | Keys: `psio::to_key` has no encoding for `std::string_view` (2 sites, `REvents.cpp`) and none for "these bytes are already a key" inside a tuple (psibase's `KeyView`, 6 sites in `Table.hpp`; D8). | `psio::to_key(std::string_view{"abc"})` → `static assertion failed … psio::key: this type has no key encoding` (`wire/g10_keyview.cpp`) | Both have a working spelling (copy the prefix, append with `psio::to_key(k, vec)`). Not a gap, a trap: `psio::to_key(fixedSizeKey)` returns a `std::array`, so `std::vector<char> k = psio::to_key(x)` does not compile; `psio::encode(psio::key{}, x)` returns a vector. |
+| G31 | Sinks and sources. `to_pssz(v, sink)` writes only to a `std::vector<char>` (not to PSIO's own `size_stream`, `fixed_buf_stream`, `vector_stream`, which `to_key` accepts); there is no input stream / cursor with varint readers (`psio::bin` decodes one value and gives no position; `varuint32_from_bin` does not exist); no `unhex(dest, begin, end)` into a fixed destination. | `char buf[64]; psio::fixed_buf_stream f{buf, sizeof buf}; psio::to_pssz(a, f);` → `no matching function for call to 'to_pssz'` (`wire/g11_sink.cpp`); `psio::varuint32_from_bin(s)` → `no member named 'varuint32_from_bin' in namespace 'psio'` (`wire/g_bin_cursor.cpp`) | Encoding into a host-provided buffer (`Actor.hpp`, `dispatch.hpp`) becomes vector-then-copy. `libraries/debug_eos_vm/dwarf.cpp` (261 calls: WASM sections, DWARF, ELF — bytes fixed by those standards, nothing of psibase's wire) and `log.cpp`'s timestamp parser use the legacy stream as a parsing cursor; they need a small cursor that is theirs, not PSIO's, unless PSIO wants one. `psio::bin` is also not the legacy `bin` for records (a non-DWNC record gets a size prefix), so it cannot read `wasm_section`. |
+| G32 | A failed checked decode in a guest gives no message: without exceptions `psio::codec_abort` is `(void)error; std::abort();` (`psio/error.hpp:194`), with no hook. | read in the header; not run in a wasm build | The legacy library called `psibase::abortMessage(text)` in a guest. Every `psio::from_pssz<T>(bytes)` / `from_ijson<T>(text)` in a service would trap without text (probed natively with `-fno-exceptions`: exit 134, nothing printed). Each call that wants a message must be `validate_…` + `psibase::check(st.ok(), st.error().what)` + trusted decode. A `[[noreturn]]` hook the embedder can define (or a weak `psio_codec_abort`) would keep the short spelling safe. |
+
+**Schemas (stage S2)**
+
+| # | Missing | Reproduction → output | What psibase needs it for |
+|---|---|---|---|
+| G33 | No runtime schema comparison in C++: no `equivalent(schemaA, typeA, schemaB, typeB)` and no `evolves_from` over the Schema IR (C++ has only the compile-time `pssz_evolves_from<Old, New>`; PSIO's Python package has a runtime `evolves_from`). `AnyType::operator==` compares names. It must also treat `char` and `u8` bytes as the same node (D41). | `struct A { std::uint32_t x; std::optional<std::uint16_t> y; }; PSIO_REFLECT(A, x, y)` `auto s1 = psio::SchemaBuilder{}.insert<A>("A").build(); psio::SchemaBuilder b; b.insert<std::uint64_t>("u64"); auto s2 = std::move(b).insert<A>("A").build(); std::cout << (*s1.get("A") == *s2.get("A"));` → `0` (`schema/g1.cpp`) | `Packages::setSchema` (a service's new schema must be an upgrade of the installed one for rows and equivalent for keys: `Packages.cpp:108-195`), `CHECK_SCHEMA` in the tester (`checkSchema.cpp`), `test_schema.cpp`, and the C++ = Rust schema check. **Blocks that part of S2.** |
+| G34 | A custom handler of `pssz_ir` can only present a value as one JSON string. | `h.add("Action", {.to_text = [](std::span<const char>, std::string& t) { t += R"({"service":"tokens","data":{"amount":5}})"; return psio::codec_ok(); }});` `pssz_ir::pssz_to_json(schema, "Actions", psio::ijson{}, bytes, out, nullptr, &h)` → `["{\"service\":\"tokens\",\"data\":{\"amount\":5}}"]` (`schema/g8.cpp`) | The `Action` and `ServiceMethod` formatters (`trace.cpp`: an action inside action arguments is shown as `{sender, service, method, data:{…}}` with `data` decoded by the target service's schema) and the inverse in `package.cpp` (`postinstall.json`). Needs a handler that writes / reads a JSON value, or psibase walks `pssz_ir::Value` itself. |
+| G35 | `SchemaBuilder` names a reflected record by its unqualified name; two different types with one name silently become one node. | `namespace a { struct Config { std::uint32_t x; }; PSIO_REFLECT(Config, x) } namespace b { struct Config { std::string name; std::uint8_t y; }; PSIO_REFLECT(Config, name, y) } struct Both { a::Config first; b::Config second; }; PSIO_REFLECT(Both, first, second)` → the built schema has one `Config`; `pssz_to_json` of a valid `Both` fails (`ok=0`) (`schema/g4.cpp`) | The legacy schema named every type `@N`. Whether a psibase service has two same-named reflected types (different namespaces, or two instantiations of one template such as `Connection<…>`) is not yet known; it would be a wrong schema without any error. |
+| G36 | `Interface::funcs[i].params` gives every unnamed parameter the name `""` (→ `pssz IR: duplicate schema member`), and `PSIO_INTERFACE` on a reflected type with no methods does not compile. | `struct Svc { void unnamed(int a, int b); }; PSIO_REFLECT(Svc, method(unnamed)) PSIO_INTERFACE(Svc, name("svc"))` → `params[0].name=''`, `json_to_pssz` → `duplicate schema member` (`schema/g6.cpp`); `struct H {}; PSIO_REFLECT(H) PSIO_INTERFACE(H, name("h"))` → `static assertion failed … method_count > 0` (`schema/g2.cpp`) | Only matters if psibase used `PSIO_INTERFACE` per service (D18). The flip will derive actions from `reflect<Svc>::method_arg_tuple<I>` instead, which is right in both cases. |
+
+**JSON (stage S4)**
+
+| # | Missing | Reproduction → first error / output | What psibase needs it for |
+|---|---|---|---|
+| G37 | `std::string_view` (and a string literal) has no JSON text. | `std::string out; psio::to_ijson(std::string_view{"x"}, out);` → `psio::json: unsupported type in encode_value` (`json/j1.cpp`) | Hand-built JSON documents (about 40 sites) write names and string values from views. |
+| G38 | `psio_is_untagged` (`psio/untagged.hpp`) is declared but JSON ignores it. | `using Extra = std::variant<std::string, std::vector<std::string>>; namespace psio { constexpr bool psio_is_untagged(const Extra*) { return true; } }` `psio::to_ijson(Extra{std::vector<std::string>{"a"}})` → `{"string[]":["a"]}`; reading `["a"]` fails (`json/j2.cpp`) | psinode's `ExtraConfigField` (a config value that is a string or a list of strings). |
+| G39 | No schemaless JSON value usable in a guest, and no "any JSON" member of a reflected record. `dynamic_value.hpp` needs a schema; `pjson` needs exceptions and simdjson and does not preserve number text. | `#include <psio/pjson_json.hpp>` … `psio::pjson_json::from_json("{\"a\":1}")` with `-fno-exceptions -DPSIO_EXCEPTIONS_ENABLED=0` → `cannot use 'throw' with exceptions disabled`; with `-DPSIO_HAVE_SIMDJSON=0` → `no member named 'pjson_json' in namespace 'psio'` (`json/j3.cpp`) | `psio1::json::any` (55 uses): XAdmin's config pass-through (a wasm service), `PrettyAction::data` in `package.cpp` (a reflected member), trace pruning in `trace.cpp`, logger sink arguments in `log.cpp`, and the `variables` member of a GraphQL POST body. |
+| G40 | No public way to read a typed sub-value from an open `psio::JsonCursor` (only `psio::detail::json_impl::…`), and the text cursor exposes no position, so the raw text of a value cannot be kept. | nothing fails to compile; the working form is in `detail::` (`json/j5.cpp`) | Hand-written readers that delegate members to reflection (`SqlRow<T>`, logger configuration, `ExtraConfigField`). |
+| G41 | Minor: no pretty-printer (one test uses `format_json`); the JSON sink must be a `std::string` (every HTTP body is a `std::vector<char>`: one copy per reply); "json: missing required member" does not name the member. | `std::vector<char> body; psio::to_ijson(R{}, body);` → `no matching function for call to 'to_ijson'` (`json/j4.cpp`) | |
+
+**GraphQL (stage S5)**
+
+| # | Missing | Reproduction → first error | What psibase needs it for |
+|---|---|---|---|
+| G42 | A reflected record without members cannot be an output type. | `struct TLSInfo { PSIO_REFLECT(TLSInfo) }; struct Row { std::string host; std::optional<TLSInfo> tls; PSIO_REFLECT(Row, host, tls) };` → `psio::graphql: an object type needs at least one visible field` (`json/g_empty.cpp`) | `TLSInfo`, `LogSocketInfo`, `ProducerMulticastSocketInfo` (`SocketInfo.hpp`), alternatives of the `SocketInfo` union and a member of XProxy's rows. |
+| G43 | No way to present a record's members beside another member (field flattening). | `{ ev { block { blockNum } id } }` on `WithBlock<T>{block, data}` → `Cannot query field "id" on type "WithBlock".` (`json/g_conn.cpp`) | `WithBlockContext<T>` (event queries of Invite and the test services): clients read `block` beside the event's own fields. Without it the shape becomes `{ block {…} data {…} }`, a client-visible change. |
+| G44 | Two instantiations of one reflected class template have the same GraphQL name. | `template <typename T> struct WithBlock { int block = 0; T data; PSIO_REFLECT(WithBlock, block, data) };` with `WithBlock<A>` and `WithBlock<B>` in one schema → `two different C++ types of this schema have the same GraphQL type name` (`json/g_tmpl.cpp`) | `WithBlockContext<T>`, `Edge<…>`, `Connection<…>`. A specialization of `psio::graphql::type_name<…>` works; PSIO's own name builder is in `detail::`. |
+| G45 | Pagination: the Relay arguments cannot be one parameter (`psio::graphql::page_args` as a method parameter → `an argument must be a scalar, an enum, …`: `json/g_args.cpp`); `paginate` has no key range (`gt` / `ge` / `lt` / `le`) and no byte budget (`maxBytes`, used by Explorer's `blocks`). | as stated | The 5 methods that return a `TableIndex` and the 5 transformed connections must spell out up to 8 parameters each; the range and the byte budget stay psibase code over a row source. |
+
+Not serialization, and not asked of PSIO: `psio1::finally` (33 uses) and
+`psio1::check` (36, all in `dwarf.cpp`) need a psibase home (D9).
 
 ## 6. Rust, JavaScript and Python
 
