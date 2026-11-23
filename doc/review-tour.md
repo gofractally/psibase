@@ -101,7 +101,7 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 - At the pinned commit four of psitri's own tests fail. They have now been triaged; none is in code psibase runs. Fixes are on psitri branch `claude/test-triage`, not yet merged or pinned:
   - "Block allocator truncate operations": the test expected behaviour that the durability work deliberately changed. Test corrected ([psitri#3](https://github.com/gofractally/psitri/issues/3)).
   - `psitrimdbx-tests`: a test wrote 1 MB where the default backend's limit is about 0.5 MB. The limit is now reported by the library and the test respects it ([psitri#4](https://github.com/gofractally/psitri/issues/4)).
-  - `sal_hybrid-va-recycle-tests`: a real defect in an experimental allocator, unbounded growth when object sizes drift. Growth is now bounded (307 segments and rising became 49, flat), but the test's tighter bound is not met and it still fails ([psitri#5](https://github.com/gofractally/psitri/issues/5)).
+  - `sal_hybrid-va-recycle-tests`: a real defect in an experimental allocator, unbounded growth when object sizes drift. Fixed: 307 segments and rising became 49, flat. The test now measures against what that design can achieve, live data plus one segment per size class ([psitri#5](https://github.com/gofractally/psitri/issues/5)).
   - `kv-compat-test`: the legacy engine's leg fails two checks that deliberately mark features it does not implement ([psitri#2](https://github.com/gofractally/psitri/issues/2)). Unchanged.
 
 ### 3. Signature verification (suggested reviewer: Steven, who wrote the Botan-based service)
@@ -192,7 +192,8 @@ Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime:
 
 Open items are tracked as issues and closed as they are fixed.
 
-- JIT2 and LLVM AOT paused and marked unverified; wasmtime (a pinned fork) is the only qualified engine.
+- JIT2 and LLVM AOT paused and marked unverified; wasmtime (a pinned fork) is the only qualified engine: #2228. Engine tests red on psizam main: [psizam#1](https://github.com/gofractally/psizam/issues/1), [psizam#2](https://github.com/gofractally/psizam/issues/2).
+- One monotonic clock for trace time, the limit and billing: #2227.
 - Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
 - Buying resources during a transaction does not raise that transaction's CPU limit: #2217 (fix on a branch).
 - Events: one billing event per transaction and the per-block pipeline: #2218. Objective pricing for events, by size and index count: #2223.
@@ -202,9 +203,9 @@ Open items are tracked as issues and closed as they are fixed.
 - Crypto library sources are fetched from their upstream sites, not mirrored: #2224.
 - The verifier's differential and Wycheproof checks are not an in-tree test: #2225.
 - psitri is fetched over SSH: #2226. psitri, ucc and psio have no license file.
-- psitri's own failing tests: two fixed on a branch, two open ([psitri#5](https://github.com/gofractally/psitri/issues/5), [psitri#2](https://github.com/gofractally/psitri/issues/2)).
-- The `psinode_test_crash` reopen failure: not reproduced on the current line, root cause not found.
-- Rust services lack wide arithmetic until `claude/canonical-next` lands.
+- psitri's own failing tests: three fixed on branch `claude/test-triage`, not yet merged; the legacy engine's compatibility leg ([psitri#2](https://github.com/gofractally/psitri/issues/2)) and an x86-only large-value compaction test ([psitri#1](https://github.com/gofractally/psitri/issues/1)) are open.
+- The reference-count abort seen in `psinode_test_crash`: not reproduced on the current line, root cause not found: #2229.
+- Rust services lack wide arithmetic until `claude/canonical-next` lands; rustc treats the target feature as unstable: #2230.
 - Canonical signatures are not in the head.
 - The benchmark report and the verifier evidence are on topic branches, not yet in the head.
 
