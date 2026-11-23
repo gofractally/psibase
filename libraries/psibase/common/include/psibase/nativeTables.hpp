@@ -70,7 +70,11 @@ namespace psibase
    {
       uint32_t  numExecutionMemories = 32;
       VMOptions vmOptions;
-      uint32_t  maxHandles = 64;
+      // A node-side constant, intentionally not serialized: the row is
+      // written from the block header's wasm config (BlockHeaderWasmConfig),
+      // which does not carry it. Making it configurable means adding it to
+      // both, as an appended optional member.
+      uint32_t maxHandles = 64;
 
       static constexpr auto db = psibase::DbId::native;
 

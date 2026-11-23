@@ -517,7 +517,8 @@ namespace
 
    struct GQLUrl
    {
-      std::string   url;
+      std::string url;
+      // Working state for connected(); not a field of the query result.
       std::uint32_t refcount;
       bool          hasToken() const { return XPeers{}.open<UrlAuthTable>().get(url).has_value(); }
       bool          connected() const { return refcount != 0; }
