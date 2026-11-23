@@ -4,8 +4,9 @@ mod events;
 mod graphql;
 
 use actions::{
-    add_pre_action_call_if_not_excluded, check_for_pre_action, process_action_args,
-    process_action_callers, process_action_schema, Options, PreAction,
+    add_pre_action_call_if_not_excluded, check_for_pre_action, check_method_number,
+    process_action_args, process_action_callers, process_action_schema, psio_interface_fn,
+    Options, PreAction,
 };
 use darling::ast::NestedMeta;
 use darling::{Error, FromMeta};
@@ -21,7 +22,12 @@ use quote::quote;
 use std::str::FromStr;
 use syn::{parse_quote, AttrStyle, Attribute, Item, ItemMod, ReturnType};
 
-pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
+/// `method_number` is the coder that gives an action its method number.
+pub fn service_macro_impl(
+    attr: TokenStream,
+    item: TokenStream,
+    method_number: &dyn Fn(&str) -> u64,
+) -> TokenStream {
     let attr_args = match NestedMeta::parse_meta_list(attr) {
         Ok(v) => v,
         Err(e) => {
@@ -46,7 +52,7 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
     let item = syn::parse2::<syn::Item>(item).unwrap();
     match item {
-        Item::Mod(impl_mod) => process_mod(&options, &psibase_mod, impl_mod),
+        Item::Mod(impl_mod) => process_mod(&options, &psibase_mod, impl_mod, method_number),
         _ => {
             abort!(item, "service attribute may only be used on a module")
         }
@@ -70,6 +76,7 @@ fn process_mod(
     options: &Options,
     psibase_mod: &proc_macro2::TokenStream,
     mut impl_mod: ItemMod,
+    method_number: &dyn Fn(&str) -> u64,
 ) -> TokenStream {
     let service_account = &options.name;
     let constant = proc_macro2::TokenStream::from_str(&options.constant).unwrap();
@@ -125,8 +132,14 @@ fn process_mod(
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
         let mut with_action_struct = proc_macro2::TokenStream::new();
+        let mut method_numbers = IndexMap::new();
+        let mut psio_fns = Vec::new();
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
+                check_method_number(method_number, f, &mut method_numbers);
+                if options.psio {
+                    psio_fns.push(psio_interface_fn(f));
+                }
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
                 if pre_action_info.has_pre_action() {
@@ -164,6 +177,33 @@ fn process_mod(
             }
         }
         add_unknown_action_check_to_dispatch_body(psibase_mod, &mut dispatch_body);
+        if options.psio {
+            // The actions as PSIO declares an interface: `#[psio::interface]`
+            // gives the argument records, the method metadata and the Schema
+            // IR's Interface. Nothing calls it yet; `Actions`, `action_structs`
+            // and the dispatcher above still carry every call.
+            let (psio_attr, psio_crate) = if options.psibase_mod == "crate" {
+                (quote! { ::psio }, "::psio".to_string())
+            } else {
+                (
+                    quote! { #psibase_mod::psio },
+                    format!("{}::psio", options.psibase_mod),
+                )
+            };
+            let psio_doc = format!(
+                "The actions of \"{}\" as a PSIO interface: `psio_actions::Tag` is the \
+                 interface, `psio_actions::args::<action>` the argument record of an action.",
+                options.name
+            );
+            items.push(parse_quote! {
+                #[doc = #psio_doc]
+                #[allow(non_snake_case)]
+                #[#psio_attr::interface(name = #service_account, module = "psio_actions", crate = #psio_crate)]
+                pub trait PsioActions {
+                    #(#psio_fns)*
+                }
+            });
+        }
         let const_pub = if options.pub_constant {
             quote! {pub}
         } else {
@@ -537,6 +577,14 @@ fn process_mod(
     } else {
         quote! {}
     };
+    let reexport_psio = if options.psio {
+        quote! {
+            #[automatically_derived]
+            pub use #mod_name::{psio_actions, PsioActions};
+        }
+    } else {
+        quote! {}
+    };
     let silence = if options.dispatch.unwrap() {
         quote! {}
     } else {
@@ -567,6 +615,8 @@ fn process_mod(
 
         #[automatically_derived]
         pub use #mod_name::#structs;
+
+        #reexport_psio
 
         #export_wasm_interface
         #polyfill

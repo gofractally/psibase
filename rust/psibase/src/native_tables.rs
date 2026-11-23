@@ -592,6 +592,7 @@ pub type RunToken = Vec<u8>;
     psio::PsszView,
     psio::ToPsszSchema,
     psio::Key,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack", custom = "ServiceMethod")]
 #[to_key(psibase_mod = "crate")]

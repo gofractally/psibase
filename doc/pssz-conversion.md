@@ -21,7 +21,8 @@ Schema IR for schemas. No chain data is migrated (fresh genesis).
 | | |
 |---|---|
 | Legacy library | `libraries/psio1`: include prefix `<psio1/…>`, namespace `psio1`, macros `PSIO1_…`, CMake target `psio1`, archive `libpsio1.a`. It is deleted at the end of the conversion. |
-| PSIO | `gofractally/psio` at `415ea1a61db6ee0667be7f41793e18c7e4d6ad9b`, which is its `main`, pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`, a topic branch; the pin moved to `main` in section 1.14, `224f80de`, and along it in section 1.15.) |
+| PSIO | `gofractally/psio` at `c6d9940441463c7ba3b6087595770a765f5fffac` (section 1.16; before that `415ea1a6`), which is its `main`, pinned in `cmake/PsibaseDependencies.cmake`, fetched to `external/psio`. (Slices 1–4a were built on `e6901feb`; slices 2b and 4b on `86cf8c0f` / `868e37bb`, whose `cpp/`, `cmake/` and `CMakeLists.txt` are identical; the follow-up of section 1.13 on `dfd0db17`, a topic branch; the pin moved to `main` in section 1.14, `224f80de`, and along it in section 1.15.) |
+| Since (sections 1.16, 6.16–6.20) | The integration head `44c57f739` is merged and the pin is `c6d99404`; ctest's baseline is 93. Rust: `Hex<T>` is `transparent` (D29 revised) and 44 of the 78 core records are declared; the stale Rust mirrors of D36 are corrected; the service macro can declare a service's actions as a PSIO interface (`psio = true`, three services); the C++ ↔ Rust fixture has 50 types, 115 values, legacy bytes for each, two service interfaces and 18 calls. |
 | Rust | The `psio` crate is a path dependency into the pinned checkout (`external/psio/rust/psio`). Declared with the official PSIO derives beside the legacy ones, which still write every byte: `AccountNumber`, `MethodNumber` (R1, 6.10); `Memo`, `tokens::Precision`, `Quantity`, `Decimal` (R2, 6.13); 20 core records of `rust/psibase/src` (R3, 6.14). 26 types are proved equal to their C++ twins through one fixture (6.15). Waiting, each for a stated reason: the time types and `Hex<T>` / `Checksum256` and every record that holds one (the JSON flip), 56 core records in all. Two behaviour changes: the name parsers no longer panic on malformed text (D30), and `Quantity::from_str` rejects a quantity over 2^64 − 1 (D17) and a fraction of 256 or more digits (D38). |
 | Native | `libraries/CMakeLists.txt` calls `psibase_acquire_dependency(psio)`; `psibase` and `psio1` link `psio::psio`. PSIO fetches simdjson 5.2.0 by URL and SHA-256; configuration fails if any other simdjson target exists first. PSIO's own install rules are excluded from psibase's install tree. |
 | Guests | The `wasm/` project defines an INTERFACE target `psio` (`psio::psio`) over the same source tree: `PSIO_EXCEPTIONS_ENABLED=0`, `PSIO_HAVE_SIMDJSON=0`. The SDK installs PSIO's headers (`include/psio`, `include/psio/external/xxhash.h`); `psibase-config.cmake{,.build}` define the same target for SDK consumers. |
@@ -1063,6 +1064,8 @@ commit itself.
 | D39 | The alternatives of a variant. (a) PSIO: an alternative has a label (the member name in the Schema IR: in C++ its index, `"0"`, `"1"`, unless `psio::schema_variant_labels<V>::names` states labels; in Rust the enum variant's identifier) and a text name (the attribute `ijsonName`: in C++ the alternative's type name; in Rust the variant's identifier unless `#[psio(name = "...")]`). (b) psibase: C++ `ConsensusData` is `std::variant<CftConsensus, BftConsensus>` and its JSON is `{"CftConsensus": ...}`; Rust is `enum ConsensusData { CFT(..), BFT(..) }` and serde writes `{"CFT": ...}` — the two already disagree in JSON today. Same for `InnerTrace::inner`, `SocketInfo`, `SocketEndpoint`, `IPAddress` (there the Rust variants are named after the types). (c) Not changed; `ConsensusData` and the three records that hold it wait. Recommended: C++ states the labels (`schema_variant_labels`, an additive declaration) and they are the Rust variant identifiers; the text name is the C++ type name, so Rust says `#[psio(name = "CftConsensus")]` and, at R8, serde's name follows. | Open. |
 | D40 | Enums on the wire. (a) PSIO: a C++ enum without `PSIO_REFLECT_ENUM` is its integer (schema `Int`, text a number, every value accepted); with it, and a Rust `#[repr(int)]` enum, it is an `Enum` node, its text is the enumerator's name and a value that is no enumerator is rejected. `docs/annotations-for-agents.md` D9: give an enum an explicit underlying type and reflect it. (b) psibase C++ reflects no enum: `RunMode`, `NewAccountMode`, `NotifyType`, `LogMessage::Severity`, `HttpStatus` are integers in pSSZ and, where they have JSON at all, numbers. Rust mirrors them as integers or one-member structs. (c) Taken: Rust says what C++ is today (`RunMode`, `NewAccountMode`: `#[psio(transparent)]` over `u8`; the others plain integers), and the fixture proves it. If C++ reflects an enum, its Rust twin becomes a `#[repr]` enum in the same commit; that changes JSON (names) and rejects unknown values, so it is a flip-time choice per enum. | As C++ today. |
 | D41 | Bytes in C++: `std::vector<char>` or `std::vector<std::uint8_t>`. (a) PSIO: both are hex; the first is hex over `char`, the second over `u8`, and PSIO's guide says byte data is `std::vector<std::uint8_t>` (`annotations-for-agents.md` D4). Rust has only `Vec<u8>`. (b) psibase C++: 446 `std::vector<char>` in 143 files, among them `Action::rawData`, `Claim::rawData`, every code and signature member. (c) Not changed; the cross-check lists the 14 records that differ in this only. Either PSIO makes the two the same node (RG14), or psibase C++ moves its byte members to `std::uint8_t` at the flip (a wide, mechanical change), or the Schema IR of the two languages differs in the element id and schema-driven tools must treat `char` as `u8` (they already do: same bytes, same text). | Open. |
+| D42 | A parameter name C++ reflects differently from how it declares it: `AuthDelegate::getOwner(AccountNumber account)` and `checkOwner` are reflected as `method(getOwner, owner)`. (a) PSIO: the reflected name is the parameter's name in JSON and in the schema. (b) psibase: clients and the generated schema say `owner` today; the Rust view said `account`. (c) Taken: Rust says `owner` (6.19). If the reflection is the mistake, correcting it in C++ changes `AuthDelegate-schema.json` and the JSON of the two actions' arguments, so it belongs to a flip. | Rust follows the reflection. |
+| D43 | Names of generated interfaces. (a) PSIO: an interface has a name (C++ default: the class name; Rust default: the trait's identifier) and optionally a package. (b) psibase: a service is known by its account (`"setcode"`) in both languages; the class and module names differ (`SetCode`, `service`). (c) Taken for the three services of 6.19: the account name, in both languages. To decide with D18: that rule, a package name and version (the psibase package?), and what the two events interfaces of a service are called (`<account>.history`?) — until then the macro does not declare events. | Account name; events wait. |
 | D21 | `psio-tests` now links `psibase` (and through it the service headers) so that the glue test can pin psibase's own records. Temporary, deleted with `psio1`. | Accepted. |
 
 **Note on D26: `SubjectPublicKeyInfo` as opaque bytes.** Nothing was changed;
@@ -1364,7 +1367,8 @@ R8 unless D29 is reopened.
 | R1 (done; 6.10) | The `psio` crate acquired from the pinned checkout. `AccountNumber`, `MethodNumber`: PSIO derives, `custom` id, text form. Two panics in the name parsers removed. The method coder stays psibase's (RG12, D33). | 2 types; 7 lock files | unchanged | `psio_leaf_types.rs` (the C++ vectors of `leaf_types.cpp`): 13 / 13; ctest 92 / 92 |
 | R2 (done for 4 types; 6.13) | `Memo` (`transparent`, the member bounded to 80), `tokens::{Precision, Quantity, Decimal}` with the overflow fix of D17. **Waiting:** time (`psio::time` replaces psibase's structs at R7 / R8: D34), `Hex<T>` and `Checksum256` (R8: D29), `SubjectPublicKeyInfo` (its C++ twin: D26). `ExactAccountNumber` is deleted at R8; `MethodString` belongs to the legacy schema format. | 4 types done | unchanged, except that a decimal text over 2^64 − 1 or with 256 or more fraction digits is rejected | `psio_wrappers.rs` (the C++ vectors of `wrappers.cpp`): 6 / 6; 3 unit tests in `quantity.rs`; ctest 92 / 92 |
 | R3 (done for 20 of 76 records; 6.14) | Records of `rust/psibase/src` outside `services`. Additive `PsszPack, PsszUnpack, PsszView, ToPsszSchema` (+ `Key` where `ToKey`) on the 20 whose members are all PSIO values and whose C++ twin is finally declared and equal. **Waiting:** 31 behind `Hex<T>` (R8), 7 behind time, 7 behind the socket variants' text form in C++, 4 (and 2 of the above) whose Rust declaration is not the C++ one today (D36), 5 of the legacy schema format, `Meta` (a serde attribute), `ConsensusBytes` (no C++ twin). | 20 derives / 5 files | unchanged | `psio_twins.rs` against the fixture C++ writes (6.15): schema IR, pSSZ, key, text; ctest 92 / 92 |
-| R4 | The macros. `action_structs` and `event_structs` gain the PSIO derives (`#[psio(crate = "…")]` where the macro names the crate today); callers and emitters build the action record instead of a tuple (same bytes in fracpack; removes the dependence on tuple ≡ record and gives argument caps a place to live, RG6); `service_tables` emits `psio::Key` bounds beside `ToKey`; the dispatcher refuses two actions with one method number at macro time (C++ D23). | 2 macros, ~2,000 lines; 809 action and 81 event records generated | unchanged | `rs-test-psibase-macros`, `psibase-macros-lib` tests, every `rs-test-*`; generated schemas of the 28 packages compared before / after |
+| R4 (done as far as it is additive; 6.19) | `#[psibase::service(psio = true)]` also declares the actions with `#[psio::interface]`; on for `setcode`, `auth-delg`, `minrecvr`; two services cross-checked against C++ (18 functions, 18 calls); two actions with one method number are a compile error. Events, record-building callers and key bounds are left to R7. | 1 macro; 3 services | unchanged | `psibase-macros-lib` tests, `psio_twins.rs`, `rs-test-psibase-macros`; schemas identical |
+| R4 (as first planned) | The macros. `action_structs` and `event_structs` gain the PSIO derives (`#[psio(crate = "…")]` where the macro names the crate today); callers and emitters build the action record instead of a tuple (same bytes in fracpack; removes the dependence on tuple ≡ record and gives argument caps a place to live, RG6); `service_tables` emits `psio::Key` bounds beside `ToKey`; the dispatcher refuses two actions with one method number at macro time (C++ D23). | 2 macros, ~2,000 lines; 809 action and 81 event records generated | unchanged | `rs-test-psibase-macros`, `psibase-macros-lib` tests, every `rs-test-*`; generated schemas of the 28 packages compared before / after |
 | R5 | Service declarations: `rust/psibase/src/services` (42 derives, 422 actions: the Rust statement of C++ interfaces), `packages/system` (25), `packages/user` (123 + 22 in plugins). Each crate that derives gets `psio` in its manifest (`psio.workspace = true`; the derives resolve `::psio`). Per type, the decisions that select bytes: `definition_will_not_change`, `String` vs `RawString` against the C++ parameter (99 `String` in 22 files of `services/` against C++ signatures that say `std::string` today), bounds (RG6). | 212 derives / 67 files | unchanged | as R4; per service that exists in both languages, action bytes pinned once and asserted in both |
 | R6 | Keys. A test that `ToKey` and `psio::Key` agree for every table key type in the tree (25 `ToKey` derives, 151 primary and 52 secondary keys); then `table.rs`, `native.rs` and the macro use `psio::to_key`, `psio::key::key_prefix`; `RawKey` / `KeyView` implement `psio::key::KeyPack` (D8). With C++ slice 6. | `to_key.rs` 286 lines, `to_key_macro.rs` deleted | unchanged where the formats agree | the agreement test; all service tests |
 | R7 | **The wire flip, with C++ slice 7.** `Pack` / `UnpackOwned` bounds → `psio::Encode<Pssz>` / `Decode<Pssz>`; `.packed()` → `psio::to_pssz`; action arguments and cross-service data → `psio::from_pssz` (validates); own rows → `psio::from_pssz_trusted`; `Nested`, `SharedAction`; schemas → Schema IR (`schema.rs`, 563 lines; the macros' schema output; `trace.rs` and `package.rs` onto `psio::pssz::dynamic`); the legacy derive names, `#[fracpack]`, `#[to_key]` and the 25 hand-written codec and key impls deleted; plugins and the XAdmin wasm rebuilt. | 198 + 62 + 32 call sites; 41 generic bounds; 331 derive lists | everything binary changes | all tests; fresh genesis; cross-language vectors for transactions and blocks |
@@ -2171,3 +2175,104 @@ Where the recommendation is UTF-8, a value that is not UTF-8 is refused by
 every reader and writer from the flip on; today nothing checks. The cases
 where that could reject something a node accepts now are the two marked
 with an alternative (`HttpRequest::method`, `LogMessage::message`).
+
+### 6.19 Slice R4: the service macro declares a PSIO interface (additive)
+
+**What is generated.** With `#[psibase::service(psio = true)]` the service
+module gains, beside everything it had,
+
+```rust
+#[psio::interface(name = "<the service's account>", module = "psio_actions", crate = "psibase::psio")]
+pub trait PsioActions {
+    fn setCode(service: AccountNumber, vmType: u8, vmVersion: u8, code: Hex<Vec<u8>>);
+    // ... one function per #[action], with its documentation
+}
+```
+
+and so, from PSIO's own attribute and nothing of psibase's: `psio_actions::Tag`
+(`psio::interface::Interface`: the name, the methods with their parameter
+names, the Schema IR `Interface` / `Func` through
+`SchemaBuilder::insert_interface`), `psio_actions::args::<action>` (the
+argument record: `Method`, `PsszPack`, `PsszUnpack`, `ToPsszSchema`,
+`JsonText`; its pSSZ is the tuple of the parameters), `psio_actions::dispatch`
+and `psio_actions::Proxy`. Both are re-exported next to `Actions` and
+`action_structs`. `psibase` re-exports the `psio` crate for the generated
+code (`pub use psio`), as it does `fracpack`. Nothing calls any of it:
+`Actions`, `action_structs`, `Wrapper`, the dispatcher and the schema are
+what they were, and callers and dispatch still pack fracpack tuples. Files:
+`psibase-macros-lib/src/service_macro/{mod,actions}.rs`.
+
+**Why it is an option and not unconditional.** A derive cannot ask whether
+a type implements a trait, and `#[psio::interface]` needs every parameter
+type to be `PsszPack + PsszUnpack + ToPsszSchema + JsonText` and every
+result type the first three. Until every type a service names is declared
+(time, the variants of D39, the service records of R5), turning it on
+everywhere does not compile. `psio = true` is therefore the statement "all
+of this service's types are PSIO values"; at the flip it becomes
+unconditional and the option is deleted. Two more conditions come from
+PSIO's attribute: parameter and result types are named as the service
+module sees them, not through `super::` or `self::` (several Rust views
+write `super::Record` in a result today), and a parameter is an owned
+value.
+
+**Turned on for three services:** `setcode` and `auth-delg` (the Rust views
+of C++ services, `rust/psibase/src/services`) and `minrecvr`
+(`rust/test_psibase_macros/services/min-call-recvr`, a service built to
+wasm and run in `rs-test-psibase-macros`, which proves the
+`psibase::psio` path from a crate that does not name `psio`). For them
+`Claim` and `ServiceMethod` gained `psio::JsonText` and `NewAccountMode`
+its PSIO declaration (`transparent` over `u8`, D40).
+
+**The cross-check** (`psio_twins.rs`, `rust_and_cpp_declare_the_same_services`;
+C++ side in `rust_twins.cpp`). C++ declares the two services as
+interfaces in the test (`PSIO_INTERFACE(SetCode, types(), name("setcode"))`
+over the methods `PSIO_REFLECT` lists: the form D18 prefers) and writes
+their `Interface` nodes into the fixture's Schema IR, and the pSSZ of the
+arguments of 18 sample calls packed as psibase packs them
+(`psibase::MethodArgs<M>`, the tuple of the parameters). Rust requires,
+for `setcode` (9 functions) and `auth-delg` (9): the same set of function
+names; for each function the same parameter names in order, the same
+parameter and result types with every reference resolved, the same
+attributes; the method metadata (`Tag::METHODS`) agreeing with the schema;
+and each call's bytes accepted by `validate_pssz`, decoded as the argument
+record and as its tuple, and written back identical. Both interfaces
+differ from C++ only in `char` (D41: `code`, a claim's `rawData`), and the
+test requires that difference to be present. Not compared: the order of
+the functions (the Rust views list them in another order; an action is
+found by number).
+
+**What it found.** `AuthDelegate::getOwner` and `checkOwner`: C++ declares
+the parameter `account` and reflects it as `owner`
+(`method(getOwner, owner)`), so its JSON name is `owner`; the Rust view
+said `account`. The Rust view now says `owner`, because the reflected name
+is what clients send today; whether the C++ reflection is the mistake is
+D42. Seen by reading and not yet under the check: `Accounts` (Rust `num`
+where C++ reflects `name`), `Nft` (`debitor` where C++ says `receiver`).
+The Rust views restate C++ interfaces by hand and nothing compared them;
+with `psio = true` and a line in the fixture each one is compared.
+
+**Two actions with one method number are a compile error now**, for every
+service, with or without `psio` ("actions `a` and `b` have the same method
+number; rename one of them"); C++ has refused them since slice 4a (D23).
+No service in the tree is affected (the full build passes). The check uses
+psibase's own coder, handed to the macro library by the proc-macro crate
+(`psibase_names::method_number_from_str`), so no lock file changes. Where
+it switches to `psio::compress_name::method_to_number` once RG12 is fixed
+is marked at `check_method_number` in `service_macro/actions.rs`; `method_raw!`
+(`number_macro.rs`) and `MethodNumber` switch in the same commit.
+
+**Not done in R4, and why.**
+
+* Events (`#[event(history | merkle)]`): the same trait could be generated
+  for them, but the name of an events interface and its C++ counterpart
+  (the `Svc_EventsHistory` structs) are not decided (D43).
+* Callers and emitters building the action record instead of a tuple, and
+  `service_tables` emitting `psio::Key` bounds: both change code that runs,
+  for no difference before the flip; left to R7 with the switch itself.
+* The interface's name is the service's account (`"setcode"`), which both
+  languages know; the C++ default would be the class name (D43).
+* No argument caps or parameter bounds are declared (the size audit awaits
+  the owner). `#[psio(max = ...)]` on an action parameter would reach the
+  generated trait, but the action function itself would then carry an
+  attribute rustc does not know; the macro must strip it there when the
+  first bound is declared.

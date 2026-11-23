@@ -129,6 +129,7 @@ pub struct SharedGenesisService<'a> {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::Key,
+    psio::JsonText,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]

@@ -1,4 +1,5 @@
 use darling::{ast::NestedMeta, util::PathList, FromMeta};
+use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
@@ -24,6 +25,7 @@ pub struct Options {
     pub psibase_mod: String,
     pub gql: bool,
     pub tables: Option<String>,
+    pub psio: bool,
 }
 
 impl Default for Options {
@@ -43,6 +45,7 @@ impl Default for Options {
             psibase_mod: "psibase".into(),
             gql: true,
             tables: None,
+            psio: false,
         }
     }
 }
@@ -193,6 +196,59 @@ pub fn process_action_schema(
         #insertions
         actions.insert(#psibase_mod::MethodString(#name_str.to_string()), #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
     }
+}
+
+/// An action as a function of the trait the service's PSIO interface is
+/// declared with: its documentation, name, parameters and result.
+pub fn psio_interface_fn(f: &ItemFn) -> proc_macro2::TokenStream {
+    let name = &f.sig.ident;
+    let docs = f
+        .attrs
+        .iter()
+        .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.meta.path().is_ident("doc"));
+    let params = f.sig.inputs.iter().map(|input| match input {
+        FnArg::Receiver(receiver) => abort!(receiver, "an action takes no self"),
+        FnArg::Typed(pat_type) => match &*pat_type.pat {
+            Pat::Ident(param) => {
+                let ident = &param.ident;
+                let ty = &pat_type.ty;
+                quote! { #ident: #ty }
+            }
+            _ => abort!(*pat_type.pat, "expected identifier"),
+        },
+    });
+    let output = &f.sig.output;
+    quote! {
+        #(#docs)*
+        fn #name(#(#params),*) #output;
+    }
+}
+
+/// Two actions of one service may not share a method number: the
+/// dispatcher could reach only one of them.
+///
+/// `method_number` is psibase's own method-name coder
+/// (`psibase_names::method_number_from_str`). PSIO's
+/// (`psio::compress_name::method_to_number`) replaces it, here and in
+/// `method_raw!`, once it hashes every name whose code does not read back
+/// (doc/pssz-conversion.md, RG12); `psio::interface::MethodTable` then makes
+/// the same check over the generated interface.
+pub fn check_method_number(
+    method_number: &dyn Fn(&str) -> u64,
+    f: &ItemFn,
+    seen: &mut IndexMap<u64, Ident>,
+) {
+    let name = &f.sig.ident;
+    let number = method_number(&name.to_string());
+    if let Some(first) = seen.get(&number) {
+        abort!(
+            name,
+            "actions `{}` and `{}` have the same method number; rename one of them",
+            first,
+            name
+        );
+    }
+    seen.insert(number, name.clone());
 }
 
 pub struct PreAction {

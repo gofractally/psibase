@@ -12,6 +12,7 @@
 // Native only (it reads and writes a file of the source tree).
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Memo.hpp>
+#include <psibase/MethodArgs.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/SnapshotHeader.hpp>
@@ -19,6 +20,8 @@
 #include <psibase/block.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
+#include <services/system/AuthDelegate.hpp>
+#include <services/system/SetCode.hpp>
 #include <services/user/Packages.hpp>
 #include <services/user/tokenTypes.hpp>
 
@@ -44,6 +47,17 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+// Services that are declared in both languages, as interfaces: their
+// functions are the methods PSIO_REFLECT lists. The name is the account the
+// service runs on, which is what the Rust service macro knows it by.
+namespace twins
+{
+   using SetCode      = SystemService::SetCode;
+   using AuthDelegate = SystemService::AuthDelegate;
+   PSIO_INTERFACE(SetCode, types(), name("setcode"))
+   PSIO_INTERFACE(AuthDelegate, types(), name("auth-delg"))
+}  // namespace twins
 
 namespace
 {
@@ -77,6 +91,19 @@ namespace
    {
       psio::SchemaBuilder builder;
       std::string         vectors;
+      std::string         calls;
+
+      // The arguments of a call of `Method`, as psibase packs them: the
+      // tuple of the method's parameter types.
+      template <auto Method, typename... Args>
+      void call(std::string_view interface, std::string_view method, Args&&... args)
+      {
+         psibase::MethodArgs<decltype(Method)> tuple{std::forward<Args>(args)...};
+         if (!calls.empty())
+            calls += ",\n";
+         calls += "{\"interface\":" + jsonString(interface) + ",\"method\":" + jsonString(method) +
+                  ",\"pssz\":" + jsonString(hex(psio::to_pssz(tuple))) + "}";
+      }
 
       template <typename T>
       void add(std::string_view name, const std::vector<T>& values)
@@ -97,7 +124,7 @@ namespace
       std::string text() &&
       {
          return "{\n\"schema_ir\":" + jsonString(hex(psio::emit_pssz(std::move(builder).build()))) +
-                ",\n\"vectors\":[\n" + vectors + "\n]\n}\n";
+                ",\n\"vectors\":[\n" + vectors + "\n],\n\"calls\":[\n" + calls + "\n]\n}\n";
       }
    };
 
@@ -231,6 +258,37 @@ namespace
       f.add<NotifyRow>("NotifyRow", {NotifyRow{}, NotifyRow{NotifyType::acceptTransaction, {action}}});
       f.add<RunMode>("RunMode", {RunMode::verify, RunMode::speculative, RunMode::rpc,
                                  RunMode::callback});
+
+      // Services: the interface (functions, parameter names and types,
+      // results) and the arguments of sample calls.
+      using SystemService::AuthDelegate;
+      using SystemService::NewAccountMode;
+      using SystemService::SetCode;
+      const AccountNumber alice{"alice"}, bob{"bob"};
+      f.builder.insert_interface<twins::SetCode>();
+      f.builder.insert_interface<twins::AuthDelegate>();
+      f.call<&SetCode::init>("setcode", "init");
+      f.call<&SetCode::setCode>("setcode", "setCode", alice, 1, 1, bytes);
+      f.call<&SetCode::stageCode>("setcode", "stageCode", alice, 7, 1, 1, bytes);
+      f.call<&SetCode::unstageCode>("setcode", "unstageCode", alice, 7);
+      f.call<&SetCode::setCodeStaged>("setcode", "setCodeStaged", alice, 7, 1, 1, digest);
+      f.call<&SetCode::setFlags>("setcode", "setFlags", alice, CodeRow::isPrivileged);
+      f.call<&SetCode::verifySeq>("setcode", "verifySeq");
+      f.call<&SetCode::defaultVmVersion>("setcode", "defaultVmVersion");
+      f.call<&SetCode::setDefaultVmVersion>("setcode", "setDefaultVmVersion", 1);
+      f.call<&AuthDelegate::checkAuthSys>(
+          "auth-delg", "checkAuthSys", 3, alice,
+          ServiceMethod{AccountNumber{"tokens"}, MethodNumber{"credit"}}, std::vector{claim, Claim{}});
+      f.call<&AuthDelegate::canAuthUserSys>("auth-delg", "canAuthUserSys", alice);
+      f.call<&AuthDelegate::getDlgsSys>("auth-delg", "getDlgsSys", alice);
+      f.call<&AuthDelegate::isAuthSys>("auth-delg", "isAuthSys", alice, std::vector{alice, bob});
+      f.call<&AuthDelegate::isRejectSys>("auth-delg", "isRejectSys", alice,
+                                         std::vector<AccountNumber>{});
+      f.call<&AuthDelegate::setOwner>("auth-delg", "setOwner", bob);
+      f.call<&AuthDelegate::newAccount>("auth-delg", "newAccount", alice, bob,
+                                        NewAccountMode::requireNew);
+      f.call<&AuthDelegate::getOwner>("auth-delg", "getOwner", alice);
+      f.call<&AuthDelegate::checkOwner>("auth-delg", "checkOwner", alice);
 
       return std::move(f).text();
    }

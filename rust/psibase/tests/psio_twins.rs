@@ -46,6 +46,8 @@ struct Fixture {
     schema: schema_ir::Schema,
     vectors: Vec<(String, Vector)>,
     checked: BTreeSet<String>,
+    /// (interface, method, the pSSZ of the arguments of a sample call).
+    calls: Vec<(String, String, Vec<u8>)>,
 }
 
 impl Fixture {
@@ -73,10 +75,23 @@ impl Fixture {
                 )
             })
             .collect();
+        let calls = json["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| {
+                (
+                    c["interface"].as_str().unwrap().to_string(),
+                    c["method"].as_str().unwrap().to_string(),
+                    unhex(c["pssz"].as_str().unwrap()),
+                )
+            })
+            .collect();
         Fixture {
             schema,
             vectors,
             checked: BTreeSet::new(),
+            calls,
         }
     }
 
@@ -508,4 +523,136 @@ fn memo_differs_only_in_its_declared_bound(f: &mut Fixture) {
     };
     assert_eq!(text.id, "string");
     assert!(matches!(text.r#type.value, V::List(_)));
+}
+
+// ── Services ────────────────────────────────────────────────────────────────
+
+use psio::interface::{Interface, Method};
+
+/// The interface the service macro declares for a Rust service
+/// (`#[psibase::service(psio = true)]`: `psio_actions::Tag`) and the one C++
+/// declares for the same service (`PSIO_REFLECT(Svc, method(...))` +
+/// `PSIO_INTERFACE`) have the same functions: names, parameter names in
+/// order, parameter and result types, attributes. The order of the
+/// functions is not compared (an action is found by its method number).
+fn same_interface<I: Interface>(fixture: &Fixture, reading: Reading) {
+    let mut builder = schema_ir::SchemaBuilder::new();
+    builder.insert_interface::<I>().unwrap();
+    let ours_schema = builder.finish();
+    let ours = &ours_schema.interfaces[0];
+    let name = I::NAME;
+    let theirs = fixture
+        .schema
+        .interfaces
+        .iter()
+        .find(|interface| interface.name == name)
+        .unwrap_or_else(|| panic!("{name} is not an interface of the fixture"));
+
+    let names = |interface: &schema_ir::Interface| -> BTreeSet<String> {
+        interface.funcs.iter().map(|func| func.name.clone()).collect()
+    };
+    assert_eq!(names(ours), names(theirs), "{name}: functions");
+    assert_eq!(ours.funcs.len(), theirs.funcs.len(), "{name}: a function is listed twice");
+    let mut differs = false;
+    for theirs in &theirs.funcs {
+        let ours = ours.funcs.iter().find(|func| func.name == theirs.name).unwrap();
+        let at = format!("{name}::{}", theirs.name);
+        let param_names = |func: &schema_ir::Func| -> Vec<String> {
+            func.params.iter().map(|param| param.name.clone()).collect()
+        };
+        assert_eq!(param_names(ours), param_names(theirs), "{at}: parameter names");
+        for (ours_param, theirs_param) in ours.params.iter().zip(&theirs.params) {
+            assert_eq!(
+                resolved(&ours_schema, &ours_param.r#type, reading),
+                resolved(&fixture.schema, &theirs_param.r#type, reading),
+                "{at}: type of {}",
+                theirs_param.name
+            );
+            assert_eq!(ours_param.attributes, theirs_param.attributes, "{at}: {}", theirs_param.name);
+            differs |= resolved(&ours_schema, &ours_param.r#type, Same)
+                != resolved(&fixture.schema, &theirs_param.r#type, Same);
+        }
+        assert_eq!(ours.result.is_some(), theirs.result.is_some(), "{at}: has a result");
+        if let (Some(ours_result), Some(theirs_result)) = (&ours.result, &theirs.result) {
+            assert_eq!(
+                resolved(&ours_schema, ours_result, reading),
+                resolved(&fixture.schema, theirs_result, reading),
+                "{at}: result"
+            );
+            differs |= resolved(&ours_schema, ours_result, Same)
+                != resolved(&fixture.schema, theirs_result, Same);
+        }
+        assert_eq!(ours.attributes, theirs.attributes, "{at}: attributes");
+    }
+    assert_eq!(differs, reading != Same, "{name}: the listed differences are exact");
+
+    // The method metadata says what the schema says.
+    for (index, method) in I::METHODS.iter().enumerate() {
+        let func = &ours.funcs[index];
+        assert_eq!(method.name, func.name);
+        assert_eq!(method.params.len(), func.params.len());
+        assert_eq!(method.has_result, func.result.is_some());
+    }
+}
+
+/// The argument record of an action reads the arguments C++ packs for a
+/// call of it (the tuple of the method's parameters) and writes the same
+/// bytes.
+fn same_arguments<M>(fixture: &Fixture, checked: &mut BTreeSet<(String, String)>)
+where
+    M: Method + psio::pssz::PsszValidate<psio::Pssz>,
+{
+    let interface = <M::Interface as Interface>::NAME;
+    let mut found = false;
+    for (_, method, bytes) in fixture
+        .calls
+        .iter()
+        .filter(|(i, m, _)| i == interface && m == M::NAME)
+    {
+        found = true;
+        psio::validate_pssz::<M>(bytes)
+            .unwrap_or_else(|e| panic!("{interface}::{method}: {} is rejected: {e:?}", hex(bytes)));
+        let args = psio::from_pssz::<M>(bytes).unwrap();
+        assert_eq!(hex(&psio::to_pssz(&args)), hex(bytes), "{interface}::{method}: arguments");
+        // The record is the tuple of its parameters.
+        let tuple = psio::from_pssz::<M::Tuple>(bytes).unwrap();
+        assert_eq!(hex(&psio::to_pssz(&tuple)), hex(bytes), "{interface}::{method}: tuple");
+    }
+    assert!(found, "{interface}::{} has no call in the fixture", M::NAME);
+    checked.insert((interface.to_string(), M::NAME.to_string()));
+}
+
+#[test]
+fn rust_and_cpp_declare_the_same_services() {
+    use psibase::services::{auth_delegate, setcode};
+    let f = Fixture::load();
+
+    same_interface::<setcode::psio_actions::Tag>(&f, CharInCpp);
+    same_interface::<auth_delegate::psio_actions::Tag>(&f, CharInCpp);
+
+    let mut checked = BTreeSet::new();
+    macro_rules! arguments {
+        ($service:ident: $($method:ident),*) => {
+            $(same_arguments::<$service::psio_actions::args::$method>(&f, &mut checked);)*
+        };
+    }
+    arguments!(setcode: init, setCode, stageCode, unstageCode, setCodeStaged, setFlags, verifySeq,
+               defaultVmVersion, setDefaultVmVersion);
+    arguments!(auth_delegate: checkAuthSys, canAuthUserSys, getDlgsSys, isAuthSys, isRejectSys,
+               setOwner, newAccount, getOwner, checkOwner);
+    let in_fixture: BTreeSet<(String, String)> = f
+        .calls
+        .iter()
+        .map(|(interface, method, _)| (interface.clone(), method.clone()))
+        .collect();
+    assert_eq!(checked, in_fixture, "every call of the fixture is checked");
+
+    // What the macro generates today is untouched and packs the same
+    // arguments in the legacy form: the action record and the tuple.
+    use psibase::fracpack::Pack;
+    let alice: AccountNumber = "alice".parse().unwrap();
+    assert_eq!(
+        setcode::action_structs::setFlags { service: alice, flags: 1 }.packed(),
+        (alice, 1u64).packed()
+    );
 }

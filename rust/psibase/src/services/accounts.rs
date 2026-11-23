@@ -16,8 +16,25 @@ pub struct Account {
     pub authSequence: u64,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Pack, Unpack, ToSchema)]
+/// What `newAccount` does when the account exists. In every format it is
+/// its number, as the C++ `enum class NewAccountMode : std::uint8_t` is.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Serialize,
+    Deserialize,
+    Pack,
+    Unpack,
+    ToSchema,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::Key,
+    psio::JsonText,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[psio(transparent)]
 pub struct NewAccountMode(u8);
 
 impl NewAccountMode {

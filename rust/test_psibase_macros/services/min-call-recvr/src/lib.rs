@@ -1,4 +1,4 @@
-#[psibase::service(name = "minrecvr")]
+#[psibase::service(name = "minrecvr", psio = true)]
 mod service {
     #[action]
     fn add2(a: i32, b: i32) -> i32 {

@@ -1,5 +1,5 @@
 // TODO: service flags
-#[crate::service(name = "setcode", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "setcode", dispatch = false, psibase_mod = "crate", psio = true)]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{AccountNumber, Checksum256, Hex};

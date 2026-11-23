@@ -1,4 +1,4 @@
-#[crate::service(name = "auth-delg", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "auth-delg", dispatch = false, psibase_mod = "crate", psio = true)]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{
@@ -21,17 +21,19 @@ mod service {
         unimplemented!()
     }
 
-    /// Returns the owner of `account`, if any
+    /// Returns the owner of `owner`, if any. (The parameter is called `owner`
+    /// because that is the name the C++ service reflects; its C++ declaration
+    /// says `account`.)
     #[action]
-    fn getOwner(account: AccountNumber) -> Option<AccountNumber> {
+    fn getOwner(owner: AccountNumber) -> Option<AccountNumber> {
         unimplemented!()
     }
 
-    /// Returns the owner of `account`
+    /// Returns the owner of `owner` (named as the C++ service reflects it)
     ///
     /// Aborts if the account has no owner.
     #[action]
-    fn checkOwner(account: AccountNumber) -> AccountNumber {
+    fn checkOwner(owner: AccountNumber) -> AccountNumber {
         unimplemented!()
     }
 
