@@ -57,7 +57,8 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 
 - **Compilation.** With wasmtime a service is compiled at first use, in tens of milliseconds, and the result is kept in a per-user cache on disk. Compiling stored services in the background ahead of first use applies to the LLVM AOT engine only.
 - **Instance pool** (ff905f61a, bc22a3953). wasmtime's pooling allocator with 256 slots per engine; a slot stays warm for the module that last used it. An instance the pool cannot serve (no free slot, a memory16 module, an oversized table) is created by a second engine without a pool running the same compiled code, and if the pool's address space cannot be reserved the node runs without one. `PSIBASE_WASMTIME_POOL=0` turns it off; the test `t-Tokens-test-one-pool-slot` forces the fallback. Resetting a slot is wasmtime's own mechanism: a copy-on-write image and in-place zeroing on Linux, a fresh mapping on macOS, where it gains almost nothing.
-- **CPU budget** (c3397f9c7). The executing thread no longer evaluates its own budget; only the watchdog thread cancels. The budget is paused only while a service is actually being loaded or compiled.
+- **CPU budget** (c3397f9c7). The executing thread no longer evaluates its own budget; only the watchdog thread cancels. The budget is paused only while a service is actually being loaded or compiled. The trace, the limit and billing are to share one monotonic clock; that change follows `claude/canonical-next`.
+- **A budget raised mid-run** (#2217). Funding resources just in time has to work. On the native side, changing the limit and the watchdog's decision to cancel happen under one lock, and the watchdog re-reads the limit whenever it wakes, so a raise that completes before the old deadline is honoured and nothing cancels on a stale limit; a raise after the budget ran out is too late and the cancellation stands. On the service side, the billing service used to set the limit only when a transaction starts and when billing moves to a sub-account; `buy_res`, `buy_res_for`, `buy_res_sub` and `del_res_sub` now recompute it when the balance they change is the one the running transaction is billed to (branch `claude/buy-res-raises-cpu-limit`, 69322f19e, not in the head). A chain test starts an account with a small balance, buys resources in its first action and then does forty transfers; its x86 run with and without the fix is in progress.
 - **Wide arithmetic** (8b09a8776). Accepted unconditionally by every engine, with no feature gate and no per-contract opt-in.
 - **memory16.** An optional one-page execution profile a module opts into with a custom section. No psibase service uses it. Tag `stable-20261122-memory16` on psibase, psizam and the wasmtime fork marks that checkpoint.
 
@@ -69,7 +70,7 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 **Questions for the reviewer.**
 - Is the wasm feature set each engine admits the right one, and is "psizam's validator admits, wasmtime only executes" a sound division?
 - The consensus engine is a fork of wasmtime. Is that acceptable, and is the way it is pinned enough?
-- Stack accounting under wasmtime is done by rewriting the module in the shim rather than by patching the compiler. Is that acceptable as a consensus rule?
+- Stack accounting under wasmtime is done by rewriting the module in the shim rather than by patching the compiler, which costs memory traffic on every wasm call (#2221). The intended direction is a deterministic depth check folded into wasmtime's own prologue. Is either acceptable as a consensus rule?
 - Instance pooling and reuse: what state can survive between uses of a slot, and is that provably none?
 - The fused float profile as the default for new code.
 - Wide arithmetic is lowered in JIT2 and LLVM as 64-bit operations plus a carry compare, with two new high-multiply operations, and is tested against a 128-bit oracle on every engine. Is unconditional acceptance what the team wants?
@@ -97,7 +98,11 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 
 **Known limits.**
 - On 22 November `psinode_test_crash` failed intermittently: a node aborted with "reference count exceeded limits" when reopening its database. It has not been reproduced in 21 loaded runs on the current line. The diagnosis is an earlier double release: in release builds psitri wrapped a reference count that was already zero, and the next retain threw. The root cause has not been found. The pinned psitri now aborts at the faulty release with a message instead of wrapping, so a recurrence will name the caller.
-- At the pinned commit four of psitri's own tests fail on the Mac and have not been triaged: "Block allocator truncate operations", `sal_hybrid-va-recycle-tests`, `psitrimdbx-tests` and `kv-compat-test`. They failed the same way at the previous pin.
+- At the pinned commit four of psitri's own tests fail. They have now been triaged; none is in code psibase runs. Fixes are on psitri branch `claude/test-triage`, not yet merged or pinned:
+  - "Block allocator truncate operations": the test expected behaviour that the durability work deliberately changed. Test corrected ([psitri#3](https://github.com/gofractally/psitri/issues/3)).
+  - `psitrimdbx-tests`: a test wrote 1 MB where the default backend's limit is about 0.5 MB. The limit is now reported by the library and the test respects it ([psitri#4](https://github.com/gofractally/psitri/issues/4)).
+  - `sal_hybrid-va-recycle-tests`: a real defect in an experimental allocator, unbounded growth when object sizes drift. Growth is now bounded (307 segments and rising became 49, flat), but the test's tighter bound is not met and it still fails ([psitri#5](https://github.com/gofractally/psitri/issues/5)).
+  - `kv-compat-test`: the legacy engine's leg fails two checks that deliberately mark features it does not implement ([psitri#2](https://github.com/gofractally/psitri/issues/2)). Unchanged.
 
 ### 3. Signature verification (suggested reviewer: Steven, who wrote the Botan-based service)
 
@@ -122,7 +127,7 @@ Visible in traces but not consensus: `ActionTrace.totalTime` is now elapsed time
 
 **Not yet in the head.** Branch `claude/canonical-signatures` (55aabe977), queued to land as part of `claude/canonical-next`: `verify-sig` accepts only low-S signatures on both curves, and every signer normalizes: the C++ helper, psinode's software and PKCS #11 signers, the Rust library's P-256 and PKCS #11 signers, the browser signing plugin, and the test harness. It includes tests of the browser plugin's signing function and of the Rust PKCS #11 signer against a SoftHSM token.
 
-**Not started.** The Rust library's key generation and the browser plugins still create P-256 keys.
+**Not started.** The Rust library's key generation and the browser plugins still create P-256 keys (#2216).
 
 **Questions for the reviewer.** Whether any existing wallet or tool signs without normalizing; whether to accept one key encoding instead of two.
 
@@ -170,7 +175,7 @@ What to keep in mind:
 - The tester figures are one block on one thread, not network throughput.
 - The network figures are a single node with the load generator on the same machine, one run per case. There is no multi-node run at c45c060cd or 054a0c386. Signed throughput rose less than unsigned.
 - Per-block event indexing means indexing time is no longer in a transaction's billed CPU, and objective pricing of events is not built.
-- The tester verified every signature twice when this was last checked, which overstates signature cost there. That has not been rechecked at 054a0c386.
+- The tester verified every signature twice when this was last checked, which overstates signature cost there. That has not been rechecked at 054a0c386 (#2219).
 
 The full report, with raw output, is on branch `claude/benchmark-report` under `doc/benchmarks/transfer-throughput/` and will be carried into the head.
 
@@ -185,16 +190,24 @@ Suite results are recorded per commit under `tests/timing/runs/`. On wasmtime:
 
 ## Known gaps, in one place
 
+Open items are tracked as issues and closed as they are fixed.
+
 - JIT2 and LLVM AOT paused and marked unverified; wasmtime (a pinned fork) is the only qualified engine.
-- psitri is fetched over SSH; an HTTPS URL is still to be switched in. The repository has no license file yet.
+- Deterministic stack check on wasmtime costs memory traffic on every call: #2221.
+- Buying resources during a transaction does not raise that transaction's CPU limit: #2217 (fix on a branch).
+- Events: objective pricing, one billing event per transaction, the per-block pipeline: #2218.
+- Network throughput drops with more connections, and signed lags unsigned: #2220.
+- The tester verifies each transaction signature twice: #2219.
+- secp256k1 by default in the Rust library and the browser plugins: #2216.
+- P-256 verification is about eight times slower than secp256k1: #2222.
+- Crypto library sources are fetched from their upstream sites, not mirrored: #2224.
+- The verifier's differential and Wycheproof checks are not an in-tree test: #2225.
+- psitri is fetched over SSH: #2226. psitri, ucc and psio have no license file.
+- psitri's own failing tests: two fixed on a branch, two open ([psitri#5](https://github.com/gofractally/psitri/issues/5), [psitri#2](https://github.com/gofractally/psitri/issues/2)).
 - The `psinode_test_crash` reopen failure: not reproduced on the current line, root cause not found.
-- Four of psitri's own tests fail on the Mac, untriaged.
 - Rust services lack wide arithmetic until `claude/canonical-next` lands.
-- P-256 verification speed.
-- The tester verified each signature twice when last checked; not rechecked at 054a0c386.
-- Crypto library sources are fetched from their upstream sites, not mirrored.
-- Canonical signatures and the browser/Rust key default are not in the head.
-- The benchmark report and the verifier differential test are on topic branches, not yet in the head.
+- Canonical signatures are not in the head.
+- The benchmark report and the verifier evidence are on topic branches, not yet in the head.
 
 ## Still to come in this pull request
 
