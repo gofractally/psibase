@@ -1,0 +1,241 @@
+{
+ "schema": 1,
+ "suite": "end-to-end",
+ "label": "x86 cloud; default build (WASMTIME); psizam 2e93ecd, psitri b7b8647; head 04efaefe4 + psitri 94fa328; database-sync=none",
+ "recorded": "2026-11-23T09:46:02Z",
+ "source": {
+  "commit": "f227e8d3067310da4300aa77b02e36148e8ab10a",
+  "branch": "HEAD",
+  "dirty": false,
+  "psitri": "94fa32878b1cd71765323aebd7665e196b870b73"
+ },
+ "system": {
+  "os": "Linux",
+  "os_release": "6.17.0-22-generic",
+  "machine": "x86_64",
+  "cpu": "AMD EPYC-Turin Processor",
+  "logical_cpus": 16,
+  "memory_bytes": 130497327104,
+  "fingerprint": "9504829d18fa",
+  "test_filesystem": {
+   "type": "ext4"
+  }
+ },
+ "build": {
+  "type": "Release",
+  "compiler": "Ubuntu clang version 20.1.8 (0ubuntu4)",
+  "flags": "",
+  "generator": "Ninja"
+ },
+ "ctest_arguments": [
+  "-R",
+  "^t-|^psinode_test_",
+  "-j",
+  "4",
+  "--timeout",
+  "900"
+ ],
+ "wall_seconds": 638.863,
+ "summary": {
+  "tests": 39,
+  "passed": 39,
+  "test_seconds": 993.109
+ },
+ "tests": [
+  {
+   "name": "psinode_test_block_signing",
+   "status": "passed",
+   "seconds": 31.6281
+  },
+  {
+   "name": "psinode_test_config",
+   "status": "passed",
+   "seconds": 0.615627
+  },
+  {
+   "name": "psinode_test_connect",
+   "status": "passed",
+   "seconds": 10.6352
+  },
+  {
+   "name": "psinode_test_crash",
+   "status": "passed",
+   "seconds": 186.351
+  },
+  {
+   "name": "psinode_test_fetch",
+   "status": "passed",
+   "seconds": 3.78756
+  },
+  {
+   "name": "psinode_test_psibase",
+   "status": "passed",
+   "seconds": 220.135
+  },
+  {
+   "name": "psinode_test_query",
+   "status": "passed",
+   "seconds": 26.5524
+  },
+  {
+   "name": "psinode_test_routing",
+   "status": "passed",
+   "seconds": 129.116
+  },
+  {
+   "name": "psinode_test_shutdown",
+   "status": "passed",
+   "seconds": 144.547
+  },
+  {
+   "name": "psinode_test_sites",
+   "status": "passed",
+   "seconds": 13.5844
+  },
+  {
+   "name": "psinode_test_snapshot",
+   "status": "passed",
+   "seconds": 42.6299
+  },
+  {
+   "name": "psinode_test_subjective",
+   "status": "passed",
+   "seconds": 28.9899
+  },
+  {
+   "name": "psinode_test_timer",
+   "status": "passed",
+   "seconds": 5.34353
+  },
+  {
+   "name": "psinode_test_txqueue",
+   "status": "passed",
+   "seconds": 83.1194
+  },
+  {
+   "name": "psinode_test_websocket",
+   "status": "passed",
+   "seconds": 1.94835
+  },
+  {
+   "name": "t-AuthDelegate-test",
+   "status": "passed",
+   "seconds": 2.86992
+  },
+  {
+   "name": "t-AuthSig-test",
+   "status": "passed",
+   "seconds": 3.15732
+  },
+  {
+   "name": "t-BrotliSvc-test",
+   "status": "passed",
+   "seconds": 0.0575612
+  },
+  {
+   "name": "t-Chainmail-test",
+   "status": "passed",
+   "seconds": 0.0672495
+  },
+  {
+   "name": "t-Credentials-test",
+   "status": "passed",
+   "seconds": 2.71265
+  },
+  {
+   "name": "t-Events-test",
+   "status": "passed",
+   "seconds": 2.93818
+  },
+  {
+   "name": "t-Explorer-test",
+   "status": "passed",
+   "seconds": 3.67317
+  },
+  {
+   "name": "t-Invite-test",
+   "status": "passed",
+   "seconds": 3.2488
+  },
+  {
+   "name": "t-Nft-test",
+   "status": "passed",
+   "seconds": 3.21664
+  },
+  {
+   "name": "t-Packages-test",
+   "status": "passed",
+   "seconds": 2.78111
+  },
+  {
+   "name": "t-Producers-test",
+   "status": "passed",
+   "seconds": 4.00133
+  },
+  {
+   "name": "t-StagedTx-test",
+   "status": "passed",
+   "seconds": 0.071062
+  },
+  {
+   "name": "t-Subgroups-test",
+   "status": "passed",
+   "seconds": 0.0514248
+  },
+  {
+   "name": "t-Symbol-test",
+   "status": "passed",
+   "seconds": 3.99874
+  },
+  {
+   "name": "t-Tokens-test",
+   "status": "passed",
+   "seconds": 5.4602
+  },
+  {
+   "name": "t-Tokens-test-one-pool-slot",
+   "status": "passed",
+   "seconds": 6.32447
+  },
+  {
+   "name": "t-Transact-test",
+   "status": "passed",
+   "seconds": 3.41138
+  },
+  {
+   "name": "t-TransferBench-test",
+   "status": "passed",
+   "seconds": 3.37167
+  },
+  {
+   "name": "t-VirtualServer-test",
+   "status": "passed",
+   "seconds": 0.0824753
+  },
+  {
+   "name": "t-XBasic-test",
+   "status": "passed",
+   "seconds": 2.72703
+  },
+  {
+   "name": "t-XKeys-test",
+   "status": "passed",
+   "seconds": 2.66407
+  },
+  {
+   "name": "t-XSites-test",
+   "status": "passed",
+   "seconds": 2.67588
+  },
+  {
+   "name": "t-psibase-tests",
+   "status": "passed",
+   "seconds": 4.52669
+  },
+  {
+   "name": "t-psio-tests",
+   "status": "passed",
+   "seconds": 0.0368879
+  }
+ ]
+}
