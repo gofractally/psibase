@@ -33,7 +33,16 @@ fn unhex(text: &str) -> Vec<u8> {
 
 struct Vector {
     pssz: Vec<u8>,
-    key: Vec<u8>,
+    /// `None` for a type that is never a key.
+    key: Option<Vec<u8>>,
+    ijson: String,
+}
+
+/// A transaction of the fixture: the packed `SignedTransaction`, its id and
+/// its I-JSON.
+struct TransactionVector {
+    signed: Vec<u8>,
+    id: Vec<u8>,
     ijson: String,
 }
 
@@ -43,6 +52,7 @@ struct Fixture {
     checked: BTreeSet<String>,
     /// (interface, method, the pSSZ of the arguments of a sample call).
     calls: Vec<(String, String, Vec<u8>)>,
+    transactions: Vec<(String, TransactionVector)>,
 }
 
 impl Fixture {
@@ -63,7 +73,7 @@ impl Fixture {
                     v["type"].as_str().unwrap().to_string(),
                     Vector {
                         pssz: unhex(v["pssz"].as_str().unwrap()),
-                        key: unhex(v["key"].as_str().unwrap()),
+                        key: v["key"].as_str().map(unhex),
                         ijson: v["ijson"].as_str().unwrap().to_string(),
                     },
                 )
@@ -81,11 +91,27 @@ impl Fixture {
                 )
             })
             .collect();
+        let transactions = json["transactions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| {
+                (
+                    t["name"].as_str().unwrap().to_string(),
+                    TransactionVector {
+                        signed: unhex(t["signed"].as_str().unwrap()),
+                        id: unhex(t["id"].as_str().unwrap()),
+                        ijson: t["ijson"].as_str().unwrap().to_string(),
+                    },
+                )
+            })
+            .collect();
         Fixture {
             schema,
             vectors,
             checked: BTreeSet::new(),
             calls,
+            transactions,
         }
     }
 
@@ -101,37 +127,16 @@ impl Fixture {
     }
 }
 
-/// The differences between two declarations that leave every byte, key
-/// and text the same and are known and listed (each is a decision or a gap
-/// recorded in doc/pssz-conversion.md):
-///
-/// * a string member: C++ `std::string` is raw bytes
-///   (`Custom{List<u8>, "string"}`), a Rust `String` is UTF-8
-///   (`Custom{List<u8>, "utf8"}`);
-/// * a byte sequence: C++ `std::vector<char>` is hex over the element
-///   `Custom{u8, "char"}`, a Rust `Vec<u8>` hex over `u8`.
-#[derive(Clone, Copy, PartialEq, Debug)]
-struct Reading {
-    /// A raw string reads as a UTF-8 one.
-    raw_as_utf8: bool,
-    /// A `char` reads as the `u8` it is.
-    char_as_u8: bool,
+/// A node with every reference replaced by what it refers to. A reference
+/// to a type that is being resolved (a recursive type: the Schema IR's own
+/// `AnyType`) stays a reference.
+fn resolved(schema: &schema_ir::Schema, ty: &AnyType) -> AnyType {
+    resolved_within(schema, ty, &mut Vec::new())
 }
 
-/// The two schemas are equal as they stand.
-const Same: Reading = Reading { raw_as_utf8: false, char_as_u8: false };
-/// C++ declares the type's strings raw and Rust UTF-8; nothing else differs.
-const RawInCpp: Reading = Reading { raw_as_utf8: true, char_as_u8: false };
-/// C++ declares the type's byte sequences over `char`; nothing else differs.
-const CharInCpp: Reading = Reading { raw_as_utf8: false, char_as_u8: true };
-/// Both.
-const RawAndCharInCpp: Reading = Reading { raw_as_utf8: true, char_as_u8: true };
-
-/// A node with every reference replaced by what it refers to, read as
-/// `reading` says.
-fn resolved(schema: &schema_ir::Schema, ty: &AnyType, reading: Reading) -> AnyType {
-    let go = |ty: &AnyType| Box::new(resolved(schema, ty, reading));
-    let members = |members: &Vec<schema_ir::Member>| {
+fn resolved_within(schema: &schema_ir::Schema, ty: &AnyType, open: &mut Vec<String>) -> AnyType {
+    let mut go = |ty: &AnyType| Box::new(resolved_within(schema, ty, open));
+    let mut members = |members: &Vec<schema_ir::Member>| {
         members
             .iter()
             .map(|m| schema_ir::Member {
@@ -143,11 +148,14 @@ fn resolved(schema: &schema_ir::Schema, ty: &AnyType, reading: Reading) -> AnyTy
     };
     AnyType::new(match &ty.value {
         V::Type(reference) => {
-            return resolved(
-                schema,
-                schema.get(&reference.r#type).expect("a known type"),
-                reading,
-            )
+            if open.contains(&reference.r#type) {
+                return ty.clone();
+            }
+            open.push(reference.r#type.clone());
+            let target = schema.get(&reference.r#type).expect("a known type");
+            let result = resolved_within(schema, target, open);
+            open.pop();
+            return result;
         }
         V::Object(o) => V::Object(schema_ir::Object {
             members: members(&o.members),
@@ -175,30 +183,9 @@ fn resolved(schema: &schema_ir::Schema, ty: &AnyType, reading: Reading) -> AnyTy
         V::Option(o) => V::Option(schema_ir::Optional {
             r#type: go(&o.r#type),
         }),
-        V::Custom(c) if reading.char_as_u8 && c.id == "char" => {
-            return resolved(schema, &c.r#type, reading)
-        }
-        // TEMPORARY, until the C++ flip branch is merged: there `Action` and
-        // `ServiceMethod` carry these custom ids (PSIO_INVARIANT in
-        // block.hpp / nativeTables.hpp); the C++ of this tree does not yet,
-        // so the id is read through on both sides. Remove with the merge.
-        V::Custom(c) if c.id == "Action" || c.id == "ServiceMethod" => {
-            return resolved(schema, &c.r#type, reading)
-        }
-        // TEMPORARY, until the C++ flip branch is merged: there
-        // `NewAccountMode` is a reflected enum (PSIO_REFLECT_ENUM in
-        // Accounts.hpp), as it is in Rust; the C++ of this tree declares a
-        // bare enum, which is its integer. Remove with the merge.
-        V::Enum(e) if e.members.first().is_some_and(|m| m.name == "keepExisting") => {
-            return resolved(schema, &e.r#type, reading)
-        }
         V::Custom(c) => V::Custom(schema_ir::Custom {
             r#type: go(&c.r#type),
-            id: if reading.raw_as_utf8 && c.id == "string" {
-                "utf8".to_string()
-            } else {
-                c.id.clone()
-            },
+            id: c.id.clone(),
         }),
         V::Tuple(t) => V::Tuple(schema_ir::Tuple {
             members: t.members.iter().map(|m| go(m)).collect(),
@@ -209,7 +196,7 @@ fn resolved(schema: &schema_ir::Schema, ty: &AnyType, reading: Reading) -> AnyTy
 
 /// The Rust type `T` and the C++ type the fixture calls `name` have one
 /// schema and one pSSZ encoding.
-fn same_schema_and_bytes<T>(fixture: &mut Fixture, name: &str, reading: Reading)
+fn same_schema_and_bytes<T>(fixture: &mut Fixture, name: &str)
 where
     T: ToPsszSchema
         + psio::pssz::PsszPack<psio::Pssz>
@@ -223,29 +210,49 @@ where
         .schema
         .get(name)
         .unwrap_or_else(|| panic!("{name} is not in the fixture's schema"));
-    let equal_under = |reading: Reading| {
-        resolved(&ours, &root, reading) == resolved(&fixture.schema, theirs, reading)
-    };
-    assert_eq!(
-        resolved(&ours, &root, reading),
-        resolved(&fixture.schema, theirs, reading),
-        "{name}: schema, read as {reading:?}"
-    );
-    // Each difference a type is listed with is one it has: the list is
-    // exact, and a type leaves it when either declaration changes.
-    if reading.raw_as_utf8 {
-        assert!(
-            !equal_under(Reading { raw_as_utf8: false, ..reading }),
-            "{name}: its strings are declared alike now"
-        );
-    }
-    if reading.char_as_u8 {
-        assert!(
-            !equal_under(Reading { char_as_u8: false, ..reading }),
-            "{name}: its byte sequences are declared alike now"
-        );
-    }
+    assert_eq!(resolved(&ours, &root), resolved(&fixture.schema, theirs), "{name}: schema");
+    same_bytes::<T>(fixture, name);
+}
 
+/// The same for a type that holds a variant. PSIO's C++ schema labels the
+/// alternatives of a `std::variant` `"0"`, `"1"`, … and carries each one's
+/// name as the attribute `ijsonName`; its Rust schema labels them by the
+/// enum's identifiers. The two nodes describe one encoding and one text
+/// but are not equal, so they are compared with PSIO's `equivalent` under
+/// `Compare::Wire` (doc/flip-interop.md 0.1); the texts are compared
+/// through the values.
+fn same_wire_and_bytes<T>(fixture: &mut Fixture, name: &str)
+where
+    T: ToPsszSchema
+        + psio::pssz::PsszPack<psio::Pssz>
+        + psio::pssz::PsszUnpack<psio::Pssz>
+        + psio::pssz::PsszValidate<psio::Pssz>,
+{
+    use psio::pssz::dynamic::{equivalent, Compare};
+    fixture.checked.insert(name.to_string());
+
+    let (ours, root) = schema_for::<T>().unwrap();
+    let theirs = fixture
+        .schema
+        .get(name)
+        .unwrap_or_else(|| panic!("{name} is not in the fixture's schema"));
+    let result = equivalent(&ours, &root, &fixture.schema, theirs, Compare::Wire);
+    assert!(result.ok, "{name}: schema: {result:?}");
+    assert_ne!(
+        resolved(&ours, &root),
+        resolved(&fixture.schema, theirs),
+        "{name}: the two schemas are equal now: compare it with same_schema_and_bytes"
+    );
+    same_bytes::<T>(fixture, name);
+}
+
+/// The Rust type reads each value of the fixture and writes the same bytes.
+fn same_bytes<T>(fixture: &Fixture, name: &str)
+where
+    T: psio::pssz::PsszPack<psio::Pssz>
+        + psio::pssz::PsszUnpack<psio::Pssz>
+        + psio::pssz::PsszValidate<psio::Pssz>,
+{
     for vector in fixture.vectors(name) {
         psio::validate_pssz::<T>(&vector.pssz)
             .unwrap_or_else(|e| panic!("{name}: {} is rejected: {e:?}", hex(&vector.pssz)));
@@ -268,8 +275,9 @@ where
 {
     for vector in fixture.vectors(name) {
         let value = psio::from_pssz::<T>(&vector.pssz).unwrap();
-        assert_eq!(hex(&psio::to_key(&value)), hex(&vector.key), "{name}: key");
-        let back = psio::from_key::<T>(&vector.key).unwrap();
+        let key = vector.key.as_ref().unwrap_or_else(|| panic!("{name} has no key in the fixture"));
+        assert_eq!(hex(&psio::to_key(&value)), hex(key), "{name}: key");
+        let back = psio::from_key::<T>(key).unwrap();
         assert_eq!(
             hex(&psio::to_pssz(&back)),
             hex(&vector.pssz),
@@ -322,103 +330,141 @@ fn rust_and_cpp_declare_the_same_types() {
     let mut f = Fixture::load();
 
     // Names (slice R1).
-    same_schema_and_bytes::<AccountNumber>(&mut f, "AccountNumber", Same);
+    same_schema_and_bytes::<AccountNumber>(&mut f, "AccountNumber");
     same_key::<AccountNumber>(&f, "AccountNumber");
     same_text::<AccountNumber>(&f, "AccountNumber");
     same_serde_text::<AccountNumber>(&f, "AccountNumber");
-    same_schema_and_bytes::<MethodNumber>(&mut f, "MethodNumber", Same);
+    same_schema_and_bytes::<MethodNumber>(&mut f, "MethodNumber");
     same_key::<MethodNumber>(&f, "MethodNumber");
     same_text::<MethodNumber>(&f, "MethodNumber");
     same_serde_text::<MethodNumber>(&f, "MethodNumber");
 
     // Wrappers and token amounts (slice R2). A memo is a UTF-8 string of at
     // most 80 bytes in both languages, declared as a bound.
-    same_schema_and_bytes::<Memo>(&mut f, "Memo", Same);
+    same_schema_and_bytes::<Memo>(&mut f, "Memo");
     same_text::<Memo>(&f, "Memo");
     same_serde_text::<Memo>(&f, "Memo");
-    same_schema_and_bytes::<Precision>(&mut f, "Precision", Same);
+    same_schema_and_bytes::<Precision>(&mut f, "Precision");
     same_key::<Precision>(&f, "Precision");
     same_text::<Precision>(&f, "Precision");
     same_serde_text::<Precision>(&f, "Precision");
-    same_schema_and_bytes::<Quantity>(&mut f, "Quantity", Same);
+    same_schema_and_bytes::<Quantity>(&mut f, "Quantity");
     same_key::<Quantity>(&f, "Quantity");
     same_text::<Quantity>(&f, "Quantity");
     same_serde_text::<Quantity>(&f, "Quantity");
-    same_schema_and_bytes::<Decimal>(&mut f, "Decimal", Same);
+    same_schema_and_bytes::<Decimal>(&mut f, "Decimal");
     same_key::<Decimal>(&f, "Decimal");
     same_text::<Decimal>(&f, "Decimal");
     same_serde_text::<Decimal>(&f, "Decimal");
 
     // Core records (slice R3).
-    same_schema_and_bytes::<BlockHeaderCode>(&mut f, "BlockHeaderCode", Same);
+    same_schema_and_bytes::<BlockHeaderCode>(&mut f, "BlockHeaderCode");
     same_key::<BlockHeaderCode>(&f, "BlockHeaderCode");
-    same_schema_and_bytes::<HttpHeader>(&mut f, "HttpHeader", RawInCpp);
+    same_schema_and_bytes::<HttpHeader>(&mut f, "HttpHeader");
     same_key::<HttpHeader>(&f, "HttpHeader");
-    same_schema_and_bytes::<VMOptions>(&mut f, "VMOptions", Same);
-    same_schema_and_bytes::<WasmConfigRow>(&mut f, "WasmConfigRow", Same);
-    same_schema_and_bytes::<ConsensusChangeRow>(&mut f, "ConsensusChangeRow", Same);
-    same_schema_and_bytes::<ScheduledSnapshotRow>(&mut f, "ScheduledSnapshotRow", Same);
-    same_schema_and_bytes::<LogTruncateRow>(&mut f, "LogTruncateRow", Same);
-    same_schema_and_bytes::<IPV4Address>(&mut f, "IPV4Address", Same);
-    same_schema_and_bytes::<IPV6Address>(&mut f, "IPV6Address", Same);
-    same_schema_and_bytes::<IPV4Endpoint>(&mut f, "IPV4Endpoint", Same);
-    same_schema_and_bytes::<IPV6Endpoint>(&mut f, "IPV6Endpoint", Same);
-    same_schema_and_bytes::<LocalEndpoint>(&mut f, "LocalEndpoint", Same);
-    same_schema_and_bytes::<TLSInfo>(&mut f, "TLSInfo", Same);
-    same_schema_and_bytes::<ServiceMethod>(&mut f, "ServiceMethod", Same);
+    same_schema_and_bytes::<VMOptions>(&mut f, "VMOptions");
+    same_schema_and_bytes::<WasmConfigRow>(&mut f, "WasmConfigRow");
+    same_schema_and_bytes::<ConsensusChangeRow>(&mut f, "ConsensusChangeRow");
+    same_schema_and_bytes::<ScheduledSnapshotRow>(&mut f, "ScheduledSnapshotRow");
+    same_schema_and_bytes::<LogTruncateRow>(&mut f, "LogTruncateRow");
+    same_schema_and_bytes::<IPV4Address>(&mut f, "IPV4Address");
+    same_schema_and_bytes::<IPV6Address>(&mut f, "IPV6Address");
+    same_schema_and_bytes::<IPV4Endpoint>(&mut f, "IPV4Endpoint");
+    same_schema_and_bytes::<IPV6Endpoint>(&mut f, "IPV6Endpoint");
+    same_schema_and_bytes::<LocalEndpoint>(&mut f, "LocalEndpoint");
+    same_schema_and_bytes::<TLSInfo>(&mut f, "TLSInfo");
+    same_schema_and_bytes::<ServiceMethod>(&mut f, "ServiceMethod");
     same_key::<ServiceMethod>(&f, "ServiceMethod");
-    same_schema_and_bytes::<EnvRow>(&mut f, "EnvRow", Same);
-    same_schema_and_bytes::<HostConfigRow>(&mut f, "HostConfigRow", RawInCpp);
-    same_schema_and_bytes::<PendingShutdownRow>(&mut f, "PendingShutdownRow", RawInCpp);
-    same_schema_and_bytes::<PackageRef>(&mut f, "PackageRef", RawInCpp);
-    same_schema_and_bytes::<PackageExport>(&mut f, "PackageExport", RawInCpp);
-    same_schema_and_bytes::<ConsoleTrace>(&mut f, "ConsoleTrace", Same);
+    same_schema_and_bytes::<EnvRow>(&mut f, "EnvRow");
+    same_schema_and_bytes::<HostConfigRow>(&mut f, "HostConfigRow");
+    same_schema_and_bytes::<PendingShutdownRow>(&mut f, "PendingShutdownRow");
+    same_schema_and_bytes::<PackageRef>(&mut f, "PackageRef");
+    same_schema_and_bytes::<PackageExport>(&mut f, "PackageExport");
+    same_schema_and_bytes::<ConsoleTrace>(&mut f, "ConsoleTrace");
 
     // Byte sequences behind `Hex<T>`, and the records that hold them.
-    same_schema_and_bytes::<Checksum256>(&mut f, "Checksum256", Same);
+    same_schema_and_bytes::<Checksum256>(&mut f, "Checksum256");
     same_key::<Checksum256>(&f, "Checksum256");
     same_text::<Checksum256>(&f, "Checksum256");
-    same_schema_and_bytes::<Vec<u8>>(&mut f, "Bytes", Same);
+    same_schema_and_bytes::<Vec<u8>>(&mut f, "Bytes");
     same_key::<Vec<u8>>(&f, "Bytes");
     same_text::<Vec<u8>>(&f, "Bytes");
-    same_schema_and_bytes::<Vec<u8>>(&mut f, "Octets", Same);
+    same_schema_and_bytes::<Vec<u8>>(&mut f, "Octets");
     same_key::<Vec<u8>>(&f, "Octets");
     same_text::<Vec<u8>>(&f, "Octets");
-    same_schema_and_bytes::<Action>(&mut f, "Action", Same);
+    same_schema_and_bytes::<Action>(&mut f, "Action");
     same_key::<Action>(&f, "Action");
-    same_schema_and_bytes::<GenesisService>(&mut f, "GenesisService", Same);
+    same_schema_and_bytes::<GenesisService>(&mut f, "GenesisService");
     same_key::<GenesisService>(&f, "GenesisService");
-    same_schema_and_bytes::<GenesisActionData>(&mut f, "GenesisActionData", RawInCpp);
+    same_schema_and_bytes::<GenesisActionData>(&mut f, "GenesisActionData");
     same_key::<GenesisActionData>(&f, "GenesisActionData");
-    same_schema_and_bytes::<Claim>(&mut f, "Claim", Same);
+    same_schema_and_bytes::<Claim>(&mut f, "Claim");
     same_key::<Claim>(&f, "Claim");
-    same_schema_and_bytes::<Producer>(&mut f, "Producer", Same);
+    same_schema_and_bytes::<Producer>(&mut f, "Producer");
     same_key::<Producer>(&f, "Producer");
-    same_schema_and_bytes::<CftConsensus>(&mut f, "CftConsensus", Same);
-    same_schema_and_bytes::<BftConsensus>(&mut f, "BftConsensus", Same);
-    same_schema_and_bytes::<BlockHeaderAuthAccount>(&mut f, "BlockHeaderAuthAccount", Same);
+    same_schema_and_bytes::<CftConsensus>(&mut f, "CftConsensus");
+    same_schema_and_bytes::<BftConsensus>(&mut f, "BftConsensus");
+    same_schema_and_bytes::<BlockHeaderAuthAccount>(&mut f, "BlockHeaderAuthAccount");
     same_key::<BlockHeaderAuthAccount>(&f, "BlockHeaderAuthAccount");
-    same_schema_and_bytes::<HttpRequest>(&mut f, "HttpRequest", RawInCpp);
-    same_schema_and_bytes::<HttpReply>(&mut f, "HttpReply", RawInCpp);
-    same_schema_and_bytes::<CodeRow>(&mut f, "CodeRow", Same);
-    same_schema_and_bytes::<CodeByHashRow>(&mut f, "CodeByHashRow", Same);
-    same_schema_and_bytes::<BlockDataRow>(&mut f, "BlockDataRow", Same);
-    same_schema_and_bytes::<StateChecksum>(&mut f, "StateChecksum", Same);
-    same_schema_and_bytes::<StateSignature>(&mut f, "StateSignature", Same);
-    same_schema_and_bytes::<SnapshotStateItem>(&mut f, "SnapshotStateItem", Same);
-    same_schema_and_bytes::<SnapshotRow>(&mut f, "SnapshotRow", Same);
+    same_schema_and_bytes::<HttpRequest>(&mut f, "HttpRequest");
+    same_schema_and_bytes::<HttpReply>(&mut f, "HttpReply");
+    same_schema_and_bytes::<CodeRow>(&mut f, "CodeRow");
+    same_schema_and_bytes::<CodeByHashRow>(&mut f, "CodeByHashRow");
+    same_schema_and_bytes::<BlockDataRow>(&mut f, "BlockDataRow");
+    same_schema_and_bytes::<StateChecksum>(&mut f, "StateChecksum");
+    same_schema_and_bytes::<StateSignature>(&mut f, "StateSignature");
+    same_schema_and_bytes::<SnapshotStateItem>(&mut f, "SnapshotStateItem");
+    same_schema_and_bytes::<SnapshotRow>(&mut f, "SnapshotRow");
 
     // Rows whose Rust declaration had fallen behind the C++ one.
-    same_schema_and_bytes::<ConfigRow>(&mut f, "ConfigRow", Same);
-    same_schema_and_bytes::<LogMessage>(&mut f, "LogMessage", RawInCpp);
-    same_schema_and_bytes::<NotifyRow>(&mut f, "NotifyRow", Same);
-    same_schema_and_bytes::<RunMode>(&mut f, "RunMode", Same);
+    same_schema_and_bytes::<ConfigRow>(&mut f, "ConfigRow");
+    same_schema_and_bytes::<LogMessage>(&mut f, "LogMessage");
+    same_schema_and_bytes::<NotifyRow>(&mut f, "NotifyRow");
+    same_schema_and_bytes::<RunMode>(&mut f, "RunMode");
     same_key::<RunMode>(&f, "RunMode");
     same_text::<RunMode>(&f, "RunMode");
     same_serde_text::<RunMode>(&f, "RunMode");
 
     // Records of services implemented in Rust, mirrored in C++ headers.
-    same_schema_and_bytes::<services::staged_tx::service::Response>(&mut f, "Response", Same);
+    same_schema_and_bytes::<services::staged_tx::service::Response>(&mut f, "Response");
+
+    // Enums written by name, and the types that are one string in JSON.
+    use psibase::services::accounts::NewAccountMode;
+    use psibase::services::auth_sig::SubjectPublicKeyInfo;
+    same_schema_and_bytes::<DbId>(&mut f, "DbId");
+    same_key::<DbId>(&f, "DbId");
+    same_text::<DbId>(&f, "DbId");
+    same_serde_text::<DbId>(&f, "DbId");
+    same_schema_and_bytes::<NewAccountMode>(&mut f, "NewAccountMode");
+    same_key::<NewAccountMode>(&f, "NewAccountMode");
+    same_text::<NewAccountMode>(&f, "NewAccountMode");
+    same_serde_text::<NewAccountMode>(&f, "NewAccountMode");
+    same_schema_and_bytes::<SubjectPublicKeyInfo>(&mut f, "SubjectPublicKeyInfo");
+    same_text::<SubjectPublicKeyInfo>(&f, "SubjectPublicKeyInfo");
+    same_serde_text::<SubjectPublicKeyInfo>(&f, "SubjectPublicKeyInfo");
+    same_wire_and_bytes::<IPAddress>(&mut f, "IPAddress");
+    same_text::<IPAddress>(&f, "IPAddress");
+    same_serde_text::<IPAddress>(&f, "IPAddress");
+    same_wire_and_bytes::<SocketEndpoint>(&mut f, "SocketEndpoint");
+    same_text::<SocketEndpoint>(&f, "SocketEndpoint");
+    same_serde_text::<SocketEndpoint>(&f, "SocketEndpoint");
+
+    // A service's schema: the record, its bytes and its text.
+    same_wire_and_bytes::<ServiceSchema>(&mut f, "ServiceSchema");
+    same_text::<ServiceSchema>(&f, "ServiceSchema");
+    same_serde_text::<ServiceSchema>(&f, "ServiceSchema");
+
+    // Transactions.
+    same_schema_and_bytes::<Tapos>(&mut f, "Tapos");
+    same_key::<Tapos>(&f, "Tapos");
+    same_text::<Tapos>(&f, "Tapos");
+    same_serde_text::<Tapos>(&f, "Tapos");
+    same_schema_and_bytes::<Transaction>(&mut f, "Transaction");
+    same_text::<Transaction>(&f, "Transaction");
+    same_serde_text::<Transaction>(&f, "Transaction");
+    same_schema_and_bytes::<SignedTransaction>(&mut f, "SignedTransaction");
+    same_text::<SignedTransaction>(&f, "SignedTransaction");
+    same_serde_text::<SignedTransaction>(&f, "SignedTransaction");
 
     let in_fixture: BTreeSet<String> = f.vectors.iter().map(|(ty, _)| ty.clone()).collect();
     assert_eq!(
@@ -437,7 +483,7 @@ use psio::interface::{Interface, Method};
 /// `PSIO_INTERFACE`) have the same functions: names, parameter names in
 /// order, parameter and result types, attributes. The order of the
 /// functions is not compared (an action is found by its method number).
-fn same_interface<I: Interface>(fixture: &Fixture, reading: Reading) {
+fn same_interface<I: Interface>(fixture: &Fixture) {
     let mut builder = schema_ir::SchemaBuilder::new();
     builder.insert_interface::<I>().unwrap();
     let ours_schema = builder.finish();
@@ -455,7 +501,6 @@ fn same_interface<I: Interface>(fixture: &Fixture, reading: Reading) {
     };
     assert_eq!(names(ours), names(theirs), "{name}: functions");
     assert_eq!(ours.funcs.len(), theirs.funcs.len(), "{name}: a function is listed twice");
-    let mut differs = false;
     for theirs in &theirs.funcs {
         let ours = ours.funcs.iter().find(|func| func.name == theirs.name).unwrap();
         let at = format!("{name}::{}", theirs.name);
@@ -465,28 +510,23 @@ fn same_interface<I: Interface>(fixture: &Fixture, reading: Reading) {
         assert_eq!(param_names(ours), param_names(theirs), "{at}: parameter names");
         for (ours_param, theirs_param) in ours.params.iter().zip(&theirs.params) {
             assert_eq!(
-                resolved(&ours_schema, &ours_param.r#type, reading),
-                resolved(&fixture.schema, &theirs_param.r#type, reading),
+                resolved(&ours_schema, &ours_param.r#type),
+                resolved(&fixture.schema, &theirs_param.r#type),
                 "{at}: type of {}",
                 theirs_param.name
             );
             assert_eq!(ours_param.attributes, theirs_param.attributes, "{at}: {}", theirs_param.name);
-            differs |= resolved(&ours_schema, &ours_param.r#type, Same)
-                != resolved(&fixture.schema, &theirs_param.r#type, Same);
         }
         assert_eq!(ours.result.is_some(), theirs.result.is_some(), "{at}: has a result");
         if let (Some(ours_result), Some(theirs_result)) = (&ours.result, &theirs.result) {
             assert_eq!(
-                resolved(&ours_schema, ours_result, reading),
-                resolved(&fixture.schema, theirs_result, reading),
+                resolved(&ours_schema, ours_result),
+                resolved(&fixture.schema, theirs_result),
                 "{at}: result"
             );
-            differs |= resolved(&ours_schema, ours_result, Same)
-                != resolved(&fixture.schema, theirs_result, Same);
         }
         assert_eq!(ours.attributes, theirs.attributes, "{at}: attributes");
     }
-    assert_eq!(differs, reading != Same, "{name}: the listed differences are exact");
 
     // The method metadata says what the schema says.
     for (index, method) in I::METHODS.iter().enumerate() {
@@ -524,13 +564,148 @@ where
     checked.insert((interface.to_string(), M::NAME.to_string()));
 }
 
+/// The error callback of a request (`x-http::setCallback`'s `err`), as a
+/// Rust service declares it: C++ `XProxy::onError` and `XPeers::errP2P`
+/// state the cap of the argument list, and so must a Rust callback, or its
+/// arguments are another encoding.
+mod proxy {
+    #[psibase::service(name = "x-proxy", dispatch = false)]
+    #[allow(non_snake_case, unused_variables)]
+    pub mod service {
+        #[action]
+        #[pssz(max_dynamic_data = 4294967295)]
+        fn onError(socket: i32, reply: Option<psibase::HttpReply>) {
+            unimplemented!()
+        }
+    }
+}
+mod peers {
+    #[psibase::service(name = "x-peers", dispatch = false)]
+    #[allow(non_snake_case, unused_variables)]
+    pub mod service {
+        #[action]
+        #[pssz(max_dynamic_data = 4294967295)]
+        fn errP2P(socket: i32, reply: Option<psibase::HttpReply>) {
+            unimplemented!()
+        }
+    }
+}
+use peers::service as x_peers;
+use proxy::service as x_proxy;
+
+/// What the caller a service macro generates packs for a call is the
+/// fixture's bytes: the path every Rust client of a C++ service takes.
+#[test]
+fn rust_callers_pack_what_cpp_packs() {
+    use psibase::services::{accounts, producers, transact};
+    let f = Fixture::load();
+    let call = |interface: &str, method: &str| -> Vec<u8> {
+        f.calls
+            .iter()
+            .find(|(i, m, _)| i == interface && m == method)
+            .unwrap_or_else(|| panic!("{interface}::{method} has no call in the fixture"))
+            .2
+            .clone()
+    };
+    let digest: Checksum256 = [
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+        0x0f, 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd,
+        0xfe, 0xff,
+    ];
+    let bytes = vec![0x00u8, 0x01, 0x7f, 0x80, 0xff];
+    let alice = account!("alice");
+    let producer = Producer {
+        name: account!("prod1"),
+        auth: Claim { service: account!("verify-sig"), rawData: bytes.clone() },
+    };
+
+    let start_boot = transact::Wrapper::pack().startBoot(vec![digest, [0; 32]]);
+    assert_eq!(hex(&start_boot.rawData), hex(&call("transact", "startBoot")));
+    assert_eq!(start_boot.method, MethodNumber::from("startBoot"));
+    let new_account = accounts::Wrapper::pack().newAccount(
+        alice,
+        account!("auth-sig"),
+        accounts::NewAccountMode::RequireNew,
+    );
+    assert_eq!(hex(&new_account.rawData), hex(&call("accounts", "newAccount")));
+    let set_producers = producers::Wrapper::pack().setProducers(vec![producer.clone()]);
+    assert_eq!(hex(&set_producers.rawData), hex(&call("producers", "setProducers")));
+
+    // An empty argument list is one byte.
+    assert_eq!(hex(&call("setcode", "init")), "00");
+    assert_eq!(hex(&psibase::services::setcode::Wrapper::pack().init().rawData), "00");
+
+    // The error callback without a reply is the capped list with the
+    // optional absent: 4-byte offsets, not the 1-byte list of `(socket)`.
+    assert_eq!(hex(&call("x-proxy", "onError")), "0400000007000000");
+    assert_eq!(
+        hex(&psio::to_pssz(&x_proxy::psio_actions::args::onError { socket: 7, reply: None })),
+        "0400000007000000"
+    );
+
+    // The transactions: the same typed values give the same bytes and id.
+    let expiration = TimePointSec::from_ticks(1_700_000_000);
+    let genesis_service = GenesisService {
+        service: account!("transact"),
+        flags: 3,
+        vmType: 1,
+        vmVersion: 1,
+        code: bytes.clone(),
+    };
+    let genesis = Transaction {
+        tapos: Tapos { expiration, refBlockSuffix: 0, flags: 0, refBlockIndex: 0 },
+        actions: vec![Action {
+            sender: AccountNumber::default(),
+            service: AccountNumber::default(),
+            method: MethodNumber::from("boot"),
+            rawData: psio::to_pssz(&GenesisActionData {
+                memo: String::new(),
+                services: vec![genesis_service],
+            }),
+        }],
+        claims: vec![],
+    };
+    let boot = Transaction {
+        tapos: Tapos { expiration, refBlockSuffix: 0x01020304, flags: 0, refBlockIndex: 7 },
+        actions: vec![
+            transact::Wrapper::pack_from(transact::SERVICE).startBoot(vec![digest]),
+            producers::Wrapper::pack_from(producers::SERVICE).setProducers(vec![producer.clone()]),
+            accounts::Wrapper::pack_from(accounts::SERVICE).newAccount(
+                alice,
+                account!("auth-any"),
+                accounts::NewAccountMode::RequireNew,
+            ),
+        ],
+        claims: vec![producer.auth.clone()],
+    };
+    let mut checked = BTreeSet::new();
+    for (name, trx) in [("genesis", genesis), ("boot", boot)] {
+        let (_, vector) = f.transactions.iter().find(|(n, _)| n == name).unwrap();
+        let signed = SignedTransaction {
+            transaction: psio::pssz::Nested::new(&trx).unwrap(),
+            proofs: vec![],
+            subjectiveData: None,
+        };
+        assert_eq!(hex(&psio::to_pssz(&signed)), hex(&vector.signed), "{name}: bytes");
+        assert_eq!(hex(&sha256(signed.transaction.bytes())), hex(&vector.id), "{name}: id");
+        assert_eq!(hex(&sha256(&psio::to_pssz(&trx))), hex(&vector.id), "{name}: id");
+        assert_eq!(psio::to_ijson(&signed), vector.ijson, "{name}: I-JSON");
+        let read = psio::from_ijson::<SignedTransaction>(&vector.ijson).unwrap();
+        assert_eq!(hex(&psio::to_pssz(&read)), hex(&vector.signed), "{name}: I-JSON read");
+        psio::validate_pssz::<SignedTransaction>(&vector.signed).unwrap();
+        checked.insert(name.to_string());
+    }
+    let in_fixture: BTreeSet<String> = f.transactions.iter().map(|(n, _)| n.clone()).collect();
+    assert_eq!(checked, in_fixture, "every transaction of the fixture is checked");
+}
+
 #[test]
 fn rust_and_cpp_declare_the_same_services() {
     use psibase::services::{auth_delegate, setcode};
     let f = Fixture::load();
 
-    same_interface::<setcode::psio_actions::Tag>(&f, Same);
-    same_interface::<auth_delegate::psio_actions::Tag>(&f, Same);
+    same_interface::<setcode::psio_actions::Tag>(&f);
+    same_interface::<auth_delegate::psio_actions::Tag>(&f);
 
     let mut checked = BTreeSet::new();
     macro_rules! arguments {
@@ -542,6 +717,20 @@ fn rust_and_cpp_declare_the_same_services() {
                defaultVmVersion, setDefaultVmVersion);
     arguments!(auth_delegate: checkAuthSys, canAuthUserSys, getDlgsSys, isAuthSys, isRejectSys,
                setOwner, newAccount, getOwner, checkOwner);
+    // What a boot packs for services implemented in C++, calls of services
+    // implemented in Rust, and the two callbacks with a capped argument list.
+    use psibase::services::{accounts, auth_sig, http_server, nft, packages, producers, sites, tokens, transact};
+    arguments!(transact: startBoot);
+    arguments!(accounts: newAccount);
+    arguments!(auth_sig: newAccount);
+    arguments!(packages: postinstall, setSchema);
+    arguments!(sites: storeSys);
+    arguments!(producers: setProducers);
+    arguments!(http_server: registerServer);
+    arguments!(tokens: credit, recall);
+    arguments!(nft: mint);
+    arguments!(x_proxy: onError);
+    arguments!(x_peers: errP2P);
     let in_fixture: BTreeSet<(String, String)> = f
         .calls
         .iter()
@@ -593,10 +782,7 @@ fn rust_views_name_parameters_as_the_implementation_does() {
         (("transact", "removeCallback"), "keyword"),
         // The C++ reflection misnames or does not name a parameter
         // (doc/pssz-conversion.md 6.22); the view has the declared name.
-        (("packages", "setSchema"), "C++ reflection"),
-        (("packages", "getSchema"), "C++ reflection"),
         (("x-admin", "isAdmin"), "C++ reflection"),
-        (("x-packages", "serveSys"), "C++ reflection"),
     ]
     .into_iter()
     .collect();

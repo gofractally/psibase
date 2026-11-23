@@ -275,7 +275,7 @@ fn process_mod(
             let mut event_psio_fns = Vec::new();
             let mut all_have_params = true;
             for (fn_index, _) in fns {
-                if let Item::Fn(f) = &items[*fn_index] {
+                if let Item::Fn(f) = &mut items[*fn_index] {
                     all_have_params &= !f.sig.inputs.is_empty();
                     event_psio_fns.push(psio_interface_fn(f));
                 }

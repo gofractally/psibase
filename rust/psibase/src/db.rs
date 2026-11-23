@@ -15,6 +15,7 @@ pub use crate::services::events::EventDb;
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
+    psio::Key,
     psio::JsonText,
     psio::Serde,
 )]

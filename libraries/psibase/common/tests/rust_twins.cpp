@@ -17,13 +17,18 @@
 #include <psibase/SnapshotHeader.hpp>
 #include <psibase/SocketInfo.hpp>
 #include <psibase/block.hpp>
+#include <psibase/crypto.hpp>
+#include <psibase/db.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/schema.hpp>
 #include <psibase/trace.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XKeys.hpp>
 #include <services/local/XPackages.hpp>
+#include <services/local/XPeers.hpp>
+#include <services/local/XProxy.hpp>
 #include <services/local/XSites.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
@@ -35,6 +40,7 @@
 #include <services/system/Db.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Producers.hpp>
+#include <services/system/Spki.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/system/StagedTx.hpp>
 #include <services/system/Transact.hpp>
@@ -77,6 +83,11 @@ namespace twins
    PSIO_INTERFACE(AuthDelegate, types(), name("auth-delg"))
 }  // namespace twins
 
+// A sample call of `Service::method`, for the fixture `f`.
+#define CALL(Service, account, method, ...)                                           \
+   f.call<Service, *psio::reflect<Service>::index_of_method(#method)>(account, #method \
+                                                                      __VA_OPT__(, ) __VA_ARGS__)
+
 namespace
 {
    template <typename Bytes>
@@ -105,17 +116,13 @@ namespace
       return out + "\"";
    }
 
-   // The arguments of a method as they are packed: each parameter as the
-   // type it is on the wire.
-   template <typename... P>
-   std::tuple<psio::wire_type_t<P>...> wireTuple(std::tuple<P...>*);
-
    struct Fixture
    {
       psio::SchemaBuilder builder;
       std::string         vectors;
       std::string         calls;
       std::string         names;
+      std::string         transactions;
 
       // The methods of a service with the names of their parameters, as
       // `PSIO_REFLECT(Service, method(name, params...))` states them: the
@@ -147,17 +154,18 @@ namespace
          names += "{\"service\":" + jsonString(account) + ",\"methods\":{" + methods + "}}";
       }
 
-      // The arguments of a call of `Method`, as psibase packs them: the
-      // tuple of the method's parameter types.
-      template <auto Method, typename... Args>
+      // The arguments of a call of method `I` of `Service`, as psibase packs
+      // them (`Actor`, `transactor`, the tester): the method's argument list,
+      // with the cap the method declares.
+      template <typename Service, std::size_t I, typename... Args>
       void call(std::string_view interface, std::string_view method, Args&&... args)
       {
-         decltype(wireTuple((typename psio::method_traits<decltype(Method)>::params*)nullptr))
-             tuple{std::forward<Args>(args)...};
          if (!calls.empty())
             calls += ",\n";
          calls += "{\"interface\":" + jsonString(interface) + ",\"method\":" + jsonString(method) +
-                  ",\"pssz\":" + jsonString(hex(psio::to_pssz(tuple))) + "}";
+                  ",\"pssz\":" +
+                  jsonString(hex(psio::method_args_to_pssz<Service, I>(std::forward<Args>(args)...))) +
+                  "}";
       }
 
       template <typename T>
@@ -165,21 +173,48 @@ namespace
       {
          builder.insert<T>(std::string{name});
          for (const auto& value : values)
-         {
-            if (!vectors.empty())
-               vectors += ",\n";
-            vectors += "{\"type\":" + jsonString(name) +
-                       ",\"pssz\":" + jsonString(hex(psio::to_pssz(value))) +
-                       ",\"key\":" + jsonString(hex(psio::to_key(value))) +
-                       ",\"ijson\":" + jsonString(psio::to_ijson(value)) + "}";
-         }
+            vector(name, value, jsonString(hex(psio::to_key(value))));
+      }
+
+      // A type that is never a key (a transaction, a schema).
+      template <typename T>
+      void addWithoutKey(std::string_view name, const std::vector<T>& values)
+      {
+         builder.insert<T>(std::string{name});
+         for (const auto& value : values)
+            vector(name, value, "null");
+      }
+
+      template <typename T>
+      void vector(std::string_view name, const T& value, const std::string& key)
+      {
+         if (!vectors.empty())
+            vectors += ",\n";
+         vectors += "{\"type\":" + jsonString(name) +
+                    ",\"pssz\":" + jsonString(hex(psio::to_pssz(value))) + ",\"key\":" + key +
+                    ",\"ijson\":" + jsonString(psio::to_ijson(value)) + "}";
+      }
+
+      // A transaction as a client sends it, and its id: the SHA-256 of the
+      // packed `Transaction` (the content of `SignedTransaction::transaction`).
+      void transaction(std::string_view name, const psibase::Transaction& trx)
+      {
+         psibase::SignedTransaction signedTrx{psio::shared_pssz<psibase::Transaction>{trx}};
+         const auto id = psibase::sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
+         if (!transactions.empty())
+            transactions += ",\n";
+         transactions += "{\"name\":" + jsonString(name) +
+                         ",\"signed\":" + jsonString(hex(psio::to_pssz(signedTrx))) +
+                         ",\"id\":" + jsonString(hex(id)) +
+                         ",\"ijson\":" + jsonString(psio::to_ijson(signedTrx)) + "}";
       }
 
       std::string text() &&
       {
          return "{\n\"schema_ir\":" + jsonString(hex(psio::emit_pssz(std::move(builder).build()))) +
                 ",\n\"vectors\":[\n" + vectors + "\n],\n\"calls\":[\n" + calls +
-                "\n],\n\"names\":[\n" + names + "\n]\n}\n";
+                "\n],\n\"transactions\":[\n" + transactions + "\n],\n\"names\":[\n" + names +
+                "\n]\n}\n";
       }
    };
 
@@ -321,36 +356,160 @@ namespace
           {SystemService::Response{},
            SystemService::Response{7, AccountNumber{"alice"}, 0x0102030405060708, true}});
 
+      // Enums that are their name in JSON, and the types that are one string
+      // there (a PEM key, an address, an endpoint).
+      using SystemService::NewAccountMode;
+      using SystemService::AuthSig::SubjectPublicKeyInfo;
+      f.add<DbId>("DbId", {DbId::service, DbId::writeOnly, DbId::native, DbId::blockLog,
+                           DbId::blockProof, DbId::prevAuthServices, DbId::subjective,
+                           DbId::nativeSubjective, DbId::session, DbId::nativeSession,
+                           DbId::temporary});
+      f.add<NewAccountMode>("NewAccountMode", {NewAccountMode::keepExisting,
+                                               NewAccountMode::matchExisting,
+                                               NewAccountMode::requireNew});
+      // A P-256 key: the DER header of such a key and 64 bytes for the point.
+      SubjectPublicKeyInfo spki{{0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48,
+                                 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48,
+                                 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04}};
+      for (unsigned char i = 1; i <= 64; ++i)
+         spki.data.push_back(i);
+      f.addWithoutKey<SubjectPublicKeyInfo>("SubjectPublicKeyInfo", {spki});
+      const IPV6Address loopback6{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, 0};
+      f.addWithoutKey<IPAddress>("IPAddress", {IPAddress{IPV4Address{{127, 0, 0, 1}}},
+                                               IPAddress{loopback6}, IPAddress{IPV6Address{}}});
+      f.addWithoutKey<SocketEndpoint>(
+          "SocketEndpoint",
+          {SocketEndpoint{IPV4Endpoint{IPV4Address{{127, 0, 0, 1}}, 8080}},
+           SocketEndpoint{IPV6Endpoint{loopback6, 8080}},
+           SocketEndpoint{LocalEndpoint{"/run/psinode.sock"}}});
+
+      // The schema of a service: the record itself (its bytes are the
+      // argument of `packages::setSchema` and the installed row, its text
+      // the schema files) for a service both languages declare.
+      const ServiceSchema setcodeSchema = ServiceSchema::make<SystemService::SetCode>();
+      f.addWithoutKey<ServiceSchema>("ServiceSchema", {ServiceSchema{}, setcodeSchema});
+
+      // Transactions. The first is a genesis transaction (one action whose
+      // arguments are the services to install); the second is a boot
+      // transaction: `transact::startBoot` with the ids of the transactions
+      // that follow, then calls of the services the boot sets up.
+      const Tapos        tapos{TimePointSec{Seconds{1700000000}}, 0x01020304, 0, 7};
+      const Transaction  genesis{Tapos{tapos.expiration, 0, 0, 0},
+                                 {Action{AccountNumber{}, AccountNumber{}, MethodNumber{"boot"},
+                                         psio::to_pssz(GenesisActionData{"", {genesisService}})}},
+                                 {}};
+      f.add<Tapos>("Tapos", {Tapos{}, tapos});
+      f.addWithoutKey<Transaction>("Transaction", {Transaction{}, genesis});
+      f.addWithoutKey<SignedTransaction>(
+          "SignedTransaction",
+          {SignedTransaction{psio::shared_pssz<Transaction>{Transaction{}}},
+           SignedTransaction{psio::shared_pssz<Transaction>{genesis}},
+           SignedTransaction{psio::shared_pssz<Transaction>{genesis},
+                             {bytes, {}},
+                             std::vector<std::vector<char>>{bytes}}});
+      f.transaction("genesis", genesis);
+
       // Services: the interface (functions, parameter names and types,
       // results) and the arguments of sample calls.
       using SystemService::AuthDelegate;
-      using SystemService::NewAccountMode;
       using SystemService::SetCode;
       const AccountNumber alice{"alice"}, bob{"bob"};
       f.builder.insert_interface<twins::SetCode>();
       f.builder.insert_interface<twins::AuthDelegate>();
-      f.call<&SetCode::init>("setcode", "init");
-      f.call<&SetCode::setCode>("setcode", "setCode", alice, 1, 1, bytes);
-      f.call<&SetCode::stageCode>("setcode", "stageCode", alice, 7, 1, 1, bytes);
-      f.call<&SetCode::unstageCode>("setcode", "unstageCode", alice, 7);
-      f.call<&SetCode::setCodeStaged>("setcode", "setCodeStaged", alice, 7, 1, 1, digest);
-      f.call<&SetCode::setFlags>("setcode", "setFlags", alice, CodeRow::isPrivileged);
-      f.call<&SetCode::verifySeq>("setcode", "verifySeq");
-      f.call<&SetCode::defaultVmVersion>("setcode", "defaultVmVersion");
-      f.call<&SetCode::setDefaultVmVersion>("setcode", "setDefaultVmVersion", 1);
-      f.call<&AuthDelegate::checkAuthSys>(
-          "auth-delg", "checkAuthSys", 3, alice,
+      CALL(SetCode, "setcode", init);
+      CALL(SetCode, "setcode", setCode, alice, 1, 1, bytes);
+      CALL(SetCode, "setcode", stageCode, alice, 7, 1, 1, bytes);
+      CALL(SetCode, "setcode", unstageCode, alice, 7);
+      CALL(SetCode, "setcode", setCodeStaged, alice, 7, 1, 1, digest);
+      CALL(SetCode, "setcode", setFlags, alice, CodeRow::isPrivileged);
+      CALL(SetCode, "setcode", verifySeq);
+      CALL(SetCode, "setcode", defaultVmVersion);
+      CALL(SetCode, "setcode", setDefaultVmVersion, 1);
+      CALL(AuthDelegate, "auth-delg", checkAuthSys, 3, alice,
           ServiceMethod{AccountNumber{"tokens"}, MethodNumber{"credit"}}, std::vector{claim, Claim{}});
-      f.call<&AuthDelegate::canAuthUserSys>("auth-delg", "canAuthUserSys", alice);
-      f.call<&AuthDelegate::getDlgsSys>("auth-delg", "getDlgsSys", alice);
-      f.call<&AuthDelegate::isAuthSys>("auth-delg", "isAuthSys", alice, std::vector{alice, bob});
-      f.call<&AuthDelegate::isRejectSys>("auth-delg", "isRejectSys", alice,
+      CALL(AuthDelegate, "auth-delg", canAuthUserSys, alice);
+      CALL(AuthDelegate, "auth-delg", getDlgsSys, alice);
+      CALL(AuthDelegate, "auth-delg", isAuthSys, alice, std::vector{alice, bob});
+      CALL(AuthDelegate, "auth-delg", isRejectSys, alice,
                                          std::vector<AccountNumber>{});
-      f.call<&AuthDelegate::setOwner>("auth-delg", "setOwner", bob);
-      f.call<&AuthDelegate::newAccount>("auth-delg", "newAccount", alice, bob,
+      CALL(AuthDelegate, "auth-delg", setOwner, bob);
+      CALL(AuthDelegate, "auth-delg", newAccount, alice, bob,
                                         NewAccountMode::requireNew);
-      f.call<&AuthDelegate::getOwner>("auth-delg", "getOwner", alice);
-      f.call<&AuthDelegate::checkOwner>("auth-delg", "checkOwner", alice);
+      CALL(AuthDelegate, "auth-delg", getOwner, alice);
+      CALL(AuthDelegate, "auth-delg", checkOwner, alice);
+
+      // What a boot packs, for services implemented in C++ ...
+      using LocalService::XPeers;
+      using LocalService::XProxy;
+      using SystemService::Accounts;
+      using SystemService::HttpServer;
+      using SystemService::Producers;
+      using SystemService::Sites;
+      using SystemService::Transact;
+      using UserService::Nft;
+      using UserService::Packages;
+      using UserService::Tokens;
+      using AuthSigService = SystemService::AuthSig::AuthSig;
+      const UserService::PackageMeta meta{"Tokens",
+                                          "1.0.0",
+                                          "network",
+                                          "Token service",
+                                          {PackageRef{"Nft", "^1.0.0"}},
+                                          {AccountNumber{"tokens"}, AccountNumber{"r-tokens"}},
+                                          {AccountNumber{"tokens"}},
+                                          {PackageExport{"tokens", AccountNumber{"tokens"}}}};
+      CALL(Transact, "transact", startBoot, std::vector<Checksum256>{digest, Checksum256{}});
+      CALL(Accounts, "accounts", newAccount, alice, AccountNumber{"auth-sig"},
+           NewAccountMode::requireNew);
+      CALL(AuthSigService, "auth-sig", newAccount, alice, spki);
+      CALL(Packages, "packages", postinstall, meta, bytes);
+      CALL(Packages, "packages", setSchema, setcodeSchema);
+      CALL(Sites, "sites", storeSys, "/index.html", "text/html", std::optional<std::string>{"gzip"},
+           bytes);
+      CALL(Sites, "sites", storeSys, "/app.js", "text/javascript", std::optional<std::string>{},
+           std::vector<char>{});
+      CALL(Producers, "producers", setProducers, std::vector{producer});
+      CALL(HttpServer, "http", registerServer, AccountNumber{"r-tokens"});
+      // ... and for services implemented in Rust, through their C++ headers.
+      // `credit` holds a memo (a bounded string: narrow offsets); `recall`
+      // ends in an unbounded optional (wide offsets); `mint` in a bounded one.
+      CALL(Tokens, "tokens", credit, 1, bob, quantity(5), Memo{"thanks"});
+      CALL(Tokens, "tokens", recall, 1, alice, quantity(5), Memo{},
+           std::optional<std::string>{"savings"});
+      CALL(Tokens, "tokens", recall, 1, alice, quantity(5), Memo{"back"}, std::optional<std::string>{});
+      CALL(Nft, "nft", mint, std::optional<UserService::NID>{});
+      CALL(Nft, "nft", mint, std::optional<UserService::NID>{7});
+      // The two callbacks whose argument list declares a cap.
+      const HttpReply notFound{HttpStatus::notFound, "text/html", {'n', 'o'}, {}};
+      CALL(XProxy, "x-proxy", onError, 7, std::optional<HttpReply>{});
+      CALL(XProxy, "x-proxy", onError, 7, std::optional<HttpReply>{notFound});
+      CALL(XPeers, "x-peers", errP2P, 7, std::optional<HttpReply>{});
+      CALL(XPeers, "x-peers", errP2P, 7, std::optional<HttpReply>{notFound});
+
+      // The boot transaction that follows a genesis transaction.
+      {
+         auto action = [](AccountNumber sender, AccountNumber service, std::string_view method,
+                          std::vector<char> arguments)
+         { return Action{sender, service, MethodNumber{method}, std::move(arguments)}; };
+         const AccountNumber transact{"transact"}, producers{"producers"}, accounts{"accounts"};
+         f.transaction(
+             "boot",
+             Transaction{
+                 tapos,
+                 {action(transact, transact, "startBoot",
+                         psio::method_args_to_pssz<
+                             Transact, *psio::reflect<Transact>::index_of_method("startBoot")>(
+                             std::vector<Checksum256>{digest})),
+                  action(producers, producers, "setProducers",
+                         psio::method_args_to_pssz<
+                             Producers, *psio::reflect<Producers>::index_of_method("setProducers")>(
+                             std::vector{producer})),
+                  action(accounts, accounts, "newAccount",
+                         psio::method_args_to_pssz<
+                             Accounts, *psio::reflect<Accounts>::index_of_method("newAccount")>(
+                             alice, AccountNumber{"auth-any"}, NewAccountMode::requireNew))},
+                 {claim}});
+      }
 
       // Every service that has a Rust view: its methods and their parameter
       // names. The first group is implemented in C++ (C++ is the authority

@@ -162,9 +162,20 @@ pub fn process_action_schema(
     }
 }
 
+/// An attribute of an action that annotates its PSIO declaration:
+/// `#[pssz(max_dynamic_data = N)]` (the cap of the argument list),
+/// `#[psio(...)]`.
+fn is_psio_annotation(attr: &syn::Attribute) -> bool {
+    attr.meta.path().is_ident("pssz") || attr.meta.path().is_ident("psio")
+}
+
 /// An action as a function of the trait the service's PSIO interface is
-/// declared with: its documentation, name, parameters and result.
-pub fn psio_interface_fn(f: &ItemFn) -> proc_macro2::TokenStream {
+/// declared with: its documentation, PSIO annotations, name, parameters
+/// and result. The annotations are taken off the action itself: they
+/// belong to the interface.
+pub fn psio_interface_fn(f: &mut ItemFn) -> proc_macro2::TokenStream {
+    let annotations: Vec<_> = f.attrs.iter().filter(|attr| is_psio_annotation(attr)).cloned().collect();
+    f.attrs.retain(|attr| !is_psio_annotation(attr));
     let name = &f.sig.ident;
     let docs = f
         .attrs
@@ -184,6 +195,7 @@ pub fn psio_interface_fn(f: &ItemFn) -> proc_macro2::TokenStream {
     let output = &f.sig.output;
     quote! {
         #(#docs)*
+        #(#annotations)*
         fn #name(#(#params),*) #output;
     }
 }

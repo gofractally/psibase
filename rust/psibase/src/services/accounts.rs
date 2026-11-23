@@ -16,7 +16,9 @@ pub struct Account {
 /// `enum class NewAccountMode : std::uint8_t`, a reflected enum): its
 /// number in PSSZ and in a key, its C++ name in JSON (`"keepExisting"`,
 /// `"matchExisting"`, `"requireNew"`; the number is read too). Any other
-/// number is refused wherever one is read.
+/// number is refused wherever one is read. C++ states that with an
+/// invariant, which names the schema node (`Custom{Enum, "NewAccountMode"}`);
+/// the id is declared here for the same node.
 #[repr(u8)]
 #[derive(
     Debug,
@@ -32,6 +34,7 @@ pub struct Account {
     psio::Serde,
 )]
 #[serde(rename_all = "camelCase")]
+#[psio(custom = "NewAccountMode")]
 pub enum NewAccountMode {
     /// An existing account will be unchanged.
     KeepExisting,
