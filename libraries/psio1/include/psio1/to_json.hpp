@@ -4,6 +4,8 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <psio/detail/nested_fwd.hpp>
+#include <psio/view.hpp>
 #include <psio1/reflect.hpp>
 #include <psio1/stream.hpp>
 #include <psio1/tuple.hpp>
@@ -328,6 +330,28 @@ template <typename S> void to_json(float value, S& stream)              { return
          write_newline(stream);
       }
       stream.write('}');
+   }
+
+   // TEMPORARY: removed when psio1 is deleted.
+   // A PSIO packed value (psio::nested, psio::pssz_buffer, psio::shared_pssz)
+   // is written as this library wrote its own packed values: the hex of its
+   // bytes.
+   template <typename S>
+   void to_json_hex(const char* data, size_t size, S& stream);
+   template <typename T, typename S>
+      requires ::psio::detail::is_nested_v<T>
+   void to_json(const T& t, S& stream)
+   {
+      auto bytes = t.bytes();
+      to_json_hex(bytes.data(), bytes.size(), stream);
+   }
+
+   // TEMPORARY: removed when psio1 is deleted.
+   // A PSIO view is written as the value it designates.
+   template <typename T, typename F, ::psio::storage St, typename S>
+   void to_json(const ::psio::view<T, F, St>& t, S& stream)
+   {
+      to_json(t.unpack(), stream);
    }
 
    // TEMPORARY: removed when psio1 is deleted.

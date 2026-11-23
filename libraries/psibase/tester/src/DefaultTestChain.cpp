@@ -59,7 +59,7 @@ namespace
                Action{.sender  = AccountNumber{"foo"},  // ignored
                       .service = AccountNumber{"bar"},  // ignored
                       .method  = {},
-                      .rawData = psio1::convert_to_frac(
+                      .rawData = psio::to_pssz(
                           GenesisActionData{.services = std::move(services)})}}),
           {});
 

@@ -7,6 +7,9 @@
 #include <catch2/catch_all.hpp>
 #include <psio/to_hex.hpp>
 
+#include <algorithm>
+#include <cstring>
+#include <map>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -38,6 +41,16 @@ namespace tables_test
    {
       PSIO_REFLECT(Empty)
    };
+   // Refers to its members; packs as a Row.
+   struct RowRef
+   {
+      std::uint32_t          id;
+      psibase::AccountNumber owner;
+      psio::pssz_view<Inner> inner;
+      std::string_view       note;
+      std::uint32_t          other;
+      PSIO_REFLECT(RowRef, id, owner, inner, note, other)
+   };
 }  // namespace tables_test
 
 using namespace tables_test;
@@ -60,18 +73,143 @@ static_assert(!psibase::detail::has_block_member<Empty>());
 TEST_CASE("tables: a key is read through a view of the packed row", "[tables]")
 {
    const Row  row{7, psibase::AccountNumber{"alice"}, {3, "x"}, "n", 9};
-   const auto bytes = psio1::convert_to_frac(row);
-   const psio1::view<const Row> view{psio1::prevalidated{bytes}};
+   const auto bytes = psio::to_pssz(row);
+   const psio::pssz_view<Row> view{bytes};
 
-   CHECK(psibase::detail::invoke(&Row::id, view).unpack() == 7);
+   CHECK(psibase::detail::invoke(&Row::id, view) == 7);
    // `other` has the type of `id`: the member is found by its pointer.
-   CHECK(psibase::detail::invoke(&Row::other, view).unpack() == 9);
-   CHECK(psibase::detail::invoke(&Row::owner, view).unpack() == psibase::AccountNumber{"alice"});
-   CHECK(std::string_view{psibase::detail::invoke(&Row::note, view)} == "n");
-   CHECK(psibase::detail::invoke(&Row::inner, view).a().unpack() == 3);
+   CHECK(psibase::detail::invoke(&Row::other, view) == 9);
+   CHECK(psibase::detail::invoke(&Row::owner, view) == psibase::AccountNumber{"alice"});
+   CHECK(psibase::detail::invoke(&Row::note, view) == "n");
+   CHECK(psibase::detail::invoke(&Row::inner, view).a == 3);
    // and from the row itself
    CHECK(psibase::detail::invoke(&Row::other, row) == 9);
 }
+
+#ifndef COMPILING_WASM
+// A key-value store in place of the host, for the native test. A handle is
+// a key prefix; handle 0 is the whole store.
+namespace
+{
+   std::map<std::vector<char>, std::vector<char>> store;
+   std::vector<std::vector<char>>                 handles{{}};
+   std::vector<char>                              lastResult;
+   std::vector<char> storeKey(psibase::KvHandle db, const char* key, std::uint32_t len)
+   {
+      auto result = handles.at(static_cast<std::uint32_t>(db));
+      result.insert(result.end(), key, key + len);
+      return result;
+   }
+}  // namespace
+namespace psibase::raw
+{
+   KvHandle kvOpenAt(KvHandle db, const char* prefix, uint32_t len, KvMode)
+   {
+      handles.push_back(storeKey(db, prefix, len));
+      return static_cast<KvHandle>(handles.size() - 1);
+   }
+   void     kvClose(KvHandle) {}
+   uint32_t getResult(const char* dest, uint32_t destSize, uint32_t offset)
+   {
+      if (offset < lastResult.size())
+         std::memcpy(const_cast<char*>(dest), lastResult.data() + offset,
+                     std::min<std::size_t>(destSize, lastResult.size() - offset));
+      return lastResult.size();
+   }
+   uint32_t kvGet(KvHandle db, const char* key, uint32_t keyLen)
+   {
+      auto pos = store.find(storeKey(db, key, keyLen));
+      if (pos == store.end())
+         return -1;
+      lastResult = pos->second;
+      return lastResult.size();
+   }
+   void kvPut(KvHandle db, const char* key, uint32_t keyLen, const char* value, uint32_t valueLen)
+   {
+      store[storeKey(db, key, keyLen)].assign(value, value + valueLen);
+   }
+   void kvRemove(KvHandle db, const char* key, uint32_t keyLen)
+   {
+      store.erase(storeKey(db, key, keyLen));
+   }
+}  // namespace psibase::raw
+
+TEST_CASE("tables: a row is stored packed and read back, by value and by view", "[tables]")
+{
+   using Secondary = psibase::CompositeKey<&Row::owner, &Row::note>;
+   using RowTable  = psibase::Table<Row, &Row::id, Secondary{}>;
+   const psibase::AccountNumber service{0x0102030405060708ull};
+   store.clear();
+   RowTable table{psibase::KvHandle{0}, psibase::tablePrefix(service, 2),
+                  psibase::KvMode::readWrite};
+
+   const Row  row{7, psibase::AccountNumber{"alice"}, {3, "x"}, "n", 9};
+   const auto packed = psio::to_pssz(row);
+   table.put(row);
+
+   // What is stored: the PSSZ of the row under the primary key, and the
+   // primary key under the secondary key.
+   auto primary = psibase::tablePrefix(service, 2);
+   primary.push_back(0);
+   psio::to_key(std::uint32_t{7}, primary);
+   auto secondary = psibase::tablePrefix(service, 2);
+   secondary.push_back(1);
+   psio::to_key(std::tuple{psibase::AccountNumber{"alice"}, std::string{"n"}}, secondary);
+   REQUIRE(store.size() == 2);
+   CHECK(store.at(primary) == packed);
+   // (the handle supplies the table prefix)
+   CHECK(store.at(secondary) == std::vector<char>{0, 0, 0, 0, 7});
+
+   // By value and by view, through either index
+   auto value = table.get(std::uint32_t{7});
+   REQUIRE(value.has_value());
+   CHECK(value->note == "n");
+   CHECK(value->inner.b == "x");
+   auto view = table.getView(std::uint32_t{7});
+   REQUIRE(view.has_value());
+   CHECK(std::ranges::equal(view->bytes(), packed));
+   CHECK((*view)->owner() == psibase::AccountNumber{"alice"});
+   CHECK((*view)->inner().b() == "x");
+   CHECK((*view)->other() == 9);
+   CHECK(!table.getView(std::uint32_t{8}).has_value());
+   auto bySecondary =
+       table.getIndex<1>().getView(std::tuple{psibase::AccountNumber{"alice"}, std::string{"n"}});
+   REQUIRE(bySecondary.has_value());
+   CHECK(*bySecondary == *view);
+
+   // A packed row is stored as it is; its keys are read through its view.
+   Row other{8, psibase::AccountNumber{"bob"}, {4, "y"}, "m", 1};
+   table.put(psio::shared_pssz<Row>{other});
+   CHECK(store.size() == 4);
+   CHECK(table.get(std::uint32_t{8})->owner == psibase::AccountNumber{"bob"});
+   CHECK(table.getIndex<1>().get(std::tuple{psibase::AccountNumber{"bob"}, std::string{"m"}})->id ==
+         8);
+
+   // Replacing a row through a view moves its secondary key.
+   other.note        = "moved";
+   const auto bytes2 = psio::to_pssz(other);
+   table.put(psio::pssz_view<Row>{bytes2});
+   CHECK(store.size() == 4);
+   CHECK(!table.getIndex<1>().get(std::tuple{psibase::AccountNumber{"bob"}, std::string{"m"}}));
+   CHECK(table.getIndex<1>()
+             .get(std::tuple{psibase::AccountNumber{"bob"}, std::string{"moved"}})
+             ->id == 8);
+
+   // A record that refers to its members packs as the row.
+   const auto innerBytes = psio::to_pssz(Inner{5, "z"});
+   table.put(RowRef{9, psibase::AccountNumber{"carol"}, psio::pssz_view<Inner>{innerBytes}, "ref", 2});
+   CHECK(table.get(std::uint32_t{9})->inner.b == "z");
+   CHECK(table.get(std::uint32_t{9})->note == "ref");
+
+   // Removing through a view of the stored row erases every key.
+   table.remove(**view);
+   CHECK(!table.get(std::uint32_t{7}));
+   CHECK(store.size() == 4);
+   table.erase(std::uint32_t{8});
+   table.erase(std::uint32_t{9});
+   CHECK(store.empty());
+}
+#endif
 
 // The keys Table.hpp writes: tablePrefix(service, table), the index number,
 // then the psio::key encoding of the index's key.
@@ -109,8 +247,8 @@ TEST_CASE("tables: the bytes of a primary and of a composite secondary key", "[t
          "6E00016D0000");
 
    // A key read through a view of the packed row is the same key.
-   const auto                   bytes = psio1::convert_to_frac(row);
-   const psio1::view<const Row> view{psio1::prevalidated{bytes}};
+   const auto                   bytes = psio::to_pssz(row);
+   const psio::pssz_view<Row> view{bytes};
    CHECK(key(0, psibase::detail::invoke(&Row::id, view)) == primary);
    CHECK(key(1, psibase::detail::invoke(Secondary{}, view)) == secondary);
 

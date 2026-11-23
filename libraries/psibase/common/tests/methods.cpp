@@ -1,12 +1,13 @@
 // What psibase derives from the methods a class reflects with PSIO_REFLECT:
-// the packed argument tuple, action lookup by method number, the call
+// the packed argument tuple (PSSZ of psio::reflect<T>::method_arg_tuple<I>),
+// action lookup by method number, dispatch over packed arguments, the call
 // proxies (transactor, ActionViewBuilder), the pack and template endpoints
-// and the action / event part of the service schema. Runs natively and in a
-// WASM guest.
+// and the action / event part of the service schema; and the packed
+// transaction a SignedTransaction holds. Runs natively and in a WASM guest
+// (the dispatcher itself natively only: it needs a host).
 #include <catch2/catch_all.hpp>
 
 #include <psibase/Actor.hpp>
-#include <psibase/MethodArgs.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/schema.hpp>
@@ -41,7 +42,7 @@ namespace methods_test
          return from.str() + memo;
       }
       std::int32_t balance(AccountNumber who) const { return static_cast<std::int32_t>(who.value); }
-      Point        locate(psio1::view<const Point> at, std::int32_t dx) const
+      Point        locate(psio::pssz_view<Point> at, std::int32_t dx) const
       {
          return Point{at.x() + dx, std::string{std::string_view{at.label()}}};
       }
@@ -80,22 +81,27 @@ using namespace methods_test;
 
 TEST_CASE("methods: the packed argument tuple and result", "[methods]")
 {
-   static_assert(std::is_same_v<MethodArgs<decltype(&Ledger::init)>, std::tuple<>>);
+   using R = psio::reflect<Ledger>;
+   static_assert(std::is_same_v<R::method_arg_tuple<0>::tuple_type, std::tuple<>>);
    // By value: no references, no cv-qualifiers.
-   static_assert(std::is_same_v<MethodArgs<decltype(&Ledger::transfer)>, TransferArgs>);
+   static_assert(std::is_same_v<R::method_arg_tuple<1>::tuple_type, TransferArgs>);
    // A view parameter is packed as the type it views.
    static_assert(
-       std::is_same_v<MethodArgs<decltype(&Ledger::locate)>, std::tuple<Point, std::int32_t>>);
-   static_assert(std::is_same_v<MethodArgs<decltype(&Ledger::Events::History::noted)>,
-                                std::tuple<AccountNumber, std::string>>);
+       std::is_same_v<R::method_arg_tuple<3>::tuple_type, std::tuple<Point, std::int32_t>>);
+   static_assert(
+       std::is_same_v<psio::reflect<Ledger::Events::History>::method_arg_tuple<0>::tuple_type,
+                      std::tuple<AccountNumber, std::string>>);
 
-   static_assert(std::is_void_v<MethodResult<decltype(&Ledger::init)>>);
-   static_assert(std::is_same_v<MethodResult<decltype(&Ledger::transfer)>, std::string>);
-   static_assert(std::is_same_v<MethodResult<decltype(&Ledger::unnamed)>, std::int32_t>);
+   static_assert(std::is_void_v<MethodResult<Ledger, 0>>);
+   static_assert(std::is_same_v<MethodResult<Ledger, 1>, std::string>);
+   static_assert(std::is_same_v<MethodResult<Ledger, 4>, std::int32_t>);
 
    static_assert(methodNumber<1, &Ledger::transfer> == MethodNumber{"transfer"});
    static_assert(methodNumber<0, &Ledger::Events::History::noted> == MethodNumber{"noted"});
-   SUCCEED();
+
+   // No argument list declares a cap: the bytes are those of the plain tuple.
+   CHECK(psio::to_pssz(R::method_arg_tuple<1>{AccountNumber{"bob"}, "rent", std::int32_t{5}}) ==
+         psio::to_pssz(TransferArgs{AccountNumber{"bob"}, "rent", std::int32_t{5}}));
 }
 
 TEST_CASE("methods: an action is found by its method number", "[methods]")
@@ -128,7 +134,7 @@ TEST_CASE("methods: transactor packs the arguments as the parameter tuple", "[me
    const transactor<Ledger> ledger{alice, Ledger::service};
 
    const auto expected =
-       psio1::convert_to_frac(TransferArgs{AccountNumber{"bob"}, "rent", std::int32_t{5}});
+       psio::to_pssz(TransferArgs{AccountNumber{"bob"}, "rent", std::int32_t{5}});
 
    // lvalues, const lvalues, temporaries and convertible arguments
    const AccountNumber bob{"bob"};
@@ -146,10 +152,10 @@ TEST_CASE("methods: transactor packs the arguments as the parameter tuple", "[me
    }
    CHECK(memo == "rent");
 
-   CHECK(ledger.init().rawData == psio1::convert_to_frac(std::tuple{}));
+   CHECK(ledger.init().rawData == psio::to_pssz(std::tuple{}));
    CHECK(ledger.init().method == MethodNumber{"init"});
    CHECK(ledger.locate(Point{4, "here"}, 3).rawData ==
-         psio1::convert_to_frac(std::tuple{Point{4, "here"}, std::int32_t{3}}));
+         psio::to_pssz(std::tuple{Point{4, "here"}, std::int32_t{3}}));
    CHECK(ledger.get_staged_tx(7).method == MethodNumber{"get_staged_tx"});
    CHECK(ledger.from(bob).balance(bob).sender == bob);
 }
@@ -160,13 +166,15 @@ TEST_CASE("methods: ActionViewBuilder packs a whole action", "[methods]")
    const AccountNumber             bob{"bob"};
    const ActionViewBuilder<Ledger> ledger{alice, Ledger::service};
    const Action expected{alice, Ledger::service, MethodNumber{"transfer"},
-                         psio1::convert_to_frac(TransferArgs{bob, "rent", std::int32_t{5}})};
-   const auto   bytes = psio1::convert_to_frac(expected);
+                         psio::to_pssz(TransferArgs{bob, "rent", std::int32_t{5}})};
+   const auto   bytes = psio::to_pssz(expected);
    auto         same  = [&](const auto& packed)
    {
-      static_assert(std::is_same_v<decltype(packed),
-                                   const psio1::shared_view_ptr<TypedAction<TransferArgs>>&>);
-      auto data = packed.data_without_size_prefix();
+      static_assert(
+          std::is_same_v<decltype(packed),
+                         const psio::shared_pssz<
+                             TypedAction<psio::reflect<Ledger>::method_arg_tuple<1>>>&>);
+      auto data = packed.bytes();
       return std::vector<char>(data.begin(), data.end()) == bytes;
    };
 
@@ -175,18 +183,202 @@ TEST_CASE("methods: ActionViewBuilder packs a whole action", "[methods]")
    CHECK(same(ledger.transfer(bob, "rent", std::optional<std::int32_t>{5})));
    CHECK(same(ledger.transfer(AccountNumber{"bob"}, std::string{"rent"}, std::int32_t{5})));
    CHECK(memo == "rent");
+
+   // The packed action is read through its view; rawData is typed.
+   auto packed = ledger.transfer(bob, memo, 5);
+   CHECK(packed->sender() == alice);
+   CHECK(packed->method() == MethodNumber{"transfer"});
+   CHECK(std::get<1>(packed->rawData()->unpack()) == "rent");
+   // A view as an argument is packed as the value it designates.
+   const auto                   point = psio::to_pssz(Point{4, "here"});
+   const psio::pssz_view<Point> pointView{point};
+   CHECK(transactor<Ledger>{alice, Ledger::service}.locate(pointView, 3).rawData ==
+         psio::to_pssz(std::tuple{Point{4, "here"}, std::int32_t{3}}));
+}
+
+namespace methods_test
+{
+   // What the dispatcher is given: views, borrowed text and values.
+   struct Disp
+   {
+      std::string log;
+
+      std::int32_t look(psio::pssz_view<const Point> at, std::int32_t dx, std::string_view note)
+      {
+         log = std::string{std::string_view{at.label()}} + "/" + std::string{note};
+         return at.x() + dx;
+      }
+      void                   store(Point p, const std::string& name) { log = p.label + "=" + name; }
+      psio::pssz_view<Point> echo(psio::pssz_view<Point> p) { return p; }
+   };
+   PSIO_REFLECT(Disp, method(look, at, dx, note), method(store, p, name), method(echo, p))
+}  // namespace methods_test
+
+TEST_CASE("methods: a method is called with packed arguments", "[methods][dispatch]")
+{
+   using R = psio::reflect<Disp>;
+   static_assert(std::is_same_v<R::method_arg_tuple<0>::tuple_type,
+                                std::tuple<Point, std::int32_t, std::string>>);
+   static_assert(std::is_same_v<R::method_params<0>,
+                                std::tuple<psio::pssz_view<Point>, std::int32_t, std::string_view>>);
+
+   const auto look  = psio::to_pssz(std::tuple{Point{4, "here"}, std::int32_t{3}, std::string{"n"}});
+   const auto store = psio::to_pssz(std::tuple{Point{1, "p"}, std::string{"nm"}});
+   // What the callers produce is what the dispatcher reads.
+   CHECK(psio::method_args_to_pssz<Disp, 0>(Point{4, "here"}, 3, "n") == look);
+
+   Disp disp;
+   REQUIRE(psio::validate_method_args<Disp, 0>(look).ok());
+   std::vector<char> result;
+   REQUIRE(psio::call_method_pssz<Disp, 0>(disp, psio::trusted{look}, result).ok());
+   CHECK(result == psio::to_pssz(std::int32_t{7}));
+   CHECK(disp.log == "here/n");
+
+   REQUIRE(psio::validate_method_args<Disp, 1>(store).ok());
+   result.clear();
+   REQUIRE(psio::call_method_pssz<Disp, 1>(disp, psio::trusted{store}, result).ok());
+   CHECK(result.empty());
+   CHECK(disp.log == "p=nm");
+
+   // A returned view is packed as the value it designates.
+   const auto echo = psio::to_pssz(std::tuple{Point{9, "e"}});
+   result.clear();
+   REQUIRE(psio::call_method_pssz<Disp, 2>(disp, psio::trusted{echo}, result).ok());
+   CHECK(result == psio::to_pssz(Point{9, "e"}));
+
+   // Malformed arguments are refused before the method runs, with a reason:
+   // no bytes, too few for the offsets, cut inside the first argument, and
+   // the arguments of another method.
+   for (const std::vector<char>& bad :
+        {std::vector<char>{}, std::vector<char>{1, 2, 3},
+         std::vector<char>(look.begin(), look.begin() + 20), store})
+   {
+      auto status = psio::validate_method_args<Disp, 0>(bad);
+      REQUIRE(!status.ok());
+      CHECK(!status.error().what.empty());
+   }
+}
+
+#ifndef COMPILING_WASM
+// The host half of the dispatcher, for the native test.
+namespace
+{
+   std::vector<char> retval;
+   bool              retvalSet = false;
+}  // namespace
+void psibase::raw::setRetval(const char* data, std::uint32_t len)
+{
+   retval.assign(data, data + len);
+   retvalSet = true;
+}
+
+TEST_CASE("methods: dispatch of an action", "[methods][dispatch]")
+{
+   auto action = [](std::string_view method, std::vector<char> args)
+   {
+      return psio::shared_pssz<Action>{Action{AccountNumber{"alice"}, AccountNumber{"disp"},
+                                              MethodNumber{method}, std::move(args)}};
+   };
+   auto run = [&](std::string_view method, std::vector<char> args, Disp& disp)
+   {
+      retval.clear();
+      retvalSet  = false;
+      auto act   = action(method, std::move(args));
+      auto index = findAction<Disp>(act->method().unpack());
+      REQUIRE(index.has_value());
+      psibase::detail::ActionTable<Disp>::calls[*index](disp, act);
+   };
+
+   Disp disp;
+   run("look", psio::to_pssz(std::tuple{Point{4, "here"}, std::int32_t{3}, std::string{"n"}}), disp);
+   CHECK(retvalSet);
+   CHECK(retval == psio::to_pssz(std::int32_t{7}));
+   CHECK(disp.log == "here/n");
+
+   run("store", psio::to_pssz(std::tuple{Point{1, "p"}, std::string{"nm"}}), disp);
+   CHECK(!retvalSet);
+   CHECK(disp.log == "p=nm");
+
+   run("echo", psio::to_pssz(std::tuple{Point{9, "e"}}), disp);
+   CHECK(retval == psio::to_pssz(Point{9, "e"}));
+
+   // Malformed arguments: the action aborts with a message that names the
+   // method, and the method does not run.
+   disp.log = "untouched";
+   CHECK_THROWS_WITH(run("look", std::vector<char>{1, 2, 3}, disp),
+                     Catch::Matchers::StartsWith("invalid argument encoding for look: "));
+   CHECK_THROWS_WITH(run("look", psio::to_pssz(std::tuple{Point{1, "p"}, std::string{"nm"}}), disp),
+                     Catch::Matchers::StartsWith("invalid argument encoding for look: "));
+   CHECK(disp.log == "untouched");
+   CHECK(!retvalSet);
+}
+#endif
+
+namespace methods_test
+{
+   struct Twin
+   {
+      std::vector<char>                             transaction;
+      std::vector<std::vector<char>>                proofs;
+      std::optional<std::vector<std::vector<char>>> subjectiveData;
+      PSIO_REFLECT(Twin, transaction, proofs, subjectiveData)
+   };
+}  // namespace methods_test
+
+TEST_CASE("methods: a signed transaction holds its transaction packed", "[methods][transaction]")
+{
+   Transaction trx;
+   trx.tapos.refBlockSuffix = 0x01020304;
+   trx.actions.push_back(Action{AccountNumber{"alice"}, AccountNumber{"tokens"},
+                                MethodNumber{"credit"}, {1, 2, 3}});
+   trx.claims.push_back(Claim{AccountNumber{"verify-sig"}, {9, 8}});
+   const auto trxBytes = psio::to_pssz(trx);
+
+   const SignedTransaction signedTrx{psio::shared_pssz<Transaction>{trx}, {{7, 7}}, {}};
+   // The member is the bytes of a byte list that holds the PSSZ of the
+   // transaction: a record with a std::vector<char> member in its place
+   // has the same bytes.
+   const auto bytes = psio::to_pssz(signedTrx);
+   CHECK(bytes == psio::to_pssz(Twin{trxBytes, {{7, 7}}, {}}));
+   // The transaction's bytes are what is hashed for its id.
+   CHECK(std::ranges::equal(signedTrx.transaction.bytes(), trxBytes));
+   CHECK(sha256(signedTrx.transaction.data(), signedTrx.transaction.size()) == sha256(trx));
+
+   // Read through the member, without unpacking.
+   CHECK(signedTrx.transaction->tapos().refBlockSuffix() == 0x01020304);
+   CHECK(signedTrx.transaction->actions().size() == 1);
+   CHECK(signedTrx.transaction->actions()[0].sender() == AccountNumber{"alice"});
+   CHECK(signedTrx.transaction->claims()[0].service() == AccountNumber{"verify-sig"});
+   CHECK(signedTrx.transaction.unpack().actions[0].rawData == std::vector<char>{1, 2, 3});
+
+   // A copy shares the bytes.
+   const SignedTransaction copy = signedTrx;
+   CHECK(copy.transaction.data() == signedTrx.transaction.data());
+   CHECK(copy.transaction == signedTrx.transaction);
+
+   // Decoding validates the member as a Transaction and adopts its bytes.
+   REQUIRE(psio::validate_pssz<SignedTransaction>(bytes).ok());
+   const auto decoded = psio::from_pssz<SignedTransaction>(bytes);
+   CHECK(decoded.transaction == signedTrx.transaction);
+   CHECK(decoded.proofs == signedTrx.proofs);
+   CHECK(psio::pssz_view<SignedTransaction>{bytes}.transaction()->actions()[0].method() ==
+         MethodNumber{"credit"});
+   // Bytes that are not a transaction are not a signed transaction.
+   CHECK(!psio::validate_pssz<SignedTransaction>(
+              psio::to_pssz(Twin{std::vector<char>{1, 2, 3}, {{7, 7}}, {}}))
+              .ok());
 }
 
 TEST_CASE("methods: packing an action from JSON", "[methods]")
 {
    CHECK(fracpackActionFromJson<Ledger>("transfer", R"({"from":"bob","memo":"rent","amount":5})") ==
-         psio1::convert_to_frac(TransferArgs{AccountNumber{"bob"}, "rent", std::int32_t{5}}));
+         psio::to_pssz(TransferArgs{AccountNumber{"bob"}, "rent", std::int32_t{5}}));
    // Arguments are matched by name, in any order; one that is absent keeps its default.
    CHECK(fracpackActionFromJson<Ledger>("transfer", R"({"memo":"rent","from":"bob"})") ==
-         psio1::convert_to_frac(TransferArgs{AccountNumber{"bob"}, "rent", std::nullopt}));
+         psio::to_pssz(TransferArgs{AccountNumber{"bob"}, "rent", std::nullopt}));
    CHECK(fracpackActionFromJson<Ledger>("locate", R"({"dx":3,"at":{"x":4,"label":"here"}})") ==
-         psio1::convert_to_frac(std::tuple{Point{4, "here"}, std::int32_t{3}}));
-   CHECK(fracpackActionFromJson<Ledger>("init", "{}") == psio1::convert_to_frac(std::tuple{}));
+         psio::to_pssz(std::tuple{Point{4, "here"}, std::int32_t{3}}));
+   CHECK(fracpackActionFromJson<Ledger>("init", "{}") == psio::to_pssz(std::tuple{}));
    // The action is named as it is written in the source.
    CHECK(!fracpackActionFromJson<Ledger>("missing", "{}"));
    CHECK(!fracpackActionFromJson<Ledger>("noted", "{}"));

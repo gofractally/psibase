@@ -7,7 +7,9 @@
 #include <psibase/db.hpp>
 #include <psio/key.hpp>
 #include <psio/shapes.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
+#include <psio1/stream.hpp>
 #include <span>
 
 #ifdef COMPILING_WASM
@@ -111,7 +113,7 @@ namespace psibase
 
       /// Store the currently-executing action into result and return the result size
       ///
-      /// The result contains a fracpacked [Action]; use [getResult] to get it.
+      /// The result contains a packed [Action]; use [getResult] to get it.
       ///
       /// If the service, while handling action A, calls itself with action B:
       /// * Before the call to B, `getCurrentAction()` returns A.
@@ -123,7 +125,7 @@ namespace psibase
 
       /// Call a service, store the return value into result, and return the result size
       ///
-      /// `action` must contain a fracpacked [Action].
+      /// `action` must contain a packed [Action].
       ///
       /// Use [getResult] to get result.
       PSIBASE_NATIVE(call) uint32_t call(const char* action, uint32_t len, CallFlags flags);
@@ -389,26 +391,26 @@ namespace psibase
    /// * After B returns, `getCurrentAction()` returns A.
    ///
    /// Note: The above only applies if the service uses [call]. [Actor] uses [call].
-   psio1::shared_view_ptr<Action> getCurrentActionView();
+   psio::shared_pssz<Action> getCurrentActionView();
 
    /// Call a service and return its result
    std::vector<char> call(const Action& action, CallFlags flags = CallFlags::none);
 
    /// Call a service and return its result
    ///
-   /// `action` must contain a fracpacked [Action].
+   /// `action` must contain a packed [Action].
    std::vector<char> call(const char* action, uint32_t len, CallFlags flags = CallFlags::none);
 
    /// Call a service and return its result
    ///
-   /// `action` must contain a fracpacked [Action].
+   /// `action` must contain a packed [Action].
    std::vector<char> call(psio1::input_stream action, CallFlags flags = CallFlags::none);
 
    /// Set the return value of the currently-executing action
    template <typename T>
    void setRetval(const T& retval)
    {
-      auto data = psio1::convert_to_frac(retval);
+      auto data = psio::to_pssz(retval);
       raw::setRetval(data.data(), data.size());
    }
 
@@ -468,7 +470,7 @@ namespace psibase
    /// Handles cannot be exported across a boundary that changes the run mode.
    inline void exportHandles(std::span<const KvHandle> handles)
    {
-      auto packed = psio1::to_frac(handles);
+      auto packed = psio::to_pssz(handles);
       raw::exportHandles(packed.data(), packed.size());
    }
 
@@ -489,7 +491,7 @@ namespace psibase
       auto size = raw::importHandles();
       if (size == -1)
          return {};
-      return psio1::from_frac<std::vector<KvHandle>>(getResult(size));
+      return psio::from_pssz<std::vector<KvHandle>>(getResult(size));
    }
 
    /// Set a key-value pair
@@ -506,7 +508,7 @@ namespace psibase
    template <typename K, NotOptional V>
    void kvPut(KvHandle db, const K& key, const V& value)
    {
-      kvPutRaw(db, psio::encode(psio::key{}, key), psio1::convert_to_frac(value));
+      kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
    }
 
    /// Remove a key-value pair if it exists
@@ -555,7 +557,7 @@ namespace psibase
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio1::from_frac<V>(psio1::prevalidated{*v});
+      return psio::from_pssz<V>(psio::trusted{*v});
    }
 
    /// Get a value, or the default if not found
@@ -595,7 +597,7 @@ namespace psibase
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio1::from_frac<V>(psio1::prevalidated{*v});
+      return psio::from_pssz<V>(psio::trusted{*v});
    }
 
    /// Get the key-value pair immediately-before provided key
@@ -625,7 +627,7 @@ namespace psibase
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio1::from_frac<V>(psio1::prevalidated{*v});
+      return psio::from_pssz<V>(psio::trusted{*v});
    }
 
    /// Get the maximum key-value pair which has key as a prefix
@@ -651,7 +653,7 @@ namespace psibase
       if (!v)
          return std::nullopt;
       // TODO: validate (allow opt-in or opt-out)
-      return psio1::from_frac<V>(psio1::prevalidated{*v});
+      return psio::from_pssz<V>(psio::trusted{*v});
    }
 
    /// Write `message` to console

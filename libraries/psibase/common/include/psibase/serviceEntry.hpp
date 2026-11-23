@@ -10,7 +10,7 @@ namespace psibase
 
    struct ProcessTransactionArgs
    {
-      psio1::shared_view_ptr<Transaction> transaction;
+      psio::shared_pssz<Transaction> transaction;
       PSIO_REFLECT(ProcessTransactionArgs, transaction)
    };
 

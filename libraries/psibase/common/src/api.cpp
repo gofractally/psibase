@@ -10,7 +10,7 @@ namespace
    template <typename... T>
    std::int32_t socketOpenImpl(T&&... t)
    {
-      auto args = psio1::to_frac(std::tie(t...));
+      auto args = psio::to_pssz(std::tie(t...));
       if (auto res = raw::socketOpen(args.data(), args.size()); res >= 0)
       {
          return res;

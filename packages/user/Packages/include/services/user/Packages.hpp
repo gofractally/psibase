@@ -193,7 +193,7 @@ namespace UserService
    };
    PSIO_REFLECT(Packages,
                 method(postinstall, package, manifest),
-                method(setSchema, account, schema),
+                method(setSchema, schema),
                 method(getSchema),
                 method(publish, package, sha256, file),
                 method(setSources, sources),

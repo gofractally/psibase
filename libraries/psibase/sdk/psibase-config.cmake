@@ -26,7 +26,10 @@ find_package(Catch2 REQUIRED)
 add_library(psio INTERFACE)
 add_library(psio::psio ALIAS psio)
 target_include_directories(psio INTERFACE ${root}/include ${root}/include/psio/external)
-target_compile_definitions(psio INTERFACE PSIO_EXCEPTIONS_ENABLED=0 PSIO_HAVE_SIMDJSON=0)
+# A failed checked decode reports through psibase::abortMessage: PSIO calls
+# psibase_psio_codec_abort (libpsibase, common/src/codecAbort.cpp).
+target_compile_definitions(psio INTERFACE PSIO_EXCEPTIONS_ENABLED=0 PSIO_HAVE_SIMDJSON=0
+    PSIO_CODEC_ABORT_HANDLER=psibase_psio_codec_abort)
 target_compile_features(psio INTERFACE cxx_std_23)
 target_link_libraries(psio INTERFACE boost)
 

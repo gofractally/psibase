@@ -7,7 +7,9 @@
 #include <psibase/time.hpp>
 #include <psio/reflect.hpp>
 #include <psio1/from_json.hpp>
-#include <psio1/shared_view_ptr.hpp>
+#include <psio/buffer.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <psio1/to_json.hpp>
 
 namespace psibase
@@ -127,7 +129,7 @@ namespace psibase
    //       e.g. complication: there are at least 2 different header formats for gzip.
    struct SignedTransaction
    {
-      psio1::shared_view_ptr<Transaction> transaction;
+      psio::shared_pssz<Transaction> transaction;
 
       // TODO: Is there standard terminology that we could use?
       std::vector<std::vector<char>> proofs;

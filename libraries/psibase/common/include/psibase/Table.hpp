@@ -10,7 +10,10 @@
 #include <psibase/blob.hpp>
 #include <psibase/serviceState.hpp>
 #include <psio/get_type_name.hpp>
+#include <psio/buffer.hpp>
 #include <psio/key.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <span>
 #include <string_view>
 #include <type_traits>
@@ -51,10 +54,10 @@ namespace psibase
       }
 
       friend UniqueKvHandle psibaseImport(const UniqueKvHandle*,
-                                          psio1::view<const std::uint32_t>         value,
-                                          psio1::view<const std::vector<KvHandle>> handles)
+                                          std::uint32_t                value,
+                                          const std::vector<KvHandle>& handles)
       {
-         return UniqueKvHandle{handles.at(value.unpack())};
+         return UniqueKvHandle{handles.at(value)};
       }
 
       friend auto to_schema(auto& builder, const UniqueKvHandle*)
@@ -140,19 +143,12 @@ namespace psibase
          }
       }
       template <typename T>
-      void read(psio1::shared_view_ptr<T>& p) const
+      void read(psio::shared_pssz<T>& p) const
       {
-         std::uint32_t sz = raw::kvGet(db, key.data(), key.size());
-         check(sz != std::uint32_t(-1), "no such key");
-         if (is_secondary)
-         {
-            std::vector<char> buf(sz);
-            raw::getResult(buf.data(), buf.size(), 0);
-            sz = raw::kvGet(db, buf.data(), buf.size());
-            check(sz != std::uint32_t(-1), "primary key not found");
-         }
-         p = psio1::shared_view_ptr<T>(psio1::size_tag{sz});
-         raw::getResult(p.data(), p.size(), 0);
+         std::vector<char> buf;
+         read(buf);
+         // A row is stored as it was packed by this table
+         p = psio::shared_pssz<T>::unchecked(std::move(buf));
       }
       std::uint32_t value_size() const
       {
@@ -331,11 +327,12 @@ namespace psibase
       ///
       /// This reads an object from the database. It does not cache; it returns a fresh object
       /// each time it's used.
-      T operator*() const { return psio1::from_frac<T>(psio1::prevalidated{*base}); }
+      T operator*() const { return psio::from_pssz<T>(psio::trusted{*base}); }
 
-      psio1::shared_view_ptr<T> view() const
+      /// The packed object
+      psio::shared_pssz<T> view() const
       {
-         psio1::shared_view_ptr<T> result;
+         psio::shared_pssz<T> result;
          base.read(result);
          return result;
       }
@@ -362,39 +359,16 @@ namespace psibase
 
    namespace detail
    {
-      template <typename T>
-      struct is_packed_view : std::false_type
-      {
-      };
-      template <typename T>
-      struct is_packed_view<psio1::view<T>> : std::true_type
-      {
-      };
-      template <typename T>
-      struct has_packed_view : is_packed_view<T>
-      {
-      };
-      template <typename... T>
-      struct has_packed_view<std::tuple<T...>>
-          : std::bool_constant<(has_packed_view<std::remove_cvref_t<T>>::value || ...)>
-      {
-      };
-
       /// Appends the key of `k` to `out`
       ///
       /// The encoding is `psio::key`. A [KeyView] is already a key: its bytes
-      /// are appended as they are. A key that was read through a view of a
-      /// packed row is the key of the value it views.
+      /// are appended as they are. A view, or a tuple that holds views, is
+      /// the key of the value it designates.
       template <typename K>
       void appendKey(const K& k, std::vector<char>& out)
       {
          if constexpr (std::same_as<K, KeyView>)
             out.insert(out.end(), k.data.begin(), k.data.end());
-         else if constexpr (is_packed_view<K>::value)
-            psio::to_key(k.unpack(), out);
-         else if constexpr (has_packed_view<K>::value)
-            // The key of a tuple is the keys of its elements, in order
-            std::apply([&](const auto&... e) { (appendKey(e, out), ...); }, k);
          else
             psio::to_key(k, out);
       }
@@ -662,10 +636,13 @@ namespace psibase
          return getImpl<std::optional<T>, false>(std::forward<K2>(k));
       }
 
+      /// Look up object by key, without unpacking it
+      ///
+      /// If a matching key is found, then it returns the packed object.
       template <compatible_key<K> K2 = K>
-      psio1::shared_view_ptr<T> getView(K2&& k) const
+      std::optional<psio::shared_pssz<T>> getView(K2&& k) const
       {
-         return getImpl<psio1::shared_view_ptr<T>, true>(std::forward<K2>(k));
+         return getImpl<std::optional<psio::shared_pssz<T>>, true>(std::forward<K2>(k));
       }
 
      private:
@@ -692,18 +669,13 @@ namespace psibase
             res = raw::kvGet(db, buffer.data(), buffer.size());
             check(res >= 0, "primary key not found");
          }
+         // A row is stored as it was packed by this table
+         buffer.resize(res);
+         raw::getResult(buffer.data(), buffer.size(), 0);
          if constexpr (View)
-         {
-            psio1::shared_view_ptr<T> v{psio1::size_tag{static_cast<std::uint32_t>(res)}};
-            raw::getResult(v.data(), v.size(), 0);
-            return v;
-         }
+            return psio::shared_pssz<T>::unchecked(std::move(buffer));
          else
-         {
-            buffer.resize(res);
-            raw::getResult(buffer.data(), buffer.size(), 0);
-            return psio1::from_frac<T>(psio1::prevalidated{buffer});
-         }
+            return psio::from_pssz<T>(psio::trusted{buffer});
       }
       UniqueKvHandle    db;
       std::vector<char> prefix;
@@ -764,9 +736,9 @@ namespace psibase
          return (value.*f);
       }
 
-      // The view of the member `m` names: the reflected member of C equal to it.
+      // The member `m` names, read through a view of a packed C
       template <std::size_t I, typename C, typename T>
-      constexpr auto get_view_member(psio1::view<const C> v, T C::* m) -> psio1::view<const T>
+      T get_view_member(const auto& v, T C::* m)
       {
          if constexpr (I == psio::reflect<C>::member_count)
          {
@@ -779,15 +751,17 @@ namespace psibase
             {
                if (m == M)
                {
-                  return v.psio_get_proxy().template get<I, M>();
+                  return psio::value_of(v.template get<I>());
                }
             }
             return get_view_member<I + 1>(v, m);
          }
       }
 
-      template <typename T, typename C>
-      decltype(auto) invoke(T C::* f, psio1::view<const C> value)
+      // (The view's parameters are deduced, so that this overload is not
+      // considered - and the view of C not instantiated - for a C itself.)
+      template <typename T, typename C, typename F, psio::storage S>
+      T invoke(T C::* f, psio::view<C, F, S> value)
       {
          return get_view_member<0>(value, f);
       }
@@ -940,17 +914,25 @@ namespace psibase
       {
          if constexpr (std::is_same_v<U, T>)
          {
-            auto serialized = psio1::convert_to_frac(value);
-            putImpl<false, T>(value, serialized);
+            auto serialized = psio::to_pssz(value);
+            putImpl(value, serialized);
          }
-         else if constexpr (std::is_same_v<U, psio1::shared_view_ptr<T>> ||
-                            std::is_same_v<U, psio1::shared_view_ptr<const T>>)
+         else if constexpr (std::is_same_v<U, psio::shared_pssz<T>> ||
+                            std::is_same_v<U, psio::pssz_buffer<T>>)
          {
-            putImpl<true, psio1::view<const T>>(*value, value.data_without_size_prefix());
+            putImpl(value.view(), value.bytes());
          }
-         else if constexpr (psio1::PackableAs<U, T>)
+         else if constexpr (std::is_same_v<U, psio::pssz_view<T>>)
          {
-            put(psio1::shared_view_ptr<T>::from_compatible(value));
+            putImpl(value, psio::bytes(value));
+         }
+         else if constexpr (!std::is_convertible_v<const U&, T>)
+         {
+            // A record that refers to its members (views, string views,
+            // spans) and packs as a T
+            auto serialized = psio::to_pssz(value);
+            check(psio::validate_pssz<T>(serialized).ok(), "value does not pack as the row type");
+            putImpl(psio::pssz_view<T>{serialized}, serialized);
          }
          else
          {
@@ -983,9 +965,7 @@ namespace psibase
       void remove(const T& oldValue) { removeImpl(oldValue); }
 
       /// Remove object from table
-      void remove(psio1::view<const T> oldValue) { removeImpl(oldValue); }
-      /// Remove object from table
-      void remove(psio1::view<T> oldValue) { remove(static_cast<psio1::view<const T>>(oldValue)); }
+      void remove(psio::pssz_view<T> oldValue) { removeImpl(oldValue); }
 
       // TODO: get index by name
       /// Get a primary or secondary index
@@ -1027,8 +1007,7 @@ namespace psibase
       std::optional<T> last() const { return getIndex<0>().last(); }
 
      private:
-      template <bool View, typename U>
-      void putImpl(const U& value, std::span<const char> serialized)
+      void putImpl(const auto& value, std::span<const char> serialized)
       {
          auto pk = serialize_key(0, detail::invoke(Primary, value));
          if constexpr (sizeof...(Secondary) > 0)
@@ -1040,7 +1019,7 @@ namespace psibase
             {
                std::vector<char> buffer(sz);
                raw::getResult(buffer.data(), buffer.size(), 0);
-               auto data              = psio1::from_frac<T>(psio1::prevalidated{std::move(buffer)});
+               auto data              = psio::from_pssz<T>(psio::trusted{buffer});
                auto replace_secondary = [&](uint8_t& idx, auto wrapped)
                {
                   auto old_key = detail::invoke(decltype(wrapped)::value, data);

@@ -517,17 +517,10 @@ TEST_CASE("psibase records: a transaction", "[canonical][records]")
    static_assert(psio1::is_packable<psibase::Tapos>::fixed_size == 15);
    roundTrips(trx);
 
-   psibase::SignedTransaction signedTrx{psio1::shared_view_ptr<psibase::Transaction>{trx}, {{7, 7}}, {}};
-   CHECK(frac(signedTrx) ==
-         "0800080000008c000000840000001700c2c0026b000000000403020101000508000000530000000800000008000000290000001c0000b82a1b83aedf0400342d8afa07a40d7ac616000000000004000000030000000102031c000029a41b0b345e050066533bcc77c60aabc8c000000000000000000004000000040000000c00004a3347810e700e040000000200000009080400000004000000020000000707");
-   CHECK(json(signedTrx) ==
-         R"({"transaction":"1700C2C0026B000000000403020101000508000000530000000800000008000000290000001C0000B82A1B83AEDF0400342D8AFA07A40D7AC616000000000004000000030000000102031C000029A41B0B345E050066533BCC77C60AABC8C000000000000000000004000000040000000C00004A3347810E700E04000000020000000908","proofs":["0707"],"subjectiveData":null})");
-   // A trailing optional that is present.
-   signedTrx.subjectiveData = {{{1}, {}}};
-   CHECK(frac(signedTrx) ==
-         "0c000c000000900000009a000000840000001700c2c0026b000000000403020101000508000000530000000800000008000000290000001c0000b82a1b83aedf0400342d8afa07a40d7ac616000000000004000000030000000102031c000029a41b0b345e050066533bcc77c60aabc8c000000000000000000004000000040000000c00004a3347810e700e0400000002000000090804000000040000000200000007070800000008000000000000000100000001");
-   CHECK(json(signedTrx) ==
-         R"({"transaction":"1700C2C0026B000000000403020101000508000000530000000800000008000000290000001C0000B82A1B83AEDF0400342D8AFA07A40D7AC616000000000004000000030000000102031C000029A41B0B345E050066533BCC77C60AABC8C000000000000000000004000000040000000C00004A3347810E700E04000000020000000908","proofs":["0707"],"subjectiveData":["01",""]})");
+   // SignedTransaction::transaction is a psio::shared_pssz<Transaction> since
+   // the binary wire flipped: the record is no longer packed by this library
+   // (its bytes are pinned in libraries/psibase/common/tests/methods.cpp).
+   // Its legacy schema is unchanged: a packed member is a FracPack node.
    CHECK(fnv(schemaOf<psibase::SignedTransaction>("SignedTransaction")) == 0x782a90f11ef1a02bull);
 }
 
@@ -599,15 +592,8 @@ TEST_CASE("psibase records: a record that carries a variant", "[canonical][recor
 
 TEST_CASE("psibase records: native table rows", "[canonical][records]")
 {
-   psibase::StatusRow status;
-   status.chainId   = digest(0x60);
-   status.current   = pinnedHeader(false);
-   status.head      = psibase::BlockInfo{pinnedHeader(false)};
-   status.consensus = {pinnedConsensus(false), std::nullopt};
-   CHECK(frac(status) ==
-         "2c00606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f0c000000a6000000660100009c00101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f07000000c016c2c1da600600007185b64f77d70b0300000005000000202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f240024000000000000071156a1302cb94422c0b8d0658e4f7e477b6510305d47d9b3fd1e82e49c00101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f07000000c016c2c1da600600007185b64f77d70b0300000005000000202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f0400040000000c000c0000005e0000008e00000000510000000400040000000800000008000000270000000c00007185b64f77d70b040000000c00004a3347810e700e04000000030000000405060c00004843fa5b77d70b040000000c0000000000000000000000000004000000040000002a00004a3347810e700e404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f010208000300000004000000100000040000000200000020000000001000");
-   CHECK(fnv(json(status)) == 0xd48e387a216ee961ull);
-
+   // (A StatusRow holds a block id, the hash of the packed header: PSSZ
+   // since the binary wire flipped. Its pin went with that.)
    psibase::CodeRow code{AccountNumber{"tokens"}, 3, digest(0x70), 1, 2};
    CHECK(frac(code) ==
          "320000342d8afa07a40d0300000000000000707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f0102");
@@ -646,13 +632,6 @@ TEST_CASE("psibase records: a table row with secondary keys", "[canonical][recor
 TEST_CASE("psibase records: an event", "[canonical][records]")
 {
    using History = UserService::Nft::Events::History;
-   using Payload = psio1::make_param_value_tuple<decltype(&History::ownerChange)>::type;
-   static_assert(std::is_same_v<Payload, std::tuple<std::uint32_t, std::uint8_t, AccountNumber,
-                                                   AccountNumber, psibase::Memo>>);
-   const Payload payload{42, 1, AccountNumber{"alice"}, AccountNumber{"bob"}, psibase::Memo{"hi"}};
-   CHECK(frac(payload) ==
-         "19002a0000000100b82a1b83aedf040029a41b0b345e0504000000020000006869");
-   CHECK(json(payload) == R"([42,1,"alice","bob","hi"])");
    CHECK(std::string_view{psio1::get_type_name<History>()} == "Nft_EventsHistory");
    const auto names = psio1::reflect<History>::member_function_names[0];
    CHECK(std::vector<std::string_view>(names.begin(), names.end()) ==
@@ -771,12 +750,6 @@ TEST_CASE("psibase records: the types slice 2b declared with PSIO", "[canonical]
          R"({"@1":{"Custom":{"type":{"Struct":{"value":{"Int":{"bits":64,"isSigned":false}}}},"id":"AccountNumber"}},"@5":{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}},"DynDepGroups":{"Object":{"service":"@1","groups":{"Custom":{"type":{"List":{"Object":{"first":"@5","second":{"List":{"Object":{"name":"@5","service":"@1"}}}}}},"id":"map"}}}}})");
 
    // A class template with a nested member
-   const psibase::TypedAction<std::tuple<std::uint32_t, std::string>> typed{
-       AccountNumber{"alice"}, AccountNumber{"tokens"}, MethodNumber{"credit"}, {{7u, "x"}}};
-   CHECK(frac(typed) ==
-         "1c0000b82a1b83aedf0400342d8afa07a40d7ac6160000000000040000000f000000080007000000040000000100000078");
-   CHECK(json(typed) ==
-         R"({"sender":"alice","service":"tokens","method":"credit","rawData":"080007000000040000000100000078"})");
    CHECK(schemaOf<psibase::TypedAction<std::tuple<std::uint32_t, std::string>>>("TypedAction") ==
          R"({"@1":{"Custom":{"type":{"Struct":{"value":"@2"}},"id":"AccountNumber"}},"@2":{"Int":{"bits":64,"isSigned":false}},"TypedAction":{"Object":{"sender":"@1","service":"@1","method":{"Custom":{"type":{"Struct":{"value":"@2"}},"id":"MethodNumber"}},"rawData":{"Custom":{"type":{"FracPack":{"Tuple":[{"Int":{"bits":32,"isSigned":false}},{"Custom":{"type":{"List":{"Int":{"bits":8,"isSigned":false}}},"id":"string"}}]}},"id":"hex"}}}}})");
 

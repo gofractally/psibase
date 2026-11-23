@@ -31,15 +31,14 @@ namespace psibase
    Action getCurrentAction()
    {
       auto data = getResult(raw::getCurrentAction());
-      return psio1::from_frac<Action>(psio1::prevalidated{data});
+      return psio::from_pssz<Action>(psio::trusted{data});
    }
 
-   psio1::shared_view_ptr<Action> getCurrentActionView()
+   psio::shared_pssz<Action> getCurrentActionView()
    {
-      psio1::shared_view_ptr<Action> ptr(psio1::size_tag{raw::getCurrentAction()});
-      raw::getResult(ptr.data(), ptr.size(), 0);
-      check(ptr.validate_strict(), "invalid action format");
-      return ptr;
+      auto data = getResult(raw::getCurrentAction());
+      check(psio::validate_strict<Action>(psio::pssz{}, data).ok(), "invalid action format");
+      return psio::shared_pssz<Action>::unchecked(std::move(data));
    }
 
    std::vector<char> call(const char* action, uint32_t len, CallFlags flags)
@@ -54,6 +53,6 @@ namespace psibase
 
    std::vector<char> call(const Action& action, CallFlags flags)
    {
-      return call(psio1::convert_to_frac(action), flags);
+      return call(psio::to_pssz(action), flags);
    }
 }  // namespace psibase

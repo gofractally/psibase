@@ -12,7 +12,6 @@
 // Native only (it reads and writes a file of the source tree).
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Memo.hpp>
-#include <psibase/MethodArgs.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/SnapshotHeader.hpp>
@@ -88,6 +87,11 @@ namespace
       return out + "\"";
    }
 
+   // The arguments of a method as they are packed: each parameter as the
+   // type it is on the wire.
+   template <typename... P>
+   std::tuple<psio::wire_type_t<P>...> wireTuple(std::tuple<P...>*);
+
    struct Fixture
    {
       psio::SchemaBuilder builder;
@@ -99,7 +103,8 @@ namespace
       template <auto Method, typename... Args>
       void call(std::string_view interface, std::string_view method, Args&&... args)
       {
-         psibase::MethodArgs<decltype(Method)> tuple{std::forward<Args>(args)...};
+         decltype(wireTuple((typename psio::method_traits<decltype(Method)>::params*)nullptr))
+             tuple{std::forward<Args>(args)...};
          if (!calls.empty())
             calls += ",\n";
          calls += "{\"interface\":" + jsonString(interface) + ",\"method\":" + jsonString(method) +

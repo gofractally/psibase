@@ -1,10 +1,10 @@
 #pragma once
 
-#include <psibase/MethodArgs.hpp>
 #include <psibase/check.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
 #include <psio1/from_json.hpp>
+#include <psio1/to_json.hpp>
 
 namespace psibase
 {
@@ -42,7 +42,7 @@ namespace psibase
              if (methodName == name)
              {
                 constexpr std::size_t                                 I = decltype(index)::value;
-                MethodArgs<typename reflect::template method_type<I>> params{};
+                typename reflect::template method_arg_tuple<I> params{};
                 std::vector<char>                                     j{json.begin(), json.end()};
                 j.push_back(0);
                 psio1::json_token_stream stream{j.data()};
@@ -55,7 +55,7 @@ namespace psibase
                           abortMessage("action '" + std::string(name) +
                                        "' does not have argument '" + std::string(k) + "'");
                     });
-                result = psio1::convert_to_frac(params);
+                result = psio::to_pssz(params);
              }
           });
       return result;
@@ -65,7 +65,7 @@ namespace psibase
    ///
    /// If `request` is a POST to `/pack_action/x`, where `x` is an action
    /// on `Service`, then this parses a JSON object containing the arguments
-   /// to `x`, packs them using fracpack, and returns the result as an
+   /// to `x`, packs them (PSSZ), and returns the result as an
    /// `application/octet-stream`.
    ///
    /// If `request` doesn't match the above, or the action name is not found,

@@ -2,7 +2,7 @@
 
 #include <psibase/RpcFwd.hpp>
 #include <psibase/block.hpp>
-#include <psio1/nested.hpp>
+#include <psio/nested.hpp>
 #include <string>
 #include <vector>
 
@@ -258,10 +258,7 @@ namespace psibase
    using HttpReply = BasicHttpReply<std::vector<char>>;
 
    template <typename T>
-   using FracpackHttpReply = BasicHttpReply<psio1::nested<T>>;
-
-   template <typename T>
-   using JsonHttpReply = BasicHttpReply<psio1::nested_json<T>>;
+   using FracpackHttpReply = BasicHttpReply<psio::nested<T>>;
 
    using HttpReplyRef = BasicHttpReply<std::span<const char>>;
 }  // namespace psibase

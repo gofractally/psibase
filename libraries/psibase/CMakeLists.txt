@@ -31,6 +31,7 @@ function(add suffix)
     )
 
     if(DEFINED IS_WASM)
+        target_sources(psibase${suffix} PRIVATE common/src/codecAbort.cpp)
         find_package(Catch2 3 REQUIRED)
         target_link_libraries(psibase${suffix} PUBLIC wasm-base${suffix})
         target_mapped_include_directories(psibase${suffix} PUBLIC common/include wasm32-psibase)

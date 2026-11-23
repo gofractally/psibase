@@ -1729,6 +1729,23 @@ namespace psio1
       constexpr bool is_nested_wrapper_v<shared_view_ptr<T>> = true;
       template <typename T>
       constexpr bool is_nested_wrapper_v<nested<T>> = true;
+      // TEMPORARY: removed when psio1 is deleted.
+      // A PSIO packed value (psio::nested, psio::pssz_buffer,
+      // psio::shared_pssz) is a FracPack node, as this library's were.
+      template <typename T>
+         requires ::psio::detail::is_nested_v<T>
+      constexpr bool is_nested_wrapper_v<T> = true;
+      template <typename T>
+      struct nested_wrapped
+      {
+         using type = std::remove_cv_t<typename T::value_type>;
+      };
+      template <typename T>
+         requires ::psio::detail::is_nested_v<T>
+      struct nested_wrapped<T>
+      {
+         using type = typename ::psio::detail::is_nested<T>::inner;
+      };
 
       template <typename T>
       constexpr bool is_duration_v = false;
@@ -1845,14 +1862,14 @@ namespace psio1
                   if (expandNested_)
                   {
                      schema.insert(name,
-                                   FracPack{insert<std::remove_cv_t<typename T::value_type>>()});
+                                   FracPack{insert<typename nested_wrapped<T>::type>()});
                   }
                   else
                   {
                      schema.insert(
                          name,
                          Custom{
-                             .type = FracPack{insert<std::remove_cv_t<typename T::value_type>>()},
+                             .type = FracPack{insert<typename nested_wrapped<T>::type>()},
                              .id   = "hex"});
                   }
                }
@@ -2095,3 +2112,43 @@ namespace psio1
    using schema_types::SchemaBuilder;
    using schema_types::SchemaDifference;
 }  // namespace psio1
+
+// TEMPORARY: removed when psio1 is deleted.
+// psibase::ServiceSchema is declared with PSIO and holds this library's
+// schema types until schemas flip. Inside a PSSZ value each of them is an
+// opaque payload: its fracpack form.
+#include <psio/adapter.hpp>
+namespace psio1
+{
+   template <typename T>
+   struct legacy_frac_adapter
+   {
+      static std::size_t packsize(const T& v) { return fracpack_size(v); }
+      static void        encode(const T& v, std::vector<char>& out)
+      {
+         vector_stream stream{out};
+         to_frac(v, stream);
+      }
+      static T decode(std::span<const char> b) { return from_frac<T>(prevalidated{b}); }
+      static ::psio::codec_status validate(std::span<const char> b) noexcept
+      {
+         return fracpack_validate<T>(b) ? ::psio::codec_ok()
+                                        : ::psio::codec_fail("invalid legacy schema", 0, "frac");
+      }
+      static ::psio::codec_status validate_strict(std::span<const char> b) noexcept
+      {
+         return fracpack_validate_strict<T>(b)
+                    ? ::psio::codec_ok()
+                    : ::psio::codec_fail("invalid legacy schema", 0, "frac");
+      }
+   };
+}  // namespace psio1
+PSIO_ADAPTER(::psio1::schema_types::Schema,
+             ::psio::binary_category,
+             ::psio1::legacy_frac_adapter<::psio1::schema_types::Schema>)
+PSIO_ADAPTER(::psio1::schema_types::AnyType,
+             ::psio::binary_category,
+             ::psio1::legacy_frac_adapter<::psio1::schema_types::AnyType>)
+PSIO_ADAPTER(::psio1::schema_types::FunctionType,
+             ::psio::binary_category,
+             ::psio1::legacy_frac_adapter<::psio1::schema_types::FunctionType>)

@@ -3,7 +3,6 @@
 #include <map>
 #include <optional>
 #include <psibase/AccountNumber.hpp>
-#include <psibase/MethodArgs.hpp>
 #include <psibase/MethodNumber.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/db.hpp>
@@ -130,13 +129,12 @@ namespace psibase
              [&](auto index, std::string_view name)
              {
                 constexpr std::size_t I = decltype(index)::value;
-                using Method            = typename reflect::template method_type<I>;
                 auto [pos, inserted]    = out.try_emplace(
                     std::string(name),
                     psio1::schema_types::FunctionType{
                         makeParams(builder, reflect::template method_param_names<I>,
-                                   (MethodArgs<Method>*)nullptr),
-                        makeResult<MethodResult<Method>>(builder)});
+                                   (typename reflect::template method_arg_tuple<I>::tuple_type*)nullptr),
+                        makeResult<psio::wire_type_t<typename reflect::template method_result<I>>>(builder)});
                 if (inserted)
                 {
                    eventTypes.push_back(&pos->second.params);
@@ -156,12 +154,11 @@ namespace psibase
              [&](auto index, std::string_view name)
              {
                 constexpr std::size_t I = decltype(index)::value;
-                using Method            = typename reflect::template method_type<I>;
                 using Event             = nt_wrap<reflect::template method_pointer<I>>;
                 auto [pos, inserted]    = out.try_emplace(
                     std::string(name),
                     EventType{.type = makeParams(builder, reflect::template method_param_names<I>,
-                                                 (MethodArgs<Method>*)nullptr),
+                                                 (typename reflect::template method_arg_tuple<I>::tuple_type*)nullptr),
                               .access = std::string(eventAccess((T*)nullptr, (Event*)nullptr))});
                 if (inserted)
                 {

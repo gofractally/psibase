@@ -100,7 +100,7 @@ namespace psibase
             auto actionTrace = getTopAction(t, 0);
             if (actionTrace.rawRetval.size() != 0)
             {
-               _return = psio1::from_frac<ReturnType>(actionTrace.rawRetval);
+               _return = psio::from_pssz<ReturnType>(actionTrace.rawRetval);
             }
          }
       }
@@ -165,8 +165,8 @@ namespace psibase
    struct FracPackBody
    {
       static std::string  contentType() { return "application/octet-stream"; }
-      std::vector<char>   body() const { return psio1::to_frac(value); }
-      static FracPackBody unpack(std::vector<char> data) { return {psio1::from_frac<T>(data)}; }
+      std::vector<char>   body() const { return psio::to_pssz(value); }
+      static FracPackBody unpack(std::vector<char> data) { return {psio::from_pssz<T>(data)}; }
       T                   value;
    };
 
@@ -734,7 +734,7 @@ namespace psibase
          if (!v)
             return std::nullopt;
          // TODO: validate (allow opt-in or opt-out)
-         return psio1::from_frac<V>(psio1::prevalidated{*v});
+         return psio::from_pssz<V>(psio::trusted{*v});
       }
 
       /// Get a key-value pair, if any
@@ -754,7 +754,7 @@ namespace psibase
          auto v = kvGreaterEqualRaw(db, psio::encode(psio::key{}, key), matchKeySize);
          if (!v)
             return std::nullopt;
-         return psio1::from_frac<V>(*v);
+         return psio::from_pssz<V>(*v);
       }
 
       void kvPutRaw(DbId db, psio1::input_stream key, psio1::input_stream value);
@@ -762,7 +762,7 @@ namespace psibase
       template <typename K, typename V>
       void kvPut(DbId db, const K& key, const V& value)
       {
-         kvPutRaw(db, psio::encode(psio::key{}, key), psio1::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
       }
    };  // TestChain
 

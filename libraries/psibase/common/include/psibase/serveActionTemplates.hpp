@@ -1,9 +1,10 @@
 #pragma once
 
-#include <psibase/MethodArgs.hpp>
 #include <psibase/Rpc.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio1/from_json.hpp>
+#include <psio1/to_json.hpp>
 #include <psio1/to_json.hpp>
 
 namespace psibase
@@ -54,7 +55,7 @@ namespace psibase
              s.write(':');
              s.write('{');
              generateActionJsonTemplate(
-                 (MethodArgs<typename reflect::template method_type<I>>*)nullptr, false,
+                 (typename reflect::template method_arg_tuple<I>::tuple_type*)nullptr, false,
                  reflect::template method_param_names<I>, s);
              s.write('}');
           });
