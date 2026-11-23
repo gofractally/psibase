@@ -35,8 +35,8 @@ pub fn get_current_time_seconds() -> u32 {
     psibase::services::transact::Wrapper::call()
         .currentBlock()
         .time
-        .seconds()
-        .seconds as u32
+        .floor::<psibase::psio::time::Seconds>()
+        .ticks() as u32
 }
 
 pub fn calculate_results(attestations: Vec<Option<Vec<u8>>>) -> GroupResult {

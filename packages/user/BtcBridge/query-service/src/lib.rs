@@ -236,8 +236,8 @@ pub mod service {
                 return reply(
                     200,
                     json!({"config":config,"policy":policy,"relay":relay,"tip_header":tip_header,"token":token,"wallet":wallet,
-                    "deposit_fee_terms":btcbridge::deposit_fees(block.time.seconds().seconds as u64),"deposit_fee_policy":btcbridge::DepositFeesTable::read().get_index_pk().get(&()),
-                    "block_num":block.blockNum,"commit_num":block.commitNum,"now":block.time.seconds().seconds,
+                    "deposit_fee_terms":btcbridge::deposit_fees(block.time.floor::<psibase::psio::time::Seconds>().ticks() as u64),"deposit_fee_policy":btcbridge::DepositFeesTable::read().get_index_pk().get(&()),
+                    "block_num":block.blockNum,"commit_num":block.commitNum,"now":block.time.floor::<psibase::psio::time::Seconds>().ticks(),
                     "addresses":addresses,"requests":requests.values().collect::<Vec<_>>(),"batches":batches,"revisions":revisions,
                     "signatures":signatures,"signing_links":signing_links,"hash_requests":hash_requests,"custody_keys":CustodyKeyTable::read().get_index_pk().iter().collect::<Vec<_>>(),"utxos":utxos.values().collect::<Vec<_>>(),"utxo_page_limit":256,"request_page_limit":256}),
                 );

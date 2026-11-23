@@ -1016,6 +1016,7 @@ dependencies = [
  "indexmap",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psio",
  "serde",
  "serde-aux",
  "serde_json",
@@ -2250,6 +2251,8 @@ dependencies = [
 name = "psio"
 version = "0.1.0"
 dependencies = [
+ "async-graphql",
+ "chrono",
  "paste",
  "psio-macros",
  "ryu",

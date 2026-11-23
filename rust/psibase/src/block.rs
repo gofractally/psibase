@@ -175,10 +175,16 @@ pub struct Claim {
     InputObject,
     PartialEq,
     Eq,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "TaposInput")]
+#[psio(definition_will_not_change)]
 pub struct Tapos {
     pub expiration: TimePointSec,
     pub refBlockSuffix: u32,
@@ -205,6 +211,11 @@ impl Tapos {
     InputObject,
     PartialEq,
     Eq,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+    psio::Key,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]

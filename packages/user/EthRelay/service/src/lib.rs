@@ -60,8 +60,8 @@ pub fn now() -> u64 {
     psibase::services::transact::Wrapper::call()
         .currentBlock()
         .time
-        .seconds()
-        .seconds as u64
+        .floor::<psibase::psio::time::Seconds>()
+        .ticks() as u64
 }
 fn slot(c: &Relay) -> u64 {
     let n: eth::Network = serde_json::from_str(&c.network).unwrap();

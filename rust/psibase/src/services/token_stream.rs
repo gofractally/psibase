@@ -8,7 +8,20 @@ use crate::{
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Stream {
     pub nft_id: NID,

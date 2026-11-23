@@ -23,7 +23,18 @@ pub mod service {
         pub actions: Vec<Action>,
     }
 
-    #[derive(Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(
+        Pack,
+        Unpack,
+        Serialize,
+        Deserialize,
+        ToSchema,
+        SimpleObject,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct StagedTx {
         pub id: u32,

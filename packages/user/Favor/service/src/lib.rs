@@ -28,8 +28,8 @@ pub fn now() -> i64 {
     psibase::services::transact::Wrapper::call()
         .currentBlock()
         .time
-        .seconds()
-        .seconds
+        .floor::<psibase::psio::time::Seconds>()
+        .ticks()
 }
 pub fn route_key() -> Result<RouteKey, &'static str> {
     RouteKeys::with_service(Wrapper::SERVICE)

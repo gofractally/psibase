@@ -21,11 +21,11 @@ fn test_diff_adjust_basic(mut chain: psibase::Chain) -> Result<(), psibase::Erro
     assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, 3000);
 
     // Reduces after a minute
-    chain.start_block_after(Seconds::new(60).into());
+    chain.start_block_after(Seconds::from_ticks(60).to_unit().unwrap());
 
     assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, 2850);
 
-    chain.start_block_after(Seconds::new(5).into());
+    chain.start_block_after(Seconds::from_ticks(5).to_unit().unwrap());
 
     Wrapper::push_from(&chain, alice)
         .increment(nft_id, 7)
@@ -36,7 +36,7 @@ fn test_diff_adjust_basic(mut chain: psibase::Chain) -> Result<(), psibase::Erro
 
     // Adjustments = floor(activity_count / (target_max + 1)). The 7 sales above left no remainder
     // (7 % 7 == 0), so these 18 sales give floor(18 / 7) = 2 steps (5% x 2 on top of 2992).
-    chain.start_block_after(Seconds::new(5).into());
+    chain.start_block_after(Seconds::from_ticks(5).to_unit().unwrap());
 
     Wrapper::push_from(&chain, alice).increment(nft_id, 18);
 
@@ -65,7 +65,7 @@ fn test_asymmetric_ppm(mut chain: psibase::Chain) -> Result<(), psibase::Error> 
 
     assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, 11000);
 
-    chain.start_block_after(Seconds::new(60).into());
+    chain.start_block_after(Seconds::from_ticks(60).to_unit().unwrap());
 
     assert_eq!(Wrapper::push(&chain).get_diff(nft_id).get()?, 10450);
 

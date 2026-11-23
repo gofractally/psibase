@@ -46,7 +46,20 @@ pub mod Service {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "RateLimitTable", index = 0)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(
+        Default,
+        Pack,
+        Unpack,
+        ToSchema,
+        SimpleObject,
+        Serialize,
+        Deserialize,
+        Debug,
+        psio::PsszPack,
+        psio::PsszUnpack,
+        psio::PsszView,
+        psio::ToPsszSchema,
+    )]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct RateLimit {
         #[primary_key]

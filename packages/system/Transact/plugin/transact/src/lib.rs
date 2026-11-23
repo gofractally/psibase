@@ -319,7 +319,7 @@ impl Auth for TransactPlugin {
         let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
         let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
 
-        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
+        let expiration = TimePointSec::from_chrono_floor(chrono::Utc::now() + chrono::Duration::seconds(3)).unwrap();
         let tapos = Tapos {
             expiration,
             refBlockSuffix: 0,

@@ -87,7 +87,7 @@ pub mod service {
             if path == "/snapshot" {
                 return reply(
                     200,
-                    json!({"config":ethbridge::ConfigTable::read().get_index_pk().get(&()),"amounts":ethbridge::ConfigTable::read().get_index_pk().get(&()).map(|c|json!({"reserve":c.reserve.to_string(),"liability":c.liability.to_string(),"withdrawal_fee":c.withdrawal_fee.to_string()})),"custody":ethbridge::CustodyTable::read().get_index_pk().iter().take(3).collect::<Vec<_>>(),"relay":foreign::<_,ethrelay::RelayTable>().get_index_pk().get(&()),"depositSelector":"13765838","vaultCodeHash":ethbridge::VAULT_CODE_HASH.trim(),"now":psibase::services::transact::Wrapper::call().currentBlock().time.seconds().seconds}),
+                    json!({"config":ethbridge::ConfigTable::read().get_index_pk().get(&()),"amounts":ethbridge::ConfigTable::read().get_index_pk().get(&()).map(|c|json!({"reserve":c.reserve.to_string(),"liability":c.liability.to_string(),"withdrawal_fee":c.withdrawal_fee.to_string()})),"custody":ethbridge::CustodyTable::read().get_index_pk().iter().take(3).collect::<Vec<_>>(),"relay":foreign::<_,ethrelay::RelayTable>().get_index_pk().get(&()),"depositSelector":"13765838","vaultCodeHash":ethbridge::VAULT_CODE_HASH.trim(),"now":psibase::services::transact::Wrapper::call().currentBlock().time.floor::<psibase::psio::time::Seconds>().ticks()}),
                 );
             }
             let values: std::collections::BTreeMap<_, _> =

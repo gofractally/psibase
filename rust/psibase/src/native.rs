@@ -324,7 +324,7 @@ pub fn kv_max<K: ToKey, V: UnpackOwned>(db: &KvHandle, key: &K) -> Option<V> {
 /// replaces any previous timeout.
 pub fn set_max_cpu_time<T: Into<MicroSeconds>>(time: T) {
     let time: MicroSeconds = time.into();
-    let time = (time.value * 1000) as u64;
+    let time = (time.ticks() * 1000) as u64;
     unsafe { native_raw::setMaxCpuTime(time) }
 }
 

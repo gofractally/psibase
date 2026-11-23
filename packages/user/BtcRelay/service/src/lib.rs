@@ -63,8 +63,8 @@ fn now() -> u64 {
     psibase::services::transact::Wrapper::call()
         .currentBlock()
         .time
-        .seconds()
-        .seconds as u64
+        .floor::<psibase::psio::time::Seconds>()
+        .ticks() as u64
 }
 pub fn live() -> Relay {
     let c = config();

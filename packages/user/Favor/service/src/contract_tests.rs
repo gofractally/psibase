@@ -641,7 +641,7 @@ fn key_rotation_expiry_and_capacity_changes_revalidate_at_execution() {
     f.ok(vec![Wrapper::pack().rotate_key(vec![43; 32].into())]);
     f.reject(vec![q.action(A)], INVALID);
     let q = f.preview(A, C, "1", "expired-001", None);
-    f.chain.start_block_after(Seconds::new(61).into());
+    f.chain.start_block_after(Seconds::from_ticks(61).to_unit().unwrap());
     f.reject(vec![q.action(A)], INVALID);
     let q = f.preview(A, C, "1", "revision-01", None);
     f.line(B, A, "99", 0, true);
@@ -877,7 +877,7 @@ fn policy_changes_revocation_and_request_expiry_invalidate_issued_routes() {
         .get(&crypto::hash_secret(&secret).unwrap())
         .unwrap();
     assert_eq!(env.context.expires_at, request.expires_at);
-    f.chain.start_block_after(Seconds::new(11).into());
+    f.chain.start_block_after(Seconds::from_ticks(11).to_unit().unwrap());
     f.reject(vec![q.action(A)], INVALID);
     f.unavailable(A, C, "USD", "1", "expired-query", Some(&secret));
 }

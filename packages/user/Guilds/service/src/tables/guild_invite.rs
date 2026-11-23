@@ -15,7 +15,7 @@ use psibase::services::{
 
 impl GuildInvite {
     fn new(guild: AccountNumber, id: u32, pre_attest: bool) -> Self {
-        let now = TransactSvc::call().currentBlock().time.seconds();
+        let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
         Self {
             guild,

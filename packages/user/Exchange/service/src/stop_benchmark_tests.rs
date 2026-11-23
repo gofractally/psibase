@@ -427,7 +427,7 @@ fn deterministic_additional_stop_maximal_mixed_maturity_distribution(
             .collect::<Vec<_>>(),
     )
     .unwrap();
-    chain.start_block_after(Seconds::new(32 * 86400).into());
+    chain.start_block_after(Seconds::from_ticks(32 * 86400).to_unit().unwrap());
     chain.finish_block();
     let before = state(&chain);
     let mut expected_state: [Option<Value>; 2] = [None, None];

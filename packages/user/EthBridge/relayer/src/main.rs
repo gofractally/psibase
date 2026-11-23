@@ -96,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
     let tapos = get_tapos_for_head(&base, client.clone()).await?;
     let trx = Transaction {
         tapos: Tapos {
-            expiration: TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(120)),
+            expiration: TimePointSec::from_chrono_floor(chrono::Utc::now() + chrono::Duration::seconds(120)).unwrap(),
             refBlockSuffix: tapos.ref_block_suffix,
             refBlockIndex: tapos.ref_block_index,
             flags: 0,

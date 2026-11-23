@@ -177,7 +177,7 @@ mod tests {
         do_test(
             &chain,
             Some(TestKey::Recovery),
-            Some(MicroSeconds::new(899000000)),
+            Some(MicroSeconds::from_ticks(899000000)),
             Some(TestKey::NewBob),
             true,
             vec![TestKey::Recovery, TestKey::NewBob],
@@ -189,7 +189,7 @@ mod tests {
         do_test(
             &chain,
             Some(TestKey::Recovery),
-            Some(MicroSeconds::new(900000000)),
+            Some(MicroSeconds::from_ticks(900000000)),
             Some(TestKey::NewBob),
             true,
             vec![TestKey::Recovery, TestKey::NewBob],

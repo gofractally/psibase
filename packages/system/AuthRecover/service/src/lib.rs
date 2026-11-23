@@ -7,7 +7,7 @@ pub mod service {
     use services::{accounts, auth_sig::SubjectPublicKeyInfo, transact, verify_sig};
     use std::cell::RefCell;
 
-    const RECOVERY_TIME: Seconds = Seconds::new(15 * 60);
+    const RECOVERY_TIME: Seconds = Seconds::from_ticks(15 * 60);
 
     #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct RecoveryKey {
@@ -71,7 +71,7 @@ pub mod service {
         });
         if action.service == get_service() && action.method == method!("setKey") {
             if let Some(rkey) = &row.rkey {
-                let now = transact::Wrapper::call().currentBlock().time.seconds();
+                let now = transact::Wrapper::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
                 if now <= rkey.expiration && has_key(&rkey.key) {
                     return true;
                 }
@@ -198,7 +198,7 @@ pub mod service {
             .expect(&format!(
                 "{sender} should be the recovery partner of {account}"
             ));
-        let expiration = transact::Wrapper::call().currentBlock().time.seconds() + RECOVERY_TIME;
+        let expiration = transact::Wrapper::call().currentBlock().time.floor::<psibase::psio::time::Seconds>() + RECOVERY_TIME;
         row.rkey = Some(RecoveryKey {
             key: recovery_key,
             expiration,

@@ -13,12 +13,12 @@ pub fn test_issued_field_updates(chain: psibase::Chain) -> Result<(), psibase::E
     svc.from("alice").attest(account!("bob"), 75).get()?;
 
     let response = svc.query::<Vec<AttestationStats>>("allAttestationStats");
-    let issued_first = response[0].mostRecentAttestation.seconds;
+    let issued_first = response[0].mostRecentAttestation.ticks();
 
     svc.from("alice").attest(account!("bob"), 65).get()?;
 
     let response = svc.query::<Vec<AttestationStats>>("allAttestationStats");
-    let issued_second = response[0].mostRecentAttestation.seconds;
+    let issued_second = response[0].mostRecentAttestation.ticks();
 
     assert!(issued_first < issued_second);
 

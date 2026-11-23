@@ -30,7 +30,7 @@ fn native_candles_hour_day_events_and_five_current_rows_survive_many_days(
     // The first action rolls every candle and emits completed history. A later
     // action rejects the same transaction, exercising rollback *after* both
     // objective candle writes and event emission, rather than just early checks.
-    chain.start_block_after(MicroSeconds::new(86_400_000_000));
+    chain.start_block_after(MicroSeconds::from_ticks(86_400_000_000));
     let mut tx = Transaction {
         tapos: Default::default(),
         actions: vec![
@@ -52,9 +52,7 @@ fn native_candles_hour_day_events_and_five_current_rows_survive_many_days(
         "later failure retained candle rollover state"
     );
     for day in 1..=6 {
-        chain.start_block_after(MicroSeconds {
-            value: 86_400_000_000,
-        });
+        chain.start_block_after(MicroSeconds::from_ticks(86_400_000_000));
         trader.trade(f.market, day % 2 == 0, 2000, 0, 64).get()?;
         assert_eq!(
             candles(&chain).len(),

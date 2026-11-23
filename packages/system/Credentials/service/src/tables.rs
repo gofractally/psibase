@@ -92,7 +92,7 @@ pub mod tables {
             allowed_actions: Vec<MethodNumber>,
         ) -> u32 {
             let id = CredentialId::next_id();
-            let now = Transact::call().currentBlock().time.seconds();
+            let now = Transact::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
             let table = CredentialTable::read_write();
             assert!(
@@ -106,7 +106,7 @@ pub mod tables {
                     pubkey_fingerprint,
                     creation_date: now,
                     issuer: get_sender(),
-                    expiry_date: expires.map(|e| now + psibase::Seconds::new(e as i64)),
+                    expiry_date: expires.map(|e| now + psibase::Seconds::from_ticks(e as i64)),
                     allowed_actions,
                 })
                 .unwrap();

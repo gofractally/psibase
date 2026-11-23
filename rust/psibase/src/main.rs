@@ -578,7 +578,7 @@ impl<'a> TaposFetcher<'a> {
         TaposFetcher {
             data: Rc::new(RefCell::new(TaposFetcherData {
                 tapos: pending().boxed_local().shared(),
-                refetch_tapos: i64::MIN.into(),
+                refetch_tapos: TimePointSec::MIN,
                 err: None,
             })),
         }
@@ -593,7 +593,7 @@ impl<'a> TaposFetcher<'a> {
         let res = {
             let mut data = self.data.borrow_mut();
             if expiration >= data.refetch_tapos {
-                data.refetch_tapos = now + Seconds::new(120);
+                data.refetch_tapos = now + Seconds::from_ticks(120);
                 let data_ref = self.data.clone();
                 data.tapos = async move {
                     get_tapos_for_head(base_url, client.clone())
@@ -649,8 +649,8 @@ impl<'a> TransactionSigner<'a> {
         client: &'a reqwest::Client,
         mut actions: Vec<Action>,
     ) -> Result<SignedTransaction, anyhow::Error> {
-        let now: TimePointSec = Utc::now().into();
-        let expiration = now + Seconds::new(10);
+        let now = TimePointSec::now().unwrap();
+        let expiration = now + Seconds::from_ticks(10);
         let tapos = self.tapos.fetch(base_url, client, now, expiration).await?;
         if let Some(proposer) = self.proposer {
             actions =
@@ -680,7 +680,7 @@ fn with_tapos(
     auto_exec: bool,
 ) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
-    let expiration = TimePointSec::from(now_plus_10secs);
+    let expiration = TimePointSec::from_chrono_floor(now_plus_10secs).unwrap();
     if let Some(proposer) = proposer {
         actions =
             vec![staged_tx::Wrapper::pack_from((*proposer).into()).propose(actions, auto_exec)];
@@ -1211,7 +1211,7 @@ async fn get_package_registry(
 async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     let client = build_client(&args.node_args.proxy).await?;
     let now_plus_120secs = Utc::now() + Duration::seconds(120);
-    let expiration = TimePointSec::from(now_plus_120secs);
+    let expiration = TimePointSec::from_chrono_floor(now_plus_120secs).unwrap();
     let mut package_registry = JointRegistry::new();
     let package_names = if args.services.is_empty() {
         vec!["DevDefault".to_string()]
@@ -2567,7 +2567,7 @@ async fn handle_login(args: &LoginArgs) -> Result<(), anyhow::Error> {
         .expect("api must use a domain name");
     let actions = vec![login_action(args.user.into(), transact::SERVICE, root_host)];
 
-    let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(10));
+    let expiration = TimePointSec::from_chrono_floor(chrono::Utc::now() + chrono::Duration::seconds(10)).unwrap();
     let tapos = Tapos {
         expiration: expiration,
         refBlockSuffix: 0,

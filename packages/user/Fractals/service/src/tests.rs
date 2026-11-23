@@ -128,7 +128,7 @@ mod chain {
     }
 
     fn pass_time(chain: &Chain, seconds: i64) {
-        chain.start_block_after(Seconds::new(seconds).into());
+        chain.start_block_after(Seconds::from_ticks(seconds).to_unit().unwrap());
     }
 
     fn token_id(chain: &Chain) -> u32 {

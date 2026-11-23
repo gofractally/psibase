@@ -115,7 +115,7 @@ pub mod service {
     /// * `genesis_time` - New genesis time for the fractal.
     #[action]
     fn set_gen_time(genesis_time: u64) {
-        Fractal::by_sender().set_genesis_time(TimePointSec::from(genesis_time as i64));
+        Fractal::by_sender().set_genesis_time(TimePointSec::from_ticks(genesis_time as i64));
     }
 
     /// Set distribution strategy

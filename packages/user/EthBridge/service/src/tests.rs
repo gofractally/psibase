@@ -30,11 +30,11 @@ fn push(chain: &Chain, actions: Vec<Action>, proofs: &[Value]) -> TransactionTra
     // Distinct transactions must reach the application's permanent replay guards.
     // Reusing the same TAPOS would only exercise Transact's duplicate cache.
     std::thread_local! { static SERIAL: std::cell::Cell<i64> = const { std::cell::Cell::new(0) }; }
-    trx.tapos.expiration.seconds += SERIAL.with(|s| {
+    trx.tapos.expiration += psibase::Seconds::from_ticks(SERIAL.with(|s| {
         let n = s.get() + 1;
         s.set(n);
         n
-    });
+    }));
     let trace = chain.push(&SignedTransaction {
         transaction: trx.packed().into(),
         proofs: witnesses,
@@ -60,10 +60,8 @@ fn push(chain: &Chain, actions: Vec<Action>, proofs: &[Value]) -> TransactionTra
 }
 fn at(chain: &Chain, slot: u64) {
     chain.start_block_at(
-        TimePointSec {
-            seconds: (1_700_000_000 + slot * 12) as i64,
-        }
-        .microseconds(),
+        TimePointSec::from_ticks((1_700_000_000 + slot * 12) as i64)
+        .to_unit::<psibase::psio::time::Micros>().unwrap(),
     );
 }
 fn boot(chain: &Chain, f: &Value) -> Result<(), Error> {

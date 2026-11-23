@@ -1,337 +1,160 @@
-use crate::{Pack, ToKey, ToSchema, Unpack};
-use async_graphql::scalar;
-use chrono::{DateTime, FixedOffset, Utc};
-use serde::{
-    de::{Deserializer, Visitor},
-    ser::Serializer,
-    Deserialize, Serialize,
-};
-use std::{
-    fmt,
-    ops::{Add, Sub},
-    str::FromStr,
-};
+//! Time is PSIO's: the four psibase names are `psio::time` values, with
+//! PSIO's API (`from_ticks` / `ticks`, `to_unit` / `floor` / `ceil`, the
+//! operators, `Display` / `FromStr`, serde, chrono and GraphQL).
+//!
+//! `Seconds` / `MicroSeconds` name the *durations* here; PSIO's units of the
+//! same meaning are `psio::time::Seconds` / `psio::time::Micros`.
 
-#[derive(
-    Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Pack, Unpack, ToKey, ToSchema,
-)]
-#[fracpack(
-    definition_will_not_change,
-    fracpack_mod = "fracpack",
-    custom = "TimePointSec"
-)]
-#[to_key(psibase_mod = "crate")]
-pub struct TimePointSec {
-    pub seconds: i64,
-}
-scalar!(TimePointSec);
+use crate::ToKey;
 
-impl FromStr for TimePointSec {
-    type Err = String;
+/// Seconds since the Unix epoch.
+pub type TimePointSec = psio::time::TimePoint<psio::time::Seconds>;
+/// Microseconds since the Unix epoch.
+pub type TimePointUSec = psio::time::TimePoint<psio::time::Micros>;
+/// A number of seconds.
+pub type Seconds = psio::time::Duration<psio::time::Seconds>;
+/// A number of microseconds.
+pub type MicroSeconds = psio::time::Duration<psio::time::Micros>;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        DateTime::<FixedOffset>::parse_from_rfc3339(s)
-            .map(|dt| dt.to_utc().into())
-            .map_err(|e| e.to_string())
+// The key of the tick count, as the structs these values replaced had
+// (`{ seconds: i64 }`, `{ microseconds: i64 }`, `{ value: i64 }`).
+impl<U: psio::time::Unit> ToKey for psio::time::TimePoint<U> {
+    fn append_key(&self, key: &mut Vec<u8>) {
+        self.ticks().append_key(key)
     }
 }
 
-impl ToString for TimePointSec {
-    fn to_string(&self) -> String {
-        DateTime::<Utc>::from(*self).to_rfc3339()
+impl<U: psio::time::Unit> ToKey for psio::time::Duration<U> {
+    fn append_key(&self, key: &mut Vec<u8>) {
+        self.ticks().append_key(key)
     }
 }
 
-impl TimePointSec {
-    pub fn microseconds(&self) -> TimePointUSec {
-        TimePointUSec {
-            microseconds: self.seconds * 1000000,
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fracpack::{Pack, Unpack};
+
+    #[test]
+    fn legacy_bytes_and_keys_are_the_tick_count() {
+        let t = TimePointSec::from_ticks(1795342530);
+        assert_eq!(t.packed(), 1795342530i64.to_le_bytes());
+        assert_eq!(TimePointSec::unpacked(&t.packed()).unwrap(), t);
+        assert_eq!(t.to_key(), 1795342530i64.to_key());
+        assert_eq!(t.to_key(), [0x80, 0, 0, 0, 0x6b, 0x02, 0xc0, 0xc2]);
+        let t = TimePointUSec::from_ticks(-1);
+        assert_eq!(t.packed(), (-1i64).to_le_bytes());
+        assert_eq!(t.to_key(), [0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+        assert_eq!(Seconds::from_ticks(5).packed(), 5i64.to_le_bytes());
+        assert_eq!(Seconds::from_ticks(5).to_key(), 5i64.to_key());
+        assert_eq!(MicroSeconds::from_ticks(5).packed(), 5i64.to_le_bytes());
+        assert_eq!(MicroSeconds::from_ticks(5).to_key(), 5i64.to_key());
+        assert_eq!(
+            Some(t).to_key(),
+            [1, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+        );
+    }
+
+    #[test]
+    fn json_is_psio_text() {
+        let sec = TimePointSec::from_ticks(1795342530);
+        let usec = TimePointUSec::from_ticks(1795342530123456);
+        // Before PSIO's types: "2026-11-22T10:15:30+00:00" and
+        // "2026-11-22T10:15:30.123456+00:00".
+        assert_eq!(
+            serde_json::to_string(&sec).unwrap(),
+            r#""2026-11-22T10:15:30Z""#
+        );
+        assert_eq!(
+            serde_json::to_string(&usec).unwrap(),
+            r#""2026-11-22T10:15:30.123456Z""#
+        );
+        // A whole second in microseconds has its six digits (before: none).
+        assert_eq!(
+            serde_json::to_string(&TimePointUSec::from_ticks(1795342530000000)).unwrap(),
+            r#""2026-11-22T10:15:30.000000Z""#
+        );
+        assert_eq!(sec.to_string(), "2026-11-22T10:15:30Z");
+        assert_eq!(usec.to_string(), "2026-11-22T10:15:30.123456Z");
+
+        // What C++ writes, and what this crate wrote before.
+        for text in [
+            r#""2026-11-22T10:15:30Z""#,
+            r#""2026-11-22T10:15:30+00:00""#,
+            r#""2026-11-22T12:15:30+02:00""#,
+            r#""2026-11-22T10:15:30.000Z""#,
+        ] {
+            assert_eq!(serde_json::from_str::<TimePointSec>(text).unwrap(), sec);
         }
-    }
-}
-
-impl From<i64> for TimePointSec {
-    fn from(seconds: i64) -> Self {
-        TimePointSec { seconds }
-    }
-}
-
-impl From<DateTime<Utc>> for TimePointSec {
-    fn from(seconds: DateTime<Utc>) -> Self {
-        TimePointSec {
-            seconds: seconds.timestamp(),
+        for text in [
+            r#""2026-11-22T10:15:30.123456Z""#,
+            r#""2026-11-22T10:15:30.123456+00:00""#,
+            r#""2026-11-22T10:15:30.123456000Z""#,
+        ] {
+            assert_eq!(serde_json::from_str::<TimePointUSec>(text).unwrap(), usec);
         }
-    }
-}
+        assert_eq!(
+            serde_json::from_str::<TimePointUSec>(r#""2026-11-22T10:15:30Z""#).unwrap(),
+            sec.to_unit().unwrap()
+        );
+        // A fraction the unit cannot hold is an error (before: dropped).
+        assert!(serde_json::from_str::<TimePointSec>(r#""2026-11-22T10:15:30.5Z""#).is_err());
 
-impl From<TimePointSec> for DateTime<Utc> {
-    fn from(time: TimePointSec) -> Self {
-        Self::from_timestamp(time.seconds, 0).expect("Timestamp out of range")
-    }
-}
-
-impl Serialize for TimePointSec {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for TimePointSec {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_str(TimePointSecVisitor)
-    }
-}
-
-struct TimePointSecVisitor;
-
-impl<'de> Visitor<'de> for TimePointSecVisitor {
-    type Value = TimePointSec;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a valid ISO 8601 timestamp as a string")
+        // A duration is its tick count (before: {"value":5}).
+        assert_eq!(serde_json::to_string(&Seconds::from_ticks(5)).unwrap(), "5");
+        assert_eq!(
+            serde_json::to_string(&MicroSeconds::from_ticks(-5)).unwrap(),
+            "-5"
+        );
+        assert_eq!(
+            serde_json::from_str::<Seconds>("5").unwrap(),
+            Seconds::from_ticks(5)
+        );
+        println!("BIG {}", serde_json::to_string(&MicroSeconds::from_ticks(1 << 60)).unwrap());
+        println!("OLDVAL {:?}", serde_json::from_str::<Seconds>(r#"{"value":5}"#).is_err());
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        TimePointSec::from_str(v).map_err(E::custom)
-    }
-}
-
-#[derive(
-    Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Pack, Unpack, ToKey, ToSchema,
-)]
-#[fracpack(
-    definition_will_not_change,
-    fracpack_mod = "fracpack",
-    custom = "TimePointUSec"
-)]
-#[to_key(psibase_mod = "crate")]
-pub struct TimePointUSec {
-    pub microseconds: i64,
-}
-scalar!(TimePointUSec);
-
-impl FromStr for TimePointUSec {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        DateTime::<FixedOffset>::parse_from_rfc3339(s)
-            .map(|dt| dt.to_utc().into())
-            .map_err(|e| e.to_string())
-    }
-}
-
-impl ToString for TimePointUSec {
-    fn to_string(&self) -> String {
-        DateTime::<Utc>::from(*self).to_rfc3339()
-    }
-}
-
-impl TimePointUSec {
-    pub fn seconds(&self) -> TimePointSec {
-        TimePointSec {
-            seconds: self.microseconds / 1000000,
-        }
-    }
-    pub fn ceil_seconds(&self) -> TimePointSec {
-        TimePointSec {
-            seconds: (self.microseconds + 999999) / 1000000,
-        }
-    }
-}
-
-impl From<i64> for TimePointUSec {
-    fn from(microseconds: i64) -> Self {
-        TimePointUSec { microseconds }
-    }
-}
-
-impl From<DateTime<Utc>> for TimePointUSec {
-    fn from(seconds: DateTime<Utc>) -> Self {
-        TimePointUSec {
-            microseconds: seconds.timestamp_micros(),
-        }
-    }
-}
-
-impl From<TimePointUSec> for DateTime<Utc> {
-    fn from(time: TimePointUSec) -> Self {
-        Self::from_timestamp_micros(time.microseconds).expect("Timestamp out of range")
-    }
-}
-
-impl Serialize for TimePointUSec {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for TimePointUSec {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_str(TimePointUSecVisitor)
-    }
-}
-
-struct TimePointUSecVisitor;
-
-impl<'de> Visitor<'de> for TimePointUSecVisitor {
-    type Value = TimePointUSec;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a valid ISO 8601 timestamp as a string")
+    #[test]
+    fn graphql_scalars_are_psio_s() {
+        use async_graphql::{InputType, OutputType};
+        // Before: TimePointSec, TimePointUSec; the durations were not scalars.
+        assert_eq!(<TimePointSec as OutputType>::type_name(), "DateTimeSeconds");
+        assert_eq!(
+            <TimePointUSec as OutputType>::type_name(),
+            "DateTimeMicroseconds"
+        );
+        assert_eq!(<Seconds as OutputType>::type_name(), "Seconds");
+        assert_eq!(<MicroSeconds as OutputType>::type_name(), "Microseconds");
+        let sec = TimePointSec::from_ticks(1795342530);
+        assert_eq!(
+            sec.to_value(),
+            async_graphql::Value::String("2026-11-22T10:15:30Z".into())
+        );
+        assert_eq!(
+            <TimePointSec as InputType>::parse(Some(async_graphql::Value::String(
+                "2026-11-22T10:15:30+00:00".into()
+            )))
+            .unwrap(),
+            sec
+        );
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        TimePointUSec::from_str(v).map_err(E::custom)
+    #[test]
+    fn unit_conversions() {
+        let usec = TimePointUSec::from_ticks(1795342530123456);
+        let sec = TimePointSec::from_ticks(1795342530);
+        assert_eq!(usec.floor::<psio::time::Seconds>(), sec);
+        assert_eq!(
+            usec.ceil::<psio::time::Seconds>(),
+            sec + Seconds::from_ticks(1)
+        );
+        assert_eq!(
+            sec.to_unit::<psio::time::Micros>().unwrap().ticks(),
+            1795342530000000
+        );
+        assert_eq!(
+            Seconds::from_ticks(2).to_unit().unwrap(),
+            MicroSeconds::from_ticks(2_000_000)
+        );
     }
 }
-
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
-    Serialize,
-    Deserialize,
-)]
-#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
-pub struct Seconds {
-    value: i64,
-}
-
-impl Seconds {
-    pub const fn new(value: i64) -> Seconds {
-        Seconds { value }
-    }
-}
-
-impl Add for Seconds {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self::Output {
-        Self::new(self.value + other.value)
-    }
-}
-
-impl Sub for Seconds {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self::Output {
-        Self::new(self.value - other.value)
-    }
-}
-
-impl Add<Seconds> for TimePointSec {
-    type Output = Self;
-
-    fn add(self, other: Seconds) -> Self::Output {
-        Self::from(self.seconds + other.value)
-    }
-}
-
-impl Add<Seconds> for TimePointUSec {
-    type Output = Self;
-
-    fn add(self, other: Seconds) -> Self::Output {
-        Self::from(self.microseconds + other.value * 1000000)
-    }
-}
-
-impl Sub<Seconds> for TimePointSec {
-    type Output = Self;
-
-    fn sub(self, other: Seconds) -> Self::Output {
-        Self::from(self.seconds - other.value)
-    }
-}
-
-impl Sub<Seconds> for TimePointUSec {
-    type Output = Self;
-
-    fn sub(self, other: Seconds) -> Self::Output {
-        Self::from(self.microseconds - other.value * 1000000)
-    }
-}
-
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
-    Serialize,
-    Deserialize,
-)]
-#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[to_key(psibase_mod = "crate")]
-pub struct MicroSeconds {
-    pub value: i64,
-}
-
-impl MicroSeconds {
-    pub fn new(value: i64) -> MicroSeconds {
-        MicroSeconds { value }
-    }
-}
-
-impl Add for MicroSeconds {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self::Output {
-        Self::new(self.value + other.value)
-    }
-}
-
-impl Sub for MicroSeconds {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self::Output {
-        Self::new(self.value - other.value)
-    }
-}
-
-impl From<Seconds> for MicroSeconds {
-    fn from(value: Seconds) -> Self {
-        Self::new(value.value * 1_000_000)
-    }
-}
-
-impl Add<MicroSeconds> for TimePointUSec {
-    type Output = Self;
-
-    fn add(self, other: MicroSeconds) -> Self::Output {
-        Self::from(self.microseconds + other.value)
-    }
-}
-
-impl Sub<MicroSeconds> for TimePointUSec {
-    type Output = Self;
-
-    fn sub(self, other: MicroSeconds) -> Self::Output {
-        Self::from(self.microseconds - other.value)
-    }
-}
-
-// TODO: string conversions
-// TODO: implement trait with the time functions helpers

@@ -51,7 +51,7 @@ mod tables {
             writeln!(
                 f,
                 "--Attestation--\n  {}: attester\n  {}: subject\n  {}: value\n  {}: issued",
-                self.attester, self.subject, self.value, self.issued.seconds
+                self.attester, self.subject, self.value, self.issued.ticks()
             )
         }
     }
@@ -80,7 +80,7 @@ mod tables {
                 self.subject,
                 self.uniqueAttesters,
                 self.numHighConfAttestations,
-                self.mostRecentAttestation.seconds
+                self.mostRecentAttestation.ticks()
             )
         }
     }
@@ -117,7 +117,7 @@ mod service {
     pub fn attest(subject: AccountNumber, value: u8) {
         assert!(value <= 100, "bad confidence score");
         let attester = get_sender();
-        let issued = transact::Wrapper::call().currentBlock().time.seconds();
+        let issued = transact::Wrapper::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
         let attestation_table = AttestationTable::new();
 

@@ -93,7 +93,7 @@ pub mod tables {
             Nft::call().credit(nft_id, sender, "RateLimit administration NFT".into());
 
             let last_updated =
-                TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1); // See comment in check_difficulty_increase
+                TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>() + psibase::Seconds::from_ticks(1); // See comment in check_difficulty_increase
 
             let new_instance = Self::new(
                 nft_id,
@@ -171,14 +171,14 @@ pub mod tables {
         }
 
         pub fn check_difficulty_decrease(&mut self) -> u64 {
-            let now = TransactSvc::call().currentBlock().time.seconds();
-            let seconds_elapsed = (now.seconds - self.last_update.seconds).max(0) as u32;
+            let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
+            let seconds_elapsed = (now.ticks() - self.last_update.ticks()).max(0) as u32;
             let windows_elapsed = seconds_elapsed / self.window_seconds;
             if windows_elapsed > 0 {
                 let below_target = self.activity_count < self.target_min;
                 let seconds_remainder = seconds_elapsed % self.window_seconds;
                 self.activity_count = 0;
-                self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
+                self.last_update = TimePointSec::from_ticks(now.ticks() - seconds_remainder as i64);
                 if below_target {
                     let factor = 1.0 - self.ratio_decrease();
                     self.active_difficulty = Self::apply_decrease(
@@ -220,7 +220,7 @@ pub mod tables {
                 // cause a decrease every block, because an increase zeroes out the activity_count, so each block
                 // would consider a window to have elapsed.
                 self.last_update =
-                    TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1);
+                    TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>() + psibase::Seconds::from_ticks(1);
                 self.save();
             }
             self.active_difficulty

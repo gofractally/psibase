@@ -12,7 +12,7 @@ mod tests {
         AppMetadata {
             account_id: account!("cooking"),
             status: app_status::DRAFT,
-            created_at: TimePointUSec::from(0),
+            created_at: TimePointUSec::from_ticks(0),
             name: "Super Cooking App".to_string(),
             short_desc: "Alice's Cooking App".to_string(),
             long_desc: "Super cooking app".to_string(),

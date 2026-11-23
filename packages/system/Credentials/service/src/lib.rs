@@ -44,7 +44,7 @@ pub mod service {
             .unwrap()
             .unwrap();
 
-        status.current.time.seconds()
+        status.current.time.floor::<psibase::psio::time::Seconds>()
     }
 
     #[action]
@@ -194,7 +194,7 @@ pub mod service {
         let table = CredentialTable::read().get_index_by_pkh();
 
         let mut active_id = None;
-        let now = Transact::call().currentBlock().time.seconds();
+        let now = Transact::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
         for claim in claims {
             if let Some(credential) = table.get(&psibase::sha256(&claim.rawData)) {
                 assert!(

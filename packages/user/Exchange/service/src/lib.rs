@@ -27,8 +27,8 @@ pub mod service {
         psibase::services::transact::Wrapper::call()
             .currentBlock()
             .time
-            .seconds()
-            .seconds as u64
+            .floor::<psibase::psio::time::Seconds>()
+            .ticks() as u64
     }
     pub(crate) fn priority(high: bool, p: u64) -> u64 {
         assert!(p > 0 && p <= MAX_PRICE, "price range");

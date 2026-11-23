@@ -136,7 +136,7 @@ fn build_transaction(
     actions: Vec<psibase::Action>,
     ref_block: &psibase::TaposRefBlock,
 ) -> psibase::Transaction {
-    let expiration = psibase::TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
+    let expiration = psibase::TimePointSec::from_chrono_floor(chrono::Utc::now() + chrono::Duration::seconds(3)).unwrap();
     psibase::Transaction {
         tapos: psibase::Tapos {
             expiration,

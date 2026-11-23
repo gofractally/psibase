@@ -25,7 +25,7 @@ impl GuildApplication {
         extra_info: String,
         inviter: Option<AccountNumber>,
     ) -> Self {
-        let now = TransactSvc::call().currentBlock().time.seconds();
+        let now = TransactSvc::call().currentBlock().time.floor::<psibase::psio::time::Seconds>();
 
         Self {
             guild,

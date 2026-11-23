@@ -189,7 +189,7 @@ impl Chain {
             &None,
             PRODUCER_ACCOUNT,
             false,
-            TimePointSec { seconds: 120 },
+            TimePointSec::from_ticks(120),
             &mut services[..],
             &essential,
             COMPRESSION_LEVEL,
@@ -428,7 +428,7 @@ impl Chain {
             status
                 .as_ref()
                 .map(|s| s.current.time)
-                .unwrap_or(TimePointUSec { microseconds: 0 })
+                .unwrap_or(TimePointUSec::from_ticks(0))
         };
         self.start_block_at(current_time + micro_seconds);
     }
@@ -436,7 +436,7 @@ impl Chain {
     fn push_start_block(&self, expiration: TimePointUSec) {
         let trx = Transaction {
             tapos: Tapos {
-                expiration: expiration.ceil_seconds(),
+                expiration: expiration.ceil::<psio::time::Seconds>(),
                 refBlockSuffix: 0,
                 flags: 0,
                 refBlockIndex: 0,
@@ -462,7 +462,7 @@ impl Chain {
 
     /// Start a new block
     ///
-    /// Starts a new block at `time`. If `time.seconds` is 0,
+    /// Starts a new block at `time`. If `time` is the epoch,
     /// then starts a new block 1 second after the most recent.
     pub fn start_block_at(&self, time: BlockTime) {
         let status = &mut *self.status.borrow_mut();
@@ -492,11 +492,11 @@ impl Chain {
 
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
-            if status.current.time + Seconds::new(1) < time {
+            if status.current.time + MicroSeconds::from_ticks(1_000_000) < time {
                 unsafe {
                     tester_raw::startBlock(
                         self.chain_handle,
-                        (time - Seconds::new(1)).microseconds,
+                        (time - MicroSeconds::from_ticks(1_000_000)).ticks(),
                         producer.value,
                         term,
                         commit_num,
@@ -509,14 +509,14 @@ impl Chain {
         unsafe {
             tester_raw::startBlock(
                 self.chain_handle,
-                time.microseconds,
+                time.ticks(),
                 producer.value,
                 term,
                 commit_num,
             )
         }
         if status.is_some() {
-            self.push_start_block(time + Seconds::new(1));
+            self.push_start_block(time + MicroSeconds::from_ticks(1_000_000));
         }
         *status = self
             .kv_get::<StatusRow, _>(StatusRow::DB, &status_key())
@@ -528,7 +528,7 @@ impl Chain {
     ///
     /// Starts a new block 1 second after the most recent.
     pub fn start_block(&self) {
-        self.start_block_after(Seconds::new(1).into())
+        self.start_block_after(MicroSeconds::from_ticks(1_000_000))
     }
 
     /// Finish a block
@@ -903,7 +903,8 @@ impl Chain {
         user: AccountNumber,
         service: AccountNumber,
     ) -> Result<String, anyhow::Error> {
-        let expiration = TimePointSec::from(Utc::now()) + Seconds::new(10);
+        let expiration =
+            TimePointSec::from_chrono_floor(Utc::now()).unwrap() + Seconds::from_ticks(10);
 
         let tapos = Tapos {
             expiration,
@@ -964,12 +965,12 @@ impl Chain {
     ///
     /// `expire_seconds` is relative to the most-recent block.
     pub fn fill_tapos(&self, trx: &mut Transaction, expire_seconds: u32) {
-        trx.tapos.expiration.seconds = expire_seconds as i64;
+        trx.tapos.expiration = TimePointSec::from_ticks(expire_seconds as i64);
         trx.tapos.refBlockIndex = 0;
         trx.tapos.refBlockSuffix = 0;
         if let Some(status) = &*self.status.borrow() {
             trx.tapos.expiration =
-                status.current.time.seconds() + Seconds::new(expire_seconds as i64);
+                status.current.time.floor::<psio::time::Seconds>() + Seconds::from_ticks(expire_seconds as i64);
             if let Some(head) = &status.head {
                 let mut suffix = [0; 4];
                 suffix.copy_from_slice(&head.blockId[head.blockId.len() - 4..]);

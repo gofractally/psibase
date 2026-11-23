@@ -41,7 +41,7 @@ pub mod service {
                     keys.insert(key.id, key);
                 }
             }
-            let body=serde_json::json!({"config":SigningConfigTable::read().get_index_pk().get(&()),"keys":keys.values().collect::<Vec<_>>(),"requests":requests,"block_num":block.blockNum,"commit_num":block.commitNum,"now":block.time.seconds().seconds}).to_string();
+            let body=serde_json::json!({"config":SigningConfigTable::read().get_index_pk().get(&()),"keys":keys.values().collect::<Vec<_>>(),"requests":requests,"block_num":block.blockNum,"commit_num":block.commitNum,"now":block.time.floor::<psibase::psio::time::Seconds>().ticks()}).to_string();
             return Some(HttpReply {
                 status: 200,
                 contentType: "application/json".into(),
