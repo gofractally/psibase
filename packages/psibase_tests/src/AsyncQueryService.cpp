@@ -37,7 +37,7 @@ struct AsyncQueryService : psibase::Service
    using Session                 = psibase::SessionTables<AsyncResponseTable>;
    static constexpr auto service = psibase::AccountNumber{"as-query"};
    void                  onBlock();
-   auto                  serveSys(const HttpRequest& req, std::optional<std::int32_t> socket)
+   auto                  serveSys(const HttpRequest& request, std::optional<std::int32_t> socket)
        -> std::optional<HttpReply>;
 };
 PSIO_REFLECT(AsyncQueryService, method(onBlock), method(serveSys, request, socket))

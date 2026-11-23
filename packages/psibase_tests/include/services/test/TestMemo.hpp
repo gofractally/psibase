@@ -21,8 +21,8 @@ namespace TestService
 
       std::string testValue(Memo memo);
       std::string testView(psio1::view<const Memo> memo);
-      void        testJson(const std::string& data);
-      void        testConstruct(const std::string& data);
+      void        testJson(const std::string& memo);
+      void        testConstruct(const std::string& memo);
    };
    PSIO_REFLECT(TestMemo,
                 method(testValue, memo),

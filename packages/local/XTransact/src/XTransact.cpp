@@ -31,7 +31,7 @@ namespace
    }
 }  // namespace
 
-void XTransact::addCallback(TransactionCallbackType type, MethodNumber callback)
+void XTransact::addCallback(TransactionCallbackType type, MethodNumber action)
 {
    auto sender = getSender();
    checkAuth(sender);
@@ -40,19 +40,19 @@ void XTransact::addCallback(TransactionCallbackType type, MethodNumber callback)
    if (auto existing = table.get(notifyType))
    {
       if (!std::ranges::any_of(existing->actions, [&](const auto& act)
-                               { return act.service == sender && act.method == callback; }))
+                               { return act.service == sender && act.method == action; }))
       {
-         existing->actions.push_back({.service = sender, .method = callback});
+         existing->actions.push_back({.service = sender, .method = action});
          table.put(*existing);
       }
    }
    else
    {
-      table.put(NotifyRow{notifyType, {{.service = sender, .method = callback}}});
+      table.put(NotifyRow{notifyType, {{.service = sender, .method = action}}});
    }
 }
 
-void XTransact::removeCallback(TransactionCallbackType type, MethodNumber callback)
+void XTransact::removeCallback(TransactionCallbackType type, MethodNumber action)
 {
    auto sender = getSender();
    checkAuth(sender);
@@ -62,7 +62,7 @@ void XTransact::removeCallback(TransactionCallbackType type, MethodNumber callba
    if (auto existing = table.get(notifyType))
    {
       std::erase_if(existing->actions, [&](const auto& act)
-                    { return act.service == sender && act.method == callback; });
+                    { return act.service == sender && act.method == action; });
       if (existing->actions.empty())
       {
          table.remove(*existing);

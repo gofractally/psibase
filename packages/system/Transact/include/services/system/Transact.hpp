@@ -269,7 +269,7 @@ namespace SystemService
       void startBlock();
 
       /// Called by RTransact to execute a transaction speculatively
-      void execTrx(psio1::view<const psio1::shared_view_ptr<psibase::Transaction>> trx,
+      void execTrx(psio1::view<const psio1::shared_view_ptr<psibase::Transaction>> transaction,
                    bool                                                          speculative);
 
       /// Called by native code on objective writes to the database
@@ -307,9 +307,9 @@ namespace SystemService
       /// identical callback is already registered.
       ///
       /// The order in which callbacks are executed is unspecified.
-      void addCallback(CallbackType type, bool objective, psibase::Action act);
+      void addCallback(CallbackType type, bool objective, psibase::Action action);
       /// Removes an existing callback
-      void removeCallback(CallbackType type, bool objective, psibase::Action act);
+      void removeCallback(CallbackType type, bool objective, psibase::Action action);
 
       /// Registers an event index service
       void regEvIdx(psibase::AccountNumber service);

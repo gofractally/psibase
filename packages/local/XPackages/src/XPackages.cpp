@@ -46,30 +46,30 @@ namespace
    }
 }  // namespace
 
-std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest        req,
+std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest        request,
                                                       std::optional<std::int32_t> socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
 
-   if (auto reply = to<XAdmin>().checkAuth(req, socket))
+   if (auto reply = to<XAdmin>().checkAuth(request, socket))
       return reply;
 
-   if (req.method == "OPTIONS")
+   if (request.method == "OPTIONS")
    {
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCors(request, XAdmin::service)};
    }
-   auto target = req.path();
+   auto target = request.path();
    if (target == "/preinstall" || target == "/prerm")
    {
-      if (req.method != "POST")
-         return HttpReply::methodNotAllowed(req);
-      if (req.contentType != "application/json")
+      if (request.method != "POST")
+         return HttpReply::methodNotAllowed(request);
+      if (request.contentType != "application/json")
       {
-         return error(req, HttpStatus::unsupportedMediaType,
+         return error(request, HttpStatus::unsupportedMediaType,
                       "Content-Type must be application/json\n");
       }
       auto package =
-          psio1::convert_from_json<LocalPackage>(std::string(req.body.begin(), req.body.end()));
+          psio1::convert_from_json<LocalPackage>(std::string(request.body.begin(), request.body.end()));
       auto pendingTable = open<PendingLocalPackagesTable>();
       PSIBASE_SUBJECTIVE_TX
       {
@@ -85,19 +85,19 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
              .removing    = target == "/prerm",
          });
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCors(request, XAdmin::service)};
    }
    else if (target == "/postinstall" || target == "/postrm")
    {
-      if (req.method != "POST")
-         return HttpReply::methodNotAllowed(req);
-      if (req.contentType != "application/json")
+      if (request.method != "POST")
+         return HttpReply::methodNotAllowed(request);
+      if (request.contentType != "application/json")
       {
-         return error(req, HttpStatus::unsupportedMediaType,
+         return error(request, HttpStatus::unsupportedMediaType,
                       "Content-Type must be application/json\n");
       }
       auto package =
-          psio1::convert_from_json<LocalPackage>(std::string(req.body.begin(), req.body.end()));
+          psio1::convert_from_json<LocalPackage>(std::string(request.body.begin(), request.body.end()));
       auto table        = open<LocalPackagesTable>();
       auto pendingTable = open<PendingLocalPackagesTable>();
       PSIBASE_SUBJECTIVE_TX
@@ -110,9 +110,9 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
          else
             table.put(package);
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCors(request, XAdmin::service)};
    }
-   else if (auto result = serveGraphQL(req, Query{}))
+   else if (auto result = serveGraphQL(request, Query{}))
    {
       return result;
    }

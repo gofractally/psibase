@@ -36,7 +36,7 @@ namespace methods_test
       static constexpr auto service = AccountNumber{"ledger"};
 
       void        init() {}
-      std::string transfer(AccountNumber from, const std::string& memo, std::optional<std::int32_t>)
+      std::string transfer(AccountNumber from, const std::string& memo, std::optional<std::int32_t> amount)
       {
          return from.str() + memo;
       }

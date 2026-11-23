@@ -71,33 +71,33 @@ namespace
    }
 }  // namespace
 
-std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
+std::optional<HttpReply> XProxy::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
-   auto target = req.path();
+   auto target = request.path();
 
-   auto subdomain = XHttp::getService(req);
+   auto subdomain = XHttp::getService(request);
 
    if (subdomain == getReceiver())
    {
-      if (auto reply = to<XAdmin>().checkAuth(req, socket))
+      if (auto reply = to<XAdmin>().checkAuth(request, socket))
          return reply;
 
-      if (auto result = serveGraphQL(req, Query{}))
+      if (auto result = serveGraphQL(request, Query{}))
          return result;
 
       if (target == "/set_origin_server")
       {
-         if (req.method != "POST")
-            return HttpReply::methodNotAllowed(req);
-         if (req.contentType != "application/json")
+         if (request.method != "POST")
+            return HttpReply::methodNotAllowed(request);
+         if (request.contentType != "application/json")
          {
             std::string_view msg = "Content-Type must be application/json\n";
             return makeError(HttpStatus::unsupportedMediaType, msg);
          }
          auto table = open<OriginServerTable>();
          auto row   = psio1::convert_from_json<OriginServerRow>(
-             std::string(req.body.begin(), req.body.end()));
+             std::string(request.body.begin(), request.body.end()));
 
          if (row.host.empty())
          {
@@ -117,15 +117,15 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
 
       if (target == "/remove_origin_server")
       {
-         if (req.method != "POST")
-            return HttpReply::methodNotAllowed(req);
-         if (req.contentType != "application/json")
+         if (request.method != "POST")
+            return HttpReply::methodNotAllowed(request);
+         if (request.contentType != "application/json")
          {
             std::string_view msg = "Content-Type must be application/json\n";
             return makeError(HttpStatus::unsupportedMediaType, msg);
          }
          auto originSubdomain = psio1::convert_from_json<AccountNumber>(
-             std::string(req.body.begin(), req.body.end()));
+             std::string(request.body.begin(), request.body.end()));
          auto table = open<OriginServerTable>();
          PSIBASE_SUBJECTIVE_TX
          {
@@ -147,15 +147,15 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
       {
          to<XHttp>().giveSocket(*socket, *registered, false);
 
-         auto user = to<RTransact>().getUser(req);
+         auto user = to<RTransact>().getUser(request);
 
          // Remove sensitive headers
-         req.removeCookie("__HOST-SESSION");
-         req.removeCookie("SESSION");
-         std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
+         request.removeCookie("__HOST-SESSION");
+         request.removeCookie("SESSION");
+         std::erase_if(request.headers, [](auto& header) { return header.matches("authorization"); });
          auto reply = from(HttpServer::service)
                           .to<ServerInterface>(*registered)
-                          .serveSys(req, socket, user);
+                          .serveSys(request, socket, user);
 
          if (!to<XHttp>().takeSocket(*socket, false))
             return {};
@@ -174,29 +174,29 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
    if (originServer)
    {
       if (originServer->bypassPrefixes &&
-          pathMatchesBypassPrefix(req.path(), *originServer->bypassPrefixes))
+          pathMatchesBypassPrefix(request.path(), *originServer->bypassPrefixes))
          return {};
 
       if (auto originUrl = psibase::splitURL(originServer->host); !originUrl.scheme.empty())
       {
          if (!originUrl.host.empty())
-            req.host = originUrl.host;
-         req.target = joinPath(originUrl.path, req.target);
+            request.host = originUrl.host;
+         request.target = joinPath(originUrl.path, request.target);
       }
       else
       {
-         req.host = originServer->host;
+         request.host = originServer->host;
       }
       std::int32_t          upstream;
       psibase::MethodNumber callback;
-      if (isWebSocketHandshake(req))
+      if (isWebSocketHandshake(request))
       {
-         upstream = to<XHttp>().websocket(req, originServer->tls, originServer->endpoint);
+         upstream = to<XHttp>().websocket(request, originServer->tls, originServer->endpoint);
          callback = MethodNumber{"onAccept"};
       }
       else
       {
-         upstream = to<XHttp>().sendRequest(req, originServer->tls, originServer->endpoint);
+         upstream = to<XHttp>().sendRequest(request, originServer->tls, originServer->endpoint);
          callback = MethodNumber{"onReply"};
       }
       auto requests = open<ProxyTable>();

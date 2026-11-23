@@ -98,7 +98,7 @@ namespace LocalService
       /// Auto-close must be enabled and the current owner of the
       /// socket must be the sender. If local is false, then the
       /// reply is expected to come through http-server.
-      void giveSocket(std::int32_t socket, psibase::AccountNumber account, bool local);
+      void giveSocket(std::int32_t socket, psibase::AccountNumber service, bool local);
 
       /// Take back ownership of a socket
       ///
@@ -145,7 +145,7 @@ namespace LocalService
       std::string rootHost(psio1::view<const std::string> host);
 
       /// handles requests to the x-http subdomain
-      auto serveSys(psibase::HttpRequest req, std::optional<std::int32_t> socket)
+      auto serveSys(psibase::HttpRequest request, std::optional<std::int32_t> socket)
           -> std::optional<psibase::HttpReply>;
 
       /// Called by the host at the beginning of a session
@@ -163,7 +163,7 @@ namespace LocalService
                 method(giveSocket, socket, service, local),
                 method(takeSocket, socket, local),
                 method(sendReply, socket, response),
-                method(accept, socket, reply, callback, err),
+                method(accept, socket, reply),
                 method(setCallback, socket, callback, err),
                 method(asyncClose, socket),
                 method(log, severity, msg),

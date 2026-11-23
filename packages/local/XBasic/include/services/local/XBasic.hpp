@@ -23,7 +23,7 @@ namespace LocalService
       static constexpr auto service = psibase::AccountNumber{"x-basic"};
       using Session                 = psibase::SessionTables<PasswordTable>;
       void       startSession();
-      AuthResult checkAuth(const psibase::HttpRequest& req, std::optional<std::int32_t> socket);
+      AuthResult checkAuth(const psibase::HttpRequest& request, std::optional<std::int32_t> socket);
    };
    PSIO_REFLECT(XBasic, method(startSession), method(checkAuth, request, socket))
    PSIBASE_REFLECT_TABLES(XBasic, XBasic::Session)

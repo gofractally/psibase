@@ -8,7 +8,7 @@ using namespace psibase;
 
 struct SocketListService : psibase::Service
 {
-   std::optional<HttpReply> serveSys(const HttpRequest& req);
+   std::optional<HttpReply> serveSys(const HttpRequest& request);
 };
 PSIO_REFLECT(SocketListService, method(serveSys, request))
 PSIBASE_REFLECT_TABLES(SocketListService)
@@ -30,9 +30,9 @@ namespace
 
 }  // namespace
 
-std::optional<HttpReply> SocketListService::serveSys(const HttpRequest& req)
+std::optional<HttpReply> SocketListService::serveSys(const HttpRequest& request)
 {
-   if (auto reply = serveGraphQL(req, QueryRoot{}))
+   if (auto reply = serveGraphQL(request, QueryRoot{}))
    {
       return reply;
    }

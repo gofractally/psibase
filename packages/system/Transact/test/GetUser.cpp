@@ -12,7 +12,7 @@ using namespace SystemService;
 struct GetUser : psibase::Service
 {
    std::optional<HttpReply> serveSys(HttpRequest req,
-                                     std::optional<std::int32_t>,
+                                     std::optional<std::int32_t>  socket,
                                      std::optional<AccountNumber> user)
    {
       check(getSender() == HttpServer::service, "Wrong sender");

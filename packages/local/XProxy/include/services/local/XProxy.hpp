@@ -47,7 +47,7 @@ namespace LocalService
       using Subjective              = psibase::SubjectiveTables<OriginServerTable>;
       using Session                 = psibase::SessionTables<ProxyTable, WebSocketTable>;
 
-      auto serveSys(psibase::HttpRequest        req,
+      auto serveSys(psibase::HttpRequest        request,
                     std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
       void onReply(std::int32_t socket, psibase::HttpReply reply);
       void onAccept(std::int32_t socket, psibase::HttpReply reply);

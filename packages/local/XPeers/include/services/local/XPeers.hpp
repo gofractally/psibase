@@ -120,7 +120,7 @@ namespace LocalService
                                                              UrlTable,
                                                              UrlTimerTable,
                                                              AdminOptionsTable>;
-      auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> user)
+      auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> socket)
           -> std::optional<psibase::HttpReply>;
 
       // Called by XAdmin to handle config changes (host names/peers)
