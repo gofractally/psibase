@@ -34,7 +34,7 @@ function(psibase_declare_dependencies)
         SOURCE_SUBDIR .psibase-no-top-level-cmake)
     FetchContent_Declare(psizam
         GIT_REPOSITORY https://github.com/gofractally/psizam.git
-        GIT_TAG 460eb172aba046d1c6bea1fc904f21e64be8faef
+        GIT_TAG 2e93ecd1561ed7d4808a1a83af1d0137bac17b41
         GIT_SHALLOW FALSE
         # The native adapter does not build the optional spec testsuite.
         GIT_SUBMODULES ""
