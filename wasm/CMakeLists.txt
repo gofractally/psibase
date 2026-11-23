@@ -221,3 +221,16 @@ add_subdirectory(../packages packages)
 add_subdirectory(../programs programs)
 
 install(FILES ${DEP_PREFIX}/lib/libcrypto.a ${DEP_PREFIX}/lib/libz.a TYPE LIB COMPONENT libpsibase)
+
+# With a single slot, almost every service instance of a transaction is one the
+# wasmtime engine's pool cannot provide, so this runs the path that creates
+# instances without it. Engines other than wasmtime ignore the variable.
+if(BUILD_RELEASE_WASM)
+    add_test(
+        NAME t-Tokens-test-one-pool-slot
+        WORKING_DIRECTORY ${ROOT_BINARY_DIR}
+        COMMAND ./psitest Tokens-test.wasm -s
+    )
+    set_tests_properties(t-Tokens-test-one-pool-slot PROPERTIES
+        ENVIRONMENT "NODE_PATH=dist;PSIBASE_WASMTIME_POOL=1")
+endif()

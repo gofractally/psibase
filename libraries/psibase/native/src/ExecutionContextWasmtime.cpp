@@ -96,12 +96,26 @@ namespace psibase::vm_wasmtime
       // under comes from the version its code was deployed with.
       // Modules are compiled and instantiated here: instances come from the
       // engine's pool of slots.
+      wt::runtime<ExecutionContextImpl> pooledRuntime(psizam::float_profile profile)
+      {
+         try
+         {
+            return wt::runtime<ExecutionContextImpl>{engineOptions(profile, true)};
+         }
+         catch (const wt::error&)
+         {
+            // The pool reserves address space for every slot up front. Where
+            // the system refuses that, instances are created one at a time.
+            return wt::runtime<ExecutionContextImpl>{engineOptions(profile)};
+         }
+      }
+
       wt::runtime<ExecutionContextImpl>& vmRuntime(psizam::float_profile profile)
       {
-         static wt::runtime<ExecutionContextImpl> strict{
-             engineOptions(psizam::float_profile::strict, true)};
-         static wt::runtime<ExecutionContextImpl> performance{
-             engineOptions(psizam::float_profile::performance, true)};
+         static wt::runtime<ExecutionContextImpl> strict =
+             pooledRuntime(psizam::float_profile::strict);
+         static wt::runtime<ExecutionContextImpl> performance =
+             pooledRuntime(psizam::float_profile::performance);
          return profile == psizam::float_profile::strict ? strict : performance;
       }
 
@@ -494,10 +508,18 @@ namespace psibase::vm_wasmtime
           once,
           []
           {
-             for (auto profile :
-                  {psizam::float_profile::strict, psizam::float_profile::performance})
+             // Both engines of a profile import the same host functions.
+             const auto profiles = {psizam::float_profile::strict,
+                                    psizam::float_profile::performance};
+             std::vector<wt::runtime<ExecutionContextImpl>*> runtimes;
+             for (auto profile : profiles)
              {
-                auto& rt = vmRuntime(profile);
+                runtimes.push_back(&vmRuntime(profile));
+                runtimes.push_back(&unpooledRuntime(profile));
+             }
+             for (auto* runtime : runtimes)
+             {
+                auto& rt = *runtime;
                 rt.add<&ExecutionContextImpl::getResult>("env", "getResult");
                 rt.add<&ExecutionContextImpl::getKey>("env", "getKey");
                 rt.add<&ExecutionContextImpl::writeConsole>("env", "writeConsole");
