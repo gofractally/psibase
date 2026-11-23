@@ -159,29 +159,25 @@ namespace
 
    std::vector<SignedTransaction> makeTransactions(TestChain& chain, std::vector<Action>&& actions)
    {
-      // The grouping of the Rust boot (rust/psibase/src/transaction_builder.rs):
-      // a transaction holds at most `targetSize` bytes of arguments, unless
-      // one action alone is larger.
-      constexpr std::size_t            targetSize = 1024 * 1024;
-      std::vector<std::vector<Action>> groups;
-      std::size_t                      size = 0;
+      std::vector<SignedTransaction> result;
+      std::vector<Action>            group;
+      std::size_t                    size = 0;
       for (auto& act : actions)
       {
-         if (groups.empty() || size + act.rawData.size() > targetSize)
+         size += act.rawData.size();
+         group.push_back(std::move(act));
+         if (size >= 1024 * 1024)
          {
-            groups.emplace_back();
+            result.push_back(SignedTransaction{
+                psio::shared_pssz<Transaction>{chain.makeTransaction(std::move(group), 30)}});
             size = 0;
          }
-         size += act.rawData.size();
-         groups.back().push_back(std::move(act));
       }
-      // Each transaction is pushed in a block of its own, one second after
-      // the one before: the last must not have expired by then.
-      const auto                     expiration = static_cast<std::uint32_t>(groups.size() + 30);
-      std::vector<SignedTransaction> result;
-      for (auto& group : groups)
-         result.push_back(SignedTransaction{psio::shared_pssz<Transaction>{
-             chain.makeTransaction(std::move(group), expiration)}});
+      if (!group.empty())
+      {
+         result.push_back(SignedTransaction{
+                psio::shared_pssz<Transaction>{chain.makeTransaction(std::move(group), 30)}});
+      }
       return result;
    }
 

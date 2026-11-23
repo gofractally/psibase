@@ -5121,7 +5121,7 @@ not worked around, reproduction given), **engine** (VM, storage), **test**
 | M5 | `verify_schema` | `WsTicketInfo::path`: the Rust service says `String`, the Rust view `RawString`, the C++ header a raw `std::string` | Rust view and C++ header behind the Rust service | view: `String`; header: `attr(path, utf8)` |
 | M6 | `verify_schema` | results of `http::rootHost`, `http::getSiblingUrl`, `x-http::rootHost`: C++ `std::string` (raw), Rust views `String` | interop: results were not on the list of strings that became UTF-8 (1.20) | the views return `psio::pssz::RawString`, which is what C++ declares; four callers use `to_string_lossy()`. Declaring `returns(utf8)` in C++ is the better end state but cannot reach the service schema today (M7) |
 | M7 | while fixing M6 | the Schema IR node of a method's result under its `returns(…)` annotation is built only inside `SchemaBuilder::insert_interface`; `ServiceSchema::makeActions` (`insert<wire result type>`) loses it | PSIO gap | reproduction `~/psibase-pssz-scratch-merge/psio_gap_result_node.cpp` (prints `"string"` for `insert<result>` and `"utf8"` for `insert_interface`). Wanted: a public `insert_method_result<T, I>()`. Also for the team: `Actor.hpp` reads a result as the plain wire type, not with `psio::decode_method_result` (same bytes for `utf8`; different for a bounded result) |
-| M8 | every `t-*` test (C++ tester boot) | `service 'transact' aborted with message: service exceeded its memory limit` on a boot transaction of 4 371 950 bytes (32 actions, one of 3 480 045) | C++ behaviour change (S6, "strict means canonical") over a PSIO property: `psio::validate_strict` for PSSZ decodes the value and allocates a second, canonical copy (`pssz.hpp` `validate_exact_materialized`); guests never free | **Open, for the owner and the team.** The largest transaction a chain processes dropped from at least 4.4 MiB to between 3.5 and 4.4 MiB (the Rust boot has the 3.48 MiB action in a transaction of its own and passes). Reproduction: `psitest AuthSig-test.wasm` at `6e3c7853d`. What changed here: the C++ tester groups boot transactions as the Rust boot does (flush before 1 MiB is exceeded; the two builders differed, flip-interop 1 "Boot transactions"), which no longer builds the 4.4 MiB transaction. The limit itself needs a non-materializing canonical check in PSIO, or fewer copies in Transact |
+| M8 | every `t-*` test (C++ tester boot) | `service 'transact' aborted with message: service exceeded its memory limit` on a boot transaction of 4 371 950 bytes (32 actions, one of 3 480 045) | C++ behaviour change (S6, "strict means canonical") over a PSIO property: `psio::validate_strict` for PSSZ decodes the value and allocates a second, canonical copy (`pssz.hpp` `validate_exact_materialized`); guests never free | **Open, for the owner and the team.** The largest transaction a chain processes dropped from at least 4.4 MiB to between 3.5 and 4.4 MiB (the Rust boot has the 3.48 MiB action in a transaction of its own and passes). Reproduction: `psitest AuthSig-test.wasm` at `6e3c7853d`. What changed here: the C++ tester groups boot transactions as the Rust boot does (flush before 1 MiB is exceeded; the two builders differed, flip-interop 1 "Boot transactions"), which no longer builds the 4.4 MiB transaction. The limit itself needs a non-materializing canonical check in PSIO, or fewer copies in Transact. **Closed by PSIO `599943b`** (7.9): the check walks the bytes in place, Transact processes 31.6 MiB, and the tester's grouping is the original one again |
 | M9 | `t-Transact-test` | `invalid argument encoding for onverify: pssz: optional selector not 0/1` | C++ (tester; predicted in 1.23) | `TestChain::runQueueItem` packs the token as `optional<RunToken>`, as `BlockContext` does |
 | M10 | `t-Nft-test`, `t-Invite-test` | `Action aborted, no return value` where an action returned an empty optional | C++ (tester) | an empty optional is no bytes in PSSZ; `Result<T>` decodes the return value whatever its size. (`trace.cpp:428` still prints a result only when it has bytes: cosmetic) |
 | M11 | `t-Tokens-test` `CHECK_SCHEMA` | events of `tokens`: C++ header `tokenId`, `counterParty`; Rust service `token_id`, `counter_party` | C++ header behind the Rust service | header renamed |
@@ -5254,6 +5254,8 @@ Client-visible, accommodated at the merge:
    `getCurrentActionView`, or a larger memory limit. Until then a
    transaction should hold one large action at most; both boot builders
    now do.
+   Settled by PSIO `599943b` (7.9): Transact's limit is its memory less
+   five pages. What remains is `r-transact`'s side (7.9).
 3. An empty optional result is no bytes (M10): any client that treats an
    empty `rawRetval` as "no result" is wrong for optional results. The
    trace printer (`trace.cpp`) does not print such a result.
@@ -5292,8 +5294,9 @@ Documentation that still describes the old formats (not edited):
 
 ### 7.7 What is left
 
-Nothing blocks the hand-over. Open, in order of weight: M8 (transaction
-size against Transact's memory), M7 and M2 (PSIO), the trust refinement
+Nothing blocks the hand-over. Open, in order of weight: the size of a
+transaction pushed over HTTP against `r-transact`'s memory and the trace
+row (7.9; M8 itself is closed), M7 and M2 (PSIO), the trust refinement
 and the size caps (team review log 0.1, 0.2), the unexercised front ends
 and plugins (0.3), the documentation above.
 
@@ -5426,3 +5429,122 @@ head's); `demo/token-metadata-host/Cargo.lock` (names the `fracpack` crate:
 the demo is outside every workspace and was not built);
 `rust/cargo-psibase/test-data/simple.wasm` (a module built against the
 old crate, used by the linker's tests in `link.rs` as input; not rebuilt).
+
+### 7.9 Transaction size after PSIO `599943b`
+
+`psio::validate_strict` for PSSZ walks the packed bytes in place and
+allocates nothing (before, it decoded the value and packed it again: M8).
+Measured through psibase on `b488a7fdd` plus this section's commit,
+macOS/arm64, wasmtime, release wasm, `psitest`; the default chain of the
+C++ tester (resource billing on), `WasmConfigRow` as `finishBoot` writes it
+(512 pages, 32 MiB), `ConfigRow` default (`maxValueSize` 8 MiB,
+`maxBlockSize` 4 MiB). The transaction is one action for `nop` (a service
+that reads nothing) with N bytes of arguments, sender `alice` (`auth-any`,
+no claims). Reproduce: `psitest Transact-test.wasm "[.measure]"` (a hidden
+case of `Transact-test.cpp`).
+
+**Pushed to the block** (`TestChain::pushTransaction` → native
+`BlockContext::pushTransaction` → `processTransaction` in the Transact
+guest). Time is the whole push seen from the test, trace returned.
+
+| Arguments | Result | Transact guest memory | Time |
+|---|---|---|---|
+| 1 MiB | ok | N + at most 5 pages | 22 ms |
+| 4.5 MiB (above the old ceiling) | ok | same | 100 ms |
+| 8 MiB | ok | same | 177 ms |
+| 16 MiB | ok | same | 361 ms |
+| 24 MiB | ok | same | 535 ms |
+| 30 MiB | ok | same | 656 ms |
+| 31 MiB | ok | same | 674 ms |
+| 31.5 MiB | ok | same | 686 ms |
+| 32 MiB − 5 pages (33 226 752 bytes) | ok | 512 pages | — |
+| 32 MiB − 4 pages (33 292 288 bytes) | `service 'transact' aborted with message: service exceeded its memory limit` | | |
+| 32 MiB | the same message | | 557 ms |
+
+Guest memory was not read from the engine. It follows from the last rows:
+the service's allocator never frees, the module starts with 3 pages, and
+the largest transaction that fits in 512 pages leaves 5 pages (327 680
+bytes) for everything else. So Transact holds the transaction **once**, and
+about 21 ms per MiB is spent on it end to end.
+
+**The limit that bites first on this path is Transact's memory**
+(`WasmConfigRow::vmOptions.max_pages`), and its failure is the allocator's
+message, not a trap. No explicit size limit applies below it:
+`maxBlockSize` (4 MiB) does not refuse a transaction that is alone in its
+block (`BlockContext::fits`, `checkBlockSize`); billing (`useNetSys` with
+the transaction's size) did not refuse `alice` on the test chain. On a
+node, not measured here: psinode's HTTP body limit is 20 MiB
+(`max_request_size`), a block goes to peers as one message which they
+refuse above 16 MiB (the comment in `verifyConfigRow`), and a callee that
+reads its arguments holds them in its own memory (below).
+
+**Posted to `/push_transaction?wait_for=applied`** (the tester's HTTP
+entry → `x-http` → `http-server` → `r-transact`; then the queued
+speculative run, the push above, and `r-transact::onTrx` for the reply).
+`r-transact` has a freeing allocator and the same 32 MiB.
+
+| Arguments | Accepted | Applied by Transact | Reply to the client |
+|---|---|---|---|
+| 1 MiB | yes | ok | 200, the trace as JSON (4.2 MB), 43 ms |
+| 1.5 MiB | yes | ok | 200 (6.3 MB), 63 ms |
+| 1.75 MiB, 2 MiB | yes | ok | **500**: `onTransaction failed … wasm trap: unreachable`, `libc++abi: bad_alloc` in `r-transact::onTrx` |
+| 4 MiB − 200 bytes, 4.5 MiB | yes | ok | **none**: `onTransaction failed: value is too big` (the trace row, 8 398 049 bytes and more, against `maxValueSize`) |
+| 4.75 MiB | yes | not reached | the continuation of the speculative run fails with `bad_alloc` in `r-transact` (the tester aborts) |
+| 5.5 MiB, 6 MiB | **no**: 500, `bad_alloc` in `r-transact::serveSys` | | |
+
+So over HTTP the transaction itself is applied up to 4.5 MiB, but the
+client is answered properly only up to about 1.5 MiB: an out-of-memory
+trap in `r-transact` bites first, the explicit limit (`maxValueSize` on
+the stored trace) second. None of this is PSIO's validation. Whether these
+thresholds were different before the flip was not measured.
+
+Where something proportional to the transaction (S bytes) is still
+materialized, by reading the code; "in place" means no allocation:
+
+| Step | What | Copies of S |
+|---|---|---|
+| `psitest` `testerPushTransaction` | `psio::from_pssz<SignedTransaction>`: the `shared_pssz<Transaction>` member owns the bytes | 1, native |
+| `TransactionContext` `execProcessTransaction` | `ProcessTransactionArgs` packed into the action; `atrace.action = action` | 2, native |
+| `NativeFunctions::getCurrentAction` | `psio::to_pssz(action)` as the result | 1, native |
+| Transact `getCurrentActionView` | `getResult` into a vector; `validate_strict<Action>` in place | **1, guest** (the only one) |
+| Transact `processTransaction` | `validate_pssz<ProcessTransactionArgs>`, `validate_strict<Transaction>`, SHA-256, views of tapos / claims / actions: in place (`tapos` and `claims` are unpacked: small) | 0 |
+| Transact, each action | `raw::call` with the action's bytes inside the transaction | 0, guest |
+| `NativeFunctions::call` | `validate_strict<Action>` in place; `from_pssz<Action>` ("don't unpack rawData" is a TODO there); `atrace.action = action` | 2 of the action, native |
+| the callee | `getCurrentActionView`: 1 of its action; the dispatcher validates the arguments in place (`validate_method_args`) and then builds the method's parameters: an owning parameter (`std::vector<char> code` of `SetCode::setCode`) is 1 more, a view parameter none. `nop` reads nothing | 1–2 of the action, in the callee's own 32 MiB |
+| the trace | holds `processTransaction`'s action and each called action with their arguments: 2 S; packed once for the tester, once more for each callback (`onTransaction`) | 2 S per copy, native |
+| `r-transact::serveSys` | the action bytes, the dispatcher's owning `HttpRequest`, `psio::from_pssz<SignedTransaction>(request.body)`, the argument of `Transact::checkFirstAuth`, the `execTrx` action for the speculative run and the `x-run::post` call around it, the `TransactionDataTable` row | about 6–7, guest (fails between 4.75 and 5.5 MiB) |
+| `r-transact::onTrx` | the trace (2 S) as action bytes, as the `TxSuccessTable` row, as JSON (hex: 4 S, in a growing buffer), as the `sendReply` action | fails between a 3.2 MB and a 3.7 MB trace |
+
+**The adaptation of M8 is undone.** `DefaultTestChain.cpp`
+`makeTransactions` is again what it was before `0ab430805` and
+`8e4cb3e33`: a boot transaction is closed once it holds 1 MiB of
+arguments or more, with the fixed 30 s expiration. The regrouping "as the
+Rust boot does" existed only because the 4.37 MB transaction no longer
+fitted, and the longer expiration (M17) only because the regrouping made
+more than 30 transactions; neither builder needs the other's grouping (the
+ids come from each builder's own transactions). Every `t-*` test therefore
+boots through the large transaction again (4 371 950 bytes when M8 was
+met; not measured again). The Rust builder
+(`transaction_builder.rs`) is the team's and was not touched.
+
+**The test**: `Transact-test.cpp` "Test transaction size" (in
+`t-Transact-test`, about 5 s with its four chain setups): 1, 4.5, 8 and
+16 MiB pushed and applied; 1 MiB posted and answered; 4.5 MiB posted,
+queued and applied (the reply is not asserted, see above); 32 MiB refused
+with the memory-limit message.
+
+| Step | Result |
+|---|---|
+| full build | exit 0 (`build-txsize1.log`) |
+| `ctest -j4` | **88 / 88** (`ctest-txsize1.log`); the count is unchanged because the new case is inside `t-Transact-test` (6.0 s) |
+
+Open, for the team (not PSIO): `r-transact` should not need six copies of
+a transaction to accept it nor a JSON trace with the arguments twice to
+answer it; a client whose transaction was applied gets a 500 or no answer
+from 1.75 MiB on. `NativeFunctions::call` still unpacks the action.
+
+**Linux, for the record** (not run here): x86-64 Linux, clang 20.1.8 +
+libstdc++ 15, wasmtime, rustc 1.100.0, on `a217d99bb` + zip `<limits>` fix
++ PSIO bound fix: native 19/19, end-to-end 39/39, Rust 29/29, plugin
+signing 1/1 (source: engine session, 2026-11-23); LLVM AOT run pending on
+`b488a7fdd`.

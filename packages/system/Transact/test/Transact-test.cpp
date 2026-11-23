@@ -1,4 +1,6 @@
 #include <catch2/catch_all.hpp>
+#include <chrono>
+#include <cstdio>
 #include <psibase/DefaultTestChain.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/testerApi.hpp>
@@ -693,5 +695,176 @@ TEST_CASE("Test work")
       expect(t.pushTransaction(t.makeTransaction(
           {transact.from(alice).setWork(true), transact.from(bob).setWork(true),
            transact.from(alice).setWork(false), transact.from(bob).setWork(false)})));
+   }
+}
+
+namespace
+{
+   // A transaction of one action for `nop` (a service that reads nothing)
+   // whose argument bytes are `size` bytes. `salt` makes transactions of
+   // one size differ.
+   SignedTransaction makeLargeTransaction(DefaultTestChain& t,
+                                          AccountNumber     sender,
+                                          std::size_t       size,
+                                          std::uint32_t     salt = 0)
+   {
+      std::vector<char> data(size, 'x');
+      for (std::size_t i = 0; i < sizeof(salt) && i < size; ++i)
+         data[i] = static_cast<char>(salt >> (8 * i));
+      return t.signTransaction(t.makeTransaction({Action{.sender  = sender,
+                                                         .service = Nop::service,
+                                                         .method  = MethodNumber{"nop"},
+                                                         .rawData = std::move(data)}}));
+   }
+}  // namespace
+
+// Transact checks a transaction where it lies (psio::validate_strict walks
+// the packed bytes) and reads it through views: the service holds the
+// transaction once, so what it can process is bounded by its memory
+// (WasmConfigRow: 512 pages, 32 MiB). r-transact, which takes a transaction
+// from a client and answers it, copies more and stops earlier.
+TEST_CASE("Test transaction size")
+{
+   DefaultTestChain t;
+   auto             alice = t.addAccount("alice");
+
+   constexpr std::size_t MiB = 1024 * 1024;
+
+   SECTION("pushed to the block")
+   {
+      // 4.5 MiB is above what Transact could process while the check
+      // made a second copy of the transaction; 16 MiB is half its memory.
+      for (std::size_t size : {MiB, 9 * MiB / 2, 8 * MiB, 16 * MiB})
+      {
+         INFO("size: " << size);
+         auto trx = makeLargeTransaction(t, alice, size);
+         REQUIRE(trx.transaction.size() > size);
+         CHECK(TraceResult{t.pushTransaction(trx)}.succeeded());
+         t.startBlock();
+      }
+   }
+
+   SECTION("posted to push_transaction")
+   {
+      auto post = [&](std::size_t size)
+      {
+         return t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                            FracPackBody{makeLargeTransaction(t, alice, size)});
+      };
+      SECTION("1 MiB: the client gets the trace")
+      {
+         CHECK(Result<void>(post(MiB).get<TransactionTrace>()).succeeded());
+      }
+      SECTION("4.5 MiB: accepted, queued and applied")
+      {
+         // The reply is another matter: r-transact keeps and sends the
+         // trace, which holds the arguments twice, and a row is at most
+         // 8 MiB (ConfigRow::maxValueSize). See doc/pssz-conversion.md 7.9.
+         t.setAutoRun(false);
+         auto reply = post(9 * MiB / 2);
+         CHECK(!reply.poll());
+         while (t.runQueueItem())
+         {
+         }
+         auto trace = t.pushNextTransaction();
+         REQUIRE(!!trace);
+         CHECK(TraceResult{std::move(*trace)}.succeeded());
+      }
+   }
+
+   SECTION("the service's memory is the limit")
+   {
+      // A transaction that cannot fit in the service's memory is refused
+      // by the service's allocator, with its message.
+      auto trx = makeLargeTransaction(t, alice, 32 * MiB);
+      CHECK(TraceResult{t.pushTransaction(trx)}.failed("service exceeded its memory limit"));
+   }
+}
+
+// Measurements behind doc/pssz-conversion.md 7.9. Not part of the suite:
+// psitest Transact-test.wasm "[.measure]"
+TEST_CASE("Measure transaction size", "[.measure]")
+{
+   DefaultTestChain t;
+   auto             alice = t.addAccount("alice");
+
+   constexpr std::size_t MiB  = 1024 * 1024;
+   std::uint32_t         salt = 1;
+   auto                  ms   = [](auto d)
+   { return std::chrono::duration_cast<std::chrono::milliseconds>(d).count(); };
+
+   auto push = [&](std::size_t size)
+   {
+      auto trx   = makeLargeTransaction(t, alice, size, salt++);
+      auto start = std::chrono::steady_clock::now();
+      auto trace = t.pushTransaction(trx);
+      auto time  = std::chrono::steady_clock::now() - start;
+      return std::pair{std::move(trace.error), ms(time)};
+   };
+
+   SECTION("pushed to the block")
+   {
+      for (std::size_t size : {MiB, 9 * MiB / 2, 8 * MiB, 16 * MiB, 24 * MiB, 30 * MiB, 31 * MiB,
+                               63 * MiB / 2, 32 * MiB})
+      {
+         auto [error, time] = push(size);
+         t.startBlock();
+         std::printf("push %zu bytes: %s, %lld ms\n", size, error ? error->c_str() : "ok",
+                     static_cast<long long>(time));
+      }
+   }
+
+   SECTION("memory beside the transaction")
+   {
+      // The service never frees: the largest payload it processes in its
+      // 512 pages tells how much it allocates beside the transaction.
+      for (std::size_t pages = 1; pages <= 8; ++pages)
+      {
+         auto size          = 32 * MiB - pages * 65536;
+         auto [error, time] = push(size);
+         t.startBlock();
+         std::printf("32 MiB less %zu pages (%zu bytes): %s\n", pages, size,
+                     error ? error->c_str() : "ok");
+      }
+   }
+
+   SECTION("posted to push_transaction")
+   {
+      // Step by step, as psinode does: the request (r-transact), the
+      // queued verification and speculative run, the transaction pushed
+      // to the block (transact), the reply (r-transact's onTransaction).
+      // A failed continuation ends the run (the tester aborts).
+      t.setAutoRun(false);
+      for (std::size_t size : {MiB, 3 * MiB / 2, 7 * MiB / 4, 2 * MiB, 4 * MiB - 200, 9 * MiB / 2,
+                               11 * MiB / 2, 6 * MiB})
+      {
+         auto trx   = makeLargeTransaction(t, alice, size, salt++);
+         auto start = std::chrono::steady_clock::now();
+         auto reply = t.asyncPost(Transact::service, "/push_transaction?wait_for=applied",
+                                  FracPackBody{std::move(trx)});
+         std::printf("post %zu bytes: ", size);
+         if (auto refused = reply.poll())
+         {
+            std::printf("refused, HTTP %d %.*s\n", static_cast<int>(refused->status),
+                        static_cast<int>(std::min<std::size_t>(refused->body.size(), 60)),
+                        refused->body.data());
+            t.startBlock();
+            continue;
+         }
+         std::fflush(stdout);
+         while (t.runQueueItem())
+         {
+         }
+         auto trace = t.pushNextTransaction();
+         auto time  = std::chrono::steady_clock::now() - start;
+         std::printf("%s, ", !trace ? "not pushed" : trace->error ? trace->error->c_str() : "ok");
+         if (auto answer = reply.poll())
+            std::printf("reply HTTP %d (%zu bytes)", static_cast<int>(answer->status),
+                        answer->body.size());
+         else
+            std::printf("no reply");
+         std::printf(", %lld ms\n", static_cast<long long>(ms(time)));
+         t.startBlock();
+      }
    }
 }
