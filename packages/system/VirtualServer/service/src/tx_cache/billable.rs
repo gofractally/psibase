@@ -25,3 +25,10 @@ pub fn set_sub(user: AccountNumber, sub_account: String) {
             .insert(user, sub_account);
     });
 }
+
+/// Whether `account`'s balance in `sub_account` (its main balance when `None`)
+/// is the one the running transaction is billed to. A change to that balance
+/// changes what the transaction can afford, so its CPU limit must follow.
+pub fn is_billed(account: AccountNumber, sub_account: &Option<String>) -> bool {
+    get_billable_account() == Some(account) && get_sub(account) == *sub_account
+}
