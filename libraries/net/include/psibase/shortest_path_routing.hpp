@@ -584,9 +584,9 @@ namespace psibase::net
          }
          catch (std::runtime_error&)
          {
-            return decltype(consensus().validate_message(*msg.data)){};
+            return decltype(consensus().validate_message(msg.data.unpack())){};
          }
-         return consensus().validate_message(*msg.data);
+         return consensus().validate_message(msg.data.unpack());
       }
       template <typename T>
          requires has_validate_message<Derived, T>

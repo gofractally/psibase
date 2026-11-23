@@ -220,7 +220,7 @@ namespace psibase
          auto trxView     = *signedTransaction.transaction;
          auto actionsView = trxView.actions();
          check(actionsView.size() == 1, "genesis transaction must have exactly 1 action");
-         execGenesisAction(*this, actionsView[0]);
+         execGenesisAction(*this, actionsView[0].unpack());
          blockContext.needGenesisAction = false;
       }
       else
@@ -247,7 +247,9 @@ namespace psibase
       try
       {
          auto& db   = self.blockContext.db;
-         auto  data = psio1::from_frac_strict<GenesisActionData>(action.rawData);
+         check(psio::validate_strict<GenesisActionData>(psio::pssz{}, action.rawData).ok(),
+               "invalid genesis action data");
+         auto data = psio::from_pssz<GenesisActionData>(psio::trusted{action.rawData});
          for (auto& service : data.services)
          {
             check(service.service.value, "account 0 is reserved");
@@ -295,7 +297,7 @@ namespace psibase
       Action action{
           .sender  = AccountNumber(),
           .service = transactionServiceNum,
-          .rawData = psio1::convert_to_frac(args),
+          .rawData = psio::to_pssz(args),
       };
       auto& atrace  = self.transactionTrace.actionTraces.emplace_back();
       atrace.action = action;  // TODO: avoid copy and redundancy between action and atrace.action
@@ -324,7 +326,7 @@ namespace psibase
       check(signedTransaction.proofs.size() == claimsView.size(),
             "proofs and claims must have same size");
       auto id = sha256(signedTransaction.transaction.data(), signedTransaction.transaction.size());
-      execVerifyProof(id, claimsView[i], signedTransaction.proofs[i]);
+      execVerifyProof(id, claimsView[i].unpack(), signedTransaction.proofs[i]);
    }
    catch (const accounting::Cancelled&)
    {
@@ -355,7 +357,7 @@ namespace psibase
           .sender  = {},
           .service = data.claim.service,
           .method  = MethodNumber{"verifySys"},
-          .rawData = psio1::convert_to_frac(data),
+          .rawData = psio::to_pssz(data),
       };
       auto& atrace     = transactionTrace.actionTraces.emplace_back();
       atrace.action    = action;

@@ -1455,7 +1455,9 @@ void run(const std::string&              db_path,
          auto key = pkcs11TokenKey(lib->GetTokenInfo(slot));
          if (auto row = secrets.get(key))
          {
-            auto pin = psio1::view<const UnlockKeyringRow>(*row).pin();
+            psibase::check(psio::validate_pssz<UnlockKeyringRow>(*row).ok(),
+                           "UnlockKeyringRow has invalid format");
+            auto pin = psio::pssz_view<UnlockKeyringRow>(*row).pin();
 
             auto pos = sessions.try_emplace(slot, lib, slot).first;
             pos->second->Login(std::string_view{pin.data(), pin.size()});
@@ -1519,7 +1521,9 @@ void run(const std::string&              db_path,
    node.chain().onValidateHostConfig(
        [](std::span<const char> value)
        {
-          auto view   = psio1::view<const HostConfigRow>(value);
+          psibase::check(psio::validate_pssz<HostConfigRow>(value).ok(),
+                         "HostConfigRow has invalid format");
+          auto view   = psio::pssz_view<HostConfigRow>(value);
           auto config = psio1::convert_from_json<PsinodeConfig>(view.config().unpack());
        });
    node.chain().onChangeHostConfig(
@@ -1535,7 +1539,7 @@ void run(const std::string&              db_path,
                  auto writer = system->sharedDatabase.createWriter();
                  auto row = system->sharedDatabase.kvGetSubjective(*writer, HostConfigRow::db,
                                                                    psio::to_key(hostConfigKey()));
-                 auto hostConfig = psio1::from_frac<HostConfigRow>(row.value());
+                 auto hostConfig = psio::from_pssz<HostConfigRow>(row.value());
                  auto combinedConfig =
                      psio1::convert_from_json<PsinodeCombinedConfig>(hostConfig.config);
                  auto& config = combinedConfig.host;
@@ -1587,7 +1591,7 @@ void run(const std::string&              db_path,
                      *writer, PendingShutdownRow::db, psio::to_key(pendingShutdownKey()));
                  if (!row)
                     return;
-                 auto shutdown  = psio1::from_frac<PendingShutdownRow>(row.value());
+                 auto shutdown  = psio::from_pssz<PendingShutdownRow>(row.value());
                  runResult.args = psio1::convert_from_json<ShutdownArgs>(shutdown.args);
 
                  shutdownTimer.setDeadline(chainContext, runResult.args->deadline);
@@ -1631,7 +1635,7 @@ void run(const std::string&              db_path,
       {
          boost::asio::post(chainContext,
                            [&node, callback = std::move(callback),
-                            transactions = psio1::from_frac<std::vector<SignedTransaction>>(
+                            transactions = psio::from_pssz<std::vector<SignedTransaction>>(
                                 packed_signed_transactions)] mutable
                            {
                               TransactionTrace trace;
@@ -1820,7 +1824,7 @@ void run(const std::string&              db_path,
                                  UnlockKeyringRow row{
                                      .device = pkcs11::makeURI(lib->GetTokenInfo(slot)),
                                      .pin    = std::move(pin.pin)};
-                                 secrets.put(pkcs11TokenKey(row.device), psio1::to_frac(row));
+                                 secrets.put(pkcs11TokenKey(row.device), psio::to_pssz(row));
                                  callback(std::nullopt);
                               }
                               catch (std::exception& e)
@@ -1917,7 +1921,7 @@ void run(const std::string&              db_path,
       {
          Action act{.service = proxyServiceNum,
                     .method  = MethodNumber{"startSession"},
-                    .rawData = psio1::to_frac(std::tuple())};
+                    .rawData = psio::to_pssz(std::tuple())};
 
          BlockContext bc{*system, system->sharedDatabase.getHead(),
                          system->sharedDatabase.createWriter(), true};

@@ -6,7 +6,8 @@
 #include <psibase/storage.hpp>
 #include <psio/key.hpp>
 #include <psio/shapes.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 
 #include <array>
 #include <filesystem>
@@ -266,7 +267,7 @@ namespace psibase
       auto kvPut(DbId db, const K& key, const V& value)
           -> std::enable_if_t<!psio::is_optional<V>::value, void>
       {
-         kvPutRaw(db, psio::encode(psio::key{}, key), psio1::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
       }
 
       template <typename K>
@@ -281,7 +282,7 @@ namespace psibase
          auto s = kvGetRaw(db, psio::encode(psio::key{}, key));
          if (!s)
             return std::nullopt;
-         return psio1::from_frac<V>(psio1::prevalidated{s->pos, s->end});
+         return psio::from_pssz<V>(psio::trusted{std::span<const char>{s->pos, s->end}});
       }
 
       template <typename V, typename K>

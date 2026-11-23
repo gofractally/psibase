@@ -83,7 +83,7 @@ namespace psibase
                            psio1::input_stream                value,
                            std::optional<psio1::input_stream> oldValue)
       {
-         check(psio1::fracpack_validate_strict<StatusRow>({value.pos, value.end}),
+         check(psio::validate_strict<StatusRow>(psio::pssz{}, {value.pos, value.end}).ok(),
                "StatusRow has invalid format");
          // TODO: Verify that only nextConsensus has changed
          auto expectedKey = psio::to_key(statusKey());
@@ -97,12 +97,12 @@ namespace psibase
                          psio1::input_stream                value,
                          std::optional<psio1::input_stream> oldValue)
       {
-         check(psio1::fracpack_validate_strict<CodeRow>(value), "CodeRow has invalid format");
-         auto code      = psio1::view<const CodeRow>(psio1::prevalidated{value});
+         check(psio::validate_strict<CodeRow>(psio::pssz{}, value).ok(), "CodeRow has invalid format");
+         auto code      = psio::pssz_view<CodeRow>(value);
          bool oldIsAuth = false;
          if (oldValue)
          {
-            auto oldCode = psio1::view<const CodeRow>(psio1::prevalidated{*oldValue});
+            auto oldCode = psio::pssz_view<CodeRow>(*oldValue);
             if (oldCode.flags() & CodeRow::isVerify)
             {
                oldIsAuth = true;
@@ -112,10 +112,10 @@ namespace psibase
          bool isAuth = code.flags() & CodeRow::isVerify;
          if (oldIsAuth || isAuth)
          {
-            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum());
+            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum().unpack());
          }
          //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), 1);
-         auto expected_key = psio::to_key(codeKey(code.codeNum()));
+         auto expected_key = psio::to_key(codeKey(code.codeNum().unpack()));
          check(key.remaining() == expected_key.size() &&
                    !std::memcmp(key.pos, expected_key.data(), key.remaining()),
                "CodeRow has incorrect key");
@@ -125,21 +125,21 @@ namespace psibase
                                psio1::input_stream  key,
                                psio1::input_stream  value)
       {
-         auto code = psio1::view<const CodeRow>(psio1::prevalidated{value});
+         auto code = psio::pssz_view<CodeRow>(value);
          if (code.flags() & CodeRow::isVerify)
          {
-            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum());
+            ctx.blockContext.modifiedAuthAccounts.insert(code.codeNum().unpack());
          }
          //ctx.incCode(code.codeHash(), code.vmType(), code.vmVersion(), -1);
       }
 
       void verifyCodeByHashRow(psio1::input_stream key, psio1::input_stream value)
       {
-         check(psio1::fracpack_validate_strict<CodeByHashRow>({value.pos, value.end}),
+         check(psio::validate_strict<CodeByHashRow>(psio::pssz{}, {value.pos, value.end}).ok(),
                "CodeByHashRow has invalid format");
          // TODO: use a view here instead of unpacking to a rich object
          auto code =
-             psio1::from_frac<CodeByHashRow>(psio1::prevalidated{std::span{value.pos, value.end}});
+             psio::from_pssz<CodeByHashRow>(psio::trusted{std::span{value.pos, value.end}});
          auto codeHash = sha256(code.code.data(), code.code.size());
          check(code.codeHash == codeHash, "CodeByHashRow has incorrect codeHash");
          auto expected_key = psio::to_key(code.key());
@@ -159,13 +159,13 @@ namespace psibase
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table != codeByHashTable)
             return;
-         auto code = psio1::view<const CodeByHashRow>(
-             psio1::prevalidated{std::span{value.pos, value.end}});
+         auto code = psio::pssz_view<CodeByHashRow>(
+             std::span{value.pos, value.end});
          if (code.vmType() != 0)
             return;
-         std::span<const std::uint8_t> bytes = code.code();
+         std::span<const char> bytes = psio::bytes(code.code());
          context.blockContext.systemContext.wasmCache.compileAhead(
-             code.codeHash(), {reinterpret_cast<const char*>(bytes.data()), bytes.size()},
+             code.codeHash().unpack(), {bytes.data(), bytes.size()},
              context.vmOptions(), code.vmVersion());
       }
 
@@ -173,16 +173,16 @@ namespace psibase
                                      psio1::input_stream  key,
                                      psio1::input_stream  value)
       {
-         auto code = psio1::view<const CodeByHashRow>(psio1::prevalidated{value});
+         auto code = psio::pssz_view<CodeByHashRow>(value);
          ctx.blockContext.removedCode.insert(
-             codeByHashKey(code.codeHash(), code.vmType(), code.vmVersion()));
+             codeByHashKey(code.codeHash().unpack(), code.vmType(), code.vmVersion()));
       }
 
       void verifyConfigRow(psio1::input_stream key, psio1::input_stream value)
       {
-         check(psio1::fracpack_validate_strict<ConfigRow>({value.pos, value.end}),
+         check(psio::validate_strict<ConfigRow>(psio::pssz{}, {value.pos, value.end}).ok(),
                "ConfigRow has invalid format");
-         auto row = psio1::from_frac<ConfigRow>(psio1::prevalidated{std::span{value.pos, value.end}});
+         auto row = psio::from_pssz<ConfigRow>(psio::trusted{std::span{value.pos, value.end}});
          auto expected_key = psio::to_key(row.key());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
@@ -203,10 +203,10 @@ namespace psibase
                                psio1::input_stream key,
                                psio1::input_stream value)
       {
-         check(psio1::fracpack_validate_strict<WasmConfigRow>({value.pos, value.end}),
+         check(psio::validate_strict<WasmConfigRow>(psio::pssz{}, {value.pos, value.end}).ok(),
                "WasmConfigRow has invalid format");
          auto row =
-             psio1::from_frac<WasmConfigRow>(psio1::prevalidated{std::span{value.pos, value.end}});
+             psio::from_pssz<WasmConfigRow>(psio::trusted{std::span{value.pos, value.end}});
          auto expected_key = psio::to_key(row.key(table));
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
@@ -226,10 +226,10 @@ namespace psibase
                                           psio1::input_stream value)
       {
          // The notifyTable is only processed subjectively
-         if (psio1::fracpack_validate<NotifyRow>({value.pos, value.end}))
+         if (psio::validate_pssz<NotifyRow>({value.pos, value.end}).ok())
          {
             auto row =
-                psio1::view<const NotifyRow>(psio1::prevalidated{std::span{value.pos, value.end}});
+                psio::pssz_view<NotifyRow>(std::span{value.pos, value.end});
             if (row.type() == NotifyType::nextTransaction)
             {
                db.setCallbackFlags(DatabaseCallbacks::nextTransactionFlag);
@@ -239,9 +239,9 @@ namespace psibase
 
       void verifySubjectiveCodeRow(psio1::input_stream key, psio1::input_stream value)
       {
-         check(psio1::fracpack_validate_strict<CodeRow>(value), "CodeRow has invalid format");
-         auto code         = psio1::view<const CodeRow>(psio1::prevalidated{value});
-         auto expected_key = psio::to_key(codeKey(code.codeNum()));
+         check(psio::validate_strict<CodeRow>(psio::pssz{}, value).ok(), "CodeRow has invalid format");
+         auto code         = psio::pssz_view<CodeRow>(value);
+         auto expected_key = psio::to_key(codeKey(code.codeNum().unpack()));
          check(key.remaining() == expected_key.size() &&
                    !std::memcmp(key.pos, expected_key.data(), key.remaining()),
                "CodeRow has incorrect key");
@@ -252,20 +252,20 @@ namespace psibase
                                        psio1::input_stream value)
       {
          // The runTable is only processed subjectively
-         if (psio1::fracpack_validate<RunRow>({value.pos, value.end}))
+         if (psio::validate_pssz<RunRow>({value.pos, value.end}).ok())
          {
             auto row =
-                psio1::view<const NotifyRow>(psio1::prevalidated{std::span{value.pos, value.end}});
+                psio::pssz_view<NotifyRow>(std::span{value.pos, value.end});
             db.setCallbackFlags(DatabaseCallbacks::runQueueFlag);
          }
       }
 
       void verifyScheduledSnapshotRow(psio1::input_stream key, psio1::input_stream value)
       {
-         check(psio1::fracpack_validate_strict<ScheduledSnapshotRow>({value.pos, value.end}),
+         check(psio::validate_strict<ScheduledSnapshotRow>(psio::pssz{}, {value.pos, value.end}).ok(),
                "ScheduledSnapshotRow has invalid format");
-         auto row = psio1::from_frac<ScheduledSnapshotRow>(
-             psio1::prevalidated{std::span{value.pos, value.end}});
+         auto row = psio::from_pssz<ScheduledSnapshotRow>(
+             psio::trusted{std::span{value.pos, value.end}});
          auto expected_key = psio::to_key(row.key());
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
@@ -277,12 +277,12 @@ namespace psibase
          auto existing = tc.blockContext.db.kvGetRaw(DbId::nativeSession, key);
          if (!existing)
             abortMessage("Cannot write a new socket");
-         auto old = psio1::view<const SocketRow>(
-             psio1::prevalidated{std::span{existing->pos, existing->end}});
-         check(psio1::fracpack_validate_strict<SocketRow>({value.pos, value.end}),
+         auto old = psio::pssz_view<SocketRow>(
+             std::span{existing->pos, existing->end});
+         check(psio::validate_strict<SocketRow>(psio::pssz{}, {value.pos, value.end}).ok(),
                "SocketRow has invalid format");
          auto row =
-             psio1::view<const SocketRow>(psio1::prevalidated{std::span{value.pos, value.end}});
+             psio::pssz_view<SocketRow>(std::span{value.pos, value.end});
          if (old.fd() != row.fd())
             abortMessage("SocketRow has incorrect key");
 
@@ -315,7 +315,7 @@ namespace psibase
                                psio1::input_stream  key,
                                psio1::input_stream  value)
       {
-         check(psio1::fracpack_validate<HostConfigRow>({value.pos, value.end}),
+         check(psio::validate_pssz<HostConfigRow>({value.pos, value.end}).ok(),
                "HostConfigRow has invalid format");
          auto expected_key = psio::to_key(hostConfigKey());
          check(key.remaining() == expected_key.size() &&
@@ -335,7 +335,7 @@ namespace psibase
                                     psio1::input_stream  key,
                                     psio1::input_stream  value)
       {
-         check(psio1::fracpack_validate<PendingShutdownRow>({value.pos, value.end}),
+         check(psio::validate_pssz<PendingShutdownRow>({value.pos, value.end}).ok(),
                "PendingShutdownRow has invalid format");
          auto expected_key = psio::to_key(pendingShutdownKey());
          check(key.remaining() == expected_key.size() &&
@@ -346,7 +346,7 @@ namespace psibase
 
       void verifyTimerRow(Database& db, psio1::input_stream key, psio1::input_stream value)
       {
-         if (psio1::fracpack_validate<TimerRow>({value.pos, value.end}))
+         if (psio::validate_pssz<TimerRow>({value.pos, value.end}).ok())
          {
             db.setCallbackFlags(DatabaseCallbacks::runQueueFlag);
          }
@@ -493,7 +493,7 @@ namespace psibase
              .service = transactionServiceNum,
              .method  = MethodNumber{"kvNotify"},
              .rawData =
-                 psio1::to_frac(std::tuple(self.code.codeNum, db, keyLen, oldValueLen, newValueLen)),
+                 psio::to_pssz(std::tuple(self.code.codeNum, db, keyLen, oldValueLen, newValueLen)),
          };
 
          auto flags       = CallFlags::none;
@@ -596,7 +596,7 @@ namespace psibase
 
    uint32_t NativeFunctions::getCurrentAction()
    {
-      return setResult(*this, psio1::convert_to_frac(currentActContext->action));
+      return setResult(*this, psio::to_pssz(currentActContext->action));
    }
 
    uint32_t NativeFunctions::call(std::span<const char> data, std::uint64_t flagsRaw)
@@ -610,7 +610,7 @@ namespace psibase
       currentActContext->transactionContext.remainingStack = remainingStack;
 
       // TODO: don't unpack rawData
-      check(psio1::fracpack_validate_strict<Action>(data), "call: invalid data format");
+      check(psio::validate_strict<Action>(psio::pssz{}, data).ok(), "call: invalid data format");
       auto flags = static_cast<CallFlags>(flagsRaw);
       if (flags == CallFlags::runModeRpc || flags == CallFlags::runModeCallback)
       {
@@ -620,7 +620,7 @@ namespace psibase
       {
          abortMessage("Invalid call flags: " + std::to_string(flagsRaw));
       }
-      auto act         = psio1::from_frac<Action>(psio1::prevalidated{data});
+      auto act         = psio::from_pssz<Action>(psio::trusted{data});
       auto callerFlags = code.flags;
       if (act.sender != code.codeNum)
       {
@@ -733,8 +733,8 @@ namespace psibase
    void NativeFunctions::exportHandles(std::span<const char> data)
    {
       using Handles = std::vector<KvHandle>;
-      check(psio1::fracpack_validate_strict<Handles>(data), "Expected list of handles");
-      auto handles = psio1::view<const Handles>{psio1::prevalidated{data}};
+      check(psio::validate_strict<Handles>(psio::pssz{}, data).ok(), "Expected list of handles");
+      auto handles = psio::pssz_view<Handles>{data};
       check(handles.size() <= transactionContext.getWasmConfig().maxHandles,
             "Too many handles exported");
       transactionContext.exportedHandles.clear();
@@ -748,7 +748,7 @@ namespace psibase
    uint32_t NativeFunctions::importHandles()
    {
       return setResult(*this,
-                       psio1::to_frac(buckets.add(std::move(transactionContext.importedHandles),
+                       psio::to_pssz(buckets.add(std::move(transactionContext.importedHandles),
                                                  transactionContext.getWasmConfig().maxHandles)));
    }
 
@@ -919,7 +919,7 @@ namespace psibase
    //       maybe include intrinsic usage so transact can veto?
    uint32_t NativeFunctions::kvGetTransactionUsage()
    {
-      auto size = setResult(*this, psio1::convert_to_frac(transactionContext.kvResourceDeltas));
+      auto size = setResult(*this, psio::to_pssz(transactionContext.kvResourceDeltas));
       return size;
    }
 
@@ -944,7 +944,7 @@ namespace psibase
       check(code.flags & ExecutionContext::isLocal, "Service is not allowed to open sockets");
 
       using Args = std::tuple<HttpRequest, std::optional<TLSInfo>, std::optional<SocketEndpoint>>;
-      check(psio1::fracpack_validate<Args>(args), "Malformed arguments to socketOpen");
+      check(psio::validate_pssz<Args>(args).ok(), "Malformed arguments to socketOpen");
 
       if (auto* callbacks =
               transactionContext.blockContext.systemContext.sharedDatabase.getCallbacks())

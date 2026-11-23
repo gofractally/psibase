@@ -65,15 +65,15 @@ namespace psibase
             }
          }
          explicit                 operator bool() const { return self != nullptr; }
-         psio1::view<const RunRow> getRun() const
+         psio::pssz_view<RunRow> getRun() const
          {
             assert(kind == Kind::run);
-            return psio1::view<const RunRow>(psio1::prevalidated{entry});
+            return psio::pssz_view<RunRow>(entry);
          }
-         psio1::view<const TimerRow> getTimer() const
+         psio::pssz_view<TimerRow> getTimer() const
          {
             assert(kind == Kind::timer);
-            return psio1::view<const TimerRow>(psio1::prevalidated{entry});
+            return psio::pssz_view<TimerRow>(entry);
          }
       };
       Item pop_impl(std::unique_lock<std::mutex>&, Database& db)
@@ -94,20 +94,20 @@ namespace psibase
             }
             std::vector<char> key(kv->key.pos, kv->key.end);
             std::vector<char> runData(kv->value.pos, kv->value.end);
-            if (!psio1::fracpack_validate<RunRow>(runData))
+            if (!psio::validate_pssz<RunRow>(runData).ok())
             {
                search_key = std::move(key);
                search_key.push_back(0);
                continue;
             }
-            auto row = psio1::view<const RunRow>(psio1::prevalidated{runData});
+            auto row = psio::pssz_view<RunRow>(runData);
             if (psio::encode(psio::key{}, runKey(row.id())) != key)
             {
                search_key = std::move(key);
                search_key.push_back(0);
                continue;
             }
-            if (std::ranges::find(running, row.id().unpack()) != running.end())
+            if (std::ranges::find(running, row.id()) != running.end())
             {
                // TODO: Don't ignore available rows in the middle
                // of the running set.
@@ -127,9 +127,9 @@ namespace psibase
             return {};
          if (auto row = db.kvGetRaw(TimerRow::db, psio::encode(psio::key{}, timerKey())))
          {
-            if (psio1::fracpack_validate<TimerRow>(std::span(row->pos, row->end)))
+            if (psio::validate_pssz<TimerRow>(std::span(row->pos, row->end)).ok())
             {
-               auto view       = psio1::view<const TimerRow>(std::span(row->pos, row->end));
+               auto view       = psio::pssz_view<TimerRow>(std::span<const char>(row->pos, row->end));
                auto expiration = saturatingCast<std::chrono::steady_clock::time_point>(
                    view.expiration().unpack());
                if (expiration < std::chrono::steady_clock::now())

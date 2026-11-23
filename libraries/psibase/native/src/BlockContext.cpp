@@ -146,7 +146,7 @@ namespace psibase
               .sender  = {},
               .service = transactionServiceNum,
               .method  = MethodNumber("startBlock"),
-              .rawData = psio1::to_frac(std::tuple()),
+              .rawData = psio::to_pssz(std::tuple()),
           }},
       }}};
       TransactionTrace  trace;
@@ -166,10 +166,10 @@ namespace psibase
       if (!notifyData)
          return;
       auto notifySpan = std::span{notifyData->pos, notifyData->end};
-      if (!psio1::fracpack_validate<NotifyRow>(notifySpan))
+      if (!psio::validate_pssz<NotifyRow>(notifySpan).ok())
          return;
 
-      auto actions = psio1::view<const NotifyRow>(psio1::prevalidated{notifySpan}).actions().unpack();
+      auto actions = psio::pssz_view<NotifyRow>(notifySpan).actions().unpack();
 
       auto oldIsProducing = isProducing;
       auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
@@ -209,16 +209,16 @@ namespace psibase
       if (!notifyData)
          return;
       auto notifySpan = std::span{notifyData->pos, notifyData->end};
-      if (!psio1::fracpack_validate<NotifyRow>(notifySpan))
+      if (!psio::validate_pssz<NotifyRow>(notifySpan).ok())
          return;
 
-      auto actions = psio1::view<const NotifyRow>(psio1::prevalidated{notifySpan}).actions().unpack();
+      auto actions = psio::pssz_view<NotifyRow>(notifySpan).actions().unpack();
 
       auto oldIsProducing = isProducing;
       auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
-      Action action{.sender = AccountNumber{}, .rawData = psio1::to_frac(std::tuple(id, trace))};
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_pssz(std::tuple(id, trace))};
 
       for (const auto& a : actions)
       {
@@ -296,19 +296,19 @@ namespace psibase
          PSIBASE_LOG(trxLogger, debug) << "nextTransaction not set";
          return {};
       }
-      if (!psio1::fracpack_validate<NotifyRow>(*notifyData))
+      if (!psio::validate_pssz<NotifyRow>(*notifyData).ok())
       {
          PSIBASE_LOG(trxLogger, warning) << "invalid nextTransaction row";
          return {};
       }
 
-      auto actions = psio1::view<const NotifyRow>(psio1::prevalidated{*notifyData}).actions();
+      auto actions = psio::pssz_view<NotifyRow>(*notifyData).actions();
 
       auto oldIsProducing = isProducing;
       auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
-      Action action{.sender = AccountNumber{}, .rawData = psio1::to_frac(std::tuple())};
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_pssz(std::tuple())};
 
       for (auto a : actions)
       {
@@ -322,8 +322,8 @@ namespace psibase
             PSIBASE_LOG(trxLogger, warning) << "Invalid nextTransaction callback" << std::endl;
             continue;
          }
-         action.service = a.service();
-         action.method  = a.method();
+         action.service = a.service().unpack();
+         action.method  = a.method().unpack();
          SignedTransaction  trx;
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, DbMode::callback()};
@@ -336,7 +336,12 @@ namespace psibase
             session.commit();
 
             std::optional<SignedTransaction> result;
-            if (!psio1::from_frac(result, atrace.rawRetval))
+            bool valid =
+                psio::validate_pssz<std::optional<SignedTransaction>>(atrace.rawRetval).ok();
+            if (valid)
+               result = psio::from_pssz<std::optional<SignedTransaction>>(
+                   psio::trusted{atrace.rawRetval});
+            if (!valid)
             {
                BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", std::move(trace));
                PSIBASE_LOG(trxLogger, warning)
@@ -369,16 +374,16 @@ namespace psibase
           *writer, DbId::nativeSubjective, psio::to_key(notifyKey(notifyType)));
       if (!notifyData)
          return tokens;
-      if (!psio1::fracpack_validate<NotifyRow>(*notifyData))
+      if (!psio::validate_pssz<NotifyRow>(*notifyData).ok())
          return tokens;
 
-      auto actions = psio1::view<const NotifyRow>(psio1::prevalidated{*notifyData}).actions();
+      auto actions = psio::pssz_view<NotifyRow>(*notifyData).actions();
 
       auto oldIsProducing = isProducing;
       auto restore        = psibase::finally{[&] { isProducing = oldIsProducing; }};
       isProducing         = true;
 
-      Action action{.sender = AccountNumber{}, .rawData = psio1::to_frac(std::tie(trx))};
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_pssz(std::tie(trx))};
 
       for (auto a : actions)
       {
@@ -392,8 +397,8 @@ namespace psibase
             PSIBASE_LOG(trxLogger, warning) << "Invalid preverifyTransaction callback" << std::endl;
             continue;
          }
-         action.service = a.service();
-         action.method  = a.method();
+         action.service = a.service().unpack();
+         action.method  = a.method().unpack();
          SignedTransaction  trx;
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, DbMode::callback()};
@@ -405,8 +410,12 @@ namespace psibase
             tc.execNonTrxAction(0, action, atrace);
             session.commit();
 
-            std::optional<std::vector<std::optional<RunToken>>> result;
-            if (!psio1::from_frac(result, atrace.rawRetval))
+            using Result = std::optional<std::vector<std::optional<RunToken>>>;
+            Result result;
+            bool   valid = psio::validate_pssz<Result>(atrace.rawRetval).ok();
+            if (valid)
+               result = psio::from_pssz<Result>(psio::trusted{atrace.rawRetval});
+            if (!valid)
             {
                BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", std::move(trace));
                PSIBASE_LOG(trxLogger, warning)
@@ -444,7 +453,7 @@ namespace psibase
       return tokens;
    }
 
-   void BlockContext::callRun(psio1::view<const RunRow> row,
+   void BlockContext::callRun(psio::pssz_view<RunRow> row,
                               std::optional<std::chrono::microseconds> proofTimeout)
    {
       auto action = row.action().unpack();
@@ -508,10 +517,10 @@ namespace psibase
          // Run the continuation
          Action action{
              .sender  = {},
-             .service = row.continuation().service(),
-             .method  = row.continuation().method(),
-             .rawData = psio1::to_frac(std::tuple(
-                 row.id().unpack(), trace, std::optional{std::span(token.data(), token.size())}))};
+             .service = row.continuation().service().unpack(),
+             .method  = row.continuation().method().unpack(),
+             .rawData = psio::to_pssz(std::tuple(
+                 row.id(), trace, std::optional{std::span(token.data(), token.size())}))};
          TransactionTrace   trace;
          TransactionContext tc{*this, trx, trace, DbMode::rpc()};
          auto&              atrace = trace.actionTraces.emplace_back();
@@ -530,16 +539,16 @@ namespace psibase
       }
    }
 
-   void BlockContext::callTimer(psio1::view<const TimerRow> row)
+   void BlockContext::callTimer(psio::pssz_view<TimerRow> row)
    {
       SignedTransaction trx;
       TransactionTrace  trace;
       try
       {
          auto               session = db.startWrite(writer);
-         psibase::Action    action{.service = row.service(),
-                                   .method  = row.method(),
-                                   .rawData = psio1::to_frac(std::tuple())};
+         psibase::Action    action{.service = row.service().unpack(),
+                                   .method  = row.method().unpack(),
+                                   .rawData = psio::to_pssz(std::tuple())};
          TransactionContext tc{*this, trx, trace, DbMode::rpc()};
          auto&              atrace = trace.actionTraces.emplace_back();
          tc.execNonTrxAction(0, action, atrace);
@@ -722,7 +731,7 @@ namespace psibase
                                       current.header.blockNum};
          systemContext.sharedDatabase.kvPutSubjective(*writer, ConsensusChangeRow::db,
                                                       psio::to_key(changeRow.key()),
-                                                      psio1::to_frac(changeRow));
+                                                      psio::to_pssz(changeRow));
       }
 
       if (status->consensus.next)

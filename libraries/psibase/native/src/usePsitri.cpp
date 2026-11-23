@@ -414,7 +414,7 @@ namespace psibase
             check(roots.size() == numChainDatabases, "wrong number of roots in fork");
             if (!writer.get(roots[(int)StatusRow::db], sk, &statusBytes, nullptr))
                throw std::runtime_error("Status row missing in fork");
-            auto status = psio1::from_frac<StatusRow>(psio1::prevalidated{statusBytes});
+            auto status = psio::from_pssz<StatusRow>(psio::trusted{statusBytes});
             if (!status.head)
                throw std::runtime_error("Status row is missing head information in fork");
             if (!writer.get(proposed, revisionById(status.head->header.previous), nullptr, nullptr))

@@ -7,7 +7,8 @@
 #include <psibase/message_serializer.hpp>
 #include <psibase/net_base.hpp>
 #include <psio/reflect.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <random>
 #include <string>
 #include <type_traits>
@@ -102,7 +103,7 @@ namespace psibase::net
          try
          {
             using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
-            return derived().recv(peer, psio1::from_frac<message_type>({s.pos, s.end}));
+            return derived().recv(peer, psio::from_pssz<message_type>({s.pos, s.end}));
          }
          catch (std::exception& e)
          {
@@ -138,7 +139,7 @@ namespace psibase::net
       void handle_message_impl(psio1::input_stream& s, F&& f)
       {
          using message_type = std::conditional_t<NeedsSignature<T>, SignedMessage<T>, T>;
-         f(psio1::from_frac<message_type>({s.pos, s.end}));
+         f(psio::from_pssz<message_type>({s.pos, s.end}));
       }
       template <typename F, template <typename...> class L, typename... T>
       void handle_message_impl(int key, const std::vector<char>& msg, F&& f, L<T...>*)
@@ -171,10 +172,10 @@ namespace psibase::net
          raw.reserve(msg.data.size() + 1);
          raw.push_back(T::type);
          raw.insert(raw.end(), msg.data.data(), msg.data.data() + msg.data.size());
-         Claim claim = msg.data->signer();
+         Claim claim = msg.data->signer().unpack();
          if constexpr (has_block_id<T>)
          {
-            chain().verify(msg.data->block_id(), {raw.data(), raw.size()}, msg.data->producer(),
+            chain().verify(msg.data->block_id().unpack(), {raw.data(), raw.size()}, msg.data->producer().unpack(),
                            claim, msg.signature);
          }
          else

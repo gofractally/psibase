@@ -113,14 +113,14 @@ void write_consensus_change_blocks(std::uint32_t             chain,
          psibase::abortMessage("Block " + std::to_string(num) + " is not in the block log");
       block.resize(size);
       raw::getResult(block.data(), size, 0);
-      auto block_view = psio1::view<const psibase::Block>(psio1::prevalidated{block});
+      auto block_view = psio::pssz_view<psibase::Block>(block);
       auto header     = block_view.header().unpack();
       lastId          = psibase::BlockInfo{header}.blockId;
       // Drop transactions. We don't need them
       {
          block.clear();
          psio1::vector_stream bstream{block};
-         psio1::to_frac(psibase::Block{header}, bstream);
+         psio::to_pssz(psibase::Block{header}, bstream);
       }
       write_row(static_cast<std::uint32_t>(DbId::blockLog), blockKey, block, stream);
       last = num;
@@ -137,7 +137,7 @@ void write_consensus_change_blocks(std::uint32_t             chain,
       key.resize(raw::getKey(nullptr, 0));
       raw::getKey(key.data(), key.size());
       key.push_back('\0');
-      auto result = psio1::from_frac<psibase::ConsensusChangeRow>(value);
+      auto result = psio::from_pssz<psibase::ConsensusChangeRow>(value);
       if (result.start >= end)
          return {};
       return result;
@@ -225,9 +225,9 @@ void write_header(const SnapshotHeader& header, auto& stream)
 
 void write_footer(const SnapshotFooter& self, auto& stream)
 {
-   write_row(SnapshotFooter::id, self.hash->key(), psio1::to_frac(*self.hash), stream);
+   write_row(SnapshotFooter::id, self.hash->key(), psio::to_pssz(*self.hash), stream);
    for (const auto& sig : self.signatures)
-      write_row(SnapshotFooter::id, sig.key(), psio1::to_frac(sig), stream);
+      write_row(SnapshotFooter::id, sig.key(), psio::to_pssz(sig), stream);
 }
 
 static const char* usage_brief =
@@ -292,7 +292,7 @@ int main(int argc, const char* const* argv)
             std::cerr << "No verified snapshot available" << std::endl;
             return 1;
          }
-         auto snapshot = psio1::from_frac<psibase::SnapshotRow>(psibase::getResult(size));
+         auto snapshot = psio::from_pssz<psibase::SnapshotRow>(psibase::getResult(size));
          key.resize(raw::getKey(nullptr, 0));
          raw::getKey(key.data(), key.size());
          raw::getFork(handle, snapshot.id);

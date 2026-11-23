@@ -97,7 +97,7 @@ void AutoCloseSocket::replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&&
          sockets->sockets[id] = std::move(other);
       }
       sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio::to_key(row.key()),
-                                        psio1::to_frac(row));
+                                        psio::to_pssz(row));
    }
 }
 
@@ -123,7 +123,7 @@ void Socket::writeInfo(Writer& writer)
    {
       SocketRow row{id, info()};
       sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio::to_key(row.key()),
-                                        psio1::to_frac(row));
+                                        psio::to_pssz(row));
    }
 }
 
@@ -324,7 +324,7 @@ void Sockets::add(Writer&                        writer,
       else
       {
          sharedDb.kvPutSubjective(writer, SocketRow::db, psio::to_key(row.key()),
-                                  psio1::to_frac(row));
+                                  psio::to_pssz(row));
       }
    }
 }
@@ -362,7 +362,7 @@ void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>
    if (!existing)
    {
       SocketRow row{socket->id, socket->info()};
-      sharedDb.kvPutSubjective(writer, SocketRow::db, psio::to_key(row.key()), psio1::to_frac(row));
+      sharedDb.kvPutSubjective(writer, SocketRow::db, psio::to_key(row.key()), psio::to_pssz(row));
    }
 }
 void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, Database* db)

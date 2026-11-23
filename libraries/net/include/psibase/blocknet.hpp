@@ -60,13 +60,17 @@ namespace psibase::net
 
    struct BlockMessage
    {
-      static constexpr unsigned          type = 34;
-      psio1::shared_view_ptr<SignedBlock> block;
+      static constexpr unsigned type = 34;
+      BlockMessage()                 = default;
+      BlockMessage(psio::shared_pssz<SignedBlock> block) : block(std::move(block)) {}
+      // Packs the block
+      BlockMessage(const SignedBlock& block) : block(block) {}
+      psio::shared_pssz<SignedBlock> block;
       std::string                        to_string() const
       {
-         BlockInfo info{block->block()};
+         BlockInfo info{block->block().header().unpack()};
          return "block: term=" + std::to_string(TermNum{block->block().header().term()}) +
-                " leader=" + AccountNumber{block->block().header().producer()}.str() +
+                " leader=" + block->block().header().producer().unpack().str() +
                 " id=" + loggers::to_string(info.blockId) +
                 " blocknum=" + std::to_string(BlockNum{block->block().header().blockNum()}) +
                 " irreversible=" + std::to_string(BlockNum{block->block().header().commitNum()}) +
@@ -93,13 +97,15 @@ namespace psibase::net
 
    struct BlockHeaderMessage
    {
-      static constexpr unsigned          type = 44;
-      psio1::shared_view_ptr<SignedBlock> block;
+      static constexpr unsigned type = 44;
+      BlockHeaderMessage()           = default;
+      BlockHeaderMessage(psio::shared_pssz<SignedBlock> block) : block(std::move(block)) {}
+      psio::shared_pssz<SignedBlock> block;
       std::string                        to_string() const
       {
-         BlockInfo info{block->block()};
+         BlockInfo info{block->block().header().unpack()};
          return "block header: term=" + std::to_string(TermNum{block->block().header().term()}) +
-                " leader=" + AccountNumber{block->block().header().producer()}.str() +
+                " leader=" + block->block().header().producer().unpack().str() +
                 " id=" + loggers::to_string(info.blockId) +
                 " blocknum=" + std::to_string(BlockNum{block->block().header().blockNum()}) +
                 " irreversible=" + std::to_string(BlockNum{block->block().header().commitNum()}) +
@@ -516,10 +522,10 @@ namespace psibase::net
             {
                throw std::runtime_error("Missing block header " + std::to_string(*headerNum));
             }
-            auto header           = blockptr->block().header().unpack();
-            auto signature        = blockptr->signature().unpack();
-            auto auxConsensusData = blockptr->auxConsensusData().unpack();
-            auto headerptr        = psio1::shared_view_ptr<SignedBlock>(SignedBlock{
+            auto header           = (*blockptr)->block().header().unpack();
+            auto signature        = (*blockptr)->signature().unpack();
+            auto auxConsensusData = (*blockptr)->auxConsensusData().unpack();
+            auto headerptr        = psio::shared_pssz<SignedBlock>(SignedBlock{
                 Block{std::move(header)}, std::move(signature), std::move(auxConsensusData)});
             state.blockNum        = *headerNum;
             network().async_send(connection.id, BlockHeaderMessage{std::move(headerptr)},
@@ -931,7 +937,7 @@ namespace psibase::net
             state.last_sent = {next_block_id, state.last_sent.num() + 1};
             auto next_block = chain().get(next_block_id);
 
-            network().async_send(peer.id, BlockMessage{next_block}, send_handler(peer));
+            network().async_send(peer.id, BlockMessage{*next_block}, send_handler(peer));
             peer.sending = true;
             consensus().post_send_block(peer.id, state.last_sent.id());
          }
@@ -1330,7 +1336,7 @@ namespace psibase::net
       void     on_key_update() {}
       BlockNum light_verify(const LightHeaderState&                   state,
                             const BlockInfo&                          info,
-                            const psio1::shared_view_ptr<SignedBlock>& block)
+                            const psio::shared_pssz<SignedBlock>& block)
       {
          throw std::runtime_error("light verify: Unknown consensus algorithm");
       }

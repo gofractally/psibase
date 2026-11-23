@@ -103,7 +103,7 @@ namespace
       // digest. No chain namespace can be dropped to make equality pass.
       replay::readSnapshot(input / "after.rows", false, [](auto, auto&, auto&) {});
       auto blockBytes = readFile(input / "block.frac");
-      auto source = psio1::from_frac<Block>(blockBytes);
+      auto source = psio::from_pssz<Block>(blockBytes);
       check(source.header.blockNum == manifest.blockNum &&
                 source.transactions.size() == manifest.transactions,
             "replay block does not match its manifest");
@@ -149,7 +149,7 @@ namespace
 
       ExecutionContext::registerHostFunctions();
       SystemContext system{shared, WasmCache{128}, {}, std::make_shared<WatchdogManager>(), sockets};
-      const auto expectedHeader = psio1::to_frac(source.header);
+      const auto expectedHeader = psio::to_pssz(source.header);
       BlockContext block(system, shared.getHead(), writer, false);
       block.start(std::move(source));
       Checksum256 transactionDigest{}, proofDigest{};
@@ -176,14 +176,14 @@ namespace
       }
       auto [after, id] = block.writeRevision(NullProver{}, Claim{});
       shared.setHead(*writer, after);
-      result.blockHeaderSha256 = replay::hex(sha256(psio1::to_frac(block.current.header)));
+      result.blockHeaderSha256 = replay::hex(sha256(psio::to_pssz(block.current.header)));
       result.transactionTraceSha256 = replay::hex(transactionDigest);
       result.proofTraceSha256 = replay::hex(proofDigest);
       result.namespaces = replay::snapshot(shared, after, output / "actual-after.rows", false);
       result.actualAfterSha256 = replay::fileHash(output / "actual-after.rows");
       saveResult(output / "result.json", result);
       check(result.proofClaims == manifest.proofClaims, "replay verified a different proof count");
-      check(psio1::to_frac(block.current.header) == expectedHeader,
+      check(psio::to_pssz(block.current.header) == expectedHeader,
             "replay changed block header/transaction/event/consensus commitments");
       check(replay::sameFile(input / "after.rows", output / "actual-after.rows"),
             "replay changed objective database bytes");

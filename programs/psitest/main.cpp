@@ -14,7 +14,7 @@
 #include <psibase/finally.hpp>
 #include <psio1/to_bin.hpp>
 #include <psio1/to_json.hpp>
-#include <psio1/view.hpp>
+#include <psio/pssz_view.hpp>
 #include <psibase/NativeVM.hpp>
 #include <psizam/debug/debug.hpp>
 #include "VmConsensusReplay.hpp"
@@ -610,7 +610,7 @@ struct HttpSocket : psibase::AutoCloseSocket
          constexpr char defaultMessage[] = "service did not send a response";
          reply.body = std::vector(&defaultMessage[0], defaultMessage + sizeof(defaultMessage) - 1);
       }
-      sendImpl(psio1::to_frac(reply));
+      sendImpl(psio::to_pssz(reply));
    }
    void send(psibase::Writer&, std::span<const char> data, std::uint32_t flags) override
    {
@@ -618,7 +618,9 @@ struct HttpSocket : psibase::AutoCloseSocket
          psibase::abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
       if (!response.empty())
          return;
-      auto reply  = psio1::view<const psibase::HttpReply>{data};
+      psibase::check(psio::validate_pssz<psibase::HttpReply>(data).ok(),
+                     "HttpReply has invalid format");
+      auto reply  = psio::pssz_view<psibase::HttpReply>{data};
       auto status = reply.status().unpack();
       auto code   = static_cast<std::uint16_t>(status);
       psibase::check(code >= 100 && code <= 599,
@@ -637,7 +639,7 @@ struct HttpSocket : psibase::AutoCloseSocket
    }
    void logResponse()
    {
-      auto view    = psio1::view<const psibase::HttpReply>(psio1::prevalidated{response});
+      auto view    = psio::pssz_view<psibase::HttpReply>(response);
       auto endTime = std::chrono::steady_clock::now();
 
       BOOST_LOG_SCOPED_LOGGER_TAG(chain->logger, "Trace", std::move(trace));
@@ -1304,7 +1306,7 @@ struct callbacks
    {
       auto&              chain = assert_chain(chain_index);
       psio1::input_stream s     = {args_packed.data(), args_packed.size()};
-      auto               act   = psio1::from_frac<psibase::Action>(args_packed);
+      auto               act   = psio::from_pssz<psibase::Action>(args_packed);
 
       auto dbMode = psibase::DbMode::from(static_cast<psibase::RunMode>(mode));
 
@@ -1356,7 +1358,7 @@ struct callbacks
 
       if (trace.error && std::getenv("PSIBASE_TESTER_TRACE_ERRORS"))
          std::fprintf(stderr, "psitest native trace error: %s\n", trace.error->c_str());
-      state.result_value = psio1::convert_to_frac(trace);
+      state.result_value = psio::to_pssz(trace);
       state.result_key.clear();
       psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
       return state.result_value.size();
@@ -1366,7 +1368,7 @@ struct callbacks
    {
       auto&              chain     = assert_chain(chain_index);
       psio1::input_stream s         = {args_packed.data(), args_packed.size()};
-      auto               signedTrx = psio1::from_frac<psibase::SignedTransaction>(args_packed);
+      auto               signedTrx = psio::from_pssz<psibase::SignedTransaction>(args_packed);
 
       chain.start_if_needed();
       BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
@@ -1417,7 +1419,7 @@ struct callbacks
       // std::cout << eosio::format_json(trace) << "\n";
       if (trace.error && std::getenv("PSIBASE_TESTER_TRACE_ERRORS"))
          std::fprintf(stderr, "psitest native trace error: %s\n", trace.error->c_str());
-      state.result_value = psio1::convert_to_frac(trace);
+      state.result_value = psio::to_pssz(trace);
       state.result_key.clear();
       psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
       return state.result_value.size();
@@ -1428,7 +1430,9 @@ struct callbacks
       auto& chain = assert_chain(chain_index);
 
       auto startTime = std::chrono::steady_clock::now();
-      auto req       = psio1::view<const psibase::HttpRequest>(args_packed);
+      psibase::check(psio::validate_pssz<psibase::HttpRequest>(args_packed).ok(),
+                     "HttpRequest has invalid format");
+      auto req       = psio::pssz_view<psibase::HttpRequest>(args_packed);
       BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "RequestMethod", req.method().unpack());
       BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "RequestTarget", req.target().unpack());
       BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "RequestHost", req.host().unpack());
@@ -1483,7 +1487,7 @@ struct callbacks
             psibase::Action action{
                 .sender  = psibase::AccountNumber(),
                 .service = psibase::proxyServiceNum,
-                .rawData = psio1::convert_to_frac(std::tuple(socket->id, req.unpack())),
+                .rawData = psio::to_pssz(std::tuple(socket->id, req.unpack())),
             };
             tc.execServe(action, atrace);
          }

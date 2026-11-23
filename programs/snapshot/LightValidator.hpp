@@ -8,7 +8,8 @@
 #include <psibase/serviceEntry.hpp>
 #include <psibase/testerApi.hpp>
 #include <psio/shapes.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <psio1/stream.hpp>
 #include <vector>
 
@@ -31,7 +32,7 @@ namespace psibase
          if (!v)
             return std::nullopt;
          // TODO: validate (allow opt-in or opt-out)
-         return psio1::from_frac<V>(psio1::prevalidated{*v});
+         return psio::from_pssz<V>(psio::trusted{*v});
       }
 
       void kvPutRaw(psibase::DbId db, psio1::input_stream key, psio1::input_stream value)
@@ -42,7 +43,7 @@ namespace psibase
          requires(!psio::is_optional<V>::value)
       void kvPut(DbId db, const K& key, const V& value)
       {
-         kvPutRaw(db, psio::encode(psio::key{}, key), psio1::convert_to_frac(value));
+         kvPutRaw(db, psio::encode(psio::key{}, key), psio::to_pssz(value));
       }
 
       void kvRemoveRaw(psibase::DbId db, psio1::input_stream key)
@@ -88,7 +89,7 @@ namespace psibase
       std::vector<char>   result;
       psio1::vector_stream stream{result};
       stream.write(static_cast<char>(CommitMessage::type));
-      psio1::to_frac(msg, stream);
+      psio::to_pssz(msg, stream);
       return sha256(result.data(), result.size());
    }
 
@@ -228,7 +229,7 @@ namespace psibase
                                   const SignedBlock&    block)
       {
          check(!!block.auxConsensusData, "BFT requires auxConsensusData to prove irreversibility");
-         auto confirms = psio1::from_frac<BlockConfirm>(*block.auxConsensusData);
+         auto confirms = psio::from_pssz<BlockConfirm>(*block.auxConsensusData);
          auto blockId  = getBlockId(confirms.blockNum);
 
          check(confirms.commits.size() >= strongThreshold(consensus), "Not enough confirmations");
@@ -293,7 +294,7 @@ namespace psibase
          psibase::VerifyArgs args{hash, claim, signature};
          psibase::Action     act{.service = claim.service,
                                  .method  = MethodNumber{"verifySys"},
-                                 .rawData = psio1::to_frac(args)};
+                                 .rawData = psio::to_pssz(args)};
          auto trace = tester::runAction(authServices.id, RunMode::verify, false, act);
 
          if (trace.error && !trace.error->empty())

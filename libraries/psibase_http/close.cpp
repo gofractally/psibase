@@ -22,7 +22,7 @@ void psibase::http::callClose(const server_state&     server,
       Action action{
           .sender  = AccountNumber(),
           .service = proxyServiceNum,
-          .rawData = psio1::convert_to_frac(std::tuple(socket.id)),
+          .rawData = psio::to_pssz(std::tuple(socket.id)),
       };
 
       try

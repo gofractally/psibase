@@ -10,7 +10,8 @@
 #include <psibase/Watchdog.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/finally.hpp>
-#include <psio1/fracpack.hpp>
+#include <psio/pssz.hpp>
+#include <psio/pssz_view.hpp>
 #include <psibase/VmEngine.hpp>
 #include <psibase/NativeVM.hpp>
 #include <psizam/debug/debug.hpp>
@@ -117,7 +118,7 @@ TEST_CASE("Native psizam policy forwards every serialized VM option")
 {
    psibase::VMOptions       chain{4321, 2, 3, 32768};
    psibase::NativeVMOptions options(chain);
-   CHECK(psio1::to_frac(static_cast<const psibase::VMOptions&>(options)) == psio1::to_frac(chain));
+   CHECK(psio::to_pssz(static_cast<const psibase::VMOptions&>(options)) == psio::to_pssz(chain));
    CHECK(options.max_mutable_global_bytes == 4321);
    CHECK(options.max_pages == 2);
    CHECK(options.max_table_elements == 3);
@@ -472,7 +473,7 @@ namespace
          // span ABI, without teaching the fixture the serialization layout.
          auto patch = [&](std::string_view marker, std::uint64_t sender)
          {
-            auto nested = psio1::to_frac(
+            auto nested = psio::to_pssz(
                 psibase::Action{.sender = psibase::AccountNumber{sender}, .service = peer});
             auto slot = std::search(code.begin(), code.end(), marker.begin(), marker.end());
             REQUIRE(slot != code.end());
@@ -580,7 +581,7 @@ TEST_CASE("Native config writes reject VM limits that cannot be instantiated")
                                 static_cast<uint32_t>(psibase::KvMode::write));
       auto                   key    = psio::encode(psio::key{}, psibase::WasmConfigRow::key(table));
       psibase::WasmConfigRow valid;
-      auto expected = psio1::to_frac(valid);
+      auto expected = psio::to_pssz(valid);
       // Seed the existing row through the fixture's database. The host writes
       // below must fail in validation before resource notifications execute.
       fixture.block.db.kvPut(psibase::DbId::native, valid.key(table), valid);
@@ -591,7 +592,7 @@ TEST_CASE("Native config writes reject VM limits that cannot be instantiated")
             invalid.vmOptions.max_pages = 65537;
          else
             invalid.vmOptions.max_stack_bytes = 0xffffffffu;
-         CHECK_THROWS(host.kvPut(handle, key, psio1::to_frac(invalid)));
+         CHECK_THROWS(host.kvPut(handle, key, psio::to_pssz(invalid)));
          auto retained = fixture.block.db.kvGetRaw(psibase::DbId::native, key);
          REQUIRE(retained.has_value());
          CHECK(std::ranges::equal(std::span(retained->pos, retained->end), expected));
@@ -646,7 +647,7 @@ TEST_CASE("Preverified proof tokens skip only the matching verification request"
    psibase::Transaction unsignedTransaction;
    unsignedTransaction.claims.push_back({.service = fixture.service});
    psibase::SignedTransaction transaction{
-       psio1::shared_view_ptr<psibase::Transaction>{unsignedTransaction},
+       psio::shared_pssz<psibase::Transaction>{unsignedTransaction},
        {{'p', 'r', 'o', 'o', 'f'}}};
    auto id     = psibase::sha256(transaction.transaction.data(), transaction.transaction.size());
    auto verify = psibase::makeVerify(transaction, id, 0);
@@ -762,7 +763,7 @@ TEST_CASE("A block being produced takes transactions up to the chain's size limi
       psibase::Transaction transaction;
       transaction.actions.push_back(psibase::Action{.rawData = std::vector<char>(bytes)});
       psibase::SignedTransaction result;
-      result.transaction = transaction;
+      result.transaction = psio::shared_pssz<psibase::Transaction>{transaction};
       if (proofBytes)
          result.proofs.push_back(std::vector<char>(proofBytes));
       return result;

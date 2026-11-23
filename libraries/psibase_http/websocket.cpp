@@ -61,7 +61,7 @@ void WebSocket::handleMessage(CloseLock&& l, bool binary)
    Action action{
        .sender  = AccountNumber(),
        .service = proxyServiceNum,
-       .rawData = psio1::convert_to_frac(std::tuple(this->Socket::id, data, flags)),
+       .rawData = psio::to_pssz(std::tuple(this->Socket::id, data, flags)),
    };
 
    try

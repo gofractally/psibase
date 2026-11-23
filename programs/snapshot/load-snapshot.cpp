@@ -48,11 +48,11 @@ void read_footer_row(SnapshotFooter& footer, std::span<const char> key, std::spa
 {
    if (key.size() == 3 && key[0] == 0 && key[1] == StateChecksum::table && key[2] == 0)
    {
-      footer.hash = psio1::from_frac<StateChecksum>(value);
+      footer.hash = psio::from_pssz<StateChecksum>(value);
    }
    else if (key.size() >= 3 && key[0] == 0 && key[1] == StateSignature::table && key[2] == 0)
    {
-      footer.signatures.push_back(psio1::from_frac<StateSignature>(value));
+      footer.signatures.push_back(psio::from_pssz<StateSignature>(value));
    }
 }
 
@@ -153,7 +153,7 @@ int verifyHeaders(psibase::TestChain&          chain,
          if (size != -1)
          {
             auto aux         = psibase::getResult(size);
-            auxConsensusData = psio1::from_frac<psibase::BlockDataRow>(aux).auxConsensusData;
+            auxConsensusData = psio::from_pssz<psibase::BlockDataRow>(aux).auxConsensusData;
          }
       }
       if (auto consensusChange = validator.push(psibase::SignedBlock{
@@ -232,7 +232,7 @@ int verifySignatures(std::uint32_t                  authServices,
       psibase::VerifyArgs args{hash, sig.claim, sig.rawData};
       psibase::Action     act{.service = sig.claim.service,
                               .method  = psibase::MethodNumber{"verifySys"},
-                              .rawData = psio1::to_frac(args)};
+                              .rawData = psio::to_pssz(args)};
       auto trace = tester::runAction(authServices, psibase::RunMode::verify, false, act);
       if (!trace.error || trace.error->empty())
       {
@@ -395,7 +395,7 @@ std::vector<psibase::BlockHeaderAuthAccount> getAuthServices(std::uint32_t chain
       raw::getResult(value.data(), value.size(), 0);
       key.resize(raw::getKey(nullptr, 0));
       raw::getKey(key.data(), key.size());
-      auto row = psio1::from_frac<psibase::CodeRow>(value);
+      auto row = psio::from_pssz<psibase::CodeRow>(value);
 
       if (row.flags & psibase::CodeRow::isVerify)
       {

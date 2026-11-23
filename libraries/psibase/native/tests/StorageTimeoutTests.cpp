@@ -49,7 +49,7 @@ namespace
          }
          Transaction trx;
          trx.claims.push_back({.service = service});
-         signedTransaction = {psio1::shared_view_ptr<Transaction>{trx}, {{'p'}}};
+         signedTransaction = {psio::shared_pssz<Transaction>{trx}, {{'p'}}};
       }
       Action action() const { return {.service = service}; }
       void   fresh()

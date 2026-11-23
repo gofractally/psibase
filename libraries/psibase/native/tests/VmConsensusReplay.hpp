@@ -284,7 +284,7 @@ namespace psibase::vm_consensus_replay
          manifest.proofClaims = claims;
          manifest.afterNamespaces = snapshot(shared, after, directory / "after.rows", false);
          manifest.afterSha256 = fileHash(directory / "after.rows");
-         auto bytes = psio1::to_frac(block);
+         auto bytes = psio::to_pssz(block);
          std::ofstream out(directory / "block.frac", std::ios::binary);
          out.exceptions(std::ios::badbit | std::ios::failbit);
          out.write(bytes.data(), bytes.size());

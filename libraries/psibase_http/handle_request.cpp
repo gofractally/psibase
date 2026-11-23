@@ -341,7 +341,7 @@ namespace psibase::http
             abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
          if (replySent.exchange(true))
             return;
-         auto result = psio1::from_frac<HttpReply>(data);
+         auto result = psio::from_pssz<HttpReply>(data);
          if (result.status == HttpStatus::switchingProtocols)
          {
             if (isWebsocketUpgrade(req, result))
@@ -875,7 +875,7 @@ namespace psibase::http
                   Action action{
                       .sender  = AccountNumber(),
                       .service = proxyServiceNum,
-                      .rawData = psio1::convert_to_frac(std::tuple(socket->id, std::move(data))),
+                      .rawData = psio::to_pssz(std::tuple(socket->id, std::move(data))),
                   };
                   tc.execServe(action, atrace);
                }

@@ -206,8 +206,8 @@ namespace
          Action action{
              .sender  = AccountNumber(),
              .service = proxyServiceNum,
-             .rawData = psio1::convert_to_frac(
-                 std::tuple(self->id, psio1::to_frac(reply), std::uint32_t(0))),
+             .rawData = psio::to_pssz(
+                 std::tuple(self->id, psio::to_pssz(reply), std::uint32_t(0))),
          };
 
          if (self->request && isWebSocketHandshake(*self->request, reply))

@@ -27,7 +27,7 @@ namespace
       {
          if (flags != 0)
             abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
-         auto reply = psio1::from_frac<HttpReply>(data);
+         auto reply = psio::from_pssz<HttpReply>(data);
          if (reply.status == HttpStatus::ok)
          {
             okay = true;
@@ -163,7 +163,7 @@ void load_local_packages(TransactionContext&           tc,
       Action action{
           .sender  = AccountNumber(),
           .service = proxyServiceNum,
-          .rawData = psio1::convert_to_frac(std::tuple(socket->id, std::move(request))),
+          .rawData = psio::to_pssz(std::tuple(socket->id, std::move(request))),
       };
       socket->okay = false;
       tc.execServe(action, atrace);
