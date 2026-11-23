@@ -80,7 +80,7 @@ namespace psibase
    /// `R` is the type of the result as it is packed. The bytes the callee
    /// returned are validated as an `R`.
    template <typename R>
-   auto fraccall(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
+   auto callPacked(std::span<const char> packed_action, CallFlags flags = CallFlags::none)
    {
       auto result_size = raw::call(packed_action.data(), packed_action.size(), flags);
       if constexpr (not std::is_same_v<void, R>)
@@ -114,9 +114,9 @@ namespace psibase
    }
 
    template <typename T>
-   auto fraccall(const Action& a, CallFlags flags = CallFlags::none)
+   auto callPacked(const Action& a, CallFlags flags = CallFlags::none)
    {
-      return fraccall<T>(psio::to_pssz(a), flags);
+      return callPacked<T>(psio::to_pssz(a), flags);
    }
 
    template <typename T>
@@ -171,7 +171,7 @@ namespace psibase
       {
          auto act = ActionViewProxy(sender, receiver)
                         .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
-         return psibase::fraccall<MethodResult<MethodClass<MemberPtr>, I>>(act.bytes(), flags);
+         return psibase::callPacked<MethodResult<MethodClass<MemberPtr>, I>>(act.bytes(), flags);
       }
    };
 
@@ -193,9 +193,9 @@ namespace psibase
                                  .call<I, MemberPtr, Args...>(std::forward<Args>(args)...);
          using result_type = MethodResult<MethodClass<MemberPtr>, I>;
          if constexpr (not std::is_void_v<result_type>)
-            return psibase::fraccall<result_type>(act.bytes(), flags).unpack();
+            return psibase::callPacked<result_type>(act.bytes(), flags).unpack();
          else
-            psibase::fraccall<void>(act.bytes(), flags);
+            psibase::callPacked<void>(act.bytes(), flags);
       }
    };
 
@@ -225,7 +225,7 @@ namespace psibase
                  event_log, type,
                  psio::method_args_to_pssz<MethodClass<MemberPtr>, I>(std::forward<Args>(args)...))),
          };
-         return fraccall<EventNumber>(action).unpack();
+         return callPacked<EventNumber>(action).unpack();
       }
    };
 
