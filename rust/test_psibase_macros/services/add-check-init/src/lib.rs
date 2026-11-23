@@ -1,9 +1,8 @@
 #[psibase::service_tables]
 mod service_tables {
 
-    use serde::{Deserialize, Serialize};
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]

@@ -8,14 +8,11 @@ pub use psibase::image_content_type::{
 pub mod tables {
     use psibase::AccountNumber;
 
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "ProfileTable", index = 0)]
     #[derive(
         Default,
         async_graphql::SimpleObject,
-        Serialize,
-        Deserialize,
         Debug,
         Clone,
         psio::PsszPack,
@@ -23,6 +20,7 @@ pub mod tables {
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct Profile {
         #[primary_key]
@@ -77,7 +75,7 @@ pub mod service {
             format!("/avatar/{caller}").into(),
             content_type.to_string(),
             None,
-            Hex(image),
+            image,
         );
     }
 

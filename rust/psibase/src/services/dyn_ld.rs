@@ -3,18 +3,16 @@
 pub mod service {
     use crate::{self as psibase, AccountNumber};
 
-    use serde::{Deserialize, Serialize};
 
     #[derive(
         Debug,
         Clone,
-        Serialize,
-        Deserialize,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct DynDep {
         pub name: String,

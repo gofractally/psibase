@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use crate::serialize_as_str;
 use crate::services::tokens::{Precision, Quantity, TokensError};
 
 /// Fixed-point decimal value stored as `quantity / 10^precision`.
@@ -15,14 +14,12 @@ use crate::services::tokens::{Precision, Quantity, TokensError};
 /// For PSIO a decimal is the record of its two members in pSSZ and in a key,
 /// and its text is the decimal number ([`Display`](std::fmt::Display) writes
 /// it, [`FromStr`] reads it).
-#[derive(psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key)]
+#[derive(psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key, psio::Serde)]
 #[psio(custom = "Decimal")]
 pub struct Decimal {
     pub quantity: Quantity,
     pub precision: Precision,
 }
-
-serialize_as_str!(Decimal, "decimal");
 
 impl psio::json::TextForm for Decimal {
     fn to_text(&self, out: &mut String) {
@@ -33,6 +30,7 @@ impl psio::json::TextForm for Decimal {
     }
 }
 psio::json_text_form!(Decimal);
+psio::async_graphql_scalar!(Decimal, "Decimal");
 
 impl Decimal {
     pub fn new(quantity: Quantity, precision: Precision) -> Self {

@@ -52,10 +52,10 @@ pub mod service {
             psibase::services::http_server::SERVICE,
             "Native HTTP server required"
         );
-        let target = request.target.to_str().unwrap_or_default();
-        let (path, query) = target.split_once('?').unwrap_or((target, ""));
+        let target = request.target.to_string_lossy();
+        let (path, query) = target.split_once('?').unwrap_or((&target, ""));
         if request.method == "GET" {
-            if let Some(id) = request.target.to_str().unwrap_or_default().strip_prefix("/header?hash=") {
+            if let Some(id) = request.target.to_string_lossy().strip_prefix("/header?hash=") {
                 if id.len() != 64 || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
                     return reply(400, json!({"error":"Invalid Ethereum hash"}));
                 }
@@ -66,14 +66,14 @@ pub mod service {
                         .get(&id.to_lowercase())),
                 );
             }
-            if let Some(id) = request.target.to_str().unwrap_or_default().strip_prefix("/deposit?id=") {
+            if let Some(id) = request.target.to_string_lossy().strip_prefix("/deposit?id=") {
                 let id = id.parse::<u64>().ok()?;
                 return reply(
                     200,
                     json!(ethbridge::DepositTable::read().get_index_pk().get(&id)),
                 );
             }
-            if let Some(owner) = request.target.to_str().unwrap_or_default().strip_prefix("/balance?owner=") {
+            if let Some(owner) = request.target.to_string_lossy().strip_prefix("/balance?owner=") {
                 let owner = owner.parse::<AccountNumber>().ok()?;
                 let config = ethbridge::ConfigTable::read().get_index_pk().get(&())?;
                 let amount =

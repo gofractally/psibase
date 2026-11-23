@@ -9,10 +9,9 @@ mod tables {
     use async_graphql::*;
     use core::fmt;
     use psibase::*;
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -20,7 +19,7 @@ mod tables {
     }
 
     #[table(name = "AttestationTable", index = 1)]
-    #[derive(Debug, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Attestation {
         /// The attesting account / the issuer
         pub attester: AccountNumber,
@@ -57,7 +56,7 @@ mod tables {
     }
 
     #[table(name = "AttestationStatsTable", index = 2)]
-    #[derive(Debug, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct AttestationStats {
         /// The credential subject, in this case, the subject/subject
         #[primary_key]

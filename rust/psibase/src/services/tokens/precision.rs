@@ -1,10 +1,7 @@
 use std::str::FromStr;
 
 
-use serde::{Deserialize, Serialize};
-
 use crate::services::tokens::TokensError;
-use async_graphql::scalar;
 
 /// The number of decimal places of a token amount, 0 to 8.
 ///
@@ -15,12 +12,12 @@ use async_graphql::scalar;
     Debug,
     Copy,
     Clone,
-    Serialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(transparent, invariant = "Precision::in_range")]
 pub struct Precision(u8);
@@ -76,14 +73,4 @@ impl FromStr for Precision {
     }
 }
 
-impl<'de> Deserialize<'de> for Precision {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let number: u8 = Deserialize::deserialize(deserializer)?;
-        Precision::new(number).map_err(|e| serde::de::Error::custom(e.to_string()))
-    }
-}
-
-scalar!(Precision);
+psio::async_graphql_scalar!(Precision, "Precision");

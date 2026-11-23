@@ -149,7 +149,7 @@ mod tests {
         }
 
         fn pass_time(&self, seconds: i64) {
-            self.chain.start_block_after(Seconds::from_ticks(seconds).to_unit().unwrap());
+            self.chain.start_block_after(Seconds::from_ticks(seconds).into());
         }
     }
 

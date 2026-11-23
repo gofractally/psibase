@@ -499,7 +499,7 @@ impl<'a> PackageBuilder<'a> {
                 );
                 let options = SimpleFileOptions::DEFAULT;
                 out.start_file("meta.json", options)?;
-                write!(out, "{}", &serde_json::to_string(&meta)?)?;
+                write!(out, "{}", psio::to_ijson(&meta))?;
                 for (service, info, path) in service_wasms {
                     out.start_file(
                         format!("service/{}.wasm", service).replace("+", "/"),
@@ -510,7 +510,7 @@ impl<'a> PackageBuilder<'a> {
                         format!("service/{}.json", service).replace("+", "/"),
                         options,
                     )?;
-                    write!(out, "{}", &serde_json::to_string(&info)?)?;
+                    write!(out, "{}", psio::to_ijson(&info))?;
                 }
                 for (service, dest, src) in data_files {
                     out.start_file(format!("data/{}{}", service, dest), options)?;
@@ -518,7 +518,7 @@ impl<'a> PackageBuilder<'a> {
                 }
                 if !postinstall.is_empty() {
                     out.start_file("script/postinstall.json", options)?;
-                    write!(out, "{}", &serde_json::to_string(&postinstall)?)?;
+                    write!(out, "{}", psio::to_ijson(&postinstall))?;
                 }
                 let mut file = out.finish()?;
                 file.rewind()?;
@@ -662,7 +662,7 @@ pub async fn build_packages(
         let mut service_wasms = Vec::new();
         for paths in paths {
             let schema: ServiceSchema =
-                serde_json::from_str(&std::io::read_to_string(File::open(paths.schema)?)?)?;
+                psio::from_ijson(&std::io::read_to_string(File::open(paths.schema)?)?)?;
             let service = schema.service.clone();
             service_wasms.push((service, schema, paths.service));
         }

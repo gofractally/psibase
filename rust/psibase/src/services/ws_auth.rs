@@ -3,7 +3,6 @@
 mod service {
     use crate::{AccountNumber, HttpReply, HttpRequest};
 
-    use serde::{Deserialize, Serialize};
 
     #[action]
     fn serveSys(
@@ -26,13 +25,12 @@ mod service {
 
     #[derive(
         Debug,
-        Serialize,
-        Deserialize,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct WsTicketInfo {
         pub user: AccountNumber,

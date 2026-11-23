@@ -1,5 +1,4 @@
 
-use serde::{Deserialize, Serialize};
 
 pub use crate::services::events::EventDb;
 
@@ -13,12 +12,11 @@ pub use crate::services::events::EventDb;
     Debug,
     Clone,
     Copy,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[serde(rename_all = "camelCase")]
 pub enum DbId {

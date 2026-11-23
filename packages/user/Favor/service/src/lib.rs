@@ -310,13 +310,13 @@ pub mod service {
     /// Network administrator provisions a random 256-bit key in protected
     /// objective state. Rotation invalidates all previews; no keys are in WASM.
     #[action]
-    fn rotate_key(secret: Hex<Vec<u8>>) {
+    fn rotate_key(secret: Vec<u8>) {
         assert_eq!(
             get_sender(),
             Wrapper::SERVICE,
             "Only the service owner can rotate routing keys"
         );
-        assert_eq!(secret.0.len(), 32, "A 256-bit routing key is required");
+        assert_eq!(secret.len(), 32, "A 256-bit routing key is required");
         let table = RouteKeys::read_write();
         let epoch = table
             .get_index_pk()
@@ -326,7 +326,7 @@ pub mod service {
             .put(&RouteKey {
                 key: 0,
                 epoch,
-                secret: secret.0,
+                secret: secret,
             })
             .unwrap();
     }

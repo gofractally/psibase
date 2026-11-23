@@ -15,7 +15,6 @@ mod graph_ql;
 mod hex;
 mod http;
 pub mod image_content_type;
-mod internal_macros;
 #[cfg(not(target_family = "wasm"))]
 mod local_socket;
 pub mod memo;
@@ -82,7 +81,6 @@ pub use trace::*;
 pub use transaction_builder::*;
 pub use web_services::*;
 
-use internal_macros::*;
 
 // For what the service macro generates into crates that do not name `psio`
 // in their manifest (`#[psio::interface(crate = "psibase::psio")]`).

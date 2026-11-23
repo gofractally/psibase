@@ -1,4 +1,3 @@
-use crate::{serialize_as_str};
 use custom_error::custom_error;
 use psio::compress_name::{method_to_number, number_to_method};
 use std::{num::ParseIntError, str::FromStr};
@@ -36,13 +35,12 @@ custom_error! { pub MethodNumberError
     psio::PsszView,
     psio::ToPsszSchema,
     psio::Key,
+    psio::Serde,
 )]
 #[psio(definition_will_not_change, custom = "MethodNumber")]
 pub struct MethodNumber {
     pub value: u64,
 }
-
-serialize_as_str!(MethodNumber, "method number");
 
 /// The text of a method is its name. Every spelling that names a method is
 /// read: the one [`Display`](std::fmt::Display) writes, an identifier as
@@ -66,6 +64,7 @@ impl psio::json::TextForm for MethodNumber {
     }
 }
 psio::json_text_form!(MethodNumber);
+psio::async_graphql_scalar!(MethodNumber, "MethodNumber");
 
 impl MethodNumber {
     pub fn new(value: u64) -> Self {

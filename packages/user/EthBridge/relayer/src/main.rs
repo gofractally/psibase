@@ -105,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
         claims,
     };
     let packed = psio::to_pssz(&trx);
-    let mut proofs: Vec<Hex<Vec<u8>>> = keys.iter().map(|k| k.sign(&packed).into()).collect();
+    let mut proofs: Vec<Vec<u8>> = keys.iter().map(|k| k.sign(&packed).into()).collect();
     proofs.extend(extra);
     let signed = SignedTransaction {
         transaction: psio::pssz::Nested::unchecked(packed),

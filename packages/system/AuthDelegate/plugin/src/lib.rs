@@ -78,7 +78,7 @@ impl Api for AuthDelegate {
         let new_account = new_account_action {
             name: get_account_number(name.as_str())?,
             owner: get_account_number(owner.as_str())?,
-            mode: psibase::services::accounts::NewAccountMode::REQUIRE_NEW,
+            mode: psibase::services::accounts::NewAccountMode::RequireNew,
         };
         Ok(add_action_to_transaction(
             <new_account_action as psio::interface::Method>::NAME,

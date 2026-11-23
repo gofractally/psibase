@@ -10,7 +10,6 @@ use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
 
 
-use serde::{Deserialize, Serialize};
 
 use crate::AccountNumber;
 
@@ -26,8 +25,6 @@ pub type TID = u32;
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -35,6 +32,7 @@ pub type TID = u32;
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct TokenRecord {
     pub id: TID,
@@ -55,8 +53,6 @@ crate::define_flags!(TokenFlags, u8, {
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -64,6 +60,7 @@ crate::define_flags!(TokenFlags, u8, {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct Holder {
     pub account: AccountNumber,
@@ -74,8 +71,6 @@ pub struct Holder {
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -83,6 +78,7 @@ pub struct Holder {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct SharedBalance {
     /// The row's id (the primary key of the tokens service's table).
@@ -97,8 +93,6 @@ pub struct SharedBalance {
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -106,6 +100,7 @@ pub struct SharedBalance {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct Balance {
     pub account: AccountNumber,
@@ -554,7 +549,7 @@ mod service {
     /// * `image`       - Image bytes, at most `MAX_ICON_SIZE` bytes
     /// * `contentType` - Image type (see `image_content_type`). PNG, JPEG, and WebP are allowed.
     #[action]
-    fn setIcon(token_id: TID, image: crate::Hex<Vec<u8>>, contentType: ImgContentType) {
+    fn setIcon(token_id: TID, image: Vec<u8>, contentType: ImgContentType) {
         unimplemented!()
     }
 

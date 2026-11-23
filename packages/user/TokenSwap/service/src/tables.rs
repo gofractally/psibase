@@ -9,10 +9,9 @@ pub mod tables {
         abort_message, get_sender, AccountNumber, Memo, ServiceWrapper, Table, };
 
     use crate::helpers::{mul_div, sqrt};
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {}
 
     impl InitRow {
@@ -38,7 +37,7 @@ pub mod tables {
     }
 
     #[table(name = "PoolTable", index = 1)]
-    #[derive(Serialize, Deserialize, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Pool {
         #[primary_key]
@@ -47,7 +46,7 @@ pub mod tables {
     }
 
     #[table(name = "ReserveTable", index = 2)]
-    #[derive(Serialize, Deserialize, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Reserve {
         pub pool_id: TID,
@@ -173,8 +172,8 @@ pub mod tables {
         }
 
         /// Content hash of the token's icon, or null if it has no icon
-        pub async fn icon_hash(&self) -> Option<psibase::Checksum256> {
-            psibase::services::tokens::icon_hash(self.token_id)
+        pub async fn icon_hash(&self) -> Option<String> {
+            psibase::services::tokens::icon_hash(self.token_id).map(|hash| psibase::to_hex(&hash))
         }
 
         pub async fn pool(&self) -> Pool {

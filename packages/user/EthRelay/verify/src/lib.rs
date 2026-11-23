@@ -8,18 +8,18 @@ pub mod service {
 
     #[action]
     #[allow(unused_variables)]
-    fn verifySys(transactionHash: Checksum256, claim: Claim, proof: Hex<Vec<u8>>) {
+    fn verifySys(transactionHash: Checksum256, claim: Claim, proof: Vec<u8>) {
         assert_eq!(claim.service, Wrapper::SERVICE, "Wrong Ethereum verifier");
-        assert_eq!(claim.rawData.0.len(), 32, "Evidence commitment size");
+        assert_eq!(claim.rawData.len(), 32, "Evidence commitment size");
         assert!(
-            proof.0.len() <= ethrelay_core::MAX_WITNESS,
+            proof.len() <= ethrelay_core::MAX_WITNESS,
             "Ethereum witness size limit"
         );
         let witness: ethrelay_core::Witness =
-            serde_json::from_slice(&proof.0).expect("Invalid Ethereum witness");
+            serde_json::from_slice(&proof).expect("Invalid Ethereum witness");
         let fact = witness.check().unwrap_or_else(|e| abort_message(&e));
         assert_eq!(
-            claim.rawData.0,
+            claim.rawData,
             fact.commitment(),
             "Ethereum evidence commitment mismatch"
         );

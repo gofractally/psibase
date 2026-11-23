@@ -487,7 +487,7 @@ pub fn action_handlers_recording(
                 context.handlers,
                 act.service,
                 act.method,
-                &act.rawData.0,
+                &act.rawData,
             ) {
                 Some((name, data)) => {
                     result.insert("method".to_string(), name.into());
@@ -498,7 +498,7 @@ pub fn action_handlers_recording(
                 }
                 None => {
                     result.insert("method".to_string(), act.method.to_string().into());
-                    result.insert("rawData".to_string(), act.rawData.to_string().into());
+                    result.insert("rawData".to_string(), crate::to_hex(&act.rawData).into());
                 }
             }
             Ok(serde_json::Value::Object(result).to_string())
@@ -527,16 +527,13 @@ pub fn action_handlers_recording(
                 )
                 .map_err(json_error)?
             } else {
-                text("rawData")?
-                    .parse::<crate::Hex<Vec<u8>>>()
-                    .map_err(json_error)?
-                    .0
+                crate::from_hex(text("rawData")?).ok_or_else(|| json_error("rawData is not hex"))?
             };
             Ok(psio::to_pssz(&Action {
                 sender,
                 service,
                 method,
-                rawData: raw_data.into(),
+                rawData: raw_data,
             }))
         },
     );
@@ -612,7 +609,7 @@ impl ActionDecoder {
     pub fn args(&self, action: &Action) -> Option<Result<serde_json::Value, anyhow::Error>> {
         let schema = self.schemas.get(&action.service)?;
         let (_, action_type) = schema.action(action.method)?;
-        Some(self.to_value(schema, &action_type.params, &action.rawData.0))
+        Some(self.to_value(schema, &action_type.params, &action.rawData))
     }
     /// The result of `service::method` as JSON: None when the schemas do
     /// not describe the action or it has no result.

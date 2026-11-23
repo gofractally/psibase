@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 use async_graphql::{InputObject, SimpleObject};
 
-use serde::{Deserialize, Serialize};
 
 use crate::services::nft;
 use crate::services::tokens::TID;
@@ -14,14 +13,13 @@ pub type SID = AccountNumber;
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct SymbolLength {
     symbolLength: u8,
@@ -32,8 +30,6 @@ pub struct SymbolLength {
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -41,6 +37,7 @@ pub struct SymbolLength {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct SymbolRecord {
     pub symbolId: SID,
@@ -51,8 +48,6 @@ pub struct SymbolRecord {
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -60,6 +55,7 @@ pub struct SymbolRecord {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct Mapping {
     pub tokenId: TID,

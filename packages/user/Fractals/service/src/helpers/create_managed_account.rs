@@ -19,7 +19,7 @@ where
     auth_delegate::Wrapper::call().newAccount(
         new_account,
         self_service,
-        accounts::NewAccountMode::REQUIRE_NEW,
+        accounts::NewAccountMode::RequireNew,
     );
 
     f();

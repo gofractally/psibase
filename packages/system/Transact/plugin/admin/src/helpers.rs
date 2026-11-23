@@ -9,7 +9,7 @@ use crate::errors::ErrorType::*;
 use crate::open_tx_table::OpenTx;
 use crate::types::FromExpirationTime;
 
-use psibase::{Hex, SignedTransaction, Tapos, Transaction};
+use psibase::{SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
 
 fn sign_with_claim(claim: &psibase::Claim, tx_hash: &[u8]) -> Result<Vec<u8>, HostTypes::Error> {
@@ -20,7 +20,7 @@ impl From<Claim> for psibase::Claim {
     fn from(claim: Claim) -> Self {
         psibase::Claim {
             service: claim.verify_service.parse().unwrap(),
-            rawData: Hex::from(claim.raw_data.clone()),
+            rawData: claim.raw_data.clone(),
         }
     }
 }
@@ -40,19 +40,19 @@ fn user_auth_proof(user: &str, tx_hash: &[u8; 32]) -> Result<Option<Proof>, Host
 pub fn get_proofs(
     tx_hash: &[u8; 32],
     extra_claims: &[psibase::Claim],
-) -> Result<Vec<Hex<Vec<u8>>>, HostTypes::Error> {
+) -> Result<Vec<Vec<u8>>, HostTypes::Error> {
     // User auth claims come from hook-user-auth. Extra signatures added via
     // add-signature (e.g. invite credentials) are appended after.
     let mut proofs = vec![];
 
     if let Some(user) = OpenTx::connection_user() {
         if let Some(proof) = user_auth_proof(&user, tx_hash)? {
-            proofs.push(Hex::from(proof.signature));
+            proofs.push(proof.signature);
         }
     }
 
     for claim in extra_claims {
-        proofs.push(Hex::from(sign_with_claim(claim, tx_hash)?));
+        proofs.push(sign_with_claim(claim, tx_hash)?);
     }
 
     Ok(proofs)
@@ -117,7 +117,7 @@ pub fn take_open_actions() -> Result<Vec<psibase::Action>, HostTypes::Error> {
 pub fn make_transaction(
     actions: Vec<psibase::Action>,
     expiration_seconds: u64,
-) -> (Transaction, Vec<psibase::Claim>, Vec<Hex<Vec<u8>>>) {
+) -> (Transaction, Vec<psibase::Claim>, Vec<Vec<u8>>) {
     let extra_claims = OpenTx::take_claims();
     let evidence = OpenTx::take_evidence();
     let mut claims = Vec::new();

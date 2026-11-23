@@ -24,7 +24,7 @@ psibase::define_trust! {
         High => "
             - Accept staged transactions
             - Reject staged transactions
-        
+
         Warning: This will grant the caller the ability to accept/reject transactions on your behalf! Make sure you completely trust the caller's legitimacy.
         ",
     }
@@ -46,7 +46,7 @@ struct StagedTxData {
     details: StagedTxDetailsInner,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(psio::JsonText, psio::Serde)]
 #[serde(rename_all = "camelCase")]
 struct StagedTxDetailsInner {
     txid: Checksum256,
@@ -56,12 +56,12 @@ struct StagedTxDetailsInner {
     action_list: ActionList,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(psio::JsonText, psio::Serde)]
 struct ActionList {
     actions: Vec<ActionDetails>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(psio::JsonText, psio::Serde)]
 struct ActionDetails {
     sender: String,
     service: String,

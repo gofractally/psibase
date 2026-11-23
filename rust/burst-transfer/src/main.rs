@@ -66,7 +66,8 @@ struct Args {
 
     /// Token symbol
     #[clap(required = true)]
-    symbol: psibase::ExactAccountNumber,
+    #[arg(value_parser = psibase::AccountNumber::from_exact)]
+    symbol: psibase::AccountNumber,
 
     /// Number of random accounts to create and use as transfer participants
     #[clap(required = true)]

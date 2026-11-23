@@ -95,7 +95,7 @@ mod tests {
 
     fn mkact(size: usize) -> Action {
         let mut result = Action::default();
-        result.rawData.0.resize(size, 0u8);
+        result.rawData.resize(size, 0u8);
         result
     }
     fn mktx(actions: Vec<Action>) -> Result<SignedTransaction, anyhow::Error> {

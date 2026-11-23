@@ -13,7 +13,7 @@ mod service {
 
     /// Holds an answer to a calculation done by an account `id`
     #[table(name = "AnswerTable", index = 0)]
-    #[derive(Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Answer {
         /// The account responsible for the calculation
         #[primary_key]
@@ -33,7 +33,7 @@ mod service {
         result: i32,
     }
 
-    #[derive(SimpleObject, Serialize, Deserialize, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct ExampleRecord {
         count: u32,
         value: i32,
@@ -182,7 +182,8 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
             HttpBody::json(r#"{"a":5,"b":7}"#),
         )?
         .body;
-    assert_eq!(format!("{}", reply), "08000500000007000000");
+    // The PSSZ of the argument list: the tuple of the parameters.
+    assert_eq!(reply, psio::to_pssz(&(5i32, 7i32)));
 
     println!("{}", chain.get(SERVICE, "/action_templates")?.text()?);
     let reply: Value = chain.get(SERVICE, "/action_templates")?.json()?;

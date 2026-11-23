@@ -546,7 +546,7 @@ mod tests {
         )?;
         graph.add_existing(existing, PackageDisposition::pinned("1.0.0"));
         let new: PackageInfo = serde_json::from_str(
-            r#"{"name":"New","description":"","version":"1.0.0","depends":[],"accounts":[],"exports":[]}"#,
+            r#"{"name":"New","version":"1.0.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""}"#,
         )?;
         graph.add(new.clone());
         graph.add_input(PackageRef {
@@ -568,7 +568,7 @@ mod tests {
     fn test_solve_one() -> Result<(), anyhow::Error> {
         let mut graph = DepGraph::new();
         let a: PackageInfo = serde_json::from_str(
-            r#"{"name":"A","description":"","version":"1.0.0","depends":[],"accounts":[]}"#,
+            r#"{"name":"A","version":"1.0.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""}"#,
         )?;
         graph.add(a.clone());
         graph.add_input(PackageRef {
@@ -584,9 +584,9 @@ mod tests {
         let mut graph = DepGraph::new();
         let packages: Vec<PackageInfo> = serde_json::from_str(
             r#"[
-{"name":"A","description":"","version":"1.0.0","depends":[],"accounts":[]},
-{"name":"B","description":"","version":"1.0.0","depends":[{"name":"A","version":"1.0.0"}],"accounts":[]}
-]"#,
+                {"name":"A","version":"1.0.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"B","version":"1.0.0","scope":"network","description":"","depends":[{"name":"A","version":"1.0.0"}],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""}
+            ]"#,
         )?;
         for package in &packages {
             graph.add(package.clone());
@@ -625,11 +625,11 @@ mod tests {
         let mut graph = DepGraph::new();
         let packages: Vec<PackageInfo> = serde_json::from_str(
             r#"[
-{"name":"A","description":"","version":"1.0.0","depends":[],"accounts":[]},
-{"name":"A","description":"","version":"1.1.0","depends":[],"accounts":[]},
-{"name":"B","description":"","version":"1.0.0","depends":[{"name":"A","version":"1.0.0"}],"accounts":[]},
-{"name":"B","description":"","version":"1.1.0","depends":[{"name":"A","version":"1.2.0"}],"accounts":[]}
-]"#,
+                {"name":"A","version":"1.0.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"A","version":"1.1.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"B","version":"1.0.0","scope":"network","description":"","depends":[{"name":"A","version":"1.0.0"}],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"B","version":"1.1.0","scope":"network","description":"","depends":[{"name":"A","version":"1.2.0"}],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""}
+            ]"#,
         )?;
         for package in &packages {
             graph.add(package.clone());
@@ -647,14 +647,14 @@ mod tests {
         let mut graph = DepGraph::new();
         let packages: Vec<PackageInfo> = serde_json::from_str(
             r#"[
-{"name":"A","description":"","version":"1.0.0","depends":[],"accounts":[]},
-{"name":"A","description":"","version":"1.1.0","depends":[],"accounts":[]},
-{"name":"A","description":"","version":"1.2.0","depends":[],"accounts":[]},
-{"name":"A","description":"","version":"1.3.0","depends":[],"accounts":[]},
-{"name":"A","description":"","version":"1.4.0","depends":[],"accounts":[]},
-{"name":"A","description":"","version":"1.5.0","depends":[],"accounts":[]},
-{"name":"B","description":"","version":"1.0.0","depends":[{"name":"A","version":"1.2.0"}],"accounts":[]}
-]"#,
+                {"name":"A","version":"1.0.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"A","version":"1.1.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"A","version":"1.2.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"A","version":"1.3.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"A","version":"1.4.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"A","version":"1.5.0","scope":"network","description":"","depends":[],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""},
+                {"name":"B","version":"1.0.0","scope":"network","description":"","depends":[{"name":"A","version":"1.2.0"}],"accounts":[],"services":[],"exports":[],"sha256":"0000000000000000000000000000000000000000000000000000000000000000","file":""}
+            ]"#,
         )?;
         for package in &packages {
             graph.add(package.clone());

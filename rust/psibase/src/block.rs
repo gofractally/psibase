@@ -1,13 +1,13 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    AccountNumber, Hex, MethodNumber, TimePointSec, TimePointUSec, WasmConfigRow,
+    AccountNumber, MethodNumber, TimePointSec, TimePointUSec, WasmConfigRow,
 };
 use async_graphql::{InputObject, SimpleObject, Union};
-use serde::{Deserialize, Serialize};
 
 // TODO: move
-pub type Checksum256 = Hex<[u8; 32]>;
+/// A SHA-256 digest: 32 bytes, hex in JSON (C++ `psibase::Checksum256`).
+pub type Checksum256 = [u8; 32];
 
 pub type BlockNum = u32;
 pub type BlockTime = TimePointUSec;
@@ -24,8 +24,6 @@ pub type BlockTime = TimePointUSec;
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     PartialEq,
@@ -36,9 +34,11 @@ pub type BlockTime = TimePointUSec;
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(custom = "Action")]
 #[graphql(input_name = "ActionInput")]
+#[graphql(complex)]
 pub struct Action {
     /// Account sending the action
     pub sender: AccountNumber,
@@ -50,33 +50,41 @@ pub struct Action {
     pub method: MethodNumber,
 
     /// Data for the method
-    pub rawData: Hex<Vec<u8>>,
+    #[graphql(skip_output)]
+    pub rawData: Vec<u8>,
+}
+
+/// In GraphQL the bytes are hex text, as in JSON.
+#[async_graphql::ComplexObject]
+impl Action {
+    #[allow(non_snake_case)]
+    async fn rawData(&self) -> String {
+        crate::to_hex(&self.rawData)
+    }
 }
 
 /// The genesis action is the first action of the first transaction of
 /// the first block. The action struct's fields are ignored, except
 /// rawData, which contains this struct.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key, psio::JsonText)]
+#[derive(Debug, Clone, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key, psio::JsonText, psio::Serde)]
 pub struct GenesisActionData {
     pub memo: String,
     pub services: Vec<GenesisService>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key, psio::JsonText)]
+#[derive(Debug, Clone, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key, psio::JsonText, psio::Serde)]
 pub struct GenesisService {
     pub service: AccountNumber,
     pub flags: u64,
     pub vmType: u8,
     pub vmVersion: u8,
-    pub code: Hex<Vec<u8>>,
+    pub code: Vec<u8>,
 }
 
 #[derive(
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     PartialEq,
@@ -87,11 +95,23 @@ pub struct GenesisService {
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "ClaimInput")]
+#[graphql(complex)]
 pub struct Claim {
     pub service: AccountNumber,
-    pub rawData: Hex<Vec<u8>>,
+    #[graphql(skip_output)]
+    pub rawData: Vec<u8>,
+}
+
+/// In GraphQL the bytes are hex text, as in JSON.
+#[async_graphql::ComplexObject]
+impl Claim {
+    #[allow(non_snake_case)]
+    async fn rawData(&self) -> String {
+        crate::to_hex(&self.rawData)
+    }
 }
 
 /// Rules for TAPOS:
@@ -120,8 +140,6 @@ pub struct Claim {
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     PartialEq,
@@ -132,6 +150,7 @@ pub struct Claim {
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "TaposInput")]
 #[psio(definition_will_not_change)]
@@ -151,8 +170,6 @@ impl Tapos {
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     PartialEq,
@@ -163,6 +180,7 @@ impl Tapos {
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "TransactionInput")]
 pub struct Transaction {
@@ -175,8 +193,6 @@ pub struct Transaction {
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     PartialEq,
     Eq,
     psio::PsszPack,
@@ -185,13 +201,14 @@ pub struct Transaction {
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct SignedTransaction {
     /// The packed transaction: a byte list holding the PSSZ of a
     /// `Transaction` (C++ `psio::nested<Transaction>`).
     pub transaction: psio::pssz::Nested<Transaction>,
-    pub proofs: Vec<Hex<Vec<u8>>>,
-    pub subjectiveData: Option<Vec<Hex<Vec<u8>>>>,
+    pub proofs: Vec<Vec<u8>>,
+    pub subjectiveData: Option<Vec<Vec<u8>>>,
 }
 
 type TermNum = u32;
@@ -200,8 +217,6 @@ type TermNum = u32;
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -210,6 +225,7 @@ type TermNum = u32;
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "ProducerInput")]
 pub struct Producer {
@@ -221,8 +237,6 @@ pub struct Producer {
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -230,6 +244,7 @@ pub struct Producer {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct CftConsensus {
     pub producers: Vec<Producer>,
@@ -239,8 +254,6 @@ pub struct CftConsensus {
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -248,12 +261,13 @@ pub struct CftConsensus {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct BftConsensus {
     pub producers: Vec<Producer>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Union, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, Union, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub enum ConsensusData {
     CftConsensus(CftConsensus),
     BftConsensus(BftConsensus),
@@ -272,8 +286,6 @@ impl ConsensusData {
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -282,6 +294,7 @@ impl ConsensusData {
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(definition_will_not_change)]
 pub struct ConsensusBytes {
@@ -293,8 +306,6 @@ pub struct ConsensusBytes {
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -303,28 +314,40 @@ pub struct ConsensusBytes {
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
+#[graphql(complex)]
 pub struct BlockHeaderAuthAccount {
     pub codeNum: AccountNumber,
+    #[graphql(skip_output)]
     pub codeHash: Checksum256,
     pub vmType: u8,
     pub vmVersion: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+/// In GraphQL the bytes are hex text, as in JSON.
+#[async_graphql::ComplexObject]
+impl BlockHeaderAuthAccount {
+    #[allow(non_snake_case)]
+    async fn codeHash(&self) -> String {
+        crate::to_hex(&self.codeHash)
+    }
+}
+
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct Consensus {
     pub data: ConsensusData,
     pub services: Vec<BlockHeaderAuthAccount>,
     pub wasmConfig: WasmConfigRow,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct PendingConsensus {
     pub consensus: Consensus,
     pub blockNum: BlockNum,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct JointConsensus {
     pub current: Consensus,
     pub next: Option<PendingConsensus>,
@@ -334,8 +357,6 @@ pub struct JointConsensus {
     Debug,
     Clone,
     Default,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -344,6 +365,7 @@ pub struct JointConsensus {
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct BlockHeaderCode {
     pub vmType: u8,
@@ -351,7 +373,7 @@ pub struct BlockHeaderCode {
     pub code: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
@@ -387,21 +409,21 @@ pub struct BlockHeader {
     authCode: Option<Vec<BlockHeaderCode>>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct SignedBlock {
     pub block: Block,
-    pub signature: Hex<Vec<u8>>,
+    pub signature: Vec<u8>,
     /// Additional signatures, where the consensus algorithm requires them.
-    pub auxConsensusData: Option<Hex<Vec<u8>>>,
+    pub auxConsensusData: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, Default, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct BlockInfo {
     pub header: BlockHeader,
     pub blockId: Checksum256,

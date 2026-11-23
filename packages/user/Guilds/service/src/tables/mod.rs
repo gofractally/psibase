@@ -12,10 +12,9 @@ mod role_map;
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{define_flags, AccountNumber, Memo};
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "GuildTable", index = 0)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct Guild {
         #[primary_key]
@@ -32,7 +31,7 @@ pub mod tables {
     }
 
     #[table(name = "RankingTable", index = 1)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Ranking {
         pub fractal: AccountNumber,
         pub guild: AccountNumber,
@@ -58,7 +57,7 @@ pub mod tables {
     }
 
     #[table(name = "GuildMemberTable", index = 2)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct GuildMember {
         #[graphql(skip)]
@@ -91,7 +90,7 @@ pub mod tables {
     }
 
     #[table(name = "GuildApplicationTable", index = 3)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct GuildApplication {
         #[graphql(skip)]
@@ -115,7 +114,7 @@ pub mod tables {
     }
 
     #[table(name = "GuildInviteTable", index = 4)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct GuildInvite {
         #[primary_key]
@@ -135,7 +134,7 @@ pub mod tables {
     }
 
     #[table(name = "GuildAttestTable", index = 5)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct GuildAttest {
         #[graphql(skip)]
@@ -159,7 +158,7 @@ pub mod tables {
     }
 
     #[table(name = "EvaluationInstanceTable", index = 6)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     #[graphql(complex)]
     pub struct EvaluationInstance {
         #[primary_key]
@@ -176,7 +175,7 @@ pub mod tables {
     }
 
     #[table(name = "RoleMapTable", index = 7)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct RoleMap {
         pub fractal: AccountNumber,
         pub role_id: u8,
@@ -191,7 +190,7 @@ pub mod tables {
     }
 
     #[table(name = "FractalSettingsTable", index = 8)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct FractalSettings {
         #[primary_key]
         pub fractal: AccountNumber,

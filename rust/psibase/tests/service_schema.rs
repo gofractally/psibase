@@ -168,7 +168,7 @@ fn an_action_view_gives_the_method_and_the_argument_bytes() {
     let bytes = psio::to_pssz(&action);
     let view = psio::PsszView::<Action>::new(&bytes).unwrap();
     assert_eq!(view.method().value().get(), action.method.value);
-    assert_eq!(view.rawData().bytes(), &action.rawData.0[..]);
+    assert_eq!(view.rawData().bytes(), &action.rawData[..]);
     let empty = Action { rawData: Vec::new().into(), ..action };
     let bytes = psio::to_pssz(&empty);
     let view = psio::PsszView::<Action>::new(&bytes).unwrap();

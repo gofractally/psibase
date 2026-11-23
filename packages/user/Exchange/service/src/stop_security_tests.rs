@@ -288,7 +288,7 @@ fn stop_opposed_maturity_calls_latch_both_directions_and_finish(chain: Chain) ->
             .collect::<Vec<_>>(),
     )
     .unwrap();
-    chain.start_block_after(Seconds::from_ticks(32 * 86400).to_unit().unwrap());
+    chain.start_block_after(Seconds::from_ticks(32 * 86400).into());
     super::metrics::measure(
         "stop_opposed_maturity",
         json!({"stop_prices":2,"loan_prices":2,"seed_atoms":0}),
@@ -634,7 +634,7 @@ fn stop_reversal_refunds_marketable_limit_remainder_without_posting_or_recursing
     Wrapper::push_from(&chain, account!("bob"))
         .stop(f.market, false, 101, 30_000_000)
         .get()?;
-    chain.start_block_after(Seconds::from_ticks(32 * 86400).to_unit().unwrap());
+    chain.start_block_after(Seconds::from_ticks(32 * 86400).into());
     let trader = account!("trader");
     let primary = |token| {
         chain

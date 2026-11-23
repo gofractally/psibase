@@ -1,4 +1,3 @@
-use crate::serialize_as_str;
 use custom_error::custom_error;
 
 use std::fmt;
@@ -23,6 +22,7 @@ custom_error! { pub MemoError
     psio::PsszUnpack,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(transparent)]
 pub struct Memo(#[psio(max = 80)] String);
@@ -70,4 +70,4 @@ impl From<&str> for Memo {
     }
 }
 
-serialize_as_str!(Memo, "memo");
+psio::async_graphql_scalar!(Memo, "Memo");

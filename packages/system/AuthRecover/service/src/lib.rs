@@ -3,27 +3,37 @@
 pub mod service {
     use async_graphql::SimpleObject;
     use psibase::*;
-    use serde::{Deserialize, Serialize};
+
     use services::{accounts, auth_sig::SubjectPublicKeyInfo, transact, verify_sig};
     use std::cell::RefCell;
 
     const RECOVERY_TIME: Seconds = Seconds::from_ticks(15 * 60);
 
-    #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct RecoveryKey {
         key: SubjectPublicKeyInfo,
         expiration: TimePointSec,
     }
 
     #[table(name = "AuthTable", index = 0)]
-    #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    #[graphql(complex)]
     pub struct AuthRow {
         #[primary_key]
         pub account: AccountNumber,
         pub pubkey: Option<SubjectPublicKeyInfo>,
+        #[graphql(skip)]
         pub key_fingerprint: Checksum256,
         pub recovery: AccountNumber,
         pub rkey: Option<RecoveryKey>,
+    }
+
+    /// In GraphQL the bytes are hex text, as in JSON.
+    #[async_graphql::ComplexObject]
+    impl AuthRow {
+        async fn key_fingerprint(&self) -> String {
+            psibase::to_hex(&self.key_fingerprint)
+        }
     }
 
     impl AuthRow {
@@ -48,7 +58,7 @@ pub mod service {
         let has_key = |key: &SubjectPublicKeyInfo| {
             claims
                 .iter()
-                .any(|claim| claim.service == verify_sig::SERVICE && claim.rawData.0 == key.0)
+                .any(|claim| claim.service == verify_sig::SERVICE && claim.rawData == key.0)
         };
         let row = AuthTable::read()
             .get_index_pk()
@@ -214,7 +224,7 @@ pub mod service {
         accounts::Wrapper::call().newAccount(
             account,
             get_service(),
-            accounts::NewAccountMode::REQUIRE_NEW,
+            accounts::NewAccountMode::RequireNew,
         );
         let key_fingerprint = sha256(&key.0);
         AuthTable::read_write()

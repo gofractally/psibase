@@ -15,7 +15,6 @@ mod service {
     use psibase::*;
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
-    use std::str::FromStr;
 
     #[derive(SimpleObject, Deserialize, Debug)]
     struct StatusUpdate {
@@ -74,7 +73,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<EventConnection<StatusUpdate>> {
-            let app = ExactAccountNumber::from_str(&app).unwrap();
+            let app = AccountNumber::from_exact(&app).unwrap();
             EventQuery::new("history.registry.appStatusChanged")
                 .condition(format!("app_account_id = '{}'", app))
                 .first(first)

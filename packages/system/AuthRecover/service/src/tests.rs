@@ -92,7 +92,7 @@ mod tests {
             .map(|key| {
                 let signature: Signature = key
                     .signing_key()
-                    .sign_prehash(&digest.0)
+                    .sign_prehash(&digest)
                     .map_err(Error::new)?;
                 Ok(signature.to_bytes().to_vec().into())
             })

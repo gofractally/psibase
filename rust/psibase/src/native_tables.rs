@@ -1,10 +1,8 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    AccountNumber, Action, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, Hex,
-    JointConsensus, MethodNumber, MicroSeconds, };
+    AccountNumber, Action, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, JointConsensus, MethodNumber, MicroSeconds, };
 use async_graphql::{InputObject, SimpleObject};
-use serde::{Deserialize, Serialize};
 
 pub type NativeTable = u16;
 pub type NativeIndex = u8;
@@ -44,7 +42,7 @@ pub fn status_key() -> (NativeTable, NativeIndex) {
     (STATUS_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct StatusRow {
     pub chainId: Checksum256,
     pub current: BlockHeader,
@@ -60,7 +58,7 @@ impl StatusRow {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct ConfigRow {
     pub maxKeySize: u32,
     pub maxValueSize: u32,
@@ -79,13 +77,12 @@ impl ConfigRow {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct VMOptions {
     max_mutable_global_bytes: u32,
@@ -97,13 +94,12 @@ pub struct VMOptions {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct WasmConfigRow {
     numExecutionMemories: u32,
@@ -117,7 +113,7 @@ impl WasmConfigRow {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct CodeRow {
     pub codeNum: AccountNumber,
     pub flags: u64,
@@ -138,13 +134,13 @@ impl CodeRow {
 }
 
 /// where code is actually stored, duplicate services are reused
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct CodeByHashRow {
     pub codeHash: Checksum256,
     pub vmType: u8,
     pub vmVersion: u8,
 
-    pub code: Hex<Vec<u8>>,
+    pub code: Vec<u8>,
 }
 
 impl CodeByHashRow {
@@ -160,7 +156,7 @@ impl CodeByHashRow {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct NotifyRow {
     #[serde(rename = "type")]
     type_: u32,
@@ -174,10 +170,10 @@ impl NotifyRow {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct BlockDataRow {
     pub blockId: Checksum256,
-    pub auxConsensusData: Option<Hex<Vec<u8>>>,
+    pub auxConsensusData: Option<Vec<u8>>,
 }
 
 impl BlockDataRow {
@@ -194,13 +190,12 @@ impl BlockDataRow {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct ConsensusChangeRow {
     pub start: BlockNum,
@@ -219,26 +214,26 @@ impl ConsensusChangeRow {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, PartialEq, Eq, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct StateChecksum {
     pub serviceRoot: Checksum256,
     pub nativeRoot: Checksum256,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct StateSignature {
     pub account: AccountNumber,
     pub claim: Claim,
-    pub rawData: Hex<Vec<u8>>,
+    pub rawData: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct SnapshotStateItem {
     pub state: StateChecksum,
     pub signatures: Vec<StateSignature>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct SnapshotRow {
     pub id: Checksum256,
     pub state: Option<SnapshotStateItem>,
@@ -255,13 +250,12 @@ impl SnapshotRow {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct ScheduledSnapshotRow {
     pub blockNum: BlockNum,
@@ -282,13 +276,12 @@ impl ScheduledSnapshotRow {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct LogTruncateRow {
     pub start: BlockNum,
@@ -304,13 +297,12 @@ impl LogTruncateRow {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(definition_will_not_change)]
 pub struct IPV4Address {
@@ -320,13 +312,12 @@ pub struct IPV4Address {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(definition_will_not_change)]
 pub struct IPV6Address {
@@ -334,7 +325,7 @@ pub struct IPV6Address {
     zone: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub enum IPAddress {
     IPV4Address(IPV4Address),
     IPV6Address(IPV6Address),
@@ -343,13 +334,12 @@ pub enum IPAddress {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(definition_will_not_change)]
 pub struct IPV4Endpoint {
@@ -360,13 +350,12 @@ pub struct IPV4Endpoint {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(definition_will_not_change)]
 pub struct IPV6Endpoint {
@@ -377,20 +366,19 @@ pub struct IPV6Endpoint {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(definition_will_not_change)]
 pub struct LocalEndpoint {
     path: psio::pssz::RawString,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub enum SocketEndpoint {
     IPV4Endpoint(IPV4Endpoint),
     IPV6Endpoint(IPV6Endpoint),
@@ -400,41 +388,40 @@ pub enum SocketEndpoint {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct TLSInfo {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct ProducerMulticastSocketInfo {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct LogSocketInfo {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct HttpSocketInfo {
     endpoint: Option<SocketEndpoint>,
     tls: Option<TLSInfo>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct HttpClientSocketInfo {
     endpoint: Option<SocketEndpoint>,
     tls: Option<TLSInfo>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct WebSocketInfo {
     endpoint: Option<SocketEndpoint>,
     tls: Option<TLSInfo>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct P2PSocketInfo {
     endpoint: Option<SocketEndpoint>,
     tls: Option<TLSInfo>,
@@ -442,7 +429,7 @@ pub struct P2PSocketInfo {
 
 /// What a socket is. The alternatives and their order are those of the
 /// C++ variant (`psibase/SocketInfo.hpp`).
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub enum SocketInfo {
     ProducerMulticastSocketInfo(ProducerMulticastSocketInfo),
     LogSocketInfo(LogSocketInfo),
@@ -452,7 +439,7 @@ pub enum SocketInfo {
     P2PSocketInfo(P2PSocketInfo),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct LogMessage {
     pub severity: u32,
     pub message: String,
@@ -468,7 +455,7 @@ impl LogMessage {
     pub const CRITICAL: u32 = 5;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct SocketRow {
     fd: i32,
     info: SocketInfo,
@@ -494,13 +481,12 @@ impl SocketRow {
     Copy,
     PartialEq,
     Eq,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(transparent)]
 #[repr(transparent)]
@@ -520,8 +506,6 @@ pub type RunToken = Vec<u8>;
     Copy,
     Clone,
     Debug,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -530,6 +514,7 @@ pub type RunToken = Vec<u8>;
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "ServiceMethodInput")]
 #[psio(custom = "ServiceMethod")]
@@ -547,13 +532,12 @@ impl ServiceMethod {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct RunRow {
     id: u64,
@@ -573,13 +557,12 @@ impl RunRow {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct EnvRow {
     pub name: psio::pssz::RawString,
@@ -596,13 +579,12 @@ impl EnvRow {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct HostConfigRow {
     pub hostVersion: String,
@@ -619,13 +601,12 @@ impl HostConfigRow {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct PendingShutdownRow {
     pub args: String,

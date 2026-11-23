@@ -1,4 +1,4 @@
-use crate::Hex;
+
 use async_graphql::connection::CursorType;
 
 /// A serialized key
@@ -29,10 +29,10 @@ impl psio::key::KeyPack for RawKey {
 impl CursorType for RawKey {
     type Error = &'static str;
     fn decode_cursor(s: &str) -> Result<Self, Self::Error> {
-        Ok(Self::new(s.parse::<Hex<Vec<u8>>>()?.0))
+        crate::from_hex(s).map(Self::new).ok_or("Hex conversion failed")
     }
     fn encode_cursor(&self) -> String {
-        Hex(self.data.as_slice()).to_string()
+        crate::to_hex(&self.data)
     }
 }
 

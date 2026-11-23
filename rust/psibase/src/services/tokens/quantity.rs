@@ -1,6 +1,5 @@
 use async_graphql::{InputObject, SimpleObject};
 
-use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
 use crate::services::tokens::{Precision, TokensError};
@@ -18,8 +17,6 @@ fn parse_u64_part(s: &str) -> Result<u64, TokensError> {
     Copy,
     Default,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     Ord,
@@ -32,6 +29,7 @@ fn parse_u64_part(s: &str) -> Result<u64, TokensError> {
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "QuantityInput")]
 pub struct Quantity {

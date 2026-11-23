@@ -139,8 +139,8 @@ pub mod service {
             psibase::services::http_server::SERVICE,
             "exchange::serveSys requires the native HTTP server"
         );
-        let target = request.target.to_str().unwrap_or_default();
-        let (path, query) = target.split_once('?').unwrap_or((target, ""));
+        let target = request.target.to_string_lossy();
+        let (path, query) = target.split_once('?').unwrap_or((&target, ""));
         let cors = supervisor_cors(&request, socket);
         let reply = |status, body, private| {
             json_reply(status, body, private).map(|mut response| {

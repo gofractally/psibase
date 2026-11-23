@@ -2,9 +2,8 @@
 mod tables {
     use async_graphql::SimpleObject;
 
-    use serde::{Deserialize, Serialize};
     #[table(name = "NetworkNameTable")]
-    #[derive(SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct NetworkName {
         pub name: String,
     }
@@ -56,7 +55,7 @@ mod service {
         let created = AuthDelegate::call().newAccount(
             account,
             SERVICE,
-            services::accounts::NewAccountMode::MATCH_EXISTING,
+            services::accounts::NewAccountMode::MatchExisting,
         );
         if !created {
             HttpServer::call_as(account).clearRedirect();

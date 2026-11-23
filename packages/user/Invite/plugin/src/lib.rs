@@ -103,7 +103,7 @@ fn prepare_new_invite_impl(
     };
 
     let fingerprint = psibase::sha256(&host::crypto::to_der(&keypair.public_key)?)
-        .0
+
         .to_vec();
 
     let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;

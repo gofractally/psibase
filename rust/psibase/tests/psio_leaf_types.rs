@@ -408,14 +408,21 @@ fn method_numbers_are_psios() {
 // ── The serde forms ─────────────────────────────────────────────────────────
 
 #[test]
-fn the_serde_forms_in_use_are_unchanged() {
-    // serde, which the services and the CLI use, still reads leniently.
+fn serde_reads_and_writes_psio_s_text() {
+    // serde (HTTP handlers, the CLI, plugins) is PSIO's text: exactly one
+    // text names an account, as in `from_ijson`.
+    assert!(serde_json::from_str::<AccountNumber>(r#""Alice""#).is_err());
+    assert!(serde_json::from_str::<AccountNumber>(r#"5"#).is_err());
     assert_eq!(
-        serde_json::from_str::<AccountNumber>(r#""Alice""#).unwrap(),
+        serde_json::from_str::<AccountNumber>(r#""alice""#).unwrap(),
         account("alice")
     );
     assert_eq!(
         serde_json::to_string(&account("alice")).unwrap(),
         r#""alice""#
     );
+    assert_eq!(serde_json::to_string(&account("alice")).unwrap(), psio::to_ijson(&account("alice")));
+    // A method number that compresses is written lower case; every spelling is read.
+    assert_eq!(serde_json::to_string(&method("setCode")).unwrap(), r#""setcode""#);
+    assert_eq!(serde_json::from_str::<MethodNumber>(r#""setCode""#).unwrap(), method("setCode"));
 }

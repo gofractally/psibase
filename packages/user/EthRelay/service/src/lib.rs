@@ -2,12 +2,11 @@
 //! sequentially. BLS, SSZ, RLP and MPT are verified by verify-eth proofs first.
 use ethrelay_core as eth;
 use psibase::*;
-use serde::{Deserialize, Serialize};
 #[psibase::service_tables]
 pub mod tables {
     use super::*;
     #[table(name = "RelayTable", index = 0)]
-    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Relay {
         pub network: String,
         pub network_hash: String,
@@ -29,7 +28,7 @@ pub mod tables {
         fn pk(&self) {}
     }
     #[table(name = "HeaderTable", index = 1)]
-    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Header {
         #[primary_key]
         pub hash: String,
@@ -39,7 +38,7 @@ pub mod tables {
         pub receipts_root: String,
     }
     #[table(name = "RingTable", index = 2)]
-    #[derive(Clone, Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Clone, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Ring {
         #[primary_key]
         pub index: u32,
@@ -86,7 +85,7 @@ pub fn evidence(fact_json: &str) -> eth::Fact {
     assert!(
         trx.claims
             .iter()
-            .any(|c| c.service == account!("verify-eth") && c.rawData.0.as_slice() == expected),
+            .any(|c| c.service == account!("verify-eth") && c.rawData.as_slice() == expected),
         "Missing verified Ethereum evidence claim"
     );
     fact

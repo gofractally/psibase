@@ -11,18 +11,16 @@ pub const PRODUCER_ACCOUNT_STRONG: AccountNumber = account!("producers+3");
 mod service {
     use crate::{services::transact::ServiceMethod, AccountNumber, Claim, ConsensusData, Producer};
 
-    use serde::{Deserialize, Serialize};
 
     #[derive(
         Debug,
         Clone,
-        Serialize,
-        Deserialize,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct CandidateInfo {
         pub account: AccountNumber,

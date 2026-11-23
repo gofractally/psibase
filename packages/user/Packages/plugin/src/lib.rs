@@ -92,7 +92,9 @@ impl From<types::PackageInfo> for psibase::PackageInfo {
                 .map(|a| a.parse().unwrap())
                 .collect(),
             exports: value.exports.into_iter().map(|e| e.into()).collect(),
-            sha256: value.sha256.parse().unwrap(),
+            sha256: psibase::from_hex(&value.sha256)
+                .and_then(|bytes| bytes.try_into().ok())
+                .unwrap(),
             file: value.file,
         }
     }
@@ -109,7 +111,7 @@ impl From<psibase::PackageInfo> for types::PackageInfo {
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
             services: value.services.into_iter().map(|a| a.to_string()).collect(),
             exports: value.exports.into_iter().map(|e| e.into()).collect(),
-            sha256: value.sha256.to_string(),
+            sha256: psibase::to_hex(&value.sha256),
             file: value.file,
         }
     }
@@ -570,9 +572,9 @@ impl PrivateApi for PackagesPlugin {
                 let data =
                     psio::from_pssz::<SitesService::action_structs::storeSys>(&action.rawData).unwrap();
                 let file = Sites::File {
-                    path: String::from_utf8_lossy(data.path.as_bytes()).into_owned(),
+                    path: data.path.to_string_lossy().into_owned(),
                     content_type: data.contentType,
-                    content: data.content.0,
+                    content: data.content,
                 };
                 if let Some(encoding) = data.contentEncoding {
                     Sites::upload_encoded(&file, &encoding).unwrap()
@@ -586,7 +588,7 @@ impl PrivateApi for PackagesPlugin {
                     psio::from_pssz::<SetCodeService::action_structs::stageCode>(&action.rawData).unwrap();
                 assert!(data.vmType == 0);
                 assert!(data.vmVersion == 0);
-                SetCode::stage_service_code(&data.service.to_string(), data.id, &data.code.0)
+                SetCode::stage_service_code(&data.service.to_string(), data.id, &data.code)
             }
         }
     }
@@ -624,7 +626,7 @@ impl From<Action> for transact::plugin::types::Action {
             sender: action.sender.to_string(),
             service: action.service.to_string(),
             method: action.method.to_string(),
-            raw_data: action.rawData.0,
+            raw_data: action.rawData,
         }
     }
 }

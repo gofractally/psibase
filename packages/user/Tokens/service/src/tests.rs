@@ -632,7 +632,7 @@ mod tests {
         chain: &psibase::Chain,
         token_id: u32,
     ) -> Result<Option<Checksum256>, psibase::Error> {
-        #[derive(serde::Deserialize)]
+        #[derive(psio::JsonText, psio::Serde)]
         #[serde(rename_all = "camelCase")]
         struct TokenIcon {
             icon_hash: Option<Checksum256>,
@@ -695,7 +695,7 @@ mod tests {
         let reply = chain.get(Wrapper::SERVICE, &target)?;
         assert_eq!(reply.status, 200);
         assert_eq!(reply.contentType, "image/png");
-        assert_eq!(reply.body.0, icon);
+        assert_eq!(reply.body, icon);
 
         assert_eq!(get_icon_hash(&chain, tid)?, Some(sha256(&icon)));
 

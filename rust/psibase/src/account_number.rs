@@ -1,4 +1,3 @@
-use crate::{serialize_as_str};
 use custom_error::custom_error;
 use psibase_names::{account_number_from_str, account_number_to_string};
 pub use psibase_names::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
@@ -35,16 +34,20 @@ custom_error! { pub AccountNumberError
     psio::PsszView,
     psio::ToPsszSchema,
     psio::Key,
+    psio::Serde,
 )]
 #[psio(definition_will_not_change, custom = "AccountNumber")]
 pub struct AccountNumber {
     pub value: u64,
 }
 
-serialize_as_str!(AccountNumber, "account number");
-
 /// The text of an account is its name. Exactly one text names each account,
-/// the one [`Display`](std::fmt::Display) writes; any other text is not a value.
+/// the one [`Display`](std::fmt::Display) writes; any other text is not a
+/// value. This is the account's text wherever PSIO reads or writes it: JSON
+/// (also through serde), GraphQL, schema-driven JSON. [`FromStr`] is the
+/// lenient conversion services use (text that names no account is the null
+/// account); where text typed by a person must name an account, use
+/// [`AccountNumber::from_exact`].
 impl psio::json::TextForm for AccountNumber {
     fn to_text(&self, out: &mut String) {
         out.push_str(&account_number_to_string(self.value));
@@ -54,6 +57,7 @@ impl psio::json::TextForm for AccountNumber {
     }
 }
 psio::json_text_form!(AccountNumber);
+psio::async_graphql_scalar!(AccountNumber, "AccountNumber");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Subaccount(pub u8);
@@ -109,12 +113,6 @@ impl From<u64> for AccountNumber {
     }
 }
 
-impl From<ExactAccountNumber> for AccountNumber {
-    fn from(n: ExactAccountNumber) -> Self {
-        AccountNumber { value: n.value }
-    }
-}
-
 impl FromStr for AccountNumber {
     type Err = ParseIntError;
 
@@ -126,49 +124,6 @@ impl FromStr for AccountNumber {
 }
 
 impl std::fmt::Display for AccountNumber {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(account_number_to_string(self.value).as_str())
-    }
-}
-
-/// Like AccountNumber, except FromStr and deserializing JSON require exact round-trip conversion
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::Key)]
-#[psio(definition_will_not_change)]
-pub struct ExactAccountNumber {
-    pub value: u64,
-}
-
-serialize_as_str!(ExactAccountNumber, "account number");
-
-impl ExactAccountNumber {
-    pub fn new(value: u64) -> Self {
-        ExactAccountNumber { value }
-    }
-}
-
-impl From<u64> for ExactAccountNumber {
-    fn from(n: u64) -> Self {
-        ExactAccountNumber { value: n }
-    }
-}
-
-impl From<AccountNumber> for ExactAccountNumber {
-    fn from(n: AccountNumber) -> Self {
-        ExactAccountNumber { value: n.value }
-    }
-}
-
-impl FromStr for ExactAccountNumber {
-    type Err = AccountNumberError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(ExactAccountNumber {
-            value: AccountNumber::from_exact(s)?.value,
-        })
-    }
-}
-
-impl std::fmt::Display for ExactAccountNumber {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(account_number_to_string(self.value).as_str())
     }

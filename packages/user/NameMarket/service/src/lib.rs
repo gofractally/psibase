@@ -14,10 +14,9 @@ pub mod tables {
     use psibase::services::tokens::Quantity;
     use psibase::AccountNumber;
 
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -25,7 +24,7 @@ pub mod tables {
     }
 
     #[table(name = "AuctionsTable", index = 1)]
-    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Auction {
         #[primary_key]
         pub length: u8,
@@ -35,7 +34,7 @@ pub mod tables {
     }
 
     #[table(name = "PurchasedAccountsTable", index = 2)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct PurchasedAccount {
         #[primary_key]
         pub account: AccountNumber,
@@ -160,7 +159,7 @@ pub mod service {
         AuthDelegate::Wrapper::call().newAccount(
             account,
             get_service(),
-            Accounts::NewAccountMode::REQUIRE_NEW,
+            Accounts::NewAccountMode::RequireNew,
         );
 
         PurchasedAccountsTable::new()

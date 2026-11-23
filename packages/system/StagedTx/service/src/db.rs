@@ -2,15 +2,14 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{AccountNumber, Action, Checksum256, TimePointUSec};
-    use serde::{Deserialize, Serialize};
 
-    #[derive(Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct ActionList {
         pub actions: Vec<Action>,
     }
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -19,7 +18,8 @@ pub mod tables {
 
     /// A table that contains all of the transactions currently staged.
     #[table(name = "StagedTxTable", index = 1)]
-    #[derive(Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
+    #[graphql(complex)]
     pub struct StagedTx {
         /// Unique ID for a staged transaction
         pub id: u32,
@@ -27,6 +27,7 @@ pub mod tables {
         /// A unique ID for a staged transaction that can be computed client-side
         ///   by fracpacking a tuple containing (id, proposed block number, vec<action>) and
         ///   then computing the sha256 of the result.
+        #[graphql(skip)]
         pub txid: Checksum256,
 
         /// The block number at which the staged transaction was proposed
@@ -45,6 +46,14 @@ pub mod tables {
         /// as it has enough approvals
         pub auto_exec: bool,
     }
+
+    /// In GraphQL the bytes are hex text, as in JSON.
+    #[async_graphql::ComplexObject]
+    impl StagedTx {
+        async fn txid(&self) -> String {
+            psibase::to_hex(&self.txid)
+        }
+    }
     impl StagedTx {
         #[primary_key]
         fn by_id(&self) -> u32 {
@@ -58,7 +67,7 @@ pub mod tables {
     }
 
     #[table(name = "LastUsedTable", index = 2)]
-    #[derive(Default, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct LastUsed {
         pub id: u32,
     }
@@ -69,7 +78,7 @@ pub mod tables {
 
     /// A table that contains all of the responses to staged transactions.
     #[table(name = "ResponseTable", index = 3)]
-    #[derive(Debug, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Response {
         /// The ID of the staged transaction
         pub id: u32,
@@ -102,7 +111,7 @@ pub mod tables {
     /// Table can be used to search for all parties in a staged transaction, or all
     /// staged transactions related to a given party.
     #[table(name = "StagedTxPartyTable", index = 4)]
-    #[derive(Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct StagedTxParty {
         /// The ID of the staged transaction
         pub id: u32,
@@ -177,7 +186,7 @@ pub mod impls {
                 .expect("Unknown staged tx");
             assert_eq!(
                 staged_tx.txid,
-                txid.into(),
+                txid,
                 "specified txid must match staged tx txid",
             );
 

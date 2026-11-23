@@ -1,47 +1,175 @@
-use anyhow::anyhow;
-use async_graphql::{scalar, InputObject, SimpleObject};
+use async_graphql::{InputObject, SimpleObject};
 
-use pem::{encode, parse, Pem};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
-#[psio(transparent)]
+/// A public key: the DER bytes of an X.509 SubjectPublicKeyInfo.
+///
+/// Wherever it is packed it is its bytes (`transparent`); they are not
+/// parsed when a key is unpacked. Its text, which is its JSON (also through
+/// serde and in GraphQL), is the PEM armor of the bytes:
+/// `-----BEGIN PUBLIC KEY-----`, base64 in lines of 64 characters,
+/// `-----END PUBLIC KEY-----`, each line ended by a line feed. White space
+/// around the armor and inside the body is ignored when text is read. Text
+/// is a key when it is that armor around base64 of bytes shaped
+/// `SEQUENCE { SEQUENCE { OBJECT IDENTIFIER … }, BIT STRING }`; the
+/// algorithm and the key material are not examined (C++
+/// `SystemService::AuthSig::SubjectPublicKeyInfo`, the authority).
+#[derive(Debug, Clone, PartialEq, Eq, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::Serde)]
+#[psio(transparent, custom = "SubjectPublicKeyInfo")]
 pub struct SubjectPublicKeyInfo(pub Vec<u8>);
-scalar!(SubjectPublicKeyInfo);
+
+impl psio::json::TextForm for SubjectPublicKeyInfo {
+    fn to_text(&self, out: &mut String) {
+        pem::encode(&self.0, out);
+    }
+    fn from_text(text: &str) -> Option<Self> {
+        let der = pem::decode(text)?;
+        pem::has_subject_public_key_info_shape(&der).then_some(SubjectPublicKeyInfo(der))
+    }
+}
+psio::json_text_form!(SubjectPublicKeyInfo);
+psio::async_graphql_scalar!(SubjectPublicKeyInfo, "SubjectPublicKeyInfo");
+
+impl std::fmt::Display for SubjectPublicKeyInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut text = String::new();
+        psio::json::TextForm::to_text(self, &mut text);
+        f.write_str(&text)
+    }
+}
 
 impl std::str::FromStr for SubjectPublicKeyInfo {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let pem = parse(s)?;
-        if pem.tag() != "PUBLIC KEY" {
-            return Err(anyhow!("Expected public key"));
-        }
-        Ok(SubjectPublicKeyInfo(pem.contents().to_vec()))
+        <Self as psio::json::TextForm>::from_text(s)
+            .ok_or_else(|| anyhow::anyhow!("SubjectPublicKeyInfo: not a PEM encoded public key"))
     }
 }
 
-impl Serialize for SubjectPublicKeyInfo {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let pem = Pem::new("PUBLIC KEY", self.0.clone());
-        let pem_string = encode(&pem);
-        serializer.serialize_str(&pem_string)
-    }
-}
+/// The PEM armor of a public key and the outer shape of its DER bytes, as
+/// C++ `psibase/pem.hpp` defines them.
+mod pem {
+    const LABEL: &str = "PUBLIC KEY";
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-impl<'de> Deserialize<'de> for SubjectPublicKeyInfo {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let pem_string: String = Deserialize::deserialize(deserializer)?;
-        let pem = parse(&pem_string).map_err(serde::de::Error::custom)?;
-        if pem.tag() != "PUBLIC KEY" {
-            return Err(serde::de::Error::custom("Expected a PUBLIC KEY PEM"));
+    pub fn encode(der: &[u8], out: &mut String) {
+        let mut body = String::with_capacity(der.len().div_ceil(3) * 4);
+        for chunk in der.chunks(3) {
+            let n = (chunk[0] as u32) << 16
+                | (*chunk.get(1).unwrap_or(&0) as u32) << 8
+                | *chunk.get(2).unwrap_or(&0) as u32;
+            for i in 0..4 {
+                if i <= chunk.len() {
+                    body.push(ALPHABET[(n >> (18 - 6 * i) & 0x3f) as usize] as char);
+                } else {
+                    body.push('=');
+                }
+            }
         }
-        Ok(SubjectPublicKeyInfo(pem.contents().to_vec()))
+        out.push_str("-----BEGIN ");
+        out.push_str(LABEL);
+        out.push_str("-----\n");
+        for line in body.as_bytes().chunks(64) {
+            out.push_str(std::str::from_utf8(line).unwrap());
+            out.push('\n');
+        }
+        out.push_str("-----END ");
+        out.push_str(LABEL);
+        out.push_str("-----\n");
+    }
+
+    fn is_space(c: char) -> bool {
+        matches!(c, ' ' | '\t' | '\r' | '\n')
+    }
+
+    pub fn decode(text: &str) -> Option<Vec<u8>> {
+        let text = text.trim_matches(is_space);
+        let text = text.strip_prefix("-----BEGIN ")?.strip_prefix(LABEL)?.strip_prefix("-----")?;
+        let end = text.find('-')?;
+        let body: Vec<u8> = text[..end].bytes().filter(|b| !is_space(*b as char)).collect();
+        let rest = text[end..].strip_prefix("-----END ")?.strip_prefix(LABEL)?.strip_prefix("-----")?;
+        if !rest.is_empty() || body.len() % 4 != 0 {
+            return None;
+        }
+        let mut digits = &body[..];
+        for _ in 0..2 {
+            if let Some(shorter) = digits.strip_suffix(b"=") {
+                digits = shorter;
+            }
+        }
+        let mut bytes = Vec::with_capacity(digits.len() / 4 * 3 + 2);
+        let (mut bits, mut count) = (0u32, 0u32);
+        for &c in digits {
+            let value = ALPHABET.iter().position(|&a| a == c)? as u32;
+            bits = bits << 6 | value;
+            count += 6;
+            if count >= 8 {
+                count -= 8;
+                bytes.push((bits >> count) as u8);
+                bits &= (1 << count) - 1;
+            }
+        }
+        // What is left is padding: fewer than six bits, all zero.
+        (count < 6 && bits == 0).then_some(bytes)
+    }
+
+    /// One DER element with a definite length: its tag and its content;
+    /// `input` is left after it.
+    fn read_der<'a>(input: &mut &'a [u8]) -> Option<(u8, &'a [u8])> {
+        let bytes = *input;
+        if bytes.len() < 2 {
+            return None;
+        }
+        let tag = bytes[0];
+        // A multi-byte tag number does not occur in a SubjectPublicKeyInfo.
+        if tag & 0x1f == 0x1f {
+            return None;
+        }
+        let mut pos = 2;
+        let mut length = bytes[1] as usize;
+        if length & 0x80 != 0 {
+            let count = length & 0x7f;
+            // 0x80 is the indefinite form, which DER does not have.
+            if count == 0 || count > std::mem::size_of::<usize>() || bytes.len() - pos < count {
+                return None;
+            }
+            length = 0;
+            for _ in 0..count {
+                length = length << 8 | bytes[pos] as usize;
+                pos += 1;
+            }
+        }
+        if bytes.len() - pos < length {
+            return None;
+        }
+        *input = &bytes[pos + length..];
+        Some((tag, &bytes[pos..pos + length]))
+    }
+
+    pub fn has_subject_public_key_info_shape(der: &[u8]) -> bool {
+        const SEQUENCE: u8 = 0x30;
+        const OID: u8 = 0x06;
+        const BIT_STRING: u8 = 0x03;
+        let shape = || -> Option<bool> {
+            let mut der = der;
+            let (tag, mut members) = read_der(&mut der)?;
+            if tag != SEQUENCE || !der.is_empty() {
+                return None;
+            }
+            let (tag, mut algorithm) = read_der(&mut members)?;
+            if tag != SEQUENCE {
+                return None;
+            }
+            let (tag, key) = read_der(&mut members)?;
+            if tag != BIT_STRING || !members.is_empty() {
+                return None;
+            }
+            let (tag, id) = read_der(&mut algorithm)?;
+            if tag != OID || id.is_empty() {
+                return None;
+            }
+            // The first byte of a BIT STRING counts the unused bits of its last byte.
+            Some(!key.is_empty() && key[0] <= 7)
+        };
+        shape().unwrap_or(false)
     }
 }
 
@@ -54,8 +182,6 @@ impl From<Vec<u8>> for SubjectPublicKeyInfo {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -63,6 +189,7 @@ impl From<Vec<u8>> for SubjectPublicKeyInfo {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "AuthRecord")]
 /// A record containing the authorization claims needed for an account using this auth service.

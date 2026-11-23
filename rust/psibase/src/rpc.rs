@@ -129,7 +129,7 @@ impl TraceFormat {
             _ => {}
         }
         if let Some(e) = &trace.error {
-            let e = String::from_utf8_lossy(e.as_bytes());
+            let e = e.to_string_lossy();
             if !e.is_empty() {
                 let message = match self {
                     TraceFormat::Error => e.to_string(),

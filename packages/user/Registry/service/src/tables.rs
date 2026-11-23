@@ -2,21 +2,19 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{AccountNumber};
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "AppMetadataTable", index = 0)]
     #[derive(
         Default,
         Debug,
         Clone,
-        Serialize,
         SimpleObject,
-        Deserialize,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     #[serde(rename_all = "camelCase")]
     #[graphql(complex)]
@@ -49,7 +47,7 @@ pub mod tables {
     }
 
     #[table(name = "NextIdTable", index = 1)]
-    #[derive(Default, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct NextId {
         pub id: u32,
     }
@@ -100,8 +98,6 @@ pub mod tables {
     #[derive(
         Debug,
         Clone,
-        Serialize,
-        Deserialize,
         SimpleObject,
         PartialEq,
         psio::PsszPack,
@@ -109,6 +105,7 @@ pub mod tables {
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct TagRecord {
         /// The unique identifier for the tag
@@ -137,7 +134,7 @@ pub mod tables {
     /// This table maps apps to their tags
     /// One AppTag record per app-tag pair
     #[table(name = "AppTagsTable", index = 3)]
-    #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, Clone, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct AppTag {
         /// The unique identifier for the app
         pub app_id: AccountNumber,

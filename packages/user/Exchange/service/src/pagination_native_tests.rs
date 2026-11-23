@@ -557,7 +557,7 @@ fn pagination_native_asset_union_skips_duplicate_pending_recipients(
                     psibase::services::accounts::Wrapper::pack().newAccount(
                         owner,
                         account!("auth-any"),
-                        psibase::services::accounts::NewAccountMode::KEEP_EXISTING,
+                        psibase::services::accounts::NewAccountMode::KeepExisting,
                     ),
                     Tokens::pack_from(alice).credit(f.base, owner, 1_u64.into(), "".into()),
                 ]

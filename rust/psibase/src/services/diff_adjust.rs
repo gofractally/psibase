@@ -43,20 +43,18 @@ pub mod Service {
     use crate::{AccountNumber, TimePointSec};
 
     use async_graphql::SimpleObject;
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "RateLimitTable", index = 0)]
     #[derive(
         Default,
         SimpleObject,
-        Serialize,
-        Deserialize,
         Debug,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct RateLimit {
         #[primary_key]

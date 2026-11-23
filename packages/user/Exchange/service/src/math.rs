@@ -8,13 +8,12 @@ pub const MAX_PRICE: u64 = (1 << 32) - 1;
     Clone,
     Copy,
     Debug,
-    serde::Serialize,
-    serde::Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct Wide {
     pub lo: u64,

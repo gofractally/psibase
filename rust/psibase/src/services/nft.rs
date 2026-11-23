@@ -1,6 +1,5 @@
 use async_graphql::{InputObject, SimpleObject};
 
-use serde::{Deserialize, Serialize};
 
 use crate::AccountNumber;
 
@@ -10,8 +9,6 @@ pub type NID = u32;
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -19,6 +16,7 @@ pub type NID = u32;
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "NftRecordInput")]
 pub struct Nft {
@@ -31,8 +29,6 @@ pub struct Nft {
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -40,6 +36,7 @@ pub struct Nft {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "NftHolderRecordInput")]
 pub struct NftHolderRecord {
@@ -51,8 +48,6 @@ pub struct NftHolderRecord {
     Debug,
     Copy,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -60,6 +55,7 @@ pub struct NftHolderRecord {
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "CreditRecordInput")]
 pub struct CreditRecord {

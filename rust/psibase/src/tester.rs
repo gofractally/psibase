@@ -311,13 +311,11 @@ impl Chain {
                 self.kv_put(DbId::NativeSubjective, &key, &code_by_hash_row);
 
                 if let Some(server) = &info.server {
-                    let body: Vec<u8> =
-                        serde_json::to_string(&services::x_http::RegisterServerRequest {
-                            service: *account,
-                            server: *server,
-                        })
-                        .unwrap()
-                        .into();
+                    let body: Vec<u8> = psio::to_ijson(&services::x_http::RegisterServerRequest {
+                        service: *account,
+                        server: *server,
+                    })
+                    .into();
                     let req = HttpRequest {
                         host: services::x_http::SERVICE.to_string() + "." + root_host,
                         method: "POST".to_string(),
@@ -350,13 +348,10 @@ impl Chain {
             requests.push(HttpRequest {
                 host: services::x_packages::SERVICE.to_string() + "." + root_host,
                 method: "PUT".to_string(),
-                target: format!("/manifest/{}", package.hash()).into(),
+                target: format!("/manifest/{}", crate::to_hex(package.hash())).into(),
                 contentType: "application/json".to_string(),
                 headers: vec![],
-                body: serde_json::to_string(&package.manifest())
-                    .unwrap()
-                    .into_bytes()
-                    .into(),
+                body: psio::to_ijson(&package.manifest()).into_bytes(),
             });
             requests.push(HttpRequest {
                 host: services::x_packages::SERVICE.to_string() + "." + root_host,
@@ -364,12 +359,7 @@ impl Chain {
                 target: "/postinstall".to_string().into(),
                 contentType: "application/json".to_string(),
                 headers: vec![],
-                body: serde_json::to_string(
-                    &package.meta().info(package.hash().clone(), String::new()),
-                )
-                .unwrap()
-                .into_bytes()
-                .into(),
+                body: psio::to_ijson(&crate::LocalPackageInfo::from(&package)).into_bytes(),
             });
         }
         assert!(
@@ -382,7 +372,7 @@ impl Chain {
                 panic!(
                     "{} {} failed: {}",
                     request.method,
-                    String::from_utf8_lossy(request.target.as_bytes()),
+                    request.target.to_string_lossy(),
                     reply.text().unwrap()
                 );
             }
@@ -650,7 +640,7 @@ impl Chain {
             .newAccount(
                 account,
                 AccountNumber::new(account_raw!("auth-any")),
-                services::accounts::NewAccountMode::KEEP_EXISTING,
+                services::accounts::NewAccountMode::KeepExisting,
             )
             .get()?;
         Ok(())
@@ -1133,9 +1123,9 @@ impl<T: psio::pssz::PsszPack<psio::Pssz> + psio::pssz::PsszUnpack<psio::Pssz>> C
                 if debug {
                     println!(
                         ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
-                        at.action.method, at.raw_retval
+                        at.action.method, crate::to_hex(&at.raw_retval)
                     );
-                    println!(">>> ChainResult::get - Unpacking ret: `{}`", ret);
+                    println!(">>> ChainResult::get - Unpacking ret: `{}`", crate::to_hex(&ret));
                 }
                 let unpacked_ret = psio::from_pssz::<T>(ret)?;
                 return Ok(unpacked_ret);

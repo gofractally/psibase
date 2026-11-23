@@ -164,7 +164,7 @@ pub fn get_initial_actions<
                 builder.push(accounts::Wrapper::pack().newAccount(
                     *account,
                     auth_delegate::SERVICE,
-                    accounts::NewAccountMode::MATCH_EXISTING,
+                    accounts::NewAccountMode::MatchExisting,
                 ))?
             }
         }
@@ -196,7 +196,7 @@ pub fn get_initial_actions<
     builder.push(accounts::Wrapper::pack().newAccount(
         initial_producer,
         auth_any::SERVICE,
-        accounts::NewAccountMode::KEEP_EXISTING,
+        accounts::NewAccountMode::KeepExisting,
     ))?;
 
     if let Some(key) = tx_signing_key {
@@ -209,7 +209,7 @@ pub fn get_initial_actions<
     builder.push(accounts::Wrapper::pack().newAccount(
         producers::ROOT,
         auth_delegate::SERVICE,
-        accounts::NewAccountMode::REQUIRE_NEW,
+        accounts::NewAccountMode::RequireNew,
     ))?;
     builder.push(
         auth_delegate::Wrapper::pack_from(producers::ROOT)

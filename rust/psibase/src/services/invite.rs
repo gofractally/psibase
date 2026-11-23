@@ -2,13 +2,10 @@ pub use crate::services::auth_sig::SubjectPublicKeyInfo;
 use crate::AccountNumber;
 use async_graphql::{InputObject, SimpleObject};
 
-use serde::{Deserialize, Serialize};
 
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
     psio::PsszPack,
@@ -16,6 +13,7 @@ use serde::{Deserialize, Serialize};
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[graphql(input_name = "InviteRecordInput")]
 /// An invite object

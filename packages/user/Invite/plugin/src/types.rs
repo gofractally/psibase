@@ -28,7 +28,7 @@ pub struct FixedDetails {
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+#[derive(psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct CurrentDetailsResponse {
     pub numAccounts: u16,
 }

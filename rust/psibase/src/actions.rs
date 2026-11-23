@@ -26,7 +26,7 @@ pub fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Acti
     accounts::Wrapper::pack_from(sender).newAccount(
         account,
         account!("auth-any"),
-        accounts::NewAccountMode::KEEP_EXISTING,
+        accounts::NewAccountMode::KeepExisting,
     )
 }
 
@@ -36,7 +36,7 @@ pub fn new_account_key_action(
     key: &AnyPublicKey,
 ) -> Action {
     if key.key.service == verify_sig::SERVICE {
-        auth_sig::Wrapper::pack_from(sender).newAccount(account, key.key.rawData.0.clone().into())
+        auth_sig::Wrapper::pack_from(sender).newAccount(account, key.key.rawData.clone().into())
     } else {
         panic!("unknown verify service {}", key.key.service)
     }
@@ -50,7 +50,7 @@ pub fn new_account_owned_action(
     auth_delegate::Wrapper::pack_from(sender).newAccount(
         account,
         owner,
-        accounts::NewAccountMode::MATCH_EXISTING,
+        accounts::NewAccountMode::MatchExisting,
     )
 }
 

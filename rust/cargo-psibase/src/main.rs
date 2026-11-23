@@ -10,7 +10,7 @@ use futures::{
     stream::FuturesUnordered,
     Future, StreamExt,
 };
-use psibase::{ExactAccountNumber, PackageInfo};
+use psibase::{AccountNumber, PackageInfo};
 use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, File};
@@ -98,7 +98,8 @@ struct SigArgs {
 
     /// Stages transactions instead of executing them immediately
     #[clap(long, value_name = "ACCOUNT")]
-    proposer: Option<ExactAccountNumber>,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    proposer: Option<AccountNumber>,
 }
 
 #[derive(Parser, Debug)]
@@ -118,7 +119,8 @@ struct InstallCommand {
     /// Sender to use for installing. The packages and all accounts
     /// that they create will be owned by this account.
     #[clap(short = 'S', long, value_name = "SENDER")]
-    sender: Option<ExactAccountNumber>,
+    #[arg(value_parser = AccountNumber::from_exact)]
+    sender: Option<AccountNumber>,
 
     /// Configure compression level for package file uploads
     /// (1=fastest, 11=most compression)
@@ -1071,7 +1073,7 @@ async fn test(
 
         // Write a package index specific to the crate
         let index_file = out_dir.join(package.name.clone() + "-index.json");
-        serde_json::to_writer(File::create(&index_file)?, &index)?;
+        std::fs::write(&index_file, psio::to_ijson(&index))?;
         test_info.push((package, index_file));
     }
 

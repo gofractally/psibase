@@ -1,5 +1,4 @@
 
-use serde::{Deserialize, Serialize};
 
 use crate as psibase;
 
@@ -7,12 +6,11 @@ use crate as psibase;
     Debug,
     Clone,
     Copy,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(transparent)]
 pub struct EventDb(u8);

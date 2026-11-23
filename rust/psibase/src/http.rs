@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{AccountNumber, Hex};
+use crate::{AccountNumber};
 use anyhow::anyhow;
 use percent_encoding::percent_decode;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -17,14 +17,13 @@ use std::collections::HashMap;
     PartialEq,
     Eq,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
 #[psio(definition_will_not_change)]
 pub struct HttpHeader {
@@ -48,7 +47,7 @@ impl HttpHeader {
 }
 
 /// HTTP Status codes
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u16)]
 pub enum HttpStatus {
     Ok = 200,
@@ -76,13 +75,12 @@ pub enum HttpStatus {
     PartialEq,
     Eq,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct HttpRequest {
     /// Fully-qualified domain name
@@ -101,17 +99,18 @@ pub struct HttpRequest {
     pub headers: Vec<HttpHeader>,
 
     /// Request body, e.g. POST data
-    pub body: Hex<Vec<u8>>,
+    pub body: Vec<u8>,
 }
 
 impl HttpRequest {
     pub fn path<'a>(&'a self) -> Cow<'a, str> {
+        // Borrowed from the request: a target that is not UTF-8 has no path.
         let target = self.target.to_str().unwrap_or_default();
         let encoded = target.split_once('?').map_or(target, |s| s.0);
         return percent_decode(encoded.as_bytes()).decode_utf8_lossy();
     }
     pub fn query(&self) -> HashMap<String, String> {
-        let target = self.target.to_str().unwrap_or_default();
+        let target = self.target.to_string_lossy();
         let encoded = target.split_once('?').map_or("", |s| s.1);
         return form_urlencoded::parse(encoded.as_bytes())
             .into_owned()
@@ -127,7 +126,7 @@ impl HttpRequest {
 
 pub struct HttpBody {
     pub contentType: String,
-    pub body: Hex<Vec<u8>>,
+    pub body: Vec<u8>,
 }
 
 impl HttpBody {
@@ -154,13 +153,12 @@ impl HttpBody {
     PartialEq,
     Eq,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct HttpReply {
     pub status: u16,
@@ -169,7 +167,7 @@ pub struct HttpReply {
     pub contentType: String,
 
     /// Response body
-    pub body: Hex<Vec<u8>>,
+    pub body: Vec<u8>,
 
     /// HTTP Headers
     pub headers: Vec<HttpHeader>,
@@ -177,7 +175,7 @@ pub struct HttpReply {
 
 impl HttpReply {
     pub fn text(self) -> Result<String, anyhow::Error> {
-        Ok(String::from_utf8(self.body.0)?)
+        Ok(String::from_utf8(self.body)?)
     }
     pub fn json<T: DeserializeOwned>(self) -> Result<T, anyhow::Error> {
         if self.status != 200 {

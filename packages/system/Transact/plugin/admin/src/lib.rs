@@ -20,7 +20,7 @@ use exports::transact::admin::admin::Guest as Admin;
 
 use crate::trust::*;
 
-use psibase::{Hex, SignedTransaction, TransactionTrace};
+use psibase::{SignedTransaction, TransactionTrace};
 use serde_json::from_str;
 use sha2::{Digest, Sha256};
 

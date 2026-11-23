@@ -1,7 +1,6 @@
 use crate::AccountNumber;
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize)]
+/// The body of `POST x-http/register_server`: both members are required.
+#[derive(psio::JsonText, psio::Serde)]
 pub struct RegisterServerRequest {
     pub service: AccountNumber,
     pub server: AccountNumber,

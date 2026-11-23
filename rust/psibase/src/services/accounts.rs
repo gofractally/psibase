@@ -2,8 +2,6 @@
 
 use crate::AccountNumber;
 
-use serde::{Deserialize, Serialize};
-use serde_aux::field_attributes::deserialize_number_from_string;
 
 pub const MIN_ALLOWED_ACCOUNT_LENGTH: u8 = 8;
 // TODO: tables
@@ -14,27 +12,34 @@ pub struct Account {
     pub authSequence: u64,
 }
 
-/// What `newAccount` does when the account exists. In every format it is
-/// its number, as the C++ `enum class NewAccountMode : std::uint8_t` is.
+/// What `newAccount` does when the account exists (C++
+/// `enum class NewAccountMode : std::uint8_t`, a reflected enum): its
+/// number in PSSZ and in a key, its C++ name in JSON (`"keepExisting"`,
+/// `"matchExisting"`, `"requireNew"`; the number is read too). Any other
+/// number is refused wherever one is read.
+#[repr(u8)]
 #[derive(
     Debug,
     Clone,
     Copy,
-    Serialize,
-    Deserialize,
+    PartialEq,
+    Eq,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::ToPsszSchema,
     psio::Key,
     psio::JsonText,
+    psio::Serde,
 )]
-#[psio(transparent)]
-pub struct NewAccountMode(u8);
-
-impl NewAccountMode {
-    pub const KEEP_EXISTING: NewAccountMode = NewAccountMode(0);
-    pub const MATCH_EXISTING: NewAccountMode = NewAccountMode(1);
-    pub const REQUIRE_NEW: NewAccountMode = NewAccountMode(2);
+#[serde(rename_all = "camelCase")]
+pub enum NewAccountMode {
+    /// An existing account will be unchanged.
+    KeepExisting,
+    /// If the account already exists, it must match the parameters that
+    /// are passed to `newAccount`: idempotent account creation.
+    MatchExisting,
+    /// The account must not already exist.
+    RequireNew,
 }
 
 #[crate::service(name = "accounts", dispatch = false, psibase_mod = "crate")]

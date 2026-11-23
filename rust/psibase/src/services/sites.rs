@@ -28,30 +28,39 @@ impl DecompressorInterface {
 #[allow(non_snake_case, unused_variables)]
 pub mod service {
 
-    use crate::{http::HttpRequest, AccountNumber, Checksum256, Hex};
+    use crate::{http::HttpRequest, AccountNumber, Checksum256};
     use async_graphql::SimpleObject;
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "SitesContentTable", index = 0)]
     #[derive(
         Debug,
         Clone,
-        Serialize,
-        Deserialize,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
+    #[graphql(complex)]
     pub struct SitesContentRow {
         pub account: AccountNumber,
         pub path: psio::pssz::RawString,
         pub contentType: String,
+        #[graphql(skip)]
         pub contentHash: Checksum256,
         pub contentEncoding: Option<String>,
         pub csp: Option<String>,
+    }
+
+    /// In GraphQL the bytes are hex text, as in JSON.
+    #[async_graphql::ComplexObject]
+    impl SitesContentRow {
+        #[allow(non_snake_case)]
+        async fn contentHash(&self) -> String {
+            crate::to_hex(&self.contentHash)
+        }
     }
 
     impl SitesContentRow {
@@ -65,14 +74,13 @@ pub mod service {
     #[derive(
         Debug,
         Clone,
-        Serialize,
-        Deserialize,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct SiteConfigRow {
         #[primary_key]
@@ -87,13 +95,12 @@ pub mod service {
     #[derive(
         Debug,
         Clone,
-        Serialize,
-        Deserialize,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct SitesDataRow {
         #[primary_key]
@@ -105,13 +112,12 @@ pub mod service {
     #[derive(
         Debug,
         Clone,
-        Serialize,
-        Deserialize,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct SitesDataRefRow {
         #[primary_key]
@@ -131,7 +137,7 @@ pub mod service {
         path: psio::pssz::RawString,
         contentType: String,
         contentEncoding: Option<String>,
-        content: Hex<Vec<u8>>,
+        content: Vec<u8>,
     ) {
         unimplemented!()
     }

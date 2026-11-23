@@ -391,6 +391,6 @@ impl Caller for RunAsCaller {
         };
         let ret =
             crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
-        psio::from_pssz::<Ret>(&ret.0).unwrap()
+        psio::from_pssz::<Ret>(&ret).unwrap()
     }
 }

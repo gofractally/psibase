@@ -12,10 +12,9 @@
 #[psibase::service_tables]
 pub mod tables {
     use psibase::{Table};
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Default, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct ConfigRow {}
     impl ConfigRow {
         #[primary_key]
@@ -78,7 +77,7 @@ mod service {
             Accounts::call().newAccount(
                 acct,
                 AuthAny::SERVICE,
-                psibase::services::accounts::NewAccountMode::MATCH_EXISTING,
+                psibase::services::accounts::NewAccountMode::MatchExisting,
             );
         }
 

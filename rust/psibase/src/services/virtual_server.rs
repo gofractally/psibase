@@ -1,20 +1,18 @@
 
 use async_graphql::SimpleObject;
-use serde::{Deserialize, Serialize};
 
 /// The specs of the virtual server and the specs required by each node
 /// and are used to configure the network specs.
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct ServerSpecs {
     /// Amount of bandwidth capacity per second per server
@@ -27,14 +25,13 @@ pub struct ServerSpecs {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct NetworkVariables {
     /// How much faster a node replays blocks compared to the live network
@@ -52,14 +49,13 @@ pub struct NetworkVariables {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     SimpleObject,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 pub struct BufferConfig {
     /// A threshold (specified in integer percentage values) at or below which the client should

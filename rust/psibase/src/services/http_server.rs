@@ -9,7 +9,7 @@ pub const HOMEPAGE_SERVICE: AccountNumber = account!("homepage");
 #[crate::service(name = "http", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{AccountNumber, Action, Hex, HttpReply, HttpRequest};
+    use crate::{AccountNumber, Action, HttpReply, HttpRequest};
 
     #[action]
     fn sendProds(action: Action) {
@@ -80,7 +80,7 @@ mod service {
 
     /// Entry point for messages
     #[action]
-    fn recv(socket: i32, data: Hex<Vec<u8>>, flags: u32) {
+    fn recv(socket: i32, data: Vec<u8>, flags: u32) {
         unimplemented!()
     }
     /// Entry point for HTTP requests

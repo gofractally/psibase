@@ -3,7 +3,6 @@
 mod service {
     use crate::{AccountNumber, HttpReply, HttpRequest, IPAddress};
 
-    use serde::{Deserialize, Serialize};
 
     /// Returns true if the account or the remote end of socket is a node admin
     #[action]
@@ -35,7 +34,7 @@ mod service {
         unimplemented!()
     }
 
-    #[derive(Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct AdminOptionsRow {
         p2p: bool,
         hosts: Vec<String>,

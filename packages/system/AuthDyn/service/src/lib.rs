@@ -6,10 +6,9 @@ pub mod tables {
     use psibase::{
         services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, ServiceWrapper, Table,
         };
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "ManagementTable", index = 0)]
-    #[derive(SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Management {
         #[primary_key]
         pub account: AccountNumber,
@@ -86,7 +85,7 @@ pub mod service {
         Accounts::call().newAccount(
             account,
             Wrapper::SERVICE,
-            services::accounts::NewAccountMode::MATCH_EXISTING,
+            services::accounts::NewAccountMode::MatchExisting,
         );
     }
 

@@ -40,7 +40,7 @@ pub fn serve_simple_ui<Wrapper: WithActionStruct + ToServiceSchema>(
 /// </html>
 /// ```
 pub fn serve_simple_index(request: &HttpRequest) -> Option<HttpReply> {
-    if request.method == "GET" && (request.target.to_str().unwrap_or_default() == "/" || request.target.to_str().unwrap_or_default() == "/index.html") {
+    if request.method == "GET" && (request.target == "/" || request.target == "/index.html") {
         Some(HttpReply {
             status: 200,
             contentType: "text/html".into(),
@@ -65,7 +65,7 @@ pub fn serve_simple_index(request: &HttpRequest) -> Option<HttpReply> {
 pub fn serve_action_templates<Wrapper: ToServiceSchema>(
     request: &HttpRequest,
 ) -> Option<HttpReply> {
-    if request.method == "GET" && request.target.to_str().unwrap_or_default() == "/action_templates" {
+    if request.method == "GET" && request.target == "/action_templates" {
         Some(HttpReply {
             status: 200,
             contentType: "text/html".into(),
@@ -117,8 +117,8 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
         }
     }
 
-    if request.method == "POST" && request.target.to_str().unwrap_or_default().starts_with("/pack_action/") {
-        Wrapper::with_action_struct(&request.target.to_str().unwrap_or_default()[13..], PackAction(&request.body))
+    if request.method == "POST" && request.target.to_string_lossy().starts_with("/pack_action/") {
+        Wrapper::with_action_struct(&request.target.to_string_lossy()[13..], PackAction(&request.body))
     } else {
         None
     }
@@ -137,11 +137,8 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
     request: &HttpRequest,
     query: Query,
 ) -> Option<HttpReply> {
-    let (base, args) = if let Some((b, q)) = request.target.to_str().unwrap_or_default().split_once('?') {
-        (b, q)
-    } else {
-        (request.target.to_str().unwrap_or_default(), "")
-    };
+    let target = request.target.to_string_lossy();
+    let (base, args) = target.split_once('?').unwrap_or((&target, ""));
     if base != "/graphql" || request.method != "GET" && request.method != "POST" {
         return None;
     }
@@ -164,7 +161,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
             })
         } else if request.contentType == "application/graphql" {
             let res = schema
-                .execute(std::str::from_utf8(&request.body.0).unwrap())
+                .execute(std::str::from_utf8(&request.body).unwrap())
                 .await;
             Some(HttpReply {
                 status: 200,
@@ -200,7 +197,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
 /// This wraps [graphiql_source].
 pub fn serve_graphiql(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET"
-        && (request.target.to_str().unwrap_or_default() == "/graphiql.html" || request.target.to_str().unwrap_or_default() == "/graphiql")
+        && (request.target == "/graphiql.html" || request.target == "/graphiql")
     {
         Some(HttpReply {
             status: 200,

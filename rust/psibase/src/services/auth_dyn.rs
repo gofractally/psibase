@@ -1,21 +1,19 @@
 pub mod policy {
     use async_graphql::SimpleObject;
 
-    use serde::{Deserialize, Serialize};
 
     use crate::AccountNumber;
 
     #[derive(
         Debug,
         Clone,
-        Serialize,
-        Deserialize,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct WeightedAuthorizer {
         pub account: AccountNumber,
@@ -31,14 +29,13 @@ pub mod policy {
     #[derive(
         Debug,
         Clone,
-        Serialize,
-        Deserialize,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct DynamicAuthPolicy {
         pub threshold: u8,

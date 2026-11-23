@@ -11,10 +11,9 @@ const MAX_EXPIRED_TICKET_ERASE_PER_MINT: usize = 32;
 #[psibase::service_tables]
 pub mod tables {
     use psibase::{AccountNumber};
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "WsTicketTable", index = 0, db = "Session")]
-    #[derive(Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct WsTicketRow {
         #[primary_key]
         pub ticket: String,
@@ -39,9 +38,9 @@ mod service {
     use super::*;
     use crate::tables::WsTicketRow;
     use psibase::{ServiceWrapper};
-    use serde::{Deserialize, Serialize};
+    use serde::Deserialize;
 
-    #[derive(Debug, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct WsTicketInfo {
         pub user: AccountNumber,
         pub app: AccountNumber,
@@ -89,7 +88,7 @@ mod service {
         let Some(user) = user else {
             return Some(text_reply(&request, 401, "Not authenticated\n"));
         };
-        let Ok(body) = serde_json::from_slice::<MintRequest>(&request.body.0) else {
+        let Ok(body) = serde_json::from_slice::<MintRequest>(&request.body) else {
             return Some(text_reply(
                 &request,
                 400,

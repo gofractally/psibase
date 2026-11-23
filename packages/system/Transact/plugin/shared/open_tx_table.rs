@@ -1,6 +1,6 @@
 use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 
-use psibase::{Action, Claim, Hex, MethodNumber};
+use psibase::{Action, Claim, MethodNumber};
 #[path = "transaction_policy.rs"]
 mod policy;
 use policy::{register_hook, ConnectionPin};
@@ -112,20 +112,20 @@ impl OpenTx {
         claims
     }
 
-    pub(crate) fn add_evidence(claim: Claim, proof: Hex<Vec<u8>>) -> Result<(), &'static str> {
+    pub(crate) fn add_evidence(claim: Claim, proof: Vec<u8>) -> Result<(), &'static str> {
         if Self::publication_started() { return Err("cannot add evidence during publication"); }
-        let mut entries: Vec<(Claim, Hex<Vec<u8>>)> = load(EVIDENCE).unwrap_or_default();
-        if entries.len() >= 8 || claim.rawData.0.len() > 65536 || proof.0.len() > 262144 {
+        let mut entries: Vec<(Claim, Vec<u8>)> = load(EVIDENCE).unwrap_or_default();
+        if entries.len() >= 8 || claim.rawData.len() > 65536 || proof.len() > 262144 {
             return Err("evidence count or entry size limit");
         }
-        let bytes: usize = entries.iter().map(|(c,p)|c.rawData.0.len()+p.0.len()).sum();
-        if bytes + claim.rawData.0.len() + proof.0.len() > 1_048_576 {
+        let bytes: usize = entries.iter().map(|(c,p)|c.rawData.len()+p.len()).sum();
+        if bytes + claim.rawData.len() + proof.len() > 1_048_576 {
             return Err("total evidence size limit");
         }
         entries.push((claim,proof)); store(EVIDENCE,&entries); Ok(())
     }
 
-    pub(crate) fn take_evidence() -> Vec<(Claim, Hex<Vec<u8>>)> {
+    pub(crate) fn take_evidence() -> Vec<(Claim, Vec<u8>)> {
         let entries=load(EVIDENCE).unwrap_or_default();
         open_tx_table().delete(EVIDENCE); entries
     }
@@ -187,7 +187,7 @@ impl OpenTx {
             method: MethodNumber::from(
                 <psibase::services::staged_tx::action_structs::propose as psio::interface::Method>::NAME,
             ),
-            rawData: Hex::from(packed),
+            rawData: packed,
         });
         Ok(())
     }

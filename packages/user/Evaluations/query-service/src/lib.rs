@@ -18,6 +18,8 @@ mod service {
         evaluation_id: u32,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         group_number: u32,
+        // Bytes in an event row are hex, as PSIO writes them.
+        #[serde(with = "psio::serde_bridge")]
         keys: Vec<Vec<u8>>,
         hash: String,
     }
@@ -30,6 +32,7 @@ mod service {
         #[serde(deserialize_with = "deserialize_number_from_string")]
         group_number: u32,
         users: Vec<AccountNumber>,
+        #[serde(with = "psio::serde_bridge")]
         result: Vec<u8>,
     }
 

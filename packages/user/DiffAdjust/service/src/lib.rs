@@ -7,12 +7,11 @@ pub mod tables {
 
     use async_graphql::{ComplexObject, SimpleObject};
 
-    use serde::{Deserialize, Serialize};
 
     const ONE_MILLION: u32 = 1_000_000;
 
     #[table(name = "RateLimitTable", index = 0)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct RateLimit {
         #[primary_key]
         pub nft_id: u32,

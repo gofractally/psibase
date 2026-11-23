@@ -236,7 +236,7 @@ pub mod service {
     /// * `image`       - Image bytes, at most `MAX_ICON_SIZE` bytes
     /// * `contentType` - Image type (see `image_content_type`). PNG, JPEG, and WebP are allowed.
     #[action]
-    fn setIcon(token_id: TID, image: Hex<Vec<u8>>, contentType: ImgContentType) {
+    fn setIcon(token_id: TID, image: Vec<u8>, contentType: ImgContentType) {
         Token::get_assert(token_id).check_is_owner(get_sender());
         assert!(
             image.len() <= MAX_ICON_SIZE,

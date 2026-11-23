@@ -4,34 +4,33 @@ pub mod service {
     use crate::{AccountNumber, Action, Checksum256, TimePointUSec};
     use async_graphql::SimpleObject;
 
-    use serde::{Deserialize, Serialize};
 
     #[derive(
-        Serialize,
-        Deserialize,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct ActionList {
         pub actions: Vec<Action>,
     }
 
     #[derive(
-        Serialize,
-        Deserialize,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
+    #[graphql(complex)]
     pub struct StagedTx {
         pub id: u32,
+        #[graphql(skip)]
         pub txid: Checksum256,
         pub propose_block: u32,
         pub propose_date: TimePointUSec,
@@ -40,18 +39,25 @@ pub mod service {
         pub auto_exec: bool,
     }
 
+    /// In GraphQL the bytes are hex text, as in JSON.
+    #[async_graphql::ComplexObject]
+    impl StagedTx {
+        async fn txid(&self) -> String {
+            crate::to_hex(&self.txid)
+        }
+    }
+
     /// A response to a staged transaction: a row of the service's
     /// `ResponseTable`.
     #[derive(
         Debug,
-        Serialize,
-        Deserialize,
         SimpleObject,
         psio::PsszPack,
         psio::PsszUnpack,
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct Response {
         /// The ID of the staged transaction

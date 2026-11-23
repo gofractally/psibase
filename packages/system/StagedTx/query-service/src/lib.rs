@@ -3,16 +3,25 @@
 mod service {
     use async_graphql::{connection::Connection, *};
     use psibase::*;
-    use serde::Deserialize;
-    use staged_tx::service::*;
-    use std::str::FromStr;
 
-    #[derive(SimpleObject, Deserialize, Debug)]
+    use staged_tx::service::*;
+
+    #[derive(SimpleObject, psio::JsonText, psio::Serde, Debug)]
+    #[graphql(complex)]
     struct Update {
+        #[graphql(skip)]
         txid: Checksum256,
         actor: AccountNumber,
         datetime: TimePointUSec,
         event_type: String,
+    }
+
+    /// In GraphQL the bytes are hex text, as in JSON.
+    #[async_graphql::ComplexObject]
+    impl Update {
+        async fn txid(&self) -> String {
+            psibase::to_hex(&self.txid)
+        }
     }
 
     struct Query;
@@ -117,7 +126,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<EventConnection<Update>> {
-            let actor = ExactAccountNumber::from_str(&actor).unwrap();
+            let actor = AccountNumber::from_exact(&actor).unwrap();
             EventQuery::new("history.staged-tx.updated")
                 .condition(format!("actor = '{}'", actor))
                 .first(first)

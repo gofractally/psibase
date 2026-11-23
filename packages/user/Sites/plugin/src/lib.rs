@@ -10,7 +10,7 @@ use bindings::transact::plugin::api as Transact;
 use psibase::compress_content;
 
 use psibase::services::sites::action_structs as Actions;
-use psibase::Hex;
+
 
 mod errors;
 use crate::trust::*;
@@ -88,7 +88,7 @@ impl Sites for SitesPlugin {
             path: file.path.clone().into(),
             contentType: file.content_type,
             contentEncoding: content_encoding,
-            content: Hex::from(content),
+            content: content,
         });
 
         if packed.len() >= TX_SIZE_LIMIT {
@@ -108,7 +108,7 @@ impl Sites for SitesPlugin {
             path: file.path.clone().into(),
             contentType: file.content_type,
             contentEncoding: Some(content_encoding),
-            content: Hex::from(file.content),
+            content: file.content,
         });
 
         if packed.len() >= TX_SIZE_LIMIT {
@@ -139,7 +139,7 @@ impl Sites for SitesPlugin {
                 path: normalize_path(&file.path).into(),
                 contentType: file.content_type.clone(),
                 contentEncoding: content_encoding,
-                content: Hex::from(content),
+                content: content,
             });
 
             if index == 0 && packed.len() >= TX_SIZE_LIMIT {

@@ -25,7 +25,7 @@ use exports::transact::plugin::{
 use crate::trust::*;
 
 use psibase::services::transact::action_structs::setSnapTime;
-use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction};
+use psibase::{SignedTransaction, Tapos, TimePointSec, Transaction};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
@@ -35,7 +35,7 @@ psibase::define_trust! {
         Medium => "",
         High => "
             - alter which of your accounts is being used
-        
+
         Warning: This will grant the caller the ability to control which of your accounts takes requested actions, including the capability to make unintended use of any of your accounts! Make sure you completely trust the caller's legitimacy.
         ",
     }
@@ -183,7 +183,7 @@ impl From<ImportClaim> for psibase::Claim {
     fn from(claim: ImportClaim) -> Self {
         psibase::Claim {
             service: claim.verify_service.parse().unwrap(),
-            rawData: Hex::from(claim.raw_data.clone()),
+            rawData: claim.raw_data.clone(),
         }
     }
 }
@@ -230,7 +230,7 @@ impl Api for TransactPlugin {
     fn add_signature(claim: ExportClaim) -> Result<(), HostTypes::Error> {
         OpenTx::add_claim(psibase::Claim {
             service: claim.verify_service.parse().unwrap(),
-            rawData: psibase::Hex::from(claim.raw_data),
+            rawData: claim.raw_data,
         });
         Ok(())
     }
@@ -331,10 +331,10 @@ impl Auth for TransactPlugin {
             actions,
             claims,
         };
-        let proofs: Vec<Hex<Vec<u8>>> =
+        let proofs: Vec<Vec<u8>> =
             user_auth_proof(&user, &Sha256::digest(&psio::to_pssz(&tx)).into())?
                 .into_iter()
-                .map(|proof| Hex::from(proof.signature))
+                .map(|proof| proof.signature)
                 .collect();
         let signed_tx = SignedTransaction {
             transaction: psio::pssz::Nested::new(&tx).unwrap(),

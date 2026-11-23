@@ -75,7 +75,7 @@ impl Boot for XAdminPlugin {
 
         let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
         let expiration = TimePointSec::from_chrono_floor(now_plus_120secs).unwrap();
-        let prod = ExactAccountNumber::from_str(&producer).map_err(|e| e.to_string())?;
+        let prod = AccountNumber::from_exact(&producer).map_err(|e| e.to_string())?;
 
         let (boot_transactions, groups) = create_boot_transactions(
             &initial_key,

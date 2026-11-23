@@ -3,10 +3,9 @@ pub mod tables {
     use async_graphql::SimpleObject;
 
     use psibase::{AccountNumber};
-    use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct ConfigRow {
         pub owner: AccountNumber,
         pub last_used_id: u32,
@@ -20,7 +19,7 @@ pub mod tables {
     }
 
     #[table(name = "EvaluationTable", index = 1)]
-    #[derive(Default, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText)]
+    #[derive(Default, SimpleObject, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
     pub struct Evaluation {
         pub id: u32,
         pub created_at: u32,
@@ -38,8 +37,6 @@ pub mod tables {
     #[derive(
         Default,
         SimpleObject,
-        Serialize,
-        Deserialize,
         Debug,
         Clone,
         psio::PsszPack,
@@ -47,6 +44,7 @@ pub mod tables {
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct User {
         pub owner: AccountNumber,
@@ -62,8 +60,6 @@ pub mod tables {
     #[derive(
         Default,
         SimpleObject,
-        Serialize,
-        Deserialize,
         Debug,
         Clone,
         psio::PsszPack,
@@ -71,6 +67,7 @@ pub mod tables {
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct Group {
         pub owner: AccountNumber,
@@ -83,8 +80,6 @@ pub mod tables {
     #[derive(
         Default,
         SimpleObject,
-        Serialize,
-        Deserialize,
         Debug,
         Clone,
         psio::PsszPack,
@@ -92,6 +87,7 @@ pub mod tables {
         psio::PsszView,
         psio::ToPsszSchema,
         psio::JsonText,
+        psio::Serde,
     )]
     pub struct UserSettings {
         #[primary_key]

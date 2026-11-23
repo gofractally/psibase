@@ -1,5 +1,4 @@
 use crate::{self as psibase, AccountNumber};
-use serde::{Deserialize, Serialize};
 
 /// Identify a service and method
 ///
@@ -8,7 +7,7 @@ pub use crate::ServiceMethod;
 
 type CallbackType = u32;
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub struct AuthTarget {
     sender: AccountNumber,
     action: Option<ServiceMethod>,
@@ -159,7 +158,7 @@ pub mod auth_interface {
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use super::{AuthTarget, CallbackType};
-    use crate::{AccountNumber, Action, Checksum256, Hex, Transaction};
+    use crate::{AccountNumber, Action, Checksum256, Transaction};
 
 
     /// Only called once, immediately after the boot transaction.
@@ -280,7 +279,7 @@ mod service {
     fn runAs(
         action: crate::Action,
         allowedActions: Vec<crate::services::transact::ServiceMethod>,
-    ) -> Hex<Vec<u8>> {
+    ) -> Vec<u8> {
         unimplemented!()
     }
 

@@ -3,15 +3,14 @@ use std::fmt;
 use crate::{
     method, nested_calls,
     services::{db, transact, virtual_server},
-    AccountNumber, Action, ActionDecoder, Hex, SchemaMap, ServiceSchema,
+    AccountNumber, Action, ActionDecoder, SchemaMap, ServiceSchema,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 
 use futures::future::{FutureExt, LocalBoxFuture, Shared};
 use serde::{
-    ser::{SerializeSeq, SerializeStruct},
-    Deserialize, Serialize, Serializer,
+    ser::{SerializeSeq, SerializeStruct}, Serialize, Serializer,
 };
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -23,7 +22,7 @@ use std::sync::Arc;
 #[serde(rename_all = "camelCase")]
 pub struct ActionTrace {
     pub action: Action,
-    pub raw_retval: Hex<Vec<u8>>,
+    pub raw_retval: Vec<u8>,
     pub inner_traces: Vec<InnerTrace>,
     pub total_time: psio::time::Duration<psio::time::Nanos>,
     pub error: Option<psio::pssz::RawString>,
@@ -34,7 +33,7 @@ impl ActionTrace {
     pub fn error_text(&self) -> Option<String> {
         self.error
             .as_ref()
-            .map(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+            .map(|e| e.to_string())
     }
 }
 
@@ -47,32 +46,31 @@ impl fmt::Display for ActionTrace {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     psio::PsszPack,
     psio::PsszUnpack,
     psio::PsszView,
     psio::ToPsszSchema,
     psio::JsonText,
+    psio::Serde,
 )]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleTrace {
     pub console: psio::pssz::RawString,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 pub enum InnerTraceEnum {
     ConsoleTrace(ConsoleTrace),
     ActionTrace(ActionTrace),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 #[serde(rename_all = "camelCase")]
 pub struct InnerTrace {
     pub inner: InnerTraceEnum,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText)]
+#[derive(Debug, Clone, psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::JsonText, psio::Serde)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionTrace {
     pub action_traces: Vec<ActionTrace>,
@@ -85,7 +83,7 @@ impl TransactionTrace {
     pub fn error_text(&self) -> Option<String> {
         self.error
             .as_ref()
-            .map(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+            .map(|e| e.to_string())
     }
 
     #[track_caller]
@@ -176,7 +174,7 @@ fn write_action_console(atrace: &ActionTrace, f: &mut fmt::Formatter<'_>) -> fmt
     for inner in &atrace.inner_traces {
         match &inner.inner {
             InnerTraceEnum::ConsoleTrace(c) => {
-                write!(f, "{}", String::from_utf8_lossy(c.console.as_bytes()))?
+                write!(f, "{}", c.console.to_string_lossy())?
             }
             InnerTraceEnum::ActionTrace(a) => write_action_console(a, f)?,
         }
@@ -197,7 +195,7 @@ fn format_string(mut s: &str, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt:
 
 fn format_console(c: &ConsoleTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{:indent$}console:    ", "")?;
-    format_string(&String::from_utf8_lossy(c.console.as_bytes()), indent + 12, f)?;
+    format_string(&c.console.to_string_lossy(), indent + 12, f)?;
     writeln!(f)
 }
 
@@ -613,7 +611,7 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
             let _ = self.add_service(act.service).await;
             let found = {
                 let schemas = self.storage.schemas.borrow();
-                nested_calls(&schemas, act.service, act.method, &act.rawData.0)
+                nested_calls(&schemas, act.service, act.method, &act.rawData)
             };
             actions.extend(found.actions);
             services.extend(found.methods.into_iter().map(|m| m.service));
@@ -638,7 +636,7 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         if let Some(Ok(data)) = decoder.args(act) {
             result.insert("data".to_string(), data);
         } else {
-            result.insert("rawData".to_string(), act.rawData.to_string().into());
+            result.insert("rawData".to_string(), crate::to_hex(&act.rawData).into());
         }
         result.into()
     }

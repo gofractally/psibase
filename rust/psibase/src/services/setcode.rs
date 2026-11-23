@@ -2,18 +2,18 @@
 #[crate::service(name = "setcode", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{AccountNumber, Checksum256, Hex};
+    use crate::{AccountNumber, Checksum256};
 
     #[action]
     fn init() {}
 
     #[action]
-    fn setCode(service: AccountNumber, vmType: u8, vmVersion: u8, code: Hex<Vec<u8>>) {
+    fn setCode(service: AccountNumber, vmType: u8, vmVersion: u8, code: Vec<u8>) {
         unimplemented!()
     }
 
     #[action]
-    fn stageCode(service: AccountNumber, id: u64, vmType: u8, vmVersion: u8, code: Hex<Vec<u8>>) {
+    fn stageCode(service: AccountNumber, id: u64, vmType: u8, vmVersion: u8, code: Vec<u8>) {
         unimplemented!();
     }
 

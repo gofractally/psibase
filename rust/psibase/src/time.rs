@@ -80,7 +80,7 @@ mod tests {
         }
         assert_eq!(
             serde_json::from_str::<TimePointUSec>(r#""2026-11-22T10:15:30Z""#).unwrap(),
-            sec.to_unit().unwrap()
+            sec.into()
         );
         // A fraction the unit cannot hold is an error (before: dropped).
         assert!(serde_json::from_str::<TimePointSec>(r#""2026-11-22T10:15:30.5Z""#).is_err());
@@ -95,8 +95,6 @@ mod tests {
             serde_json::from_str::<Seconds>("5").unwrap(),
             Seconds::from_ticks(5)
         );
-        println!("BIG {}", serde_json::to_string(&MicroSeconds::from_ticks(1 << 60)).unwrap());
-        println!("OLDVAL {:?}", serde_json::from_str::<Seconds>(r#"{"value":5}"#).is_err());
     }
 
     #[test]
@@ -138,7 +136,7 @@ mod tests {
             1795342530000000
         );
         assert_eq!(
-            Seconds::from_ticks(2).to_unit().unwrap(),
+            MicroSeconds::from(Seconds::from_ticks(2)),
             MicroSeconds::from_ticks(2_000_000)
         );
     }

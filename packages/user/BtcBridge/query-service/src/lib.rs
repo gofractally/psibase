@@ -42,8 +42,8 @@ pub mod service {
             psibase::services::http_server::SERVICE,
             "Native HTTP server required"
         );
-        let target = request.target.to_str().unwrap_or_default();
-        let (path, query) = target.split_once('?').unwrap_or((target, ""));
+        let target = request.target.to_string_lossy();
+        let (path, query) = target.split_once('?').unwrap_or((&target, ""));
         if request.method == "GET" {
             if let Some(reply) = crate::explorer::serve(path, query) {
                 return Some(reply);

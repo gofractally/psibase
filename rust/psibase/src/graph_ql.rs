@@ -369,8 +369,11 @@ impl<'de> Deserialize<'de> for SqlRow {
 
         let rowid = map
             .remove("rowid")
+            // A 64-bit integer in I-JSON: bare up to 2^53 - 1, a decimal
+            // string beyond (the legacy writer always wrote a string).
             .and_then(|v| match v {
                 Value::String(s) => s.parse::<u64>().ok(),
+                Value::Number(n) => n.as_u64(),
                 _ => None,
             })
             .ok_or_else(|| serde::de::Error::missing_field("rowid"))?;

@@ -120,7 +120,7 @@ impl Signer for EcdsaPrivateKey {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
             service: AccountNumber::new(account_raw!("verify-sig")),
-            rawData: crate::Hex::from(self.pubkey.clone()),
+            rawData: self.pubkey.clone(),
         }
     }
     fn sign(&self, data: &[u8]) -> Vec<u8> {
@@ -191,7 +191,7 @@ impl Signer for PKCS11PrivateKey {
     fn get_claim(&self) -> crate::Claim {
         crate::Claim {
             service: AccountNumber::new(account_raw!("verify-sig")),
-            rawData: crate::Hex::from(self.pubkey.clone()),
+            rawData: self.pubkey.clone(),
         }
     }
     fn sign(&self, data: &[u8]) -> Vec<u8> {

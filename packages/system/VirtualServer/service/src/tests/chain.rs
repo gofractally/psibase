@@ -672,7 +672,7 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let signing_key =
         SigningKey::from_pkcs8_pem(&private_key).map_err(|e| psibase::Error::new(e))?;
     let signature: Signature = signing_key
-        .sign_prehash(&psibase::sha256(&tx_packed).0)
+        .sign_prehash(&psibase::sha256(&tx_packed))
         .map_err(|e| psibase::Error::new(e))?;
     let strx = SignedTransaction {
         transaction: psio::pssz::Nested::unchecked(tx_packed),
