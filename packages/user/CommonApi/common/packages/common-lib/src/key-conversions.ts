@@ -175,26 +175,6 @@ export function publicKeyPairToString({ keyType, keyPair }: any): string {
     else throw new Error("unsupported key type");
 }
 
-// Convert the public key in {keyType, keyPair} to fracpack format
-export function publicKeyPairToFracpack({ keyType, keyPair }: any): Uint8Array {
-    const x = keyPair.getPublic().getX().toArray("be", 32);
-    const y = keyPair.getPublic().getY().toArray("be", 32);
-    return new Uint8Array(
-        [
-            4,
-            0,
-            0,
-            0, // offset to variant
-            keyType, // variant index
-            33,
-            0,
-            0,
-            0, // variant size
-            y[31] & 1 ? 3 : 2, // inner array begins here
-        ].concat(x),
-    );
-}
-
 function PEMtoDER(s: string, tag?: any): Uint8Array {
     const match = s.match(/-----BEGIN (.*?)-----([^]*?)-----END \1-----/);
     if (!match) throw new Error("Public key expected");
@@ -236,25 +216,6 @@ export function publicKeyPairToDER({ keyType, keyPair }: any): Uint8Array {
         result[i] = x[j];
     }
     return result;
-}
-
-// Convert the signature in {keyType, signature} to fracpack format
-export function signatureToFracpack({ keyType, signature }: any): Uint8Array {
-    const r = signature.r.toArray("be", 32);
-    const s = signature.s.toArray("be", 32);
-    return new Uint8Array(
-        [
-            4,
-            0,
-            0,
-            0, // offset to variant
-            keyType, // variant index
-            64,
-            0,
-            0,
-            0, // variant size
-        ].concat(r, s),
-    );
 }
 
 export function signatureToBin({ signature }: any) {

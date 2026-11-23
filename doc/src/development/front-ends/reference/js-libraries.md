@@ -115,7 +115,7 @@ Example uses:
 
 ## Key Conversions
 
-`/common/common-lib.js` exports functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text and fracpack forms. 
+`/common/common-lib.js` exports functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text forms. 
 
 | Function                                      | Description                                                                        |
 | --------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -123,8 +123,6 @@ Example uses:
 | `publicStringToKeyPair(s)`                    | Convert a public key in string form to `{keyType, keyPair}`                        |
 | `privateKeyPairToString({keyType, keyPair})`  | Convert the private key in `{keyType, keyPair}` to a string                        |
 | `publicKeyPairToString({keyType, keyPair})`   | Convert the public key in `{keyType, keyPair}` to a string                         |
-| `publicKeyPairToFracpack({keyType, keyPair})` | Convert the public key in `{keyType, keyPair}` to fracpack format in a Uint8Array  |
-| `signatureToFracpack({keyType, signature})`   | Convert the signature in `{keyType, signature}` to fracpack format in a Uint8Array |
 
 Each function accepts or returns a `{keyType, keyPair}` or `{keyType, signature}`, where `keyType` is one of the following values:
 
