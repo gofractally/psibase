@@ -3,6 +3,8 @@
 #include <psibase/block.hpp>
 #include <psibase/openssl.hpp>
 
+#include <openssl/bn.h>
+#include <openssl/core_names.h>
 #include <openssl/ec.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -111,6 +113,26 @@ std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::generateKey(int nid)
    return result;
 }
 
+void psibase::normalizeSignature(EVP_PKEY* key, std::span<char> signature)
+{
+   BIGNUM* n = nullptr;
+   if (!EVP_PKEY_get_bn_param(key, OSSL_PKEY_PARAM_EC_ORDER, &n))
+      handleOpenSSLError();
+   std::unique_ptr<BIGNUM, OpenSSLDeleter> order(n);
+
+   const std::size_t len   = signature.size() / 2;
+   auto              sData = reinterpret_cast<unsigned char*>(signature.data()) + len;
+   std::unique_ptr<BIGNUM, OpenSSLDeleter> s(BN_bin2bn(sData, len, nullptr));
+   std::unique_ptr<BIGNUM, OpenSSLDeleter> half(BN_dup(order.get()));
+   if (!s || !half || !BN_rshift1(half.get(), half.get()))
+      handleOpenSSLError();
+   if (BN_cmp(s.get(), half.get()) > 0)
+   {
+      if (!BN_sub(s.get(), order.get(), s.get()) || BN_bn2binpad(s.get(), sData, len) == -1)
+         handleOpenSSLError();
+   }
+}
+
 std::unique_ptr<EVP_PKEY, OpenSSLDeleter> psibase::parsePrivateKey(std::span<const char> key)
 {
    auto* ptr = reinterpret_cast<const unsigned char*>(key.data());
@@ -175,6 +197,7 @@ std::vector<char> psibase::OpenSSLProver::prove(std::span<const char> data,
       if (auto len = getEcLen(static_cast<EVP_PKEY*>(privateKey)))
       {
          result = der2compact(std::move(result), len);
+         normalizeSignature(static_cast<EVP_PKEY*>(privateKey), result);
       }
       return result;
    }

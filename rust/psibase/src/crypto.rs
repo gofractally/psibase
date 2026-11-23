@@ -102,6 +102,58 @@ impl Signer for PKCS8PrivateKeyK1 {
     }
 }
 
+/// The group order n of a curve, big-endian, if `spki` is a public key on
+/// secp256k1 or P-256.
+#[cfg(not(target_family = "wasm"))]
+fn group_order(spki: &[u8]) -> Option<[u8; 32]> {
+    const K1_OID: [u8; 7] = [0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x0a];
+    const R1_OID: [u8; 10] = [0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
+    const K1_ORDER: [u8; 32] = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36,
+        0x41, 0x41,
+    ];
+    const R1_ORDER: [u8; 32] = [
+        0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xbc, 0xe6, 0xfa, 0xad, 0xa7, 0x17, 0x9e, 0x84, 0xf3, 0xb9, 0xca, 0xc2, 0xfc, 0x63,
+        0x25, 0x51,
+    ];
+    let contains = |oid: &[u8]| spki.windows(oid.len()).any(|w| w == oid);
+    if contains(&K1_OID) {
+        Some(K1_ORDER)
+    } else if contains(&R1_OID) {
+        Some(R1_ORDER)
+    } else {
+        None
+    }
+}
+
+/// Rewrites a 64-byte r || s ECDSA signature into the low-S form, s <= n/2.
+/// verify-sig accepts no other form. (r, n - s) is the same signature with
+/// the other of its two encodings.
+#[cfg(not(target_family = "wasm"))]
+fn normalize_signature(mut signature: Vec<u8>, pubkey: &[u8]) -> Vec<u8> {
+    let Some(order) = group_order(pubkey) else {
+        return signature;
+    };
+    if signature.len() != 64 {
+        return signature;
+    }
+    // other = n - s
+    let mut other = [0u8; 32];
+    let mut borrow = 0i16;
+    for i in (0..32).rev() {
+        let d = order[i] as i16 - signature[32 + i] as i16 - borrow;
+        borrow = (d < 0) as i16;
+        other[i] = (d + 256 * borrow) as u8;
+    }
+    // s > n/2 exactly when n - s < s, because n is odd.
+    if other[..] < signature[32..] {
+        signature[32..].copy_from_slice(&other);
+    }
+    signature
+}
+
 #[cfg(not(target_family = "wasm"))]
 #[derive(Debug)]
 struct EcdsaPrivateKey {
@@ -124,11 +176,13 @@ impl Signer for EcdsaPrivateKey {
         }
     }
     fn sign(&self, data: &[u8]) -> Vec<u8> {
-        self.key_pair
+        let signature = self
+            .key_pair
             .sign(get_system_random(), data)
             .expect("Failed to sign")
             .as_ref()
-            .to_vec()
+            .to_vec();
+        normalize_signature(signature, &self.pubkey)
     }
 }
 
@@ -197,7 +251,9 @@ impl Signer for PKCS11PrivateKey {
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         let digest = Sha256::digest(data);
         let session = self.session.lock().unwrap();
-        session.sign(&Mechanism::Ecdsa, self.key, &digest).unwrap()
+        // The token returns whichever s it computed.
+        let signature = session.sign(&Mechanism::Ecdsa, self.key, &digest).unwrap();
+        normalize_signature(signature, &self.pubkey)
     }
 }
 

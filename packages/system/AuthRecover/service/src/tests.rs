@@ -94,6 +94,8 @@ mod tests {
                     .signing_key()
                     .sign_prehash(&digest.0)
                     .map_err(Error::new)?;
+                // verify-sig only accepts the low-S form.
+                let signature = signature.normalize_s().unwrap_or(signature);
                 Ok(signature.to_bytes().to_vec().into())
             })
             .collect::<Result<_, Error>>()?;

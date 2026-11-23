@@ -102,23 +102,23 @@ TEST_CASE("verify-sig: both curves, valid and invalid signatures")
    }
 }
 
-TEST_CASE("verify-sig: either s value is accepted")
+TEST_CASE("verify-sig: only the low-S form is accepted")
 {
    Fixture f;
    for (auto [group, order] : {std::pair{std::string_view{"secp256r1"}, &r1Order},
                                std::pair{std::string_view{"secp256k1"}, &k1Order}})
    {
       INFO(group);
-      auto priv = PrivateKeyInfo::create(group);
-      auto key  = getSubjectPublicKeyInfo(priv).data;
-
-      auto first = f.transaction(key);
-      CHECK(f.push(first, f.sign(first, priv)).succeeded());
-
-      // A transaction can only be applied once, so the other s value is
-      // checked on a second transaction.
-      auto second = f.transaction(key);
-      CHECK(f.push(second, otherS(f.sign(second, priv), *order)).succeeded());
+      // Several keys and messages; sign() already returns the low-S form.
+      for (int i = 0; i < 8; ++i)
+      {
+         auto priv = PrivateKeyInfo::create(group);
+         auto trx  = f.transaction(getSubjectPublicKeyInfo(priv).data);
+         auto sig  = f.sign(trx, priv);
+         // (r, n - s) satisfies the ECDSA equation too, but is not canonical.
+         CHECK(f.push(trx, otherS(sig, *order)).failed("signature invalid"));
+         CHECK(f.push(trx, sig).succeeded());
+      }
    }
 }
 
@@ -170,6 +170,27 @@ TEST_CASE("verify-sig: public key encodings")
          auto trx = f.transaction(key);
          CHECK(f.push(trx, f.sign(trx, priv)).failed("signature invalid"));
       }
+   }
+   SECTION("hybrid point")
+   {
+      // 06/07 || X || Y is a third encoding of the same point
+      for (std::string_view group : {"secp256r1", "secp256k1"})
+      {
+         INFO(group);
+         auto priv = PrivateKeyInfo::create(group);
+         auto key  = getSubjectPublicKeyInfo(priv).data;
+         key[key.size() - 65] = 0x06 | (key.back() & 1);
+         auto trx             = f.transaction(key);
+         CHECK(f.push(trx, f.sign(trx, priv)).failed("invalid public key"));
+      }
+   }
+   SECTION("unused bits in the bit string")
+   {
+      auto priv = PrivateKeyInfo::create("secp256k1");
+      auto key  = getSubjectPublicKeyInfo(priv).data;
+      key[key.size() - 66] = 1;
+      auto trx             = f.transaction(key);
+      CHECK(f.push(trx, f.sign(trx, priv)).failed("unsupported public key"));
    }
    SECTION("trailing data")
    {
