@@ -843,10 +843,7 @@ mod service {
     /// could afford before. Does nothing unless `account`/`sub_account` is the
     /// balance the running transaction is billed to.
     fn refresh_cpu_limit(account: AccountNumber, sub_account: Option<String>) {
-        if tx_cache::billable::get_billable_account() != Some(account) {
-            return;
-        }
-        if tx_cache::billable::get_sub(account) != sub_account {
+        if !tx_cache::billable::is_billed(account, &sub_account) {
             return;
         }
         CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, sub_account));

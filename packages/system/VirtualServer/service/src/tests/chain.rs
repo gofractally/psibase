@@ -497,12 +497,16 @@ fn settlement_exhausts_resource_buffer(chain: psibase::Chain) -> Result<(), psib
     Ok(())
 }
 
-// A transaction's CPU limit follows the balance it is billed to. alice starts
-// with a small resource balance, buys more in her first action and then does
-// far more work than the small balance allowed. Without the limit following the
-// purchase the transaction is stopped at what she could afford when it began.
+// End to end: alice starts with only what her transaction's bytes and the
+// purchase's own writes cost, buys resources in her first action and then does
+// work the purchase pays for. The purchase updates the limit of the transaction
+// it runs in (see tests/billed_balance.rs for the rule).
+//
+// This cannot show the limit rising by timing: at current prices the cost of
+// storing one byte buys most of a second of CPU, so any balance that covers
+// the purchase's writes already affords more CPU than a block allows.
 #[psibase::test_case(packages("VirtualServer", "StagedTx"))]
-fn resources_bought_in_a_transaction_raise_its_cpu_limit(
+fn resources_bought_in_a_transaction_pay_for_the_rest_of_it(
     chain: psibase::Chain,
 ) -> Result<(), psibase::Error> {
     initial_setup(&chain)?;
@@ -596,22 +600,6 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
         Ok(())
     };
 
-    // The same work without the purchase does not fit in the starting balance:
-    // it is stopped by the CPU limit or, sooner, by a charge the balance
-    // cannot cover.
-    // Funding pushes transactions of its own, which moves the chain past a
-    // transaction built beforehand; build once for the size, then again.
-    fund_start(&build(false))?;
-    let unfunded = build(false);
-    let trace = chain.push(&unfunded);
-    let error = trace.error.unwrap_or_default();
-    println!("without the purchase: {error}");
-    assert!(
-        !error.is_empty(),
-        "the work was meant to exceed the starting balance"
-    );
-    chain.finish_block();
-
     // With the purchase as its first action it runs to the end.
     fund_start(&build(true))?;
     let funded = build(true);
@@ -619,7 +607,7 @@ fn resources_bought_in_a_transaction_raise_its_cpu_limit(
     println!("with the purchase: {:?}", trace.error);
     assert!(
         trace.error.is_none(),
-        "a transaction that bought resources was still limited to its starting balance: {}",
+        "a transaction that bought resources in its first action did not complete: {}",
         trace.error.unwrap_or_default()
     );
     chain.finish_block();
