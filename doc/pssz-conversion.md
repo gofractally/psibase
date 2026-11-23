@@ -650,6 +650,63 @@ day of this work, between the R1 build and the R2 build. The comparison
 above and the one of 6.10 were made before it, with one `wasm-opt`; from R2
 on, wasm binaries are not compared with earlier builds at all.)
 
+### 1.16 The integration head merged; pin moved to PSIO `c6d99404`
+
+**Merge.** `bytemaster/head` at `44c57f739` is merged into `claude/pssz`
+(merge commit `7014902a1`; the branch was based on `8fa03237f`). The head
+brought WebAssembly wide arithmetic on by default, the psizam pin
+`63b2ee3` (the checkout in `external/psizam` is moved by hand: the CMake
+guard refuses a checkout whose head is not the pin), the requirement of
+binaryen 133 or newer, the call profile and `t-TransferBench-test`. PSIO's
+pin and the Rust services were not touched there.
+
+Two files conflicted, both because this branch spells the legacy library
+`psio1`:
+
+| File | Resolution |
+|---|---|
+| `libraries/psibase/native/include/psibase/db.hpp` | The head's side (the new `kvContains`) with `psio::input_stream` written `psio1::input_stream`, as in the rest of the class. |
+| `libraries/psibase/native/src/usePsitri.cpp` | The head's side (the per-database write counts, `kvContains`) with `psio1::input_stream`. |
+
+Three new uses of the legacy library merged without a conflict and were
+renamed the same way, or they would have named PSIO: `psio::convert_to_key`
+in `ExecutionContext.cpp` and `ExecutionContextWasmtime.cpp`,
+`psio::to_frac` in `packages/user/Tokens/test/src/TransferBench.cpp`. The
+head touched no `PSIO_REFLECT` declaration, dispatch, `Actor`, schema or
+table code, so nothing converted had to be converted again.
+
+| | |
+|---|---|
+| Full build | exit 0 (`~/psibase-pssz-build.build-head.log`), `wasm-opt` 133 |
+| `ctest -j4` | **93 / 93** (`~/psibase-pssz-build.ctest-head.log`). The baseline is 93 now: the 92 of before and the head's `t-TransferBench-test`. The head itself records 91 tests on this machine (`tests/timing/runs/*8b09a8776*`: 24 native, 38 end-to-end, 29 Rust); the two this branch adds are `n-psibase-psio-tests` and `t-psibase-psio-tests`. `psinode_test_crash` passed. |
+| Generated `*-schema.json` (68) vs. the snapshot of 0167a3056 | byte-identical: the head changed no schema. The baseline for later steps is `~/psibase-pssz-snap-head/` (the same 68 files). |
+
+**Pin.** `c6d9940441463c7ba3b6087595770a765f5fffac` (20 commits after
+`415ea1a6`; commit `c8553bd3e`; the same three files state it). In it:
+every type with offsets takes its own width (a bounded list of bounded
+elements has a 1- or 2-byte offset table), a record's cap narrows the
+containers beneath it (`docs/pssz-spec.md` 3.1, 3.2, 3.6), and
+`docs/annotations.md`, `tutorial-annotations.md` and
+`annotations-for-agents.md` exist. In Rust `PsszFormat` gained
+`POSITION_CAP`, `type Free` and `type Under<const C>`, member views of a
+capped record are typed by position, and `PsszError` / `KeyError` are not
+`Copy`.
+
+**What it cost psibase: nothing.** No psibase source changed. psibase
+names none of the changed traits (it uses the derives, `psio::json::TextForm`
+and the free functions), has no hand-written PSIO codec, declares no cap,
+and its one bound (`Memo`, a bounded string, not a list) has no offset
+table. The C++ ↔ Rust fixture was regenerated and is byte-identical; the
+bytes pinned in `leaf_types.cpp`, `wrappers.cpp` and the Rust tests are
+unchanged. RG13 is closed in this pin (6.8).
+
+| | |
+|---|---|
+| Full build | exit 0 (`~/psibase-pssz-build.build-repin-c6d9.log`) |
+| `ctest -j4` | 93 / 93 (`~/psibase-pssz-build.ctest-repin-c6d9.log`) |
+| Generated `*-schema.json` (68) vs. `~/psibase-pssz-snap-head/` | byte-identical |
+| The six unbuilt packages | exit 0 (`~/psibase-pssz-build.repin-c6d9-check-unbuilt.log`) |
+
 ## 2. Inventory of what remains
 
 Counts are occurrences / files in the tree outside `libraries/psio1`,
@@ -993,16 +1050,19 @@ commit itself.
 | D26 | `SubjectPublicKeyInfo` is the last wrapper on legacy hooks. Its canonical form is clear (`transparent()` over the DER bytes, an `invariant`, a PEM text adapter with `schema_id`), but both its validator and its PEM parser abort (Botan throws natively, aborts in a guest) and PSIO requires them to report (stated in `psio/invariant.hpp` and `psio/adapter.hpp` at `dfd0db17`). Needed: a reporting DER structure check and PEM check (in psibase; small), or a decision that key material is validated only where it is used. The owner leans to the second: opaque bytes on the wire, parsed where used. What that involves and who relies on the decode-time check today is in the note below this table. | Not converted. |
 | D27 | The message of an out-of-range `Precision` read from packed data or JSON lost the offending value (1.11). | Resolved in 1.13 by PSIO (`codec_fail_owned`, G21): the message names the value again. |
 | D28 | How Rust gets the `psio` crate. (a) PSIO: the crate is `rust/psio` in the repository, version 0.1.0, not published; its derives name `::psio`. (b) psibase: every Rust dependency of its own is a path dependency; `fracpack` is reached through `psibase`. (c) Proposed, and what the R1 patch does: `psio = { path = "../external/psio/rust/psio" }` in `rust/Cargo.toml` — the checkout CMake fetches and verifies against the one pin, so C++ and Rust cannot use different PSIO commits and no second copy exists. Cost: Cargo works only in a configured tree. Open: services built outside the tree (RG10). | Taken with R1: path into the pinned checkout. |
-| D29 | `Hex<T>` and the PSIO declaration of records that hold it. (a) PSIO: `Vec<u8>` and `[u8; N]` are hex strings in I-JSON; no wrapper is needed. (b) psibase: `Hex<Vec<u8>>` / `Hex<[u8; 32]>` (65 uses) exist so that serde writes hex. (c) Recommended: the member type becomes `Vec<u8>` / `[u8; N]` when the record's serde derives become `psio::Serde` (R8); until then a record with a `Hex` member either waits with its PSIO derives or `Hex<T>` is given `#[psio(transparent)]` for the interval. The second adds a line that R8 deletes; the owner's call. **Decided by the owner: no interim workaround.** Such records wait for R8 unless PSIO expresses a hex member cleanly; it does not (6.13), so 31 of the 76 core records wait (6.14). That is most of the core — `Action`, `Claim`, `SignedTransaction`, the consensus records, the HTTP request and reply, the traces — and it means the compiler and the shared vectors do not pass over them before the flips, which was the reason for declaring early (6.3). If the owner prefers that evidence to the purity of the interval, the cheapest form is `#[psio(transparent)]` plus the binary and schema derives on `Hex<T>` (one type, deleted at R8). | Waiting, as decided. |
+| D29 | `Hex<T>` and the PSIO declaration of records that hold it. (a) PSIO: `Vec<u8>` and `[u8; N]` are hex strings in I-JSON; no wrapper is needed. (b) psibase: `Hex<Vec<u8>>` / `Hex<[u8; 32]>` (65 uses) exist so that serde writes hex. (c) Recommended: the member type becomes `Vec<u8>` / `[u8; N]` when the record's serde derives become `psio::Serde` (R8); until then a record with a `Hex` member either waits with its PSIO derives or `Hex<T>` is given `#[psio(transparent)]` for the interval. The second adds a line that R8 deletes; the owner's call. **First decided: no interim workaround** (31 of the 76 core records waited, 6.14). **Revised by the coordinator and done (6.16):** `Hex<T>` is needed between the wire flip and the JSON flip in any case and PSIO will not change for it, so `#[psio(transparent)]` is its declaration for that period; 21 of the 31 are declared, the other 10 wait for other reasons. The earlier text follows. That is most of the core — `Action`, `Claim`, `SignedTransaction`, the consensus records, the HTTP request and reply, the traces — and it means the compiler and the shared vectors do not pass over them before the flips, which was the reason for declaring early (6.3). If the owner prefers that evidence to the purity of the interval, the cheapest form is `#[psio(transparent)]` plus the binary and schema derives on `Hex<T>` (one type, deleted at R8). | Done: `Hex<T>` is transparent (6.16). |
 | D30 | `rust/psibase_names`: `account_number_from_str` panicked on a subaccount that is not a number from 0 to 255 (`"alice+"`), and the hash-form parser of `method_number_from_str` underflowed on a character outside the alphabet. (a) PSIO: a text form reports (`TextForm::from_text` returns `None`). (b) psibase: text that is not a name is value 0 for every other malformed input. (c) In the R1 patch: both return 0. Reachable today from any JSON that names an account or method. The fix does not depend on PSIO. | Fixed with R1 (6.10). |
 | D31 | Rust additive declarations (6.3): types carry the official PSIO derives beside the legacy ones until the flip deletes the legacy names. The alternative is to change declarations and wire in one commit. | Taken: R1–R3 are written that way. |
 | D32 | Rust text of `MethodNumber` and `AccountNumber` under PSIO is C++'s (D2, D3): strict account names, lenient method names. serde (what services and the CLI use today) stays lenient until R8; then `ExactAccountNumber` is deleted. | Taken with R1: as C++. |
 | D33 | Which method coder is psibase's. (a) PSIO (`psio::compress_name`, Rust and C++, byte-identical to psibase's legacy C++): a name whose arithmetic code runs past 64 bits in its last partial byte keeps the truncated code — not marked as a hash, not reading back as the name (`getSymbolType` → `0x7ea96086faa7f7c0` → `getsymboltyp`); `#` text that is not 17 characters is `u64::MAX`. (b) psibase Rust (`rust/psibase_names`): such a name is its hash (`#hmlnslheseoypnnp`); such `#` text is 0. So psibase's C++ and Rust disagree today on 15 action and event names in the tree, 5 of them declared in both languages (`checkFirstAuth`, `removeCallback`, `getSymbolType`, `cpu_min_unit`, `get_resources`). (c) Not changed: `MethodNumber` keeps psibase's Rust coder, the difference is pinned by a test, and it is reported to PSIO as RG12. Recommended: PSIO adopts the Rust rule (a name that does not fit is hashed, whichever bit it overflows by), C++ follows through the pin, and then Rust deletes its method coder; the alternative is that Rust adopts the truncated codes, which changes the numbers of the Rust actions in the class and keeps a coder under which two names can share a number unnoticed. Either way the numbers of some existing methods change in one language, so it belongs to the flip. | Open. `psibase_names` unchanged. |
 | D34 | Time in Rust. (a) PSIO: `psio::time::TimePoint<U>` / `Duration<U>`; text is RFC 3339 UTC with exactly the unit's fraction digits, a duration its tick count; GraphQL scalars `DateTimeSeconds`, … (b) psibase Rust: its own structs; JSON through chrono (`…+00:00`, fraction only when not zero, any offset read, excess fraction dropped), a duration `{"value":5}`; GraphQL scalars `TimePointSec`, `TimePointUSec`. (c) Not changed: replacing the types changes JSON and GraphQL, and before the wire flip would need legacy `Pack` impls for PSIO's types inside `rust/fracpack`. The types are replaced at R7 / R8; nothing is missing in PSIO for it (6.13). To confirm: that the GraphQL scalar names may change, and whether Rust should match C++'s single `DateTime`. | Waiting for R7 / R8. |
 | D35 | Raw or UTF-8, per string member. A Rust `String` is UTF-8 and a C++ `std::string` raw; eight of the records declared in both languages differ in exactly that (6.14). Per member either C++ gains `utf8` or the Rust member becomes `RawString`; the audit has a recommendation for each. | Open; the cross-check lists the eight. |
-| D36 | Rust declarations that are not the C++ ones today: `ConfigRow` (C++ has `maxBlockSize`), `LogMessage` (member order), `SocketInfo` (four alternatives against six, in another order) and `ProducerMultiCastSocketInfo` (name), `RunMode` (C++ an enum), `SignedBlock` (C++ has `auxConsensusData`). Found by reading the two declarations for the cross-check; not by a test, because nothing in Rust reads these rows from a node today as far as was seen. (c) Not changed: correcting them changes bytes the Rust side writes. Recommended: correct them to the C++ declarations in one commit before the flip, then add them to the fixture. | Open; not converted. |
+| D36 | Rust declarations that are not the C++ ones today: `ConfigRow` (C++ has `maxBlockSize`), `LogMessage` (member order), `SocketInfo` (four alternatives against six, in another order) and `ProducerMultiCastSocketInfo` (name), `RunMode` (C++ an enum), `SignedBlock` (C++ has `auxConsensusData`). Found by reading the two declarations for the cross-check; not by a test, because nothing in Rust reads these rows from a node today as far as was seen. (c) Corrected in 6.17 (the owner's instruction), with who used each and what covers it; `RunMode` turned out not to be wrong on the wire. | Done (6.17); `SocketInfo` and `SignedBlock` have no test yet. |
 | D37 | `Memo` in C++. The Rust PSIO declaration states the flip's form (UTF-8, at most 80 bytes, as a bound). C++ still says `transparent(), invariant(wellFormed)` over a raw string, which the legacy glue needs until the flip. The two give the same bytes and text for a memo, another schema node and possibly another width inside a record. At the flip C++ becomes `attr(contents, utf8 \| max<80>)`; whether the invariant stays beside it decides whether the schema calls the type `Custom{…, "Memo"}` — Rust must then say the same. | Open; the difference is pinned (6.15). |
 | D38 | A second wrap in the Rust decimal parsers, fixed with the approved one: fraction digits were counted with `len() as u8`, so a fraction of 256 digits counted as none (`"5." + 255 zeros + "1"` read as 6 at precision 0). (a) No standard. (b) C++ `Decimal::parse` rejects more than 8 fraction digits by length. (c) Fixed to reject (`PrecisionOverflow`), with tests; not in the list of approved changes, so stated here. | Fixed with R2; revert `u8::try_from` in `quantity.rs` and `decimal.rs` if unwanted. |
+| D39 | The alternatives of a variant. (a) PSIO: an alternative has a label (the member name in the Schema IR: in C++ its index, `"0"`, `"1"`, unless `psio::schema_variant_labels<V>::names` states labels; in Rust the enum variant's identifier) and a text name (the attribute `ijsonName`: in C++ the alternative's type name; in Rust the variant's identifier unless `#[psio(name = "...")]`). (b) psibase: C++ `ConsensusData` is `std::variant<CftConsensus, BftConsensus>` and its JSON is `{"CftConsensus": ...}`; Rust is `enum ConsensusData { CFT(..), BFT(..) }` and serde writes `{"CFT": ...}` — the two already disagree in JSON today. Same for `InnerTrace::inner`, `SocketInfo`, `SocketEndpoint`, `IPAddress` (there the Rust variants are named after the types). (c) Not changed; `ConsensusData` and the three records that hold it wait. Recommended: C++ states the labels (`schema_variant_labels`, an additive declaration) and they are the Rust variant identifiers; the text name is the C++ type name, so Rust says `#[psio(name = "CftConsensus")]` and, at R8, serde's name follows. | Open. |
+| D40 | Enums on the wire. (a) PSIO: a C++ enum without `PSIO_REFLECT_ENUM` is its integer (schema `Int`, text a number, every value accepted); with it, and a Rust `#[repr(int)]` enum, it is an `Enum` node, its text is the enumerator's name and a value that is no enumerator is rejected. `docs/annotations-for-agents.md` D9: give an enum an explicit underlying type and reflect it. (b) psibase C++ reflects no enum: `RunMode`, `NewAccountMode`, `NotifyType`, `LogMessage::Severity`, `HttpStatus` are integers in pSSZ and, where they have JSON at all, numbers. Rust mirrors them as integers or one-member structs. (c) Taken: Rust says what C++ is today (`RunMode`, `NewAccountMode`: `#[psio(transparent)]` over `u8`; the others plain integers), and the fixture proves it. If C++ reflects an enum, its Rust twin becomes a `#[repr]` enum in the same commit; that changes JSON (names) and rejects unknown values, so it is a flip-time choice per enum. | As C++ today. |
+| D41 | Bytes in C++: `std::vector<char>` or `std::vector<std::uint8_t>`. (a) PSIO: both are hex; the first is hex over `char`, the second over `u8`, and PSIO's guide says byte data is `std::vector<std::uint8_t>` (`annotations-for-agents.md` D4). Rust has only `Vec<u8>`. (b) psibase C++: 446 `std::vector<char>` in 143 files, among them `Action::rawData`, `Claim::rawData`, every code and signature member. (c) Not changed; the cross-check lists the 14 records that differ in this only. Either PSIO makes the two the same node (RG14), or psibase C++ moves its byte members to `std::uint8_t` at the flip (a wide, mechanical change), or the Schema IR of the two languages differs in the element id and schema-driven tools must treat `char` as `u8` (they already do: same bytes, same text). | Open. |
 | D21 | `psio-tests` now links `psibase` (and through it the service headers) so that the glue test can pin psibase's own records. Temporary, deleted with `psio1`. | Accepted. |
 
 **Note on D26: `SubjectPublicKeyInfo` as opaque bytes.** Nothing was changed;
@@ -1472,6 +1532,15 @@ At `415ea1a6`:
 | RG11 | Closed: with no feature a dependent compiles pSSZ, keys, text, the Schema IR, time, names and interfaces; the other formats are features. | psibase asks for no feature; the crate builds without warnings of its own in psibase's workspaces. |
 | RG12 | **New, open.** `psio::compress_name::method_to_number` (and C++ `psio::detail::method_to_number`) returns a truncated arithmetic code for a name whose code runs past 64 bits in its last partial byte: the number is not marked as a hash and `number_to_method` does not return the name. | Reproduction: `method_to_number("getSymbolType")` = `0x7ea96086faa7f7c0`; `number_to_method(0x7ea96086faa7f7c0)` = `"getsymboltyp"`. (`"TxSuccessTable"` → `0x04ac12664a779248` → `"txsuccesstabl"`.) The encoder zeroes its output, and so falls back to the hash, when a set bit would land on bit 63 or the input is not consumed, but not when the final partial byte lies beyond bit 64 (C++ `psio/compress_name.hpp`: `if (m_Mask != 0x80 and m_bit < 64) m_output \|= …` has no `else`). psibase's Rust coder has that `else` (`method_to_number_converter.rs`: `self.output = 0`) and hashes the name. Also: `method_to_number("#abc")` is `u64::MAX` where psibase's Rust reads 0. Effect: psibase cannot replace its Rust method coder with PSIO's without changing method numbers (D33). |
 | RG13 | **New, open.** `#[derive(psio::Key)]` on a `#[psio(transparent)]` type ignores the bound of its member. | `#[derive(PsszPack, PsszUnpack, Key, JsonText)] #[psio(transparent)] struct Memo(#[psio(max = 4)] String);` — `psio::from_key::<Memo>(&psio::to_key(&"abcde".to_string()))` is `Ok`, and so are `validate_key` and `try_to_key(&Memo("abcde".into()))`, while `from_pssz` and `from_ijson` of the same text are errors. The same bound on a member of an ordinary record is enforced in a key (`from_key` and `try_to_key` are errors), and `from_key::<BoundedString<4>>` is an error. (Separately, `try_to_key(&BoundedString::<4>("abcde".into()))` is `Ok`: the writer trusts the wrapper's public field.) `docs/pssz-rust-profile.md` says an annotated member has "the same checks … in Json / IJson text and in keys". Effect: `psibase::Memo` does not derive `Key` (6.13). |
+
+At `c6d99404`:
+
+| # | Status | Reproduction / description |
+|---|---|---|
+| RG13 | Closed, verified: `psio::from_key::<Memo>(&psio::to_key(&"abcde".to_string()))` with `Memo(#[psio(max = 4)] String)` is an error now. | `psibase::Memo` could derive `psio::Key`; not done (it is not a legacy key either). |
+| RG12 | Open (announced for a later pin). | `MethodNumber` and the service macro stay on psibase's coder; the place to switch is marked in `service_macro/actions.rs` (`check_method_number`). |
+| RG14 | **New, open.** A C++ `std::vector<char>` and a `std::vector<std::uint8_t>` are different Schema IR nodes, and Rust can only say the second. | C++: `psio::SchemaBuilder b; b.insert<std::vector<char>>("A"); b.insert<std::vector<std::uint8_t>>("B");` → `A` = `Custom{List<Custom{Int{8, unsigned}, "char"}>, "hex"}`, `B` = `Custom{List<Int{8, unsigned}>, "hex"}`. Rust: `schema_for::<Vec<u8>>()` = `B`; no Rust type gives `A` (`"char"` is a reserved id the dynamic codec reads, `rust/psio/src/pssz_schema_ir.rs:373`). pSSZ, key and I-JSON of the two are identical. Effect: a C++ record with a `std::vector<char>` member and its Rust twin never have equal schemas (14 psibase records today, D41). Wanted: one node for a byte sequence whatever the C++ element spelling, or a Rust spelling of the other. |
+| RG15 | **New, minor.** `&[u8]` (and `&str`, `&[T]`) is `PsszPack` but not `ToPsszSchema` or `KeyPack`-with-`KeyUnpack`, so a record that borrows (`SharedAction<'a> { rawData: Hex<&'a [u8]> }`) can derive `PsszPack` only: no schema, no `psio::Key`. | `#[derive(psio::PsszPack, psio::ToPsszSchema)] struct S<'a> { b: &'a [u8] }` → "the trait bound `&'a [u8]: ToPsszSchema` is not satisfied". Not blocking: the owned twin has the schema, and psibase's three such records only need to be written. `psio::Key` on a borrowing record would need a write-only key derive. |
 
 Not gaps: tuples stop at 12 elements (psibase's largest action has 9
 arguments, and R4 stops packing tuples); `Rc` / `Arc` are not pSSZ values
@@ -1960,3 +2029,145 @@ Checked after R3:
 | `psibase-psio-tests` (native) | 38 test cases, 1 of them `[twins]` |
 | Generated `*-schema.json` (68) | byte-identical to the build of 0167a3056 |
 | The six unbuilt packages | exit 0 (`~/psibase-pssz-build.r3-check-unbuilt.log`) |
+
+### 6.16 `Hex<T>` and the records it held back (D29 revised)
+
+The decision is revised by the coordinator: `Hex<T>` is psibase's own serde
+wrapper and is needed between the wire flip and the JSON flip whatever
+else happens, and PSIO is not going to change for it, so
+`#[psio(transparent)]` on it is its declaration for that period, not a
+workaround.
+
+```rust
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord,
+         psio::PsszPack, psio::PsszUnpack, psio::ToPsszSchema, psio::Key, psio::JsonText)]
+#[psio(transparent)]
+pub struct Hex<T>(pub T);
+```
+
+The derives are generic: `Hex<Vec<u8>>`, `Hex<[u8; N]>` (so `Checksum256`)
+are their member in pSSZ, key, I-JSON and the Schema IR; `Hex<&[u8]>` is
+written (`PsszPack`) and nothing else, because PSIO reads owned values and
+a borrowed slice has no schema of its own. The legacy `Pack`, `Unpack`,
+`ToKey`, `ToSchema`, serde and GraphQL impls are untouched.
+`psio_wrappers.rs` has the tests: bytes, key, text and schema node equal
+to the bare type's, in a record and in a list too, rejection of a short
+digest and of text that is not hex, and the legacy forms unchanged. That
+the bare type is also the C++ member's is in the fixture (`Checksum256`,
+`Bytes` = `std::vector<char>`, `Octets` = `std::vector<std::uint8_t>`).
+
+**Declared (20 of the 31 that waited; `NotifyRow` in 6.17 makes 21).** With `PsszPack, PsszUnpack,
+PsszView, ToPsszSchema` (and `Key` where they derive `ToKey`): `Action`,
+`GenesisService`, `GenesisActionData`, `Claim`, `Producer`, `CftConsensus`,
+`BftConsensus`, `BlockHeaderAuthAccount`; `HttpRequest`, `HttpReply`;
+`CodeRow`, `CodeByHashRow`, `BlockDataRow`, `StateChecksum`,
+`StateSignature`, `SnapshotStateItem`, `SnapshotRow`. With `PsszPack`
+only, because they borrow: `SharedAction`, `SharedGenesisService`,
+`SharedGenesisActionData` (the test requires them to write the bytes of
+the owned records). `NotifyRow` joined in 6.17.
+
+**Still waiting (10).**
+
+| Reason | Types |
+|---|---|
+| The labels and text names of a variant's alternatives are not settled (D39) — 4 | `ConsensusData`, and what holds it: `Consensus`, `PendingConsensus`, `JointConsensus` |
+| Time: `ActionTrace::totalTime` is a `std::chrono::nanoseconds` in C++ (`Custom{i64, "duration-nanos"}`) and an `i64` in Rust (D34) — 4 | `ActionTrace`, `InnerTraceEnum` (also a variant, D39), `InnerTrace`, `TransactionTrace` |
+| The C++ member is a legacy library type until the flip (`psio1::shared_view_ptr<Transaction>`; Rust `Hex<Vec<u8>>`, to become a nested value) — 1 | `SignedTransaction` |
+| Holds a `BlockHeader` (time) — 1 | `SignedBlock` |
+
+**A second listed difference: `char`.** A C++ `std::vector<char>` is
+`Custom{List<Custom{u8, "char"}>, "hex"}` in the Schema IR and a
+`std::vector<std::uint8_t>` is `Custom{List<u8>, "hex"}`, which is what a
+Rust `Vec<u8>` is. Bytes, key and text are identical. psibase C++ writes
+byte members as `std::vector<char>` almost everywhere (446 occurrences in
+143 files; 74 of the unsigned spellings), so 13 of the records above
+(and `NotifyRow`, 6.17) differ from their Rust twin in exactly that. The cross-check lists them
+(`CharInCpp`) the way it lists raw / UTF-8 strings: the schemas must be
+equal once a `char` is read as the `u8` it is, and unequal before. RG14,
+D41.
+
+### 6.17 The Rust declarations that had fallen behind C++ (D36)
+
+Corrected to the C++ declarations. For each: what was wrong, who uses the
+Rust type, and what now covers it.
+
+| Type | Was | Now | Used in Rust by | Covered by |
+|---|---|---|---|---|
+| `ConfigRow` | two members | `maxBlockSize: u32` added (C++ `nativeTables.hpp`) | nothing (the declaration only) | the fixture: schema, pSSZ, legacy bytes |
+| `LogMessage` | `message, severity, service` | `severity, message, service`, the order C++ reflects (its members are declared in another order than they are reflected) | nothing | the fixture |
+| `NotifyRow` | JSON member `type_`; `key()` without the type | `#[serde(rename = "type")]`; `key()` is `(table, index, type)` as C++ `notifyKey`. The legacy schema still calls the member `type_` (the legacy derive does not read serde names) | nothing | the fixture (schema and bytes; not the key function, not JSON) |
+| `SocketInfo` | four alternatives | the six of C++, in its order: `ProducerMulticastSocketInfo`, `LogSocketInfo`, `HttpSocketInfo`, `HttpClientSocketInfo`, `WebSocketInfo`, `P2PSocketInfo`; `LogSocketInfo` and `P2PSocketInfo` are new, `ProducerMultiCastSocketInfo` is renamed. Every index after the first was wrong | nothing (`SocketRow` holds it; nothing reads `SocketRow`) | **no test**: the socket variants are not PSIO-declared yet (their text form in C++), so they are not in the fixture |
+| `SignedBlock` | two members | `auxConsensusData: Option<Hex<Vec<u8>>>` added | nothing | **no test** (it holds a `BlockHeader`, which waits for time) |
+| `RunMode` | reported as "a struct where C++ has an enum" | **was not wrong on the wire**: the legacy derive packs a struct of one unnamed member as that member, so it has always been one byte, and its legacy schema is the integer, as C++'s is for an enum. It gains `#[psio(transparent)]` and the PSIO derives, which is what the C++ enum is for PSIO today (D40) | `tester.rs`, `tester_raw.rs` (an argument of the `runAction` host function, by value), `RunRow` (nothing reads it), one VirtualServer test | the fixture: schema, pSSZ, key, text, legacy bytes |
+
+So the bytes the legacy Rust code packs changed for `ConfigRow`,
+`LogMessage`, `SocketInfo` / `SocketRow` and `SignedBlock`, the JSON for
+`NotifyRow`, and none of them had a reader or a test in Rust. `ctest`
+(93 / 93) is unaffected.
+
+**The fixture now carries legacy bytes as well** (`"frac"`: the value as
+`psio1::convert_to_frac` packs it; temporary, deleted with the legacy
+library), and `psio_twins.rs` requires the legacy Rust declaration of
+every fixture type but `Decimal` (which has no legacy codec in Rust) to
+read those bytes and write them back. This is the test that would have
+caught D36: with the old `ConfigRow` it fails on the schema, and with the
+old `LogMessage` on both. 50 types, 115 values.
+
+Not exposed by the cross-check but seen while doing it, and left:
+`ConsensusBytes` (Rust only, used by nothing: delete rather than declare),
+and the Rust views of C++ services restate parameter names loosely (6.18).
+
+### 6.18 What is left of R3, and raw or UTF-8 per string member (D35)
+
+**Core records (`rust/psibase/src` outside `services`): 44 of 78 declared**
+(20 in R3, 20 in 6.16, `ConfigRow`, `LogMessage`, `NotifyRow`, `RunMode`
+in 6.17; the 76 of 6.14 and the two socket records added in 6.17). The 34
+that wait, by first reason:
+
+| Reason | Types |
+|---|---|
+| Time (D34; R7 / R8) — 12 | `Tapos`, `Transaction`, `BlockHeader`, `Block`, `SignedBlock`, `BlockInfo`, `StatusRow`, `RunRow`; `ActionTrace`, `InnerTraceEnum`, `InnerTrace`, `TransactionTrace` (a duration member) |
+| Variant labels (D39) — 4 | `ConsensusData`, `Consensus`, `PendingConsensus`, `JointConsensus` |
+| The socket variants' text form in C++ (1.9), and D39 — 10 | `IPAddress`, `SocketEndpoint`, `HttpSocketInfo`, `HttpClientSocketInfo`, `WebSocketInfo`, `P2PSocketInfo`, `SocketInfo`, `SocketRow`; `ProducerMulticastSocketInfo` and `LogSocketInfo` (empty records that could be declared; left with the variant that holds them) |
+| The C++ member is a legacy library type until the flip — 1 | `SignedTransaction` |
+| The legacy schema format (R7) — 5 | `MethodString`, `EventType`, `FieldId`, `TableInfo`, `Schema` |
+| A serde attribute PSIO's schema derive refuses (R8) — 1 | `package::Meta` |
+| No C++ twin, no user — 1 | `ConsensusBytes` (delete) |
+
+Nothing in this list can move without one of: the time replacement, an
+owner decision (D39), the C++ socket text adapters, or the flips. So this
+step added no declaration; it is the list below.
+
+**Raw or UTF-8.** Neither language was changed. Every `String` member of a
+record declared in both languages whose C++ member is a `std::string`
+without `utf8`, with a recommendation by the owner's rule (names, versions
+and human text are UTF-8; header values, paths, environment values and
+arbitrary bytes are raw). "UTF-8" means C++ gains `attr(member, utf8)`;
+"raw" means the Rust member becomes `psio::pssz::RawString` at R7. All are
+best estimates.
+
+| Record | Member | Recommended | Why |
+|---|---|---|---|
+| `HttpHeader` | `name` | UTF-8 | a header name is an ASCII token; psibase compares it case-insensitively as text |
+| | `value` | raw | a header value is bytes off the wire (RFC 9110 allows obs-text); rejecting a request for one header would be new behaviour |
+| `HttpRequest` | `host` | raw | the Host header's value, not validated before the record is built |
+| | `method` | UTF-8 | a token (`GET`, `POST`); psibase compares it with literals. Raw if an unknown method must still reach the service as it came |
+| | `target` | raw | a path and query as sent, percent-encoding and all |
+| | `contentType` | raw | a header value |
+| `HttpReply` | `contentType` | raw | a header value, written by a service |
+| `LocalEndpoint` | `path` | raw | a file-system path |
+| `EnvRow` | `name` | raw | an environment variable's name: bytes to the host |
+| | `value` | raw | an environment value |
+| `HostConfigRow` | `hostVersion` | UTF-8 | a version |
+| | `config` | UTF-8 | a JSON document |
+| `PendingShutdownRow` | `args` | UTF-8 | a JSON document |
+| `PackageRef` | `name`, `version` | UTF-8 | a package name and a version requirement |
+| `PackageExport` | `name` | UTF-8 | a name |
+| `ConsoleTrace` | `console` | raw | whatever a service wrote to its console |
+| `GenesisActionData` | `memo` | UTF-8 | human text |
+| `LogMessage` | `message` | UTF-8 | human text; raw if a service must be able to log bytes it did not check (today the node writes it to its log unchecked) |
+
+Where the recommendation is UTF-8, a value that is not UTF-8 is refused by
+every reader and writer from the flip on; today nothing checks. The cases
+where that could reject something a node accepts now are the two marked
+with an alternative (`HttpRequest::method`, `LogMessage::message`).

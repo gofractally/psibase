@@ -29,6 +29,12 @@
 #include <psio/pssz.hpp>
 #include <psio/schema_builder.hpp>
 
+// TEMPORARY: removed when psio1 is deleted. The fixture also carries each
+// value as the legacy library packs it, so that the Rust test can require
+// the legacy Rust declaration -- what Rust writes until the wire flip -- to
+// pack the same bytes.
+#include <psio1/fracpack.hpp>
+
 #include <catch2/catch_all.hpp>
 
 #include <cstdlib>
@@ -83,7 +89,8 @@ namespace
             vectors += "{\"type\":" + jsonString(name) +
                        ",\"pssz\":" + jsonString(hex(psio::to_pssz(value))) +
                        ",\"key\":" + jsonString(hex(psio::to_key(value))) +
-                       ",\"ijson\":" + jsonString(psio::to_ijson(value)) + "}";
+                       ",\"ijson\":" + jsonString(psio::to_ijson(value)) +
+                       ",\"frac\":" + jsonString(hex(psio1::convert_to_frac(value))) + "}";
          }
       }
 
@@ -214,6 +221,16 @@ namespace
       f.add<SnapshotStateItem>("SnapshotStateItem", {SnapshotStateItem{}, stateItem});
       f.add<SnapshotRow>("SnapshotRow",
                          {SnapshotRow{}, SnapshotRow{digest, stateItem, {stateItem, SnapshotStateItem{}}}});
+
+      // Rows whose Rust declaration had fallen behind this one.
+      f.add<ConfigRow>("ConfigRow", {ConfigRow{}, ConfigRow{1, 2, 3}});
+      f.add<LogMessage>("LogMessage",
+                        {LogMessage{}, LogMessage{.message  = "started",
+                                                  .severity = LogMessage::Severity::warning,
+                                                  .service  = AccountNumber{"transact"}}});
+      f.add<NotifyRow>("NotifyRow", {NotifyRow{}, NotifyRow{NotifyType::acceptTransaction, {action}}});
+      f.add<RunMode>("RunMode", {RunMode::verify, RunMode::speculative, RunMode::rpc,
+                                 RunMode::callback});
 
       return std::move(f).text();
    }

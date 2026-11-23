@@ -10,6 +10,10 @@
 //! * write the same key, and read it, where the Rust type is a key;
 //! * write the same I-JSON text, and read it, where the Rust type has text.
 //!
+//! Until the wire flip the fixture also carries each value as the C++ legacy
+//! library packs it, and the legacy Rust declaration -- what Rust writes
+//! today -- must read and write those bytes (`same_legacy_bytes`).
+//!
 //! Every type in the fixture must be checked, so a type added in C++ fails
 //! here until Rust declares it.
 #![allow(non_upper_case_globals)]
@@ -34,6 +38,8 @@ struct Vector {
     pssz: Vec<u8>,
     key: Vec<u8>,
     ijson: String,
+    /// The value as the C++ legacy library packs it.
+    frac: Vec<u8>,
 }
 
 struct Fixture {
@@ -62,6 +68,7 @@ impl Fixture {
                         pssz: unhex(v["pssz"].as_str().unwrap()),
                         key: unhex(v["key"].as_str().unwrap()),
                         ijson: v["ijson"].as_str().unwrap().to_string(),
+                        frac: unhex(v["frac"].as_str().unwrap()),
                     },
                 )
             })
@@ -228,6 +235,20 @@ where
     }
 }
 
+/// The legacy declaration of the Rust type `T` reads what the C++ legacy
+/// library packs for the type the fixture calls `name`, and packs the same
+/// bytes. Deleted with the legacy library.
+fn same_legacy_bytes<T>(fixture: &Fixture, name: &str)
+where
+    T: psibase::fracpack::Pack + psibase::fracpack::UnpackOwned,
+{
+    for vector in fixture.vectors(name) {
+        let value = T::unpacked(&vector.frac)
+            .unwrap_or_else(|e| panic!("{name}: legacy {} is rejected: {e:?}", hex(&vector.frac)));
+        assert_eq!(hex(&value.packed()), hex(&vector.frac), "{name}: legacy bytes");
+    }
+}
+
 /// Also the same key.
 fn same_key<T>(fixture: &Fixture, name: &str)
 where
@@ -348,6 +369,50 @@ fn rust_and_cpp_declare_the_same_types() {
     same_schema_and_bytes::<SnapshotStateItem>(&mut f, "SnapshotStateItem", CharInCpp);
     same_schema_and_bytes::<SnapshotRow>(&mut f, "SnapshotRow", CharInCpp);
     borrowed_records_write_the_bytes_of_the_owned_ones(&f);
+
+    // Rows whose Rust declaration had fallen behind the C++ one.
+    same_schema_and_bytes::<ConfigRow>(&mut f, "ConfigRow", Same);
+    same_schema_and_bytes::<LogMessage>(&mut f, "LogMessage", RawInCpp);
+    same_schema_and_bytes::<NotifyRow>(&mut f, "NotifyRow", CharInCpp);
+    same_schema_and_bytes::<RunMode>(&mut f, "RunMode", Same);
+    same_key::<RunMode>(&f, "RunMode");
+    same_text::<RunMode>(&f, "RunMode");
+
+    // What Rust writes today: the legacy declarations pack what C++ packs.
+    // (`Decimal` has no legacy codec in Rust.)
+    macro_rules! legacy {
+        ($($name:literal => $ty:ty),* $(,)?) => {
+            $(same_legacy_bytes::<$ty>(&f, $name);)*
+            let with_legacy: BTreeSet<String> =
+                [$($name),*, "Decimal"].iter().map(|name| name.to_string()).collect();
+            assert_eq!(with_legacy, f.checked, "every type's legacy bytes are checked");
+        };
+    }
+    f.checked.insert("Memo".to_string());
+    legacy! {
+        "AccountNumber" => AccountNumber, "MethodNumber" => MethodNumber, "Memo" => Memo,
+        "Precision" => Precision, "Quantity" => Quantity,
+        "BlockHeaderCode" => BlockHeaderCode, "HttpHeader" => HttpHeader,
+        "VMOptions" => VMOptions, "WasmConfigRow" => WasmConfigRow,
+        "ConsensusChangeRow" => ConsensusChangeRow,
+        "ScheduledSnapshotRow" => ScheduledSnapshotRow, "LogTruncateRow" => LogTruncateRow,
+        "IPV4Address" => IPV4Address, "IPV6Address" => IPV6Address,
+        "IPV4Endpoint" => IPV4Endpoint, "IPV6Endpoint" => IPV6Endpoint,
+        "LocalEndpoint" => LocalEndpoint, "TLSInfo" => TLSInfo,
+        "ServiceMethod" => ServiceMethod, "EnvRow" => EnvRow, "HostConfigRow" => HostConfigRow,
+        "PendingShutdownRow" => PendingShutdownRow, "PackageRef" => PackageRef,
+        "PackageExport" => PackageExport, "ConsoleTrace" => ConsoleTrace,
+        "Checksum256" => Checksum256, "Bytes" => Hex<Vec<u8>>, "Octets" => Hex<Vec<u8>>,
+        "Action" => Action, "GenesisService" => GenesisService,
+        "GenesisActionData" => GenesisActionData, "Claim" => Claim, "Producer" => Producer,
+        "CftConsensus" => CftConsensus, "BftConsensus" => BftConsensus,
+        "BlockHeaderAuthAccount" => BlockHeaderAuthAccount, "HttpRequest" => HttpRequest,
+        "HttpReply" => HttpReply, "CodeRow" => CodeRow, "CodeByHashRow" => CodeByHashRow,
+        "BlockDataRow" => BlockDataRow, "StateChecksum" => StateChecksum,
+        "StateSignature" => StateSignature, "SnapshotStateItem" => SnapshotStateItem,
+        "SnapshotRow" => SnapshotRow, "ConfigRow" => ConfigRow, "LogMessage" => LogMessage,
+        "NotifyRow" => NotifyRow, "RunMode" => RunMode,
+    }
 
     memo_differs_only_in_its_declared_bound(&mut f);
 

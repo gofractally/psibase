@@ -62,11 +62,13 @@ impl StatusRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct ConfigRow {
     pub maxKeySize: u32,
     pub maxValueSize: u32,
+    /// The most bytes of transactions a block may hold.
+    pub maxBlockSize: u32,
 }
 
 impl ConfigRow {
@@ -169,17 +171,18 @@ impl CodeByHashRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct NotifyRow {
+    #[serde(rename = "type")]
     type_: u32,
     actions: Vec<Action>,
 }
 
 impl NotifyRow {
     pub const DB: DbId = DbId::Native;
-    pub fn key(&self) -> (NativeTable, NativeIndex) {
-        (NOTIFY_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
+    pub fn key(&self) -> (NativeTable, NativeIndex, u32) {
+        (NOTIFY_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.type_)
     }
 }
 
@@ -455,7 +458,11 @@ pub struct TLSInfo {}
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-pub struct ProducerMultiCastSocketInfo {}
+pub struct ProducerMulticastSocketInfo {}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct LogSocketInfo {}
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -480,18 +487,29 @@ pub struct WebSocketInfo {
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+pub struct P2PSocketInfo {
+    endpoint: Option<SocketEndpoint>,
+    tls: Option<TLSInfo>,
+}
+
+/// What a socket is. The alternatives and their order are those of the
+/// C++ variant (`psibase/SocketInfo.hpp`).
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub enum SocketInfo {
-    ProducerMultiCastSocketInfo(ProducerMultiCastSocketInfo),
+    ProducerMulticastSocketInfo(ProducerMulticastSocketInfo),
+    LogSocketInfo(LogSocketInfo),
     HttpSocketInfo(HttpSocketInfo),
     HttpClientSocketInfo(HttpClientSocketInfo),
     WebSocketInfo(WebSocketInfo),
+    P2PSocketInfo(P2PSocketInfo),
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct LogMessage {
-    pub message: String,
     pub severity: u32,
+    pub message: String,
     pub service: Option<AccountNumber>,
 }
 
@@ -522,8 +540,28 @@ impl SocketRow {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+/// How an action is run. In every format it is its number, as the C++
+/// `enum class RunMode : std::uint8_t` is (the legacy derive already packs
+/// a struct of one unnamed member as that member).
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Pack,
+    Unpack,
+    ToSchema,
+    Serialize,
+    Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::ToPsszSchema,
+    psio::Key,
+    psio::JsonText,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
+#[psio(transparent)]
 #[repr(transparent)]
 pub struct RunMode(u8);
 

@@ -452,6 +452,8 @@ pub struct Block {
 pub struct SignedBlock {
     pub block: Block,
     pub signature: Hex<Vec<u8>>,
+    /// Additional signatures, where the consensus algorithm requires them.
+    pub auxConsensusData: Option<Hex<Vec<u8>>>,
 }
 
 #[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize)]
