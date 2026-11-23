@@ -8,6 +8,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
+psio.workspace = true
 faucet-tok = { path = "../service", version = "0.29.0" }
 psibase.workspace = true
 wit-bindgen-rt.workspace = true

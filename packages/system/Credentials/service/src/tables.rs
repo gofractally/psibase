@@ -10,7 +10,7 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -34,7 +34,7 @@ pub mod tables {
     }
 
     #[table(name = "CredentialIdTable", index = 1)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct CredentialId {
         pub id: u32,
     }
@@ -56,7 +56,7 @@ pub mod tables {
     }
 
     #[table(name = "CredentialTable", index = 2)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct Credential {
         pub id: u32,
         pub pubkey_fingerprint: Checksum256,

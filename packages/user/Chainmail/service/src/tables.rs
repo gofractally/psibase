@@ -5,7 +5,7 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct InitRow {}
 
     impl InitRow {
@@ -14,7 +14,7 @@ pub mod tables {
     }
 
     #[table(name = "SavedMessageTable", index = 1)]
-    #[derive(Debug, Serialize, Deserialize, ToSchema, Pack, Unpack, SimpleObject)]
+    #[derive(Debug, Serialize, Deserialize, ToSchema, Pack, Unpack, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct SavedMessage {
         #[primary_key]
         pub msg_id: u64,

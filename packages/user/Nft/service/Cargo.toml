@@ -11,6 +11,7 @@ plugins = ["nft-plugin"]
 postinstall = [{ sender = "nft", service = "nft", method = "init", data = {} }]
 
 [dependencies]
+psio.workspace = true
 psibase.workspace = true
 psibase_service.workspace = true
 psibase_macros.workspace = true

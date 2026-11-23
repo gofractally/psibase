@@ -9,6 +9,7 @@ publish.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
+psio.workspace = true
 favor = { path = "../service" }
 psibase.workspace = true
 wit-bindgen-rt.workspace = true

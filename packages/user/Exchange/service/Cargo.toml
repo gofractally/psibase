@@ -20,6 +20,7 @@ postinstall = [
     { sender = "exchange", service = "events", method = "addIndex", data = { db = 0, service = "exchange", event = "candle1d", column = 0 } },
 ]
 [dependencies]
+psio.workspace = true
 psibase.workspace = true
 psibase_service.workspace = true
 serde.workspace = true

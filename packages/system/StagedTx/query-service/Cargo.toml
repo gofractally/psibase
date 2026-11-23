@@ -9,6 +9,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+psio.workspace = true
 psibase.workspace = true
 psibase_service.workspace = true
 serde.workspace = true

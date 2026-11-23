@@ -10,7 +10,7 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ManagementTable", index = 0)]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct Management {
         #[primary_key]
         pub account: AccountNumber,

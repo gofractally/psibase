@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+psio.workspace = true
 wit-bindgen-rt.workspace = true
 psibase.workspace = true
 serde.workspace = true

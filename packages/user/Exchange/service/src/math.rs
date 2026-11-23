@@ -13,6 +13,10 @@ pub const MAX_PRICE: u64 = (1 << 32) - 1;
     psibase::ToSchema,
     serde::Serialize,
     serde::Deserialize,
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
 )]
 pub struct Wide {
     pub lo: u64,

@@ -14,7 +14,7 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct InitRow {}
 
     impl InitRow {
@@ -40,7 +40,7 @@ pub mod tables {
     }
 
     #[table(name = "PoolTable", index = 1)]
-    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack, Debug)]
+    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     #[graphql(complex)]
     pub struct Pool {
         #[primary_key]
@@ -49,7 +49,7 @@ pub mod tables {
     }
 
     #[table(name = "ReserveTable", index = 2)]
-    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack, Debug)]
+    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Pack, Unpack, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     #[graphql(complex)]
     pub struct Reserve {
         pub pool_id: TID,

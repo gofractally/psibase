@@ -4,7 +4,7 @@ mod tables {
     use psibase::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
     #[table(name = "NetworkNameTable")]
-    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct NetworkName {
         pub name: String,
     }

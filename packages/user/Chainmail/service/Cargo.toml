@@ -14,6 +14,7 @@ data = [{ src = "../ui/dist/", dst = "/" }]
 postinstall = [{ sender = "chainmail", service = "chainmail", method = "init" }]
 
 [dependencies]
+psio.workspace = true
 psibase.workspace = true
 psibase_service.workspace = true
 async-graphql.workspace = true

@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 [workspace]
 [dependencies]
+psio.workspace = true
 psibase = {path="../../../../rust/psibase"}
 ethrelay-core = {path="../../EthRelay/core",features=["bls"]}
 serde = {version="1.0",features=["derive"]}

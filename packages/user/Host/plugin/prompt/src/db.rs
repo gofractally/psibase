@@ -18,7 +18,7 @@ mod tables {
     }
 }
 
-#[derive(Pack, Unpack)]
+#[derive(Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 pub struct ActivePrompt {
     pub prompt_app: String,
     pub active_app: String, // Currently active application

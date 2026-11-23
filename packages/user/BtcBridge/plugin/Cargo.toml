@@ -5,6 +5,7 @@ rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 [dependencies]
+psio.workspace = true
 btcbridge = { path = "../service" }
 btcrelay = { path = "../../BtcRelay/service" }
 psibase.workspace = true

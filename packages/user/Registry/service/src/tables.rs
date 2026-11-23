@@ -7,7 +7,11 @@ pub mod tables {
     #[table(name = "AppMetadataTable", index = 0)]
     #[derive(
         Default, Debug, Clone, Pack, Unpack, ToSchema, Serialize, SimpleObject, Deserialize,
-    )]
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
     #[serde(rename_all = "camelCase")]
     #[graphql(complex)]
     pub struct AppMetadata {
@@ -39,7 +43,7 @@ pub mod tables {
     }
 
     #[table(name = "NextIdTable", index = 1)]
-    #[derive(Default, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Default, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct NextId {
         pub id: u32,
     }
@@ -89,7 +93,11 @@ pub mod tables {
     #[table(name = "TagsTable", index = 2)]
     #[derive(
         Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, PartialEq,
-    )]
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
     pub struct TagRecord {
         /// The unique identifier for the tag
         #[primary_key]
@@ -117,7 +125,7 @@ pub mod tables {
     /// This table maps apps to their tags
     /// One AppTag record per app-tag pair
     #[table(name = "AppTagsTable", index = 3)]
-    #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct AppTag {
         /// The unique identifier for the app
         pub app_id: AccountNumber,

@@ -6,7 +6,7 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack)]
+    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct ConfigRow {
         pub owner: AccountNumber,
         pub last_used_id: u32,
@@ -20,7 +20,7 @@ pub mod tables {
     }
 
     #[table(name = "EvaluationTable", index = 1)]
-    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
     pub struct Evaluation {
         pub id: u32,
         pub created_at: u32,
@@ -37,7 +37,11 @@ pub mod tables {
     #[table(name = "UserTable", index = 2)]
     #[derive(
         Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
-    )]
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
     pub struct User {
         pub owner: AccountNumber,
         pub evaluation_id: u32,
@@ -51,7 +55,11 @@ pub mod tables {
     #[table(name = "GroupTable", index = 3)]
     #[derive(
         Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
-    )]
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
     pub struct Group {
         pub owner: AccountNumber,
         pub evaluation_id: u32,
@@ -62,7 +70,11 @@ pub mod tables {
     #[table(name = "UserSettingsTable", index = 4)]
     #[derive(
         Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone,
-    )]
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
     pub struct UserSettings {
         #[primary_key]
         pub user: AccountNumber,

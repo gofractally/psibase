@@ -21,19 +21,19 @@ pub struct FixedDetailsResponse {
     pub expiryDate: String,
 }
 
-#[derive(Pack, Unpack)]
+#[derive(Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 pub struct FixedDetails {
     pub expiry_date: String,
     pub private_key: String,
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize, Pack, Unpack)]
+#[derive(Deserialize, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 pub struct CurrentDetailsResponse {
     pub numAccounts: u16,
 }
 
-#[derive(Default, Pack, Unpack)]
+#[derive(Default, Pack, Unpack, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 pub struct DeviceDetails {
     // Whether this device created an account with this invite
     pub account_created: bool,

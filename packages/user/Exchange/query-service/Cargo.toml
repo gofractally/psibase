@@ -8,6 +8,7 @@ publish.workspace = true
 # Only this read-only RPC is privileged. Financial exchange code is not.
 flags = ["isPrivileged"]
 [dependencies]
+psio.workspace = true
 psibase.workspace = true
 psibase_service.workspace = true
 serde_json.workspace = true

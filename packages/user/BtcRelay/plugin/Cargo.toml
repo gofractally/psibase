@@ -5,6 +5,7 @@ rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 [dependencies]
+psio.workspace = true
 btcrelay = { path = "../service" }
 psibase.workspace = true
 serde.workspace = true

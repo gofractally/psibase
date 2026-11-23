@@ -1,6 +1,6 @@
 use psibase::{Pack, ToSchema, Unpack};
 
-#[derive(Debug, Copy, Clone, Pack, Unpack, ToSchema)]
+#[derive(Debug, Copy, Clone, Pack, Unpack, ToSchema, psio::PsszPack, psio::PsszUnpack, psio::PsszView, psio::ToPsszSchema)]
 pub struct StagedTxEvent {
     pub ty: u8,
 }

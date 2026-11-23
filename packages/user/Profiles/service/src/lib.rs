@@ -21,7 +21,11 @@ pub mod tables {
         Deserialize,
         Debug,
         Clone,
-    )]
+    psio::PsszPack,
+    psio::PsszUnpack,
+    psio::PsszView,
+    psio::ToPsszSchema,
+)]
     pub struct Profile {
         #[primary_key]
         pub account: AccountNumber,
