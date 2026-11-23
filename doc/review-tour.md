@@ -50,7 +50,7 @@ These are the changes the team has to agree to, as opposed to review for quality
 
 **Questions for the reviewer.** Crash and unclean-shutdown recovery; the reader/writer model; what "fold once per block" means for a transaction that is interrupted.
 
-**Known limits.** On 22 November an intermittent failure was reported in `psinode_test_crash`: a node aborted with "reference count exceeded limits" when reopening its database after a shutdown that the test harness cut short. The author of this document does not know whether it has been resolved.
+**Known limits.** On 22 November an intermittent failure was seen in `psinode_test_crash`: a node aborted with "reference count exceeded limits" when reopening its database. It occurred in 2 of 3 full runs on a tree based on an older head (8fa03237f) under heavy machine load. It has not recurred in 8 full runs on a branch that includes head 44c57f739. It was diagnosed as a double release earlier in the node's life; the caller has not been identified, and an always-on check is being added.
 
 ### 3. Signature verification (suggested reviewer: Steven, who wrote the Botan-based service)
 
@@ -122,7 +122,7 @@ Suite results are recorded per commit under `tests/timing/runs/`. The latest hea
 
 - JIT2 and LLVM AOT paused and marked unverified; wasmtime is the only qualified engine.
 - psitri is a private repository.
-- The `psinode_test_crash` reopen failure, status unknown to the author.
+- The `psinode_test_crash` reopen failure: not reproduced on the current head, cause not pinned to a caller.
 - Rust services lack wide arithmetic.
 - P-256 verification speed.
 - The tester verifies each signature twice.
@@ -132,7 +132,19 @@ Suite results are recorded per commit under `tests/timing/runs/`. The latest hea
 
 ## Still to come in this pull request
 
-- **Migration to the new PSIO library.** Serialization is being moved from the in-tree fracpack library to the canonical [gofractally/psio](https://github.com/gofractally/psio) library and its PSSZ format, for services, the SDK and clients. That work is in progress on a separate branch and is not in this head. When it lands, this pull request will be updated with its own tour section so the new PSIO library and the wire-format change can be reviewed.
+### Migration to gofractally/psio and PSSZ (in progress, not in this head)
+
+Serialization is being moved from the in-tree fracpack library to the canonical [gofractally/psio](https://github.com/gofractally/psio) library. The work is on topic branch `claude/pssz` (pushed up to bc71f6bb0, with newer commits still being verified) and a parallel C++ branch that is not pushed yet. When it lands, this pull request will be updated with its own tour section so the new PSIO library and the format change can be reviewed. Status as reported by its author on 23 November:
+
+- **Done on the branch, wire format still unchanged.** Every C++ type and service is declared with psio's `PSIO_REFLECT`; dispatch, call proxies, tables and schema generation read `psio::reflect`; every packed Rust type carries the PSIO derives beside the old ones; C++, Rust and the Python test harness share one method-name coder, which changed ten method numbers. Rust mirrors of C++ types and C++ mirrors of Rust services were cross-checked with a shared fixture (51 types; parameter names of 28 services and 265 methods) and corrected where they disagreed. The full suite passed 93/93 at each verified step.
+- **In progress: the switch itself.** C++ and Rust are being converted in parallel and will be merged together. In one step it changes the binary format (fracpack to PSSZ), service schemas (to PSIO's Schema IR), JSON (to I-JSON: 64-bit integers above 2^53-1 as decimal strings, bytes as hex, variants as `{"Name": value}`, action arguments as an object keyed by parameter name), and the GraphQL engine. It then deletes `libraries/psio1` and `rust/fracpack`. Front ends and plugins are not covered by the test suite and may need updating.
+- **Left for the team after the switch.** Per-type size caps (a proposal exists: 161 member bounds and 84 type caps, almost all new rules); tightening validation to "own table rows trusted, everything else validated" (an audit of 584 decode sites exists); the token-transfer `data` argument.
+- **gofractally/psio changed substantially for this.** PSSZ evolution, pruning and width rules; annotations for bounds on ordinary types; method reflection with argument caps; views; keys; I-JSON; Schema IR with runtime compatibility checks; a GraphQL engine; Rust, TypeScript and Python implementations held to shared conformance fixtures. Reviewers should start with its `docs/annotations.md`, `docs/tutorial-annotations.md` and `docs/pssz-spec.md`.
+- **Fixes found along the way, independent of the format** (on `claude/pssz`): a request-body decode whose result was not checked in `RTransact`; code reference counts in `SetCode`/`XAdmin` that were never persisted, so unreferenced code was never erased; a missing field in the C++ mirror of a staged-transaction response; `Decimal`/`Quantity` parsing that wrapped on overflow; several Rust mirrors that were wrong on the wire.
+- A running list of questions and decisions for reviewers will be committed as `doc/team-review.md` with the migration.
+
+### Also to come
+
 - Canonical low-S signatures.
 - Wide arithmetic for Rust services.
 - Updated throughput numbers and the benchmark report.
