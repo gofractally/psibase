@@ -13,6 +13,7 @@ function(add suffix)
         COMMAND wasm-ctor-eval
             -c prestart
             --enable-sign-ext --enable-nontrapping-float-to-int --enable-simd --enable-bulk-memory
+            --enable-wide-arithmetic
             VerifySig-prestart${suffix}.wasm
             -o ${ROOT_BINARY_DIR}/VerifySig${suffix}.wasm
     )
